@@ -205,8 +205,7 @@ final class BiRoutes implements RouteModule {
 
     /** {@code spec} re-pointed at the bound query's CTE. */
     private static MeasureCompiler.Spec overBound(MeasureCompiler.Spec spec) {
-        return new MeasureCompiler.Spec(BOUND, spec.measures(), spec.groupBy(),
-                spec.grains(), spec.filters(), spec.orderBy(), spec.limit(), spec.when());
+        return spec.withDataset(BOUND);
     }
 
     /** The Result Set contract (same shape as {@code /queries/{id}/run}) + the compiled SQL for transparency. */

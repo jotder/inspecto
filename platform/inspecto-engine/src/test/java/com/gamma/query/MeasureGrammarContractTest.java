@@ -122,4 +122,21 @@ class MeasureGrammarContractTest {
                 () -> MeasureCompiler.parse(unknown, 100, 1000));
         assertTrue(e.getMessage().contains("p42"), () -> "unhelpful refusal: " + e.getMessage());
     }
+
+    /** C1 (D-AN12): the as-of aggregates, the window's keys and cap and the ratio id join are pinned to the same file. */
+    @SuppressWarnings("unchecked")
+    @Test
+    void theWindowAndRatioGrammarMatchesTheCommittedContract() throws IOException {
+        Map<String, Object> contract = JSON.readValue(contractPath().toFile(), Map.class);
+        assertEquals(MeasureCompiler.AS_OF_AGGS, contract.get("asOfAggregations"),
+                "MeasureCompiler.AS_OF_AGGS and " + CONTRACT + " disagree");
+        Map<String, Object> window = (Map<String, Object>) contract.get("window");
+        assertEquals(List.of("field", "asOf", "days"), window.get("keys"), "the window keys parse() accepts");
+        assertEquals(MeasureCompiler.MAX_WINDOW_DAYS, window.get("maxDays"));
+        Map<String, Object> ratio = (Map<String, Object>) contract.get("ratio");
+        MeasureCompiler.Measure a = new MeasureCompiler.Measure("sum", "x"), b = new MeasureCompiler.Measure("count", null);
+        assertEquals("sum_x" + ratio.get("idSeparator") + "count", new MeasureCompiler.Ratio(a, b).id());
+        // no as-of aggregate is a shorthand aggregate, so no shorthand surface can accept one it cannot give an as-of
+        for (String agg : MeasureCompiler.AS_OF_AGGS) assertFalse(MeasureCompiler.AGGS.contains(agg), agg);
+    }
 }

@@ -34,6 +34,15 @@ interface Acc {
     p?: number;
 }
 
+/** Whole days from the latest ISO date in `dates` (first ten characters each) to `asOf` (YYYY-MM-DD); NULL for none. */
+export function recencyDays(dates: readonly string[], asOf: string): number | null {
+    const valid = dates.filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)).map((d) => d.slice(0, 10));
+    if (!valid.length) return null;
+    const latest = valid.reduce((a, b) => (a > b ? a : b));
+    const ms = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+    return Math.round((ms(asOf) - ms(latest)) / 86_400_000);
+}
+
 /**
  * Register the aggregates on the AlaSQL engine. AlaSQL calls a custom aggregate per row with stage 1 (first row of a
  * group) or 2 (each later row) and the accumulator, then once with stage 3 to finalize; a two-argument aggregate gets
@@ -49,6 +58,13 @@ export function registerStatAggregates(alasql: any): void {
     };
     alasql.aggr.QUANTILE_CONT = (v: unknown, p: unknown, acc: Acc | undefined, stage: number) =>
         stage === 3 ? (acc ? quantileCont(acc.xs, acc.p ?? 0.5) : null) : collect(v, acc, stage, Number(p));
+    // RECENCY(col, 'asOf') — the offline spelling of the window-relative `recency` (D-AN12); the as-of rides in the accumulator.
+    alasql.aggr.RECENCY = (v: unknown, asOf: unknown, acc: { dates: string[]; asOf: string } | undefined, stage: number) => {
+        if (stage === 3) return acc ? recencyDays(acc.dates, acc.asOf) : null;
+        const a = stage === 1 || !acc ? { dates: [] as string[], asOf: String(asOf) } : acc;
+        if (v !== null && v !== undefined) a.dates.push(String(v));
+        return a;
+    };
     alasql.aggr.VAR_SAMP = (v: unknown, acc: Acc | undefined, stage: number) =>
         stage === 3 ? (acc ? varSamp(acc.xs) : null) : collect(v, acc, stage);
     alasql.aggr.STDDEV_SAMP = (v: unknown, acc: Acc | undefined, stage: number) => {

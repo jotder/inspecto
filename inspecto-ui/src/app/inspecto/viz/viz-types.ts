@@ -46,6 +46,18 @@ export type Aggregation =
     | 'p95'
     | 'p99';
 
+/** Aggregates only defined relative to a {@link QueryWindow}'s as-of date (D-AN12) — `MeasureCompiler.AS_OF_AGGS`,
+ *  contract-pinned. Not an {@link Aggregation}: the shorthand `agg(field)` surfaces cannot give an as-of. */
+export type AsOfAggregation = 'recency';
+
+/** A trailing window as of a date (C1): only rows whose `field` (read as a date) is in `(asOf − days, asOf]` feed the
+ *  measures; `days` absent = no lower bound. `asOf` is `YYYY-MM-DD` and always stated, so a result is reproducible. */
+export interface QueryWindow {
+    field: string;
+    asOf: string;
+    days?: number;
+}
+
 /** One measure in a {@link QuerySpec} — a stable id, a compiled SQL expression, and a display label. */
 export interface QueryMeasure {
     id: string;
@@ -54,8 +66,11 @@ export interface QueryMeasure {
     /** Structured origin (set by `buildMeasure`) — what the server path sends as a validated `{agg, field}`
      *  pair (M2; the wire never carries SQL text). Absent on named-measure expressions, which therefore
      *  only run offline. `field` is unset for `count`. */
-    agg?: Aggregation;
+    agg?: Aggregation | AsOfAggregation;
     field?: string;
+    /** A ratio of two aggregates (C1, D-AN12), not an `{agg, field}` pair: `num / den` as a decimal, NULL for a zero
+     *  denominator. Its id is `<num id>_per_<den id>`; on the wire it travels in `ratios`, not `measures`. */
+    ratio?: { num: QueryMeasure; den: QueryMeasure };
 }
 
 export type SortDir = 'asc' | 'desc';
@@ -72,6 +87,8 @@ export interface QuerySpec {
      *  offline it drives `bucketSpecRows`, live it travels in the `/bi/query` body as `grains`. */
     grains?: Record<string, TimeGrain>;
     measures: QueryMeasure[];
+    /** A trailing window as of a date; applies to every measure (and gives `recency` its as-of). */
+    window?: QueryWindow;
     filters?: ConditionGroup | null;
     /** `agg` marks a hidden-aggregate term (CATEGORY-SORT-ORDER-1): `field` is a Dataset column NOT in the result,
      *  ordered as `agg(field)` server-side while the grouping is unchanged. Absent = a result column. */

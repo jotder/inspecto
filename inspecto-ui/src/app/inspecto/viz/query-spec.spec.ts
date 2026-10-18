@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ColumnMeta, emptyGroup } from 'app/inspecto/query';
-import { aggExpression, buildMeasure, compileSpec, measureId } from './query-spec';
+import { aggExpression, buildMeasure, compileSpec, isoDaysBefore, measureId, ratioMeasure, recencyMeasure, windowTerms } from './query-spec';
+import { biQueryBody } from './dataset-result.service';
 import { Aggregation, QuerySpec } from './viz-types';
 import MEASURE_CONTRACT from 'app/inspecto/contracts/measure-grammar.contract.json';
 import { MEASURE_AGGS } from 'app/inspecto/query/measure-grammar';
@@ -131,5 +132,81 @@ describe('compileSpec', () => {
         expect(sql).toContain(`WHERE "tariff" = 'premium'`);
         expect(sql).toContain('ORDER BY "sum_duration_s" DESC');
         expect(sql).toContain('LIMIT 10');
+    });
+});
+
+/**
+ * C1 (D-AN12): windowed and ratio Measures. The twin half of `MeasureWindowTest` — the offline engine returns the SAME
+ * golden figures DuckDB does, read from the one committed contract file.
+ */
+describe('windowed and ratio measures', () => {
+    const corpus = MEASURE_CONTRACT.windowed;
+    const rows = corpus.rows.map((r) => Object.fromEntries(corpus.columns.map((c, i) => [c, r[i]])));
+
+    function spec(days?: number): QuerySpec {
+        const amount = buildMeasure('sum', 'amount');
+        return {
+            datasetId: 'tx',
+            sourceName: 'tx',
+            groupBy: ['customer'],
+            window: { field: corpus.field, asOf: corpus.asOf, ...(days != null ? { days } : {}) },
+            measures: [
+                buildMeasure('count', 'x'),
+                amount,
+                recencyMeasure('day', corpus.asOf),
+                ratioMeasure(buildMeasure('sum', 'refund'), amount),
+            ],
+            orderBy: [{ field: 'customer', dir: 'asc' }],
+        };
+    }
+
+    async function run(days?: number) {
+        const res = await runSql(compileSpec(spec(days)), 'tx', rows);
+        expect(res.ok, res.error).toBe(true);
+        return res.rows;
+    }
+
+    function check(got: Record<string, unknown>[], expected: Record<string, Record<string, number | null>>) {
+        expect(got.map((r) => r['customer'])).toEqual(Object.keys(expected));
+        for (const row of got) {
+            for (const [col, want] of Object.entries(expected[row['customer'] as string])) {
+                if (want === null) expect(row[col] ?? null, `${row['customer']} ${col}`).toBeNull();
+                else expect(row[col], `${row['customer']} ${col}`).toBeCloseTo(want, 12);
+            }
+        }
+    }
+
+    it('runs the contract corpus offline to the figures DuckDB is held to', async () => {
+        check(await run(30), corpus.expected.days30);
+        check(await run(), corpus.expected.open);
+    });
+
+    it('names the ids the server names and keeps the pair shape for everything but a ratio', () => {
+        const [, amount, recency, ratio] = spec(30).measures;
+        expect(recency.id).toBe('recency_day');
+        expect(ratio.id).toBe(`sum_refund${MEASURE_CONTRACT.ratio.idSeparator}sum_amount`);
+        expect(ratio.agg).toBeUndefined();
+        expect(ratio.ratio?.den).toBe(amount);
+    });
+
+    it('compiles the window to date terms ANDed after the filters, calendar days back from the as-of', () => {
+        expect(isoDaysBefore('2026-06-30', 30)).toBe('2026-05-31');
+        expect(isoDaysBefore('2026-03-01', 1)).toBe('2026-02-28');
+        expect(windowTerms({ field: 'day', asOf: '2026-06-30' })).toEqual([`SUBSTRING("day", 1, 10) <= '2026-06-30'`]);
+        const where = emptyGroup('AND');
+        where.items.push({ kind: 'condition', field: 'tariff', operator: '=', value: 'premium' });
+        const sql = compileSpec({ ...spec(7), filters: where }, COLS);
+        expect(sql).toContain(`WHERE ("tariff" = 'premium') AND SUBSTRING("day", 1, 10) <= '2026-06-30' AND SUBSTRING("day", 1, 10) > '2026-06-23'`);
+    });
+
+    it('sends ratios and the window on the wire, never an expression', () => {
+        const body = biQueryBody(spec(30));
+        expect(body?.window).toEqual({ field: 'day', asOf: corpus.asOf, days: 30 });
+        expect(body?.measures).toEqual([
+            { agg: 'count' },
+            { agg: 'sum', field: 'amount' },
+            { agg: 'recency', field: 'day' },
+        ]);
+        expect(body?.ratios).toEqual([{ num: { agg: 'sum', field: 'refund' }, den: { agg: 'sum', field: 'amount' } }]);
     });
 });

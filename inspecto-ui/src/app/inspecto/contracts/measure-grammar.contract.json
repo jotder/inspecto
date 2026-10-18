@@ -11,5 +11,36 @@
     },
     "evenValues": [ 4, 1, 3, 2 ],
     "evenMedian": 2.5
+  },
+  "asOfAggregations": [ "recency" ],
+  "window": { "keys": [ "field", "asOf", "days" ], "maxDays": 3660 },
+  "ratio": { "idSeparator": "_per_" },
+  "windowed": {
+    "asOf": "2026-06-30",
+    "field": "day",
+    "columns": [ "customer", "day", "amount", "refund" ],
+    "rows": [
+      [ "A", "2026-06-30", 10, 1 ],
+      [ "A", "2026-06-01", 20, 0 ],
+      [ "A", "2026-05-31", 40, 4 ],
+      [ "A", "2026-07-01", 80, 8 ],
+      [ "B", "2026-06-15", 5, 0 ],
+      [ "B", "2026-06-20", 5, 0 ],
+      [ "C", "2026-04-01", 7, 0 ],
+      [ "D", "2026-06-10", 0, 0 ]
+    ],
+    "expected": {
+      "days30": {
+        "A": { "count": 2, "sum_amount": 30, "recency_day": 0, "sum_refund_per_sum_amount": 0.03333333333333333 },
+        "B": { "count": 2, "sum_amount": 10, "recency_day": 10, "sum_refund_per_sum_amount": 0 },
+        "D": { "count": 1, "sum_amount": 0, "recency_day": 20, "sum_refund_per_sum_amount": null }
+      },
+      "open": {
+        "A": { "count": 3, "sum_amount": 70, "recency_day": 0, "sum_refund_per_sum_amount": 0.07142857142857142 },
+        "B": { "count": 2, "sum_amount": 10, "recency_day": 10, "sum_refund_per_sum_amount": 0 },
+        "C": { "count": 1, "sum_amount": 7, "recency_day": 90, "sum_refund_per_sum_amount": 0 },
+        "D": { "count": 1, "sum_amount": 0, "recency_day": 20, "sum_refund_per_sum_amount": null }
+      }
+    }
   }
 }

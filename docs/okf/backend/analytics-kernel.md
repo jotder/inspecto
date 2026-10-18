@@ -702,6 +702,53 @@ Tests: `ChangePointTest` (spike, K-run, one short of K, persistent shift with an
 not feeding the CUSUM, warm-up, negative shift, σ estimate by hand, input rules); `ChangePointDuckDbParityTest` (SQL =
 JVM for 3 keys with different σ, a NULL key, a NULL residual, `rebase` × warm-up; and the template golden above).
 
+## Windowed and ratio Measures
+
+*ANALYTICS-CORE-1 C1 (`PREDICTIVE-WINDOWED-MEASURES-1`), built 2026-10-18; decision D-AN12.* Entity Measures over a
+trailing window as of a date — recency, frequency, sum — and ratios of aggregates, the shared inputs of RFM and churn.
+Three additions to `MeasureCompiler.Spec`, all optional, so no existing spec, call site or shipped number moves; the
+Java compiler, its TypeScript twin (`viz/query-spec.ts`) and the contract JSON change in one commit.
+
+* **`window: {field, asOf, days?}`** — only rows whose `field`, **read as a DATE** (a timestamp's own wall-clock date, no
+  zone involved), is in `(asOf − days, asOf]` feed *every* measure and ratio of the spec; `days` absent = no lower bound.
+  `asOf` (`YYYY-MM-DD`) is mandatory — never "now" — so a run is reproducible. `days` 1..3660. Unknown keys refused.
+  It is a **row restriction, not a Measure**: a Measure stays an `{agg, field}` pair (parked-rows D10 stands).
+* **`recency`** — the one window-relative aggregate, in its own list `AS_OF_AGGS` (not in `AGGS`): whole days from the
+  latest `field` in the window to `asOf`, `DATE_DIFF('day', CAST(MAX(f) AS DATE), asOf)`. **Refused without a
+  window** (and inside a ratio). Kept out of `AGGS` on purpose: summarize, KPI, Alert Rule and report take `agg(field)`
+  shorthand and have no as-of to give, so they keep refusing it at save time instead of failing at run time.
+  An entity with **no row in the window has no output row** — so recency is "within the window"; give the window the
+  horizon the question needs (churn: at least the inactivity limit), or leave `days` off.
+* **`ratios: [{num: {agg, field}, den: {agg, field}}]`** — `CAST(num AS DOUBLE) / NULLIF(CAST(den AS DOUBLE), 0)`:
+  **NULL for a zero or empty denominator**, never 0 or ∞. Column id `<numId>_per_<denId>` (`sum_refund_per_sum_amount`).
+  A separate list, so "Risk factors take no free arithmetic" (D11) stands: nothing parses an expression; only the fixed
+  `AGGS` may appear in `num` / `den`. Frequency is `count` (or `countDistinct` on the date field for active days) and the
+  monetary value `sum`, under the window; `recency` + those three are an RFM row.
+* **Bound, not rendered.** Both window bounds and `recency`'s as-of are `CAST(? AS DATE)` parameters (parameters are
+  collected in text order: select list, then filters, `when`, window); `render` prints `DATE '…'` for display only.
+* **The BI route is the boundary.** `POST /bi/query` accepts `window` and `ratios`; `BiResultMasking.vet` refuses a
+  ratio whose aggregate reveals values (`max`, `sum`, statistics…) over a masked column and a `window` on a masked
+  column, as it does for flat measures and filters. `BiRoutes.overBound` re-points the spec with `Spec.withDataset`, which
+  carries the window and ratios (a copy through the old constructor would have dropped them silently). The OpenAPI
+  fragment and `docs/api/openapi-v1.json` describe both keys.
+* **Not covered:** two windows in one spec (last 30 days against the 90 before — run two specs); a window on a
+  `transform.summarize` / KPI / Alert Rule measure (their shorthand has no clause for it); a window anchored on "today"
+  (state the date). A Predictive consumer reads this through `MeasureCompiler.parse` / `compile` with its own as-of.
+
+**TypeScript twin.** `QuerySpec.window`, `QueryMeasure.ratio`, `recencyMeasure(field, asOf)`, `ratioMeasure(num, den)`;
+`compileSpec` ANDs the window's date terms (`SUBSTRING(f, 1, 10)` compared as ISO text) after the filters; offline
+`RECENCY(col, 'asOf')` is registered in `stat-aggregates.ts` (it exists only offline — live, the wire carries
+`{agg: 'recency', field}`); `biQueryBody` sends `window` and moves ratio measures to `ratios`. ⚠ The offline window needs
+**ISO date strings** in the column (a `Date` object would not compare).
+
+**Contract.** `measure-grammar.contract.json` gains `asOfAggregations`, `window` (`keys`, `maxDays`), `ratio.idSeparator`
+and a golden `windowed` corpus (8 events, 4 customers, asOf 2026-06-30; the edges are in it: the as-of day itself is in,
+`asOf − 30` is out, a day after the as-of is out, an event 90 days back shows only in the open window, a zero
+denominator is NULL). Tests: `MeasureWindowTest` (compiled text and parameter order, open window, ratio SQL, every refusal,
+the seams `withLimit` / `withOrderBy` / `withDataset`, and the corpus RUN on DuckDB), `MeasureGrammarContractTest`
+(the new pins), `ControlApiBiQueryMaskingTest#aRatioOrWindowOverAMaskedColumnIsRefusedForAViewer`, and the vitest
+`windowed and ratio measures` block in `query-spec.spec.ts` (the same corpus run offline to the same figures).
+
 ## Holdout split
 
 *ANALYTICS-CORE-1 S5d, built 2026-10-17.* `com.gamma.analytics.split.HoldoutSplit` — train / validation / test for any

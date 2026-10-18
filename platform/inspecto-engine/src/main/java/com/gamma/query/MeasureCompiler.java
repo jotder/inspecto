@@ -1,6 +1,8 @@
 package com.gamma.query;
 
 import com.gamma.analytics.time.TimeGrain;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,6 +43,13 @@ public final class MeasureCompiler {
      *  two disagree on silently groups by the wrong period. The UI's extra {@code auto} means "no grain"
      *  and is never sent. */
     static final List<String> GRAINS = List.of("day", "week", "month");
+    /** Aggregates that are only defined relative to a {@link Window}'s as-of date (D-AN12): {@code recency(field)} is the
+     *  whole days from the latest {@code field} in the window to the as-of date. Kept OUT of {@link #AGGS} so the
+     *  shorthand {@code agg(field)} surfaces (summarize, KPI, Alert Rule, report) keep refusing what they cannot give an
+     *  as-of; {@code MeasureGrammarContractTest} pins this list too. */
+    static final List<String> AS_OF_AGGS = List.of("recency");
+    /** The widest trailing window a spec may name, in days (ten years). */
+    static final int MAX_WINDOW_DAYS = 3660;
 
     private MeasureCompiler() {}
 
@@ -54,6 +63,43 @@ public final class MeasureCompiler {
 
     /** One filter term; {@code op} ∈ = != > >= < <= in like isNull notNull. */
     public record Filter(String field, String op, Object value) {}
+
+    /**
+     * A trailing window as of a date (C1, D-AN12): the rows whose {@code field}, read as a DATE, falls in
+     * {@code (asOf − days, asOf]} — whole days, the timestamp's own wall-clock date, no zone involved. {@code days == null}
+     * leaves it open at the start (everything up to and including {@code asOf}). Applied to EVERY measure and ratio of
+     * the spec, and to nothing else: a window is a row restriction, not a Measure, so a Measure stays an
+     * {@code {agg, field}} pair. {@code asOf} is always stated (never "now"), so a run is reproducible. It also gives
+     * {@link #AS_OF_AGGS} their as-of.
+     */
+    public record Window(String field, LocalDate asOf, Integer days) {
+        public Window {
+            safeIdent(field, "window field");
+            if (asOf == null) throw new IllegalArgumentException("window needs an 'asOf' date");
+            if (days != null && (days < 1 || days > MAX_WINDOW_DAYS))
+                throw new IllegalArgumentException("window 'days' must be 1.." + MAX_WINDOW_DAYS + ": " + days);
+        }
+
+        /** The exclusive lower bound {@code asOf − days}, or {@code null} for an open window. */
+        LocalDate after() {
+            return days == null ? null : asOf.minusDays(days);
+        }
+    }
+
+    /**
+     * A ratio of two aggregates (C1, D-AN12): {@code num / den} as DOUBLE, NULL when the denominator is 0 or NULL. Its
+     * column id is {@code <num id>_per_<den id>}. A separate list on the spec, so the {@code {agg, field}} Measure pair
+     * and the "Risk factors take no free arithmetic" rule both stand; only the fixed {@link #AGGS} may appear in it.
+     */
+    public record Ratio(Measure num, Measure den) {
+        public Ratio {
+            if (num == null || den == null) throw new IllegalArgumentException("a ratio needs 'num' and 'den'");
+        }
+
+        public String id() {
+            return num.id() + "_per_" + den.id();
+        }
+    }
 
     /**
      * One ORDER BY term. {@code agg} non-null marks a <b>hidden aggregate</b> term (CATEGORY-SORT-ORDER-1): the
@@ -91,21 +137,42 @@ public final class MeasureCompiler {
      */
     public record Spec(String dataset, List<Measure> measures, List<String> groupBy,
                        Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit,
-                       Map<String, Object> when) {
+                       Map<String, Object> when, Window window, List<Ratio> ratios) {
+        public Spec {
+            ratios = ratios == null ? List.of() : List.copyOf(ratios);
+        }
+
         /** The pre-{@code when} shape: every existing caller stays source-compatible. */
         public Spec(String dataset, List<Measure> measures, List<String> groupBy,
                     Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit) {
-            this(dataset, measures, groupBy, grains, filters, orderBy, limit, null);
+            this(dataset, measures, groupBy, grains, filters, orderBy, limit, null, null, null);
+        }
+
+        /** The pre-{@code window} shape: no window, no ratios. */
+        public Spec(String dataset, List<Measure> measures, List<String> groupBy,
+                    Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit,
+                    Map<String, Object> when) {
+            this(dataset, measures, groupBy, grains, filters, orderBy, limit, when, null, null);
         }
 
         /** The same spec with another row cap — how a route asks for ONE row past its cap to detect truncation. */
         public Spec withLimit(int newLimit) {
-            return new Spec(dataset, measures, groupBy, grains, filters, orderBy, newLimit, when);
+            return new Spec(dataset, measures, groupBy, grains, filters, orderBy, newLimit, when, window, ratios);
         }
 
         /** The same spec with another ORDER BY. */
         public Spec withOrderBy(List<Sort> newOrderBy) {
-            return new Spec(dataset, measures, groupBy, grains, filters, newOrderBy, limit, when);
+            return new Spec(dataset, measures, groupBy, grains, filters, newOrderBy, limit, when, window, ratios);
+        }
+
+        /** The same spec re-pointed at another relation — how a route runs it over a bound query's CTE. */
+        public Spec withDataset(String newDataset) {
+            return new Spec(newDataset, measures, groupBy, grains, filters, orderBy, limit, when, window, ratios);
+        }
+
+        /** True when the result is aggregated: at least one measure or ratio. */
+        boolean aggregated() {
+            return !measures.isEmpty() || !ratios.isEmpty();
         }
     }
 
@@ -160,24 +227,30 @@ public final class MeasureCompiler {
         String dataset = trimToNull(body.get("dataset"));
         if (dataset == null) throw new IllegalArgumentException("body must include 'dataset'");
 
+        Window window = parseWindow(body.get("window"));
         List<Measure> measures = new ArrayList<>();
         if (body.get("measures") instanceof List<?> ms)
             for (Object o : ms)
-                if (o instanceof Map<?, ?> m) {
-                    String agg = trimToNull(m.get("agg"));
-                    String field = trimToNull(m.get("field"));
-                    if (agg == null || !AGGS.contains(agg))
-                        throw new IllegalArgumentException("unknown aggregation '" + agg + "' (one of " + AGGS + ")");
-                    if (!"count".equals(agg)) safeIdent(field, "measure field");
-                    measures.add(new Measure(agg, field));
-                }
+                if (o instanceof Map<?, ?> m) measures.add(parseMeasure(m, window != null));
+        List<Ratio> ratios = new ArrayList<>();
+        if (body.get("ratios") instanceof List<?> rs)
+            for (Object o : rs) {
+                if (!(o instanceof Map<?, ?> r))
+                    throw new IllegalArgumentException("each ratio must be an object {num: {agg, field}, den: {agg, field}}");
+                for (Object k : r.keySet())
+                    if (!"num".equals(k) && !"den".equals(k))
+                        throw new IllegalArgumentException("unknown ratio key '" + k + "' (num, den)");
+                if (!(r.get("num") instanceof Map<?, ?> n) || !(r.get("den") instanceof Map<?, ?> d))
+                    throw new IllegalArgumentException("a ratio needs 'num' and 'den', each {agg, field}");
+                ratios.add(new Ratio(parseMeasure(n, false), parseMeasure(d, false)));
+            }
 
         List<String> groupBy = new ArrayList<>();
         if (body.get("groupBy") instanceof List<?> gs)
             for (Object g : gs) groupBy.add(safeIdent(trimToNull(g), "groupBy column"));
 
-        if (measures.isEmpty() && groupBy.isEmpty())
-            throw new IllegalArgumentException("spec needs at least one measure or groupBy column");
+        if (measures.isEmpty() && ratios.isEmpty() && groupBy.isEmpty())
+            throw new IllegalArgumentException("spec needs at least one measure, ratio or groupBy column");
 
         Map<String, String> grains = new LinkedHashMap<>();
         if (body.get("grains") instanceof Map<?, ?> gm)
@@ -209,10 +282,11 @@ public final class MeasureCompiler {
                     String agg = trimToNull(s.get("agg"));
                     if (agg != null && !ORDER_AGGS.contains(agg))
                         throw new IllegalArgumentException("unknown orderBy agg '" + agg + "' (one of " + ORDER_AGGS + ")");
-                    boolean inResult = groupBy.contains(field) || measures.stream().anyMatch(m -> m.id().equals(field));
+                    boolean inResult = groupBy.contains(field) || measures.stream().anyMatch(m -> m.id().equals(field))
+                            || ratios.stream().anyMatch(r -> r.id().equals(field));
                     // An explicit agg, or a field that is not a result column, orders by a hidden aggregate of the Dataset column.
                     if (agg == null && !inResult) agg = "min";
-                    if (agg != null && (measures.isEmpty() || groupBy.isEmpty()))
+                    if (agg != null && ((measures.isEmpty() && ratios.isEmpty()) || groupBy.isEmpty()))
                         throw new IllegalArgumentException("orderBy '" + field + "' (hidden " + agg
                                 + ") needs at least one measure and one groupBy column");
                     boolean cosmetic = Boolean.TRUE.equals(s.get("cosmetic")) && agg == null && groupBy.contains(field);
@@ -232,7 +306,46 @@ public final class MeasureCompiler {
 
         int limit = body.get("limit") instanceof Number n ? n.intValue() : defaultLimit;
         return new Spec(dataset, measures, groupBy, grains, filters, orderBy,
-                Math.max(1, Math.min(maxLimit, limit)), when);
+                Math.max(1, Math.min(maxLimit, limit)), when, window, ratios);
+    }
+
+    /** One {@code {agg, field}} body entry. An {@link #AS_OF_AGGS} name needs the spec's window ({@code windowed}). */
+    private static Measure parseMeasure(Map<?, ?> m, boolean windowed) {
+        String agg = trimToNull(m.get("agg"));
+        String field = trimToNull(m.get("field"));
+        boolean asOf = agg != null && AS_OF_AGGS.contains(agg);
+        if (agg == null || !(AGGS.contains(agg) || asOf))
+            throw new IllegalArgumentException("unknown aggregation '" + agg + "' (one of " + AGGS
+                    + (windowed ? ", and with a window " + AS_OF_AGGS : "") + ")");
+        if (asOf && !windowed)
+            throw new IllegalArgumentException("aggregation '" + agg + "' is relative to a window's as-of date: "
+                    + "the spec needs a 'window' (and a ratio cannot use it)");
+        if (!"count".equals(agg)) safeIdent(field, "measure field");
+        return new Measure(agg, field);
+    }
+
+    /** The body's {@code window}: {@code {field, asOf: "YYYY-MM-DD", days?}}; unknown keys refused. {@code null} = none. */
+    private static Window parseWindow(Object raw) {
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?> w)) throw new IllegalArgumentException("'window' must be an object {field, asOf, days}");
+        for (Object k : w.keySet())
+            if (!"field".equals(k) && !"asOf".equals(k) && !"days".equals(k))
+                throw new IllegalArgumentException("unknown window key '" + k + "' (field, asOf, days)");
+        String field = trimToNull(w.get("field"));
+        String asOfText = trimToNull(w.get("asOf"));
+        LocalDate asOf;
+        try {
+            asOf = asOfText == null ? null : LocalDate.parse(asOfText);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("window 'asOf' must be a YYYY-MM-DD date: '" + asOfText + "'");
+        }
+        Integer days = null;
+        if (w.get("days") != null) {
+            if (!(w.get("days") instanceof Number n) || n.doubleValue() != n.intValue())
+                throw new IllegalArgumentException("window 'days' must be a whole number: " + w.get("days"));
+            days = n.intValue();
+        }
+        return new Window(field, asOf, days);
     }
 
     /**
@@ -279,7 +392,8 @@ public final class MeasureCompiler {
         // whether or not a grain was applied.
         for (String dim : spec.groupBy())
             select.add(dimExpression(dim, spec.grains()) + (isBucketed(dim, spec.grains()) ? " AS " + q(dim) : ""));
-        for (Measure m : spec.measures()) select.add(aggExpression(m) + " AS " + q(m.id()));
+        for (Measure m : spec.measures()) select.add(measureExpression(m, spec.window(), p) + " AS " + q(m.id()));
+        for (Ratio r : spec.ratios()) select.add(ratioExpression(r) + " AS " + q(r.id()));
 
         StringBuilder sql = new StringBuilder("SELECT ")
                 .append(select.isEmpty() ? "*" : String.join(", ", select))
@@ -298,11 +412,12 @@ public final class MeasureCompiler {
             }
             if (!"TRUE".equals(w)) whereTerms.add(w);
         }
+        if (spec.window() != null) windowTerms(spec.window(), whereTerms, p);
         if (!whereTerms.isEmpty()) {
             List<String> terms = whereTerms;
             sql.append(" WHERE ").append(String.join(" AND ", terms));
         }
-        if (!spec.measures().isEmpty() && !spec.groupBy().isEmpty())
+        if (spec.aggregated() && !spec.groupBy().isEmpty())
             // The full expression, not the alias: a bucketed dimension's alias is the raw column's own name,
             // so grouping by the alias would be ambiguous with the underlying column.
             sql.append(" GROUP BY ").append(String.join(", ",
@@ -340,6 +455,34 @@ public final class MeasureCompiler {
         if (grain == null) return q(dim);
         String format = "month".equals(grain) ? "%Y-%m" : "%Y-%m-%d";
         return "STRFTIME(" + TimeGrain.parse(grain).truncateSql(q(dim)) + ", '" + format + "')";
+    }
+
+    /** The aggregate of a measure in a spec: {@link #aggExpression}, or a window-relative one bound to the as-of date. */
+    private static String measureExpression(Measure m, Window w, List<Object> p) {
+        if (!AS_OF_AGGS.contains(m.agg())) return aggExpression(m);
+        if (w == null) throw new IllegalArgumentException("aggregation '" + m.agg() + "' needs a window (its as-of date)");
+        safeIdent(m.field(), "measure field");
+        // whole days from the latest date in the window to the as-of date; NULL when the group has no dated row
+        return "DATE_DIFF('day', CAST(MAX(" + q(m.field()) + ") AS DATE), " + dateParam(w.asOf(), p) + ")";
+    }
+
+    /** {@code num / den} as DOUBLE, NULL for a zero or NULL denominator. */
+    private static String ratioExpression(Ratio r) {
+        return "CAST(" + aggExpression(r.num()) + " AS DOUBLE) / NULLIF(CAST(" + aggExpression(r.den()) + " AS DOUBLE), 0)";
+    }
+
+    /** The window's row restriction: {@code CAST(f AS DATE) <= asOf} and, when it has {@code days}, {@code > asOf − days}. */
+    private static void windowTerms(Window w, List<String> where, List<Object> p) {
+        String col = "CAST(" + q(w.field()) + " AS DATE)";
+        where.add(col + " <= " + dateParam(w.asOf(), p));
+        if (w.after() != null) where.add(col + " > " + dateParam(w.after(), p));
+    }
+
+    /** A DATE operand: bound as {@code CAST(? AS DATE)} when {@code p} collects values, else a rendered {@code DATE '…'}. */
+    private static String dateParam(LocalDate d, List<Object> p) {
+        if (p == null) return "DATE '" + d + "'";
+        p.add(d.toString());
+        return "CAST(? AS DATE)";
     }
 
     /**

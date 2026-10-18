@@ -192,6 +192,26 @@ class ControlApiBiQueryMaskingTest {
         }
     }
 
+    /** C1 (D-AN12): a ratio of a value-revealing aggregate, or a window, over a masked column is refused as its flat cousins are. */
+    @Test
+    void aRatioOrWindowOverAMaskedColumnIsRefusedForAViewer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            String ratioOverMasked = "\"groupBy\":[\"region\"],\"ratios\":[{\"num\":{\"agg\":\"max\",\"field\":\"msisdn\"},"
+                    + "\"den\":{\"agg\":\"count\"}}]";
+            String windowOverMasked = "\"measures\":[{\"agg\":\"count\"}],\"window\":{\"field\":\"msisdn\",\"asOf\":\"2026-07-08\"}";
+            assertEquals(422, bi(c, "viewer", "calls_ds", ratioOverMasked).statusCode());
+            assertEquals(422, bi(c, "viewer", "calls_ds", windowOverMasked).statusCode());
+            // a ratio over unclassified columns is fine, for the viewer too, and the revealer may read the masked one
+            String clean = "\"groupBy\":[\"region\"],\"ratios\":[{\"num\":{\"agg\":\"sum\",\"field\":\"amount\"},"
+                    + "\"den\":{\"agg\":\"count\"}}]";
+            HttpResponse<String> ok = bi(c, "viewer", "calls_ds", clean);
+            assertEquals(200, ok.statusCode(), ok.body());
+            assertEquals(7.5, V1Body.of(ok.body()).get("rows").get(0).get("sum_amount_per_count").asDouble(), 1e-12);
+            assertEquals(200, bi(c, "revealer", "calls_ds", ratioOverMasked).statusCode());
+        }
+    }
+
     @Test
     void typedModeLeavesAnUnclaimedPiiColumnRawAndModeAllMasksIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
