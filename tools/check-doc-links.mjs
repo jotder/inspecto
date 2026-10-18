@@ -80,7 +80,7 @@ const ROOTS = ['.'];
 // the same reason. ⛔ It is absent from a fresh clone, so widening this scope looked green to the author
 // and went red the moment it met a checkout that had ever built a bundle.
 const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target', 'graphify-out',
-                           'inspecto-deploy']);
+                           'inspecto-deploy', 'inspecto-demo']);  // inspecto-demo: the same kind of gitignored bundle (2026-10-18)
 
 /** The archive is exempt AS A SOURCE only — see the header. Kept as a prefix so it reads at the call site. */
 const ARCHIVE_PREFIX = 'docs/archived-documents/';

@@ -87,7 +87,7 @@ const ROOTS = ['.'];
 // same reason. ⛔ It is absent from a fresh clone, so omitting it looks green to the author and goes red
 // the moment the guard meets a checkout that has ever built a bundle.
 const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target', 'graphify-out',
-                           'inspecto-deploy']);
+                           'inspecto-deploy', 'inspecto-demo']);  // inspecto-demo: the same kind of gitignored bundle (2026-10-18)
 
 /** Exempt AS SOURCES only — see the header. Kept as prefixes so they read at the call site. */
 const EXEMPT_TIERS = ['docs/archived-documents/', 'docs/superpower/'];
