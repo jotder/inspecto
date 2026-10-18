@@ -82,5 +82,5 @@ The corpus ships in `data/samples`; copy each feed into `data/inbox/<feed>` to i
 - The STR template follows no real regulator's schema; replace its fields and delivery directory.
 - Entity Lists are not shipped; screening does nothing until they exist and the Job is enabled.
 - Detection is daily batch over the previous day.
-- The Link Analysis view needs the Link Analysis add-on modules (`offerings/standard.toon`,
-  `addons.linkAnalysis`).
+- The Link Analysis view needs the Link Analysis add-on modules (`offerings/basic.toon`,
+  `addons.linkAnalysis`; Standard inherits it).

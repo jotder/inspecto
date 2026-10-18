@@ -1,8 +1,8 @@
 # AI assist
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: `aiAssist` add-on - Standard: `agent` (plus the `agent-hosted` provider); Advanced adds
-> `intelligence`. Checked against the code on 2026-10-17.
+> Offering: `aiAssist` add-on - Standard: `agent` (the `agent-hosted` provider exists in the reactor but ships in
+> no bundle, `docs/EDITIONS.md`); Advanced adds `intelligence`. Checked against the code on 2026-10-17.
 
 ## 1. What it is
 

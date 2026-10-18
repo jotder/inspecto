@@ -28,7 +28,7 @@ module-level summary.
 |---|---|---|
 | `la-core` | `la/inspecto-la-core` | Domain and ports: op-log evaluator, `InvestigationStore` port + filesystem store, Drafts, Graph Run service |
 | `la-storage` | `la/inspecto-la-storage` | Versioned Parquet link index, `SqlGraphEngine` / `RoutingGraphEngine` |
-| `la-api` | `la/inspecto-la-api` | The `/inv` and `/geo` routes (81), masking, Draft orchestration, gates |
+| `la-api` | `la/inspecto-la-api` | The `/inv` and `/geo` routes (87), masking, Draft orchestration, gates |
 | `geo-link` | `la/inspecto-geo-link` | Bridge to the host: `DatasetProvider`, `CasePort`, `CollectorCoveragePort`, `LinkIndexBuilder`, measures and alert-rule routes |
 | `la-store-pg` | `la/inspecto-la-store-pg` | Postgres `InvestigationStoreProvider` (Advanced) |
 

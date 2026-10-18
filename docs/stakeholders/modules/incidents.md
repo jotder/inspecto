@@ -1,8 +1,8 @@
 # Incidents
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: add-on `incidents` in `offerings/standard.toon` — `status: planned`, `hostedBy[2]: engine,ops`
-> (no module of its own; the code ships in the engine and the `ops` module). Checked against the code on 2026-10-17.
+> Offering: add-on `incidents` in `offerings/standard.toon` — `status: built`, module `ops`
+> (the code ships in the engine and the `ops` module). Checked against the code on 2026-10-17.
 
 ## 1. What it is
 
@@ -109,7 +109,6 @@ The capability gate runs before the scope guard: no capability → 403, out-of-s
 
 ## 9. Limits and gotchas
 
-- The add-on is `planned` in the offering even though the objects machinery is built — it has no module id.
 - `POST /objects/{id}/ack` sends action `ack`, which the built-in INCIDENT workflow does not define; it only
   works with a custom workflow (not verified by a test).
 - No acknowledged-at stamp, so no MTTA. Queues and watchers were retired; assignment is person-only.

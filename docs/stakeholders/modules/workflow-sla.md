@@ -1,7 +1,7 @@
 # Workflow and SLA
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: add-on `workflowSla` in `offerings/standard.toon` — `status: planned`, `hostedBy[1]: engine`.
+> Offering: add-on `workflowSla` in `offerings/standard.toon` — `status: built`, module `ops`.
 > The models are built (`ASSURE-WORKFLOW-SLA-1`, closed 2026-10-04); see §9. Checked against the code on 2026-10-17.
 
 ## 1. What it is
@@ -91,8 +91,6 @@ removed state answers 409.
 
 ## 9. Limits and gotchas
 
-- The offering lists `workflowSla` as `planned` and hosted by the engine, while the code is built and the
-  runtime lives in `ops`. The offering entry looks stale.
 - A Case's `targetDate` is only a loose hint; the SLA Policy is the clock.
 - Open residual `ASSURE-WORKFLOW-SLA-RESIDUALS-1` (a): a deleted assignee is not rechecked at sweep time.
 - Queues and watchers were retired (INC-4); assignment is person-only.

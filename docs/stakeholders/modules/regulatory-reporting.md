@@ -72,6 +72,7 @@ into the same path jail as the `report` Job's `out_dir`.
 | `POST /regulatory-reports` | `canWorkIncidents` |
 | `POST /regulatory-reports/{id}/request-approval` | `canWorkIncidents` |
 | `POST /regulatory-reports/{id}/approve`, `/decline`, `/retry` | `canApproveChanges` |
+| `GET /regulatory-reports/{id}/verify` | re-hashes the delivered file against its `.sha256` sidecar |
 | `PUT`, `DELETE /regulatory-reports/templates/{id}` | `canApproveChanges` |
 
 Draft gates, in order: capability -> write root 503 -> unknown body key 422 -> template unknown or broken 422 ->
@@ -84,7 +85,7 @@ refused 422 -> saved `draft`.
 - [Case management](case-management.md), [Incidents](incidents.md) - report subjects.
 - [Maker-checker](maker-checker.md), [Action requests](action-requests.md) - four-eyes pattern and storage.
 - [Identity and access](identity-access.md) - scope checks on subject and member Incidents.
-- [AML solution](../solutions/aml.md), [Mobile money](../solutions/mobile-money.md).
+- [AML solution](../solutions/aml.md) — the only pack that ships a report template (`aml-str`).
 
 ## 9. Limits and gotchas
 

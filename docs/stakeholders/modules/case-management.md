@@ -126,4 +126,4 @@ State changes, comments, links and findings use the shared object routes in
 - Dispositions and the postmortem resolution gate apply to Incidents only; a Case's disposition is part of
   its Findings.
 - Rule evaluation stays `canAdminister` although transitions moved to `canWorkIncidents`.
-- Whether the SLA clock stops at `CLOSED` was not confirmed (`SlaDecisions` names `RESOLVED` and `ARCHIVED`).
+- The SLA sweep stops at any terminal state of the registered workflow, so `CLOSED` stops the clock (`SlaDecisions`).

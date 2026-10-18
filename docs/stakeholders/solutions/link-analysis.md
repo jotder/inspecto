@@ -31,7 +31,8 @@ default, with a second approver for wide expansions and standing detection on wh
 - **Settings** — `spaces/_templates/la-showcase/config/link-analysis.toon`: `masking_mode: typed`,
   `four_eyes_fan_out_above: 2000`, `index.enabled: true`, Drafts limits (`max_open: 10`,
   `hibernate_after_minutes: 60`, `expire_after_days: 14`). The mobile-money template sets a fan-out
-  threshold of 100 (per its `template.toon`).
+  threshold of 100 (`spaces/_templates/la-mobile-money/config/link-analysis.toon`). Both templates declare
+  `minEdition: advanced`.
 - **Index Job** `la_index_build` (`la.index.build`, `on_signal: pipeline.commit` for `mule_transfers`):
   first a full build, then appends (`spaces/_templates/la-showcase/config/jobs/la_index_build_job.toon`).
 - **Standing detection** `la_detect` (`la.detect`, every 5 minutes) evaluates Alert Rules bound to an
