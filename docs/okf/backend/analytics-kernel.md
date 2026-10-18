@@ -1096,6 +1096,8 @@ NULL / NaN input gives NULL), equal to the JVM within 1e-12 (`LogisticDuckDbPari
 
 ### Isolation forest — `IsolationForest`, and the Anomaly option (C4)
 
+Backlog row: `ANOMALY-ML-SCORING-1` (competitive gap L).
+
 The kernel: 100 trees (≤ 1,000) over samples of 256 (≤ 4,096) drawn without replacement, height limit ⌈log₂ ψ⌉, splits on a
 feature chosen weight-proportionally among those that still vary, at a uniform point between the node's min and max.
 `s = 2^(−E[h]/c(ψ))`; `Path.excess() = 2·max(0, s − 0.5)` in [0, 1]. `attribute(point, reference)` gives per-feature shares
