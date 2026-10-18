@@ -216,7 +216,6 @@ import { buildServerIdMap } from './graph-run-apply';
 import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
-import { AiExplainComponent } from '@inspecto/core/ai-assist/ai-explain.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { laLimit } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
@@ -315,7 +314,6 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         FormMenuDirective,
         LinkAnalysisCapsComponent,
         LinkAnalysisModulesComponent,
-        AiExplainComponent,
         ChipComponent,
         FormsModule,
         ReactiveFormsModule,

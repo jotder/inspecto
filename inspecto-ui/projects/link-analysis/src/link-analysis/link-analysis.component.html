@@ -1383,7 +1383,10 @@
             />
             <!-- the page title and its info (moved down from the header, operator 2026-10-15): the page's one h1 -->
             <h1 class="shrink-0 text-sm font-semibold leading-6" data-testid="la-title">Link Analysis</h1>
-            <inspecto-ai-explain screen="Link Analysis" [terms]="['Entity', 'Link', 'Dataset', 'Pipeline']" />
+            <inspecto-la-host-slot
+                [component]="aiExplain"
+                [inputs]="{ screen: 'Link Analysis', terms: ['Entity', 'Link', 'Dataset', 'Pipeline'] }"
+            />
             @if (!graph()) {
                 <span class="text-secondary hidden min-w-0 truncate text-xs md:inline">
                     Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it.
