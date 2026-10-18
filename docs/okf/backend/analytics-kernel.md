@@ -663,6 +663,45 @@ Tests: `HourOfWeekTest` (Monday/Sunday ends, zone changes the slot, labels, a pu
 bad input), `HourOfWeekDuckDbParityTest` (slot SQL = JVM for 3 kinds × 4 zones across the New York and Berlin DST
 weeks, under two different session zones; profile and strength per key, a NULL value left out, no-key form).
 
+## Change-point and regime detection
+
+*ANALYTICS-CORE-1 C6, built 2026-10-18.* `com.gamma.analytics.time.ChangePoint` — the regime-change and drift logic of
+the Business Assurance forecast template, lifted out of its Holt-Winters recursion into a function of the **residuals**
+`e_t = actual − expected`, so any model (the S5 forecaster, a baseline, a peer median) can feed it. JVM `detect(e,
+Params)` and DuckDB `sql(relation, orderColumn, residualColumn, sigmaColumn, keys, Params)` (a recursive CTE per key),
+one rule.
+
+**Rule**, per point with `a_t = e_t − offset` and σ the caller's residual scale: *outside* = |a_t| > z·σ; *run* = consecutive
+outside points; **regime change** = run ≥ K, raised once on the K-th point then the run restarts; a two-sided **CUSUM**
+over inside points only (`S⁺ ← max(0, S⁺ + a/σ − k)`, `S⁻ ← max(0, S⁻ − a/σ − k)`; an outside point leaves the sums
+alone, so a spike or a shift never feeds them); **drift** = an inside, non-regime point with S⁺ or S⁻ > h. After a regime
+change or a drift the run and the sums restart at 0. **`outside_band`** = an outside point in a run whose longest
+`run_at` stayed below K (a run that became a regime change is that one event); it looks at the whole run, so it is
+retrospective, as the template's. Leading `warmup` points update the state but carry no flag. Defaults `Params.of(σ)`
+are the template's, tuned on its corpus: z 4, K 3, k 0.25, h 8.
+
+**`rebase`** (default off). Without it the detector assumes the model re-levels itself after a regime change (the
+template's Holt-Winters does: its forecast restarts from the actual). A model that does not keeps producing large
+residuals and the rule would raise a regime change every K points; `rebase` moves the offset by `a_t` at each regime
+change or drift so the new level reads as residual 0. Level only — a drift's slope is not estimated.
+
+**σ.** `scaleOfDifferences(x, lag)` = 1.4826 · MAD(x_t − x_{t−lag}) / √2 (a difference of two equal-variance errors has
+variance 2σ²), the template's estimate (lag 7 for a daily series with a weekly season). The SQL form reads σ from a column
+that is constant per key, so per-key σ is the caller's one-line aggregate.
+
+**Golden — the template is the reference.** `ChangePointDuckDbParityTest#theKernelReproducesTheTemplatesOwnFlagsFromItsResiduals`
+runs `ba_revenue_forecast_view.toon` as shipped and in four variants (level shift up, down, ramp up, down) and feeds the
+kernel the template's own `actual − forecast`: `outside_band`, `regime_change` and `drift_change` are equal on every one
+of its 175 days in all five corpora (rows 8..182; warm-up 21 = the template's 28 days). The template itself is **not
+rewired** to the kernel: its recursion is one state machine shared with the forecaster, and no shipped number moves.
+
+**No Step yet** (D-AN11): the template raises it in a `sql.template` Job, where the SQL form drops in; a
+`transform.timeseries.changepoint` Step needs a residual-producing Step first and is filed as `CHANGEPOINT-STEP-1`.
+
+Tests: `ChangePointTest` (spike, K-run, one short of K, persistent shift with and without `rebase`, ramp, outside points
+not feeding the CUSUM, warm-up, negative shift, σ estimate by hand, input rules); `ChangePointDuckDbParityTest` (SQL =
+JVM for 3 keys with different σ, a NULL key, a NULL residual, `rebase` × warm-up; and the template golden above).
+
 ## Holdout split
 
 *ANALYTICS-CORE-1 S5d, built 2026-10-17.* `com.gamma.analytics.split.HoldoutSplit` — train / validation / test for any
