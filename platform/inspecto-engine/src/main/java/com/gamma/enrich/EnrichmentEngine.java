@@ -185,7 +185,7 @@ public final class EnrichmentEngine {
 
             // 1. reference views
             for (EnrichmentConfig.Reference r : cfg.references()) {
-                st.execute("CREATE VIEW \"" + r.name() + "\" AS SELECT * FROM "
+                st.execute("CREATE VIEW " + SqlIdent.q(r.name()) + " AS SELECT * FROM "
                         + referenceReader(r, pipelines));
             }
 
@@ -291,7 +291,7 @@ public final class EnrichmentEngine {
             beforeFirstView(conn);
             // 1. reference views — resolved exactly as a run (real data, bounded by the transform's own join)
             for (EnrichmentConfig.Reference r : cfg.references())
-                st.execute("CREATE VIEW \"" + r.name() + "\" AS SELECT * FROM " + referenceReader(r, pipelines));
+                st.execute("CREATE VIEW " + SqlIdent.q(r.name()) + " AS SELECT * FROM " + referenceReader(r, pipelines));
             // 2. input seeded from the caller's sample (not the Stage-1 glob)
             seedInput(conn, rows);
             // 3. transform → temp table
@@ -451,7 +451,7 @@ public final class EnrichmentEngine {
         if (!cfg.output().hasEventTime()) return null;
         try {
             return ConsignmentOutputs.boundsByPartition(conn, table, cfg.output().partitions(),
-                    "TRY_CAST(\"" + cfg.output().eventTimeSource() + "\" AS TIMESTAMP)");
+                    "TRY_CAST(" + SqlIdent.q(cfg.output().eventTimeSource()) + " AS TIMESTAMP)");
         } catch (Exception unmeasurable) {
             log.debug("enrichment '{}': no event-time bounds from '{}' on {}: {}",
                     cfg.name(), cfg.output().eventTimeSource(), table, unmeasurable.getMessage());

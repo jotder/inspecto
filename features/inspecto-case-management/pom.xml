@@ -68,6 +68,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- CaseRuleEvaluateGoldenTest's PostgreSQL variant (INSPECTO_TEST_PG_URL); test scope is not transitive from inspecto-ops. -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Platform test kit (FakeApiContext + RouteModuleContract TCK) -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>

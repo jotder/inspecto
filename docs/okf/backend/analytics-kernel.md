@@ -63,6 +63,8 @@ Packages:
   `HourOfWeek` and `SeasonalProfile` (C5), `ChangePoint` (C6).
 * `com.gamma.analytics.cohort` — `Retention` and `Funnel` (C9, § [Cohort retention and funnel](#cohort-retention-and-funnel)).
 * `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
+* `com.gamma.analytics.catalogue` — the function catalogue (C8): `AnalyticsFunction`, `AnalyticsFunctionProvider`,
+  `AnalyticsCatalogue`, `KernelFunctions` (§ [Function catalogue](#function-catalogue)).
 * `com.gamma.analytics.similarity` — the similarity kit (S1): `Similarity`, `JaroWinkler`, `TextUnit`,
   `SimilaritySql` (§ [Similarity kit](#similarity-kit)).
 * `com.gamma.analytics.entity` — deterministic entity grouping (S2): `EntityGrouping`, `EntityGroupingSql`,
@@ -124,6 +126,33 @@ ANALYTICS-CORE-1 S7: Jobs and packs reach the kernel through the read-only Platf
 delegates here: a Platform Service interface must be engine-published (D-12) and this module may never depend on the
 engine (D-AN1). The surface reuses the kernel's own `MedianMode`, `QuantileMode` and `TimeGrain` rather than copies.
 Menu row, grants and dry run: [platform-services](control-plane/platform-services.md) §3; tests `AnalyticsServiceTest`.
+## Function catalogue
+
+ANALYTICS-CORE-1 C8 (2026-10-18; D-AN33…D-AN35). `com.gamma.analytics.catalogue` DESCRIBES what the kernel offers and
+runs nothing: an `AnalyticsFunction` is an id (dotted lower-case, `stats.quantile`), a label, its `Kernel`
+(statistics · profiler · time series · forecasting · similarity · entity grouping · graph), a `Cost` hint
+(constant · linear · linearithmic · quadratic), a `ResultKind` (scalar · column · table · sql · groups · forecast ·
+catalogue), the `Form`s it runs as (JVM, SQL, or both with parity tests), the pipeline Step id when it is also a Step,
+and its `Param`s (type, default, bounds, choices) — the same facts LA's `Algorithm` enum publishes for graphs.
+
+* **Registration point — the one thing a later kernel does.** Implement `AnalyticsFunctionProvider` (one `functions()`
+  method) in the kernel's own package and add its class to
+  `platform/inspecto-analytics/src/main/resources/META-INF/services/com.gamma.analytics.catalogue.AnalyticsFunctionProvider`.
+  `AnalyticsCatalogue.load()` (ServiceLoader) merges every provider, orders by kernel then id and **fails at load on a
+  duplicate id**. `KernelFunctions` is the S-tier provider (26 entries, 2026-10-18); do not extend it for a new kernel.
+* **Route.** `GET /analytics/functions[?kernel=…]` (`AnalyticsCatalogueRoutes`, core): read-only and ungated — no write
+  root, no capability, no data — so the endpoint skill's 503 / 403 / 409 gates do not apply; an unknown `kernel` is 422
+  naming the valid ones; the kernel counts stay whole when the list is narrowed. In `openapi.fragment.json`; the UI pane is
+  [analytics-functions](../frontend/features/analytics-functions.md).
+* **Graph.** Listed as `graph.algorithms` (a pointer to `GET /inv/graph/algorithms`, where `la-core`'s 29 `Algorithm`
+  constants and their measured ceilings live — this module may not depend on `la-core`) and `graph.temporal_motif`.
+* **Honest limits.** The cost hint is asymptotic, never a measured ceiling; the descriptions are hand-written beside
+  the code they describe, so a kernel function changed without its entry drifts — the checks are structural (unique ids,
+  every named Step is a real `BuiltinNodeType`, ids sit under their kernel's prefix), not semantic.
+* **Tests.** `AnalyticsCatalogueTest` (analytics), `ControlApiAnalyticsCatalogueTest` (real HTTP: shape, filter, 422,
+  any role reads, writes refused, Step ids real).
+
+
 
 ## Column profiler
 

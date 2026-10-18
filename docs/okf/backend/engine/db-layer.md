@@ -84,10 +84,10 @@ com.gamma.util.SqlIdent.q;` are the house idiom):
 A name that must be validated before it is quoted keeps a validator that returns it **unquoted** (e.g.
 `PostgresPublishSql.safeId`, the `SAFE_IDENT` checks) and quotes through `SqlIdent.q` at the call site.
 Every named site is now on the path (2026-10-17): `MeasureCompiler` and `AnomalyScoreEvaluator` quote
-through `SqlIdent.q` and `SqlBuilder.typedOperand`, and the Parquet/partition summarizers moved from
-`inspecto-util` up to `inspecto-sql` (`com.gamma.sql.SummarizeSupport`) so their input view is
-`SqlViews.parquet(..., true, Hive.AUTO)` rather than a hand-built `read_parquet(` — `inspecto-util` sits below
-`inspecto-sql`, and moving the one caller up kept ONE option list where a util-level copy would have made two.
+through `SqlIdent.q` and `SqlBuilder.typedOperand`. The Parquet / partition summarizers (`ParquetSummarizer`,
+`PartitionSummarizer`, `SummarizeSupport`) were first moved up to `inspecto-sql` onto `SqlViews.parquet(..., true,
+Hive.AUTO)` and then **deleted on 2026-10-18** (D-AN30): no caller in the repo, no `main`, no ServiceLoader or
+config reference (grep over every tracked file), so a hand-built `read_parquet(` has no place left to live.
 The Measure grammar has one evaluator: `WorkingSetMeasures` (geo-link) loads the measured column of a Working
 Set relation into a sealed in-memory DuckDB table and runs `MeasureCompiler`'s SELECT over it.
 
@@ -117,8 +117,9 @@ writer's method (`EventRoutes.csv`, `AuditLogRoutes.csv`, `ReportRenderer.csvCel
 than the doubling `replace` (a char loop, a regex, a `String.format` of a quote), an identifier wrapped in
 `"` with no escape at all (nothing to match — `EnrichmentEngine.buildFilter`'s key and
 `ConsignmentIngestStrategy.stampReferenceVersions`' `src` / `dst` moved onto `SqlIdent.q` on 2026-10-17, after a name
-containing `"` was shown to give broken SQL; the same files still wrap other names that way: the reference view names and
-`eventTimeSource` in `EnrichmentEngine`, other table and view names in `ConsignmentIngestStrategy`), statistics computed inline (`VolumeBaseline`'s lower median), and a robust z named
+containing `"` was shown to give broken SQL; the reference view names and `eventTimeSource` in `EnrichmentEngine` and the `dropTable` / `dropView` / member-copy names in
+`ConsignmentIngestStrategy` followed on 2026-10-18, pinned by `ConsignmentDropQuotingTest`; many other `"\"" + name + "\""`
+wraps of engine-generated scratch names remain, listed under `ANALYTICS-CORE-1` in `BACKLOG.md`), statistics computed inline (`VolumeBaseline`'s lower median), and a robust z named
 only `z` (`RobustStats.z`) are not counted, so a 0 means "no copy of the escape", not "no hand-built SQL". Plan:
 [`analytics-core-plan.md`](../../../superpower/analytics-core-plan.md) §1a, §4a.
 

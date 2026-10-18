@@ -10,20 +10,28 @@ import com.gamma.ops.link.LinkRelationship;
 import com.gamma.ops.link.ObjectLink;
 import com.gamma.ops.tag.TagRule;
 import com.gamma.workflow.ObjectType;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Golden pins for {@link CaseOperations#evaluateCaseRule} (ANALYTICS-CORE-1 S8), captured from the JVM-side walk
  * before the window and the expressible Tag Rule filter fields moved into the object store's query, and run on the
- * in-memory store and on DuckDB. Each line records a rule's evaluation outcome, the members it grouped (in the
+ * in-memory store, on DuckDB and, when {@code INSPECTO_TEST_PG_URL} / {@code -Dinspecto.test.pg.url} names a
+ * server, on PostgreSQL (skipped per test otherwise). Each line records a rule's evaluation outcome, the members it grouped (in the
  * newest-first order the matches are linked) and the correlation id the new Case inherited from its newest match.
  *
  * <p>Covers: the Incident status alias fold ({@code open} → IDENTIFIED, {@code in_progress} → DIAGNOSING, a padded
@@ -126,7 +134,47 @@ class CaseRuleEvaluateGoldenTest {
         }
     }
 
+    private static final String URL_PROPERTY = "inspecto.test.pg.url";
+    private static String adminUrl;
+    private static String schema;
+    private static String pgUrl;
+
+    @BeforeAll
+    static void connect() throws Exception {
+        adminUrl = System.getProperty(URL_PROPERTY);
+        if (adminUrl == null || adminUrl.isBlank()) adminUrl = System.getenv("INSPECTO_TEST_PG_URL");
+        if (adminUrl == null || adminUrl.isBlank()) return;
+        schema = "inspecto_test_caserule_" + Long.toHexString(System.nanoTime());
+        try (Connection c = DriverManager.getConnection(adminUrl); Statement s = c.createStatement()) {
+            s.execute("CREATE SCHEMA " + schema);
+        }
+        pgUrl = adminUrl + (adminUrl.contains("?") ? "&" : "?") + "currentSchema=" + schema;
+    }
+
+    @AfterAll
+    static void drop() throws Exception {
+        if (schema == null) return;
+        try (Connection c = DriverManager.getConnection(adminUrl); Statement s = c.createStatement()) {
+            s.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        }
+    }
+
+    private static ObjectStore pg() {
+        assumeTrue(pgUrl != null, "needs PostgreSQL: set INSPECTO_TEST_PG_URL or -D" + URL_PROPERTY);
+        try {
+            try (Connection c = DriverManager.getConnection(pgUrl); Statement s = c.createStatement()) {
+                s.execute("DROP TABLE IF EXISTS inspecto_ops_objects");
+                s.execute("DROP TABLE IF EXISTS inspecto_ops_object_entity_ref");
+            }
+            return DbObjectStore.open(pgUrl, null, null);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     @Test void inMemory() { assertEquals(GOLDEN, run(InMemoryObjectStore::new)); }
 
     @Test void duckDb() { assertEquals(GOLDEN, run(CaseRuleEvaluateGoldenTest::duck)); }
+
+    @Test void postgres() { assertEquals(GOLDEN, run(CaseRuleEvaluateGoldenTest::pg)); }
 }

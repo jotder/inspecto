@@ -107,6 +107,10 @@ export const appRoutes: Route[] = [
             // /studio/dashboards (audit C2). Redirect keeps old links/bookmarks working.
             { path: 'dashboard', redirectTo: 'overview', pathMatch: 'full' },
             { path: 'diagnoses', loadChildren: () => import('app/modules/admin/diagnoses/diagnoses.routes') },
+            {
+                path: 'analytics-functions',
+                loadChildren: () => import('app/modules/admin/analytics-functions/analytics-functions.routes'),
+            },
             { path: 'events', loadChildren: () => import('app/modules/admin/events/events.routes') },
             { path: 'audit', loadChildren: () => import('app/modules/admin/audit-logs/audit-logs.routes') },
             { path: 'alerts', loadChildren: () => import('app/modules/admin/alerts/alerts.routes') },
