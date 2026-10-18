@@ -22,7 +22,7 @@ import { Lens, LensService } from 'app/inspecto/api';
             [matMenuTriggerFor]="menu"
             class="min-w-0 max-sm:!px-2"
             matTooltip="View as"
-            aria-label="Switch lens"
+            [attr.aria-label]="labelFor(lens.currentLens()) + ', switch lens'"
         >
             <mat-icon class="icon-size-5" [svgIcon]="iconFor(lens.currentLens())"></mat-icon>
             <!-- label collapses to the icon on phones so the header row fits 375px (Wave 5 P2) -->

@@ -51,12 +51,9 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                         </p>
                     } @else {
                         <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-                            Every Pipeline, every Run, one place to see it.
+                            {{ pitch.title }}
                         </h1>
-                        <p class="text-secondary max-w-md text-lg">
-                            Onboard Streams, author Pipelines, watch Expectations hold, and hand the Business Lens a
-                            Dataset it can trust.
-                        </p>
+                        <p class="text-secondary max-w-md text-lg">{{ pitch.body }}</p>
                     }
                 </div>
 
@@ -188,6 +185,11 @@ export class SignInComponent implements OnInit {
     readonly caption = computed(() => this.session.branding().caption);
     /** ED-1: the product this host is ("Inspecto" in the console, "Inspecto LA" in la-app). */
     readonly product = this.env.productName ?? 'Inspecto';
+    /** LA-EDITIONS-RESIDUALS-1 (6): the non-demo headline; la-app pitches investigation, not the console. */
+    readonly pitch = this.env.signInPitch ?? {
+        title: 'Every Pipeline, every Run, one place to see it.',
+        body: 'Onboard Streams, author Pipelines, watch Expectations hold, and hand the Business Lens a Dataset it can trust.',
+    };
     readonly footer = computed(() => this.session.branding().footerText ?? this.env.footerText);
     /** HOME-VERSION-1: the version the backend reports — the field a support call reads aloud. Absent until known. */
     readonly version = computed(() => this.session.version());

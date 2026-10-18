@@ -32,6 +32,14 @@ describe('LensSwitcherComponent', () => {
         expect(fixture.componentInstance.labelFor(fixture.componentInstance.lens.currentLens())).toBe('Builder');
     });
 
+    // WCAG 2.5.3 label in name: the trigger's accessible name starts with its visible lens label.
+    it('names the trigger by its visible label', () => {
+        const fixture = create();
+        fixture.detectChanges();
+        const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+        expect(btn.getAttribute('aria-label')).toBe('Builder, switch lens');
+    });
+
     it('selecting a lens updates the shared LensService', () => {
         const fixture = create();
         const lens = TestBed.inject(LensService);

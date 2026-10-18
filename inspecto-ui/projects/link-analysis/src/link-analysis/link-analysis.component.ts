@@ -1766,7 +1766,9 @@ export class LinkAnalysisComponent implements OnInit {
         const { pair } = mergePairOf(ids);
         if (!pair) return;
         this.investigation.mergeDraft.set(pair);
-        this.toastr.info('Prefilled in the Identity section of the Investigation tab - add a reason and confirm there.');
+        // LA-I2-GAPS-RESIDUALS-1 (5): open the tab that holds the prefilled merge, so the next step is on screen.
+        this.toolboxTab.set('investigation');
+        this.toastr.info('Prefilled in the Identity section below - add a reason and confirm there.');
     }
 
     /** One step: seal what is on screen and attach it to a Case (optionally linking the open Investigation too). */

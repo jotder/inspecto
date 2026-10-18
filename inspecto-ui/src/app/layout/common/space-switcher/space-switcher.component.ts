@@ -42,7 +42,7 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
                 [matMenuTriggerFor]="menu"
                 class="min-w-0 max-sm:!px-2"
                 matTooltip="Switch space"
-                aria-label="Switch space"
+                [attr.aria-label]="label() + ', switch space'"
             >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
                 <!-- label collapses to the icon on phones so the header row fits 375px (Wave 5 P2) -->

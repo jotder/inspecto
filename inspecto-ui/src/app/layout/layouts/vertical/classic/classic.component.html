@@ -1,3 +1,12 @@
+<!-- LA-A11Y-AUDIT-1: skip link, the first tab stop; hidden until focused. Without it a keyboard user passes every nav stop first. -->
+<a
+    href="#main-content"
+    class="bg-card text-primary sr-only z-[1000] rounded px-4 py-2 font-semibold shadow-lg focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+    data-testid="skip-to-content"
+    (click)="skipToContent($event)"
+    >Skip to main content</a
+>
+
 <!-- Loading bar -->
 <gamma-loading-bar role="status"></gamma-loading-bar>
 
@@ -86,7 +95,7 @@
     </div>
 
     <!-- Content -->
-    <main class="flex flex-auto flex-col">
+    <main id="main-content" tabindex="-1" class="flex flex-auto flex-col outline-none">
         <!-- *ngIf="true" hack is required here for router-outlet to work correctly.
              Otherwise, layout changes won't be registered and the view won't be updated! -->
         @if (true) {

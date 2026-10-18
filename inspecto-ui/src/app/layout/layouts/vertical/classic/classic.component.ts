@@ -218,6 +218,12 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
      *
      * @param name
      */
+    /** Moves focus to the routed content without changing the URL (a `#` href would hit the router). */
+    skipToContent(event: Event): void {
+        event.preventDefault();
+        document.getElementById('main-content')?.focus();
+    }
+
     toggleNavigation(name: string): void {
         // Get the navigation
         const navigation = this._gammaNavigationService.getComponent<GammaVerticalNavigationComponent>(name);

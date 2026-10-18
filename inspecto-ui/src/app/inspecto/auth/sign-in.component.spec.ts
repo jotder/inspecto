@@ -21,7 +21,7 @@ const FAILED_KEY = 'inspecto.signInFailed';
  * `inspecto/auth/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
  * switch to test — `session.service.ts:64` says so explicitly; `auth.mock` arrives on `/bootstrap`.
  */
-function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean; noSpace?: boolean; productName?: string } = {}) {
+function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean; noSpace?: boolean; productName?: string; signInPitch?: { title: string; body: string } } = {}) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => opts.loginRequired ?? true,
@@ -40,7 +40,9 @@ function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstr
             provideNoopAnimations(),
             { provide: SessionService, useValue: session },
             { provide: Router, useValue: router },
-            ...(opts.productName ? [{ provide: APP_ENVIRONMENT, useValue: { ...appEnvironment(), productName: opts.productName } }] : []),
+            ...(opts.productName || opts.signInPitch
+                ? [{ provide: APP_ENVIRONMENT, useValue: { ...appEnvironment(), productName: opts.productName, signInPitch: opts.signInPitch } }]
+                : []),
         ],
     });
     const fixture = TestBed.createComponent(SignInComponent);
@@ -200,6 +202,15 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
             expect(text(el.querySelector('h1 + p'))).toBe(
                 'A demonstration running on this computer only. Choose a Demo User to see Inspecto LA as that person would.',
             );
+            await expectNoA11yViolations(el);
+        });
+
+        // LA-EDITIONS-RESIDUALS-1 (6): la-app's OIDC sign-in pitches its own product, never the console's Pipelines.
+        it('OIDC sign-in: a host-provided pitch replaces the console headline', async () => {
+            const { el } = create({ productName: 'Inspecto LA', signInPitch: { title: 'Follow every link.', body: 'Investigate a number.' } });
+            expect(text(el.querySelector('h1'))).toBe('Follow every link.');
+            expect(text(el.querySelector('h1 + p'))).toBe('Investigate a number.');
+            expect(el.textContent).not.toContain('Every Pipeline');
             await expectNoA11yViolations(el);
         });
 

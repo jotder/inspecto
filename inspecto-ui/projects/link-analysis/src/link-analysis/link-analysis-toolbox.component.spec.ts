@@ -288,6 +288,17 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(c.loadedPack()).toBeNull();
     });
 
+    // LA-I2-GAPS-RESIDUALS-1 (9): a temporal pack's steps must not survive the switch, or Search around stays hidden.
+    it('pattern packs: "Custom motif" after a temporal motif starts blank, so Search around is available', () => {
+        const { c } = make();
+        c.loadPatternPack('layering-chain');
+        c.updatePatternStep(1, { afterPrevious: true } as never);
+        expect(c.aroundSpec()).toBeNull();
+        c.loadPatternPack('');
+        expect(c.patternSteps()).toEqual([{}, { direction: 'out' }]);
+        expect(c.aroundSpec()).not.toBeNull();
+    });
+
     it('pattern packs: the active Industry pack relabels the picker and the description, ids kept', () => {
         installDomainProfiles(
             [

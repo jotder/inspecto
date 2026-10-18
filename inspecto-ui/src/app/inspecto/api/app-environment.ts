@@ -12,6 +12,8 @@ export interface AppEnvironment {
     footerText: string;
     /** The product name on the shared sign-in screen; unset means "Inspecto" (the console). `la-app` sets "Inspecto LA". */
     productName?: string;
+    /** The non-demo sign-in headline and line beside it; unset means the console's Pipeline pitch. `la-app` sets its own. */
+    signInPitch?: { title: string; body: string };
     /** Public PKCE-client OIDC config baked into the bundle (no secret); absent/blank means "use `/bootstrap`". */
     oidc?: { authorizeUrl?: string; clientId?: string; scopes?: string; endSessionUrl?: string; mock?: boolean };
 }

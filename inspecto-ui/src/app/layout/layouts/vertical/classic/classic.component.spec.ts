@@ -41,6 +41,13 @@ describe('ClassicLayoutComponent', () => {
         expect(root.querySelector('gamma-vertical-navigation')?.getAttribute('role')).toBe('navigation');
         expect(root.querySelector('gamma-vertical-navigation')?.getAttribute('aria-label')).toBe('Main');
         expect(root.querySelector('gamma-loading-bar')?.getAttribute('role')).toBe('status');
+        // LA-A11Y-AUDIT-1: a skip link is the first focusable element and moves focus into main.
+        const skip = root.querySelector('a, button, [tabindex]:not([tabindex="-1"])') as HTMLAnchorElement;
+        expect(skip.dataset['testid']).toBe('skip-to-content');
+        document.body.appendChild(root);
+        skip.click();
+        expect(document.activeElement).toBe(main);
+        root.remove();
     });
 
     /** Link Analysis takes the footer's 56px for its canvas; every other route keeps it. */
