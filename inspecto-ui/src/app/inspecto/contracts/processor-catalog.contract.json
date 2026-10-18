@@ -811,9 +811,9 @@
     "label" : "Pearson & Spearman correlation matrix",
     "emoji" : "🧮",
     "icon" : "heroicons_outline:squares-2x2",
-    "status" : "partial",
+    "status" : "delivered",
     "nodeType" : "transform.stats.correlation",
-    "note" : "`transform.stats.correlation` ships Pearson plus the least-squares line (slope, intercept, r2) per column pair and group, as long-form rows; Spearman (rank) correlation is not built (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "note" : "`transform.stats.correlation` — Pearson (default) or Spearman (`method: spearman`: Pearson of the within-group average ranks, ties share their average rank) plus the least-squares line (slope, intercept, r2) per column pair and group, as long-form rows (2026-10-17 Pearson, 2026-10-18 Spearman, ANALYTICS-CORE-1 S3)",
     "addable" : true
   }, {
     "id" : "enrichment.reference",

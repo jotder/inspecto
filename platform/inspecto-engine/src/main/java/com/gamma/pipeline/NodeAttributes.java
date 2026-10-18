@@ -580,7 +580,11 @@ public final class NodeAttributes {
             NodeAttribute.of("columns", "Number columns", "list", "required").placeholder("PRICE, QUANTITY")
                     .help("Every pair of these is correlated; in each pair the later column is regressed on the earlier."),
             NodeAttribute.of("group_by", "Groups", "list", "optional").placeholder("REGION")
-                    .help("One row per group per pair. Blank: one row per pair."));
+                    .help("One row per group per pair. Blank: one row per pair."),
+            NodeAttribute.of("method", "Method", "select", "optional").defaultValue("pearson")
+                    .options("pearson", "Pearson (straight-line relationship, on the values)",
+                            "spearman", "Spearman (any rising or falling relationship, on the ranks; ties share their average rank)")
+                    .help("Spearman is Pearson on the ranks, so slope, intercept and r2 describe the line through the ranks."));
 
     /**
      * {@code transform.similarity} (ANALYTICS-CORE-1 S1, catalog {@code quality.match.fuzzy}): a similarity score of two

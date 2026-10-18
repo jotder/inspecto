@@ -1008,10 +1008,12 @@ class NodeConfigNameContractTest {
         Map<String, Object> corr = new LinkedHashMap<>();
         corr.put("columns", List.of("QTY", "PRICE", "TAX"));
         corr.put("group_by", List.of("ID"));
+        corr.put("method", "spearman");
         var c = com.gamma.pipeline.exec.DistributionStep.parseCorrelation(
                 timeSeriesSavedAs(dir.resolve("c"), "correlation", "transform.stats.correlation", corr));
         assertEquals(3, c.pairs().size());
         assertEquals(List.of("ID"), c.groupBy());
+        assertEquals(com.gamma.analytics.distribution.CorrelationSql.Method.SPEARMAN, c.method());
     }
 
     private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)

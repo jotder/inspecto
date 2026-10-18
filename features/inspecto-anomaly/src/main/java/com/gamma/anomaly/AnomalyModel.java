@@ -30,6 +30,8 @@ import java.util.regex.Pattern;
  * minBaselinePoints: 7           elevatedThreshold: 60   highThreshold: 80
  * zCap: 10   scale: 3            maxEntities: 500000 (1..2000000; default -Danomaly.score.maxEntities, else 200000)
  * dataScope: fraud
+ * method: robust_z             (robust_z | isolation_forest; ANALYTICS-CORE-1 C4 — see {@link Forest})
+ * forest: {trees (default 100), sampleSize (default 256), seed (default 1)}   (isolation_forest only)
  * peers: {by[1..3]: cohort columns, dataset (default the first feature's), key (default the first feature's key),
  *         minGroupSize (default 30), fallback: population (opt-in, D-AD11 b)}
  * features[n]: {id, label, dataset, key, time, measure (count | agg(field)), filters, direction (up|down|both),
@@ -45,7 +47,7 @@ import java.util.regex.Pattern;
 public record AnomalyModel(String id, String entityType, int window, Seasonality seasonality, int minBaselinePoints,
                            double elevatedThreshold, double highThreshold, double zCap, double scale,
                            Integer maxEntities, String dataScope, String description, Peers peers,
-                           List<Feature> features) {
+                           List<Feature> features, Forest forest) {
 
     public static final String KIND = com.gamma.alert.AnomalyScoreOutputs.KIND;
     public static final String SCORES_PREFIX = com.gamma.alert.AnomalyScoreOutputs.SCORES_PREFIX;
@@ -63,8 +65,10 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     private static final Pattern MODEL_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_]*");
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType", "bucket",
             "window", "scoredPeriod", "seasonality", "minBaselinePoints", "elevatedThreshold", "highThreshold", "zCap",
-            "scale", "maxEntities", "dataScope", "description", "peers", "features", "watchList", "exclusionList");
+            "scale", "maxEntities", "dataScope", "description", "peers", "features", "watchList", "exclusionList",
+            "method", "forest");
     private static final Set<String> LATER_KEYS = Set.of();
+    private static final Set<String> FOREST_KEYS = Set.of("trees", "sampleSize", "seed");
     private static final Set<String> PEER_KEYS = Set.of("by", "dataset", "key", "minGroupSize", "fallback");
     public static final int MAX_PEER_COLUMNS = 3;
     private static final Set<String> FEATURE_KEYS = Set.of("id", "label", "dataset", "key", "time", "measure",
@@ -82,6 +86,14 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     public record Peers(List<String> by, String dataset, String key, int minGroupSize, boolean populationFallback) {
         public Peers { by = List.copyOf(by); }
     }
+
+    /**
+     * The optional second scoring method (ANALYTICS-CORE-1 C4, ANOMALY-ML-SCORING-1): an isolation forest over the
+     * entities' per-feature deviations ({@link com.gamma.analytics.model.IsolationForest}) in place of the weighted-RMS
+     * of the robust z. Absent ({@code null} on the model) = the shipped robust-statistical score, untouched. The forest
+     * is seeded, so the same model and data give the same scores; it is fitted by the Job only (never in the preview).
+     */
+    public record Forest(int trees, int sampleSize, long seed) {}
 
     /** One feature: a Measure over one Dataset, grouped by its key column and by the day of its {@code time} column. */
     public record Feature(String id, String label, String dataset, String key, String time, String measure,
@@ -165,6 +177,14 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
 
     public AnomalyModel { features = List.copyOf(features); }
 
+    /** The pre-C4 shape: the robust-statistical score (no forest). */
+    public AnomalyModel(String id, String entityType, int window, Seasonality seasonality, int minBaselinePoints,
+                        double elevatedThreshold, double highThreshold, double zCap, double scale, Integer maxEntities,
+                        String dataScope, String description, Peers peers, List<Feature> features) {
+        this(id, entityType, window, seasonality, minBaselinePoints, elevatedThreshold, highThreshold, zCap, scale,
+                maxEntities, dataScope, description, peers, features, null);
+    }
+
     public String scoresDataset() { return SCORES_PREFIX + id; }
     public String latestDataset() { return scoresDataset() + LATEST_SUFFIX; }
 
@@ -197,7 +217,7 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
     /** This model with every feature narrowed to one entity ({@link Feature#forEntity}) — {@code POST /anomaly-scores/preview}. */
     public AnomalyModel forEntity(String entityKey) {
         return new AnomalyModel(id, entityType, window, seasonality, minBaselinePoints, elevatedThreshold, highThreshold,
-                zCap, scale, maxEntities, dataScope, description, peers, features.stream().map(f -> f.forEntity(entityKey)).toList());
+                zCap, scale, maxEntities, dataScope, description, peers, features.stream().map(f -> f.forEntity(entityKey)).toList(), forest);
     }
 
     public String band(double score) {
@@ -266,8 +286,39 @@ public record AnomalyModel(String id, String entityType, int window, Seasonality
             features.add(f);
         }
         Peers peers = m.get("peers") == null ? null : peers(m.get("peers"), features.get(0));
+        Forest forest = forest(m);
         return new AnomalyModel(id, entityType, window, seasonality, minPoints, elevated, high, zCap, scale,
-                maxEntities, scope, Values.trimToNull(m.get("description")), peers, features);
+                maxEntities, scope, Values.trimToNull(m.get("description")), peers, features, forest);
+    }
+
+    private static Forest forest(Map<String, Object> m) {
+        String method = Values.trimToNull(m.get("method"));
+        if (method != null && !"robust_z".equals(method) && !"isolation_forest".equals(method))
+            throw new IllegalArgumentException("anomaly-model.method must be robust_z or isolation_forest, got '" + method + "'");
+        boolean forest = "isolation_forest".equals(method);
+        if (!forest) {
+            if (m.get("forest") != null)
+                throw new IllegalArgumentException("anomaly-model.forest needs method: isolation_forest");
+            return null;
+        }
+        String at = "anomaly-model.forest";
+        Map<?, ?> fm = Map.of();
+        if (m.get("forest") != null) {
+            if (!(m.get("forest") instanceof Map<?, ?> given))
+                throw new IllegalArgumentException(at + " must be an object {trees, sampleSize, seed}");
+            fm = given;
+        }
+        for (Object k : fm.keySet())
+            if (!FOREST_KEYS.contains(String.valueOf(k)))
+                throw new IllegalArgumentException(at + ": unknown key '" + k + "' (expected " + new TreeSet<>(FOREST_KEYS) + ")");
+        int trees = whole(fm.get("trees"), at + ".trees", 1, com.gamma.analytics.model.IsolationForest.MAX_TREES,
+                com.gamma.analytics.model.IsolationForest.DEFAULT_TREES);
+        int sample = whole(fm.get("sampleSize"), at + ".sampleSize", 2, com.gamma.analytics.model.IsolationForest.MAX_SAMPLE_SIZE,
+                com.gamma.analytics.model.IsolationForest.DEFAULT_SAMPLE_SIZE);
+        double seed = fm.get("seed") == null ? 1 : number(fm.get("seed"), at + ".seed");
+        if (seed != Math.rint(seed) || Math.abs(seed) > 9.0e15)
+            throw new IllegalArgumentException(at + ".seed must be a whole number, got " + fm.get("seed"));
+        return new Forest(trees, sample, (long) seed);
     }
 
     private static Peers peers(Object raw, Feature first) {

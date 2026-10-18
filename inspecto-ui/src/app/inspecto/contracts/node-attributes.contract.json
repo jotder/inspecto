@@ -1458,6 +1458,20 @@
     "tier" : "optional",
     "help" : "One row per group per pair. Blank: one row per pair.",
     "placeholder" : "REGION"
+  }, {
+    "key" : "method",
+    "label" : "Method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "pearson",
+    "options" : [ {
+      "value" : "pearson",
+      "label" : "Pearson (straight-line relationship, on the values)"
+    }, {
+      "value" : "spearman",
+      "label" : "Spearman (any rising or falling relationship, on the ranks; ties share their average rank)"
+    } ],
+    "help" : "Spearman is Pearson on the ranks, so slope, intercept and r2 describe the line through the ranks."
   } ],
   "transform.join" : [ {
     "key" : "reference",

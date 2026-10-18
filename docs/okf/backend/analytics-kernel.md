@@ -36,6 +36,10 @@ timestamp: 2026-10-18T00:00:00Z
 > [change-point and regime detection](#change-point-and-regime-detection), C1
 > [windowed and ratio Measures](#windowed-and-ratio-measures), C9 [cohort retention and funnel](#cohort-retention-and-funnel).
 > No caller uses the kernels yet; their Steps are open (`ANALYTICS-STEPS-TS-1`).
+>
+> **The model kernels are built (2026-10-18, Could C2, C3, C4 and the Spearman residual of S3):** rank correlation
+> (`method: spearman`), k-means, logistic regression with the holdout split, and an isolation forest behind the Anomaly
+> Score (§ [Model kernels](#model-kernels)). Decisions D-AN20…D-AN29, assistant-decided, pending operator confirmation.
 
 ## The module
 
@@ -65,6 +69,8 @@ Packages:
   `MatchCondition`, `KeyColumn`, `Normalization`, `SimilarityCandidate`, `EntityRecord` (§ [Entity grouping](#entity-grouping)).
 * `com.gamma.analytics.distribution` — the distribution Steps' kernel (S3): `OutlierSql`, `Binning`, `CorrelationSql`
   (§ [Distribution Steps](#distribution-steps)).
+* `com.gamma.analytics.model` — the model kernels (C2–C4): `KMeans`, `KMeansSql`, `LogisticRegression`, `LogisticSql`,
+  `IsolationForest`, `SeededRandom`, `InputCap` (§ [Model kernels](#model-kernels)).
 * `com.gamma.analytics.baseline` — the baseline contract, moved unchanged from `features/inspecto-anomaly`
   (`com.gamma.anomaly.baseline`) by M6: `BaselineStatistic` (the pluggable interface), `BaselineStatistics`
   (the factory), `SeasonalBaseline` + `Seasonality`, `PeerBaseline`, `Baseline`, `BaselineScore`, `RobustStats`.
@@ -440,7 +446,10 @@ empty bins in a Pipeline.
 `DistributionStep` (engine) owns the three grammars; `RowShaper`, the recipe compiler and the save gate (`ConfigRoutes`)
 refuse with its words. Keys, outputs and release bar: [step-catalog](pipeline-graph/step-catalog.md) § `outlier`,
 § `binning`, § `correlation`. Base in every edition (D-AN7). The catalog's *Pearson & Spearman correlation matrix* is
-**PARTIAL**: Spearman is not built. In the engine: `RowShaperDistributionTest`,
+**DELIVERED** (2026-10-18): `method: spearman` runs the same figures over the within-group *average ranks*
+(`Stats.ranks`, `Stats.spearman`, `CorrelationSql.Method.SPEARMAN`; ties share the average of the ranks they span, so
+ranks are multiples of 0.5 and exact; parity with the JVM form in `CorrelationDuckDbParityTest`), so `slope` /
+`intercept` / `r2` then describe the line through the ranks. The default stays Pearson, so no shipped figure moved. In the engine: `RowShaperDistributionTest`,
 `PipelineJobRunnerTest#runsAFlatConfigsOutlierAndBinningStepsAndWritesFlagsAndBins`,
 `PipelineJobRunnerTest#runsAFlatConfigsCorrelationStepAndWritesOneRowPerPair`; demos `examples/07-steps/outliers` and
 `examples/07-steps/correlation`.
@@ -1021,9 +1030,68 @@ forecast — candidates for change-point work (Could C6), not part of the foreca
 monthly TIMESTAMP series, and the check counts), `ForecastTemplateGoldenTest` (above); in the engine
 `RowShaperTimeSeriesTest` (resample → forecast against the JVM kernel, the refusals), `PipelineJobRunnerTest#runsAFlatConfigsResampleAndForecastStepsAndWritesTheForecastWithItsBand`.
 
+## Model kernels
+
+*ANALYTICS-CORE-1 Could C2, C3, C4, built 2026-10-18 (decisions D-AN20…D-AN29 in the plan's §9).*
+Package `com.gamma.analytics.model`. Hand-written, **no dependency** (D-AN8), **fit is offline / in a Job only (W7)** —
+nothing here trains on the request path; only the scoring and assignment forms may run there. All three share:
+
+* **Determinism.** Same rows in the same order + the same spec (seed included) = the same model, to the last bit.
+  Randomness is `SeededRandom`, SplitMix64 written out (pinned by the published vector in `KMeansTest`), not the JDK's.
+  Callers hand rows over **sorted by entity key**.
+* **Bounded input fails closed (D-AD10).** `InputCap` uses `EntityCap`'s numbers (default 200,000, ceiling 2,000,000), passed
+  in; past it `InputCap.Exceeded`, never a sampled subset. Inputs are finite numbers (NaN / infinity refused).
+* **Cancellation.** `com.gamma.graph.RunControl.checkpoint()` once per sweep / Newton step / tree.
+
+### k-means — `KMeans`, `KMeansSql` (C2)
+
+Lloyd's iterations from a k-means++ start on **z-scored** inputs (the fit's mean and population σ; a constant column has
+scale 1). Stops when no assignment changes or after `maxIterations` (default 100, ≤ 1,000); `Model.converged()` says
+which. k ≤ 64, ≤ 50 columns. An empty cluster takes the point farthest from its own centre. **Clusters are numbered by
+centroid** (ascending, lexicographic in standardised space), so label 0 is the same group however the start fell;
+*naming* a cluster is the operator's step. The `Model` carries means, scales, centroids, sizes, inertia, iterations and the
+seed. `KMeansSql.select(relation, columns, model, clusterColumn)` assigns the nearest stored centroid set-based (lowest
+index on a tie; a NULL / NaN input gives a NULL cluster); `KMeansDuckDbParityTest` holds it equal to `Model.assign`.
+**No Step (D-AN22):** a fit yields a stored model version, which a Step cannot own; adding one later is additive.
+
+### Logistic regression — `LogisticRegression`, `LogisticSql` (C3)
+
+Ridge-penalised **Newton / IRLS** from zero (so no random start): L2 `λ = 1` default on the standardised coefficients, intercept
+free; stops on a largest step below 1e-8 or after 25 steps by default (≤ 100). Rows are split by `HoldoutSplit.HashSplit`
+on the entity key (the S5d split: train / validation / test, the same entity always the same role). **Standardisation uses
+the train rows only** — validation and test are scored with it, never inside it. Both classes must be in the train rows.
+`Model` has the coefficients (standardised space), the train means / scales, and `Metrics` (log-loss, AUC from average
+ranks, accuracy at 0.5) for each share. A score is `100·σ(b0 + Σ bᵢ·zᵢ)`; `contributions` returns the `bᵢ·zᵢ` terms and
+`recompute(intercept, contributions)` rebuilds the score from them. `LogisticSql` is the scoring form (stable sigmoid;
+NULL / NaN input gives NULL), equal to the JVM within 1e-12 (`LogisticDuckDbParityTest`). Fitting has no SQL form.
+
+### Isolation forest — `IsolationForest`, and the Anomaly option (C4)
+
+The kernel: 100 trees (≤ 1,000) over samples of 256 (≤ 4,096) drawn without replacement, height limit ⌈log₂ ψ⌉, splits on a
+feature chosen weight-proportionally among those that still vary, at a uniform point between the node's min and max.
+`s = 2^(−E[h]/c(ψ))`; `Path.excess() = 2·max(0, s − 0.5)` in [0, 1]. `attribute(point, reference)` gives per-feature shares
+**counterfactually** (the drop in excess when one feature takes its reference value, normalised to 1) — split-count credit
+was built first and rejected because a split is chosen by chance, not by what isolates the point (D-AN27).
+
+The Anomaly option (`features/inspecto-anomaly`, `AnomalyForestScorer`): a model with `method: isolation_forest`
+(+ optional `forest: {trees, sampleSize, seed}`; default `robust_z`, nothing changes) re-combines the entities' per-feature
+**deviations** — the shipped robust z with its self and peer baselines, direction and `zCap` — through the forest in place
+of the weighted RMS. `raw` = the excess, `score = 100·raw`, bands from the model's own thresholds. The explanation keeps
+every `FeatureResult` field; `contribution = share·raw` sums to `raw`, features are listed largest first (evidence follows
+the top one), and `AnomalyForestScorer.recompute` rebuilds `{raw, score}` from the stored explanation alone. Output goes
+through the M7 score-output contract unchanged (`period_start, score, band, raw, features, insufficient_count`). The entity cap
+(`maxEntities`) fails the run before the forest is fitted. **No preview** (D-AN28: fitting on the request path). Fewer than 2
+entities score 0. ⚠ Not authorable in the UI model form yet (D-AN29): write `method` / `forest` as TOON.
+
+### Tests
+
+`KMeansTest`, `KMeansDuckDbParityTest`, `LogisticRegressionTest`, `LogisticDuckDbParityTest`, `IsolationForestTest` (determinism,
+caps, cancellation, refusals); in the Anomaly feature `AnomalyForestScorerTest` over the golden corpus (default unchanged,
+planted anomalies at the top, bit-for-bit repeat, recompute, cap, preview refusal, model grammar).
+
 ## References
 
-* Plan and decisions D-AN1 … D-AN8: [`analytics-core-plan.md`](../../superpower/analytics-core-plan.md).
+* Plan and decisions D-AN1 … D-AN9 and D-AN20 … D-AN29: [`analytics-core-plan.md`](../../superpower/analytics-core-plan.md).
 * The baselines' first consumer: [anomaly-scores](control-plane/anomaly-scores.md).
 * The score kinds on the contract: [anomaly-scores](control-plane/anomaly-scores.md), [risk-scores](control-plane/risk-scores.md).
 * Module axes and manifests: [module-taxonomy](module-taxonomy.md).

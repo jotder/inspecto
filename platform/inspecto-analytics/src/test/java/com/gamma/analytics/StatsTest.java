@@ -275,4 +275,23 @@ class StatsTest {
         assertThrows(IllegalArgumentException.class, () -> Stats.linearRegression(new double[] {1, Double.NaN}, new double[] {1, 2}));
         assertThrows(IllegalArgumentException.class, () -> Stats.correlation(new double[0], new double[0]));
     }
+
+    @Test
+    void ranksAreOneBasedAndTiesTakeTheAverageOfTheRanksTheySpan() {
+        assertArrayEquals(new double[] {1, 2, 3}, Stats.ranks(new double[] {10, 20, 30}), 0);
+        assertArrayEquals(new double[] {3, 1, 2}, Stats.ranks(new double[] {30, 10, 20}), 0);
+        // 1 < 2 = 2 = 2 < 9: the three twos span ranks 2, 3, 4 and all rank 3
+        assertArrayEquals(new double[] {1, 3, 3, 3, 5}, Stats.ranks(new double[] {1, 2, 2, 2, 9}), 0);
+        assertArrayEquals(new double[] {1.5, 1.5}, Stats.ranks(new double[] {4, 4}), 0);
+    }
+
+    @Test
+    void spearmanIsOneForAnyMonotoneCurveMinusOneForReversedAndEmptyForAConstant() {
+        double[] x = {1, 2, 3, 4, 5, 6};
+        assertEquals(1.0, Stats.spearman(x, new double[] {1, 8, 27, 64, 125, 216}).getAsDouble(), 1e-12);
+        assertEquals(-1.0, Stats.spearman(x, new double[] {6, 5, 4, 3, 2, 1}).getAsDouble(), 1e-12);
+        assertTrue(Stats.spearman(x, new double[] {2, 2, 2, 2, 2, 2}).isEmpty());
+        // textbook: x = 1..5, y = 2,1,4,3,5 -> d² = 1+1+1+1+0 = 4, rho = 1 - 6*4/(5*24) = 0.8
+        assertEquals(0.8, Stats.spearman(new double[] {1, 2, 3, 4, 5}, new double[] {2, 1, 4, 3, 5}).getAsDouble(), 1e-12);
+    }
 }
