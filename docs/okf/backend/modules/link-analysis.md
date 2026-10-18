@@ -556,7 +556,7 @@ needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint
 ### 6.1 Gate order for an `/inv` request
 
 1. `ControlApi.authenticate` → Subject (401 audited).
-2. `rateLimit` → `LinkAnalysisRateClasses`: 12 expensive POSTs share a per-subject `linkAnalysis` bucket (capacity 30,
+2. `rateLimit` → `LinkAnalysisRateClasses`: the expensive routes (the `EXPENSIVE` table in `LinkAnalysisRateClasses`, about twenty entries; the earlier "12 POSTs" figure was stale) share a per-subject `linkAnalysis` bucket (capacity 30,
    refill 1 per 2 s; install limits `rate.link_analysis_burst` / `_per_s`, else `control.rateLimit.linkAnalysis.*`; 429); Investigation routes are exempt (pinned by `LinkAnalysisRateClassCoverageTest`).
 3. `authorize` → host ABAC PEP.
 4. `requireModuleEnabled` → feature `geoLink` in the Space's `modules.toon` (404 `MODULE_DISABLED`); then the host's

@@ -127,9 +127,10 @@ paid for violating them.
   Beside it, the external-facing [`stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md`](stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md)
   (v1.2, 2026-09-11) — written to the landscape's §4 claims register, with a release-basis note naming the
   Sprint 8 rows it assumes shipped; its `.docx` is generated, gitignored. And the dedicated
-  [`stakeholders/LINK_ANALYSIS_WHITEPAPER.md`](stakeholders/LINK_ANALYSIS_WHITEPAPER.md) (v1.0, 2026-10-14) —
-  the comprehensive whitepaper for Inspecto Link Analysis & Graph Intelligence (in-process sovereign graph engine,
-  Parquet link indexing at 10^8 scale, 29 deterministic algorithms, tamper-evident op log and forensic dossier).
+  [`stakeholders/LINK_ANALYSIS_WHITEPAPER.md`](stakeholders/LINK_ANALYSIS_WHITEPAPER.md) (v1.1, October 2026) —
+  the whitepaper for Inspecto LA (Link Analysis) & Graph Intelligence (in-process sovereign graph engine,
+  Parquet link indexing measured to 10^8, 29 deterministic algorithms, tamper-evident op log and forensic Dossier;
+  Basic / Standard / Advanced editions, a sourced benchmark section and a Claims Register).
 - [`roadmap/`](roadmap/) — stakeholder overview, roadmap (Now/Next/Later), presentation decks;
   [`roadmap/WAREHOUSE_TARGETS.md`](roadmap/WAREHOUSE_TARGETS.md) — Inspecto as the ETL/ELT feeder into
   warehouses and lakes: four delivery mechanisms, a grounded target matrix, build order (2026-09-15).
