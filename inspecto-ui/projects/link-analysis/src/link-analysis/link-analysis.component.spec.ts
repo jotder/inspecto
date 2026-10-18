@@ -12,7 +12,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, of, throwError } from 'rxjs';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
 import { InvService, RecursivePathsRequest } from '@inspecto/link-analysis/api/inv.service';
@@ -194,6 +194,8 @@ installDomainProfiles(
     ],
     null,
 );
+// ...and hands the registry back empty, so a later spec in the same worker does not inherit these packs.
+afterAll(() => installDomainProfiles([], null));
 
 describe('LinkAnalysisComponent', () => {
     it('renders the empty state, is a11y-clean, and validates the mapping before querying', async () => {

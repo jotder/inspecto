@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
     GENERIC_PROFILE,
     IndustryPackDto,
@@ -32,6 +32,8 @@ const MONEY: IndustryPackDto = {
 };
 
 describe('domain profiles', () => {
+    // The registry is module state shared with other specs in the worker: start each test from it empty.
+    beforeEach(() => installDomainProfiles([], null));
     afterEach(() => installDomainProfiles([], null));
 
     it('hold only the neutral generic profile until the server installs its packs', () => {

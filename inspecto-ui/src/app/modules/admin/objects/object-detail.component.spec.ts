@@ -5,7 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { EventsService, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
@@ -298,6 +298,7 @@ describe('ObjectDetailComponent', () => {
         // Since the Industry pack format (LA-EDITIONS-1 phase 4) the investigable entity types come from the installed
         // Domain Profiles, so the Telecom pack is installed here rather than inherited from another spec's global state.
         installDomainProfiles([profileFromPack(TELECOM_PACK_FIXTURE)]);
+        onTestFinished(() => installDomainProfiles([], null));
         const { fixture } = create({
             get: () => of({ ...CASE, objectType: 'INCIDENT', attributes: { rule: 'r', 'key.a_msisdn': '966501' } }),
         });
