@@ -206,9 +206,9 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/case-history` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:101` |
 | POST | `/inv/deep-links/resolve` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java:79` |
 | POST | `/inv/entities/([^/]+)/resolve` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java:51` |
-| POST | `/inv/entity-identities` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:93` |
-| POST | `/inv/entity-identities/([^/]+)/retract` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:97` |
-| POST | `/inv/entity-identities/import` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:95` |
+| POST | `/inv/entity-identities` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:94` |
+| POST | `/inv/entity-identities/([^/]+)/retract` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:98` |
+| POST | `/inv/entity-identities/import` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:96` |
 | POST | `/inv/graph/runs` | gated | `canRunLinkGraphAnalysis` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java:126` |
 | POST | `/inv/graph/runs/([^/]+)/cancel` | exempt | self-service | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java:131` |
 | POST | `/inv/inbound/investigations` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java:77` |
