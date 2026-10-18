@@ -74,6 +74,7 @@ import {
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { G6GraphData, EntityProjection, GraphSourceId, GraphSourceQuery, NodeRule, toGraphml } from '@inspecto/core/graph';
+import { LinkAnalysisGlossaryComponent } from './link-analysis-glossary.component';
 import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules.component';
 import {
     analysisNodeCapValue,
@@ -314,6 +315,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         FormMenuDirective,
+        LinkAnalysisGlossaryComponent,
         LinkAnalysisDisplayRulesComponent,
         LinkAnalysisCapsComponent,
         LinkAnalysisModulesComponent,

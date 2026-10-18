@@ -2249,6 +2249,12 @@ The decisions behind these were **assistant-decided under operator delegation an
 - **UI:** `inspecto-link-analysis-display-rules` (presentational) at the foot of the Display menu: rule list with remove, and an add form (type, attribute, comparison, value, swatch).
 - **Deferred:** shape / size / halo outcomes, link (edge) rules, measure predicates, per-Space shared rules, rule reordering (add order is the order), and a legend row for rule colours.
 
+### Glossary popover (typology terms, 2026-10-18)
+
+- `inspecto-link-analysis-glossary` (presentational, OnPush; `glossaryEntries(profile)` is the pure model) is a book icon in the tool rail, just before the Display menu. Its `laFormMenu` popover lists the ACTIVE Industry pack's `term.<id>` entries (label, abbreviation, one-line definition), sorted by label; a term with no definition reads *No definition stated.*
+- Reactive to the active pack (reads `domainProfile(activeDomainProfileId())`); the button is **absent** when the pack states no `term.<id>` (generic, or a pack without a typology). Display only: a pack explains words, it adds no concept. Other term families (`entity_type.*`, `link_kind.*`, `pattern.*`) keep their own surfaces and are not listed here; the Settings > Domain Profile table still lists every key.
+- Not built: search/filter inside the popover, deep links from a pattern or Incident to its term.
+
 ### Search around (loaded-graph mode)
 
 - `search-around.ts` is the pure model: `SearchAroundSpec`, `stepsToSearchAround(steps)` and `searchAroundToSteps(spec)` convert between plain-language conditions and the existing `PatternStep[]`. `link-analysis-search-around.component.ts` (presentational, OnPush) is the form: start type, then per condition a direction, a link kind and a neighbour type, a words list and the *Search around* button.

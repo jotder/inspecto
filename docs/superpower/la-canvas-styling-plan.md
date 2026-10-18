@@ -26,7 +26,7 @@ Per-kind colour, shape (circle/square/diamond/...) and line pattern/size are the
    high-connectivity / unexpanded / selection halos, client-side evaluation only.
 3. **Pattern picker relabel: BUILT** (`pattern.<pack id>` term -> picker label; its `definition` replaces the
    description when stated; ids and the loaded pack stay raw). **Typology terms (`term.<id>`: SIM box, IRSF, Wangiri,
-   Float): no surface exists** - they are glossary-only entries and the SPA draws no glossary; nothing built. Follow-up: a **glossary popover** (not built).
+   Float): no surface exists** - they are glossary-only entries and the SPA draws no glossary; nothing built. Follow-up: a **glossary popover** (BUILT 2026-10-18: tool-rail book icon listing the active pack's `term.<id>` entries; as-built in the OKF `link-analysis.md`).
 
 ## Tests (unit)
 `link-analysis-overlays.component.spec.ts`: a pack installed with a link-kind and an entity-type term relabels the chip
