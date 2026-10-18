@@ -1,12 +1,12 @@
 # Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)
 
-**Status:** 🟡 DESIGN 2026-10-18 — nothing built. Operator decisions in §8 are open.
+**Status:** 🟡 DESIGN 2026-10-18 — nothing built. §8 decisions taken by the assistant under operator delegation (2026-10-18) — **PENDING OPERATOR CONFIRMATION**; S0 (decisions + GLOSSARY) done, S1+ not started.
 **Row:** `docs/BACKLOG.md` §4, `AGENTIC-INVESTIGATION-1` (P2, competitive gap AA).
 **Competitors:** Mobileum RAID Agentic and Subex AI Agent Squads (see `stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`, rows AA and the gap table).
 
 ## 1. Goal
 
-An agent works one Incident. It produces an **Investigation**, which has four parts:
+An agent works one Incident. It produces an **Incident Brief**, which has four parts:
 
 1. **Why it fired.** The trigger Signal, the Expectation or Decision Rule that raised it, the threshold and the observed value.
 2. **Evidence.** Bounded queries, timelines, batch diffs, similar past Incidents and linked entities. Each item is cited.
@@ -40,10 +40,10 @@ An agent works one Incident. It produces an **Investigation**, which has four pa
 
 The design does **not** route the proposed action through the eoiagent approval gate. A parked gate thread works for a chat turn. It does not work for a four-eyes decision that may take hours or days, needs a second, different person, and must survive restarts and the 1 h resume-token TTL.
 
-Instead, the agent's last act is a non-blocking tool, `investigation_propose`. That tool writes an **Action Request** (the `inspecto-action-requests` four-eyes store already used by `invoke-api`) of kind `consequence`, with these fields:
+Instead, the agent's last act is a non-blocking tool, `brief_propose`. That tool writes an **Action Request** (the `inspecto-action-requests` four-eyes store already used by `invoke-api`) of kind `consequence`, with these fields:
 
 - `consequence`: a registered `ConsequenceProvider` id, plus arguments
-- `incidentRef` and `investigationId`
+- `incidentRef` and `briefId`
 - `requestedBy`: the **human** who started the investigation (the authenticated Subject), with `agent:<run>` recorded as the author
 - `dryRun`: a preview, where the provider supports one
 
@@ -58,21 +58,21 @@ The investigation steps are **read-only**, so they need no gate. They run as a f
 
 ### 3.3 Value at risk
 
-This is declared, never inferred by the model. An Expectation or Decision Rule may carry an optional `valueAtRisk` block: `measure` (a Measure over the failing rows, e.g. `sum(charge_amount)`), `currency` or `unit`, and an optional `rate` multiplier. The investigation runs it as a bounded query and shows the formula, inputs and row count. Where no declaration exists, the Investigation says *"not declared"*. It never shows a model-guessed number.
+This is declared, never inferred by the model. An Expectation or Decision Rule may carry an optional `valueAtRisk` block: `measure` (a Measure over the failing rows, e.g. `sum(charge_amount)`), `currency` or `unit`, and an optional `rate` multiplier. The investigation runs it as a bounded query and shows the formula, inputs and row count. Where no declaration exists, the Incident Brief says *"not declared"*. It never shows a model-guessed number.
 
-### 3.4 The Investigation record
+### 3.4 The Incident Brief record
 
-The record is a persisted `Investigation` (`id, incidentRef, startedBy, model, why, evidence[], valueAtRisk?, proposal?, status, createdAt`), and each evidence item holds `tool, args, resultDigest, citation`. It lives beside `TriageRunStore` and follows the Incident's retention through `IncidentPurgeTask`, which cascades to it. The SPA shows it on the Incident page: an "Investigate" button, then the four sections, then a proposal card linking to the Action Request.
+The record is a persisted `IncidentBrief` (`id, incidentRef, startedBy, model, why, evidence[], valueAtRisk?, proposal?, status, createdAt`), and each evidence item holds `tool, args, resultDigest, citation`. It lives beside `TriageRunStore` and follows the Incident's retention through `IncidentPurgeTask`, which cascades to it. The SPA shows it on the Incident page: an "Investigate" button, then the four sections, then a proposal card linking to the Action Request.
 
 ## 4. Slices
 
 | Slice | Content | Size | Depends on |
 |---|---|---|---|
-| S0 | Decisions §8; GLOSSARY entry for **Investigation** | S | — |
-| S1 | `incident_get` + `incident_similar` read tools; Incident-scoped playbook; persisted `Investigation` (why + evidence only) | M | S0 |
+| S0 | Decisions §8; GLOSSARY entry for **Incident Brief** | S | — |
+| S1 | `incident_get` + `incident_similar` read tools; Incident-scoped playbook; persisted `IncidentBrief` (why + evidence only) | M | S0 |
 | S2 | Incident page "Investigate" panel (read-only render, citations) | M | S1 |
 | S3 | `valueAtRisk` declaration on Expectation / Decision Rule specs (`ConfigSafetyValidator` rule), bounded execution, display | M | S0 |
-| S4 | `investigation_propose` → Action Request of kind `consequence`; four-eyes via `ApprovalPolicy`; server-side execute on approval; dry-run preview where available | L | S1 |
+| S4 | `brief_propose` → Action Request of kind `consequence`; four-eyes via `ApprovalPolicy`; server-side execute on approval; dry-run preview where available | L | S1 |
 | S5 | Close the loop: approval or denial is written to `FeedbackStore` so `incident_similar` learns outcomes; purge cascade | S | S4 |
 | S6 | (Could) batch: investigate the top-N open Incidents by value at risk on a schedule — still propose-only | M | S3, S4 |
 
@@ -81,11 +81,11 @@ Each slice ships alone: S1+S2 already close most of the "explains why it fired" 
 ## 5. Seams touched
 
 - `InspectoTools` (2 read tools + 1 propose tool) · `pack/Playbooks`
-- `triage/` (new `InvestigationStore`)
+- `triage/` (new `BriefStore`)
 - `inspecto-action-requests` (new request kind; generalize the execute path from `invoke-api` to any registered Consequence)
 - `ApprovalPolicy` / `ApproverCheck` (reused, unchanged)
 - Expectation / Decision Rule config specs + `ConfigSafetyValidator`
-- New routes: `POST /incidents/{ref}/investigations`, `GET /incidents/{ref}/investigations`. Each needs an `openapi-v1.json` entry and the four route gates.
+- New routes: `POST /incidents/{ref}/briefs`, `GET /incidents/{ref}/briefs`. Each needs an `openapi-v1.json` entry and the four route gates.
 - `IncidentPurgeTask` cascade
 - SPA Incident page
 
@@ -113,10 +113,29 @@ Each slice ships alone: S1+S2 already close most of the "explains why it fired" 
 2. **Who is the "maker" for four-eyes?** **Recommend the human who started the investigation.** The agent is recorded as author only. An unattended (S6) run is made by a configured service principal, and then any human may approve.
 3. **Which Consequences may be proposed?** **Recommend an allow-list per Space**, default `create-alert`, `start-job`, `trigger-pipeline`, `create-incident`/case escalation. Exclude `invoke-api` until its own four-eyes path is unified.
 4. **Value-at-risk source.** **Recommend a declared `valueAtRisk` block only**; never a model estimate.
-5. **Investigation trigger.** **Recommend on demand (button) first**; scheduled top-N (S6) only on demand from a customer.
+5. **Incident Brief trigger.** **Recommend on demand (button) first**; scheduled top-N (S6) only on demand from a customer.
 6. **Edition.** **Recommend Advanced (and Preview)**, matching the intelligence module.
 7. **Model locality.** **Recommend keeping the local-models-only cut by default**, with a hosted model as an explicit Space opt-in because evidence holds customer data.
-8. **Retention.** **Recommend that an Investigation follows its Incident's retention and legal hold.**
+8. **Retention.** **Recommend that an Incident Brief follows its Incident's retention and legal hold.**
+
+### 8.1 Decisions taken (assistant-decided under operator delegation 2026-10-18 — PENDING OPERATOR CONFIRMATION)
+
+**Naming (found while grounding, not in the original list).** ⛔ **Investigation** is already the Link Analysis enquiry object (`GLOSSARY.md` §11; routes `/inv/*`), and the Triage entry bans the word for the Assistant. The agent's output is therefore the **Incident Brief** (Instance; its Type is the existing **Triage** playbook). This doc was renamed to match: `IncidentBrief`, `BriefStore`, `briefId`, `brief_propose`, `/incidents/{ref}/briefs`. *Reverse:* a global rename in this doc and the GLOSSARY entry, nothing is built.
+
+| # | Decision | Rationale (grounded) | Reverse by |
+|---|---|---|---|
+| 1 | **Action Requests, as recommended.** ⚠ Correction: today an Action Request is an *outbound API call* (`ActionRequests`, `ActionDispatcher`), not a generic Consequence. S4 must add a `consequence` kind; it must reuse the same HMAC-signed per-Space store, four-eyes and expiry, never a new approval path. | `AgentApprovals` has no four-eyes and parks a thread (AGT-6b). | Route proposals through `AgentApprovals` (loses four-eyes) |
+| 2 | **Maker = the authenticated human who started the Brief; agent is author only.** An unattended run (S6) uses a configured service principal, and then any human may approve. | `ApproverCheck` already excludes the maker. | — |
+| 3 | **Per-Space allow-list, default empty set = nothing proposable until an admin lists kinds; suggested list `create-alert`, `start-job`, `trigger-pipeline`, `create-incident`. `invoke-api` excluded.** (Tightened from "default on": fail closed.) | A new capability that can cause side effects should be opt-in per Space. | Ship the suggested list as the default |
+| 4 | **Declared `valueAtRisk` block only; never a model estimate.** Absent = "not declared". | The wrong number is worse than none. | — |
+| 5 | **On demand (button) only.** S6 not scheduled. | No unattended cost. | — |
+| 6 | **Advanced (and Preview) only**, matching the intelligence module. | Build flavour, not an `if`. | Add to Standard |
+| 7 | **Local models only by default; hosted model is an explicit per-Space opt-in.** | Evidence holds customer data. | Allow hosted by default |
+| 8 | **A Brief follows its Incident's retention and legal hold; purge cascades.** | One lifecycle, no orphan evidence. | — |
+
+**Safety invariants (fixed, not decisions):** the agent never executes a Consequence, it only files a proposal; every claim cites an evidence item; every gate fails closed (no model, no Subject, no allow-list entry, no eligible approver = no proposal / stays pending).
+
+**S0 scope:** these decisions and the GLOSSARY entry **Incident Brief**. S0 adds **no code, route or config key**, so it has no tests; the first code is S1.
 
 ## 9. Follow-ups (not this row)
 
