@@ -641,6 +641,28 @@ calls the same `decide`, so the two forms share one decision.
 ⚠ The series must have no gaps (resample first); a gap shifts every lag. Detrending is the caller's choice (a first
 difference through `transform.timeseries.shift`); the peak rule only keeps a trend from being *chosen*.
 
+## Hour of week and seasonal profile
+
+*ANALYTICS-CORE-1 C5, built 2026-10-18.* Hour buckets were already in the M5 primitives (`TimeGrain.HOUR`, zoned,
+DST rules above) and the hourly candidates 24 and 168 already in `SeasonalityDetector`; C5 adds what was missing, the
+**calendar slot** and the **profile over it**.
+
+* `HourOfWeek` (`HOUR_OF_DAY` 24 slots, `WEEKDAY` 7, `HOUR_OF_WEEK` 168) — `slot(LocalDateTime)`, `slot(Instant, ZoneId)`,
+  `slotSql(expr)` (wall clock) and `slotSql(expr, zone)` (a `TIMESTAMPTZ` on an explicit zone's wall clock). **The clock is
+  always stated; never DuckDB's session zone.** Weekday is ISO, Monday = 0; hour of week = weekday × 24 + hour (Monday
+  00h = 0). Both occurrences of a repeated fall-back hour share a slot; a skipped hour has no observations.
+* `SeasonalProfile` — `of(kind, slots, values)` / `profileSql` (per key and slot: `n`, `mean`) and `strengthSql` (per key:
+  `n`, `strength`). **Strength** = Σ_obs (slot mean − mean)² / Σ_obs (x − mean)², population arithmetic, in [0, 1], NULL
+  for a constant series: "does a weekday×hour shape explain this series?". It complements `SeasonalityDetector`
+  (which period repeats, on an evenly spaced series); it needs no gap fill. ⚠ With 168 free means a short noise series
+  scores well above 0 (about 168/n), so read strength against the observations per slot.
+* No Step: the slot is a one-line SQL expression and the profile feeds `SeasonalBaseline` callers; a Step can follow
+  the first consumer (D-AN10).
+
+Tests: `HourOfWeekTest` (Monday/Sunday ends, zone changes the slot, labels, a pure shape explained to 1.0, constant and
+bad input), `HourOfWeekDuckDbParityTest` (slot SQL = JVM for 3 kinds × 4 zones across the New York and Berlin DST
+weeks, under two different session zones; profile and strength per key, a NULL value left out, no-key form).
+
 ## Holdout split
 
 *ANALYTICS-CORE-1 S5d, built 2026-10-17.* `com.gamma.analytics.split.HoldoutSplit` — train / validation / test for any
