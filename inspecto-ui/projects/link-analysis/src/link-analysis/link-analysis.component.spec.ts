@@ -2554,3 +2554,92 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         expect(c.drawAnnouncement()).toContain('no branch to fold');
     });
 });
+
+describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, mergeUnavailable)', () => {
+    /** An open Investigation whose Working Set holds the given typed entities; all of them drawn, none selected. */
+    const inInvestigation = async (ids: string[]) => {
+        const made = create();
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        const c = made.fixture.componentInstance;
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: ids.map((id) => ({ id })),
+            links: [],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        made.fixture.detectChanges();
+        const el = made.fixture.nativeElement as HTMLElement;
+        const select = (count: number) => {
+            c.onSelectionChange((c.canvasData()?.nodes ?? []).slice(0, count).map((n) => n.id));
+            made.fixture.detectChanges();
+        };
+        const merge = () => el.querySelector('[data-testid="la-selection-merge"]') as HTMLButtonElement | null;
+        return { ...made, c, el, select, merge };
+    };
+
+    it('is available for two typed, readable entities with the capability, inside an Investigation', async () => {
+        const { fixture, c, select, merge } = await inInvestigation(['msisdn:+447700900123', 'imsi:234150000000001']);
+        select(2);
+        expect(c.selectedOnCanvas()).toHaveLength(2);
+        expect(c.mergeUnavailable()).toBe('');
+        expect(merge()!.disabled).toBe(false);
+        fixture.destroy();
+    });
+
+    it('is unavailable, with the reason, when there is no open Investigation', async () => {
+        const { fixture, c, el } = await inInvestigation(['msisdn:+447700900123', 'imsi:234150000000001']);
+        c.investigation.activeId.set(null);
+        c.investigation.log.set(null as never);
+        c.investigation.workingSet.set(null);
+        fixture.detectChanges();
+        c.onSelectionChange(['a', 'b']); // the query graph is drawn again
+        fixture.detectChanges();
+        expect(c.selectedOnCanvas()).toHaveLength(2);
+        expect(c.mergeUnavailable()).toContain('exactly two');
+        expect(el.querySelector('[data-testid="la-selection-merge"]')).toBeNull(); // the action is Investigation-only
+        fixture.destroy();
+    });
+
+    it('is unavailable, with the reason, without the Incident management capability', async () => {
+        const { fixture, c, select, merge } = await inInvestigation(['msisdn:+447700900123', 'imsi:234150000000001']);
+        select(2);
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set([]);
+        fixture.detectChanges();
+        expect(c.mergeUnavailable()).toContain('needs the Incident management capability');
+        expect(merge()!.disabled).toBe(true);
+        session.capabilities.set(['canManageIncidents']);
+        fixture.detectChanges();
+        expect(c.mergeUnavailable()).toBe('');
+        expect(merge()!.disabled).toBe(false);
+        fixture.destroy();
+    });
+
+    it('is unavailable unless exactly two typed entities are selected', async () => {
+        const { fixture, c, select, merge } = await inInvestigation(['msisdn:+44', 'imsi:1', 'plain']);
+        select(1);
+        expect(c.mergeUnavailable()).toContain('exactly two');
+        expect(merge()!.disabled).toBe(true);
+        select(3);
+        expect(c.mergeUnavailable()).toContain('exactly two');
+        expect(merge()!.disabled).toBe(true);
+        c.onSelectionChange((c.canvasData()?.nodes ?? []).slice(1, 3).map((n) => n.id)); // imsi:1 + the untyped one
+        fixture.detectChanges();
+        expect(c.mergeUnavailable()).toContain('typed entities');
+        expect(merge()!.disabled).toBe(true);
+        fixture.destroy();
+    });
+
+    it('is unavailable when either selected node is a masked alias', async () => {
+        const { fixture, c, select, merge } = await inInvestigation(['msisdn:masked:0123456789abcdef', 'imsi:1']);
+        select(2);
+        expect(c.selectedOnCanvas()).toHaveLength(2);
+        expect(c.mergeUnavailable()).toContain('masked entity cannot be merged');
+        expect(merge()!.disabled).toBe(true);
+        fixture.destroy();
+    });
+});
