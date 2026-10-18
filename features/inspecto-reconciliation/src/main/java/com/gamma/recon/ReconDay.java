@@ -322,9 +322,13 @@ public final class ReconDay {
     }
 
     /**
-     * The bounded in-memory result cache: at most {@link #MAX_ENTRIES} entries, least-recently-used evicted. Keys
-     * carry the input fingerprint, so a changed file (size or mtime) or a changed config is a different key — stale
-     * entries are never read, only aged out.
+     * The bounded in-memory result cache. Result entries (grain / breaks / rows) are bounded two ways: at most
+     * {@link #MAX_ENTRIES} entries AND an estimated {@link #maxBytes} of heap in total, least-recently-used evicted
+     * first (RECON-UPLIFT-1 P4: a cached 200,000-key-group 3-way day holds about 250 MB, so a count bound alone allowed
+     * ~8 GB). The entry just stored is never evicted, so one day larger than the budget is still served from the cache
+     * (alone); the worst case is therefore max(budget, the largest entry), and an entry is bounded by
+     * {@code ReconRoutes.rowCap}. Keys carry the input fingerprint, so a changed file (size or mtime) or a changed
+     * config is a different key: stale entries are never read, only aged out.
      */
     static final class Cache {
         /** Result entries (grain / breaks / rows - a day's rows can be large). */
@@ -334,17 +338,62 @@ public final class ReconDay {
          * seven small entries evicted the very results they sat in front of (RECON-CACHE-1).
          */
         static final int MAX_SMALL_ENTRIES = 512;
-        private static final Map<String, Object> MAP = lru(MAX_ENTRIES);
-        private static final Map<String, Object> SMALL = lru(MAX_SMALL_ENTRIES);
+        /** System property: the result tier's byte budget. Unset = a fraction of the JVM's max heap (see {@link #defaultBudget}). */
+        static final String MAX_BYTES_PROPERTY = "recon.cache.max_bytes";
+        /** Not final only so a test can change it. */
+        static volatile long maxBytes = configuredBudget();
 
-        private static Map<String, Object> lru(int max) {
-            return new LinkedHashMap<>(16, 0.75f, true) {
-                @Override protected boolean removeEldestEntry(Map.Entry<String, Object> e) { return size() > max; }
-            };
+        private record Weighed(Object value, long bytes) { }
+
+        private static final Map<String, Weighed> MAP = new LinkedHashMap<>(16, 0.75f, true);
+        private static long mapBytes;
+        private static final Map<String, Object> SMALL = new LinkedHashMap<>(16, 0.75f, true) {
+            @Override protected boolean removeEldestEntry(Map.Entry<String, Object> e) { return size() > MAX_SMALL_ENTRIES; }
+        };
+
+        /** An eighth of the max heap, between 64 MB and 1 GB. */
+        static long defaultBudget() {
+            return Math.max(64L << 20, Math.min(1L << 30, Runtime.getRuntime().maxMemory() / 8));
         }
 
-        private static Map<String, Object> tier(String key) {
-            return key.startsWith("grain|") || key.startsWith("breaks|") || key.startsWith("rows|") ? MAP : SMALL;
+        private static long configuredBudget() {
+            String v = System.getProperty(MAX_BYTES_PROPERTY);
+            if (v != null && !v.isBlank()) {
+                try {
+                    long n = Long.parseLong(v.trim());
+                    if (n > 0) return n;
+                } catch (NumberFormatException ignored) {
+                    // a bad value falls back to the default, like the sandbox's -Dassist.sql.* settings
+                }
+            }
+            return defaultBudget();
+        }
+
+        private static boolean large(String key) {
+            return key.startsWith("grain|") || key.startsWith("breaks|") || key.startsWith("rows|");
+        }
+
+        /**
+         * A rough heap estimate: strings 40 + 2 per char, numbers 24, a map 48 + its entries, a list of N elements as
+         * N x the first element (rows of one result are alike, so the first stands for all). Deliberately an estimate,
+         * not a measurement: it only has to keep the retained size in the right order of magnitude.
+         */
+        static long weigh(Object o) {
+            if (o == null) return 0;
+            if (o instanceof CharSequence c) return 40L + 2L * c.length();
+            if (o instanceof Number || o instanceof Boolean || o instanceof Character) return 24;
+            if (o instanceof Map<?, ?> m) {
+                long n = 48;
+                for (Map.Entry<?, ?> e : m.entrySet()) n += 32 + weigh(e.getKey()) + weigh(e.getValue());
+                return n;
+            }
+            if (o instanceof List<?> l) return l.isEmpty() ? 24 : 24L + (long) l.size() * (8 + weigh(l.get(0)));
+            if (o instanceof ReconService.DayResult r) {
+                return 64 + weigh(r.rows()) + 16L + 4L * (r.cls() == null ? 0 : r.cls().length) + weigh(r.totals()) + weigh(r.summary()) + weigh(r.sample());
+            }
+            if (o instanceof ReconService.Page pg) return 32 + weigh(pg.rows());
+            if (o instanceof ReconService.DayPage dp) return 32 + weigh(dp.day()) + weigh(dp.page());
+            return 64;
         }
 
         /** Hits per key kind (the key up to its first {@code |}: grain, scope, days, prune, stats, breaks, rows) — read by tests. */
@@ -352,17 +401,36 @@ public final class ReconDay {
 
         @SuppressWarnings("unchecked")
         static synchronized <T> T get(String key) {
-            Object v = tier(key).get(key);
+            Object v;
+            if (large(key)) { Weighed w = MAP.get(key); v = w == null ? null : w.value(); }
+            else v = SMALL.get(key);
             if (v != null) HITS.merge(key.substring(0, Math.max(0, key.indexOf('|'))), 1L, Long::sum);
             return (T) v;
         }
         static synchronized long hits(String kind) { return HITS.getOrDefault(kind, 0L); }
-        static synchronized void put(String key, Object value) { tier(key).put(key, value); }
-        static synchronized void clear() {
+        static synchronized void put(String key, Object value) {
+            if (!large(key)) { SMALL.put(key, value); return; }
+            Weighed old = MAP.remove(key);
+            if (old != null) mapBytes -= old.bytes();
+            long w = weigh(value);
+            MAP.put(key, new Weighed(value, w));
+            mapBytes += w;
+            // Evict least-recently-used first, but never the entry just stored (it is the youngest, so the loop stops at it).
+            var it = MAP.entrySet().iterator();
+            while ((MAP.size() > MAX_ENTRIES || mapBytes > maxBytes) && MAP.size() > 1 && it.hasNext()) {
+                var e = it.next();
+                if (e.getKey().equals(key)) break;
+                mapBytes -= e.getValue().bytes();
+                it.remove();
+            }
+        }        static synchronized void clear() {
             MAP.clear();
+            mapBytes = 0;
             SMALL.clear();
             synchronized (FINGERPRINTS) { FINGERPRINTS.clear(); }
         }
         static synchronized int size() { return MAP.size() + SMALL.size(); }
+        /** The estimated heap held by the result tier. */
+        static synchronized long bytes() { return mapBytes; }
     }
 }

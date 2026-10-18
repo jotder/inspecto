@@ -276,4 +276,23 @@ class ReconBreaksParityTest {
             }
         }
     }
+
+    /**
+     * A key whose TYPE differs between the sides (DATE vs TIMESTAMP): the grain's unified key would read back as a
+     * timestamp and change the key text, hence the recorded Break's id. Such a Reconciliation must take the original
+     * per-type scans, so each key keeps its own side's type (found by the independent review, 2026-10-18).
+     */
+    @Test
+    void aKeyWhoseTypeDiffersBetweenSidesKeepsItsOwnSidesText() throws Exception {
+        ReconService.Spec spec = spec(List.of(
+                side("a", "(DATE '2026-01-01',1.0),(DATE '2026-01-02',2.0)", "d, amount"),
+                side("b", "(TIMESTAMP '2026-01-01 00:00:00',1.0),(TIMESTAMP '2026-01-03 00:00:00',2.0)", "d, amount")),
+                List.of("d"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)), ReconService.Cardinality.MANY_TO_MANY);
+        List<String> expected = render(legacy(spec, CAP));
+        List<String> actual = render(ReconBreaks.compute(spec, CAP));
+        assertEquals(expected, actual, "mixed key types must give exactly the per-type scans' Breaks");
+        assertTrue(actual.stream().anyMatch(b -> b.contains("missing_right|2026-01-02|")),
+                "the anchor-only key reads as A's DATE, not a timestamp: " + actual);
+        assertFalse(actual.stream().anyMatch(b -> b.contains("missing_right|2026-01-02 00:00")), actual.toString());
+    }
 }

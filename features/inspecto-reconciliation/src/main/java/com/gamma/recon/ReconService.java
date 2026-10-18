@@ -359,12 +359,15 @@ public final class ReconService {
         private final SqlSandbox sandbox;
         private final Connection conn;
         private final Spec spec;
+        /** False when a key column has a different type on different sides (see {@link #keyTypesAgree}). */
+        private final boolean uniformKeys;
         private Map<String, Object> summary;
 
-        private Grain(SqlSandbox sandbox, Connection conn, Spec spec) {
+        private Grain(SqlSandbox sandbox, Connection conn, Spec spec, boolean uniformKeys) {
             this.sandbox = sandbox;
             this.conn = conn;
             this.spec = spec;
+            this.uniformKeys = uniformKeys;
         }
 
         public Spec spec() { return spec; }
@@ -388,6 +391,10 @@ public final class ReconService {
         public Map<String, BreakSet> breakSets(int other, int limit) throws SQLException {
             if (other < 1 || other >= spec.sides().size())
                 throw new IllegalArgumentException("side '" + other + "' is not a compared side of this reconciliation");
+            // 🔴 The grain keeps one unified key per row (COALESCE over the sides), so a key whose type differs between sides
+            // (DATE vs TIMESTAMP) would change its text, and with it the recorded Break's id. Such a Reconciliation takes the
+            // original per-type scans, which read each key from its own side. Rare, and exactly as before.
+            if (!uniformKeys) return breaks(spec, null, null, other, limit, 0);
             if (spec.carriedImpact() != null) padAbsentImpact(conn, spec);
             Map<String, BreakSet> out = new LinkedHashMap<>();
             out.put("missing_right", breakSet(conn, spec, grainMissingSql(spec, other, true, limit), 'a', limit, false));
@@ -411,11 +418,34 @@ public final class ReconService {
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE TEMP TABLE __grain AS " + grainTableSql(spec));
             }
-            return new Grain(sandbox, conn, spec);
+            return new Grain(sandbox, conn, spec, keyTypesAgree(conn, spec));
         } catch (SQLException | RuntimeException e) {
             sandbox.close();
             throw e;
         }
+    }
+
+    /**
+     * Whether every key column has the same SQL type on every side (a {@code LIMIT 0} read of each side's key columns:
+     * metadata only, no scan). Two sides that join on a DATE and a TIMESTAMP, or an INTEGER and a DECIMAL, agree on the
+     * key's VALUE but not its Java type, so a unified grain key would not read back as the side's own.
+     */
+    static boolean keyTypesAgree(Connection conn, Spec spec) throws SQLException {
+        List<String> keys = spec.keyColumns();
+        List<List<String>> types = new ArrayList<>();
+        for (int side = 0; side < spec.sides().size(); side++) {
+            StringBuilder sql = new StringBuilder("SELECT ");
+            for (int i = 0; i < keys.size(); i++) sql.append(i > 0 ? ", " : "").append(q(spec.physical(side, keys.get(i))));
+            sql.append(" FROM ").append(VIEWS[side]).append(" LIMIT 0");
+            List<String> t = new ArrayList<>();
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql.toString())) {
+                ResultSetMetaData md = rs.getMetaData();
+                for (int c = 1; c <= md.getColumnCount(); c++) t.add(md.getColumnTypeName(c));
+            }
+            types.add(t);
+        }
+        for (int side = 1; side < types.size(); side++) if (!types.get(side).equals(types.get(0))) return false;
+        return true;
     }
 
     /**
