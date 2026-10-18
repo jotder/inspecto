@@ -73,7 +73,8 @@ import {
 } from './investigate-number';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
-import { G6GraphData, EntityProjection, GraphSourceId, GraphSourceQuery, toGraphml } from '@inspecto/core/graph';
+import { G6GraphData, EntityProjection, GraphSourceId, GraphSourceQuery, NodeRule, toGraphml } from '@inspecto/core/graph';
+import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules.component';
 import {
     analysisNodeCapValue,
     collapseBranches,
@@ -248,6 +249,7 @@ interface PresentationSnapshot {
     nodeShapes: Record<string, string>;
     edgePatterns: Record<string, EdgePattern>;
     edgeSizes: Record<string, number>;
+    nodeRules: NodeRule[];
     layoutId: GraphLayoutId;
 }
 
@@ -312,6 +314,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         FormMenuDirective,
+        LinkAnalysisDisplayRulesComponent,
         LinkAnalysisCapsComponent,
         LinkAnalysisModulesComponent,
         ChipComponent,
@@ -981,6 +984,13 @@ export class LinkAnalysisComponent implements OnInit {
     readonly nodeShapes = signal<Record<string, string>>({});
     readonly edgePatterns = signal<Record<string, EdgePattern>>({});
     readonly edgeSizes = signal<Record<string, number>>({});
+    /** Conditional formatting: ordered attribute-predicate → node-colour rules (first match wins); saved with a view. */
+    readonly nodeRules = signal<NodeRule[]>([]);
+    /** Every node-`attrs` key present in the drawn graph — the rule builder's attribute options. */
+    readonly nodeAttributeKeys = computed<string[]>(() => {
+        const g = this.investigation.canvas() ?? this.graph();
+        return g ? [...new Set(g.nodes.flatMap((n) => Object.keys(n.data.attrs ?? {})))].sort() : [];
+    });
     // ── level of detail (mockup review point 5): labels are the first thing to go on a big canvas ──
     readonly levelOfDetail = signal(true);
     /** Above this many displayed nodes, labels are dropped while level of detail is on (`display.lod_label_cap`). */
@@ -1037,6 +1047,7 @@ export class LinkAnalysisComponent implements OnInit {
             nodeShapes: this.nodeShapes(),
             edgePatterns: this.edgePatterns(),
             edgeSizes: this.edgeSizes(),
+            ...(this.nodeRules().length ? { nodeRules: this.nodeRules() } : {}),
         }),
         { equal: (a, b) => stableKey(a) === stableKey(b) },
     );
@@ -1054,7 +1065,8 @@ export class LinkAnalysisComponent implements OnInit {
             Object.keys(this.edgeColors()).length > 0 ||
             Object.keys(this.nodeShapes()).length > 0 ||
             Object.keys(this.edgePatterns()).length > 0 ||
-            Object.keys(this.edgeSizes()).length > 0,
+            Object.keys(this.edgeSizes()).length > 0 ||
+            this.nodeRules().length > 0,
     );
 
     // ── layout (the Layout toolbox; persisted with a saved view) ──
@@ -1883,6 +1895,12 @@ export class LinkAnalysisComponent implements OnInit {
         this.edgeSizes.set(size != null ? { ...rest, [kind]: size } : rest);
     }
 
+    /** Replace the conditional-formatting rules (undoable). */
+    setNodeRules(rules: NodeRule[]): void {
+        this.recordHistory();
+        this.nodeRules.set(rules);
+    }
+
     /** Pick a graph layout (tree layouts are gated on {@link isTreeShaped} in the template). */
     setLayout(id: GraphLayoutId): void {
         this.recordHistory();
@@ -1912,6 +1930,7 @@ export class LinkAnalysisComponent implements OnInit {
             nodeShapes: this.nodeShapes(),
             edgePatterns: this.edgePatterns(),
             edgeSizes: this.edgeSizes(),
+            nodeRules: this.nodeRules(),
             layoutId: this.layoutId(),
         };
     }
@@ -1931,6 +1950,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.nodeShapes.set(s.nodeShapes);
         this.edgePatterns.set(s.edgePatterns);
         this.edgeSizes.set(s.edgeSizes);
+        this.nodeRules.set(s.nodeRules);
         this.pickedLayout.set(s.layoutId);
     }
 
@@ -1976,6 +1996,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.nodeShapes.set(display?.nodeShapes ?? {});
         this.edgePatterns.set(display?.edgePatterns ?? {});
         this.edgeSizes.set(display?.edgeSizes ?? {});
+        this.nodeRules.set(display?.nodeRules ?? []);
     }
 
     // ── canvas tools: fit · fullscreen · collapse/expand ──

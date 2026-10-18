@@ -21,7 +21,7 @@ Per-kind colour, shape (circle/square/diamond/...) and line pattern/size are the
    msisdn, wallet, account, agent, handset, cell). `<inspecto-graph-view [entityIcons]>` (Link Analysis sets it) draws the
    icon tile; an explicit per-kind shape override WINS; a type with no glyph keeps its plain shape. No runtime sprite
    extraction, no async seam, no pack field. The shared icon picker also gains these glyphs.
-2. **Conditional formatting: DEFERRED.** Open options: rule shape (attribute / measure predicate -> colour, shape,
+2. **Conditional formatting: smallest slice BUILT 2026-10-18** (ordered node-colour rules on `attrs`, saved with the view's `display`, client-side; as-built in the OKF `link-analysis.md`). Still open beyond that slice: rule shape (attribute / measure predicate -> colour, shape,
    size, halo), persistence (saved view `display` vs the Space), precedence against per-kind overrides and the
    high-connectivity / unexpanded / selection halos, client-side evaluation only.
 3. **Pattern picker relabel: BUILT** (`pattern.<pack id>` term -> picker label; its `definition` replaces the

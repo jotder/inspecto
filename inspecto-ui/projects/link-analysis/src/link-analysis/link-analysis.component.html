@@ -520,6 +520,13 @@
                                 </button>
                             </div>
                         }
+                        <inspecto-link-analysis-display-rules
+                            [rules]="nodeRules()"
+                            [attributes]="nodeAttributeKeys()"
+                            [kinds]="nodeKinds()"
+                            [swatches]="swatches"
+                            (rulesChange)="setNodeRules($event)"
+                        />
                     </div>
                 </mat-menu>
 

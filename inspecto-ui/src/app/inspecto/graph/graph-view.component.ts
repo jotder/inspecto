@@ -28,6 +28,8 @@ import {
 } from '@antv/g6';
 import { G6GraphData, entityTypeIcon, nodeColor, nodeKindLabel, nodeShape } from './catalog-graph';
 import { toSvg } from './graph-export';
+import type { G6Node } from './graph-types';
+import { NodeRule, nodeRuleColor } from './node-rules';
 import { NodeKind } from 'app/inspecto/api';
 import { ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
 
@@ -223,6 +225,8 @@ export interface GraphDisplayOptions {
     edgePatterns: Record<string, EdgePattern>;
     /** edge (relationship) kind → line width in px. */
     edgeSizes: Record<string, number>;
+    /** Conditional formatting: ordered rules colouring the nodes that satisfy an attribute predicate (first match wins). */
+    nodeRules?: NodeRule[];
 }
 
 /**
@@ -773,6 +777,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const group = this.emGroups?.get(d.id as string);
         if (group) return this.groupSwatch.get(group)!; // analysis overlay wins over styling
         const kind = (d.data as { kind: NodeKind }).kind;
+        const ruled = nodeRuleColor(this.display?.nodeRules, d.data as G6Node['data']);
+        if (ruled) return ruled; // conditional formatting outranks the per-kind colour
         return this.display?.nodeColors[kind] ?? (d.data as { color?: string }).color ?? nodeColor(kind);
     }
 

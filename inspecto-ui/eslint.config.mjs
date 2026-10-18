@@ -64,6 +64,7 @@ const coreGraphFiles = [
     'catalog-graph',
     'graph-view.component',
     'graph-export',
+    'node-rules', // conditional-formatting predicate the core graph-view reads (no library deps)
 ];
 const CORE_MSG =
     'Core (app/inspecto/**) must not import Link Analysis / Geo library code: keep the type or function core needs in a core file, or inject it (D-5 step 1).';

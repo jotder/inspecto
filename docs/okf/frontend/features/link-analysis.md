@@ -2239,7 +2239,15 @@ The decisions behind these were **assistant-decided under operator delegation an
 ### Built-in Entity Type glyph icons
 
 - `catalog-graph.ts`: `GLYPH_LIBRARY` holds inlined Heroicons outline paths (MIT; the attribution is in the comment there), `ENTITY_TYPE_GLYPH` keys nine Entity Type ids (subscriber, imsi, imei, msisdn, wallet, account, agent, handset, cell) to a glyph, and `entityTypeIcon(...)` builds the icon tile. The shared icon picker gains the same glyphs.
-- Opt-in: `<inspecto-graph-view [entityIcons]>`; Link Analysis sets it. An explicit per-kind shape override (Display menu `nodeShapes`) **wins** over the icon; a type with no glyph keeps its plain shape. No runtime sprite extraction and no pack field. Conditional formatting stays deferred.
+- Opt-in: `<inspecto-graph-view [entityIcons]>`; Link Analysis sets it. An explicit per-kind shape override (Display menu `nodeShapes`) **wins** over the icon; a type with no glyph keeps its plain shape. No runtime sprite extraction and no pack field. Conditional formatting: see the next section.
+
+### Conditional formatting (smallest useful slice, 2026-10-18)
+
+- **Scope built:** ordered *node-colour* rules, an attribute predicate to a chart-token swatch. `core/graph/node-rules.ts` is the pure model (`NodeRule {kind?, attr, op, value, color}`, ops equals / is not / contains / greater / less; numeric ops need both sides numeric; a node WITHOUT the attribute never matches, not even *is not*; `kind` scopes to one Entity Type; the first matching rule wins). Rules read the node's `attrs` (a node mapping's attribute columns) only. It is on the core allow-list in `eslint.config.mjs` because `graph-view` reads it.
+- **Precedence:** analysis-overlay group colour > a matching rule > per-kind Display colour > default. Halos (high connectivity, selection), the dotted unexpanded outline and the dimmed stranded node are separate style channels, so a rule never hides them; the halo takes the rule's colour like any node colour.
+- **Persistence:** `GraphDisplayOptions.nodeRules` (optional; written only when non-empty), so it saves and restores with the saved view and rides the same undo history (`PresentationSnapshot.nodeRules`). Client-side only; no backend or Space-level storage.
+- **UI:** `inspecto-link-analysis-display-rules` (presentational) at the foot of the Display menu: rule list with remove, and an add form (type, attribute, comparison, value, swatch).
+- **Deferred:** shape / size / halo outcomes, link (edge) rules, measure predicates, per-Space shared rules, rule reordering (add order is the order), and a legend row for rule colours.
 
 ### Search around (loaded-graph mode)
 

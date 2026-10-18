@@ -5,3 +5,4 @@ export * from './graph-source';
 export * from './graph-export';
 export * from './entity-key';
 export * from './branching-stage';
+export * from './node-rules';
