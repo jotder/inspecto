@@ -92,5 +92,5 @@ removed state answers 409.
 ## 9. Limits and gotchas
 
 - A Case's `targetDate` is only a loose hint; the SLA Policy is the clock.
-- Open residual `ASSURE-WORKFLOW-SLA-RESIDUALS-1` (a): a deleted assignee is not rechecked at sweep time.
+- Not built (retired to BACKLOG §6 2026-10-18; trigger: an IAM customer): a deleted assignee is not rechecked at sweep time.
 - Queues and watchers were retired (INC-4); assignment is person-only.

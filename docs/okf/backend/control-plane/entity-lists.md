@@ -138,7 +138,9 @@ The seam is `com.gamma.entitylist.WatchListFeed`, an engine SPI that `inspecto-e
 8. **`create` is not governed; `members` and `retire` are.** Only additions expiring within 24 h are exempt (D-P5).
 9. **The sidecar is a projection.** It never fails the write, and it never creates a data root.
 
-## Residuals (P3 `ASSURE-ENTITY-LISTS-RESIDUALS-1`)
+## Residuals (former P3 `ASSURE-ENTITY-LISTS-RESIDUALS-1`, closed 2026-10-18)
+
+The row is closed: (2)-(4) shipped and (1) was retired to BACKLOG §6 *Link Analysis & Geo* on 2026-10-18 (decided under operator delegation; trigger: a customer asks).
 
 - `excludeBy` / `seedBy` seal exact keys only; range entries do not take part yet. This is Link Analysis-owned. Decided 2026-10-04: DEFER until a customer asks; range / CIDR matching changes the sealed-log format and the replay hash, so it needs its own design.
 - ~~There is no SPA authoring for ranges or expiry~~ shipped 2026-10-06: each writable list in the Investigation

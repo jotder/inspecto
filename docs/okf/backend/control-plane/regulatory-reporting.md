@@ -208,7 +208,7 @@ path. SPA: *Verify the delivered file* on a submitted report shows the result in
 accidental change and an outside-the-system edit noticed later; it is not a signature (anyone who can rewrite the file
 can rewrite the sidecar) - that is XMLDSig / CMS, still demand-gated.
 
-## Deliberately not built (see `docs/BACKLOG.md` `REGULATORY-REPORTING-RESIDUALS-1`)
+## Deliberately not built (former P3 `REGULATORY-REPORTING-RESIDUALS-1`, retired to BACKLOG §6 *Cases, Incidents & Assistant* 2026-10-18 under operator delegation; trigger: a named regulator or an operator ask)
 Regulator acknowledgement ingest (`rejected`, receipts); live regulator delivery (SFTP / HTTPS through a Connection);
 nested repeating groups; signing the delivered file (XMLDSig / CMS); a dedicated filing capability (RBAC capability
 contribution is declined, P1-D3).
