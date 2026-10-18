@@ -1,13 +1,23 @@
-# Analytics core — one home for data operations and statistics (plan, 2026-10-17)
+# Analytics core — one home for data operations and statistics (plan, 2026-10-17; reviewed 2026-10-18)
 
-> 🟢 **MUST ITEMS BUILT 2026-10-17** (M1–M10; M6 amended by D-AN9). As-built: `okf/backend/analytics-kernel.md`
-> and `okf/backend/engine/db-layer.md` (one SQL building path). Duplication inventory 74 → 2 (only Jaccard and
-> Jaro-Winkler left, Should item S1). Should batch 2 BUILT 2026-10-17: S1 (similarity kit, `transform.similarity` Step; duplication inventory now 0), S5 (forecast kernel + prediction intervals + `transform.timeseries.forecast` Step, accuracy measures and backtest, seasonality detection, holdout split), S6 (temporal motif matcher in `platform/inspecto-graph`), S7 (`analytics` Platform Service). Should batch 3 BUILT 2026-10-17: S2 (deterministic entity grouping, `transform.entity.link`, D-M1 enforced in the API), S3 (`transform.stats.outlier`, `transform.data.binning`, `transform.stats.correlation` — Spearman added 2026-10-18, D-AN20), S4 (`transform.analytics.rank`, `transform.sample`, `transform.matrix.pivot`), S8 (`ObjectService.analytics` rollup and the Case Rule window into the store; Postgres goldens unverified here). All Should items built; Could: C2, C3, C4 BUILT 2026-10-18 (model-kernel lane, §9; the rest not started). As built (verifier notes): S5 (e) writes a time-indexed *sibling* of the M7 contract — it reuses the column vocabulary and the series cap but not the 0–100 scale or the `_latest` swap, because a forecast is keyed by time, not by entity; the Assistant's `anomaly_scan` uses the kernel's SQL forms (`StatsSql`) rather than the S7 Platform Service, since it is set-based SQL. Lane C 2026-10-18 (D-AN30…D-AN35): S8 Postgres goldens run green on PostgreSQL 18, the named quote residuals and the dead `Summarize*` classes dealt with, and Could item C8 (Analytics function catalogue, `GET /analytics/functions` + the Analytics functions pane) built; the remaining Could items and `PartitionCompactor` `union_by_name` stay open. As built (verifier notes): S5 (e) writes a time-indexed *sibling* of the M7 contract — it reuses the column vocabulary and the series cap but not the 0–100 scale or the `_latest` swap, because a forecast is keyed by time, not by entity; the Assistant's `anomaly_scan` uses the kernel's SQL forms (`StatsSql`) rather than the S7 Platform Service, since it is set-based SQL. Decisions D-AN1…D-AN9 taken by the agent under the
-> operator's delegated authority, each with its reason (§7). Row: `ANALYTICS-CORE-1` in `docs/BACKLOG.md`.
+> 🟢 **BUILT — every Must, every Should, and Could C1–C6, C8, C9** (2026-10-17 and 2026-10-18). Open: C7 (blocked on
+> DuckDB 2.0) and the follow-ups in §10. Row: `ANALYTICS-CORE-1` in `docs/BACKLOG.md`. As-built:
+> `okf/backend/analytics-kernel.md` and `okf/backend/engine/db-layer.md` (one SQL building path).
 >
-> 🟢 **COULD, lane A (time series and Measures) BUILT 2026-10-18:** C5 hour-of-week slots and seasonal profile, C6
-> change-point / regime detection, C1 windowed and ratio Measures, C9 cohort retention and funnel — decisions D-AN10…D-AN13
-> (assistant-decided, **PENDING OPERATOR CONFIRMATION**). The Steps for C6 and C9 are open (`ANALYTICS-STEPS-TS-1`).
+> | Batch | Built | Decisions |
+> |---|---|---|
+> | Must, 2026-10-17 | M1–M10: Analytics Kernel `platform/inspecto-analytics`, graph library `platform/inspecto-graph`, one SQL building path, statistical Measure aggregates, one column profiler, time-series primitives and Steps, baseline and score-output contracts, the ratcheting duplication guard (inventory 74 → 2 → 0 after S1) | D-AN1…D-AN9 (§7; M6 amended by D-AN9) |
+> | Should, 2026-10-17 | S1 similarity kit + `transform.similarity`; S2 entity grouping + `transform.entity.link` (D-M1 enforced in the API); S3 `transform.stats.outlier` / `transform.data.binning` / `transform.stats.correlation`; S4 `transform.analytics.rank` / `transform.sample` / `transform.matrix.pivot`; S5 forecast kernel, prediction intervals, `transform.timeseries.forecast`, accuracy measures and backtest, seasonality detection, holdout split; S6 temporal motif matcher; S7 `analytics` Platform Service; S8 `ObjectService.analytics` rollup and the Case Rule window in the store | §7 |
+> | Could lane A, 2026-10-18 | C5 hour-of-week slots and seasonal profile, C6 change-point kernel, C1 windowed and ratio Measures, C9 cohort retention and funnel (their Steps: `ANALYTICS-STEPS-TS-1`) | D-AN10…D-AN13 (§7) |
+> | Could lane B, 2026-10-18 | Spearman (completes S3), C2 k-means, C3 logistic regression, C4 isolation forest as an Anomaly Model option | D-AN20…D-AN29 (§9) |
+> | Could lane C, 2026-10-18 | C8 function catalogue (`GET /analytics/functions` + the Analytics functions pane); S8 Postgres goldens green on PostgreSQL 18; quote residuals; dead `Summarize*` classes deleted | D-AN30…D-AN35 (§7) |
+>
+> Every decision from D-AN10 on is **assistant-decided under the operator's delegation, PENDING OPERATOR CONFIRMATION**.
+> As built (verifier notes): S5 (e) writes a time-indexed *sibling* of the M7 contract — it reuses the column
+> vocabulary and the series cap but not the 0–100 scale or the `_latest` swap, because a forecast is keyed by time,
+> not by entity; the Assistant's `anomaly_scan` uses the kernel's SQL forms (`StatsSql`) rather than the S7 Platform
+> Service, since it is set-based SQL. D-AN1…D-AN9 were taken by the agent under the operator's delegated authority,
+> each with its reason (§7).
 >
 > **Operator brief (2026-10-17).** Every application on the platform — Link Analysis, Revenue Assurance, Fraud,
 > Case Management — is data-heavy. Generic data munching and statistics belong in the core, once; what only one
@@ -114,10 +124,10 @@ Sizes: S / M / L. "Consumers" names who gets it first.
 
 | # | Item | Scope | Consumers | Size |
 |---|---|---|---|---|
-| **S1** | **Similarity kit** | Jaro-Winkler, Levenshtein, token Jaccard, normalisation (case, accents, whitespace) — JVM and DuckDB's built-in string similarity functions, with parity tests; Step `quality.match.fuzzy`. Screening's name folding and blocking stay in Screening | Screening, data quality, LA, Mobile Money | S |
-| **S2** | **Deterministic entity grouping** | Blocking keys + match conditions + union-find → resolution groups; Step `enrichment.entity.link`. Similarity can *propose* candidates but never asserts identity (D-M1) | LA, Screening, Case dedupe, Mobile Money agents/wallets | M |
-| **S3** | **Distribution Steps** | `transform.stats.outlier` (IQR, robust z), `transform.data.binning` (equal-width, quantile), histogram, `transform.stats.correlation` (`corr`, `regr_*`) | Data quality, Fraud, BA | M |
-| **S4** | **Ranking, sampling, pivot** | `transform.analytics.rank` (Top-N per group), `quality.sample.reservoir` (seeded, deterministic, stratified), `transform.matrix.pivot` | BI, investigations, testing large Datasets | S–M |
+| **S1** | **Similarity kit** | Jaro-Winkler, Levenshtein, token Jaccard, normalisation (case, accents, whitespace) — JVM and DuckDB's built-in string similarity functions, with parity tests; Step `transform.similarity` (planned as `quality.match.fuzzy`). Screening's name folding and blocking stay in Screening | Screening, data quality, LA, Mobile Money | S |
+| **S2** | **Deterministic entity grouping** | Blocking keys + match conditions + union-find → resolution groups; Step `transform.entity.link` (planned as `enrichment.entity.link`). Similarity can *propose* candidates but never asserts identity (D-M1) | LA, Screening, Case dedupe, Mobile Money agents/wallets | M |
+| **S3** | **Distribution Steps** | `transform.stats.outlier` (IQR, robust z), `transform.data.binning` (equal-width, quantile), histogram, `transform.stats.correlation` (`corr`, `regr_*`; Spearman via `method`, D-AN20) | Data quality, Fraud, BA | M |
+| **S4** | **Ranking, sampling, pivot** | `transform.analytics.rank` (Top-N per group), `transform.sample` (planned as `quality.sample.reservoir`; seeded, deterministic, stratified), `transform.matrix.pivot` | BI, investigations, testing large Datasets | S–M |
 | **S5** | **Forecasting & Prediction base** (promoted 2026-10-17: the next item after the Musts) | (a) **Forecast kernel** — seasonal-naive and Holt-Winters additive, lifted from the `business-assurance` template SQL into a core function and Step `transform.timeseries.forecast`, built on the M5 primitives; (b) **Backtest + accuracy measures** — rolling-origin backtest and one definition each of MAE, MAPE (zero-actual rule stated), sMAPE, bias and coverage of the prediction interval; (c) **Seasonality detection** — period found from the data (autocorrelation over candidate periods, deterministic), so a declared period is optional; (d) **Deterministic holdout split** — seeded train / validation / test split by time or by entity hash, reusable by any model; (e) **Prediction-interval output shape** — point forecast plus lower / upper band and level, written through the M7 score/output contract so BI, KPI bands and Alert Rules read every forecast the same way. The Predictive design's S4 builds on it (OD-11 stays open there); no training on the request path, no new dependency (W1–W3, W7) | BA and RA packs, KPI bands, Anomaly (seasonality), Predictive | M–L |
 | **S6** | **Temporal motif matcher** | `BranchingPatternEngine` (fan-in / fan-out stages within a window) to the core; LA's `PatternQueryCompiler` stays | AML structuring, Mobile Money, Fraud | S |
 | **S8** | **JVM-side aggregation to SQL** | `ObjectService.analytics`, `CaseOperations.evaluateCaseRule`, `ReportService` percentiles move to the store's SQL or the kernel | Case Management, Incidents, ops reports | S |
@@ -125,17 +135,19 @@ Sizes: S / M / L. "Consumers" names who gets it first.
 
 ### Could — when demand is named
 
-| # | Item | Note |
-|---|---|---|
-| C1 | Windowed and ratio Measures ✅ **built 2026-10-18** (D-AN12) | `PREDICTIVE-WINDOWED-MEASURES-1`; D10/D11 revisited: both stand |
-| C2 | Clustering kernel (k-means) | Predictive design's *Could*; segmentation. 🟢 BUILT 2026-10-18 (§9) |
-| C3 | Hand-written logistic regression | Predictive *Could*; fitted churn. 🟢 BUILT 2026-10-18 (§9) |
-| C4 | Isolation forest behind the Anomaly explanation shape | D-AD2 left room for it. 🟢 BUILT 2026-10-18 (§9) |
-| C5 | Hour buckets and weekday×hour seasonality ✅ **built 2026-10-18** (D-AN10) | parked D9 |
-| C6 | Change-point / regime detection ✅ **built 2026-10-18**, kernel and SQL form (D-AN11); Step open | generalise the BA template's regime-change SQL |
-| C7 | Graph traversal in SQL via `USING KEY` recursion | only after DuckDB 2.0 adoption (loop-queries plan C1/C2) |
-| C8 | Analytics function catalogue in the UI — ✅ BUILT 2026-10-18 (D-AN33…D-AN35) | id, parameters, cost hint, result kind — as LA's `Algorithm` enum does for graphs |
-| C9 | Cohort, funnel and retention primitives ✅ **built 2026-10-18**, kernel and SQL form (D-AN13); Step open | Sales & Marketing BI pack |
+Status: 🟢 built · ⏳ open · ⛔ blocked.
+
+| # | Item | Status | Note |
+|---|---|---|---|
+| C1 | Windowed and ratio Measures | 🟢 2026-10-18 (D-AN12) | `PREDICTIVE-WINDOWED-MEASURES-1` closed; D10 and D11 revisited, both stand |
+| C2 | Clustering kernel (k-means) | 🟢 2026-10-18 (D-AN22, D-AN23) | Predictive design's *Could*; segmentation. Kernel and SQL assignment form, no Step |
+| C3 | Hand-written logistic regression | 🟢 2026-10-18 (D-AN25) | Predictive *Could*; fitted churn. Fit offline only (W7) |
+| C4 | Isolation forest behind the Anomaly explanation shape | 🟢 2026-10-18 (D-AN26…D-AN28) | `ANOMALY-ML-SCORING-1`; UI form follow-up D-AN29 |
+| C5 | Hour buckets and weekday×hour seasonality | 🟢 2026-10-18 (D-AN10) | parked D9 |
+| C6 | Change-point / regime detection | 🟢 2026-10-18, kernel and SQL form (D-AN11); Step open | generalise the BA template's regime-change SQL; Step: `ANALYTICS-STEPS-TS-1` |
+| C7 | Graph traversal in SQL via `USING KEY` recursion | ⛔ | only after DuckDB 2.0 adoption (loop-queries plan C1/C2) |
+| C8 | Analytics function catalogue in the UI | 🟢 2026-10-18 (D-AN33…D-AN35); lane A and B kernels not yet registered (§10) | id, parameters, cost hint, result kind — as LA's `Algorithm` enum does for graphs |
+| C9 | Cohort, funnel and retention primitives | 🟢 2026-10-18, kernel and SQL form (D-AN13); Step open | Sales & Marketing BI pack; Step: `ANALYTICS-STEPS-TS-1` |
 
 ### Won't — this horizon (each a recorded decision)
 
@@ -150,22 +162,24 @@ Sizes: S / M / L. "Consumers" names who gets it first.
 | W7 | Training on the request path, auto-retrain | predictive §4 / §7 |
 | W8 | Moving domain logic into the core | LA index / Investigations / Value Measures, Reconciliation break lifecycle, Screening name folding, Case Rules stay where they are (§2) |
 
-### 4a. Success measures (baseline → target)
+### 4a. Success measures (baseline → target → now)
 
-| Measure | Today | Target |
-|---|---|---|
-| Private SQL quoting / literal helpers outside `SqlBuilder` | ~30 | 0 (recorded exemptions only) |
-| Hand-built `read_*(` outside `SqlViews` (non-ingest) | ~29 files, split not yet counted | 0 |
-| Median / percentile / z-score implementations | 4 / 4 / 3 | 1 each, with explicit modes |
-| Column profilers | 3 | 1 |
-| Time-grain truncation copies | 5 | 1 |
-| Similarity implementations | 3 | 1 kit |
-| Union-find implementations | 3 | 1 |
-| JVM re-implementations of the Measure grammar | 1 (`WorkingSetMeasures`) | 0 |
-| Score-output writers | 2 (Anomaly, Risk Score) | 1 contract |
-| Duplication guard | none | in CI, ratchet only down |
+| Measure | Baseline 2026-10-17 | Target | Now (2026-10-18) |
+|---|---|---|---|
+| Private SQL quoting / literal helpers outside `SqlBuilder` | ~30 | 0 (recorded exemptions only) | 0 by the guard; 57 exemptions recorded (55 before 2026-10-18) in `tools/data-ops-duplication.exemptions.json`, two of them (typed-literal formatters in `Retention`, `ChangePoint`) added 2026-10-18 because the shared builders have no inline typed-literal form. The guard sees only named helpers: hand-wrapped `"" + name + ""` scratch-name sites remain (§10) |
+| Hand-built `read_*(` outside `SqlViews` (non-ingest) | ~29 files | 0 | 0 by the guard (the recorded exemptions are ingest and Collector-sample readers) |
+| Median / percentile / z-score implementations | 4 / 4 / 3 | 1 each, with explicit modes | 1 each (M1, M2) |
+| Column profilers | 3 | 1 | 1 (`ColumnProfiler`, M4) |
+| Time-grain truncation copies | 5 | 1 | 1 (M5) |
+| Similarity implementations | 3 | 1 kit | 1 kit (S1) |
+| Union-find implementations | 3 | 1 | 1 (`com.gamma.graph.UnionFind`, M8) |
+| JVM re-implementations of the Measure grammar | 1 (`WorkingSetMeasures`) | 0 | 0 by the guard (category d) |
+| Score-output writers | 2 (Anomaly, Risk Score) | 1 contract | 1 contract (M7), plus the S5 (e) time-indexed sibling |
+| Duplication guard | none | in CI, ratchet only down | in CI (`ci.yml`, `--ratchet`); inventory 0 |
 
-## 5. Order
+⚠ The guard's inventory rose 0 → 2 when lane A merged (two private literal helpers) and the CI ratchet failed on `master` until the two reasoned exemptions above were recorded; the ratchet is the check that a Could batch did not quietly re-open the duplication this plan exists to remove.
+
+## 5. Order (as executed — every step below is built; see the header)
 
 1. **A0 (M10, M1)** — the duplication guard in report-only mode (the baseline inventory), then the module,
    definitions, conformance and parity tests. Nothing calls it yet.
@@ -188,10 +202,12 @@ Sizes: S / M / L. "Consumers" names who gets it first.
 - ⚠ **Timezone.** DuckDB's session zone is the host's, not UTC — M5 states the zone in every definition.
 - ⚠ **Module guards.** A new platform module needs its `module.toon`, the module-deps allow-list and enforcer rule.
 
-## 7. Decisions — taken 2026-10-17 by the agent under the operator's delegated authority
+## 7. Decisions — taken 2026-10-17 and 2026-10-18 by the agent under the operator's delegated authority
 
 The operator delegated these calls for this plan ("take the decisions for me in this context") and asked for a short
-note on each. Any of them can be reversed by the operator.
+note on each. Any of them can be reversed by the operator. D-AN1…D-AN9 were taken 2026-10-17; D-AN10…D-AN13 (lane A) and
+D-AN30…D-AN35 (lane C) on 2026-10-18 and are **pending operator confirmation**; D-AN20…D-AN29 (lane B) are in §9.
+Numbers D-AN14…D-AN19 are unused (the ranges were split per lane to avoid collisions).
 
 | # | Decision | Why |
 |---|---|---|
@@ -245,3 +261,16 @@ decisions smartly, with reasons"). None is confirmed by the operator yet; each c
 | D-AN27 | **Per-feature explanation is counterfactual, not split-count.** Each feature's share is how much of the entity's excess disappears if that feature alone had no deviation (clipped, normalised to sum 1); `contribution = share · raw`, so contributions sum to `raw` and the score is recomputed from the stored explanation alone (`AnomalyForestScorer.recompute`) | Crediting the features a path happens to split on was built first and **failed its own test** (an outlier on feature 1 got 49 % to feature 0: a split is chosen by chance, not by what isolates the point). The counterfactual names the feature that matters and is deterministic. Cost: up to d extra tree walks per entity with a deviation, bounded by the 16-feature and entity caps |
 | D-AN28 | **An isolation-forest model has no preview** (`POST /anomaly-scores/preview` refuses it, 422); it is scored by the `anomaly.score` Job only | The forest is fitted over the whole population; fitting on a request thread breaks W7, and a one-entity preview has no population to isolate against |
 | D-AN29 | **The Anomaly Model form in the UI does not yet author `method` / `forest`**; they are written as TOON (the save gate validates them) | The UI catalogue is another lane's area; the follow-up is filed in `ANOMALY-ML-SCORING-1`. Unverified here: whether the form round-trips an unknown key without dropping it |
+
+## 10. Open items (2026-10-18)
+
+Nothing here blocks the plan; each is a follow-up, in the order a shift should take them.
+
+1. **Operator confirmation of D-AN10…D-AN35** (§7, §9), all assistant-decided. The ones most worth a read: D-AN12 (D10 and D11 stand; `window` and `ratios` are spec additions, `recency` lives outside `AGGS`), D-AN26 (the isolation forest reuses the per-feature deviations), D-AN30 (dead `Summarize*` classes deleted) and D-AN22 (k-means has no Step).
+2. **Register the lane A and B kernels in the C8 catalogue.** Each ships its own `AnalyticsFunctionProvider` plus a `META-INF/services` line (D-AN33); today only the S-tier `KernelFunctions` is listed, so the catalogue does not yet show hour-of-week, change-point, windowed Measures, cohort / funnel, k-means, logistic regression or the isolation forest.
+3. **`ANALYTICS-STEPS-TS-1`** — Steps for change-point and cohort / funnel (D-AN11, D-AN13); build against the Sales & Marketing pack's plan when it is scheduled. k-means and logistic regression deliberately have no Step (D-AN22, D-AN25).
+4. **Anomaly Model form in the UI** does not author `method` / `forest` (D-AN29); check it round-trips the keys without dropping them. No golden-pack template uses the isolation forest yet.
+5. **Hand-wrapped scratch-name sites** (`"" + name + ""`) the duplication guard cannot see, listed on the `ANALYTICS-CORE-1` row (D-AN32); look at `PatternRoutes` in la-api first, its columns come from the request.
+6. **`PartitionCompactor` `union_by_name`** behaviour — operator-owned; not touched.
+7. **C7** stays blocked on DuckDB 2.0 adoption.
+8. **Verification gaps:** S8's Postgres goldens ran on PostgreSQL 18 only (`TEST-ENV-PG-ASN-UNRUN-1` stays open); the full reactor and the UI specs were not re-run on the merged tree; `check-dependencies.mjs` cannot run on this profile (asn modules excluded).
