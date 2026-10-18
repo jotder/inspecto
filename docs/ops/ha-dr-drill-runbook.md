@@ -231,7 +231,8 @@ drilled). At the instant of each failure 2-8 files (about 200-800 rows) were sti
    fence check and releases its arming / authored claims once its thread ends; a Job type whose body never reaches a
    fence check runs to completion inside that deadline. `GracefulStopHandoverTest` drives the whole handover (close
    mid-run → run cancelled → lease released → second node claims) for a pipeline run and a Job run. A single long
-   uninterruptible write/fetch can still delay release up to that deadline.
+   uninterruptible write/fetch can still delay release up to that deadline (a chunked file stops between chunks;
+   mid-unit interruption declined 2026-10-18, BACKLOG §6).
 3. **At-least-once on `kill -9`** (above) — root-caused to the output-before-acknowledgement window with
    node-local output trees; not the dedup ledger. Open decision: see `HA-KILL9-DOUBLE-INGEST-1` for the options.
    **Contract until decided: failover delivery is at-least-once unless the output tree is shared or synced (then a

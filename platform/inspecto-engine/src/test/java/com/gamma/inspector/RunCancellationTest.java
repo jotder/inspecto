@@ -171,6 +171,48 @@ class RunCancellationTest {
         assertNull(CommitRetry.recordFor(feed, cfg), "no attempt spent");
     }
 
+    /**
+     * HA-CANCEL-RESIDUALS-1 (3): a chunked file stops BETWEEN chunks - the shared write checkpoint runs once per
+     * chunk, so a cancel after the first chunk landed writes no further chunk. The chunk already written stays
+     * (lost-lease posture: deterministic names, the survivor overwrites); nothing commits.
+     */
+    @Test
+    void aCancelledChunkedFileStopsBetweenChunks(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTestRef.writePipeline(dir, """
+              chunking:
+                max_file_bytes: 30
+                target_chunk_bytes: 30
+            """).toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        StringBuilder rows = new StringBuilder("ID,AMT,EVENT_DATE\n");
+        for (int i = 0; i < 8; i++) rows.append("r").append(i).append(",1.0,2020-04-03\n");
+        Files.writeString(inbox.resolve("big.csv"), rows);
+        File feed = inbox.resolve("big.csv").toFile();
+
+        // Cancel as soon as the first chunk's output has landed.
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
+                () -> CommitFence.State.HELD, () -> chunkOutputs(cfg) > 0)) {
+            assertThrows(CommitFence.RunCancelledException.class, () -> CollectorProcessor.run(cfg));
+        }
+        assertEquals(1, chunkOutputs(cfg), "exactly the first chunk landed; no chunk after the cancel");
+        assertTrue(feed.exists(), "not committed: the input stays in the inbox");
+        assertEquals(0, filesUnder(cfg.dirs().manifestsDir()), "no manifest");
+        assertEquals(0, filesUnder(cfg.dirs().quarantine()), "not quarantined");
+        assertNull(CommitRetry.recordFor(feed, cfg), "no attempt spent");
+
+        CollectorProcessor.run(cfg);   // the survivor re-plans the same file and overwrites in place
+        assertFalse(feed.exists(), "re-picked and committed by the next run");
+        assertTrue(chunkOutputs(cfg) > 1, "the full file is written as several chunks");
+    }
+
+    private static long chunkOutputs(PipelineConfig cfg) {
+        Path root = Path.of(cfg.dirs().database());
+        if (!Files.exists(root)) return 0;
+        try (Stream<Path> s = Files.walk(root)) {
+            return s.filter(Files::isRegularFile).filter(p -> p.getFileName().toString().startsWith("big_c")).count();
+        } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+    }
+
     /** (c): a fence that is never cancelled changes nothing. */
     @Test
     void aRunThatIsNotCancelledCompletesNormally(@TempDir Path dir) throws Exception {
