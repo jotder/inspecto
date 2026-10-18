@@ -159,17 +159,17 @@ describe('entityTypeIcon', () => {
     it('every shipped Entity Type has a glyph that exists in the library', () => {
         for (const t of SHIPPED) {
             expect(GLYPH_LIBRARY[ENTITY_TYPE_GLYPH[t]], t).toBeTruthy();
-            expect(entityTypeIcon(t, '#112233'), t).toContain('data:image/svg+xml');
+            expect(entityTypeIcon(t, '#112233'), t).toContain('data:image/svg+xml'); // ds-allow — test colour input, asserted back verbatim
         }
     });
 
     it('is stroked in the given colour, and absent for a type with no glyph', () => {
-        expect(decodeURIComponent(entityTypeIcon('msisdn', '#112233')!)).toContain('stroke="#112233"');
-        expect(entityTypeIcon('custom_type', '#112233')).toBeUndefined();
+        expect(decodeURIComponent(entityTypeIcon('msisdn', '#112233')!)).toContain('stroke="#112233"'); // ds-allow — test colour input, asserted back verbatim
+        expect(entityTypeIcon('custom_type', '#112233')).toBeUndefined(); // ds-allow — test colour input, asserted back verbatim
     });
 
     it('an explicit per-kind shape override wins over the icon; other kinds keep theirs', () => {
-        expect(entityTypeIcon('wallet', '#112233', { wallet: 'diamond' })).toBeUndefined();
-        expect(entityTypeIcon('cell', '#112233', { wallet: 'diamond' })).toBeTruthy();
+        expect(entityTypeIcon('wallet', '#112233', { wallet: 'diamond' })).toBeUndefined(); // ds-allow — test colour input, asserted back verbatim
+        expect(entityTypeIcon('cell', '#112233', { wallet: 'diamond' })).toBeTruthy(); // ds-allow — test colour input, asserted back verbatim
     });
 });
