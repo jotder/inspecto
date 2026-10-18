@@ -1113,6 +1113,25 @@
                                     }
                                 }
                             } @else {
+                                @if (aroundSpec()) {
+                                    <mat-button-toggle-group
+                                        aria-label="Pattern view"
+                                        [value]="aroundView() ? 'around' : 'steps'"
+                                        (change)="aroundView.set($event.value === 'around')"
+                                    >
+                                        <mat-button-toggle value="steps">Steps</mat-button-toggle>
+                                        <mat-button-toggle value="around">Search around</mat-button-toggle>
+                                    </mat-button-toggle-group>
+                                }
+                                @if (aroundView() && aroundSpec(); as around) {
+                                    <inspecto-la-search-around
+                                        [spec]="around"
+                                        [nodeKinds]="nodeKinds()"
+                                        [edgeKinds]="edgeKinds()"
+                                        (specChange)="setAroundSpec($event)"
+                                        (run)="runPattern()"
+                                    />
+                                } @else {
                                 <div class="flex flex-col gap-2">
                                     @for (step of patternSteps(); track $index; let i = $index) {
                                         <div class="flex flex-wrap items-center gap-2">
@@ -1202,6 +1221,7 @@
                                     >
                                         {{ note }}
                                     </p>
+                                }
                                 }
                             }
                             @if (patternMatches().length) {

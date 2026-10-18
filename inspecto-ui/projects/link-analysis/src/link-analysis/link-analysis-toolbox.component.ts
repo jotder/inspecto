@@ -103,6 +103,8 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { ServerPathsState, ServerPatternState } from './entity-projection';
 import { indexSourceNote } from './index-source';
 import { IndexMappingTarget, LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
+import { LinkAnalysisSearchAroundComponent } from './link-analysis-search-around.component';
+import { SearchAroundSpec, searchAroundToSteps, stepsToSearchAround } from './search-around';
 import { LinkAnalysisValueMeasuresComponent } from './link-analysis-value-measures.component';
 import { LinkAnalysisServerAlgorithmsComponent } from './link-analysis-server-algorithms.component';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
@@ -228,6 +230,7 @@ type CentralityMetric =
         LinkAnalysisServerAlgorithmsComponent,
         LinkAnalysisServerRunComponent,
         LinkAnalysisIndexBuildComponent,
+        LinkAnalysisSearchAroundComponent,
         LinkAnalysisValueMeasuresComponent,
     ],
     templateUrl: './link-analysis-toolbox.component.html',
@@ -497,6 +500,15 @@ export class LinkAnalysisToolboxComponent {
     /** The pattern-match motif — step 0 = the start node; each later step traverses one edge. */
     readonly patternSteps = signal<PatternStep[]>([{}, { direction: 'out' }]);
     readonly patternMatches = signal<GraphSelection[]>([]);
+    /** The Search around view of the motif (plain-language conditions); off = the step list. */
+    readonly aroundView = signal(false);
+    /** The motif as a search-around spec; null when it carries a temporal constraint (only the step list can show it). */
+    readonly aroundSpec = computed(() => stepsToSearchAround(this.patternSteps()));
+
+    setAroundSpec(spec: SearchAroundSpec): void {
+        this.patternSteps.set(searchAroundToSteps(spec));
+    }
+
     /**
      * The pattern packs (parameterized starter motifs) + the one loaded, for its hint. Seeded with the shipped
      * built-ins so the catalog is never empty, then REPLACED by this Space's authored `pattern-pack` components

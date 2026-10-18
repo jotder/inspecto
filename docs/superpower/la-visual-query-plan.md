@@ -34,7 +34,7 @@ rendering (`describeSearchAround`).
 inverse for non-temporal path motifs, validation (one condition required), plain-language description. Spec:
 `search-around.spec.ts` (3 tests). No UI wired: the placement of the panel is a decision (below).
 
-## Decisions owed
+## Decisions owed (superseded by the block below)
 1. **Placement/surface**: a new "Search around" mode in the existing Pattern section of the toolbox (builder gets a friendlier form view) vs a
    separate panel/dialog. Affects UI only.
 2. **Mode 2 semantics**: running beyond the loaded graph as a chain of `expand` ops needs the expand rung to filter by NEIGHBOUR TYPE as well
@@ -49,3 +49,17 @@ inverse for non-temporal path motifs, validation (one condition required), plain
 ## Next steps once decisions land
 form view component (OnPush, schema-free reactive form, `<inspecto-option-picker>` for kinds/direction, axe assertion) - wire to toolbox
 Pattern section - mode 2 after decision 2 - update OKF + `/design` gallery if a new shared pattern appears.
+
+## Decisions (assistant-decided, pending operator confirmation)
+1. Placement: a "Search around" view inside the toolbox Pattern section (toggle beside the step list), not a new panel.
+2. Beyond-the-graph mode: v1 = link kind + direction only (verified: the expand rung's settings are Direction and Link kinds, no neighbour type).
+   Neighbour-type conditions work on the loaded graph only; no client post-filter. Extending `expand` with a neighbour type is deferred and
+   needs a decision entry (not a twelfth op).
+3. No OR / branching in v1. 4. A loaded-graph search leaves no Investigation trace (as the motif builder). 5. No temporal conditions in v1
+   (a temporal motif shows no Search around view, only the step list).
+
+## Built (2026-10-18, second slice)
+`link-analysis-search-around.component.ts` (presentational, OnPush; start type, per-condition direction / link kind / neighbour type,
+words list, Search around button) wired into `link-analysis-toolbox.component` (`aroundView`, `aroundSpec`, `setAroundSpec`; the spec
+edits `patternSteps`, Find matches path = `runPattern`). Residual: the beyond-the-graph run (chained `expand` with link kind + direction)
+is NOT built; the form states that Expand never follows a neighbour type. Not driven in a live preview.

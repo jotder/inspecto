@@ -989,3 +989,14 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         );
     });
 });
+
+describe('LinkAnalysisToolboxComponent search around', () => {
+    it('edits the motif through the spec and shows no spec for a temporal motif', () => {
+        const { c } = make();
+        c.patternSteps.set([{}, { direction: 'out' }]);
+        c.setAroundSpec({ startType: 'entity', conditions: [{ direction: 'in', linkKind: 'link' }] });
+        expect(c.patternSteps()).toEqual([{ nodeKind: 'entity' }, { direction: 'in', edgeKind: 'link' }]);
+        c.patternSteps.set([{}, { direction: 'out', afterPrevious: true }]);
+        expect(c.aroundSpec()).toBeNull();
+    });
+});
