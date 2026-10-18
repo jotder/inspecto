@@ -3,8 +3,8 @@ type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
 description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6), and ranking, sampling and pivot (S4: the deterministic seeded sampler with DuckDB parity, Steps transform.analytics.rank, transform.sample, transform.matrix.pivot), and deterministic entity grouping (S2: blocking keys, exact match conditions, union-find, its DuckDB form and parity, Step transform.entity.link; similarity never forms a group, D-M1). Also the distribution Steps (S3: outlier flags, equal-width and quantile bins, Pearson correlation and linear regression, their edge rules and DuckDB parity).
 resource: docs/superpower/analytics-core-plan.md
-tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, modules, duckdb]
-timestamp: 2026-10-17T00:00:00Z
+tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, cohort, change-point, modules, duckdb]
+timestamp: 2026-10-18T00:00:00Z
 ---
 
 # Analytics Kernel
@@ -31,6 +31,11 @@ timestamp: 2026-10-17T00:00:00Z
 > review candidates, never a group (§ [Entity grouping](#entity-grouping)).
 > **S3, the distribution Steps, are built (2026-10-17):** `transform.stats.outlier`, `transform.data.binning` and
 > `transform.stats.correlation` on the definitions here (§ [Distribution Steps](#distribution-steps)).
+> **Could batch, lane A, built 2026-10-18 (D-AN10…D-AN13 in the plan, assistant-decided, pending operator confirmation):**
+> C5 [hour of week and seasonal profile](#hour-of-week-and-seasonal-profile), C6
+> [change-point and regime detection](#change-point-and-regime-detection), C1
+> [windowed and ratio Measures](#windowed-and-ratio-measures), C9 [cohort retention and funnel](#cohort-retention-and-funnel).
+> No caller uses the kernels yet; their Steps are open (`ANALYTICS-STEPS-TS-1`).
 
 ## The module
 
@@ -50,7 +55,9 @@ Packages:
 * `com.gamma.analytics.accuracy` — `Accuracy`, `AccuracySql`, `Backtest` (S5b, § [Accuracy and backtest](#accuracy-and-backtest)).
 * `com.gamma.analytics.split` — `HoldoutSplit` (S5d, § [Holdout split](#holdout-split)).
 * `com.gamma.analytics.sample` — `Sampler` (S4, § [Ranking, sampling and pivot](#ranking-sampling-and-pivot)).
-* `com.gamma.analytics.time` — also `SeasonalityDetector` (S5c, § [Seasonality detection](#seasonality-detection)).
+* `com.gamma.analytics.time` — also `SeasonalityDetector` (S5c, § [Seasonality detection](#seasonality-detection)),
+  `HourOfWeek` and `SeasonalProfile` (C5), `ChangePoint` (C6).
+* `com.gamma.analytics.cohort` — `Retention` and `Funnel` (C9, § [Cohort retention and funnel](#cohort-retention-and-funnel)).
 * `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
 * `com.gamma.analytics.similarity` — the similarity kit (S1): `Similarity`, `JaroWinkler`, `TextUnit`,
   `SimilaritySql` (§ [Similarity kit](#similarity-kit)).
