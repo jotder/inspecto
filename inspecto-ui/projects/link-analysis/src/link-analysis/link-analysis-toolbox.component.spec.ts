@@ -7,6 +7,7 @@ import { ComponentDef, ComponentsService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { G6GraphData } from '@inspecto/core/graph';
 import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
+import { GENERIC_PROFILE, installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 
 /** A tiny two-cluster graph: a–b–c plus d–e (mirrors the studio spec fixture). */
@@ -285,6 +286,46 @@ describe('LinkAnalysisToolboxComponent', () => {
 
         c.loadPatternPack(''); // back to a custom motif
         expect(c.loadedPack()).toBeNull();
+    });
+
+    it('pattern packs: the active Industry pack relabels the picker and the description, ids kept', () => {
+        installDomainProfiles(
+            [
+                GENERIC_PROFILE,
+                profileFromPack({
+                    id: 'p',
+                    name: 'P',
+                    description: '',
+                    spaceTemplates: [],
+                    patternPacks: [],
+                    profile: { measureHints: [], timeHints: [], suggestedTools: [] },
+                    entityTypes: [],
+                    linkKinds: [],
+                    terms: [
+                        {
+                            key: 'pattern.layering-chain',
+                            label: 'Cash-out chain',
+                            abbreviation: '',
+                            definition: 'Pack words.',
+                        },
+                    ],
+                } as never),
+            ],
+            'p',
+        );
+        try {
+            const { c } = make();
+            const opts = c.packOptions();
+            expect(opts.find((o) => o.value === 'layering-chain')?.label).toBe('Cash-out chain');
+            const other = c.patternPacks().find((p) => p.id !== 'layering-chain')!;
+            expect(opts.find((o) => o.value === other.id)?.label).toBe(other.label); // no term: own label
+            c.loadPatternPack('layering-chain');
+            expect(c.loadedPack()?.id).toBe('layering-chain');
+            expect(c.packDescription(c.loadedPack()!)).toBe('Pack words.');
+            expect(c.packDescription(other)).toBe(other.description);
+        } finally {
+            installDomainProfiles([], null);
+        }
     });
 
     it("pattern packs: a Space's authored packs merge over the built-ins, a malformed one is skipped", () => {
@@ -757,7 +798,13 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         t.fixture.componentRef.setInput('graphTruncated', true);
         t.fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'links: A → B' }]);
         t.fixture.componentRef.setInput('indexMappings', [
-            { dataset: 'telecom_links_dataset', sourceCol: 'a_msisdn', targetCol: 'b_msisdn', kindCol, label: 'links: A → B' },
+            {
+                dataset: 'telecom_links_dataset',
+                sourceCol: 'a_msisdn',
+                targetCol: 'b_msisdn',
+                kindCol,
+                label: 'links: A → B',
+            },
         ]);
         t.c.tab.set('pattern');
         t.c.loadPatternPack('telecom-subscription-ring');
@@ -896,7 +943,10 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
     it('LA-DEMO-POLISH-1 (1): a hand-built ordered motif uses the Investigation bound time column when the links carry it', () => {
         const timed: G6GraphData = {
             nodes: GRAPH.nodes,
-            edges: GRAPH.edges.map((e, i) => ({ ...e, data: { ...e.data, attrs: { last_seen: `2026-10-0${i + 1}T00:00:00Z` } } })),
+            edges: GRAPH.edges.map((e, i) => ({
+                ...e,
+                data: { ...e.data, attrs: { last_seen: `2026-10-0${i + 1}T00:00:00Z` } },
+            })),
         };
         const t = make(timed);
         t.c.loadedPack.set(null);
@@ -915,7 +965,10 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
     it('LA-DEMO-POLISH-1 (1): an open Investigation bound to a time column the links carry runs; one they lack is named', () => {
         const timed: G6GraphData = {
             nodes: GRAPH.nodes,
-            edges: GRAPH.edges.map((e, i) => ({ ...e, data: { ...e.data, attrs: { last_seen: `2026-10-0${i + 1}T00:00:00Z` } } })),
+            edges: GRAPH.edges.map((e, i) => ({
+                ...e,
+                data: { ...e.data, attrs: { last_seen: `2026-10-0${i + 1}T00:00:00Z` } },
+            })),
         };
         const t = make(timed, [ringPack]);
         t.c.tab.set('pattern');
@@ -931,6 +984,8 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         t.fixture.componentRef.setInput('investigationTimeCol', 'first_seen');
         t.fixture.componentRef.setInput('graph', GRAPH);
         t.fixture.detectChanges();
-        expect(t.c.browserPatternColumns().blocked).toContain("Investigation's time column first_seen is not on the links");
+        expect(t.c.browserPatternColumns().blocked).toContain(
+            "Investigation's time column first_seen is not on the links",
+        );
     });
 });

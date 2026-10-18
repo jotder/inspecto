@@ -1,7 +1,12 @@
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { DecimalPipe } from '@angular/common';
 import type { InvestigationHeader } from '@inspecto/link-analysis/api/inv.service';
-import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
+import {
+    activeDomainProfileId,
+    domainProfile,
+    DomainProfileId,
+    termLabel,
+} from '@inspecto/link-analysis/graph/domain-profile';
 import { RiskScorePanelComponent } from '@inspecto/core/components/risk-score-panel.component';
 import { AnomalyPanelComponent } from '@inspecto/core/components/anomaly-panel.component';
 import {
@@ -191,14 +196,7 @@ export interface ServerRunSpec {
 
 /** The metrics the Centrality group can rank by — each returns a {@link NodeScore} list. */
 type CentralityMetric =
-    | 'degree'
-    | 'betweenness'
-    | 'closeness'
-    | 'eigenvector'
-    | 'katz'
-    | 'pagerank'
-    | 'hub'
-    | 'authority';
+    'degree' | 'betweenness' | 'closeness' | 'eigenvector' | 'katz' | 'pagerank' | 'hub' | 'authority';
 
 /**
  * **Link Analysis — graph-algorithms toolbox** (the bottom panel's Analysis tab, extracted from the
@@ -211,7 +209,8 @@ type CentralityMetric =
     selector: 'inspecto-link-analysis-toolbox',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [PenFieldComponent, 
+    imports: [
+        PenFieldComponent,
         ChipComponent,
         DecimalPipe,
         MatButtonModule,
@@ -308,8 +307,16 @@ export class LinkAnalysisToolboxComponent {
     /** "Custom motif" is a real, blank-valued choice (the skill's idiom), then every loaded pack. */
     readonly packOptions = computed<PickerOption[]>(() => [
         { value: '', label: 'Custom motif' },
-        ...this.patternPacks().map((p) => ({ value: p.id, label: p.label })),
+        ...this.patternPacks().map((p) => ({ value: p.id, label: this.packLabel(p) })),
     ]);
+    /** What the active Industry pack calls a pattern pack (`pattern.<id>`), else its own label. Display only: the id is kept. */
+    packLabel(p: PatternPack): string {
+        return termLabel(domainProfile(activeDomainProfileId()), `pattern.${p.id}`, p.label);
+    }
+    /** The pack's description, or the active Industry pack's definition of it when it states one. Display only. */
+    packDescription(p: PatternPack): string {
+        return domainProfile(activeDomainProfileId()).terms[`pattern.${p.id}`]?.definition || p.description;
+    }
     readonly nodeKinds = input<string[]>([]);
     readonly edgeKinds = input<string[]>([]);
     /** Tool-group ids the host's domain profile foregrounds — badged "suggested" on the header. */

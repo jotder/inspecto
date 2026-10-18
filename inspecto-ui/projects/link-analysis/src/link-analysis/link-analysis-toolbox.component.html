@@ -941,7 +941,7 @@
                             }
                             @if (loadedPack(); as pack) {
                                 <p class="text-sm text-secondary" role="status">
-                                    {{ pack.description }}
+                                    {{ packDescription(pack) }}
                                     @if (pack.tool) {
                                         <span class="font-medium"> Better served by the {{ pack.tool }} tool.</span>
                                     }
