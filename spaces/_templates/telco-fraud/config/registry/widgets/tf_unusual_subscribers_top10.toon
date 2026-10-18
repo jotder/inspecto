@@ -1,0 +1,14 @@
+vizType: table
+datasetId: tf_subscriber_anomaly_latest
+controls:
+  x[2]{field}:
+    entity_key
+    band
+  y[1]{field,agg}:
+    score,max
+options:
+  title: Most unusual subscribers (top 10)
+  tableSort:
+    field: max_score
+    dir: desc
+  limit: 10

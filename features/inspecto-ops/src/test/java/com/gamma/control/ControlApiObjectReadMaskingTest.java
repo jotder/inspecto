@@ -290,6 +290,16 @@ class ControlApiObjectReadMaskingTest {
             }
             // The comment POST echo for a non-revealer is masked too.
             assertFalse(send(c, "worker", "POST", "/objects/" + id + "/comments", "{\"body\":\"x " + RAW + "\"}").body().contains(RAW));
+            // ... and so are the attachment-create and RCA-apply echoes; a revealer's echo keeps the raw key.
+            String attach = "{\"name\":\"cdr\",\"uri\":\"file:///e/x\",\"caption\":\"for " + RAW + "\"}";
+            String rca = "{\"sections\":[\"Called " + RAW + "\"]}";
+            for (String[] call : List.of(new String[]{"/attachments", attach}, new String[]{"/rca", rca})) {
+                var masked = send(c, "worker", "POST", "/objects/" + id + call[0], call[1]);
+                assertEquals(200, masked.statusCode(), masked.body());
+                assertFalse(masked.body().contains(RAW), call[0] + ": " + masked.body());
+                assertTrue(masked.body().contains("masked:"), call[0] + ": " + masked.body());
+                assertTrue(send(c, "workrev", "POST", "/objects/" + id + call[0], call[1]).body().contains(RAW), call[0]);
+            }
             // ObjectLink carries ids, types, a relationship word and a timestamp, no free text: pin the exact shape.
             assertEquals(200, send(c, "worker", "POST", "/objects/" + id + "/links", "{\"to\":\"" + other + "\"}").statusCode());
             JsonNode links = JSON.readTree(get(c, "viewer", "/objects/" + id + "/links").body()).get("data");

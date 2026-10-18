@@ -38,3 +38,20 @@ describe('TABLE_PLUGIN — options.tableSort', () => {
         expect(stale.orderBy).toBeUndefined();
     });
 });
+
+// ANOMALY-DETECTION-RESIDUALS-1 (a): a top-N table tile — `options.limit` is the query's row limit, so the server
+// returns only the top rows of `tableSort` (and masks them), instead of the whole Dataset.
+describe('TABLE_PLUGIN — options.limit', () => {
+    it('sends the limit with the ORDER BY over the /bi/query wire', () => {
+        const spec = TABLE_PLUGIN.buildQuery(VALUES, {
+            ...CTX,
+            options: { tableSort: { field: 'sum_exposure_sar', dir: 'desc' }, limit: 10 },
+        });
+        expect(spec.limit).toBe(10);
+        expect(biQueryBody(spec)?.limit).toBe(10);
+    });
+
+    it('sends no limit without the option', () => {
+        expect(TABLE_PLUGIN.buildQuery(VALUES, CTX).limit).toBeUndefined();
+    });
+});

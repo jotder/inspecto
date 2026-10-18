@@ -406,6 +406,9 @@ timestamp: 2026-07-16T00:00:00Z
     is identical whether or not an Incident exists for the key (no `minted` / reuse oracle); the cost is that a non-revealer
     can no longer mint from a classified Dataset at all. A revealer or no-Subject request is unchanged. Tests:
     `ControlApiCaseFromEntitiesTest`, `ControlApiObjectReadMaskingTest`, `case-members.spec.ts`.
+    **Echoes (closed 2026-10-18, `OBJECT-READ-MASKING-RESIDUALS-1`).** `POST /objects/{id}/attachments` and
+    `POST /objects/{id}/rca` echo their notes through the same `maskedNotes` as comments; `ControlApiObjectReadMaskingTest`.
+    The row is closed; its unverified edges (direct `notify()` by a Run, no write root, `maskingMode` ignored) are in BACKLOG §6.
     **Follow-ups (closed, `OBJECT-READ-MASKING-RESIDUALS-1`).** (1) `GET /objects/{id}/graph` masks each node `title` with
     THAT node's own attributes (same `ObjectReadMasking`). (2) `OBJECT_OPENED` is emitted WITHOUT the title
     (`<type> opened [<id>]`; the title is on the object, nothing consumed it); the append-only log still holds older raw rows,
