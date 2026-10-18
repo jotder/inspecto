@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
+import { GENERIC_PROFILE, installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import type { G6GraphData } from '@inspecto/core/graph';
 import {
@@ -103,7 +104,9 @@ describe('Link Analysis legend - link-kind chips', () => {
         const fixture = TestBed.createComponent(Host);
         fixture.detectChanges();
         const buttons = Array.from(
-            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[aria-label="Link kinds"] button'),
+            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+                '[aria-label="Link kinds"] button',
+            ),
         );
         expect(buttons.length).toBeGreaterThan(0);
         for (const b of buttons) expect(getComputedStyle(b).minHeight).toBe('24px');
@@ -184,5 +187,46 @@ describe('Link Analysis legend - unexpanded row (LA-UNEXPANDED-MARKER-1)', () =>
         fixture.componentRef.setInput('unexpanded', 0);
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="legend-unexpanded-aid"]')).toBeNull();
+    });
+});
+
+describe('Link Analysis legend - Industry pack relabels', () => {
+    it('draws the active pack link-kind and entity-type terms, keeps the raw kind as the key, and falls back', async () => {
+        installDomainProfiles(
+            [
+                GENERIC_PROFILE,
+                profileFromPack({
+                    id: 'p',
+                    name: 'P',
+                    description: '',
+                    spaceTemplates: [],
+                    patternPacks: [],
+                    profile: { measureHints: [], timeHints: [], suggestedTools: [] },
+                    entityTypes: [],
+                    linkKinds: [],
+                    terms: [
+                        { key: 'link_kind.wire', label: 'Transfer', abbreviation: '', definition: '' },
+                        { key: 'entity_type.account', label: 'Wallet', abbreviation: '', definition: '' },
+                    ],
+                } as never),
+            ],
+            'p',
+        );
+        try {
+            TestBed.configureTestingModule({ imports: [Host], providers: [provideNoopAnimations()] });
+            const fixture = TestBed.createComponent(Host);
+            fixture.detectChanges();
+            const el: HTMLElement = fixture.nativeElement;
+            const wire = el.querySelector('button[data-kind="wire"]') as HTMLButtonElement;
+            expect(wire.textContent).toContain('Transfer');
+            expect(wire.getAttribute('aria-label')).toBe('Hide Transfer links');
+            expect(el.querySelector('button[data-kind="sms"]')?.textContent).toContain('sms');
+            const rows = Array.from(el.querySelectorAll('[aria-label="Node kinds"] li')).map((l) => l.textContent);
+            expect(rows[0]).toContain('Wallet');
+            expect(rows[1]).toContain('person');
+            await expectNoA11yViolations(el);
+        } finally {
+            installDomainProfiles([], null);
+        }
     });
 });

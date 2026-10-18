@@ -5,6 +5,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { NodeKind } from '@inspecto/core/api';
 import { G6GraphData } from '@inspecto/core/graph';
 import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
+import { activeDomainProfileId, domainProfile, termLabel } from '@inspecto/link-analysis/graph/domain-profile';
 import { WorkingSetStat } from '@inspecto/link-analysis/graph/working-set-stats';
 import { nodeColor } from '@inspecto/core/graph/catalog-graph';
 import { baseEdgeKind } from '@inspecto/core/graph/graph-view.component';
@@ -109,7 +110,7 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                                 [style.background]="i.color"
                                 aria-hidden="true"
                             ></span>
-                            <span>{{ i.kind }}</span>
+                            <span>{{ nodeLabel(i.kind) }}</span>
                             <span class="text-secondary ml-auto tabular-nums">{{ i.count }}</span>
                         </li>
                     }
@@ -170,9 +171,7 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                                     class="link-kind rounded-full"
                                     [attr.aria-pressed]="!hiddenEdgeKinds().includes(k)"
                                     [attr.aria-label]="
-                                        (hiddenEdgeKinds().includes(k) ? 'Show ' : 'Hide ') +
-                                        (k || 'unlabelled') +
-                                        ' links'
+                                        (hiddenEdgeKinds().includes(k) ? 'Show ' : 'Hide ') + linkLabel(k) + ' links'
                                     "
                                     [attr.data-kind]="k"
                                     (click)="edgeKindToggle.emit(k)"
@@ -188,7 +187,7 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                                             aria-hidden="true"
                                         ></span>
                                         <span [class.line-through]="hiddenEdgeKinds().includes(k)">{{
-                                            k || 'unlabelled'
+                                            linkLabel(k)
                                         }}</span>
                                     </inspecto-chip>
                                 </button>
@@ -197,7 +196,8 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                     </ul>
                     <!-- LA-UNEXPANDED-MARKER-1 decision: a hide here is the drawing only, never what an expand reads or the log records -->
                     <div class="text-secondary mt-1 text-[11px]" data-testid="legend-kinds-note">
-                        Hiding a kind only changes the drawing. Expand still follows it; set Link kinds in the expand settings to leave one out.
+                        Hiding a kind only changes the drawing. Expand still follows it; set Link kinds in the expand
+                        settings to leave one out.
                     </div>
                 }
                 @if (hint()) {
@@ -219,6 +219,14 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
     `,
 })
 export class LinkAnalysisLegendComponent {
+    /** What the active Industry pack calls a node kind (`entity_type.<kind>`), else the kind itself. Display only. */
+    protected nodeLabel(kind: string): string {
+        return termLabel(domainProfile(activeDomainProfileId()), `entity_type.${kind}`, kind);
+    }
+    /** What the active Industry pack calls a link kind (`link_kind.<kind>`), else the kind (or "unlabelled"). Display only. */
+    protected linkLabel(kind: string): string {
+        return termLabel(domainProfile(activeDomainProfileId()), `link_kind.${kind}`, kind || 'unlabelled');
+    }
     readonly items = input<LegendItem[]>([]);
     readonly edgeKinds = input<string[]>([]);
     /** Link kinds hidden on the canvas (their chip shows unpressed). */
