@@ -981,6 +981,16 @@ lane record: [`archived plan`](../../../archived-documents/plans-archive/la-conf
 
 ## 10. Known seams and residuals
 
+* **Collector coverage has no expected-Collector roster** (decided 2026-10-18 under operator delegation, BACKLOG §6): a Collector
+  that never delivered is invisible. A derived roster is wrong for single-schema / segmented Pipelines (their batches record no
+  `output_table`); an authored list needs a new write route. ⚠ `GET /lineage` (`LineageRoutes`) still reads only the
+  configured run's audit CSV, the blind spot `HostCollectorCoveragePort` fixed for coverage on 2026-10-14.
+* **Limits settled 2026-10-18** (decided under operator delegation): browser betweenness (500) stays below suspicion score
+  (1,000) — suspicion computes betweenness unguarded, so it is never refused in betweenness's words; Graph Run and index pools
+  are one per Space (a multi-Space host multiplies them); a hand edit of `la-limits.toon` reaches rate buckets at the next system
+  PUT or restart and a Graph Run service's traversal policy at its idle-out; the Case member cap is a fixed 100 on both sides
+  (`CaseRoutes.MAX_CASE_ENTITIES`, 422 above it; SPA `MAX_CASE_MEMBERS`), not a configuration item. Open: the CL-10 defaults
+  were measured on a laptop, not a server-class host (`LA-CONFIG-LIMITS-RESIDUALS-1`).
 * Index scale is proven to 10^8 edges; 10^9 is extrapolation (`LA-INDEX-SCALE-MEASURE-1`).
 * The index builder connection is deliberately unsandboxed; its safety rests on the trusted-relation contract and
   the caller's view gate.

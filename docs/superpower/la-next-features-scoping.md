@@ -15,7 +15,7 @@ before a slice starts. It is a plan: when a row ships, distil the as-built facts
 | `LA-EMBED-VIEW-1` | **NEEDS DECISION** (design complete; nothing built) | the whole feature | L (4-5 slices) |
 | `LA-LIVE-DETECTION-1` | **MOSTLY DONE - needs decision** (LD-1 to LD-7 built; template sharing + documented residuals left) | template sharing (declined D-LD6) | S-M |
 | `LA-INVESTIGATION-OPS-DEFERRED-1` | **MOSTLY DONE - stale row headline** | three narrow open items; four DECLINED | S each |
-| `LA-COLLECTOR-COVERAGE-1` | **NEEDS DECISION** (shipped; only the expected-Collector roster remains) | a roster so a Collector that never delivered is visible | M |
+| `LA-COLLECTOR-COVERAGE-1` | **CLOSED 2026-10-18** (roster retired to BACKLOG §6, decided under operator delegation) | a roster so a Collector that never delivered is visible | M |
 
 ## 1. Verify before building (the rows look stale; grep the symbols)
 
