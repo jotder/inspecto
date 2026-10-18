@@ -749,6 +749,47 @@ the seams `withLimit` / `withOrderBy` / `withDataset`, and the corpus RUN on Duc
 (the new pins), `ControlApiBiQueryMaskingTest#aRatioOrWindowOverAMaskedColumnIsRefusedForAViewer`, and the vitest
 `windowed and ratio measures` block in `query-spec.spec.ts` (the same corpus run offline to the same figures).
 
+## Cohort retention and funnel
+
+*ANALYTICS-CORE-1 C9, built 2026-10-18; decision D-AN13.* `com.gamma.analytics.cohort` — the primitives the Sales &
+Marketing BI pack needs (acquisition cohorts, retention curves, a conversion funnel), each a JVM function and a DuckDB SQL
+builder held equal by a parity test. Built on M5 (`TimeGrain` buckets on a stated clock) and on C1's as-of discipline (the
+as-of is always stated, never "now"). Entities are compared as text; an event with a NULL entity or time is ignored.
+
+**`Retention`** — `compute(events, Params)` / `sql(relation, entityColumn, timeColumn, Params)` →
+`cohort, period, size, active, rate`. `Params(grain, zone, through, from, mode, maxPeriods)`: `grain` is HOUR or coarser;
+`zone` null = the column's own clock (DATE / zone-less TIMESTAMP), else the zone a `TIMESTAMPTZ` is bucketed in (never
+DuckDB's session zone); `through` is the as-of.
+* Events after `through`'s bucket are dropped; an entity's **cohort** is the bucket of its earliest remaining event;
+  **size** = the cohort's entities; the **period** of an event = whole buckets from its cohort's bucket (0 = the cohort's own).
+  `from` leaves older cohorts out of the *result* only — dropping old events first would make old entities look new.
+* **`EXACT`** (classic): active(c, k) = distinct entities of c with an event in period k. **`UNBOUNDED`** ("returned on or
+  after"): … in period k *or later*; never rises with k, period 0 = size.
+* A cell exists only when **observable** (bucket c + k not after `through`, and k ≤ `maxPeriods`, default 120): an observable
+  cell with nobody active is a row with `active = 0`; a cell not yet observable is **absent, never 0**.
+* Hourly periods count wall-clock hours (a repeated fall-back hour is one bucket).
+
+**`Funnel`** — `compute(events, Params)` / `sql(relation, entityColumn, stepColumn, timeColumn, Params)` →
+`step, name, entities, from_previous, from_first`. `Params(steps, within)`: 2..12 distinct step names; `within` an optional
+whole-second window from the anchor. Per entity the chain is built **earliest-first**: t₁ = the earliest step-1 event (the
+anchor); tᵢ = the earliest step-i event with time ≥ tᵢ₋₁ (the very same instant counts) and, with `within`, ≤ t₁ + within. An
+entity *reached* step i when tᵢ exists. Events between steps are ignored; steps need not be consecutive; an event outside the
+funnel's steps is ignored. ⚠ **The anchor is always the earliest step-1**: an entity whose first attempt is too old for
+`within` but whose later attempt would fit is *not* rescued ("any attempt" would need every step-1 as an anchor) — say so to
+whoever reads the funnel. `from_previous` is NULL for step 1 and where the previous step is empty; `from_first` is 1 for step 1
+and NULL when step 1 is empty. The caller bounds the time range by filtering the relation.
+
+**No Step yet** (D-AN13): a pack reaches these through Steps, and the registration seams (`ProcessorCatalog`,
+`NodeAttributes`, the two contract JSONs, `BuiltinNodeType`) were under edit by another lane the same day; filed with the
+change-point Step as `ANALYTICS-STEPS-TS-1`. The Sales & Marketing pack's plan is not in the repository, so the Step's
+shape (columns, one Step or two) is best fixed against it.
+
+Tests: `CohortTest` (hand matrices for monthly EXACT and UNBOUNDED retention, `from` and `maxPeriods`, the zone moving an
+event across a month, week and day periods; a hand funnel of 6 entities with ordering, same-instant, earliest-anchor and
+within cases; input rules), `CohortDuckDbParityTest` (retention SQL = JVM over 400 seeded entities for 4 grains × 4 zones ×
+2 modes across the Berlin and New York DST changes with a different session zone, and over a DATE column; funnel SQL = JVM
+with no window, 48 h and 30 d).
+
 ## Holdout split
 
 *ANALYTICS-CORE-1 S5d, built 2026-10-17.* `com.gamma.analytics.split.HoldoutSplit` — train / validation / test for any
