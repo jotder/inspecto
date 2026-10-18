@@ -108,6 +108,53 @@ class CorrelationDuckDbParityTest {
     }
 
     @Test
+    void spearmanIsPearsonOfTheAverageRanksPerGroup() throws Exception {
+        // the seeded x / y are rounded to 2 decimals, so most groups of 10+ rows carry ties on both sides
+        int groups = 0;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(CorrelationSql.select("t", List.of(new CorrelationSql.Pair("x", "y")),
+                     List.of("g"), CorrelationSql.Method.SPEARMAN))) {
+            while (rs.next()) {
+                groups++;
+                String g = rs.getString("g");
+                List<double[]> pairs = pairsOf(g);
+                double[] x = pairs.stream().mapToDouble(p -> p[0]).toArray();
+                double[] y = pairs.stream().mapToDouble(p -> p[1]).toArray();
+                assertEquals(x.length, rs.getLong("n"), g + " n counts the complete pairs");
+                if (x.length == 0) {
+                    rs.getObject("correlation");
+                    assertTrue(rs.wasNull(), g + " no pair: NULL");
+                    continue;
+                }
+                same(Stats.spearman(x, y), rs, "correlation", g);
+                Stats.Regression reg = Stats.linearRegression(Stats.ranks(x), Stats.ranks(y));
+                same(reg.slope(), rs, "slope", g);
+                same(reg.intercept(), rs, "intercept", g);
+                same(reg.r2(), rs, "r2", g);
+            }
+        }
+        assertEquals(36, groups);
+    }
+
+    @Test
+    void spearmanSeesAMonotoneCurvePearsonDoesNot() throws Exception {
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE OR REPLACE TABLE m AS SELECT i AS a, exp(i) AS b FROM range(1, 21) r(i)");
+        }
+        var pair = List.of(new CorrelationSql.Pair("a", "b"));
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(CorrelationSql.select("m", pair, List.of(), CorrelationSql.Method.SPEARMAN))) {
+            assertTrue(rs.next());
+            assertEquals(1.0, rs.getDouble("correlation"), 1e-12);
+        }
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(CorrelationSql.select("m", pair, List.of()))) {
+            assertTrue(rs.next());
+            assertTrue(rs.getDouble("correlation") < 0.9);
+        }
+    }
+
+    @Test
     void severalPairsGiveOneRowEachInTheOrderGivenAndUnGroupedIsOneGroup() throws Exception {
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE OR REPLACE TABLE w AS SELECT x AS a, y AS b, x * 2 + 1 AS c FROM t WHERE g = 'n30'");

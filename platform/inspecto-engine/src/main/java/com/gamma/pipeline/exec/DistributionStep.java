@@ -151,7 +151,7 @@ public final class DistributionStep {
     // ── correlation ──────────────────────────────────────────────────────────────────────────────────────────────
 
     /** A parsed {@code correlation} config: every pair {@code (columns[i], columns[j])}, i &lt; j, y = the later one. */
-    public record Correlation(List<String> columns, List<String> groupBy) {
+    public record Correlation(List<String> columns, List<String> groupBy, CorrelationSql.Method method) {
         public List<CorrelationSql.Pair> pairs() {
             List<CorrelationSql.Pair> out = new ArrayList<>();
             for (int i = 0; i < columns.size(); i++)
@@ -173,13 +173,13 @@ public final class DistributionStep {
         }
 
         public String select(String input) {
-            return CorrelationSql.select(q(input), pairs(), groupBy);
+            return CorrelationSql.select(q(input), pairs(), groupBy, method);
         }
     }
 
     /** Parse and validate a {@code correlation} config; {@link IllegalArgumentException} names the first problem. */
     public static Correlation parseCorrelation(Map<?, ?> cfg) {
-        known(cfg, CORRELATION, Set.of("columns", "group_by"));
+        known(cfg, CORRELATION, Set.of("columns", "group_by", "method"));
         List<String> columns = identList(cfg, "columns", CORRELATION);
         if (columns.size() < 2)
             throw bad(CORRELATION, "needs at least two 'columns' - every pair of them is correlated");
@@ -195,7 +195,13 @@ public final class DistributionStep {
             if (CorrelationSql.OUTPUT.stream().anyMatch(o -> o.equalsIgnoreCase(g)))
                 throw bad(CORRELATION, "group column '" + g + "' collides with an output column " + CorrelationSql.OUTPUT);
         }
-        return new Correlation(columns, groupBy);
+        String m = text(cfg, "method", "pearson");
+        CorrelationSql.Method method = switch (m) {
+            case "pearson" -> CorrelationSql.Method.PEARSON;
+            case "spearman" -> CorrelationSql.Method.SPEARMAN;
+            default -> throw bad(CORRELATION, "'method' '" + m + "' is not one of [pearson, spearman]");
+        };
+        return new Correlation(columns, groupBy, method);
     }
 
     // ── checks against the inbound data ──────────────────────────────────────────────────────────────────────────

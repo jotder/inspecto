@@ -138,6 +138,18 @@ class RowShaperDistributionTest {
         assertNull(e[5]);
     }
 
+    @Test
+    void spearmanWritesTheRankCorrelationAndABadMethodIsRefused() throws Exception {
+        String out = run("transform.stats.correlation",
+                cfg("columns", List.of("qty", "amount"), "group_by", List.of("region"), "method", "spearman"));
+        Object[] n = rows("SELECT region, correlation FROM \"" + out + "\" WHERE region = 'N'").get(0);
+        double[] x = {1, 2, 3, 4, 5}, y = {10, 12.5, 11, 13, 95};
+        assertEquals(Stats.spearman(x, y).orElseThrow(), (Double) n[1], 1e-12);
+        assertEquals(0.9, (Double) n[1], 1e-12, "ranks 1..5 against 1,3,2,4,5: d² = 2, 1 - 6*2/120");
+        assertRefused("transform.stats.correlation", cfg("columns", List.of("qty", "amount"), "method", "kendall"),
+                "not one of [pearson, spearman]");
+    }
+
     // ── refusals ─────────────────────────────────────────────────────────────────────────────────────────────────
 
     @Test

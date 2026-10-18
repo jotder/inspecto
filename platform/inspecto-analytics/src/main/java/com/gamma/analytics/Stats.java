@@ -251,6 +251,37 @@ public final class Stats {
     }
 
     /**
+     * The ranks of {@code values}, 1-based, ascending; <b>ties take the average of the ranks they span</b> (three
+     * equal values after two smaller ones all rank 4, not 3, 4, 5) — the tie rule Spearman's rho is defined with, and
+     * the one SQL form below reproduces ({@code rank() + (ties − 1) / 2}). Every rank is a multiple of 0.5, so the
+     * ranks are exact in a double. Input rules as every statistic here.
+     */
+    public static double[] ranks(double[] values) {
+        check(values, "ranks");
+        Integer[] order = new Integer[values.length];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        java.util.Arrays.sort(order, (a, b) -> Double.compare(values[a], values[b]));
+        double[] out = new double[values.length];
+        for (int i = 0; i < order.length; ) {
+            int j = i;
+            while (j + 1 < order.length && values[order[j + 1]] == values[order[i]]) j++;
+            double rank = (i + j) / 2.0 + 1;   // positions i..j (0-based) hold ranks i+1..j+1
+            for (int k = i; k <= j; k++) out[order[k]] = rank;
+            i = j + 1;
+        }
+        return out;
+    }
+
+    /**
+     * Spearman's rank correlation: the {@link #correlation} of the {@link #ranks} of each side (average ranks for
+     * ties). Empty when either side is constant, as Pearson's. Input rules as {@link #correlation}.
+     */
+    public static OptionalDouble spearman(double[] x, double[] y) {
+        checkPairs(x, y, "spearman correlation");
+        return correlation(ranks(x), ranks(y));
+    }
+
+    /**
      * Ordinary least squares of {@code y} on {@code x} — DuckDB's {@code regr_*} family:
      * <ul>
      *   <li>{@code count} = n, the pairs ({@code regr_count});</li>
