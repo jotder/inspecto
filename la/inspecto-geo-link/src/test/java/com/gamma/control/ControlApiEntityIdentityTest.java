@@ -291,4 +291,29 @@ class ControlApiEntityIdentityTest {
             assertFalse(changed.toString().contains("7700900123"), "seqs, never keys: " + changed);
         }
     }
+
+    /** LA-19 probe: an alias a masked caller only holds must never be written as if it were a raw identifier. */
+    @Test
+    void assertRefusesAMaskedAliasAndWritesNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            JsonNode made = data(post(c, IDS, assertion("msisdn:+447700900123", "handset:H-1")), 201);
+            String alias = made.at("/assertion/a").asText();
+            assertTrue(alias.matches("masked:[0-9a-f]{16}"), alias);
+            int before = facts(c);
+            HttpResponse<String> r = post(c, IDS, assertion("msisdn:" + alias, "imsi:1"));
+            status(422, r, "an alias is not a readable identifier");
+            assertEquals(before, facts(c), "the refusal wrote no fact");
+        }
+    }
+
+    /** LA-19 probe: a retract names a seq, and its response renders masked keys only. */
+    @Test
+    void retractResponseNeverCarriesARawMaskedKey(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(post(c, IDS, assertion("msisdn:+447700900123", "handset:H-1")), 201);
+            HttpResponse<String> r = post(c, IDS + "/1/retract", "{\"reason\":\"r\"}");
+            status(200, r, "retract");
+            assertFalse(r.body().contains("7700900123"), r.body());
+        }
+    }
 }

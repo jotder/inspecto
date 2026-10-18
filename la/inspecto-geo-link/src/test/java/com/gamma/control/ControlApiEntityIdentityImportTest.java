@@ -294,4 +294,16 @@ class ControlApiEntityIdentityImportTest {
             data(post(c, IMPORT, body(",\"limit\":100")), 201);
         }
     }
+
+    /** LA-19: a Dataset column that already holds masked aliases must not become permanent identity facts. */
+    @Test
+    void aMaskedAliasInTheDatasetRefusesTheImportAndWritesNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedRegister(c, ",('masked:0c84ed76c92cdfe2','234109')", CLASSIFIED);
+            HttpResponse<String> r = post(c, IMPORT, body(""));
+            status(422, r, "an alias is not an identifier");
+            assertTrue(r.body().contains("masked alias"), r.body());
+            assertEquals(0, facts(c).size(), "the refusal wrote no fact");
+        }
+    }
 }

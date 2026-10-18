@@ -7,6 +7,7 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.entitystore.LaLimit;
+import com.gamma.entitystore.MaskTokens;
 import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.spi.http.RouteModule;
@@ -235,6 +236,8 @@ public final class EntityIdentityRoutes implements RouteModule {
         int empty = 0, self = 0, duplicate = 0;
         Map<String, String[]> pairs = new LinkedHashMap<>();
         for (List<String> row : rows) {
+            refuseAlias(row.get(0), "aCol");
+            refuseAlias(row.get(1), "bCol");
             String ka = row.get(0) == null ? "" : EntityTypes.normalise(aType.normaliser(), row.get(0));
             String kb = row.get(1) == null ? "" : EntityTypes.normalise(bType.normaliser(), row.get(1));
             if (ka.isEmpty() || kb.isEmpty()) { empty++; continue; }
@@ -400,11 +403,19 @@ public final class EntityIdentityRoutes implements RouteModule {
         EntityTypes.EntityType t = EntityListFacts.type(root, type).orElseThrow(() -> new ApiException(422,
                 ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + field + "' names Entity Type '" + type + "', which is not in force "
                         + LinkAnalysisSettings.forRoot(root).effectiveEntityTypes().stream().map(EntityTypes.EntityType::id).toList()));
+        refuseAlias(s.substring(colon + 1), field);
         String value = EntityTypes.normalise(t.normaliser(), s.substring(colon + 1));
         if (value.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + field + "' is empty after the " + type
                     + " normaliser (" + t.normaliser() + ")");
         return type + ":" + value;
+    }
+
+    /** LA-19: an alias (masked:<16 hex>) is a pseudonym, not an identifier - written as a fact it would be a permanent junk key. 422, before any append. */
+    private static void refuseAlias(String value, String field) {
+        if (value != null && value.strip().startsWith(MaskTokens.TOKEN_PREFIX))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + field + "' is a masked alias (masked:<16 hex>), "
+                    + "not an identifier - an identity can only be asserted on the real values, which a masked caller cannot read");
     }
 
     /** The group holding {@code key} as of {@code atSeq}; a key in no live assertion resolves to itself. */
