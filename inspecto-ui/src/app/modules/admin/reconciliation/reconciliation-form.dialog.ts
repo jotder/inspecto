@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
     AbstractControl,
     FormArray,
@@ -17,6 +18,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { Dataset } from '../studio/datasets/dataset-types';
 import { DatasetsService } from '../studio/datasets/datasets.service';
+import { apiErrorMessage, ReconApiService, ReconDatasetColumns, ReconServerConfig } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import {
@@ -25,6 +28,7 @@ import {
     MeasureAgg,
     ReconBands,
     Reconciliation,
+    ReconRunResult,
     ToleranceType,
 } from 'app/inspecto/reconciliation';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
@@ -52,13 +56,29 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
     return Number(c.value) < Number(warn) ? { belowWarn: true } : null;
 };
 
+/** `Test definition` compares at most this many keys (the route accepts 1..100000). */
+export const TEST_SAMPLE_KEYS = 1000;
+
+/** The Break types the test result reports, in reading order. */
+const BREAK_TYPE_LABELS: [keyof ReconRunResult['summary']['byType'], string][] = [
+    ['missing_left', 'Missing on left'],
+    ['missing_right', 'Missing on right'],
+    ['value_break', 'Value'],
+    ['cardinality_break', 'Cardinality'],
+];
+
+type SideColumn = ReconDatasetColumns['columns'][number];
+
 /** Define (or edit) a Dataset-vs-Dataset reconciliation — both sides, the key column(s) whose order is
  *  the Board hierarchy, the compare column(s) each with an aggregation + tolerance, and the Board's
- *  severity bands. Column pickers are driven by the left dataset's declared columns. */
+ *  severity bands. Column pickers offer the columns of EVERY chosen side (`/recon/columns`); a key missing on a
+ *  side or a non-numeric `sum` column is flagged inline and blocks Save, and `Test definition` runs the real
+ *  comparison on a small sample. */
 @Component({
     selector: 'app-reconciliation-form-dialog',
     standalone: true,
     imports: [
+        InspectoAlertComponent,
         InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatDialogModule,
@@ -114,10 +134,23 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                     formControlName="thirdDataset"
                 />
 
+                @if (sideSummary().length) {
+                    <ul
+                        class="text-secondary m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs"
+                        aria-label="Columns per dataset"
+                    >
+                        @for (s of sideSummary(); track s.label) {
+                            <li>
+                                <span class="font-semibold">{{ s.label }}</span> {{ s.text }}
+                            </li>
+                        }
+                    </ul>
+                }
+
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Key column(s) — selection order is the Board tree</mat-label>
                     <mat-select formControlName="keyColumns" multiple>
-                        @for (c of leftColumns(); track c) {
+                        @for (c of columnOptions(); track c) {
                             <mat-option [value]="c">{{ c }}</mat-option>
                         }
                     </mat-select>
@@ -125,10 +158,18 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                         <mat-error>Pick at least one key column.</mat-error>
                     }
                 </mat-form-field>
+                @for (m of keyIssues(); track m) {
+                    <p class="text-warn m-0 text-xs" role="alert">{{ m }}</p>
+                }
 
                 <div class="flex items-center justify-between">
                     <span class="text-secondary text-xs font-semibold uppercase tracking-wider">Compare columns</span>
-                    <button mat-stroked-button type="button" (click)="addCompare()" [disabled]="!leftColumns().length">
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        (click)="addCompare()"
+                        [disabled]="!columnOptions().length"
+                    >
                         <mat-icon svgIcon="heroicons_outline:plus"></mat-icon><span class="ml-1">Add</span>
                     </button>
                 </div>
@@ -138,7 +179,7 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                             <mat-form-field class="flex-1" subscriptSizing="dynamic">
                                 <mat-label>Column</mat-label>
                                 <mat-select formControlName="column">
-                                    @for (c of leftColumns(); track c) {
+                                    @for (c of columnOptions(); track c) {
                                         <mat-option [value]="c">{{ c }}</mat-option>
                                     }
                                 </mat-select>
@@ -176,6 +217,9 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                                 <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                             </button>
                         </div>
+                        @for (m of compareIssues()[i] ?? []; track m) {
+                            <p class="text-warn m-0 text-xs" role="alert">{{ m }}</p>
+                        }
                     }
                 </div>
 
@@ -199,10 +243,41 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                     </mat-form-field>
                     <span class="text-secondary text-xs">ok &lt; warn · warn–breach · breach &gt;</span>
                 </div>
+
+                @if (testError(); as err) {
+                    <inspecto-alert variant="error" title="Test failed">
+                        {{ err }} Check that every key and compare column exists on each dataset and that a sum column
+                        is numeric.
+                    </inspecto-alert>
+                }
+                @if (testResult(); as r) {
+                    <div class="bg-card rounded-2xl border p-3 text-sm" role="status">
+                        <p class="m-0 font-semibold">
+                            Test on {{ r.sampleLabel }} · {{ r.groups }} key groups compared ·
+                            {{ r.matchedKeys }} matched · {{ r.elapsedMs }} ms
+                        </p>
+                        <p class="text-secondary m-0 mt-1 text-xs">Breaks by type</p>
+                        <ul class="m-0 flex list-none flex-wrap gap-x-4 p-0 tabular-nums">
+                            @for (b of r.breaks; track b.label) {
+                                <li>{{ b.label }}: {{ b.count }}</li>
+                            }
+                        </ul>
+                    </div>
+                }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
+                <button
+                    type="button"
+                    mat-stroked-button
+                    class="mr-auto"
+                    (click)="testDefinition()"
+                    [disabled]="!canTest() || testing()"
+                >
+                    <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
+                    <span class="ml-1">{{ testing() ? 'Testing…' : 'Test definition' }}</span>
+                </button>
                 <button type="button" mat-button (click)="requestClose()">Cancel</button>
-                <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid">
+                <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid || hasIssues()">
                     {{ editing ? 'Save' : 'Create' }}
                 </button>
             </mat-dialog-actions>
@@ -214,6 +289,8 @@ export class ReconciliationFormDialog {
     private datasetsApi = inject(DatasetsService);
     private ref = inject(MatDialogRef<ReconciliationFormDialog, ReconciliationFormResult>);
     private confirm = inject(InspectoConfirmService);
+    private reconApi = inject(ReconApiService);
+    private destroyRef = inject(DestroyRef);
 
     /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
@@ -231,6 +308,107 @@ export class ReconciliationFormDialog {
     ]);
     readonly leftColumns = signal<string[]>([]);
 
+    /** The form's value as a signal, so the per-side checks below are `computed`s. */
+    private readonly snap = signal<Record<string, unknown>>({});
+    /** Dataset id → its `/recon/columns` inventory; absent while loading or after a failed read. */
+    private readonly inventory = signal<Record<string, SideColumn[]>>({});
+    private readonly inventoryFailed = signal<Record<string, true>>({});
+    private loadedFor = '';
+    readonly testing = signal(false);
+    readonly testError = signal<string | null>(null);
+    readonly testResult = signal<{
+        sampleLabel: string;
+        groups: number;
+        matchedKeys: number;
+        elapsedMs: number;
+        breaks: { label: string; count: number }[];
+    } | null>(null);
+
+    /** A stored column map renames columns per side, so a same-name check would be wrong; it is skipped. */
+    private readonly columnMapped = (() => {
+        const m = (this.data?.recon?.raw as Record<string, unknown> | undefined)?.['columnMap'];
+        return typeof m === 'object' && m !== null && Object.keys(m).length > 0;
+    })();
+
+    /** The chosen sides in order, with the label the dialog calls them. */
+    private readonly sides = computed(() =>
+        (
+            [
+                ['Left', this.snap()['leftDataset']],
+                ['Right', this.snap()['rightDataset']],
+                ['Third', this.snap()['thirdDataset']],
+            ] as [string, string][]
+        )
+            .filter(([, id]) => !!id)
+            .map(([label, id]) => ({ label, id })),
+    );
+
+    readonly sideSummary = computed(() =>
+        this.sides().map((s) => {
+            const cols = this.inventory()[s.id];
+            const text = cols
+                ? `${cols.length} columns (${cols.filter((c) => c.numeric).length} numeric)`
+                : this.inventoryFailed()[s.id]
+                  ? 'columns could not be read, not checked'
+                  : 'reading columns…';
+            return { label: s.label, text };
+        }),
+    );
+
+    /** Every column of every side whose inventory is known; the left dataset's declared columns until then. */
+    readonly columnOptions = computed(() => {
+        const inv = this.inventory();
+        const names = new Set<string>();
+        for (const s of this.sides()) for (const c of inv[s.id] ?? []) names.add(c.name);
+        return names.size ? [...names] : this.leftColumns();
+    });
+
+    /** Sides whose inventory is known, with their column lookup: the only ones a pick can be checked against. */
+    private checkable(): { label: string; cols: Map<string, SideColumn> }[] {
+        if (this.columnMapped) return [];
+        const inv = this.inventory();
+        return this.sides()
+            .filter((s) => inv[s.id])
+            .map((s) => ({ label: `${s.label} (${s.id})`, cols: new Map(inv[s.id].map((c) => [c.name, c])) }));
+    }
+
+    readonly keyIssues = computed<string[]>(() => {
+        const sides = this.checkable();
+        return ((this.snap()['keyColumns'] as string[] | undefined) ?? []).flatMap((k) => {
+            const missing = sides.filter((s) => !s.cols.has(k)).map((s) => s.label);
+            return missing.length ? [`Key "${k}" is not a column of ${missing.join(' or ')}.`] : [];
+        });
+    });
+
+    /** Per compare row: not on every side, or a `sum` over a non-numeric column. */
+    readonly compareIssues = computed<string[][]>(() => {
+        const sides = this.checkable();
+        return ((this.snap()['compareRows'] as { column?: string; agg?: string }[] | undefined) ?? []).map((r) => {
+            const col = r.column;
+            if (!col) return [];
+            const missing = sides.filter((s) => !s.cols.has(col)).map((s) => s.label);
+            if (missing.length) return [`Column "${col}" is not a column of ${missing.join(' or ')}.`];
+            const text = sides
+                .filter((s) => r.agg !== 'count' && s.cols.get(col)?.numeric === false)
+                .map((s) => s.label);
+            return text.length
+                ? [`Column "${col}" is not numeric on ${text.join(' or ')}; use count or pick a numeric column.`]
+                : [];
+        });
+    });
+
+    readonly hasIssues = computed(() => this.keyIssues().length > 0 || this.compareIssues().some((m) => m.length > 0));
+    readonly canTest = computed(() => {
+        const v = this.snap();
+        return (
+            !!v['leftDataset'] &&
+            !!v['rightDataset'] &&
+            ((v['keyColumns'] as string[] | undefined)?.length ?? 0) > 0 &&
+            !this.hasIssues() &&
+            this.form.valid
+        );
+    });
+
     readonly form: FormGroup = this.fb.group({
         name: ['', [Validators.required]],
         leftDataset: ['', [Validators.required]],
@@ -243,6 +421,12 @@ export class ReconciliationFormDialog {
     });
 
     constructor() {
+        this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+            this.snap.set(this.form.getRawValue());
+            this.testResult.set(null);
+            this.testError.set(null);
+            this.loadInventory();
+        });
         this.form.controls['warnPct'].valueChanges.subscribe(() =>
             this.form.controls['breachPct'].updateValueAndValidity({ emitEvent: false }),
         );
@@ -265,7 +449,87 @@ export class ReconciliationFormDialog {
             this.datasets.set(d);
             const left = this.form.controls['leftDataset'].value;
             if (left) this.onLeftChange(left);
+            this.snap.set(this.form.getRawValue());
+            this.loadInventory();
         });
+    }
+
+    /** Read the columns of every chosen side once per distinct set of Datasets (`/recon/columns`). */
+    private loadInventory(): void {
+        const ids = [...new Set(this.sides().map((s) => s.id))].sort();
+        const key = ids.join('|');
+        if (!ids.length || key === this.loadedFor) return;
+        this.loadedFor = key;
+        this.inventory.set({});
+        this.inventoryFailed.set({});
+        this.reconApi
+            .columns(ids)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (res) => {
+                    if (this.loadedFor !== key) return;
+                    this.inventory.set(Object.fromEntries(res.datasets.map((d) => [d.dataset, d.columns])));
+                    this.inventoryFailed.set(
+                        Object.fromEntries(
+                            ids
+                                .filter((i) => !res.datasets.some((d) => d.dataset === i))
+                                .map((i) => [i, true as const]),
+                        ),
+                    );
+                },
+                error: () => {
+                    if (this.loadedFor === key)
+                        this.inventoryFailed.set(Object.fromEntries(ids.map((i) => [i, true as const])));
+                },
+            });
+    }
+
+    /** `Test definition`: the existing `/recon/run` over a small sample of keys; nothing is saved or recorded. */
+    testDefinition(): void {
+        const v = this.form.getRawValue();
+        const raw = (this.data?.recon?.raw ?? {}) as Record<string, unknown>;
+        const config: ReconServerConfig = {
+            datasets: [v.leftDataset, v.rightDataset, ...(v.thirdDataset ? [v.thirdDataset] : [])],
+            keyColumns: v.keyColumns,
+            compareColumns: (v.compareRows as CompareColumn[])
+                .filter((c) => c.column)
+                .map((c) => ({ column: c.column, agg: c.agg, toleranceType: c.toleranceType, tolerance: c.tolerance })),
+            includeRecordCount: true,
+            ...(raw['columnMap'] ? { columnMap: raw['columnMap'] as ReconServerConfig['columnMap'] } : {}),
+            ...(raw['filters'] ? { filters: raw['filters'] as ReconServerConfig['filters'] } : {}),
+            ...(typeof raw['cardinality'] === 'string' && raw['cardinality']
+                ? { cardinality: raw['cardinality'] }
+                : {}),
+        };
+        this.testing.set(true);
+        this.testError.set(null);
+        this.testResult.set(null);
+        this.reconApi
+            .run(config, { day: null, offset: 0, limit: 1, filter: 'all', sample: TEST_SAMPLE_KEYS })
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (r) => {
+                    this.testing.set(false);
+                    const by = r.summary.byType;
+                    this.testResult.set({
+                        sampleLabel: r.sample?.sampled
+                            ? `a sample of ${r.sample.size} keys`
+                            : r.day
+                              ? `all keys of ${r.day}`
+                              : 'all keys',
+                        groups: r.summary.groups,
+                        matchedKeys: r.summary.matchedKeys,
+                        elapsedMs: r.statistics.elapsedMs,
+                        breaks: BREAK_TYPE_LABELS.filter(([k]) => k !== 'cardinality_break' || by[k] !== undefined).map(
+                            ([k, label]) => ({ label, count: by[k] ?? 0 }),
+                        ),
+                    });
+                },
+                error: (e) => {
+                    this.testing.set(false);
+                    this.testError.set(apiErrorMessage(e, 'The comparison could not run.'));
+                },
+            });
     }
 
     get compareRowsArray(): FormArray<FormGroup> {
@@ -307,7 +571,7 @@ export class ReconciliationFormDialog {
     }
 
     submit(): void {
-        if (this.form.invalid) {
+        if (this.form.invalid || this.hasIssues()) {
             this.form.markAllAsTouched();
             return;
         }
