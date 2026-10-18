@@ -57,3 +57,23 @@ op-log hash and masked aliases; recommend declining rewrite.
 * **D-4 Merge stays a view or rewrites?** Recommend view; confirm.
 * **D-5 Masking (LA-19):** may candidates be scored on raw keys server-side when the Space masks the type (output aliased only), or structural-only? Also whether a masked analyst may accept a pair they cannot read. The LA-19 question itself is unrecorded in the docs (roadmap says reconfirm with operator) - this may overlap it.
 * **D-6 Scope/cost:** candidate caps, blocking keys, rate class, and whether candidates run on an Investigation step or an Entity List.
+
+## 5. Coordinator decisions (assistant-decided on operator delegation 2026-10-18; PENDING OPERATOR CONFIRMATION)
+
+* **D-M1 STANDS.** Sections 2-3 (fuzzy candidate generation, scoring, suggester endpoint) are PARKED: build only if the operator reverses D-M1.
+* Scope is MANUAL merge/unmerge: no new op (vocabulary closed), merges stay a view (no id rewrite), Space-wide identity fact under the
+  existing assertion permission and four-eyes rules, no new capability. Accept = assert fact then seal existing `resolve` at the new head (option C).
+* LA-19: a masked analyst cannot assert a pair they cannot read; refuse with the existing masking error.
+
+## 6. Verification: the manual path is already built (2026-10-18)
+
+* Backend: `POST /inv/entity-identities {a,b,reason}` (201), `POST /inv/entity-identities/{seq}/retract`, `GET` list/group with `at=`,
+  mapping-Dataset import; pinned by `ControlApiEntityIdentityTest`, `ControlApiEntityIdentityImportTest`, resolve/merged tests.
+* SPA: `LinkAnalysisIdentitiesComponent` (embedded in the Investigation tab) has the *Assert same entity* form (two typed keys, cross-type allowed),
+  group lookup, and *Retract* per assertion; `InvService.assertIdentity` / `retractIdentity`.
+* **Missing (the real residuals):** (1) no picking of two entities from the canvas/Working Set - analyst must type typed keys;
+  (2) no one-step "assert then seal `resolve` at new head" - the analyst must add the `resolve` op separately, and nothing prompts it;
+  (3) not verified here: whether assert REFUSES a pair of masked aliases the caller cannot read (existing tests cover masked READ keys);
+  needs a real-HTTP probe before relying on the LA-19 rule above.
+* Suggested smallest follow-up (SPA only, no backend): node-context action "Merge with..." on two selected nodes prefilling the existing form,
+  followed by an offered `resolve` op. Not built: it is a UI change on a surface already shipped and needs the operator's confirmation first.
