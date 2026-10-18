@@ -140,6 +140,50 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   Datasets, one run on a loaded laptop — compare the pair, not with the numbers above): first page unpruned 233 ms →
   pruned 173 ms; `/recon/breaks` compute 495 ms → 124 ms; breaks over a 1,000-key sample 757 ms → 160 ms; a repeated
   breaks/rows request is now a cache read-back (~10 µs) instead of a recompute.
+* **At scale, and one scan per side** (`RECON-UPLIFT-1` lane A, 2026-10-18; plan
+  [`reconciliation-uplift-plan.md`](../../../superpower/reconciliation-uplift-plan.md)). Until then nothing above ~400k rows
+  was measured. `ReconPerfTest#scaleProbe` (`RECON_PERF=1 RECON_PERF_DAYS=1 RECON_PERF_KEYS=<n>`; the two settings also
+  resize the older tests, so set them only when running the probe alone) measures ONE day of N key groups × 3 sides
+  (HLR/CRM/CBS, ≈ 2 % of keys broken), default sandbox (1 GB, 2 threads, 30 s per statement), 12-CPU / 32 GB laptop that
+  other sessions were also using — **timings swing ±30 % run to run, so read the same-process pairs, not one number**.
+  JVM heap max 8 GB. Per-type scans = the pre-B1 record compute; shared grain = B1:
+
+  | key groups | whole run (page 5000) | record compute, per-type scans → shared grain (cap lifted) | Breaks | status change, 50k-Break file | page at offset 0 / deep | peak heap / process |
+  |---|---|---|---|---|---|---|
+  | 200k | 0.5–0.6 s | 0.86 s → 0.51 s | 13,434 | 0.32–0.34 s | 0.19 s / 0.19 s | 0.55–0.56 GB / 0.85 GB |
+  | 1 M | 1.0–1.7 s | 4.7 s → 1.8 s (same process) | 67,179 | 0.28–0.30 s | 0.75 s / 0.51–0.72 s | 0.34–0.42 GB / 0.6–0.7 GB |
+  | 5 M | 9.4–10.6 s | 38.9 s → 17.2 s (separate runs) | 335,901 | 0.28–0.51 s | 3.9–5.6 s / 4.4–5.0 s | 0.7–0.8 GB / 1.7 GB |
+  | 10 M | 17.9–27.8 s | 51.6 s → 31.2 s (same process) | 671,809 | 0.37–0.41 s | 9.5–10.3 s / 7.8–10.6 s | 1.2–1.7 GB / 2.3–2.9 GB |
+
+  A 200k-row day materialised for the cache (`dayRun` at the production row cap) holds **253 MB** of heap; at 1 M groups and
+  up the day is paged in SQL and nothing is cached. Every size ran to completion, no sandbox error and no timeout.
+  **Verdicts on the plan's findings:**
+  * **P2 (1 GB / 30 s sandbox) — holds at 10 M key groups, with thin margin.** The 1 GB DuckDB limit did not fail (the process
+    grew to 2.3–2.9 GB: DuckDB spills past its limit). The 30 s timeout is per statement and the single grain build is the
+    longest one: 17–25 s at 10 M here, so a slower or busier host (or a wider key) will time out. No failure was observed, so
+    no knob was built (B2 closed unbuilt); both limits are already global settings (`-Dassist.sql.memory_limit`,
+    `-Dassist.sql.threads`, `-Dassist.sql.timeout_seconds`). Not run: above 10 M, wide keys, multi-day, a 1-CPU host.
+  * **P4 (materialising up to 200,000 key groups) — a real, unbounded-in-bytes risk, not a failure.** 253 MB per cached 3-way
+    day; the cache is bounded by COUNT (`ReconDay.Cache.MAX_ENTRIES` = 32), so the worst case is ~8 GB, more than the heap of
+    a small host. Nothing broke here (8 GB heap), so it is recorded, not fixed: the cheap fix is a lower
+    `ReconRoutes.rowCap` or a byte bound on the cache (no BACKLOG row yet: raised in the lane A report).
+  * **P5 (one JSON state file) — not a problem at the cap.** A status change on a full 50,000-Break file (9.7 MB) costs
+    0.3–0.5 s and does not grow with the reconciliation's size; recording that file costs 0.3–0.8 s. The cap, not the file,
+    is what bites: at 1 M key groups a ~2 %-broken day is already 67k Breaks and a record is refused (422) by design (D-RU4).
+  * **P6 (OFFSET paging) — no deep-offset penalty measured.** A page at offset ≈ the end of the set (203k deep at 10 M)
+    cost the same as offset 0 (9.5–10.3 s vs 7.8–10.6 s): the cost is the per-request scan of both sides, not the sort or the
+    offset, so keyset paging would not help (B3 closed unbuilt). The existing per-answer cache is what makes a repeat free.
+  * **P1 (a run scans each side several times) — confirmed and fixed (B1).** `ReconService.openGrain` builds `__grain` once
+    in one sandbox; `Grain.summary()` and `Grain.breakSets(pair, cap)` read the run summary and every pair's missing /
+    value / cardinality Break sets off it (`grainMissingSql` / `grainValueSql` / `grainCardinalitySql`), and
+    `ReconBreaks.compute` and `ReconRunJob` use it, so a run records from one scan (the Job previously built the grain for
+    its summary and then re-scanned for the Breaks; `/record` re-scanned per Break type and pair). Record compute went
+    from ≈ 3.2× a page (1 M, 3.1 s vs 1.0 s) to ≈ 1.0–2.0× a page, and 30–60 % less wall-clock at every size. ⚠ The per-pair sets
+    are read with the same per-pair `within` / cardinality predicates, **not** the `__cls` bit alone: `__cls` ORs its value
+    and cardinality bits over every pair, so on a 3-way run only the missing bits are per pair.
+    Pinned by `ReconBreaksParityTest` — new path = the original per-type scans (`ReconService.breaks` + `fromSets`, run live
+    as the oracle) = a stored expected result, on a 2-way, a 3-way, a day-pruned, an absolute and a percent tolerance edge,
+    a duplicate key (every cardinality), a null key, a record-count-only and the cap-refusal cases. No HTTP shape moved.
 * **State retention** (`RECON-PERF-RESIDUALS-1` (7), ⛔ decision 2026-10-09): a record keeps the Breaks of the
   `ReconStateStore.RETAIN_DAYS` = **90** most recent recorded days (newest by DAY, not wall clock) and drops older days
   WHOLE, whatever their status — an open Break 91 days back is gone (setting its status later re-appends it

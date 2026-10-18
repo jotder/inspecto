@@ -294,26 +294,7 @@ public final class ReconService {
 
             Map<String, Object> totals = new LinkedHashMap<>();
             for (int s = 0; s < n; s++) totals.put(WIRE_SIDES[s], measuresOf(spec, agg, "t" + s + "_"));
-            List<Map<String, Object>> pairs = new ArrayList<>();
-            for (int other = 1; other < n; other++) {
-                String p = "p" + other + "_";
-                Map<String, Object> byType = new LinkedHashMap<>();
-                byType.put("missing_left", agg.get(p + "missing_left"));
-                byType.put("missing_right", agg.get(p + "missing_right"));
-                byType.put("value_break", agg.get(p + "value_break"));
-                if (spec.cardinality() != Cardinality.MANY_TO_MANY)
-                    byType.put("cardinality_break", agg.get(p + "cardinality_break"));
-                Map<String, Object> pair = new LinkedHashMap<>();
-                pair.put("side", WIRE_SIDES[other]);
-                pair.put("matchedKeys", agg.get(p + "matched"));
-                pair.put("byType", byType);
-                pairs.add(pair);
-            }
-            Map<String, Object> summary = new LinkedHashMap<>();
-            summary.put("groups", groups);
-            summary.put("matchedKeys", pairs.get(0).get("matchedKeys"));
-            summary.put("byType", pairs.get(0).get("byType"));
-            summary.put("pairs", pairs);
+            Map<String, Object> summary = summaryOf(spec, agg, groups);
 
             String order = " ORDER BY " + orderByKeys(spec, "");
             if (groups <= rowCap) {
@@ -336,6 +317,104 @@ public final class ReconService {
             int total = ((Number) select(conn, "SELECT COUNT(*) AS c FROM __grain" + where).get(0).get("c")).intValue();
             DayResult day = new DayResult(null, null, groups, totals, summary, sampleInfo, (System.nanoTime() - t0) / 1_000_000);
             return new DayPage(day, new Page(rows, total));
+        }
+    }
+
+    /** The Break {@code summary} ({@link RunResult}) from {@link #grainSummarySql}'s one aggregate row. */
+    private static Map<String, Object> summaryOf(Spec spec, Map<String, Object> agg, long groups) {
+        List<Map<String, Object>> pairs = new ArrayList<>();
+        for (int other = 1; other < spec.sides().size(); other++) {
+            String p = "p" + other + "_";
+            Map<String, Object> byType = new LinkedHashMap<>();
+            byType.put("missing_left", agg.get(p + "missing_left"));
+            byType.put("missing_right", agg.get(p + "missing_right"));
+            byType.put("value_break", agg.get(p + "value_break"));
+            if (spec.cardinality() != Cardinality.MANY_TO_MANY)
+                byType.put("cardinality_break", agg.get(p + "cardinality_break"));
+            Map<String, Object> pair = new LinkedHashMap<>();
+            pair.put("side", WIRE_SIDES[other]);
+            pair.put("matchedKeys", agg.get(p + "matched"));
+            pair.put("byType", byType);
+            pairs.add(pair);
+        }
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("groups", groups);
+        summary.put("matchedKeys", pairs.get(0).get("matchedKeys"));
+        summary.put("byType", pairs.get(0).get("byType"));
+        summary.put("pairs", pairs);
+        return summary;
+    }
+
+    /**
+     * ONE sandbox holding ONE {@code __grain} (each side aggregated once), from which a run's {@link #summary} AND every
+     * pair's Break sets ({@link #breakSets}) are read - RECON-UPLIFT-1 B1. Before it, recording a run built the grain for
+     * the summary and then re-aggregated each side once per Break type and pair ({@link #breaks}); here a Break set is a
+     * {@code SELECT} over the grain's per-side columns. Close it to release the sandbox.
+     *
+     * <p>🔴 The sets must stay identical to {@link #breaks}' (same keys, values, order, truncation): the Break
+     * predicates are the SAME {@link #within} / {@link #cardinalityViolationCols} expressions over the same aggregated
+     * values, and {@code ReconBreaksParityTest} pins it.
+     */
+    public static final class Grain implements AutoCloseable {
+        private final SqlSandbox sandbox;
+        private final Connection conn;
+        private final Spec spec;
+        private Map<String, Object> summary;
+
+        private Grain(SqlSandbox sandbox, Connection conn, Spec spec) {
+            this.sandbox = sandbox;
+            this.conn = conn;
+            this.spec = spec;
+        }
+
+        public Spec spec() { return spec; }
+
+        /** The run's Break summary (the same as {@link RunResult#summary()}); one aggregate over the grain, memoised. */
+        public Map<String, Object> summary() throws SQLException {
+            if (summary == null) {
+                Map<String, Object> agg = select(conn, grainSummarySql(spec)).get(0);
+                summary = summaryOf(spec, agg, ((Number) agg.get("groups")).longValue());
+            }
+            return summary;
+        }
+
+        /**
+         * The Break sets of the anchor-relative pair {@code other} (1 = "b", 2 = "c"), each capped at {@code limit}
+         * ({@code truncated} set past it) - what {@link #breaks(Spec, Map, String, int, int, int)} returns with no path, type
+         * or sample. A carried impact column is validated here exactly as there ({@code IllegalArgumentException} when no
+         * side has it), though no Break set reads it: ⚠ a row's {@code impact} block is {@code {a:null, b:null}} here, unlike
+         * {@link #breaks}, because the grain does not carry the impact column ({@link ReconBreaks#compute} never reads it).
+         */
+        public Map<String, BreakSet> breakSets(int other, int limit) throws SQLException {
+            if (other < 1 || other >= spec.sides().size())
+                throw new IllegalArgumentException("side '" + other + "' is not a compared side of this reconciliation");
+            if (spec.carriedImpact() != null) padAbsentImpact(conn, spec);
+            Map<String, BreakSet> out = new LinkedHashMap<>();
+            out.put("missing_right", breakSet(conn, spec, grainMissingSql(spec, other, true, limit), 'a', limit, false));
+            out.put("missing_left", breakSet(conn, spec, grainMissingSql(spec, other, false, limit), 'b', limit, false));
+            out.put("value_break", spec.measures().isEmpty()
+                    ? new BreakSet(List.of(), 0, false)
+                    : breakSet(conn, spec, grainValueSql(spec, other, limit), 'x', limit, false));
+            if (spec.cardinality() != Cardinality.MANY_TO_MANY)
+                out.put("cardinality_break", breakSet(conn, spec, grainCardinalitySql(spec, other, limit), 'x', limit, true));
+            return out;
+        }
+
+        @Override public void close() { sandbox.close(); }
+    }
+
+    /** Open a {@link Grain}: register the sides and build {@code __grain} once. */
+    public static Grain openGrain(Spec spec) throws SQLException, IOException {
+        SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy());
+        try {
+            Connection conn = registerSides(sandbox, spec);
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE TEMP TABLE __grain AS " + grainTableSql(spec));
+            }
+            return new Grain(sandbox, conn, spec);
+        } catch (SQLException | RuntimeException e) {
+            sandbox.close();
+            throw e;
         }
     }
 
@@ -695,6 +774,59 @@ public final class ReconService {
                   .append(cardinalityViolationCols(spec, a, o)).append(")) AS ").append(q(p + "cardinality_break"));
         }
         return sb.append(" FROM __grain").toString();
+    }
+
+    /**
+     * {@link #missingSql} read off {@code __grain}: keys on one side of the anchor↔{@code other} pair and absent on the
+     * other, aliased {@code sa_*} (anchor-only) or {@code sb_*} (other-only) like {@link #breakSet} expects. A grain row's
+     * key equals every present side's key (the chain joins them NULL-safely), so it orders exactly as {@link #missingSql}.
+     */
+    static String grainMissingSql(Spec spec, int other, boolean anchorOnly, int limit) {
+        int present = anchorOnly ? 0 : other, absent = anchorOnly ? other : 0;
+        String prefix = anchorOnly ? "sa_" : "sb_";
+        StringBuilder sb = new StringBuilder("SELECT ");
+        grainKeys(sb, spec);
+        for (int i = 0; i < spec.measures().size(); i++)
+            sb.append(q("s" + present + "_m" + i)).append(" AS ").append(q(prefix + "m" + i)).append(", ");
+        sb.append(q("s" + present + "_mr")).append(" AS ").append(q(prefix + "mr"))
+          .append(" FROM __grain WHERE ").append(q("s" + present + "_mr")).append(" IS NOT NULL AND ")
+          .append(q("s" + absent + "_mr")).append(" IS NULL")
+          .append(" ORDER BY ").append(orderByKeys(spec, ""))
+          .append(" LIMIT ").append(Math.max(0, limit) + 1);
+        return sb.toString();
+    }
+
+    /** {@link #valueBreaksSql} read off {@code __grain}: matched keys of the pair with a compare column outside its tolerance. */
+    static String grainValueSql(Spec spec, int other, int limit) {
+        List<String> broken = IntStream.range(0, spec.measures().size())
+                .mapToObj(i -> "NOT " + within(q("s0_m" + i), q("s" + other + "_m" + i), spec.measures().get(i)))
+                .toList();
+        return grainMatchedSql(spec, other, limit, String.join(" OR ", broken));
+    }
+
+    /** {@link #cardinalityBreaksSql} read off {@code __grain}: matched keys of the pair violating the declared {@link Cardinality}. */
+    static String grainCardinalitySql(Spec spec, int other, int limit) {
+        return grainMatchedSql(spec, other, limit, cardinalityViolationCols(spec, q("s0_mr"), q("s" + other + "_mr")));
+    }
+
+    /** Keys present on BOTH sides of the pair where {@code violation} holds, shaped {@code sa_*}/{@code sb_*} like {@link #valueBreaksSql}. */
+    private static String grainMatchedSql(Spec spec, int other, int limit, String violation) {
+        StringBuilder sb = new StringBuilder("SELECT ");
+        grainKeys(sb, spec);
+        for (int i = 0; i < spec.measures().size(); i++)
+            sb.append(q("s0_m" + i)).append(" AS ").append(q("sa_m" + i)).append(", ")
+              .append(q("s" + other + "_m" + i)).append(" AS ").append(q("sb_m" + i)).append(", ");
+        sb.append(q("s0_mr")).append(" AS ").append(q("sa_mr")).append(", ")
+          .append(q("s" + other + "_mr")).append(" AS ").append(q("sb_mr"))
+          .append(" FROM __grain WHERE ").append(q("s0_mr")).append(" IS NOT NULL AND ").append(q("s" + other + "_mr"))
+          .append(" IS NOT NULL AND (").append(violation).append(')')
+          .append(" ORDER BY ").append(orderByKeys(spec, ""))
+          .append(" LIMIT ").append(Math.max(0, limit) + 1);
+        return sb.toString();
+    }
+
+    private static void grainKeys(StringBuilder sb, Spec spec) {
+        for (int i = 0; i < spec.keyColumns().size(); i++) sb.append(q("k" + i)).append(", ");
     }
 
     /** `COALESCE(__s0."ki", …, __s{n-1}."ki")` — the unified key column across all joined sides. */

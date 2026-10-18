@@ -306,10 +306,21 @@ public final class ReconBreaks {
      * replaces, where the Board merged a 200-row page and closed everything outside it.
      */
     public static List<Break> compute(ReconService.Spec spec, int cap) throws SQLException, IOException {
+        try (ReconService.Grain grain = ReconService.openGrain(spec)) {
+            return compute(grain, cap);
+        }
+    }
+
+    /**
+     * {@link #compute(ReconService.Spec, int)} over an already-built {@link ReconService.Grain}: every pair's Break sets
+     * are read from the one grain (RECON-UPLIFT-1 B1), so a caller that also needs the run summary shares the scan.
+     */
+    public static List<Break> compute(ReconService.Grain grain, int cap) throws SQLException {
+        ReconService.Spec spec = grain.spec();
         List<Break> out = new ArrayList<>();
         for (int other = 1; other < spec.sides().size(); other++) {
             String pair = PAIRS.get(other - 1);
-            Map<String, ReconService.BreakSet> sets = ReconService.breaks(spec, null, null, other, cap, 0);
+            Map<String, ReconService.BreakSet> sets = grain.breakSets(other, cap);
             for (Map.Entry<String, ReconService.BreakSet> e : sets.entrySet())
                 if (e.getValue().truncated())
                     throw new IllegalArgumentException("reconciliation has more than " + cap + " " + pair + " "
