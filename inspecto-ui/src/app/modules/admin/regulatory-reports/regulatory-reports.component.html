@@ -220,6 +220,27 @@
                     }
                 </div>
             }
+            @if (canVerify()) {
+                <div class="mt-4 flex flex-col gap-2">
+                    <div class="flex justify-end">
+                        <button mat-stroked-button [disabled]="verifying()" (click)="verify()">
+                            Verify the delivered file
+                        </button>
+                    </div>
+                    @if (verification(); as v) {
+                        <inspecto-alert
+                            [variant]="v.ok ? 'success' : 'error'"
+                            [title]="v.ok ? 'The delivered file matches' : 'The delivered file does not match'"
+                        >
+                            File {{ v.file }}: {{ v.fileState }}; sidecar {{ v.file }}.sha256: {{ v.sidecar }}.
+                            @if (!v.ok && v.actualSha256) {
+                                It now hashes to <span class="font-mono break-all">{{ v.actualSha256 }}</span
+                                >.
+                            }
+                        </inspecto-alert>
+                    }
+                </div>
+            }
             @if (canRetry()) {
                 <div class="mt-4 flex justify-end">
                     <button mat-flat-button color="primary" [disabled]="acting()" (click)="retry()">

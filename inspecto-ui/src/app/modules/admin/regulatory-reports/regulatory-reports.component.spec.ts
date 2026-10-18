@@ -208,6 +208,40 @@ describe('RegulatoryReportsComponent', () => {
         expect(api.retry).toHaveBeenCalledWith(REPORT.id);
     });
 
+    it('a submitted report offers Verify and shows a mismatch in the server terms', async () => {
+        const verify = vi.fn(() =>
+            of({
+                id: REPORT.id,
+                file: 'x.xml',
+                expectedSha256: 'a'.repeat(64),
+                actualSha256: 'b'.repeat(64),
+                fileState: 'mismatch',
+                sidecar: 'match',
+                ok: false,
+                integrity: true,
+            }),
+        );
+        const { fixture } = await create({ get: vi.fn(() => of({ ...DETAIL, status: 'submitted' })), verify });
+        const c = fixture.componentInstance;
+        c.open({ id: REPORT.id });
+        fixture.detectChanges();
+        expect(buttons(fixture.nativeElement)).toContain('Verify the delivered file');
+        c.verify();
+        fixture.detectChanges();
+        expect(verify).toHaveBeenCalledWith(REPORT.id);
+        const text = fixture.nativeElement.textContent as string;
+        expect(text).toContain('The delivered file does not match');
+        expect(text).toContain('File x.xml: mismatch');
+        expect(text).toContain('b'.repeat(64));
+    });
+
+    it('offers no Verify before the report is submitted', async () => {
+        const { fixture } = await create();
+        fixture.componentInstance.open({ id: REPORT.id });
+        fixture.detectChanges();
+        expect(buttons(fixture.nativeElement)).not.toContain('Verify the delivered file');
+    });
+
     it('New report is offered only with canWorkIncidents, opens the draft dialog and shows the draft', async () => {
         const { fixture, dialog } = await create();
         const el = fixture.nativeElement as HTMLElement;

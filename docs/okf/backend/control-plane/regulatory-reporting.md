@@ -32,6 +32,7 @@ id: sample-sar
 title: Sample suspicious activity report
 format: xml                                  (xml | csv | json)
 rootElement: suspiciousActivityReport        (required for xml; wraps json when given)
+schema: sample-sar.xsd                       (xml only, optional: the XSD a draft must validate against)
 delivery:
   kind: file-drop                            (the only kind built)
   dir: regulatory-submissions/sample-sar     (jailed like the report Job's out_dir)
@@ -71,6 +72,7 @@ to the SAME file name. `rejected` is reserved for a regulator's refusal (nothing
 | `POST /regulatory-reports/{id}/approve` | `canApproveChanges` | pending → approved → submitted / failed |
 | `POST /regulatory-reports/{id}/decline` | `canApproveChanges` | pending → declined |
 | `POST /regulatory-reports/{id}/retry` | `canApproveChanges` | failed → submitted / failed |
+| `GET /regulatory-reports/{id}/verify` | `canWorkIncidents` or `canApproveChanges` | re-hash the delivered file and its `.sha256` sidecar (2026-10-18) |
 
 *Reader* = `canWorkIncidents` OR `canApproveChanges` (checked in the handler) AND the subject visible: a report is
 visible exactly when its Case / Incident is (`ObjectRoutes.visibleTo`: SEC-7d scope + row policy); invisible reads 404.
@@ -156,7 +158,7 @@ The Space switcher resets to the first Space on every sign-in: pick the Space ag
 | 14 | Unhappy paths | **PASS** (each a clear 4xx) | required `narrative` empty 422; unknown input key 422 naming what the template reads; both `caseId` and `incidentId` 422; unknown Case 404; unknown template 422; input over 20000 chars 422; control character in XML 422; required source that resolves empty (`subject.nope`) 422 at draft; source root not in `[incidents, input, report, subject, evidence]` 422 at template save; `delivery.dir` outside the jail 403; DELETE of a template used by a report 409, of a built-in with no override 409; viewer draft 403; approve of a draft 409 |
 | 15 | Huge Case | **PASS at unit level** (2026-10-14): the 1 MiB document cap (`ReportRenderer.MAX_BYTES`) refuses, never truncates; a real 1 MiB Case was not driven | |
 
-**Re-driven 2026-10-14 after the fixes** on a fresh Enterprise bundle (`telco-fraud`, 30 Incidents, one Case over 3 of them with attachments and an `impact`): XML (escaped `&lt;b&gt;` `&amp;`), CSV (formula cell prefixed) and JSON (parses) each drafted by `fm.analyst`, approved by `admin` -> `submitted`, the file on disk hashing to `contentSha256`, no absolute path anywhere in the response (`delivery.dir` is `regulatory-submissions/<id>`); a late attachment on a PENDING report -> `sourceChanged: true`, decline -> `declined`, the redraft carries it; the maker approving 403; `ra.viewer` 403 (pane shows the refusal alone, no *No Report Templates.*); route-level AUDIT rows now `regulatory-report.declined` and `regulatory-report.approval_requested`; `GET /audit/verify` `ok: true`. Still not claimable: schema validation, sealing, schedule, masking. **GO to present the add-on with that scope stated** (decisions below are the ways to widen it).
+**Re-driven 2026-10-14 after the fixes** on a fresh Enterprise bundle (`telco-fraud`, 30 Incidents, one Case over 3 of them with attachments and an `impact`): XML (escaped `&lt;b&gt;` `&amp;`), CSV (formula cell prefixed) and JSON (parses) each drafted by `fm.analyst`, approved by `admin` -> `submitted`, the file on disk hashing to `contentSha256`, no absolute path anywhere in the response (`delivery.dir` is `regulatory-submissions/<id>`); a late attachment on a PENDING report -> `sourceChanged: true`, decline -> `declined`, the redraft carries it; the maker approving 403; `ra.viewer` 403 (pane shows the refusal alone, no *No Report Templates.*); route-level AUDIT rows now `regulatory-report.declined` and `regulatory-report.approval_requested`; `GET /audit/verify` `ok: true`. Still not claimable (then): schema validation, sealing, schedule, masking - see the decisions below. **GO to present the add-on with that scope stated** (decisions below are the ways to widen it).
 
 Small defects found, all cosmetic - **three fixed 2026-10-14**: (1) the route-level AUDIT row of a decline / retry / send-for-approval read
 `regulatory-report.created` (the POST default in `AuditTrail.classify`); it now reads `regulatory-report.declined | retried | approval_requested`
@@ -167,20 +169,49 @@ the template wrote it (`dirLabel`, stored beside the pinned absolute `dir` the d
 1 MiB cap refuses with the cap in the message, half the cap renders whole). Not fixable: a required template field that names a Case
 attribute that does not exist saves (it cannot be known statically) and fails at draft with a 422 naming it.
 
-**Decisions owed by the operator** (each is a build the rehearsal showed is absent; see `docs/BACKLOG.md` `REGULATORY-REPORTING-1`).
+**Decisions taken 2026-10-18** (owed since the rehearsal; taken by the lane with the operator away, each the
+recommendation, per the decide-when-away rule):
 
-1. **XSD validation of XML reports** - recommend BUILD the mechanism: an optional template key `schema` (an XSD under the Space config root or the module classpath), validated at draft with `javax.xml.validation` (JDK, no dependency), every violation named in the 422. Cost about 0.5 day. Ship only a synthetic `sample-sar.xsd`; a real regulator XSD is pack content (`PACK-AML-1`) and must come from the operator.
-2. **Sealing / signing the delivered file** - (a) a `<file>.sha256` sidecar plus `GET /regulatory-reports/{id}/verify` that re-hashes the delivered file against the pinned digest, about 0.5 day; (b) a detached HMAC with the Space key, 1 day, verifiable only by us; (c) XMLDSig / CMS with an operator-supplied key and certificate, 3-5 days plus key custody. Recommend (a) now, (c) only when a named regulator requires it.
-3. **Masking report content** - recommend DECLARE it by design and close: a filing needs the real identifiers, the approver must see exactly what is filed, and `ra.viewer` already cannot read a report. Alternative (pane masking for a caller without reveal) costs 1-2 days and defeats the four-eyes review.
-4. **In-place amend** - recommend NO: decline and redraft (rehearsed beat 10) keeps one immutable document per filing. Alternative: a `supersedes` link from the redraft, about 1 day.
-5. **Scheduled drafting** - recommend NO (a person drafts, by design); 2 days if wanted.
-6. **Regulator acknowledgement ingest / live SFTP or HTTPS delivery** - demand-gated; recommend leave until a regulator is named (each is 3+ days and needs that regulator's receipt format and credentials).
-7. **Reproducible regenerate** (drop `report.id` / `createdAt` from the hash) - recommend NO; say "pinned", not "reproducible".
+1. **XSD validation of XML reports** - BUILT (below).
+2. **Sealing the delivered file** - BUILT as option (a): a `.sha256` sidecar plus a verify route (below). A detached
+   HMAC (verifiable only by us) is not built; XMLDSig / CMS with an operator-supplied key waits for a named regulator
+   that requires it.
+3. **Masking report content** - DECLARED unmasked by design: a filing needs the real identifiers, the approver must see
+   exactly what is filed, and `ra.viewer` cannot read a report at all. Closed.
+4. **In-place amend** - NO: decline and redraft keeps one immutable document per filing.
+5. **Scheduled drafting** - NO: a person drafts, by design.
+6. **Acknowledgement ingest / live SFTP or HTTPS delivery** - left until a regulator is named (its receipt format and
+   credentials are the input).
+7. **Reproducible regenerate** - NO: say "pinned", not "reproducible".
 
-## Deliberately not built (see `docs/BACKLOG.md` `REGULATORY-REPORTING-1`)
-Regulator acknowledgement ingest (`rejected`, receipts); live regulator
-delivery (SFTP / HTTPS through a Connection); nested repeating groups; sealing / signing the delivered file; a
-dedicated filing capability (RBAC capability contribution is declined, P1-D3).
+## XSD validation (built 2026-10-18)
+An xml template may name `schema: <file>.xsd` (`ReportTemplate.SCHEMA_FILE`; refused on csv / json). `SchemaCheck`
+finds it beside the Space's templates (`<config root>/regulatory-report-templates/<file>`) first, then beside the
+built-ins on the classpath, so a Space can tighten a built-in's schema by dropping a file of the same name. The factory
+runs with secure processing and `ACCESS_EXTERNAL_SCHEMA` / `ACCESS_EXTERNAL_DTD` empty: one self-contained file, no
+`xs:import` by URL. Gates: `PUT /regulatory-reports/templates/{id}` 422 when the schema is absent or does not compile;
+the draft renders, then validates, and refuses 422 `does not validate against schema '<file>'` with every violation as
+`line L:C message` - nothing is saved. The built-in `sample-sar` names the shipped synthetic `sample-sar.xsd` (element
+order, required elements, `preparedAt` an `xs:dateTime`, `amountSuspected` an `xs:decimal`, `currency` three capitals).
+It follows no real regulator: a real XSD is pack content from the operator (`PACK-AML-1`,
+`REGULATORY-SAR-STR-TEMPLATES-1`).
+
+## Sealing: sidecar and verify (built 2026-10-18)
+`FileDrop.deliver` writes `<file>.sha256` beside the file, in `sha256sum` format (`<hex>  <file>` and a newline), so a receiver
+checks it with a stock tool. Written once, atomically, never overwritten (a different sidecar already present fails the
+submission); an idempotent retry after a crash between the two writes adds the missing sidecar.
+`GET /regulatory-reports/{id}/verify` (reader gate and visibility as the detail route; not `submitted` 409; a malformed
+id 422; unknown 404) re-jails the pinned folder, re-hashes the file and reads the sidecar against `contentSha256`:
+`{file, expectedSha256, actualSha256, fileState, sidecar, ok, integrity}`, each state `match | mismatch | missing`,
+`ok` only when both match; `integrity` is the record's MAC. A read: no AUDIT row. Names the file, never the absolute
+path. SPA: *Verify the delivered file* on a submitted report shows the result in place. A sidecar seals against
+accidental change and an outside-the-system edit noticed later; it is not a signature (anyone who can rewrite the file
+can rewrite the sidecar) - that is XMLDSig / CMS, still demand-gated.
+
+## Deliberately not built (see `docs/BACKLOG.md` `REGULATORY-REPORTING-RESIDUALS-1`)
+Regulator acknowledgement ingest (`rejected`, receipts); live regulator delivery (SFTP / HTTPS through a Connection);
+nested repeating groups; signing the delivered file (XMLDSig / CMS); a dedicated filing capability (RBAC capability
+contribution is declined, P1-D3).
 
 ## Template authoring (shipped 2026-10-11)
 `PUT` / `DELETE /regulatory-reports/templates/{id}` write `<write root>/regulatory-report-templates/<id>.toon` (the

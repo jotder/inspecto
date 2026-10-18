@@ -153,6 +153,21 @@ class ControlApiRegulatoryTemplatesTest {
                     422, "but the path names 'my-tpl'");
             status(send(c, "PUT", T + "my-tpl", "{\"title\":\"x\",\"format\":\"pdf\",\"bogus\":1}", ADMIN), 422, "unknown key 'bogus'");
             status(send(c, "PUT", T + "my-tpl", "{\"title\":\"x\",\"format\":\"pdf\"}", ADMIN), 422, "'format' must be one of");
+            // 422: a schema on a non-xml template, an unsafe schema name, a schema that is nowhere
+            status(send(c, "PUT", T + "my-tpl", template("Mine", "out/my").replace("{\"title\"", "{\"schema\":\"a.xsd\",\"title\""), ADMIN),
+                    422, "applies to an xml template only");
+            String xml = template("Mine", "out/my").replace("\"format\":\"json\"", "\"format\":\"xml\",\"rootElement\":\"r\"");
+            status(send(c, "PUT", T + "my-tpl", xml.replace("{\"title\"", "{\"schema\":\"../x.xsd\",\"title\""), ADMIN),
+                    422, "'schema' must be an XSD file name");
+            status(send(c, "PUT", T + "my-tpl", xml.replace("{\"title\"", "{\"schema\":\"absent.xsd\",\"title\""), ADMIN),
+                    422, "schema 'absent.xsd' is not in");
+            Files.createDirectories(c.root.resolve("regulatory-report-templates"));
+            Files.writeString(c.root.resolve("regulatory-report-templates/broken.xsd"), "<xs:schema");
+            status(send(c, "PUT", T + "my-tpl", xml.replace("{\"title\"", "{\"schema\":\"broken.xsd\",\"title\""), ADMIN),
+                    422, "does not compile");
+            assertEquals(200, send(c, "PUT", T + "xsd-ok", xml.replace("{\"title\"", "{\"schema\":\"sample-sar.xsd\",\"title\""), ADMIN)
+                    .statusCode(), "a built-in XSD is found by name");
+            Files.delete(c.root.resolve("regulatory-report-templates/xsd-ok.toon"));
             // 403: the drop directory escapes the jail
             status(send(c, "PUT", T + "my-tpl", template("Mine", "../../../outside"), ADMIN), 403, "delivery.dir is refused");
             assertFalse(Files.exists(c.root.resolve("regulatory-report-templates/my-tpl.toon")), "no refusal wrote anything");

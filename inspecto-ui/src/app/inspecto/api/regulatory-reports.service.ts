@@ -32,6 +32,8 @@ export interface ReportTemplate {
     description: string | null;
     format: 'xml' | 'csv' | 'json';
     rootElement?: string | null;
+    /** xml only: the XSD a draft must validate against (looked up in the Space, then among the built-ins). */
+    schema?: string | null;
     origin: 'built-in' | 'space';
     delivery: { kind: string; dir: string };
     /** The `input.*` keys the template reads — the only values a draft may carry. */
@@ -72,6 +74,18 @@ export interface RegulatoryReport {
     submission: { kind: string; file: string; at: string; alreadyPresent: boolean } | null;
     lastError?: string | null;
     history: { status: string; by: string; at: string }[];
+}
+
+/** The delivered file and its `.sha256` sidecar, re-read against the pinned digest. `ok` only when both match. */
+export interface RegulatoryReportVerification {
+    id: string;
+    file: string;
+    expectedSha256: string;
+    actualSha256: string | null;
+    fileState: 'match' | 'mismatch' | 'missing';
+    sidecar: 'match' | 'mismatch' | 'missing';
+    ok: boolean;
+    integrity: boolean;
 }
 
 /** One report with the exact content that is (or was) submitted, and the approver's live checks. */
@@ -170,6 +184,13 @@ export class RegulatoryReportsService {
 
     retry(id: string): Observable<RegulatoryReportDetail> {
         return this.transition(id, 'retry');
+    }
+
+    /** Re-hash a submitted report's delivered file and its `.sha256` sidecar — `GET /regulatory-reports/{id}/verify`. */
+    verify(id: string): Observable<RegulatoryReportVerification> {
+        return this.http.get<RegulatoryReportVerification>(
+            apiUrl(`/regulatory-reports/${encodeURIComponent(id)}/verify`),
+        );
     }
 
     /** Author (create or replace) the Space's Report Template `id` — `PUT /regulatory-reports/templates/{id}`. */

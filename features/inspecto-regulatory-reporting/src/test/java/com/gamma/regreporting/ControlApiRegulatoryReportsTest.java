@@ -321,6 +321,90 @@ class ControlApiRegulatoryReportsTest {
         }
     }
 
+    // ── sealing: the .sha256 sidecar and GET /{id}/verify ──────────────────────────────────────────
+
+    @Test
+    void aSubmittedFileCarriesASha256SidecarAndVerifyReHashesBoth() throws Exception {
+        try (Ctx c = open(true)) {
+            String kase = seedCase(c, Map.of(), Map.of());
+            String id = pending(c, kase, AUTHOR);
+            status(send(c, "GET", "/regulatory-reports/" + id + "/verify", null, AUTHOR), 409, "not submitted");
+            JsonNode done = data(send(c, "POST", "/regulatory-reports/" + id + "/approve", "{}", CHECKER), 200);
+            String sha = done.get("contentSha256").asText();
+            Path dir = c.root.resolve("regulatory-submissions/sample-sar");
+            assertEquals(sha + "  " + id + ".xml\n", Files.readString(dir.resolve(id + ".xml.sha256")),
+                    "sha256sum format, so a receiver checks it with a stock tool");
+
+            JsonNode v = data(send(c, "GET", "/regulatory-reports/" + id + "/verify", null, AUTHOR), 200);
+            assertTrue(v.get("ok").asBoolean(), v.toString());
+            assertEquals("match", v.get("fileState").asText());
+            assertEquals("match", v.get("sidecar").asText());
+            assertEquals(sha, v.get("actualSha256").asText());
+            assertEquals(id + ".xml", v.get("file").asText());
+            assertFalse(v.toString().contains(c.root.toAbsolutePath().normalize().toString().replace("\\", "\\\\")), v.toString());
+
+            Files.writeString(dir.resolve(id + ".xml.sha256"), "0".repeat(64) + "  " + id + ".xml\n");
+            v = data(send(c, "GET", "/regulatory-reports/" + id + "/verify", null, CHECKER), 200);
+            assertFalse(v.get("ok").asBoolean());
+            assertEquals("mismatch", v.get("sidecar").asText());
+
+            Files.writeString(dir.resolve(id + ".xml"), "<tampered/>");
+            Files.delete(dir.resolve(id + ".xml.sha256"));
+            v = data(send(c, "GET", "/regulatory-reports/" + id + "/verify", null, CHECKER), 200);
+            assertFalse(v.get("ok").asBoolean());
+            assertEquals("mismatch", v.get("fileState").asText());
+            assertEquals("missing", v.get("sidecar").asText());
+            assertNotEquals(sha, v.get("actualSha256").asText());
+
+            Files.delete(dir.resolve(id + ".xml"));
+            v = data(send(c, "GET", "/regulatory-reports/" + id + "/verify", null, CHECKER), 200);
+            assertEquals("missing", v.get("fileState").asText());
+            assertTrue(v.get("actualSha256").isNull());
+
+            status(send(c, "GET", "/regulatory-reports/" + id + "/verify", null, DEV), 403, "canWorkIncidents");
+            status(send(c, "GET", "/regulatory-reports/rr-20200101000000-abcdef/verify", null, CHECKER), 404, null);
+        }
+    }
+
+    @Test
+    void aRetryAfterACrashBetweenFileAndSidecarWritesTheSidecar() throws Exception {
+        try (Ctx c = open(true)) {
+            String id = pending(c, seedCase(c, Map.of(), Map.of()), AUTHOR);
+            data(send(c, "POST", "/regulatory-reports/" + id + "/approve", "{}", CHECKER), 200);
+            Path side = c.root.resolve("regulatory-submissions/sample-sar").resolve(id + ".xml.sha256");
+            String line = Files.readString(side);
+            Files.delete(side);
+            FileDrop.deliver(c.root, "regulatory-submissions/sample-sar", id + ".xml",
+                    Files.readString(c.root.resolve("regulatory-submissions/sample-sar").resolve(id + ".xml")),
+                    line.substring(0, 64));
+            assertEquals(line, Files.readString(side));
+        }
+    }
+
+    // ── XSD validation at draft ──────────────────────────────────────────────────────────────────
+
+    @Test
+    void theBuiltInSampleValidatesAgainstItsSchemaAndASpaceSchemaOverridesIt() throws Exception {
+        try (Ctx c = open(true)) {
+            String kase = seedCase(c, Map.of(), Map.of());
+            draft(c, kase);   // sample-sar names sample-sar.xsd: the happy path validates
+            // a Space XSD of the same name wins over the built-in; this one caps reportingEntity at 3 chars
+            String strict;
+            try (var in = getClass().getResourceAsStream("/META-INF/inspecto/regulatory-templates/sample-sar.xsd")) {
+                strict = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).replace(
+                        "<xs:element name=\"reportingEntity\" type=\"text\"/>",
+                        "<xs:element name=\"reportingEntity\"><xs:simpleType><xs:restriction base=\"xs:string\">"
+                                + "<xs:maxLength value=\"3\"/></xs:restriction></xs:simpleType></xs:element>");
+            }
+            Files.createDirectories(c.root.resolve("regulatory-report-templates"));
+            Files.writeString(c.root.resolve("regulatory-report-templates/sample-sar.xsd"), strict);
+            status(send(c, "POST", "/regulatory-reports", draftBody(kase), AUTHOR), 422,
+                    "does not validate against schema 'sample-sar.xsd'");
+            assertEquals(1, data(send(c, "GET", "/regulatory-reports", null, AUTHOR), 200).get("total").asInt(),
+                    "a draft that fails its schema is never saved");
+        }
+    }
+
     // ── scope and source drift ───────────────────────────────────────────────────────────────────
 
     @Test

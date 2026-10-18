@@ -15,6 +15,7 @@ import {
     LensService,
     RegulatoryReport,
     RegulatoryReportDetail,
+    RegulatoryReportVerification,
     RegulatoryReportsService,
     RegulatoryReportStatus,
     ReportTemplate,
@@ -87,6 +88,9 @@ export class RegulatoryReportsComponent implements OnInit {
     readonly canDecide = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'pending');
     /** Authoring a template decides what is filed and where it is dropped: the oversight capability, like approving. */
     readonly canAuthorTemplates = computed(() => this.lens.canApproveChanges());
+    readonly canVerify = computed(() => this.selected()?.status === 'submitted');
+    readonly verification = signal<RegulatoryReportVerification | null>(null);
+    readonly verifying = signal(false);
     readonly canRetry = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'failed');
 
     // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
@@ -220,6 +224,7 @@ export class RegulatoryReportsComponent implements OnInit {
     private show(d: RegulatoryReportDetail): void {
         this.actError.set(null);
         this.reason.reset('');
+        this.verification.set(null);
         this.selected.set(d);
     }
 
@@ -264,6 +269,24 @@ export class RegulatoryReportsComponent implements OnInit {
             confirmText: 'Decline',
         });
         if (ok) this.act('decline');
+    }
+
+    /** Re-hash the delivered file and its sidecar. A read: no confirmation. */
+    verify(): void {
+        const r = this.selected();
+        if (!r) return;
+        this.verifying.set(true);
+        this.actError.set(null);
+        this.api.verify(r.id).subscribe({
+            next: (v) => {
+                this.verifying.set(false);
+                this.verification.set(v);
+            },
+            error: (err) => {
+                this.verifying.set(false);
+                this.actError.set(apiErrorMessage(err, 'The delivered file could not be verified'));
+            },
+        });
     }
 
     retry(): void {
