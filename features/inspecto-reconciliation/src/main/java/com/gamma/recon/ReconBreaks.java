@@ -315,7 +315,7 @@ public final class ReconBreaks {
      * {@link #compute(ReconService.Spec, int)} over an already-built {@link ReconService.Grain}: every pair's Break sets
      * are read from the one grain (RECON-UPLIFT-1 B1), so a caller that also needs the run summary shares the scan.
      */
-    public static List<Break> compute(ReconService.Grain grain, int cap) throws SQLException {
+    public static List<Break> compute(ReconService.Grain grain, int cap) throws SQLException, IOException {
         ReconService.Spec spec = grain.spec();
         List<Break> out = new ArrayList<>();
         for (int other = 1; other < spec.sides().size(); other++) {

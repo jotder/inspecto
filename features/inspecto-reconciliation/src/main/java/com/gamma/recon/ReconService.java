@@ -388,7 +388,7 @@ public final class ReconService {
          * side has it), though no Break set reads it: ⚠ a row's {@code impact} block is {@code {a:null, b:null}} here, unlike
          * {@link #breaks}, because the grain does not carry the impact column ({@link ReconBreaks#compute} never reads it).
          */
-        public Map<String, BreakSet> breakSets(int other, int limit) throws SQLException {
+        public Map<String, BreakSet> breakSets(int other, int limit) throws SQLException, IOException {
             if (other < 1 || other >= spec.sides().size())
                 throw new IllegalArgumentException("side '" + other + "' is not a compared side of this reconciliation");
             // 🔴 The grain keeps one unified key per row (COALESCE over the sides), so a key whose type differs between sides
