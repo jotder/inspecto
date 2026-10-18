@@ -20,6 +20,8 @@ function buildTableQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
         measures,
         filters: ctx.filters ?? null,
         ...(sort && sortable ? { orderBy: [{ field: sort.field, dir: sort.dir }] } : {}),
+        // `options.limit` is a server-side row limit for a table (a top-N tile with `tableSort`), not a client trim.
+        ...(ctx.options?.limit ? { limit: ctx.options.limit } : {}),
     };
 }
 

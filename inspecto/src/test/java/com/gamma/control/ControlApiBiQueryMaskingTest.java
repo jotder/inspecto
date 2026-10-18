@@ -133,6 +133,43 @@ class ControlApiBiQueryMaskingTest {
         Files.writeString(c.root.resolve("link-analysis.toon"), "masking_mode: " + mode + "\n");
     }
 
+    /**
+     * ANOMALY-DETECTION-RESIDUALS-1 (a): the telco-fraud top-10 anomaly tile, sent as the SPA's table plugin sends it
+     * (group by entity key + band, max score, ORDER BY the score, row limit 10) over a scores-shaped store whose Dataset
+     * classifies {@code entity_key} MSISDN: a viewer gets the top 10 by score under the alias, never a number; a
+     * revealer gets the same rows raw. Twelve entities, so the limit really cuts.
+     */
+    @Test
+    void anAnomalyTopTenTileIsMaskedOrderedAndLimitedForAViewer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            StringBuilder values = new StringBuilder();
+            for (int i = 1; i <= 12; i++)
+                values.append(i == 1 ? "" : ",").append("('4417009009").append(String.format("%02d", i)).append("',")
+                        .append(i * 7.5).append(",'").append(i > 8 ? "high" : "normal").append("')");
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("scores_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES " + values + ") AS t(entity_key,score,band)", "2026-07-08T00:00:00Z"));
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "tf_subscriber_anomaly_latest", Map.of("view", "scores_view",
+                    "columns", List.of(Map.of("name", "entity_key", "classification", "MSISDN"), Map.of("name", "score"), Map.of("name", "band"))));
+            String tile = "\"groupBy\":[\"entity_key\",\"band\"],\"measures\":[{\"agg\":\"max\",\"field\":\"score\"}],"
+                    + "\"orderBy\":[{\"field\":\"max_score\",\"dir\":\"desc\"}],\"limit\":10";
+            HttpResponse<String> viewer = bi(c, "viewer", "tf_subscriber_anomaly_latest", tile);
+            assertEquals(200, viewer.statusCode(), viewer.body());
+            HttpResponse<String> revealer = bi(c, "revealer", "tf_subscriber_anomaly_latest", tile);
+            assertEquals(200, revealer.statusCode(), revealer.body());
+            JsonNode vRows = V1Body.of(viewer.body()).get("rows"), rRows = V1Body.of(revealer.body()).get("rows");
+            assertEquals(10, vRows.size(), viewer.body());
+            assertEquals(column(rRows, "max_score"), column(vRows, "max_score"), "same top 10, same order");
+            assertEquals("90.0", column(vRows, "max_score").get(0), "highest score first");
+            byte[] key = MaskTokens.spaceKey(c.root);
+            for (int i = 0; i < 10; i++) {
+                String raw = rRows.get(i).get("entity_key").asText();
+                assertTrue(raw.startsWith("4417009009"), raw);
+                assertEquals(MaskTokens.token(key, raw), vRows.get(i).get("entity_key").asText());
+                assertFalse(viewer.body().contains(raw), "raw " + raw + " reached a viewer");
+            }
+        }
+    }
+
     // ── /bi/query ───────────────────────────────────────────────────────────────────
 
     @Test

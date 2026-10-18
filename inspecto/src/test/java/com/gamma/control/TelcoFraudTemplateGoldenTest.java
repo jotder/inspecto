@@ -489,6 +489,20 @@ class TelcoFraudTemplateGoldenTest {
                     assertTrue(v.get("value").asDouble() > 0, id + ": the KPI tile has a value: " + v);
                     continue;
                 }
+                if ("table".equals(w.get("vizType").asText())) {
+                    // ANOMALY-DETECTION-RESIDUALS-1 (a): the top-10 anomaly tile reads the anomaly.score Job's _latest store,
+                    // which this golden does not run (no anomaly module here); its masking and top-N are pinned over real
+                    // HTTP by ControlApiBiQueryMaskingTest.anAnomalyTopTenTileIsMaskedOrderedAndLimitedForAViewer. Here: it
+                    // is a top-10 by score over a Dataset that classifies the entity key, so a viewer cannot get the number.
+                    assertEquals("tf_unusual_subscribers_top10", id);
+                    assertEquals(10, w.get("options").get("limit").asInt(), id);
+                    assertEquals("max_score", w.get("options").get("tableSort").get("field").asText(), id);
+                    com.fasterxml.jackson.databind.JsonNode ds = V1Body.of(call(base + "/components/dataset/"
+                            + w.get("datasetId").asText(), null)).get("content");
+                    assertTrue(ds.get("columns").toString().contains("\"entity_key\",\"type\":\"string\",\"classification\":\"MSISDN\""),
+                            id + ": the entity key is classified: " + ds);
+                    continue;
+                }
                 assertEquals("bar", w.get("vizType").asText(), id);
                 String dataset = w.get("datasetId").asText();
                 String x = w.get("controls").get("x").get(0).get("field").asText();
@@ -514,7 +528,7 @@ class TelcoFraudTemplateGoldenTest {
                 assertEquals(bars.size(), viewerBars.size(), id + ": one viewer bar per key");
                 typologiesShown.add(dataset);
             }
-            assertEquals(18, tiles, "four KPI tiles and fourteen typology Widgets");
+            assertEquals(19, tiles, "four KPI tiles, fourteen typology Widgets and the anomaly top-10");
             assertEquals(EXPECTED.keySet(), typologiesShown, "every typology has a Widget on the dashboard");
         } finally {
             api.close();
