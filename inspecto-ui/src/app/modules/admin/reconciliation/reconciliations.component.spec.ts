@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { Observable, of, throwError } from 'rxjs';
@@ -157,10 +157,20 @@ describe('ReconciliationsComponent', () => {
         expect(hidden.componentInstance.rowActions().map((a) => a.hint)).toEqual(['Open']);
     });
 
-    it('offers New and Duplicate to an author', () => {
+    it('offers New, Duplicate and Schedule to an author', () => {
         const shown = create().fixture;
         expect(shown.nativeElement.textContent).toContain('New reconciliation');
-        expect(shown.componentInstance.rowActions().map((a) => a.hint)).toEqual(['Open', 'Duplicate']);
+        expect(shown.componentInstance.rowActions().map((a) => a.hint)).toEqual(['Open', 'Duplicate', 'Schedule']);
+    });
+
+    // RECON-UPLIFT-1 U5: Schedule opens the Jobs create dialog with a recon.run Job for this row prefilled.
+    it('Schedule links to the Jobs create handshake with a recon.run seed for the row', () => {
+        const { fixture } = create();
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        fixture.componentInstance.schedule(RECON);
+        expect(navigate).toHaveBeenCalledWith(['/jobs'], {
+            queryParams: { create: 1, type: 'recon.run', 'param.reconciliation': RECON.id },
+        });
     });
 
     it('renders with no a11y violations', async () => {

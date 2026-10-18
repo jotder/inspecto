@@ -184,6 +184,28 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
     Pinned by `ReconBreaksParityTest` — new path = the original per-type scans (`ReconService.breaks` + `fromSets`, run live
     as the oracle) = a stored expected result, on a 2-way, a 3-way, a day-pruned, an absolute and a percent tolerance edge,
     a duplicate key (every cardinality), a null key, a record-count-only and the cap-refusal cases. No HTTP shape moved.
+* **Review fixes after the merge** (`RECON-UPLIFT-1`, independent review 2026-10-18):
+  * 🔴 **A key whose type differs between sides stays on the per-type scans.** The grain holds ONE key per row,
+    `COALESCE` over the sides, so a DATE on A and a TIMESTAMP on B read back as a timestamp: the key text, and with it a
+    recorded Break's id, changed (verified: the anchor-only key `2026-01-02` read back as epoch millis `1767292200000`).
+    `ReconService.keyTypesAgree` compares each side's key column types with a `LIMIT 0` read (metadata only, no scan);
+    when they differ `Grain.breakSets` returns the original `breaks(...)` scans, which read each key from its own side.
+    Pinned by `ReconBreaksParityTest#aKeyWhoseTypeDiffersBetweenSidesKeepsItsOwnSidesText`, which FAILS on the unfixed
+    code. The Board's page rows (`dayRun`) always used the unified key; that is unchanged.
+  * **The day cache is bounded by bytes** (P4). `ReconDay.Cache`'s result tier (grain / breaks / rows) keeps at most
+    `MAX_ENTRIES` = 32 entries AND an estimated `maxBytes` of heap, least-recently-used evicted first. The budget is
+    `-Drecon.cache.max_bytes` or, unset, an eighth of the JVM's max heap within 64 MB to 1 GB. Sizes are an ESTIMATE
+    (`Cache.weigh`: strings 40 + 2 per char, a list as N x its first element, so rows of one result stand for each other),
+    not a measurement. The entry just stored is never evicted, so one day larger than the budget is still served from the
+    cache (alone): the worst case is max(budget, the largest entry), and an entry is bounded by `ReconRoutes.rowCap`.
+    Small entries (scope, days, prune, stats) are outside the byte count. Pinned by `ReconDayCacheTest`.
+  * **Schedule (U5).** The reconciliation list's **Schedule** action (authors only, like Jobs' own create) opens
+    `/jobs?create=1&type=recon.run&param.reconciliation=<id>`. The Jobs pane reads it with `jobSeedFromQuery` (`jobs/job-seed.ts`:
+    the type must be an identifier, a param name an identifier, a value at most 200 characters with no control
+    character; anything else is dropped), strips every key it read, and opens the create dialog with `JobFormData.seed`.
+    The dialog applies a seeded value only to a parameter the Job Type DECLARES, so a link cannot add an arbitrary
+    parameter; an edit wins over a seed. A seeded type the server does not know degrades to the existing "no descriptor"
+    warning.
 * **State retention** (`RECON-PERF-RESIDUALS-1` (7), ⛔ decision 2026-10-09): a record keeps the Breaks of the
   `ReconStateStore.RETAIN_DAYS` = **90** most recent recorded days (newest by DAY, not wall clock) and drops older days
   WHOLE, whatever their status — an open Break 91 days back is gone (setting its status later re-appends it
@@ -486,9 +508,8 @@ back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model 
   same-name check, because it would be wrong. **Test definition** posts the unsaved definition to the existing
   `/recon/run` with `sample: 1000, limit: 1` (no new route, nothing recorded) and shows key groups compared, matched
   keys, elapsed time and Breaks by type, or the server's message with a fix hint; any edit clears the result.
-  Not built: **U5 Schedule**. The Jobs create dialog takes only `{existingNames}` and `/jobs?create=1` carries no
-  job type or params, so a prefilled `recon.run` Job needs a change to the Jobs feature (a `type`/`params` seed on
-  `JobFormData` and a query-param handshake), which lane C may not touch.
+  **U5 Schedule** was not built by lane C (it needs a seed on the Jobs create dialog, outside lane C's files); it was built
+  afterwards, see *Review fixes after the merge* above.
 
 **RECON-UPLIFT-1 lane B — Breaks page and Board (2026-10-18, as built).** Plan:
 [`reconciliation-uplift-plan.md`](../../../superpower/reconciliation-uplift-plan.md) (U1, U3, U4, U6).

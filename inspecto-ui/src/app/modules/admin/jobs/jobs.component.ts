@@ -45,7 +45,8 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { CHART_SERIES } from 'app/inspecto/theme/chart-tokens';
 import { fmtDuration, scheduleSummary, whatScheduled } from './job-display';
 import { JobDetailComponent } from './job-detail/job-detail.component';
-import { JobFormDialog } from './job-form.dialog';
+import { JobFormDialog, JobSeed } from './job-form.dialog';
+import { isSeedKey, jobSeedFromQuery } from './job-seed';
 import { JobRunParamsDialog } from './job-run-params.dialog';
 import { JobRunDetailDialog } from './job-run-detail.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -154,10 +155,10 @@ export class JobsComponent implements OnInit, OnDestroy {
     readonly fmtDuration = fmtDuration;
 
     /** Open the create dialog; reload the list when a job is saved. */
-    newJob(): void {
+    newJob(seed?: JobSeed): void {
         this.dialog
             .open(JobFormDialog, {
-                data: { existingNames: this.jobs().map((j) => j.name) },
+                data: { existingNames: this.jobs().map((j) => j.name), ...(seed ? { seed } : {}) },
                 width: '640px',
                 maxHeight: '88vh',
             })
@@ -311,14 +312,19 @@ export class JobsComponent implements OnInit, OnDestroy {
         // after the strip navigation settles — MatDialog closes open dialogs on navigation.
         this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((q) => {
             if (q.get('create') != null) {
+                // `&type=<job type>&param.<name>=<value>` prefills the dialog (e.g. "Schedule this reconciliation").
+                const seed = jobSeedFromQuery(q);
                 void this.router
                     .navigate([], {
                         relativeTo: this.route,
-                        queryParams: { create: null },
+                        queryParams: {
+                            create: null,
+                            ...Object.fromEntries(q.keys.filter(isSeedKey).map((k) => [k, null])),
+                        },
                         queryParamsHandling: 'merge',
                         replaceUrl: true,
                     })
-                    .then(() => this.newJob());
+                    .then(() => this.newJob(seed));
             }
         });
         this.load();

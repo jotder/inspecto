@@ -65,6 +65,16 @@ export interface JobFormData {
     focusSchedule?: boolean;
     /** Ids already in use — on create the name control rejects a duplicate inline (product-wide rule). */
     existingNames?: string[];
+    /**
+     * Prefill for a NEW job (the `?create=1&type=…&param.<name>=…` handshake, e.g. "Schedule this reconciliation"):
+     * the Job Type and values for parameters it DECLARES. A key the type does not declare is ignored, so a link cannot
+     * add an arbitrary parameter; an edit (`job`) wins over a seed.
+     */
+    seed?: JobSeed;
+}
+export interface JobSeed {
+    type: string;
+    params?: Record<string, string>;
 }
 export interface JobFormResult {
     saved?: JobDetail;
@@ -270,7 +280,9 @@ export class JobFormDialog implements AfterViewInit {
               enabled: this.data.job.enabled,
               catchUp: !!this.data.job.catchUp,
           }
-        : undefined;
+        : this.data.seed?.type
+          ? { type: this.data.seed.type }
+          : undefined;
 
     readonly paramsForm = this.fb.group({ params: this.fb.array<FormGroup>([]) });
 
@@ -478,7 +490,8 @@ export class JobFormDialog implements AfterViewInit {
         this.paramOptionLoaders.set(loaders);
         const init: Record<string, unknown> = {};
         for (const s of specs) {
-            const v = this.data.job?.params?.[s.key];
+            // An edit's stored value wins; otherwise a seed's (create only), and only for a DECLARED parameter.
+            const v = this.data.job ? this.data.job.params?.[s.key] : this.data.seed?.params?.[s.key];
             if (v !== undefined) init[s.key] = paramValueToForm(s, v);
         }
         this.paramInitial.set(Object.keys(init).length ? init : undefined);

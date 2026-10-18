@@ -1,10 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { JobFailureDay, JobMetrics, JobRunRow, JobView, JobsService, LensService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -31,6 +31,8 @@ function create(
     reporting: 'ok' | '404',
     listResult: Observable<JobView[]> = of([]),
     paramMap: Observable<ParamMap> = of(convertToParamMap({})),
+    query: ParamMap = convertToParamMap({}),
+    dialog: unknown = {},
 ) {
     const report404 = () => throwError(() => ({ status: 404 }));
     const stub = {
@@ -54,16 +56,18 @@ function create(
                 provide: ActivatedRoute,
                 useValue: {
                     paramMap,
-                    queryParamMap: of(convertToParamMap({})),
+                    queryParamMap: of(query),
                     snapshot: { paramMap: convertToParamMap({}) },
                 },
             },
             { provide: JobsService, useValue: stub },
             { provide: ToastrService, useValue: {} },
-            { provide: MatDialog, useValue: {} },
+            { provide: MatDialog, useValue: dialog },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
         ],
     });
+    // The component imports MatDialog's own module, whose provider outranks one given to the TestBed: override it.
+    TestBed.overrideProvider(MatDialog, { useValue: dialog });
     const fixture = TestBed.createComponent(JobsComponent);
     fixture.detectChanges(); // runs ngOnInit (schedules load)
     return fixture;
@@ -176,5 +180,42 @@ describe('JobsComponent', () => {
         fixture.detectChanges();
         expect(c.detailName()).toBeNull();
         expect(el.querySelector('app-job-detail')).toBeNull();
+    });
+
+    // RECON-UPLIFT-1 U5: `?create=1&type=…&param.<name>=…` opens the create dialog prefilled, and strips every key it read.
+    it('opens the create dialog with the seed from the query, and strips the keys it owns', async () => {
+        const navigate = vi.spyOn(Router.prototype, 'navigate').mockResolvedValue(true);
+        const open = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+        create(
+            'ok',
+            of([]),
+            of(convertToParamMap({})),
+            convertToParamMap({ create: '1', type: 'recon.run', 'param.reconciliation': 'r1', q: 'keep' }),
+            { open },
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({
+                queryParams: { create: null, type: null, 'param.reconciliation': null },
+                replaceUrl: true,
+            }),
+        );
+        expect(open).toHaveBeenCalledTimes(1);
+        const data = (open.mock.calls[0] as unknown as [unknown, { data: { seed?: unknown } }])[1].data;
+        expect(data.seed).toEqual({ type: 'recon.run', params: { reconciliation: 'r1' } });
+        vi.restoreAllMocks();
+    });
+
+    it('a plain ?create=1 opens the dialog with no seed', async () => {
+        vi.spyOn(Router.prototype, 'navigate').mockResolvedValue(true);
+        const open = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+        create('ok', of([]), of(convertToParamMap({})), convertToParamMap({ create: '1' }), { open });
+        await Promise.resolve();
+        await Promise.resolve();
+        const data = (open.mock.calls[0] as unknown as [unknown, { data: { seed?: unknown } }])[1].data;
+        expect(data.seed).toBeUndefined();
+        vi.restoreAllMocks();
     });
 });

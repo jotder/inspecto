@@ -34,7 +34,8 @@ type ReconciliationRow = Reconciliation & {
 /**
  * Reconciliation (C9) — the list of Dataset-vs-Dataset reconciliations; open one to run it and drill its
  * breaks. Creating one (New / Duplicate) writes a `reconciliation` Component, which the server gates on
- * `canAuthorWorkbench` — so both actions show only with that capability (R3-05).
+ * `canAuthorWorkbench` — so both actions show only with that capability (R3-05); Schedule opens the Jobs create
+ * dialog (same capability) with a `recon.run` Job for the row prefilled.
  */
 @Component({
     selector: 'app-reconciliations',
@@ -125,6 +126,12 @@ export class ReconciliationsComponent implements OnInit {
                       hint: 'Duplicate',
                       onClick: (r: ReconciliationRow) => this.duplicate(r),
                   },
+                  // Scheduling creates a Job, which the Jobs pane gates on the same capability.
+                  {
+                      icon: 'heroicons_outline:clock',
+                      hint: 'Schedule',
+                      onClick: (r: ReconciliationRow) => this.schedule(r),
+                  },
               ]
             : []),
     ]);
@@ -163,6 +170,13 @@ export class ReconciliationsComponent implements OnInit {
 
     create(): void {
         this.openForm({});
+    }
+
+    /** Open the Jobs create dialog prefilled with a `recon.run` Job for this Reconciliation (the `?create=1` handshake). */
+    schedule(r: Reconciliation): void {
+        void this.router.navigate(['/jobs'], {
+            queryParams: { create: 1, type: 'recon.run', 'param.reconciliation': r.id },
+        });
     }
 
     /** The template flow (design §8): prefill from an existing recon, create a fresh one (no run state). */

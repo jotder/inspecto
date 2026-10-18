@@ -933,4 +933,71 @@ describe('JobFormDialog - the Link Analysis Job Types', () => {
         expect(when.placeholder).toContain('$signal.pipeline');
         expect(when.help).toContain('$signal.pipeline');
     });
+
+    // RECON-UPLIFT-1 U5: the ?create=1&type=…&param.<name>=… handshake prefills a NEW job.
+    describe('seed (a prefilled create)', () => {
+        const reconRun = {
+            id: 'recon.run',
+            title: 'Reconciliation Run',
+            description: '',
+            parameters: [
+                {
+                    name: 'reconciliation',
+                    type: 'STRING',
+                    required: true,
+                    deduce: '',
+                    default: '',
+                    description: 'Saved reconciliation',
+                },
+                { name: 'day', type: 'DATE', required: false, deduce: '', default: '', description: 'Day' },
+            ],
+            emits: [],
+            artifacts: [],
+            requires: ['objects'],
+        } as unknown as JobTypeDescriptor;
+
+        it('preselects the Job Type and prefills a declared parameter', async () => {
+            const { c, fixture } = create(
+                { seed: { type: 'recon.run', params: { reconciliation: 'switch_vs_billing' } } },
+                undefined,
+                vi.fn(() => of(reconRun)),
+                () => of([reconRun]),
+            );
+            await Promise.resolve();
+            await Promise.resolve();
+            fixture.detectChanges();
+            expect(c.schemaForm.form.get('type')?.value).toBe('recon.run');
+            expect(c.selectedType()?.id).toBe('recon.run');
+            expect(c.paramInitial()).toEqual({ reconciliation: 'switch_vs_billing' });
+        });
+
+        it('ignores a seeded parameter the Job Type does not declare', async () => {
+            const { c, fixture } = create(
+                { seed: { type: 'recon.run', params: { reconciliation: 'r1', evil: 'x' } } },
+                undefined,
+                vi.fn(() => of(reconRun)),
+                () => of([reconRun]),
+            );
+            await Promise.resolve();
+            await Promise.resolve();
+            fixture.detectChanges();
+            expect(Object.keys(c.paramInitial() ?? {})).toEqual(['reconciliation']);
+            expect(c.paramsArray.length).toBe(0); // not smuggled into the free key/value editor either
+        });
+
+        it('an edit wins over a seed', () => {
+            const { c } = create({
+                seed: { type: 'recon.run', params: { reconciliation: 'seeded' } },
+                job: {
+                    name: 'j1',
+                    type: 'report',
+                    cron: '0 0 6 * * *',
+                    onPipeline: null,
+                    enabled: true,
+                    params: { report: 'x' },
+                },
+            });
+            expect(c.schemaForm.form.get('type')?.value).toBe('report');
+        });
+    });
 });
