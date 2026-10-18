@@ -1,0 +1,12 @@
+id: solution-pack.industry-telecom
+kind: solution-pack
+title: Industry pack telecom
+industryPack: telecom
+billable: true
+orderCode: INS-IP-TELECOM
+enforcement: contract
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

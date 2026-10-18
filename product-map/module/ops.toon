@@ -1,0 +1,7 @@
+id: module.ops
+kind: module
+title: Case management and objects
+parent: layer.features
+module: ops
+billable: false
+status: ga

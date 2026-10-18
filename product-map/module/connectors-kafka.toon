@@ -1,0 +1,7 @@
+id: module.connectors-kafka
+kind: module
+title: Kafka stream connector
+parent: layer.providers
+module: connectors-kafka
+billable: false
+status: ga

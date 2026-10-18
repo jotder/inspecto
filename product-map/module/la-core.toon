@@ -1,0 +1,7 @@
+id: module.la-core
+kind: module
+title: Link analysis core and ports
+parent: layer.la
+module: la-core
+billable: false
+status: ga

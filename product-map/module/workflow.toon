@@ -1,0 +1,7 @@
+id: module.workflow
+kind: module
+title: Workflow and SLA models
+parent: layer.platform
+module: workflow
+billable: false
+status: ga

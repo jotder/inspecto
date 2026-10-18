@@ -1,0 +1,7 @@
+id: module.agent-hosted
+kind: module
+title: Hosted model providers for the assistant
+parent: layer.providers
+module: agent-hosted
+billable: false
+status: ga

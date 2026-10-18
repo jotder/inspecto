@@ -1,0 +1,8 @@
+id: module.regulatory-reporting
+kind: module
+title: Regulatory Reporting
+parent: layer.features
+module: regulatory-reporting
+billable: false
+status: ga
+docs: docs/stakeholders/modules/regulatory-reporting.md

@@ -1,0 +1,5 @@
+id: layer.features
+kind: layer
+title: Feature modules
+billable: false
+status: ga

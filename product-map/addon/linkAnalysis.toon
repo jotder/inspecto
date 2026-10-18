@@ -1,0 +1,13 @@
+id: addon.linkAnalysis
+kind: addon
+title: Link Analysis
+offeringAddon: linkAnalysis
+billable: true
+orderCode: INS-AO-LINK-ANALYSIS
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/stakeholders/modules/link-analysis.md

@@ -1,0 +1,7 @@
+id: module.telecom-asn1
+kind: module
+title: Telecom ASN.1 decoder
+parent: layer.providers
+module: telecom-asn1
+billable: false
+status: ga

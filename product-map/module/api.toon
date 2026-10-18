@@ -1,0 +1,7 @@
+id: module.api
+kind: module
+title: Public API annotations
+parent: layer.platform
+module: api
+billable: false
+status: ga

@@ -1,0 +1,7 @@
+id: module.policy
+kind: module
+title: Attribute-based access policy
+parent: layer.providers
+module: policy
+billable: false
+status: ga

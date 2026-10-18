@@ -1,0 +1,13 @@
+id: addon.caseManagement
+kind: addon
+title: Case Management
+offeringAddon: caseManagement
+billable: true
+orderCode: INS-AO-CASE-MANAGEMENT
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/stakeholders/modules/case-management.md

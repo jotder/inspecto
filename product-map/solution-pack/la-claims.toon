@@ -1,0 +1,6 @@
+id: solution-pack.la-claims
+kind: solution-pack
+title: Link Analysis claims showcase
+template: la-claims
+billable: false
+status: preview

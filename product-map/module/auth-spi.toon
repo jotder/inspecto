@@ -1,0 +1,7 @@
+id: module.auth-spi
+kind: module
+title: Authentication and capability contract
+parent: layer.spi
+module: auth-spi
+billable: false
+status: ga

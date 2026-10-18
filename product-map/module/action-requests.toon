@@ -1,0 +1,8 @@
+id: module.action-requests
+kind: module
+title: Action Requests
+parent: layer.features
+module: action-requests
+billable: false
+status: ga
+docs: docs/stakeholders/modules/action-requests.md

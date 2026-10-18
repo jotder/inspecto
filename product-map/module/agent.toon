@@ -1,0 +1,7 @@
+id: module.agent
+kind: module
+title: Assistant agent
+parent: layer.features
+module: agent
+billable: false
+status: ga

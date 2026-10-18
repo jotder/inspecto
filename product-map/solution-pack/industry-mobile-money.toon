@@ -1,0 +1,12 @@
+id: solution-pack.industry-mobile-money
+kind: solution-pack
+title: Industry pack mobile-money
+industryPack: mobile-money
+billable: true
+orderCode: INS-IP-MOBILE-MONEY
+enforcement: contract
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

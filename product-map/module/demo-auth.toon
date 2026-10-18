@@ -1,0 +1,7 @@
+id: module.demo-auth
+kind: module
+title: Demo authenticator
+parent: layer.providers
+module: demo-auth
+billable: false
+status: ga

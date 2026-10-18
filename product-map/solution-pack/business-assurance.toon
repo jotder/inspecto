@@ -1,0 +1,13 @@
+id: solution-pack.business-assurance
+kind: solution-pack
+title: Business assurance
+template: business-assurance
+billable: true
+orderCode: INS-SP-BUSINESS-ASSURANCE
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/stakeholders/solutions/business-assurance.md

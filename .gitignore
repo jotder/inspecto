@@ -186,3 +186,6 @@ docs/stakeholders/*.docx
 *.keystore
 *.jks
 !providers/inspecto-connectors/src/test/resources/ftps-test-keystore.jks
+
+# Product Map prices and customer records (PRODUCT-MAP-1, D-PM3): never committed
+product-map/private/

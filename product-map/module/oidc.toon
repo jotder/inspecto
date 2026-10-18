@@ -1,0 +1,7 @@
+id: module.oidc
+kind: module
+title: OIDC authenticator and token relay
+parent: layer.providers
+module: oidc
+billable: false
+status: ga

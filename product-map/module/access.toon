@@ -1,0 +1,7 @@
+id: module.access
+kind: module
+title: Access policy (roles, grants, row scope, audit trail)
+parent: layer.platform
+module: access
+billable: false
+status: ga

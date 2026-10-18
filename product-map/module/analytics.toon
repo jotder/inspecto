@@ -1,0 +1,7 @@
+id: module.analytics
+kind: module
+title: Analytics Kernel (canonical statistics and baselines)
+parent: layer.platform
+module: analytics
+billable: false
+status: ga

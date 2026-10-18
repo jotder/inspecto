@@ -1,0 +1,7 @@
+id: module.graph
+kind: module
+title: Graph algorithms
+parent: layer.platform
+module: graph
+billable: false
+status: ga

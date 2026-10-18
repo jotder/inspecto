@@ -1,0 +1,13 @@
+id: addon.workflowSla
+kind: addon
+title: Workflow Sla
+offeringAddon: workflowSla
+billable: true
+orderCode: INS-AO-WORKFLOW-SLA
+enforcement: contract
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/stakeholders/modules/workflow-sla.md

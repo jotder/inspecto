@@ -1,0 +1,12 @@
+id: edition.standard
+kind: edition
+title: Standard
+offering: standard
+billable: true
+orderCode: INS-ED-STANDARD
+enforcement: build
+billing:
+  model: per-node
+support:
+  tier: standard
+status: ga

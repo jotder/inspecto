@@ -1,0 +1,7 @@
+id: module.entity-list
+kind: module
+title: Entity lists
+parent: layer.features
+module: entity-list
+billable: false
+status: ga

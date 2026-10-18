@@ -1,0 +1,7 @@
+id: module.la-storage
+kind: module
+title: Link analysis storage
+parent: layer.la
+module: la-storage
+billable: false
+status: ga

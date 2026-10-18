@@ -1,0 +1,12 @@
+id: solution-pack.telco-fraud
+kind: solution-pack
+title: Telecom fraud
+template: telco-fraud
+billable: true
+orderCode: INS-SP-TELCO-FRAUD
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

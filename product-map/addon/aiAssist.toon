@@ -1,0 +1,13 @@
+id: addon.aiAssist
+kind: addon
+title: Ai Assist
+offeringAddon: aiAssist
+billable: true
+orderCode: INS-AO-AI-ASSIST
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/stakeholders/modules/ai-assist.md

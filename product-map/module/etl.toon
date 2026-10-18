@@ -1,0 +1,7 @@
+id: module.etl
+kind: module
+title: ETL model and step registry
+parent: layer.platform
+module: etl
+billable: false
+status: ga

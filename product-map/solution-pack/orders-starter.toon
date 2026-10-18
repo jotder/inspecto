@@ -1,0 +1,12 @@
+id: solution-pack.orders-starter
+kind: solution-pack
+title: Orders starter
+template: orders-starter
+billable: true
+orderCode: INS-SP-ORDERS-STARTER
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

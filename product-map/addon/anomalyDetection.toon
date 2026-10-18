@@ -1,0 +1,12 @@
+id: addon.anomalyDetection
+kind: addon
+title: Anomaly Detection
+offeringAddon: anomalyDetection
+billable: true
+orderCode: INS-AO-ANOMALY-DETECTION
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

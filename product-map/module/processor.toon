@@ -1,0 +1,7 @@
+id: module.processor
+kind: module
+title: Control plane and processor host
+parent: layer.product
+module: processor
+billable: false
+status: ga

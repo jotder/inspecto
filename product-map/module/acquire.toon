@@ -1,0 +1,7 @@
+id: module.acquire
+kind: module
+title: Acquisition and collectors
+parent: layer.platform
+module: acquire
+billable: false
+status: ga

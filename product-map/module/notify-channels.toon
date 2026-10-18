@@ -1,0 +1,7 @@
+id: module.notify-channels
+kind: module
+title: Notification channels
+parent: layer.providers
+module: notify-channels
+billable: false
+status: ga

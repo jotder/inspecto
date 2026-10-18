@@ -1,0 +1,8 @@
+id: module.exchange
+kind: module
+title: Exchange (publication and ingestion contracts)
+parent: layer.features
+module: exchange
+billable: false
+status: ga
+docs: docs/stakeholders/modules/exchange.md

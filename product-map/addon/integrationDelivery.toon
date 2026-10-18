@@ -1,0 +1,12 @@
+id: addon.integrationDelivery
+kind: addon
+title: Integration Delivery
+offeringAddon: integrationDelivery
+billable: true
+orderCode: INS-AO-INTEGRATION-DELIVERY
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

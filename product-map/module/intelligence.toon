@@ -1,0 +1,7 @@
+id: module.intelligence
+kind: module
+title: AI assist and intelligence
+parent: layer.features
+module: intelligence
+billable: false
+status: ga

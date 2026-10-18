@@ -1,0 +1,12 @@
+id: addon.scoringLists
+kind: addon
+title: Scoring Lists
+offeringAddon: scoringLists
+billable: true
+orderCode: INS-AO-SCORING-LISTS
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

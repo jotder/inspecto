@@ -1,0 +1,13 @@
+id: solution-pack.mobile-money
+kind: solution-pack
+title: Mobile money
+template: mobile-money
+billable: true
+orderCode: INS-SP-MOBILE-MONEY
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/stakeholders/solutions/mobile-money.md

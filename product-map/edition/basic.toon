@@ -1,0 +1,12 @@
+id: edition.basic
+kind: edition
+title: Basic
+offering: basic
+billable: true
+orderCode: INS-ED-BASIC
+enforcement: build
+billing:
+  model: per-node
+support:
+  tier: standard
+status: ga

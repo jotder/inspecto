@@ -1,0 +1,8 @@
+id: module.anomaly
+kind: module
+title: Anomaly Detection
+parent: layer.features
+module: anomaly
+billable: false
+status: ga
+docs: docs/stakeholders/modules/anomaly.md

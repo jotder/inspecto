@@ -1,0 +1,7 @@
+id: module.observability
+kind: module
+title: Observability (metrics endpoint + events feed API)
+parent: layer.features
+module: observability
+billable: false
+status: ga

@@ -1,0 +1,6 @@
+id: solution-pack.la-audit
+kind: solution-pack
+title: Link Analysis audit showcase
+template: la-audit
+billable: false
+status: preview

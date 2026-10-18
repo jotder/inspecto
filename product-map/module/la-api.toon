@@ -1,0 +1,7 @@
+id: module.la-api
+kind: module
+title: Link analysis and geo routes
+parent: layer.la
+module: la-api
+billable: false
+status: ga

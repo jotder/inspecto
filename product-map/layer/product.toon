@@ -1,0 +1,5 @@
+id: layer.product
+kind: layer
+title: Product host
+billable: false
+status: ga

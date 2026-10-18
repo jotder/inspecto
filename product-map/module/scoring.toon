@@ -1,0 +1,7 @@
+id: module.scoring
+kind: module
+title: Scoring
+parent: layer.features
+module: scoring
+billable: false
+status: ga

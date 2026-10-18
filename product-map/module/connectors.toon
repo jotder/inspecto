@@ -1,0 +1,7 @@
+id: module.connectors
+kind: module
+title: Collector and export connectors
+parent: layer.providers
+module: connectors
+billable: false
+status: ga

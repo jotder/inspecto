@@ -1,0 +1,7 @@
+id: module.util
+kind: module
+title: Utilities, DuckDB access, TOON helpers, module manifests
+parent: layer.platform
+module: util
+billable: false
+status: ga

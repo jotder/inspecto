@@ -1,0 +1,12 @@
+id: edition.advanced
+kind: edition
+title: Advanced
+offering: advanced
+billable: true
+orderCode: INS-ED-ADVANCED
+enforcement: build
+billing:
+  model: per-node
+support:
+  tier: standard
+status: ga

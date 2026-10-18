@@ -1,0 +1,12 @@
+id: addon.multiEntity
+kind: addon
+title: Multi Entity
+offeringAddon: multiEntity
+billable: true
+orderCode: INS-AO-MULTI-ENTITY
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

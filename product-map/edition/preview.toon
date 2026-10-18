@@ -1,0 +1,12 @@
+id: edition.preview
+kind: edition
+title: Preview
+offering: preview
+billable: true
+orderCode: INS-ED-PREVIEW
+enforcement: build
+billing:
+  model: per-node
+support:
+  tier: standard
+status: ga

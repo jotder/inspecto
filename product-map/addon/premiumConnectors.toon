@@ -1,0 +1,12 @@
+id: addon.premiumConnectors
+kind: addon
+title: Premium Connectors
+offeringAddon: premiumConnectors
+billable: true
+orderCode: INS-AO-PREMIUM-CONNECTORS
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

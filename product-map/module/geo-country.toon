@@ -1,0 +1,7 @@
+id: module.geo-country
+kind: module
+title: MaxMind geo-country resolver
+parent: layer.providers
+module: geo-country
+billable: false
+status: ga

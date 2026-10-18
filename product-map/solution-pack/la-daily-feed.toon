@@ -1,0 +1,12 @@
+id: solution-pack.la-daily-feed
+kind: solution-pack
+title: Link Analysis daily feed
+template: la-daily-feed
+billable: true
+orderCode: INS-SP-LA-DAILY-FEED
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

@@ -1,0 +1,8 @@
+id: module.screening
+kind: module
+title: Screening
+parent: layer.features
+module: screening
+billable: false
+status: ga
+docs: docs/stakeholders/modules/screening.md

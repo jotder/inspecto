@@ -1,0 +1,7 @@
+id: module.sql
+kind: module
+title: SQL guard and helpers
+parent: layer.platform
+module: sql
+billable: false
+status: ga

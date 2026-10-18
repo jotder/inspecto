@@ -1,0 +1,6 @@
+id: solution-pack.la-showcase-off
+kind: solution-pack
+title: Link Analysis showcase (feature off)
+template: la-showcase-off
+billable: false
+status: preview

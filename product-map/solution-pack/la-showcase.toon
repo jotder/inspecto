@@ -1,0 +1,6 @@
+id: solution-pack.la-showcase
+kind: solution-pack
+title: Link Analysis showcase
+template: la-showcase
+billable: false
+status: preview

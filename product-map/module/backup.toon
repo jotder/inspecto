@@ -1,0 +1,7 @@
+id: module.backup
+kind: module
+title: Backup and restore
+parent: layer.features
+module: backup
+billable: false
+status: ga

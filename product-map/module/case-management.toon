@@ -1,0 +1,8 @@
+id: module.case-management
+kind: module
+title: Case Management
+parent: layer.features
+module: case-management
+billable: false
+status: ga
+docs: docs/stakeholders/modules/case-management.md

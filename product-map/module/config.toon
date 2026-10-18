@@ -1,0 +1,7 @@
+id: module.config
+kind: module
+title: Config model and codecs
+parent: layer.platform
+module: config
+billable: false
+status: ga

@@ -1,0 +1,12 @@
+id: solution-pack.telco-ra
+kind: solution-pack
+title: Telecom revenue assurance
+template: telco-ra
+billable: true
+orderCode: INS-SP-TELCO-RA
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga

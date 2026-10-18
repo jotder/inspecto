@@ -1,0 +1,6 @@
+id: solution-pack.la-mobile-money
+kind: solution-pack
+title: Link Analysis mobile money
+template: la-mobile-money
+billable: false
+status: preview

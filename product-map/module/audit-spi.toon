@@ -1,0 +1,7 @@
+id: module.audit-spi
+kind: module
+title: Audit contract
+parent: layer.spi
+module: audit-spi
+billable: false
+status: ga

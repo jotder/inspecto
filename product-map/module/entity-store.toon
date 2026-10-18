@@ -1,0 +1,7 @@
+id: module.entity-store
+kind: module
+title: Entity store
+parent: layer.platform
+module: entity-store
+billable: false
+status: ga

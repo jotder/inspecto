@@ -1,0 +1,7 @@
+id: module.geo-link
+kind: module
+title: Geo and link adapters over platform data
+parent: layer.la
+module: geo-link
+billable: false
+status: ga

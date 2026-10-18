@@ -1,0 +1,5 @@
+id: layer.spi
+kind: layer
+title: Service contracts (SPI)
+billable: false
+status: ga

@@ -1,7 +1,7 @@
 # Product Map: plan
 
 > 🟢 **PLAN 2026-10-18 (`PRODUCT-MAP-1`): decisions D-PM1…D-PM6 were taken by the operator on 2026-10-18 (§8).
-> Nothing is built yet; S0 (glossary) is done.**
+> S0 (glossary) and S1 (format, seed, gitignore) are done; S2…S5 are not built.**
 > **Goal:** one place that is easy to manage, laid out like a mind map, that describes every **Product Map Item**:
 > modules, Add-ons, Solution packs, **Functionalities** and **Editions**. Pricing, support and sales use it, and it
 > can produce a **customer-specific build** (an Offering made of only what a customer buys). People and agents both
@@ -50,14 +50,15 @@ Product Map
 └─ Customer build  offerings/customer-<id>.toon (Edition + chosen Product Map Items)
 ```
 
-Each Product Map Item is one file: `product-map/<kind>/<id>.toon`. Technical facts are **looked up from the
+Each Product Map Item is one file: `product-map/<kind>/<name>.toon`, with id `<kind>.<name>`. **Ids are qualified by
+kind** because the namespaces overlap (Add-on `reconciliation` and module `reconciliation`). Technical facts are **looked up from the
 manifest by `module:`**, never typed in here:
 
 ```
-id: la-graph-algorithms
+id: functionality.la-graph-algorithms
 kind: functionality              # layer | module | functionality | addon | solution-pack | edition
 title: Graph algorithms (29)
-parent: la-core                  # makes the tree / mind map
+parent: module.la-core           # makes the tree / mind map
 module: la-core                  # manifest id; guard checks it exists
 billable: true
 orderCode: INS-LA-ALGO           # required when billable; unique
@@ -92,7 +93,11 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 
 1. **`product-map-seed.mjs`** (one-off): builds the skeleton from what already exists: one item per manifest, per
    Offering `addons{}`, per Space Template and Industry pack, and per Edition. Functionality items are seeded from
-   `docs/stakeholders/modules/*` headings, then reviewed by hand.
+   ✅ **Built (S1).** As built: Functionality items are **not seeded**, because the module pages share one
+   nine-heading template and list no Functionalities, so they are written by hand. A Space Template that no Offering
+   ships (the LA showcases) is seeded `billable: false`, `status: preview`. An Add-on whose module another Add-on also
+   names (`incidents` and `workflowSla` both resolve to `ops`) is seeded `enforcement: contract`, since it cannot be
+   left out of a build on its own. Commercial fields (billing model, support tier, Order Code) are placeholders.
 2. **`check-product-map.mjs`** (guard, runs in CI with the other guards): every `module:` is a real manifest id;
    every non-internal module has an item; every `parent:` resolves (no cycles); `billable:true` has an `orderCode`
    and a `billing.model`; Order Codes are unique; `enforcement` is possible for the module; no technical fact is
@@ -126,7 +131,7 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 | Slice | Delivers | Done when |
 |---|---|---|
 | S0 ✅ | glossary terms; decisions signed | done 2026-10-18 |
-| S1 | file format + `product-map-seed.mjs` + reviewed seed + `.gitignore` entry | every manifest/Add-on/Solution pack/Edition has an item |
+| S1 ✅ | file format + `product-map-seed.mjs` + reviewed seed + `.gitignore` entry | done 2026-10-18: 87 items (6 layers, 47 modules, 15 Add-ons, 15 Solution packs, 4 Editions) |
 | S2 | `check-product-map.mjs` in the guards job | a missing module item, a bad `parent:`, an impossible `enforcement` or a committed price fails CI |
 | S3 | `render-product-map.mjs`: CSV + XLSX + mind-map HTML | the price list and the Edition matrix open in Excel |
 | S4 | `product-map-import.mjs` round trip | edit a price in Excel → import → a one-line change in `private/prices.toon` |
@@ -140,6 +145,9 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 - **`enabled-gate` and `contract` are not technical enforcement.** There is no licence engine (a recorded decision),
   so a copied bundle or a Space admin can switch an item back on. The bill of materials states the enforcement
   level of each item so this is never a surprise.
+- **A bought item pulls in another.** `requires.modules` edges cross Add-ons: Screening needs `ops` and `entity-list`,
+  Action Requests needs `notify-channels`, Anomaly needs `entity-list`. `customer-build.mjs` (S5) must list such
+  modules on the bill of materials as "included because X needs it", so the price is a decision and not an accident.
 - **Private folder lost.** `product-map/private/` is not in git, so it needs its own backup. S1 documents where.
 
 ## 8. Decisions (operator, 2026-10-18)

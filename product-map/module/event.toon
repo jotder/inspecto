@@ -1,0 +1,7 @@
+id: module.event
+kind: module
+title: Event model and log
+parent: layer.platform
+module: event
+billable: false
+status: ga
