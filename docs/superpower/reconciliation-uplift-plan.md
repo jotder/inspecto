@@ -1,12 +1,20 @@
 # Reconciliation uplift: usability and performance plan
 
-> 🟡 **PLAN 2026-10-18 (`RECON-UPLIFT-1`): design only, nothing built.** Decisions D-RU1…D-RU8 were taken on the operator's
+> 🟢 **BUILT 2026-10-18 (`RECON-UPLIFT-1`): B0/B1 and U1-U6 shipped on master, then amended by an independent review (below); B2/B3 closed unbuilt.** Decisions D-RU1…D-RU8 were taken on the operator's
 > behalf (the operator asked for smart decisions; each carries its reason and how to reverse it, §6). **Method:** three
 > read-only reviews run in parallel (backend, UI, a measured baseline), then every top finding was checked against the code
 > before it went into this plan. **What is NOT known:** behaviour above about 400k rows. No benchmark or test above that
 > exists, so every claim about 10M rows is a hypothesis until slice B0 measures it.
 > 🟢 **Lane A (backend) 2026-10-18: B0 measured and B1 built; B2 and B3 closed unbuilt** (no failure at 10M key groups, no deep-offset
 > cost): numbers, verdicts on P2/P4/P5/P6 and the as-built shared grain are in the OKF concept below. UI lanes B and C are separate.
+> 🔴 **Review amendments (2026-10-18, merged work re-reviewed by two independent agents):** (1) the shared grain unified a key
+> column's type across sides, which changed a recorded Break's id when a key was DATE on one side and TIMESTAMP on the other
+> (verified: epoch millis instead of the date); such Reconciliations now take the original per-type scans; (2) the day cache is
+> bounded by estimated bytes (P4); (3) U5 Schedule was built (the Jobs create dialog takes a validated prefill seed);
+> (4) UI: stale Test-definition result, per-set `+`/`N of TOTAL`/"More in: ..." pager, CSV formula-injection guard and BOM, a dead
+> empty-state button, an out-of-order day-summary race, and an unbounded `?offset=`. Each has a test that fails on the old code.
+> Not fixed: the shared `toCsv` (`app/inspecto/data-table/core/csv.ts`) has the same formula-injection exposure for every
+> other export, and the Grouped Breaks view still labels groups `Type (n)` with no total. As-built facts: the OKF concept.
 > As-built behaviour: [`okf/frontend/features/reconciliation.md`](../okf/frontend/features/reconciliation.md); module page:
 > [`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md).
 
