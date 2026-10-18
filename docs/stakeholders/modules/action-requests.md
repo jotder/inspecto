@@ -1,7 +1,7 @@
 # Action Requests
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: Professional and Enterprise (optional module `inspecto-action-requests`, module id `action-requests`).
+> Offering: Standard and Advanced (optional module `inspecto-action-requests`, module id `action-requests`).
 > Checked against the code on 2026-10-17.
 
 ## 1. What it is
@@ -42,7 +42,7 @@ resolved through the core `LinkedSubjectProvider` seam that `inspecto-ops` fills
    Change (one call, one approval). Under OIDC the approver must also be on `approvers.toon`.
 3. **`approverCheck`**, computed live on every read, list item and create response:
    - `ok` - an enumerated non-maker holds `canApproveChanges` unscoped;
-   - `none-eligible` - no role grants the capability, every holder is a maker, the OIDC roster is empty, or Personal (no Subject);
+   - `none-eligible` - no role grants the capability, every holder is a maker, the OIDC roster is empty, or Basic (no Subject);
    - `unknown` - enumeration failed, a holder is scoped or an Access Policy exists, or the record's MAC fails.
    A `none-eligible` at raise time emits one WARN audit `action-request.no-eligible-approver`. It is
    informational: nothing auto-declines.

@@ -1,7 +1,7 @@
 # Jobs and scheduler
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
-> Offering: all tiers; Job Packs and some maintenance tasks (backup, restore) are Professional and
+> Offering: all tiers; Job Packs and some maintenance tasks (backup, restore) are Standard and
 > above. Checked against the code on 2026-10-17.
 
 ## 1. What it is

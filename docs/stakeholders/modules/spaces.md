@@ -74,7 +74,7 @@ one `lifecycleLock`; reads are lock-free. `createFromTemplate` copies the templa
    are recorded `SKIPPED` and its gated background ticks pause (`ModuleGate`). An unreadable file disables
    nothing (fail-open). Core routes own no feature and are never gated here.
 3. **Permitted (RBAC)** — `ApiContext.withCapability` demands a capability of the request's Subject
-   (403 otherwise); with no Subject attached (Personal) it is a no-op.
+   (403 otherwise); with no Subject attached (Basic) it is a no-op.
 
 ## 5. Configuration
 

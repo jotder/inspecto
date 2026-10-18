@@ -1,7 +1,7 @@
 # Pipelines and Steps
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
-> Offering: all tiers; the `transform.mask` Step is Enterprise. Checked against the code on 2026-10-17.
+> Offering: all tiers; the `transform.mask` Step is Advanced. Checked against the code on 2026-10-17.
 
 ## 1. What it is
 
@@ -60,7 +60,10 @@ on the [scheduler](jobs-scheduler.md). Code homes:
 `transform.derive`, `transform.sql`, `transform.validate`, `transform.dedup`, `transform.route`,
 `transform.join`, `transform.summarize`, `transform.running`, `transform.profile`, `transform.hash`,
 `transform.mask`, `transform.explode`, `transform.matrix.unpivot`, `transform.timeseries.resample`,
-`transform.timeseries.shift`, `transform.timeseries.forecast`, `transform.similarity`; and the sinks
+`transform.timeseries.shift`, `transform.timeseries.forecast`, `transform.similarity`,
+`transform.analytics.rank`, `transform.sample`, `transform.matrix.pivot`, `transform.entity.link`,
+`transform.stats.outlier`, `transform.data.binning`, `transform.stats.correlation`, `transform.split`,
+`transform.merge`; and the sinks
 (`sink.persistent`, `sink.materialized`, `sink.webhook`, `sink.excel`, `sink.view`). The step catalog documents each
 one's keys, refusals and a runnable example.
 

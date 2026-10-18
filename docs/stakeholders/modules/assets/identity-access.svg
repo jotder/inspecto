@@ -25,7 +25,7 @@
 <text x="140" y="219" text-anchor="middle" font-size="11" fill="#0F6E56">Subject (else 401)</text>
 <rect x="260" y="170" width="200" height="70" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
 <text x="360" y="189" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">2 AccessDecider</text>
-<text x="360" y="205" text-anchor="middle" font-size="11" fill="#534AB7">PolicyEngine (Enterprise)</text>
+<text x="360" y="205" text-anchor="middle" font-size="11" fill="#534AB7">PolicyEngine (Advanced)</text>
 <text x="360" y="219" text-anchor="middle" font-size="11" fill="#534AB7">ALLOW / DENY / ABSTAIN</text>
 <rect x="480" y="170" width="200" height="70" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
 <text x="580" y="189" text-anchor="middle" font-size="13" font-weight="500" fill="#085041">3 withCapability</text>

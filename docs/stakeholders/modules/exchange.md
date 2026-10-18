@@ -1,7 +1,7 @@
 # Exchange (multi-entity sharing)
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: Professional and above (`multiEntity` add-on, module `exchange`). Checked against the code on 2026-10-17.
+> Offering: Standard and above (`multiEntity` add-on, module `exchange`). Checked against the code on 2026-10-17.
 
 ## 1. What it is
 

@@ -3,7 +3,7 @@
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content: the Space Templates `la-showcase`
 > (`spaces/_templates/la-showcase/template.toon`) and `la-mobile-money`
 > (`spaces/_templates/la-mobile-money/template.toon`). Offering: the `linkAnalysis` add-on in
-> `offerings/standard.toon` (modules `la-storage`, `la-core`, `la-api`, `geo-link`) and
+> `offerings/basic.toon` (modules `la-storage`, `la-core`, `la-api`, `geo-link`) and
 > `offerings/advanced.toon` (`la-store-pg`). Checked against the templates on 2026-10-17.
 
 ## Business problem

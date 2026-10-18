@@ -1,7 +1,7 @@
 # Maker-checker (Pending Changes)
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
-> Offering: every edition; deciding needs an Authenticator, so on Personal it cannot be switched on through the API.
+> Offering: every edition; deciding needs an Authenticator, so on Basic it cannot be switched on through the API.
 > Checked against the code on 2026-10-17.
 
 ## 1. What it is

@@ -1,8 +1,8 @@
 # Identity and Access
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
-> Offering: auth-free on Personal; OIDC sign-in and file/keystore secrets on Professional and up; Attribute-based
-> Access Policies (ABAC) on Enterprise and Preview; Demo User sign-in only in a `-DemoAuth` demo bundle.
+> Offering: auth-free on Basic; OIDC sign-in and file/keystore secrets on Standard and up; Attribute-based
+> Access Policies (ABAC) on Advanced and Preview; Demo User sign-in only in a `-DemoAuth` demo bundle.
 > Checked against the code on 2026-10-17.
 
 ## 1. What it is
@@ -35,8 +35,9 @@ module-level map.
 Platform base, in front of every `ControlApi` route. The access module is `bindingTime: build`
 (`platform/inspecto-access/src/main/resources/META-INF/inspecto/module.toon`); the four providers are
 `bindingTime: boot` and are selected purely by being on the classpath — no runtime flag turns them on.
-Maven profiles in `pom.xml`: `edition-professional` and `edition-standard` add `inspecto-oidc` and
-`inspecto-secrets`; `edition-enterprise` and `edition-preview` add `inspecto-policy` too.
+Maven profiles in `pom.xml`: `edition-standard`, `edition-preview` and `edition-advanced` add `inspecto-oidc` and
+`inspecto-secrets`; `edition-preview` and `edition-advanced` add `inspecto-policy` too (Basic is the default
+build, no profile).
 `inspecto-demo-auth` is a default reactor module but `inspecto/package.ps1` stages it only under
 `-DemoAuth`, replacing `inspecto-oidc.jar`; `tools/check-demo-auth-isolation.mjs` fails CI if it leaks into a
 non-demo bundle.
@@ -74,7 +75,7 @@ an authored role with an empty capability list is revoked. Edits apply on the ne
 
 **Secrets.** `SecretResolver` expands references at use time: `${ENV:NAME}`, `${SYS:prop}` and bare `${NAME}`
 in every edition; `${FILE:/path}` and `${KEYSTORE:alias}` only through `FileKeystoreSecretsProvider`. A
-Personal bundle refuses those two schemes with an edition-naming error rather than returning null.
+Basic bundle refuses those two schemes with an edition-naming error rather than returning null.
 
 ## 5. Configuration
 
@@ -125,7 +126,7 @@ All in `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` and `AuthRou
 
 ## 9. Limits and gotchas
 
-- **Personal has no authenticator**: every route is open. Bind with `-Dcontrol.bind=127.0.0.1` on shared
+- **Basic has no authenticator**: every route is open. Bind with `-Dcontrol.bind=127.0.0.1` on shared
   networks; the default listens on every interface.
 - **Fail-closed documents**: an unreadable `roles.toon` suspends all role grants; an unreadable
   `access-policies.toon` denies every decision until fixed.

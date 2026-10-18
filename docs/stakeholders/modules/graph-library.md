@@ -92,5 +92,6 @@ pattern route behind `/inv/pattern/branching`).
   fail on one side.
 - The library holds no limits; an uncapped caller can run an expensive algorithm on a large graph.
   Always pass a `RunControl` with a budget or deadline.
-- Deterministic entity grouping (analytics plan S2) is not built; `UnionFind` is its intended home.
+- Deterministic entity grouping is built in the [Analytics Kernel](analytics-kernel.md) (`EntityGrouping`, Step
+  `enrichment.entity.link`); `UnionFind` is also used by the entity store's `EntityRegistry`.
 - Its pom's enforcer `bannedDependencies` rule fences out `inspecto-*` dependencies; adding one fails the build.

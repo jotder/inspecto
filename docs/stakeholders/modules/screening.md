@@ -1,7 +1,7 @@
 # Screening
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: Professional and above (`screening` add-on, module `screening`). Checked against the code on 2026-10-17.
+> Offering: Standard and above (`screening` add-on, module `screening`). Checked against the code on 2026-10-17.
 
 ## 1. What it is
 
@@ -26,7 +26,7 @@ notes: [Screening concept](../../okf/backend/control-plane/screening.md).
 An add-on over the platform base. It reads Entity Lists (`entity-list` module), runs as a Job through the
 [Jobs scheduler](jobs-scheduler.md), and on confirm opens an [Incident](incidents.md) and a
 [Case](case-management.md). Bundles without the jar answer the routes with the manifest's `absentMessage`
-("Professional edition and above").
+("Standard edition and above").
 
 ## 4. How it works
 

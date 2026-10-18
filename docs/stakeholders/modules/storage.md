@@ -2,7 +2,7 @@
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
 > Offering: all tiers (embedded DuckDB everywhere); Postgres for operational data, DuckLake
-> registration and the compliance archive are Professional and above. Checked against the code on 2026-10-17.
+> registration and the compliance archive are Standard and above. Checked against the code on 2026-10-17.
 
 ## 1. What it is
 
@@ -71,7 +71,7 @@ write archives the prior copy to `<typeDir>/.history/<id>.v<N>.toon` (keep
 `ACQUISITION_LEDGER`, `DELIVERY_RECEIPTS`, `ALERTS` — each with its own `*.backend` default.
 `-Dinspecto.db=duckdb|postgres` selects the connection for all of them; a per-family `*.db.url` still
 wins. DDL is portable (`VARCHAR` / `BIGINT`, no upserts). An unhonourable `postgres` selection fails at
-boot. The JDBC driver ships as the `postgresql.jar` sidecar in Professional and Enterprise bundles.
+boot. The JDBC driver ships as the `postgresql.jar` sidecar in Standard and Advanced bundles.
 
 ## 5. Configuration
 
@@ -82,7 +82,7 @@ boot. The JDBC driver ships as the `postgresql.jar` sidecar in Professional and 
 | `-Dcomponents.history.keep` | component history depth |
 | `pipeline-history.toon` (`/settings/pipeline-history`) | Pipeline history depth per Space |
 | `output:`, `sinks:`, `dirs.database` in `*_pipeline.toon` | where business data lands |
-| `sinks[].ducklake` | DuckLake registration (Professional and above) |
+| `sinks[].ducklake` | DuckLake registration (Standard and above) |
 
 ## 6. Screens
 

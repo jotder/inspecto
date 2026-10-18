@@ -1,7 +1,7 @@
 # Risk Scores and Entity Lists
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: Professional and above — add-on `scoringLists` (status `built`, modules `entity-list`, `scoring`) in
+> Offering: Standard and above — add-on `scoringLists` (status `built`, modules `entity-list`, `scoring`) in
 > `offerings/standard.toon`. Checked against the code on 2026-10-17.
 
 ## 1. What it is
@@ -116,4 +116,4 @@ Models are authored through `/components/risk-score/{id}`.
 - A registered sidecar Dataset reads raw Parquet, so masking does not apply.
 - Score entity keys are masked on read unless the caller holds `canRevealLinkEntities`.
 - A scoring query failure is rethrown with a generic message so cell values never reach logs.
-- Risk Scores are not shipped in Personal.
+- Risk Scores are not shipped in Basic.

@@ -16,7 +16,7 @@ s.path('M390 90 C 560 120, 700 110, 760 100', dash=True)
 
 s.group(20, 140, 900, 120, 'ControlApi request gating (in order)')
 s.box(40, 170, 200, 70, 'teal', '1 Authenticator', 'JWT or demo token ->\nSubject (else 401)')
-s.box(260, 170, 200, 70, 'purple', '2 AccessDecider', 'PolicyEngine (Enterprise)\nALLOW / DENY / ABSTAIN')
+s.box(260, 170, 200, 70, 'purple', '2 AccessDecider', 'PolicyEngine (Advanced)\nALLOW / DENY / ABSTAIN')
 s.box(480, 170, 200, 70, 'teal', '3 withCapability', 'role -> capabilities\n(else 403)')
 s.box(700, 170, 200, 70, 'teal', '4 WriteGates', 'no write root -> 503')
 for x in (240, 460, 680):

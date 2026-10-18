@@ -1,7 +1,7 @@
 # Case Management
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: Professional and above — add-on `caseManagement` (status `built`, module `case-management`) in
+> Offering: Standard and above — add-on `caseManagement` (status `built`, module `case-management`) in
 > `offerings/standard.toon`. Checked against the code on 2026-10-17.
 
 ## 1. What it is

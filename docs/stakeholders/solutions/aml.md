@@ -1,7 +1,7 @@
 # Anti-money-laundering (AML)
 
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content pack: Space Template `aml`
-> (`spaces/_templates/aml/template.toon`). Offering: Professional and above (`offerings/standard.toon`,
+> (`spaces/_templates/aml/template.toon`). Offering: Standard and above (`offerings/standard.toon`,
 > `contentPacks`). Checked against the template on 2026-10-17.
 
 ## Business problem

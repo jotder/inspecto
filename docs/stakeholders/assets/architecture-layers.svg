@@ -4,7 +4,7 @@
 <rect x="0" y="0" width="940" height="900" fill="#FFFFFF"/>
 <rect x="40" y="30" width="860" height="52" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
 <text x="470" y="49" text-anchor="middle" font-size="13" font-weight="500" fill="#444441">Offering  (offerings/*.toon)</text>
-<text x="470" y="65" text-anchor="middle" font-size="11" fill="#5F5E5A">tier: Personal · Professional · Enterprise (+ Preview)  +  add-ons  +  content packs</text>
+<text x="470" y="65" text-anchor="middle" font-size="11" fill="#5F5E5A">tier: Basic · Standard · Advanced (+ Preview)  +  add-ons  +  content packs</text>
 <line x1="470" y1="82" x2="470" y2="100" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
 <rect x="40" y="100" width="860" height="78" rx="4" fill="none" stroke="#B4B2A9" stroke-width="0.6" stroke-dasharray="4 3"/>
 <text x="48" y="115" font-size="11" fill="#5F5E5A">Content packs = Space Templates (spaces/_templates): function packs and industry packs</text>

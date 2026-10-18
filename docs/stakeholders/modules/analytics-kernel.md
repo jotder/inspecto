@@ -109,6 +109,6 @@ Callers found in the code (`grep com.gamma.analytics`):
   never moved.
 - A forecast series must be regular (bucket and fill it first) and hold at least two seasons.
 - SQL-side `quantile_cont` / `quantile_disc` strings in other modules stay SQL by decision.
-- **Entity grouping is not built.** Deterministic entity grouping (blocking keys plus union-find,
-  Step `enrichment.entity.link`) is plan item S2 and still open; only the shared `UnionFind` in the
-  [graph library](graph-library.md) exists, and the Step appears in `ProcessorCatalog` as planned.
+- Deterministic entity grouping (blocking keys plus union-find) is built: `com.gamma.analytics.entity.EntityGrouping`
+  in the kernel and the Step `enrichment.entity.link` (`transform.entity.link`, `EntityLinkStep`), delivered in
+  `ProcessorCatalog`. The shared `UnionFind` lives in the [graph library](graph-library.md).

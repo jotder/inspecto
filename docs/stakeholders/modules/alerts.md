@@ -84,7 +84,7 @@ All in `AlertRoutes.java`:
 
 | Route | Gate |
 |---|---|
-| `GET /alerts` | none - no `withCapability` and no `CapabilityManifest` entry; any caller past the AuthN gate (everyone on Personal) |
+| `GET /alerts` | none - no `withCapability` and no `CapabilityManifest` entry; any caller past the AuthN gate (everyone on Basic) |
 | `GET /alerts/rules`, `GET /alerts/rules/pending` | none (as above) |
 | `POST /alerts/evaluate` | `canOperateRuns` |
 | `POST /alerts/{id}/ack`, `POST /alerts/{id}/resolve` | `canWorkIncidents` |

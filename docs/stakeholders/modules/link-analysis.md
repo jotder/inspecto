@@ -1,8 +1,8 @@
 # Link Analysis
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Link Analysis.
-> Offering: Professional and above (`linkAnalysis` add-on: `la-storage`, `la-core`, `la-api`, `geo-link`);
-> Enterprise adds `la-store-pg`. Checked against the code on 2026-10-17.
+> Offering: every edition from Basic (`linkAnalysis` add-on in `offerings/basic.toon`: `la-storage`, `la-core`, `la-api`, `geo-link`);
+> Advanced adds `la-store-pg`. Basic withholds the Investigation surface (see `docs/EDITIONS.md`). Checked against the code on 2026-10-17.
 
 ## 1. What it is
 
@@ -30,7 +30,7 @@ module-level summary.
 | `la-storage` | `la/inspecto-la-storage` | Versioned Parquet link index, `SqlGraphEngine` / `RoutingGraphEngine` |
 | `la-api` | `la/inspecto-la-api` | The `/inv` and `/geo` routes (81), masking, Draft orchestration, gates |
 | `geo-link` | `la/inspecto-geo-link` | Bridge to the host: `DatasetProvider`, `CasePort`, `CollectorCoveragePort`, `LinkIndexBuilder`, measures and alert-rule routes |
-| `la-store-pg` | `la/inspecto-la-store-pg` | Postgres `InvestigationStoreProvider` (Enterprise) |
+| `la-store-pg` | `la/inspecto-la-store-pg` | Postgres `InvestigationStoreProvider` (Advanced) |
 
 They sit on two platform-base modules, `graph` (algorithms) and `entity-store` (Entity Types, Entity Lists,
 identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it reaches LA only through SPIs it owns.

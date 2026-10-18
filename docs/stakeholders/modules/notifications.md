@@ -2,7 +2,7 @@
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
 > Offering: in-app feed in every edition; the email and webhook channels (`providers/inspecto-notify-channels`)
-> in the Professional, Enterprise (includes Professional) and Preview Offerings, not Personal. Checked against the code on 2026-10-17.
+> in the Standard, Advanced (includes Standard) and Preview Offerings, not Basic. Checked against the code on 2026-10-17.
 
 ## 1. What it is
 
@@ -33,8 +33,8 @@ contracts `NotificationChannel` and `WebhookSinkTransport`. The same module also
 The engine side (`com.gamma.notify` in `platform/inspecto-engine`) owns rendering, dedupe, preferences,
 receipts and suppression. The control-plane routes are in
 `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java`. The transports are a separate provider
-so the Personal build ships no external channel: the root `pom.xml` adds `providers/inspecto-notify-channels`
-only under the `edition-professional`, `edition-standard`, `edition-preview` and `edition-enterprise` profiles
+so the Basic build ships no external channel: the root `pom.xml` adds `providers/inspecto-notify-channels`
+only under the `edition-standard`, `edition-preview` and `edition-advanced` profiles
 (EDG-01). Notifications are also a Platform Service (`notifications`, via `NotificationAccess`) distinct from
 the `mail` Platform Service (`MailAccess`), which sends to recipients an author names — see
 [Platform Services](platform-services.md).
@@ -123,7 +123,7 @@ All in `NotificationRoutes`; gates per `platform/inspecto-access/src/main/java/c
 
 - An unconfigured channel is dropped at discovery (`discoverChannels` checks `configured()`), so a missing
   `notify.smtp.host` / `notify.smtp.to` or `notify.webhook.url` silently disables that flag-driven path.
-- A `ChannelConfig` whose `kind` has no transport on the classpath (e.g. Personal) delivers nothing.
+- A `ChannelConfig` whose `kind` has no transport on the classpath (e.g. Basic) delivers nothing.
 - Suppression applies only to persisted `ChannelConfig` targets, never to the flag-driven path (no target).
 - Webhook egress (`WebhookEgress`) checks the resolved address against the egress policy and the current
   Space's allowlist, pins the connect to that address, never follows a 3xx and treats non-2xx as failure.

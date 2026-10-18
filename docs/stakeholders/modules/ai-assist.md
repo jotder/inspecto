@@ -1,7 +1,7 @@
 # AI assist
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: `aiAssist` add-on - Professional: `agent` (plus the `agent-hosted` provider); Enterprise adds
+> Offering: `aiAssist` add-on - Standard: `agent` (plus the `agent-hosted` provider); Advanced adds
 > `intelligence`. Checked against the code on 2026-10-17.
 
 ## 1. What it is
@@ -11,7 +11,7 @@ AI assist is the optional model-backed help layer, in two tiers:
 - **Assist agent** (`features/inspecto-agent`, manifest id `agent`): explain, diagnose, draft and triage skills
   that are read-only or draft-only and abstain rather than ship a low-confidence answer; plus failure diagnosis of
   failed batches.
-- **Intelligence agent** (`features/inspecto-intelligence`, manifest id `intelligence`, Enterprise): multi-turn
+- **Intelligence agent** (`features/inspecto-intelligence`, manifest id `intelligence`, Advanced): multi-turn
   sessions, tool calls, playbook investigations that produce **Triage Runs**, an approvals gate for mutating
   actions, and bounded autonomy behind a kill switch.
 

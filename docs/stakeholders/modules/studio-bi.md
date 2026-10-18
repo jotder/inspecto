@@ -1,7 +1,7 @@
 # Studio BI
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
-> Offering: all tiers (the BI half is ungated); the two investigation studios are Professional and
+> Offering: all tiers (the BI half is ungated); the two investigation studios are Standard and
 > above and have their own page, [link-analysis](link-analysis.md). Checked against the code on 2026-10-17.
 
 ## 1. What it is
@@ -12,7 +12,7 @@ chart, a board. Its parts, in the canonical vocabulary:
 - **Dataset** — a named relation over a store (component kind `dataset`), owned by the data plane.
 - **Measure** — an aggregation over a Dataset field (`{agg, field}`), or a named calculated Measure
   stored on the Dataset.
-- **Visualization Type** — a template for a chart or view (`VizPlugin`); thirteen ship.
+- **Visualization Type** — a template for a chart or view (`VizPlugin`); twenty ship.
 - **Widget** — an instance: one Visualization Type bound to a Dataset with its controls set.
 - **Dashboard** — tiles of Widgets with a quick-filter bar, drill-through and PNG export.
 - **KPIs and Reports** — the business gallery, with scheduled delivery through the `report` Job Type.
@@ -45,8 +45,9 @@ ETags and history from the component registry. Code homes:
 
 **Visualization Types.** A `VizPlugin` declares `meta`, `controls`, `buildQuery()`,
 `transformProps()` and a `render` descriptor. `BUILTIN_VIZ_PLUGINS` registers, in order: `kpi`,
-`table`, `bar`, `line`, `area`, `pie`, `bubble`, `gauge`, `scatter`, `funnel`, and the view-bound
-`geo-map`, `link-analysis` and `reconciliation`. `viz-render.component.ts` dispatches on
+`table`, `bar`, `line`, `area`, `pie`, `bubble`, `gauge`, `scatter`, `funnel`, the P3 breadth additions
+(`kpi-trend`, `progress-list`, `treemap`, `waterfall`, `combo`, `heatmap`), and the view-bound
+`geo-map`, `link-analysis`, `reconciliation` and `working-set`. `viz-render.component.ts` dispatches on
 `render.kind` (`chartjs`, `aggrid`, `component`).
 
 **Controls become structured Measures, never SQL text.** A control value

@@ -1,7 +1,7 @@
 # Regulatory Reporting
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: Professional and above (`regulatoryReporting` add-on, module `regulatory-reporting`). Checked against
+> Offering: Standard and above (`regulatoryReporting` add-on, module `regulatory-reporting`). Checked against
 > the code on 2026-10-17.
 
 ## 1. What it is

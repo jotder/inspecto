@@ -1,7 +1,7 @@
 # Reconciliation
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
-> Offering: Professional and above — add-on `reconciliation` (status `built`, module `reconciliation`) in
+> Offering: Standard and above — add-on `reconciliation` (status `built`, module `reconciliation`) in
 > `offerings/standard.toon`. Checked against the code on 2026-10-17.
 
 ## 1. What it is
@@ -125,5 +125,4 @@ Fail-closed: write root unset 503, unknown id 404, unusable config or failing qu
 - `POST /recon/promote` refuses an inline draft config — the Reconciliation must be saved.
 - The SPA recomputes Break identity; `ReconBreaks.keyText` must match JavaScript number spelling or recorded
   resolutions silently read as open.
-- The 503 text in `promote` still says "Standard and Enterprise"; the offering is Professional and above.
 

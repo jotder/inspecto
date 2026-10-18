@@ -15,7 +15,7 @@ for y in (45, 110, 175):
     s.arrow(470, y, 520, y)
 s.box(750, 85, 170, 50, 'gray', 'Ops screens', 'Overview, Events, Runs')
 s.arrow(710, 110, 750, 110)
-s.group(20, 220, 900, 90, 'maintenance Job Type: BackupTaskProvider in inspecto-backup (Professional+)')
+s.group(20, 220, 900, 90, 'maintenance Job Type: BackupTaskProvider in inspecto-backup (Standard+)')
 s.box(40, 245, 250, 50, 'coral', 'backup', 'zip + SHA-256 sidecar')
 s.box(340, 245, 250, 50, 'coral', 'backup_verify', 'hash-first, fail-closed')
 s.box(640, 245, 260, 50, 'coral', 'restore', 'manifest check, zip-slip jail')

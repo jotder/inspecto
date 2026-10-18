@@ -3,7 +3,7 @@
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
 > Offering: health, status, run reports and the audit log in all tiers; the Prometheus endpoint, the
 > Events screen routes (`inspecto-observability`) and backup / restore (`inspecto-backup`) are
-> Professional and above. Checked against the code on 2026-10-17.
+> Standard and above. Checked against the code on 2026-10-17.
 
 ## 1. What it is
 
@@ -50,7 +50,7 @@ routes, not from `/metrics`.
 
 **Event ledger.** `EventLog` is a synchronous bus (global plus one per Space) and the single
 secret-scrub seam. `EventStore` backends are chosen by `-Devents.backend`: `memory` (engine default,
-a ring of 8,192), `parquet` (set by the Professional and Enterprise launchers), or `db`.
+a ring of 8,192), `parquet` (set by the Standard and Advanced launchers), or `db`.
 
 **Audit.** `AuditTrail` is one interceptor in `ControlApi.dispatch` that records every successful
 state-changing request, export reads and denied attempts, as `AUDIT` / `ACCESS_DENIED` events.
@@ -117,7 +117,7 @@ All path parameters resolve against the Space config root through `PathJail.requ
 
 ## 9. Limits and gotchas
 
-- On Personal the demo backup chain stops at its first link with a FAILED run; that is the edition
+- On Basic the demo backup chain stops at its first link with a FAILED run; that is the edition
   boundary, not a defect.
 - The in-memory event store forgets on restart; durable audit needs the `parquet` or `db` backend.
 - Retention is never on by default: every deleting task is inert until an operator defines a Job.
