@@ -55,6 +55,16 @@
                  for the module's own build. -->
             <scope>provided</scope>
         </dependency>
+        <!-- PACKAGE-PREVIEW-SBOM-1 (2026-10-18): main code imports com.gamma.etl (FailureReactor ->
+             ConsignmentEvent), so declare it directly instead of leaning on inspecto-processor's
+             transitive closure, which a `package` run (the SBOM step) does not carry. `provided` for
+             the same reason as the processor: the core ships it as its own thin jar on every bundle. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
 
         <!-- eoiagent model substrate: LlmGateway port (core) + Lc4jChatGateway transport (model).
              eoiagent types live ONLY in this module, behind the AssistAgent SPI; the lean core
