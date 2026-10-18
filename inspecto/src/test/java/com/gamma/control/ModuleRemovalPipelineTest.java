@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * {@code MODULE-REORG-1 P4a} — removal semantics (plan §2.5) for the Pipeline surface: config that names a
  * capability no installed module provides. Characterisation first; every test pins what the product does
- * TODAY, and the verdicts are recorded in {@code docs/okf/product/layer/platform/plan-module-reorganisation-decisions.md}.
+ * TODAY, and the verdicts are recorded in {@code docs/okf/product/layer/platform/spec-module-reorg-decisions.md}.
  *
  * <p>The node type {@code zz.absent-module-node} is registered nowhere, standing in for a node type that a
  * removed module used to contribute.

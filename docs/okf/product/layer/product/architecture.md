@@ -68,5 +68,5 @@ layout-level siblings a growing `flex` or they steal width from the content colu
 ## Source-of-truth docs
 
 The shared, profile-independent sources of truth are the in-app `/design` gallery
-(see [design-system gallery](user-guide-ds-gallery.md)), the `angular-ui` rules, and
+(see [design-system gallery](spec-ds-gallery.md)), the `angular-ui` rules, and
 `docs/okf/product/layer/product/tests-accessibility-audit.md`. When code and docs disagree, fix one — don't silently diverge.

@@ -1,4 +1,4 @@
-"""Sequence diagram for docs/okf/product/layer/product/architecture-journey-alert-to-case.md (SOLUTION-SUITE-DOCS-1)."""
+"""Sequence diagram for docs/okf/product/layer/product/user-guide-journey-alert-to-case.md (SOLUTION-SUITE-DOCS-1)."""
 import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
 
 ACTORS = [('Event / data','gray'),('AlertService','teal'),('Incident','purple'),('Case rule','purple'),('Analyst','gray'),('Action Request','coral'),('Checker','gray')]

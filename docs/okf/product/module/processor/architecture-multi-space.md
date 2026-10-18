@@ -28,7 +28,7 @@ Five process-wide singletons — `EventLog`, `MetricRegistry` (its `space` label
 [`ConnectionRegistry`](../connectors/spec-connectors.md), `StabilityGate`, `AcquisitionLedgers` — resolve per-space
 by reading `EventLog.currentSpaceId()`, which returns the `space` **SLF4J MDC** key or `"default"` when
 absent. **The MDC does not cross thread-pool boundaries**, so every executor on the execution path must copy
-the MDC onto its worker (see [gotchas](../../layer/platform/architecture-gotchas.md)). The `default` space sets no MDC → output
+the MDC onto its worker (see [gotchas](../../layer/platform/admin-guide-gotchas.md)). The `default` space sets no MDC → output
 stays label-free (byte-identical single-space).
 
 ## API seam

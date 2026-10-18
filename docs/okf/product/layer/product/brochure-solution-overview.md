@@ -48,9 +48,9 @@ Each pack page names the modules the pack switches on and walks the end-to-end s
 | Business Assurance | seasonal and trend deviations in revenue and margin | [business-assurance](../../solution-pack/business-assurance/architecture.md) |
 | Link Analysis | relationship investigations across the above | [link-analysis](../../solution-pack/la-showcase/architecture.md) |
 
-Three journeys follow one piece of work across modules: [from a file to a dashboard](architecture-journey-file-to-dashboard.md),
-[from an alert to a closed Case](architecture-journey-alert-to-case.md) and
-[a safe config change](architecture-journey-safe-config-change.md).
+Three journeys follow one piece of work across modules: [from a file to a dashboard](user-guide-journey-file-to-dashboard.md),
+[from an alert to a closed Case](user-guide-journey-alert-to-case.md) and
+[a safe config change](user-guide-journey-safe-config-change.md).
 
 ## 4. How it is put together (level 1)
 

@@ -45,10 +45,10 @@ Assembly mechanisms:
 * **`-D` flags** — e.g. `-Dauth.mode=none` (Basic) vs `-Dauth.mode=oidc` (Standard).
 * **`package.ps1 -Edition …`** — emits per-edition bundles from one build (`Basic` | `Standard` |
   `Advanced`, the last a superset of Standard bundling the ABAC `policy` jar as well; see
-  [build & run](admin-guide-build-test.md)).
+  [build & run](spec-build-test.md)).
 
 One version spans all editions; artifacts differ by classifier. The matching branch policy is in
-[branching & release](admin-guide-branching-release.md).
+[branching & release](spec-branching-release.md).
 
 ## Extracting a feature into an edition module — the as-built recipe (EDG-01, 2026-09-07/08)
 

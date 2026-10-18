@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * A same-size rewrite of {@code modules.toon} inside one mtime tick must take effect: keyed on (mtime ms, size) the
- * cache kept the OLD disabled set, so a module switched off stayed on (docs/okf/product/layer/platform/architecture-module-reorg-gotchas.md).
+ * cache kept the OLD disabled set, so a module switched off stayed on (docs/okf/product/layer/platform/spec-module-reorg-gotchas.md).
  */
 class ModuleSettingsSameTickTest {
 

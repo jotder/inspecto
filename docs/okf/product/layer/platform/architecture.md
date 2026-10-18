@@ -36,7 +36,7 @@ Inspecto is deliberately **framework-free**: no Spring, no web framework, no IoC
   no `META-INF/services` entry and is not discovered. *(Corrected 2026-09-08: this bullet used to list it as
   the "ingestion SPI".)*
 * **Embedded DuckDB** — bulk ingest via the native Appender API; see [DuckDB](../../module/engine/spec-duckdb.md). Requires the
-  `--enable-native-access=ALL-UNNAMED` JVM flag (see [build & run](admin-guide-build-test.md)).
+  `--enable-native-access=ALL-UNNAMED` JVM flag (see [build & run](spec-build-test.md)).
 * **Virtual threads everywhere** — HTTP requests, the [job](../../module/processor/spec-jobs.md) executor, batch
   processing, and multi-source orchestration all run on bounded virtual-thread pools.
 

@@ -48,5 +48,5 @@ command rather than a shell mismatch.
 
 1. `lint:tokens` green. 2. `build` green (AOT + budgets). 3. `test:ci` green (unit + a11y).
 4. **Verify in the browser preview** — load the route, confirm behavior in the DOM, check console for errors (don't ask the user to check manually).
-5. If a pattern changed, update the [`/design` gallery](user-guide-ds-gallery.md) and the shared `angular-ui` rules.
+5. If a pattern changed, update the [`/design` gallery](spec-ds-gallery.md) and the shared `angular-ui` rules.
 6. Commit per the repo's branch policy: `feat:`/`test:`/`docs:` → `master` only; `fix:` → oldest supported branch then merge-forward. Never push without an explicit ask.

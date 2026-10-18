@@ -10,7 +10,7 @@ timestamp: 2026-10-18T00:00:00Z
 # Module reorganisation - decision record
 
 The model itself (axes, manifest, gates, Offerings, packaging) is [architecture-module-taxonomy.md](architecture-module-taxonomy.md); the traps are
-[architecture-module-reorg-gotchas.md](architecture-module-reorg-gotchas.md). Every phase P0..P7 shipped by 2026-10-09; the open
+[spec-module-reorg-gotchas.md](spec-module-reorg-gotchas.md). Every phase P0..P7 shipped by 2026-10-09; the open
 items are the `MODULE-REORG-*` rows of `docs/BACKLOG.md` (listed at the end). The plan that carried the work is archived
 (`docs/archived-documents/plans-archive/module-architecture-reorg-plan.md`): provenance only, it holds the per-slice
 as-built narrative, the 2026-10-06 measured baseline and the refuted premises.

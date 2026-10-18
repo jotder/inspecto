@@ -36,7 +36,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   **Gotcha**: `toToon` does **not** emit tabular-array format — a Java-constructed schema whose `fields`/
   `rules` are `List<Map>` round-trips as nested maps and the parser then throws *"Array length mismatch:
   declared N, found 0"*. Write test schemas as inline TOON strings, not via `toToon(schemaMap)`; round-trip is
-  only safe when the map was originally `JToon.decode`-d. See [gotchas](../../layer/platform/architecture-gotchas.md).
+  only safe when the map was originally `JToon.decode`-d. See [gotchas](../../layer/platform/admin-guide-gotchas.md).
   ⚠ **An unquoted comma-bearing value in a table row is REFUSED, by line** (`TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1`,
   fixed 2026-09-23). The comma is also the row delimiter, so `AMT,"1",DECIMAL(18,2)` under
   `fields[3]{name,selector,type}` is **four** values — genuinely ambiguous, so it is never guessed at.
@@ -115,7 +115,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   branch as `schema_file`, including the `grammar:<id>` registry form.)*
   *(Superseded 2026-09-23: `../` now resolves from the config's directory and the one jail judges it.)*
   ⚠ The config-relative branch was contained (a `../` escape was skipped, not resolved); the CWD branch was
-  **not** jailed and is explicitly not a security boundary (see [gotchas](../../layer/platform/architecture-gotchas.md) and
+  **not** jailed and is explicitly not a security boundary (see [gotchas](../../layer/platform/admin-guide-gotchas.md) and
   `BACKLOG.md` §6).
 
 ## The three config file types per source

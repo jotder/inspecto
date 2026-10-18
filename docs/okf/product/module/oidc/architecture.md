@@ -30,12 +30,12 @@ A profile-gated Maven module (`inspecto-oidc`, in the `edition-standard`/`editio
   `-Dauth.oidc.audience` is warn-only by decision (`:96-101`). (2) **SEC-SIDECAR-BOOT-1** — this
   module must ship **shaded** (`inspecto-oidc-*-sidecar.jar`): the plain 16 KB jar carries no
   `com/nimbusds` classes and every Professional/Enterprise bundle failed to boot until 2026-09-07; see
-  [build & test](../../layer/platform/admin-guide-build-test.md).
+  [build & test](../../layer/platform/spec-build-test.md).
 * **jlink** — ✅ **PKG-4 closed 2026-07-07**: the embedded runtime's module set is verified sufficient
   for Nimbus JOSE+JWT (`inspecto/package.ps1:19-25`; `REQUIREMENTS.md:254`, `:398`), so a Professional
   bundle may embed it. `-NoRuntime` is now only an option (the target must then supply Java 24+), used
   by the CI release and while the jlink *step* is re-proven on a host with no stale JVM holding
-  `runtime/bin/server/jvm.dll` ([build & test](../../layer/platform/admin-guide-build-test.md)).
+  `runtime/bin/server/jvm.dll` ([build & test](../../layer/platform/spec-build-test.md)).
 
 Edition context: [editions model](../../layer/platform/architecture-editions-model.md) ·
 [auth & security](../access/admin-guide-auth-security.md) · consumer flow: [`/api/v1`](../processor/api-v1.md).

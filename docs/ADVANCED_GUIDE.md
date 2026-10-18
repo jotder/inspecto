@@ -6,7 +6,7 @@
 > [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md); for the *design rationale* of the Pipeline engine see
 > [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md); for *acquisition feature depth* see
 > [`data-acquisition-framework.md`](okf/product/module/acquire/spec-framework-design.md); for the *edition/build model* see
-> [`EDITIONS.md`](EDITIONS.md). Short, focused fixes live in [`troubleshooting.md`](okf/product/layer/platform/architecture-troubleshooting.md).
+> [`EDITIONS.md`](EDITIONS.md). Short, focused fixes live in [`troubleshooting.md`](okf/product/layer/platform/admin-guide-troubleshooting.md).
 
 ---
 
@@ -180,7 +180,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 - **Failure modes:** field/schema mismatch → quarantine (`field_mismatch`); unreadable → `unreadable`;
   readable but **zero ingestable rows** (empty / header-only) → quarantine (`empty`) so it is consumed
   once instead of being rediscovered and reprocessed every poll cycle (an EMPTY batch never backs up/marks);
-  `year=NULL` partitions (see [`troubleshooting.md`](okf/product/layer/platform/architecture-troubleshooting.md)); a `BATCH_FAILED` with `offendingFile`.
+  `year=NULL` partitions (see [`troubleshooting.md`](okf/product/layer/platform/admin-guide-troubleshooting.md)); a `BATCH_FAILED` with `offendingFile`.
 
 ### 5.3 Pipeline-graph engine (`com.gamma.pipeline`, `com.gamma.pipeline.exec`)
 - **Responsibility:** the pipeline-as-graph layer. `PipelineLift` lifts the canonical `*_pipeline.toon`
@@ -561,7 +561,7 @@ remove the marker/ledger entry. Remember markers/ledger are written **LAST** in 
 marker and *will* re-pick the file.
 
 **Output lands in `year=NULL/month=NULL/day=NULL`.** Partition columns weren't derived. See
-[`troubleshooting.md`](okf/product/layer/platform/architecture-troubleshooting.md) (partition extraction) — usually a schema/derive mis-config.
+[`troubleshooting.md`](okf/product/layer/platform/admin-guide-troubleshooting.md) (partition extraction) — usually a schema/derive mis-config.
 
 **A batch failed.** `GET /pipelines/{n}/batches` (status FAILED) or `events/search?type=BATCH_FAILED` → attrs
 `error`, `offendingFile`, `errorRows`. Per-file: `GET /pipelines/{n}/files` + the `errors/` CSV. Quarantined
@@ -637,7 +637,7 @@ are computed at scrape time by `MetricsService`'s collector. Confirm the service
 - Pipeline engine design (IR, lift, validator, executor, T32 live-exec) → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md), [`live-execution.md`](okf/product/module/engine/spec-live-execution.md)
 - Editions / build flavors → [`EDITIONS.md`](EDITIONS.md) · Branch & release policy → [`BRANCHING.md`](BRANCHING.md)
 - Architecture overview → [`stage1-architecture.md`](okf/product/module/engine/architecture-stage1.md) · Operator console → [`operator-console.md`](archived-documents/operator-console.md)
-- Short fixes (DuckDB/PG view quirks, partition extraction) → [`troubleshooting.md`](okf/product/layer/platform/architecture-troubleshooting.md)
+- Short fixes (DuckDB/PG view quirks, partition extraction) → [`troubleshooting.md`](okf/product/layer/platform/admin-guide-troubleshooting.md)
 
 ---
 

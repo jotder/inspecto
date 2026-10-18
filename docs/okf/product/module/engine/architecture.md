@@ -48,4 +48,4 @@ The concept docs are unchanged by the move; only the home module changed:
 Modularization is reactor-internal — the single `inspecto.jar` is unchanged (shade has no
 include-list, so the sibling modules' classes and resources bundle automatically).
 
-Build/run: see [build & test](../../layer/platform/admin-guide-build-test.md).
+Build/run: see [build & test](../../layer/platform/spec-build-test.md).

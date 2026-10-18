@@ -28,7 +28,7 @@ OKF concepts linked below; this page only strings them together.
 3. **Parsing preview.** While authoring, `POST /api/v1/config/preview/parsing` and
    `POST /api/v1/config/preview/schema` show what the grammar makes of a sample;
    `POST /api/v1/config/suggest/schema` proposes a schema. Saves go through `POST /api/v1/config/write`
-   (see the [safe config change journey](architecture-journey-safe-config-change.md)).
+   (see the [safe config change journey](user-guide-journey-safe-config-change.md)).
 4. **Stage-1 ingest.** `ConsignmentPlanner` groups inbox files into a Consignment; `ConsignmentIngestor`
    parses, transforms and partitions it and checks Expectations; rejected rows go to quarantine.
 5. **Lakehouse commit.** `ConsignmentIngestor` commits in crash-safe order: DuckLake register, manifest,

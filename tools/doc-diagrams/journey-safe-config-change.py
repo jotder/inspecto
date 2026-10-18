@@ -1,4 +1,4 @@
-"""Sequence diagram for docs/okf/product/layer/product/architecture-journey-safe-config-change.md (SOLUTION-SUITE-DOCS-1)."""
+"""Sequence diagram for docs/okf/product/layer/product/user-guide-journey-safe-config-change.md (SOLUTION-SUITE-DOCS-1)."""
 import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
 
 ACTORS = [('Maker','gray'),('Editor (SPA)','blue'),('Control API','blue'),('SaveGate','purple'),('PendingChanges','purple'),('Checker','gray'),('Config store','teal')]

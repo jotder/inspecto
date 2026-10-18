@@ -9,7 +9,7 @@ timestamp: 2026-10-09T00:00:00Z
 
 # Module reorganisation - traps and gotchas
 
-Context: [architecture-module-taxonomy.md](architecture-module-taxonomy.md), [decisions](plan-module-reorganisation-decisions.md). Each line is cause, then rule.
+Context: [architecture-module-taxonomy.md](architecture-module-taxonomy.md), [decisions](spec-module-reorg-decisions.md). Each line is cause, then rule.
 
 ## Moving code
 - **Regroup recipe: two commits.** Pure moves first (`git mv` only, so history follows), then the path rewrites in a second commit; mixing them hides the renames from git.

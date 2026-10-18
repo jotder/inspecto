@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-module-architecture — REPORT-ONLY baseline of the module-architecture reorg (docs/okf/product/layer/platform/architecture-module-taxonomy.md; decisions: docs/okf/product/layer/platform/plan-module-reorganisation-decisions.md).
+// check-module-architecture — REPORT-ONLY baseline of the module-architecture reorg (docs/okf/product/layer/platform/architecture-module-taxonomy.md; decisions: docs/okf/product/layer/platform/spec-module-reorg-decisions.md).
 //
 //   node tools/check-module-architecture.mjs [--root .] [--json] [--check]
 //

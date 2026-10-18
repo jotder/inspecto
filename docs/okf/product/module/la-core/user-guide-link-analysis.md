@@ -41,7 +41,7 @@ timestamp: 2026-07-07T00:00:00Z
 > **four are stubs** that report once on the console (`console.info`, never an error) and set `available: false` so the library hides the
 > affordance: `LA_WIDGETS` ("Pin to a Widget"), `LA_CATALOG` (the reuse-graph source), `LA_PIPELINE_GRAPH` (the provenance source) and
 > `LA_DASHBOARD_HEADER` (an empty header; la-app has no dashboards). Entity Lists get their own page there, which provides the empty
-> `InvestigationSessionStore` the section reads. A `/settings` page hosts the Settings > Link Analysis component; its rail link appears only with `canAuthorWorkbench`. The la-showcase demo's `admin` persona holds that capability through the template role `la-settings`. The bundle choice (`package.ps1 -Ui`) is in `okf/product/layer/platform/admin-guide-build-test.md`.
+> `InvestigationSessionStore` the section reads. A `/settings` page hosts the Settings > Link Analysis component; its rail link appears only with `canAuthorWorkbench`. The la-showcase demo's `admin` persona holds that capability through the template role `la-settings`. The bundle choice (`package.ps1 -Ui`) is in `okf/product/layer/platform/spec-build-test.md`.
 
 The Builder-lens studio at `/studio/link-analysis` for graph investigation. Keep the four graph planes
 distinct ([`GLOSSARY.md`](../../../../GLOSSARY.md) §11): this studio works on **P3 — Entity/Link graphs**

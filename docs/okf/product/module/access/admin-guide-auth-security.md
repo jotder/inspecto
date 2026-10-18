@@ -131,7 +131,7 @@ server-side authorization system, all behind the existing SPIs (core stays auth-
 The `edition-advanced` Maven profile = `edition-standard` + the new **`inspecto-policy`** module
 (artifactId `inspecto-policy`), which registers a `PolicyEngine` on the core's **`AccessDecider`** SPI
 via `META-INF/services`. Basic/Standard never bundle it and behave byte-identically. Build/test with
-`mvn -o -Pedition-advanced clean test` ([build & test](../../layer/platform/admin-guide-build-test.md)).
+`mvn -o -Pedition-advanced clean test` ([build & test](../../layer/platform/spec-build-test.md)).
 
 - **Attribute model (A1).** `Subject` gained an additive `attributes()` map (empty on every pre-A1 caller).
   `roles.toon` carries an optional `identity: {attributeClaims: […]}` **allowlist**; `OidcAuthenticator`

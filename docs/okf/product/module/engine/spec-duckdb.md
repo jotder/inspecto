@@ -10,7 +10,7 @@ timestamp: 2026-06-28T00:00:00Z
 # DuckDB Integration
 
 The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNAMED` JVM flag — see
-[build & run](../../layer/platform/admin-guide-build-test.md)).
+[build & run](../../layer/platform/spec-build-test.md)).
 
 * **Appender, not JDBC batch.** `DuckDbRecordSink` and `TypedRecordIngester` bulk-load via the DuckDB
   `DuckDBAppender` API (heap buffer `APPEND_BATCH = 10,000` rows). Benchmarked on 1M rows: JDBC
@@ -159,7 +159,7 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
     - **Still an operator call** — the measurement removes the blocker (BACKLOG §6); it does not ship a
       default.
 * **Reserved-word quoting.** `day` is a DuckDB keyword — alias it (`run_day`) in SQL; quote `"trigger"` too.
-  Watch this whenever generating SQL with date/trigger columns. See [gotchas](../../layer/platform/architecture-gotchas.md).
+  Watch this whenever generating SQL with date/trigger columns. See [gotchas](../../layer/platform/admin-guide-gotchas.md).
 * ⚠ **The session `TimeZone` is the HOST zone, not UTC** — probed 2026-08-15 against the bundled
   `org.duckdb:duckdb_jdbc:1.5.2.1` on a plain `jdbc:duckdb:` connection:
   `current_setting('TimeZone')` returned the host zone (`Asia/Calcutta` on this box) and

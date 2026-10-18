@@ -45,4 +45,4 @@ See [Modules](../../index.md) for each one.
   Maven profiles + `ServiceLoader` + `-D` flags. Standard's OIDC auth now exists as the profile-gated
   `inspecto-oidc` module — the core itself still carries zero auth code. See
   [Editions](architecture-editions-model.md) and [auth & security](../../module/access/admin-guide-auth-security.md).
-* **Mainline** `master` — today the **only** line. `4.x` was deleted 2026-08-17 with its `v4.0.0`/`v4.0.0-RC1` tags, and nothing is in production after `3.x` (newest tag `v3.12.0`); the next `N.x` is cut from `master` at release. See [branch & release policy](admin-guide-branching-release.md) and `docs/BRANCHING.md` §0-A.
+* **Mainline** `master` — today the **only** line. `4.x` was deleted 2026-08-17 with its `v4.0.0`/`v4.0.0-RC1` tags, and nothing is in production after `3.x` (newest tag `v3.12.0`); the next `N.x` is cut from `master` at release. See [branch & release policy](spec-branching-release.md) and `docs/BRANCHING.md` §0-A.

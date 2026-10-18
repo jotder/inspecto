@@ -932,7 +932,7 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
   `--apply`. On a fresh spaces root the sign-in picker is empty until a Space with `demo-users.toon` exists - that is why step 2 scaffolds first.
   A Space created later from the gallery (`POST /spaces {"id":"la-showcase","template":"la-showcase"}`) is equivalent.
   **Since 2026-10-12 the `-DemoAuth -Ui la-app` bundle ships `la-showcase` already seeded** (bundles ship no Spaces *except* this flavor): unzip,
-  `serve-demo`, sign in - see [`build-test.md`](../../layer/platform/admin-guide-build-test.md) (step 6f) and the variants runbook.
+  `serve-demo`, sign in - see [`build-test.md`](../../layer/platform/spec-build-test.md) (step 6f) and the variants runbook.
 - **Variants.** `inspecto-personal` (launch config; a Personal bundle from `package.ps1` with no flags, port 8098): `GET /inv/investigations` answers 503
   `CAPABILITY_UNAVAILABLE`. **Postgres store (no Docker automation):** start the Enterprise/Preview server with
   `-Dinvestigations.backend=db -Dinvestigations.db.url=jdbc:postgresql://<host>:5432/<db>` (password through the `SecretResolver`; the `la-store-pg` jar is
@@ -1214,7 +1214,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 | Per-Space file topology, `OperationalDb`, PG-1, the CWD traps | `docs/okf/product/module/engine/spec-db-layer.md` (`Reference`) §4–§5 | `inspecto-engine` | §3.8 |
 | The Space-root jail: `PathJail`, declared ∪ discovered roots | `docs/okf/product/module/config/spec-config-safety.md` (`Concept`) | `platform/inspecto-config/` | §3.8, §6.6 |
 | The Spaces layout and the migrator CLI | `docs/okf/product/module/config/admin-guide-configuration-reference.md` (`Reference`) §Spaces | — | §3.2 |
-| The two Space gotchas — MDC across workers; paths resolve against the CWD | `docs/okf/product/layer/platform/architecture-gotchas.md` (`Reference`) | — | §3.3, §3.8 |
+| The two Space gotchas — MDC across workers; paths resolve against the CWD | `docs/okf/product/layer/platform/admin-guide-gotchas.md` (`Reference`) | — | §3.3, §3.8 |
 | The seeded isolation policies | `docs/okf/product/module/access/plan-security.md` §3.10 · `docs/okf/product/module/access/admin-guide-auth-security.md` | `providers/inspecto-policy/` | §3.9 |
 | The Spaces admin view and the template gallery | `docs/okf/product/layer/product/user-guide-spaces.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/spaces` | §3.10 |
 | `SpacesService`, the `spaceInterceptor`, `SERVER_GLOBAL` | `docs/okf/product/layer/product/spec-multi-space.md` (`Convention`) | `inspecto-ui/src/app/inspecto/api/space.interceptor.ts` | §3.10 |

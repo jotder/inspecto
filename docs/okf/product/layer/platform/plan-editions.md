@@ -17,7 +17,7 @@ supersedes-rows: REQUIREMENTS §3.16 PKG-1 through PKG-4, and EDITIONS OPS-07 (t
 >
 > ⛔ **This area has two upstream concept homes, not one.** [`okf/backend/editions/`](../../index.md)
 > owns the assembly model and the authentication story;
-> [`build-test.md`](admin-guide-build-test.md) owns bundling and reactor sizes. Neither is
+> [`build-test.md`](spec-build-test.md) owns bundling and reactor sizes. Neither is
 > retired by this spec — both stay as the concept tier, and both are corrected below.
 >
 > ⚠ **This spec absorbs a plan that is now archived.** `deployment-topology-plan.md` was the only plan in
@@ -922,7 +922,7 @@ this area has three sites whose line citations drifted (§3.2).
 | The examples suite | `inspecto/examples/` — 30 examples, tracked and staged | ⚠ One runs in any pipeline |
 | The assembly concept | [`editions-model.md`](architecture-editions-model.md) | ⚠ Says "five" then lists seven; the shade claim is corrected in this commit |
 | The authentication story | [`auth-security.md`](../../module/access/admin-guide-auth-security.md) | — |
-| Bundling and reactor sizes | [`build-test.md`](admin-guide-build-test.md) | ⚠ Its jar *table* omits what its own prose gets right |
+| Bundling and reactor sizes | [`build-test.md`](spec-build-test.md) | ⚠ Its jar *table* omits what its own prose gets right |
 | The feature board | `docs/EDITIONS.md` | See §2 |
 | The deployment design | this spec §3.9–§3.13 (narrative) and **§3.14 (the six tables verbatim)** | current |
 | The build plan's provenance | `docs/archived-documents/plans-archive/deployment-topology-plan.md` | ⛔ **ARCHIVED 2026-09-09**; Phases 0–5 remain unbuilt and are tracked on §3 P2 + `SPEC-DEPLOY-ROWS-1` |

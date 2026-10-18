@@ -128,7 +128,7 @@ Whole-Space zip (`inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java
 ## 9. Limits and gotchas
 
 - **The MDC does not cross thread pools.** Every executor on the execution path must copy it, or work lands
-  in the `default` Space (see [cross-cutting gotchas](../../layer/platform/architecture-gotchas.md)).
+  in the `default` Space (see [cross-cutting gotchas](../../layer/platform/admin-guide-gotchas.md)).
 - **`SpaceMigrator` is a CLI, not a boot step**, and a discover-mode server has no flat fallback.
 - **`DELETE` has two 409s:** any CRUD verb on a single-tenant server, and `?purge=true` on the last Space
   directory on disk.

@@ -29,12 +29,12 @@ timestamp: 2026-07-16T00:00:00Z
 >   that tell you to turn it on to make an abort visible cannot work.
 > - ⚠ **`java -jar` and `mvn clean package`** are both wrong for this repo: the launcher uses `-cp`
 >   (RUNSH-CP-1) and packaging is `-pl inspecto,:inspecto-connectors -am -DskipTests -q`. See
->   [build & test](admin-guide-build-test.md).
+>   [build & test](spec-build-test.md).
 > - ⚠ The **`Issue Tracker`** section heading (§ below) predates the shipped Issue → **Incident** rename;
 >   the same file already says Incident elsewhere.
 >
 > For the curated flag table read [Operations](admin-guide-launch-flags.md); for build, reactor and `package.ps1` read
-> [Build & Test](admin-guide-build-test.md). Fix a cross-cutting fact **there**, not here. *(Moved from the retired root-level `admin-guide-launch-flags.md` (docs consolidation, 2026-07-16).)*
+> [Build & Test](spec-build-test.md). Fix a cross-cutting fact **there**, not here. *(Moved from the retired root-level `admin-guide-launch-flags.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../../inspecto/README.md) documentation. See the [docs index](../../../../INDEX.md).
 

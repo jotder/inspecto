@@ -17,7 +17,7 @@ timestamp: 2026-07-16T00:00:00Z
   triggered a new ingest of the **same** pipeline inline would block forever on the claim its own thread holds
   — hence event-triggered work is handed to an off-bus virtual-thread pool (see [jobs](../processor/spec-jobs.md)). Before
   2026-08-01 this was the global `ingestLock`; being re-entrant, it would have double-ingested rather than
-  hung (see [cross-cutting gotchas](../../layer/platform/architecture-gotchas.md)). `emit()` uses no SLF4J (avoids re-entrant capture) and
+  hung (see [cross-cutting gotchas](../../layer/platform/admin-guide-gotchas.md)). `emit()` uses no SLF4J (avoids re-entrant capture) and
   swallows subscriber errors. A startup store-swap (`InMemoryEventStore` → configured backend) drains the old
   store oldest-first so nothing is lost.
 * **`MetricRegistry`** (`platform/inspecto-event/src/main/java/com/gamma/metrics/MetricRegistry.java`) — counters/gauges/

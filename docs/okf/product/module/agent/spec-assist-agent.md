@@ -13,7 +13,7 @@ The assist surface is an SPI in the core, implemented by the optional [agent mod
 
 > 🔴 **No bundle ships that implementor.** `inspecto-agent` is a plain reactor module that
 > `package.ps1` never copies, so `/assist/*` answers **503 in every artifact** — the intended default
-> (`EDITIONS.md` `CP-14`, [`build-test.md`](../../layer/platform/admin-guide-build-test.md), `BACKLOG.md` `PKG-5`). Using the
+> (`EDITIONS.md` `CP-14`, [`build-test.md`](../../layer/platform/spec-build-test.md), `BACKLOG.md` `PKG-5`). Using the
 > Assistant means building and placing the jar by hand. Requirement-of-record:
 > [Assistant capability spec](plan-assistant.md) §3.10.
 

@@ -2,7 +2,7 @@
 
 > Audience: product owner and market/sales · Status date: **2026-10-07**, Inspecto column refreshed **2026-10-17** · Companion to
 > [`brochure-competitive-landscape.md`](brochure-competitive-landscape.md) (the living two-sided landscape) and to the offering map
-> in [`../platform/plan-module-reorganisation-decisions.md`](../platform/plan-module-reorganisation-decisions.md) (offering map)
+> in [`../platform/spec-module-reorg-decisions.md`](../platform/spec-module-reorg-decisions.md) (offering map)
 > (where every Inspecto gap below is filed as a module or pack).
 >
 > **What this is.** A capability-by-capability comparison of Inspecto against six telecom / fintech assurance

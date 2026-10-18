@@ -491,8 +491,8 @@ name claims every edition is signed when **two of three** are, with no artifact 
 | The local layer | `.githooks/pre-push` |
 | Packaging | `inspecto/package.ps1` |
 | Developer scripts | `tools/scaffold.mjs`, `tools/run-backend.ps1`, `tools/seed-uat.ps1`, `tools/rename-batch-to-consignment.mjs`, `tools/templates/` |
-| Build and test practice | [`build-test.md`](admin-guide-build-test.md); [`testing-and-build.md`](../product/tests-testing-build.md); [`design-system-tokens.md`](../product/spec-design-tokens.md) |
-| Branch and release policy | `docs/BRANCHING.md`; [`branching-release.md`](admin-guide-branching-release.md) |
+| Build and test practice | [`build-test.md`](spec-build-test.md); [`testing-and-build.md`](../product/tests-testing-build.md); [`design-system-tokens.md`](../product/spec-design-tokens.md) |
+| Branch and release policy | `docs/BRANCHING.md`; [`branching-release.md`](spec-branching-release.md) |
 | The docs lifecycle | `CLAUDE.md` §Documentation lifecycle; `docs/INDEX.md` |
 | The shared setup | `.claude/` — four entry documents, three agents, five hooks, nine skills, settings, launch configuration |
 | The guard roster in prose | `docs/PROJECT_NOTES.md` — the only prior inventory, and never a table |

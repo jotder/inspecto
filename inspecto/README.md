@@ -450,7 +450,7 @@ input→output **lineage matrix** — all also queryable via the Control API (`/
 `/batches`, `/lineage`). Per-run logs land in `logs/<source>/` when `dirs.log_dir` is set.
 
 **When something fails:** check the quarantine directory and reason, the status CSV, and
-[Troubleshooting](../docs/okf/product/layer/platform/architecture-troubleshooting.md) for common failures and fixes. The `explain-entity`
+[Troubleshooting](../docs/okf/product/layer/platform/admin-guide-troubleshooting.md) for common failures and fixes. The `explain-entity`
 and `diagnose-and-alert` skills can synthesize a root-cause from the same audit data if the agent
 is enabled.
 
@@ -486,7 +486,7 @@ This README is the overview + user guide. Detailed topics live under [`../docs/`
 | [Operations](../docs/okf/product/layer/platform/admin-guide-operations-reference.md) | Pre-ETL utilities, batch processing & concurrency, multi-source orchestration, output structure, audit logs, deployment |
 | [Operator Console (Inspector)](../docs/USER_GUIDE.md) | The web UI: connecting with tokens, every screen, common operator tasks, dev vs. prod serving, troubleshooting |
 | [Integrations](../docs/okf/product/layer/platform/api-integrations-ducklake.md) | DuckLake registration and the pg_duckdb warehouse query layer |
-| [Troubleshooting](../docs/okf/product/layer/platform/architecture-troubleshooting.md) | Common failures and fixes |
+| [Troubleshooting](../docs/okf/product/layer/platform/admin-guide-troubleshooting.md) | Common failures and fixes |
 | [Assistant](../docs/okf/product/module/agent/plan-assistant.md) | The assist-agent design: skills, model tiering, oracles, security guardrails |
 
 Engineering notes (not user-facing): [design decisions & ADRs](../docs/PROJECT_NOTES.md) ·

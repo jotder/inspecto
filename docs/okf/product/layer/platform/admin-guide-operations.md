@@ -38,7 +38,7 @@
 - **Recover** — every batch is idempotent and crash-isolated: reprocess a batch, resume a paused
   pipeline, or replay from quarantine; markers make re-ingest safe.
   Playbooks: [`../../../../ADVANCED_GUIDE.md`](../../../../ADVANCED_GUIDE.md) §troubleshooting ·
-  [`architecture-troubleshooting.md`](architecture-troubleshooting.md) (DuckDB/pg_duckdb quirks).
+  [`admin-guide-troubleshooting.md`](admin-guide-troubleshooting.md) (DuckDB/pg_duckdb quirks).
 - **Config changes** — validated drafts only (`POST /api/v1/validate` → `/api/v1/config/write` under the fail-closed
   write root); the safety validator blocks dangerous specs (`422`).
 - **Backup / move** — whole-Space zip export/import (dry-run preview), or artifact-level **Metadata

@@ -1300,7 +1300,7 @@ vocabulary, secret, doc-link, gate-tally, dependency-review and coverage guards 
 
 ---
 
-## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; concepts `okf/product/layer/platform/architecture-module-taxonomy.md`, `okf/product/layer/platform/plan-module-reorganisation-decisions.md`)*
+## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; concepts `okf/product/layer/platform/architecture-module-taxonomy.md`, `okf/product/layer/platform/spec-module-reorg-decisions.md`)*
 
 **Platform module** — A horizontal Maven module that the rest of the system builds on (for example
 `inspecto-engine`): its **Build role** is *Platform module*. ⛔ Not **Platform Service** (§6-A — the grantable

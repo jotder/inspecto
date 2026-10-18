@@ -26,7 +26,7 @@ startsWith endsWith in between isNull isNotNull matches`. **Extensions (Decision
 cell, never together with `value`); `ignoreCase: true` on `= != in contains startsWith endsWith matches`;
 `matches` (regular expression, partial match, pattern ≤ 256 chars, no lookaround / back-references /
 possessive quantifiers). `ConditionTree.validate` (called by `requireGroupRoot`) refuses misuse and bad
-patterns; full detail in [module-reorganisation-decisions](../../layer/platform/plan-module-reorganisation-decisions.md) (Decision Kernel).
+patterns; full detail in [module-reorganisation-decisions](../../layer/platform/spec-module-reorg-decisions.md) (Decision Kernel).
 
 **Strict mode (opt-in, 2026-10-09):** `ConditionTree.matchedStrict` / `filterStrict` / `validateStrict` and
 `ConditionSql.predicateStrict` are the fail-closed twins of the lenient API, which stays byte-identical
@@ -37,7 +37,7 @@ operator (`< <= > >= between`) whose operand is neither a number nor an ISO date
 identical for present data, except that a leaf whose field is ABSENT from the row is FALSE (even `isNull`).
 `ConditionsTreeEquivalenceTest` classifies how far the tree can stand in for the `Conditions` text notation
 (golden table beside it); the verdict and the remaining blockers are in
-[module-reorganisation-decisions](../../layer/platform/plan-module-reorganisation-decisions.md) (Declined, Decision Kernel step 7).
+[module-reorganisation-decisions](../../layer/platform/spec-module-reorg-decisions.md) (Declined, Decision Kernel step 7).
 
 `com.gamma.query.ConditionTree` (`platform/inspecto-engine/src/main/java/com/gamma/query/ConditionTree.java`) is a
 **pure, dependency-free port of the browser evaluator** (`inspecto-ui/.../query/query-eval.ts`) plus
@@ -107,7 +107,7 @@ consequence: `executed`, `skipped` (nothing to do, or an action nobody ever decl
 action, declared in a module manifest's `provides.consequences`, whose module or required service is not
 installed; the detail names the module). An absent module is never reported `executed`. Saving a rule still
 preserves unknown/absent actions. `GET /decision-rules/consequences` lists every action with `available`,
-`reason` and `module`; the SPA editor reads it. Background: [module-reorganisation-decisions](../../layer/platform/plan-module-reorganisation-decisions.md).
+`reason` and `module`; the SPA editor reads it. Background: [module-reorganisation-decisions](../../layer/platform/spec-module-reorg-decisions.md).
 
 The **record-routing** consequences (`route`/`tag`/`quarantine`/`drop`) are applied by the engine
 itself, per batch, via `com.gamma.query.DecisionRuleApplier` — invoked from

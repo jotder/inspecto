@@ -577,7 +577,7 @@ what it promises is absence.
 | The tool belt | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`, `ArgumentDeriver.java`, `GlossaryLoader.java` | same |
 | Gated actions | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/action/ComponentActions.java`, `OperationalActions.java` | same §P3 |
 | Signal projections | `platform/inspecto-engine/src/main/java/com/gamma/signal/AgUiProjection.java`, `Signals.java` | [`signal-backbone.md`](../event/spec-signal-backbone.md) §S3–S7 |
-| Packaging truth | `pom.xml` (`eoiagent.version`, `maven.compiler.release`), `package.ps1`, `.github/workflows/ci.yml` | [`build-test.md`](../../layer/platform/admin-guide-build-test.md) §bundling; `EDITIONS.md` `CP-14` |
+| Packaging truth | `pom.xml` (`eoiagent.version`, `maven.compiler.release`), `package.ps1`, `.github/workflows/ci.yml` | [`build-test.md`](../../layer/platform/spec-build-test.md) §bundling; `EDITIONS.md` `CP-14` |
 | Client surfaces | `inspecto-ui/src/app/modules/admin/assist/`, `agent-chat/`, `approvals/`, `autonomy/`, `model-settings/`; `inspecto-ui/src/app/inspecto/ai-assist/`, `inspecto-ui/src/app/inspecto/a2ui/` | [`assist.md`](../intelligence/user-guide-assist.md), [`model-settings.md`](user-guide-model-settings.md), [`inline-ai-authoring.md`](../intelligence/user-guide-inline-ai-authoring.md) |
 | The upstream (black box) | groupId `com.eoiagent`, repo `jotder/inspect-agent` | [`okf/agentic/`](../../index.md) — ⚠ stale, see §2 |
 

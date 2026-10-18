@@ -2,7 +2,7 @@
 type: Architecture
 title: Module taxonomy — axes, offerings, gates (target model)
 description: How modules are classified for itemized distribution — three axes, Offerings, the Installed/Enabled/Permitted gates, removal semantics, packaging (thin jars, build id, SBOM, signing), OpenAPI fragments, test kit and TCKs. Built by MODULE-REORG-1 (shipped 2026-10-09).
-resource: docs/okf/product/layer/platform/plan-module-reorganisation-decisions.md
+resource: docs/okf/product/layer/platform/spec-module-reorg-decisions.md
 tags: [architecture, modules, offering, editions, itemization]
 timestamp: 2026-10-09T00:00:00Z
 ---
@@ -14,7 +14,7 @@ timestamp: 2026-10-09T00:00:00Z
 > (`com.gamma.module` in `inspecto-util`) and `GET /modules`; the per-Space **Enabled** gate (`modules.toon`, `GET|PUT /settings/modules` — a route of a
 > disabled module answers 404 `MODULE_DISABLED`, `/bootstrap` `features{}` and `GET /modules` `enabledInSpace` follow it).
 > Directory regroup DONE 2026-10-07 (layout below). Offerings exist as a checked artifact (see below). The decision record (D-MR1…D-MR12, declined items, deliberate exceptions) is
-> [plan-module-reorganisation-decisions.md](plan-module-reorganisation-decisions.md); the traps are [architecture-module-reorg-gotchas.md](architecture-module-reorg-gotchas.md). The plan that carried the work is archived (`docs/archived-documents/plans-archive/module-architecture-reorg-plan.md`, provenance only).
+> [spec-module-reorg-decisions.md](spec-module-reorg-decisions.md); the traps are [spec-module-reorg-gotchas.md](spec-module-reorg-gotchas.md). The plan that carried the work is archived (`docs/archived-documents/plans-archive/module-architecture-reorg-plan.md`, provenance only).
 
 ## Manifest format (`META-INF/inspecto/module.toon`)
 ```
@@ -154,8 +154,8 @@ A module's HTTP paths live in `<module>/src/main/resources/META-INF/inspecto/ope
 The platform test kit is the test-jar of `inspecto-http-spi` (`com.gamma.control.testkit`): `FakeApiContext` (the in-repo `ApiContext` double, honours `withCapability` when given a Subject) and the abstract `RouteModuleContract` TCK (registers a route, no duplicate (method, pattern), every mutating route behind `withCapability` or exempt with a reason, `featureIds()` within the module's own manifest, registration is repeatable) plus `ModuleRoutesParity`. Other SPI TCKs live in the SPI's own test-jar: connector factories (`inspecto-acquire`), `Authenticator`/`TokenRelay` (`inspecto-auth-spi`), notification channels, Job Types, maintenance tasks, describers and parser plugins (`inspecto-engine`), each proven able to fail by a self-test against a deliberately broken implementer. A module with a route that needs the host at `register()` moves that work into a `HostBootHook`. What the TCKs cannot drive (connector `create`/workbench/egress, running a Job, `requires:` id existence, positive auth paths) is listed in the gotchas page.
 
 ## Where the rest of the model lives
-Decision Kernel (Condition Language, Consequence registry, adoption by rule kind): [decisions](plan-module-reorganisation-decisions.md#decision-kernel-d-mr12) and [decision-rules](../../module/processor/spec-decision-rules.md). Operational store families as a contribution point (`OperationalDb.Family`, `StoreFamilyProvider`; `tools/check-family-count.mjs`): `OperationalDb`. Incidents / Case Management / Action Requests / Workflow & SLA split: [incidents](../../addon/incidents/plan-incidents.md).
+Decision Kernel (Condition Language, Consequence registry, adoption by rule kind): [decisions](spec-module-reorg-decisions.md#decision-kernel-d-mr12) and [decision-rules](../../module/processor/spec-decision-rules.md). Operational store families as a contribution point (`OperationalDb.Family`, `StoreFamilyProvider`; `tools/check-family-count.mjs`): `OperationalDb`. Incidents / Case Management / Action Requests / Workflow & SLA split: [incidents](../../addon/incidents/plan-incidents.md).
 
 ## Related
-[Module reorganisation: decisions](plan-module-reorganisation-decisions.md) · [gotchas](architecture-module-reorg-gotchas.md) · 
+[Module reorganisation: decisions](spec-module-reorg-decisions.md) · [gotchas](spec-module-reorg-gotchas.md) · 
 [Architecture layers](architecture-layers.md) · [Editions model](architecture-editions-model.md)

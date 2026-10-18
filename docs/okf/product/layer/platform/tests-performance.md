@@ -315,7 +315,7 @@ default 256 MB):
 (`PluginIngestBenchmark`): the old JDBC `PreparedStatement.executeBatch` path ran ~6.9K rows/s; the
 Appender path runs **~520–530K rows/s — ~75× faster**, at parity with the native CSV `duckdb` engine.
 This is what makes union-mode many-small-files throughput acceptable and shrinks the single-threaded
-ingest trough that otherwise starves many-core hosts (see [troubleshooting → CPU](architecture-troubleshooting.md)).
+ingest trough that otherwise starves many-core hosts (see [troubleshooting → CPU](admin-guide-troubleshooting.md)).
 
 Mode comparison (`PluginIngestBenchmark`, 500K rows, PARQUET, 30 day-partitions): union ≈ 233K rows/s /
 30 consolidated files / 23 MB peak; generation (4 gens) ≈ 202K rows/s / 120 files / 15 MB peak — i.e.
