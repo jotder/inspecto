@@ -1318,6 +1318,14 @@ features, packs (Space Templates, Pipelines, Dashboards, Alert / Decision Rule s
 settings. An **Edition** (§14 `PKG`) is an Offering that lists other Offerings; the bundle, the EDITIONS matrix
 and the SBOM are generated from Offerings. ⛔ Not *plan*, *SKU*, *package* or *product tier*.
 
+**Product Map** *(added 2026-10-18, `PRODUCT-MAP-1`, plan [`superpower/product-map-plan.md`](superpower/product-map-plan.md); design only, nothing built)* — The commercial tree of everything Inspecto offers, laid out like a mind map (Layer → Module → **Functionality**, plus Add-ons, Solution packs and Editions), used for pricing, support and customer-specific builds. It refers to module manifests and Offerings by id and never restates their technical facts. ⛔ Not the **Catalog** (§3, the library of Schemas and Datasets) and not an **Offering** (what one bundle contains).
+
+**Product Map Item** — One node of the Product Map, carrying a `billable` flag and, when billable, an **Order Code** and an `enforcement` (`build` · `enabled-gate` · `contract`) saying how a sale is honoured. ⛔ Not *Catalog Item*, *SKU* or *billable unit*.
+
+**Functionality** — A Product Map Item that a customer recognises inside a module (for example "Maker-checker approvals"); it can be priced but usually cannot be left out of a build. ⛔ Not a **Capability** (an RBAC permission, §1-A) and not a feature id (`provides.features`).
+
+**Order Code** — The stable code that identifies a billable Product Map Item on a quote, invoice or bill of materials. ⛔ Not *SKU*.
+
 **Add-on** — A horizontal, domain-neutral Optional module set sold to any customer (Incidents, Case Management,
 Reconciliation, Scoring & Lists, Action Requests, Regulatory Reporting, Workflow & SLA, Link Analysis & Investigations, AI Assist &
 Intelligence, Integration & Delivery, Premium Connectors, Multi-entity / Group). **Tiers** (Basic ·
