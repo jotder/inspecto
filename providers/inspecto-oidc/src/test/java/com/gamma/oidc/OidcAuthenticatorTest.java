@@ -207,6 +207,7 @@ class OidcAuthenticatorTest {
                 Roles.CAN_OFFER_SIGNALS,   // cross-Space consequence D7, 2026-09-28
                 Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6, 2026-10-01
                 Roles.CAN_BUILD_LINK_INDEX,   // LA separation D-3 step 4, 2026-10-02
+                Roles.CAN_UPLOAD_DATA,   // analyst upload, D-UP3
                 Roles.CAN_SHARE_INVESTIGATION),   // LA-EMBED-VIEW-1, 2026-10-12
                 admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
@@ -226,7 +227,8 @@ class OidcAuthenticatorTest {
         // The assertion still pins the CASE role as granting nothing of its own.
         assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS,
                         Roles.CAN_WORK_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6
-                        Roles.CAN_BUILD_LINK_INDEX),   // LA separation D-3 step 4
+                        Roles.CAN_BUILD_LINK_INDEX,   // LA separation D-3 step 4
+                        Roles.CAN_UPLOAD_DATA),   // analyst upload, D-UP3
                 ana.capabilities(), "case role grants no capability");
 
         String plain = token(Instant.now().plusSeconds(60), List.of("operations"), RSA_KEY, ISSUER, AUDIENCE, "ops");
@@ -315,6 +317,7 @@ class OidcAuthenticatorTest {
                         Roles.CAN_OFFER_SIGNALS,     // cross-Space consequence D7, 2026-09-28
                         Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6, 2026-10-01
                         Roles.CAN_BUILD_LINK_INDEX,   // LA separation D-3 step 4, 2026-10-02
+                        Roles.CAN_UPLOAD_DATA,   // analyst upload, D-UP3
                         Roles.CAN_SHARE_INVESTIGATION),   // LA-EMBED-VIEW-1, 2026-10-12
                 subject.get().capabilities());
     }
@@ -525,7 +528,8 @@ class OidcAuthenticatorTest {
         assertEquals("olly", olly.id());
         assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS,
                         Roles.CAN_WORK_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6
-                        Roles.CAN_BUILD_LINK_INDEX),   // LA separation D-3 step 4
+                        Roles.CAN_BUILD_LINK_INDEX,   // LA separation D-3 step 4
+                        Roles.CAN_UPLOAD_DATA),   // analyst upload, D-UP3
                 olly.capabilities());
     }
 
