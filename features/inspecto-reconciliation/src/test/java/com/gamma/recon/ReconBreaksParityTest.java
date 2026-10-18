@@ -295,4 +295,74 @@ class ReconBreaksParityTest {
                 "the anchor-only key reads as A's DATE, not a timestamp: " + actual);
         assertFalse(actual.stream().anyMatch(b -> b.contains("missing_right|2026-01-02 00:00")), actual.toString());
     }
+
+    // ── RECON-UPLIFT-RESIDUALS-1 (6): the reviewer's parity gaps — each must agree with the live per-type scans ──
+
+    /** Live parity, plus the Breaks it must contain. */
+    private static List<String> parity(ReconService.Spec spec) throws Exception {
+        List<String> actual = render(ReconBreaks.compute(spec, CAP));
+        assertEquals(render(legacy(spec, CAP)), actual, "shared-grain Breaks differ from the per-type scans");
+        return actual;
+    }
+
+    @Test
+    void aColumnMapRenameReadsEachSidesOwnColumn() throws Exception {
+        ReconService.Side b = new ReconService.Side("b",
+                "SELECT * FROM (VALUES (1,1.0),(2,3.0),(4,1.0)) AS t(ident, amt)", Map.of("id", "ident", "amount", "amt"), null);
+        List<String> out = parity(spec(List.of(side("a", "(1,1.0),(2,2.0),(3,1.0)", "id, amount"), b),
+                List.of("id"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)), ReconService.Cardinality.MANY_TO_MANY));
+        assertEquals(List.of("AB|missing_right|3|null|null|null|null|null|open", "AB|missing_left|4|null|null|null|null|null|open",
+                "AB|value_break|2|amount|2.0|3.0|1.0|null|open"), out);
+    }
+
+    @Test
+    void anEmptySideMakesEveryKeyMissing() throws Exception {
+        ReconService.Side empty = new ReconService.Side("b",
+                "SELECT * FROM (VALUES (1,1.0)) AS t(id, amount) WHERE false", null, null);
+        List<String> out = parity(spec(List.of(side("a", "(1,1.0),(2,2.0)", "id, amount"), empty),
+                List.of("id"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)), ReconService.Cardinality.ONE_TO_ONE));
+        assertEquals(List.of("AB|missing_right|1|null|null|null|null|null|open", "AB|missing_right|2|null|null|null|null|null|open"), out);
+        List<String> mirrored = parity(spec(List.of(empty, side("a", "(1,1.0)", "id, amount")),
+                List.of("id"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)), ReconService.Cardinality.ONE_TO_ONE));
+        assertEquals(List.of("AB|missing_left|1|null|null|null|null|null|open"), mirrored);
+    }
+
+    @Test
+    void aNullMeasureOnOneSideOfAThreeWay() throws Exception {
+        String cols = "id, amount";
+        List<String> out = parity(spec(List.of(
+                side("a", "(1,1.0),(2,1.0)", cols), side("b", "(1,NULL),(2,1.0)", cols), side("c", "(1,1.0),(2,NULL)", cols)),
+                List.of("id"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)), ReconService.Cardinality.MANY_TO_MANY));
+        assertTrue(out.contains("AB|value_break|1|amount|1.0|null|null|null|open"), out.toString());
+        assertTrue(out.contains("AC|value_break|2|amount|1.0|null|null|null|open"), out.toString());
+        assertEquals(2, out.size(), out.toString());
+    }
+
+    @Test
+    void aNullInOneColumnOfAMultiColumnKey() throws Exception {
+        String cols = "region, product, amount";
+        List<String> out = parity(spec(List.of(
+                side("a", "('EU',NULL,1.0),('EU','x',2.0),(NULL,'y',3.0)", cols),
+                side("b", "('EU',NULL,1.5),('EU','x',2.0),('US','y',3.0)", cols)),
+                List.of("region", "product"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)),
+                ReconService.Cardinality.ONE_TO_ONE));
+        assertTrue(out.stream().anyMatch(b -> b.startsWith("AB|value_break|EU · |amount|1.0|1.5")), out.toString());
+        assertTrue(out.stream().anyMatch(b -> b.startsWith("AB|missing_right| · y|")), out.toString());
+        assertTrue(out.stream().anyMatch(b -> b.startsWith("AB|missing_left|US · y|")), out.toString());
+    }
+
+    /** RECON-UPLIFT-RESIDUALS-1 (5): a grain Break set no longer carries a misleading {@code impact {a:null,b:null}}. */
+    @Test
+    void grainBreakSetsCarryNoImpactBlock() throws Exception {
+        ReconService.Spec spec = spec(List.of(side("a", "(1,1.0,5.0),(2,1.0,6.0)", "id, amount, fee"),
+                        side("b", "(1,2.0,5.0)", "id, amount, fee")),
+                List.of("id"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)), ReconService.Cardinality.MANY_TO_MANY)
+                .withImpact("fee");
+        try (ReconService.Grain grain = ReconService.openGrain(spec)) {
+            for (ReconService.BreakSet set : grain.breakSets(1, CAP).values())
+                for (Map<String, Object> row : set.rows()) assertFalse(row.containsKey("impact"), row.toString());
+        }
+        Map<String, ReconService.BreakSet> live = ReconService.breaks(spec, null, null, 1, CAP, 0);
+        assertTrue(live.get("value_break").rows().get(0).containsKey("impact"), "the /recon/breaks route keeps its impact");
+    }
 }

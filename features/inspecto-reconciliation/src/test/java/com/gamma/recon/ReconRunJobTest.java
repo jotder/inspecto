@@ -60,6 +60,7 @@ class ReconRunJobTest {
 
         assertEquals("SUCCESS", result.status(), result.message());
         assertTrue(result.message().contains("3 break(s)"), result.message());
+        assertFalse(result.message().contains("[A-B"), "a 2-way run names no pairs: " + result.message());
 
         assertEquals("recon.run.completed", ctx.type.get());
         assertEquals(Severity.WARN, ctx.severity.get(), "breaks present ⇒ WARN");
@@ -189,6 +190,7 @@ class ReconRunJobTest {
         CapturingContext ctx = new CapturingContext(Map.of("reconciliation", "three_recon"));
         JobResult r = new ReconRunJob(cfg, dataDir.toString(), () -> null).run(ctx);
         assertTrue(r.message().contains("2 break(s)"), "A-B is clean, A-C has 2: " + r.message());
+        assertTrue(r.message().contains("[A-B 0, A-C 2]"), "the message names each pair's share: " + r.message());
         assertEquals(2L, ((Number) ctx.payload.get().get("breaks")).longValue());
         assertEquals(2L, ((Number) ctx.payload.get().get("missingRight")).longValue());
         assertEquals(2, new com.gamma.recon.ReconStateStore(writeRoot).read("three_recon").breaks().size());

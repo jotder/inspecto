@@ -4,7 +4,7 @@ title: Module reorganisation - decision record (D-MR1..D-MR12)
 description: The decisions, declined items, deliberate exceptions and offering map behind the module reorganisation (MODULE-REORG-1), with the preconditions for revisiting each declined item.
 resource: docs/okf/backend/module-taxonomy.md
 tags: [architecture, modules, decisions, offering, decision-kernel]
-timestamp: 2026-10-09T00:00:00Z
+timestamp: 2026-10-18T00:00:00Z
 ---
 
 # Module reorganisation - decision record
@@ -119,4 +119,4 @@ Breaking changes are free on any surface (nothing after 3.x was in production): 
 - **The jlink hand list is retired** (2026-10-18, taken on the operator's behalf): `package.ps1` links the derived set alone and **fails closed** on a lock mismatch or a missing section, rather than falling back to a hand list; `tools/jlink-runtime-extra.txt` stays as the one hand-kept list, because each entry carries its WHY; every edition must have a lock section (`--check`, CI guards job). Reverse by restoring the union block in `package.ps1` (git history).
 
 ## Open rows (BACKLOG section Module architecture)
-`MODULE-REORG-1` (umbrella) - `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (no work item) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; the Workflow & SLA second source was declined 2026-10-11, see the memo above). `MODULE-REORG-P7-KERNEL` closed 2026-10-09: steps 1, 3–6 and the Escalation Rule edit UI shipped; step 7 and the five unregistered Consequences declined (BACKLOG §6).
+The umbrella row `MODULE-REORG-1` was closed 2026-10-18 (decided under operator delegation): every phase P0..P7 shipped, its model is this record plus [module-taxonomy.md](module-taxonomy.md), and its open work is tracked only in the sub-rows. `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (no work item) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; the Workflow & SLA second source was declined 2026-10-11, see the memo above). `MODULE-REORG-P7-KERNEL` closed 2026-10-09: steps 1, 3–6 and the Escalation Rule edit UI shipped; step 7 and the five unregistered Consequences declined (BACKLOG §6).

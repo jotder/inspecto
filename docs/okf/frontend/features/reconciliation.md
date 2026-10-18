@@ -547,6 +547,7 @@ back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model 
   recorded lifecycle overlaid. It never shows those rows, so the screen still holds one page. The tables' own
   *Export CSV* is switched off (`[exportable]="false"`): it would export only the loaded page. Column sort in the tables
   re-orders the loaded page only; `/recon/breaks` has no server sort.
+* **Shared CSV hardening (2026-10-18).** The formula guard (a string cell starting `=` `+` `-` `@` tab or CR gets a leading `'`) and the UTF-8 BOM live in the SHARED `toCsv` / `downloadCsv` (`data-table/core/csv.ts`), so every export has them; the Grammar CSV opts out of the guard because it is re-imported verbatim. A 3-way `recon.run` message names each pair's share (`[A-B 0, A-C 2]`); the Grouped view reads `Type (n of total)`; `Grain.breakSets` rows carry no `impact` block (RECON-UPLIFT-RESIDUALS-1).
 * **Controls (U3).** Detail page: one filled **Run now** (recompute), and the icon is **Reload** (re-reads the
   recorded statuses, assignees and Incident links without recomputing); the banner's duplicate button is gone. Board:
   the icon is **Reload**; **Record run** carries a tooltip plus an `aria-describedby` hint saying what it persists.
