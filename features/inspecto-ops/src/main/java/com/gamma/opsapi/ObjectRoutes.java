@@ -90,9 +90,9 @@ public final class ObjectRoutes implements RouteModule {
         api.get("/objects/([^/]+)/graph", scoped(api, (e, m) -> objectGraph(api, ApiContext.name(m), e)));
         api.post("/objects/([^/]+)/comments", scoped(api, (e, m) -> addComment(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> maskedNotes(api, e, ApiContext.name(m), toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.COMMENT)))));
-        api.post("/objects/([^/]+)/attachments", scoped(api, (e, m) -> addAttachment(api, ApiContext.name(m), api.body(e))));
+        api.post("/objects/([^/]+)/attachments", scoped(api, (e, m) -> addAttachment(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> maskedNotes(api, e, ApiContext.name(m), toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT)))));
-        api.post("/objects/([^/]+)/rca", scoped(api, (e, m) -> applyRca(api, ApiContext.name(m), api.body(e))));
+        api.post("/objects/([^/]+)/rca", scoped(api, (e, m) -> applyRca(api, e, ApiContext.name(m), api.body(e))));
         // Operator decision 2026-09-25: saving a Case's FINDINGS VALUES is collaboration, like a comment — open
         // to anyone who can see the object (the scope guard still answers 404), recorded in
         // CapabilityManifest.EXEMPTIONS. It writes ONLY attributes.findings + its flat copies and refuses any
@@ -578,13 +578,13 @@ public final class ObjectRoutes implements RouteModule {
      * {@code POST /objects/{id}/attachments} (Phase 4) — attach an evidence reference (metadata only);
      * body {@code {name, uri, contentType?, author?, caption?}}.
      */
-    private Object addAttachment(ApiContext api, String id, Map<String, Object> body) {
+    private Object addAttachment(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         String name = ApiContext.str(body, "name");
         String uri = ApiContext.str(body, "uri");
         if (name == null || uri == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'name' and 'uri'");
         try {
-            return OpsEngine.of(api).attach(id, ApiContext.str(body, "author"), name, ApiContext.str(body, "contentType"),
-                    uri, ApiContext.str(body, "caption")).toMap();
+            return maskedNotes(api, ex, id, List.of(OpsEngine.of(api).attach(id, ApiContext.str(body, "author"), name,
+                    ApiContext.str(body, "contentType"), uri, ApiContext.str(body, "caption")).toMap())).get(0);
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -606,7 +606,7 @@ public final class ObjectRoutes implements RouteModule {
      * {@code POST /objects/{id}/rca} (Phase 4) — seed an RCA skeleton (one comment per section). Body is
      * the template: {@code {template:{name,sections[]}}} or an inline {@code {name?,sections[],actor?}}.
      */
-    private Object applyRca(ApiContext api, String id, Map<String, Object> body) {
+    private Object applyRca(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         RcaTemplate template;
         Object t = body.get("template");
         if (t instanceof String named) {       // a *_rca.toon template referenced by name
@@ -619,12 +619,12 @@ public final class ObjectRoutes implements RouteModule {
             tmpl.putIfAbsent("name", "ad-hoc"); // an inline template needn't name itself
             try {
                 template = RcaTemplate.fromMap(tmpl);
-            } catch (IllegalArgumentException ex) {
-                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, ex.getMessage());
+            } catch (IllegalArgumentException bad) {
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
             }
         }
         try {
-            return toNoteMaps(OpsEngine.of(api).applyRca(id, template, ApiContext.str(body, "actor")));
+            return maskedNotes(api, ex, id, toNoteMaps(OpsEngine.of(api).applyRca(id, template, ApiContext.str(body, "actor"))));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
