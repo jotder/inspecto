@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | current | [Case Management](architecture-overview.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Case Management — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

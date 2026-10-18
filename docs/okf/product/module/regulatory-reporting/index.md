@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Regulatory Reporting — regulator-format reports from Cases, four-eyes, file drop](spec.md) |
 | architecture | current | [Regulatory Reporting](architecture-overview.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Regulatory Reporting — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

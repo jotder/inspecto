@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | missing | |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Geo and link adapters over platform data — feature database](feature-db.md) |
 | user-guide | current | [Geo Map Analysis](user-guide-geo-map.md) |
 | admin-guide | missing | |
 | api | missing | |

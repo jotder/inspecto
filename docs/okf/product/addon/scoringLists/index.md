@@ -19,7 +19,7 @@ tags: [product-item, addon]
 | spec | missing | |
 | architecture | missing | |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Scoring & Lists — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Anomaly Scores — explainable behavioural anomaly scoring per entity](spec-anomaly-scores.md) |
 | architecture | current | [Anomaly Detection](architecture-overview.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Anomaly Detection — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

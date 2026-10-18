@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Screening — Match Scores against Entity Lists and the review of Screening Hits](spec.md) |
 | architecture | current | [Screening](architecture-overview.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Screening — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

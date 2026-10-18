@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | missing | |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Telecom ASN.1 decoder — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

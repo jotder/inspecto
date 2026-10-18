@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Data acquisition — the original requirement](spec-framework-design.md) · [Unpack stage — decompression at the Collector](spec-unpack-stage.md) |
 | architecture | current | [Collectors](architecture-collectors.md) · [Data Acquisition Framework](architecture-framework.md) · [Multi-location ingest — the composition pattern](architecture-multi-location-ingest.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Acquisition and collectors — feature database](feature-db.md) |
 | user-guide | current | [Collector configuration (the one surface)](user-guide-collector-config.md) · [Collectors](user-guide-collectors.md) |
 | admin-guide | missing | |
 | api | missing | |

@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | current | [Observability and backup](architecture-observability-backup.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Observability (metrics endpoint + events feed API) — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

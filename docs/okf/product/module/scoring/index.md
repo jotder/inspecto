@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Risk Scores — weighted-factor scoring per entity](spec-risk-scores.md) |
 | architecture | current | [Decision Kernel (Decision Rules and the Condition Language)](architecture-decision-kernel.md) · [Risk Scores and Entity Lists](architecture-scoring-entity-lists.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Scoring — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

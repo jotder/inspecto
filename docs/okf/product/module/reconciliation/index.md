@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | current | [Reconciliation](architecture-overview.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Reconciliation — feature database](feature-db.md) |
 | user-guide | current | [Reconciliation](user-guide-reconciliation.md) |
 | admin-guide | missing | |
 | api | missing | |
