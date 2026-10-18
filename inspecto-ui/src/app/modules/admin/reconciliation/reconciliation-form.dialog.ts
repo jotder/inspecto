@@ -315,6 +315,8 @@ export class ReconciliationFormDialog {
     private readonly inventoryFailed = signal<Record<string, true>>({});
     private loadedFor = '';
     readonly testing = signal(false);
+    /** Bumped by every Test and every edit; a response lands only if it still carries the latest value. */
+    private testSeq = 0;
     readonly testError = signal<string | null>(null);
     readonly testResult = signal<{
         sampleLabel: string;
@@ -423,6 +425,9 @@ export class ReconciliationFormDialog {
     constructor() {
         this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
             this.snap.set(this.form.getRawValue());
+            // An edit voids any test in flight: its answer is for the OLD definition.
+            this.testSeq++;
+            this.testing.set(false);
             this.testResult.set(null);
             this.testError.set(null);
             this.loadInventory();
@@ -501,6 +506,7 @@ export class ReconciliationFormDialog {
                 ? { cardinality: raw['cardinality'] }
                 : {}),
         };
+        const seq = ++this.testSeq;
         this.testing.set(true);
         this.testError.set(null);
         this.testResult.set(null);
@@ -509,6 +515,7 @@ export class ReconciliationFormDialog {
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
                 next: (r) => {
+                    if (seq !== this.testSeq) return;
                     this.testing.set(false);
                     const by = r.summary.byType;
                     this.testResult.set({
@@ -526,6 +533,7 @@ export class ReconciliationFormDialog {
                     });
                 },
                 error: (e) => {
+                    if (seq !== this.testSeq) return;
                     this.testing.set(false);
                     this.testError.set(apiErrorMessage(e, 'The comparison could not run.'));
                 },

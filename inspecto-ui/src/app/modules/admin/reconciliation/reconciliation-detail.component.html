@@ -239,7 +239,7 @@
                             class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider"
                             [title]="'A = ' + r.leftDataset"
                         >
-                            Only in A — {{ leftLabel() }} ({{ missingA().length }})
+                            Only in A — {{ leftLabel() }} ({{ setCountText('missing_right') }})
                         </h2>
                         <inspecto-data-table
                             tier="standard"
@@ -262,7 +262,9 @@
                             class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider"
                             [title]="sideLetter() + ' = ' + sideDatasetId()"
                         >
-                            Only in {{ side() === 'c' ? 'C' : 'B' }} — {{ sideDataset() }} ({{ missingB().length }})
+                            Only in {{ side() === 'c' ? 'C' : 'B' }} — {{ sideDataset() }} ({{
+                                setCountText('missing_left')
+                            }})
                         </h2>
                         <inspecto-data-table
                             tier="standard"
@@ -282,7 +284,7 @@
                 @if (valueBreaks().length) {
                     <section aria-label="Matched but different">
                         <h2 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
-                            Matched, different values ({{ valueBreaks().length }})
+                            Matched, different values ({{ setCountText('value_break') }})
                         </h2>
                         <inspecto-data-table
                             tier="standard"
@@ -304,7 +306,7 @@
                          Only a Reconciliation that declares a cardinality can have any (see duplicates()). -->
                     <section aria-label="Duplicate keys" data-testid="duplicate-keys">
                         <h2 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
-                            Duplicate keys — {{ cardinality() }} ({{ duplicates().length }})
+                            Duplicate keys — {{ cardinality() }} ({{ setCountText('cardinality_break') }})
                         </h2>
                         <inspecto-data-table
                             tier="standard"
@@ -341,7 +343,7 @@
         @if (hasMore() || pageIndex() > 0) {
             <nav class="mt-4 flex items-center justify-end gap-3" aria-label="Break pages" data-testid="break-pager">
                 <span class="text-secondary text-sm tabular-nums" aria-live="polite">
-                    Rows {{ pageFrom() }}–{{ pageTo() }}{{ hasMore() ? ' · more follow' : '' }}
+                    Rows {{ pageFrom() }}–{{ pageTo() }}{{ hasMore() ? ' · More in: ' + moreIn() : '' }}
                 </span>
                 <button
                     mat-stroked-button

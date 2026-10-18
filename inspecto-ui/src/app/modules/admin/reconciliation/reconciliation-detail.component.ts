@@ -45,6 +45,7 @@ import {
     ReconState,
     ReconToolbarComponent,
 } from 'app/inspecto/reconciliation';
+import { csvSafeRow } from './csv-safe';
 import { ElapsedTimer } from './recon-elapsed';
 import { ReconExecService } from './recon-exec.service';
 import { ReconAssignData, ReconAssignDialog } from './recon-assign.dialog';
@@ -122,8 +123,12 @@ export class ReconciliationDetailComponent implements OnInit {
     );
     /** The `?offset=` the page opened with; applied once the Reconciliation is known (its type count sets the page size). */
     private pendingOffset = 0;
-    /** True when the server reports more Breaks after this page (a set came back `truncated`). */
-    readonly hasMore = signal(false);
+    /** The Break set types the server cut at the page size (`truncated`) - the sets that have more after this page. */
+    readonly truncatedTypes = signal<ReadonlySet<BreakSetType>>(new Set());
+    /** True when the server reports more Breaks after this page (some set came back `truncated`). */
+    readonly hasMore = computed(() => this.truncatedTypes().size > 0);
+    /** Latest `loadDays` request; an older day's slower answer must not overwrite a newer one. */
+    private daySeq = 0;
     /** True while a full CSV export is paging through the server. */
     readonly exporting = signal(false);
     /** The day's Break counts per type (whole day, unscoped) — from the Board's cached run; null when unknown. */
@@ -352,9 +357,27 @@ export class ReconciliationDetailComponent implements OnInit {
         // A type the filter excluded was never requested: its count is unknown, not zero.
         if (this.typeFilter() !== 'all' && this.typeFilter() !== type) return '–';
         const onPage = this.drillBreaks().filter((b) => b.type === type).length;
-        const mayHaveMore = this.hasMore() && (this.typeFilter() === 'all' || this.typeFilter() === type);
-        return mayHaveMore ? `${onPage}+` : String(onPage);
+        return this.truncatedTypes().has(type) ? `${onPage}+` : String(onPage);
     };
+
+    /**
+     * A set heading's count: `N of TOTAL` when the day summary knows that set's whole-day total, else this page's
+     * count with a `+` only when that set was cut. Never a bare page count that reads like the total.
+     */
+    readonly setCountText = (type: BreakSetType): string => {
+        const onPage = this.drillBreaks().filter((b) => b.type === type).length;
+        const total = this.dayTotal(type);
+        if (total !== null) return `${onPage} of ${formatNumber(total)}`;
+        return this.truncatedTypes().has(type) ? `${onPage}+` : String(onPage);
+    };
+
+    /** The pager's "where": the labels of the sets that have more after this page. */
+    readonly moreIn = computed(() =>
+        this.typeOptions()
+            .filter((o) => o.value !== 'all' && this.truncatedTypes().has(o.value as BreakSetType))
+            .map((o) => o.label)
+            .join(', '),
+    );
 
     /**
      * How many Breaks the banner reports: the day's total over every type when the Board summary is known, else
@@ -742,7 +765,7 @@ export class ReconciliationDetailComponent implements OnInit {
         const type = this.route.snapshot.queryParamMap.get('type');
         if (BREAK_TYPE_FILTERS.includes(type as BreakTypeFilter)) this.typeFilter.set(type as BreakTypeFilter);
         const offset = Number(this.route.snapshot.queryParamMap.get('offset'));
-        if (Number.isInteger(offset) && offset > 0) this.pendingOffset = offset;
+        if (Number.isInteger(offset) && offset > 0 && offset <= MAX_URL_OFFSET) this.pendingOffset = offset;
         this.destroyRef.onDestroy(() => this.elapsed.stop());
         // Labels only: a failed read leaves the sides named by their ids.
         this.datasetsApi
@@ -797,16 +820,18 @@ export class ReconciliationDetailComponent implements OnInit {
 
     /** The day picker's list and the effective day — one row of the (server-cached) Board run for this day. */
     private async loadDays(r: Reconciliation): Promise<void> {
+        const seq = ++this.daySeq;
         try {
             const res = await firstValueFrom(
                 this.exec.page(r, { day: this.day(), offset: 0, limit: 1, filter: 'all' }),
             );
+            if (seq !== this.daySeq) return; // a newer day was asked for meanwhile
             this.availableDays.set(res.availableDays ?? []);
             this.daySummary.set(res.summary ?? null);
             if (!this.day() && res.day) this.day.set(res.day);
         } catch {
             // the picker stays empty; the Breaks still compute (for the latest day, server-side)
-            this.daySummary.set(null);
+            if (seq === this.daySeq) this.daySummary.set(null);
         }
     }
 
@@ -828,7 +853,8 @@ export class ReconciliationDetailComponent implements OnInit {
 
     /** Narrow to one Break type (or all) — back to the first page, kept in the URL like the day. */
     setType(type: BreakTypeFilter): void {
-        if (this.computing() || type === this.typeFilter()) return;
+        // Same type on a later page still acts: it is how "Show all types, first page" leaves an empty stale page.
+        if (this.computing() || (type === this.typeFilter() && this.pageIndex() === 0)) return;
         this.typeFilter.set(type);
         this.pageIndex.set(0);
         this.syncUrl();
@@ -889,7 +915,7 @@ export class ReconciliationDetailComponent implements OnInit {
                 this.pageSize(),
                 this.pageIndex() * this.pageSize(),
             );
-            this.hasMore.set(anyTruncated(sets));
+            this.truncatedTypes.set(truncatedSetTypes(sets));
             // Tagged with the pair they were computed on — the recorded state holds both pairs of a 3-way.
             const pair = side === 'c' ? 'AC' : 'AB';
             const day = this.day() ?? undefined;
@@ -899,7 +925,7 @@ export class ReconciliationDetailComponent implements OnInit {
             this.lastEvaluated.set(new Date());
         } catch (e) {
             this.liveBreaks.set(null);
-            this.hasMore.set(false);
+            this.truncatedTypes.set(new Set());
             this.impacts.set({});
             this.dupImpacts.set({});
             this.toastr.error(apiErrorMessage(e, 'Could not compute the break sets'));
@@ -939,18 +965,20 @@ export class ReconciliationDetailComponent implements OnInit {
                 const dups = duplicateImpacts(r, sets);
                 for (const b of this.overlay(live)) {
                     const impact = (b.type === 'cardinality_break' ? dups : impacts)[b.key];
-                    rows.push({
-                        type: breakLabel(b.type),
-                        key: b.key,
-                        column: b.column ?? '',
-                        left: b.leftValue ?? '',
-                        right: b.rightValue ?? '',
-                        diff: b.diff ?? '',
-                        impact: impact ?? '',
-                        status: b.status,
-                        ageDays: breakAgeDays(b) ?? '',
-                        assignee: b.assignee ?? '',
-                    });
+                    rows.push(
+                        csvSafeRow({
+                            type: breakLabel(b.type),
+                            key: b.key,
+                            column: b.column ?? '',
+                            left: b.leftValue ?? '',
+                            right: b.rightValue ?? '',
+                            diff: b.diff ?? '',
+                            impact: impact ?? '',
+                            status: b.status,
+                            ageDays: breakAgeDays(b) ?? '',
+                            assignee: b.assignee ?? '',
+                        }),
+                    );
                 }
                 if (!anyTruncated(sets)) break;
                 if (rows.length >= EXPORT_CAP) {
@@ -958,7 +986,8 @@ export class ReconciliationDetailComponent implements OnInit {
                     break;
                 }
             }
-            downloadCsv(`${r.id}-breaks-${day ?? 'latest'}`, toCsv(rows, EXPORT_COLUMNS));
+            // The BOM makes Excel read the file as UTF-8 (keys carry non-ASCII such as the middle dot).
+            downloadCsv(`${r.id}-breaks-${day ?? 'latest'}`, '\ufeff' + toCsv(rows, EXPORT_COLUMNS));
             if (capped)
                 this.toastr.warning(
                     `Exported the first ${formatNumber(rows.length)} Breaks — narrow the filter for the rest.`,
@@ -1095,11 +1124,22 @@ const BREAK_TYPE_FILTERS: readonly BreakTypeFilter[] = [
 const EXPORT_PAGE = 5000;
 /** The export stops here — more rows than this wants a narrower filter, not a bigger download. */
 const EXPORT_CAP = 50_000;
+/** A `?offset=` beyond this is a stale or hostile link, ignored like a negative one. */
+const MAX_URL_OFFSET = 1_000_000;
 const EXPORT_COLUMNS = ['type', 'key', 'column', 'left', 'right', 'diff', 'impact', 'status', 'ageDays', 'assignee'];
+
+/** The Break set types the server says have more rows after this page. */
+function truncatedSetTypes(sets: ReconBreakSets): ReadonlySet<BreakSetType> {
+    return new Set(
+        (Object.keys(sets) as BreakSetType[]).filter(
+            (t) => (sets[t] as { truncated?: boolean } | undefined)?.truncated === true,
+        ),
+    );
+}
 
 /** True when any returned Break set says more rows follow it. */
 function anyTruncated(sets: ReconBreakSets): boolean {
-    return Object.values(sets).some((set) => !!set && (set as { truncated?: boolean }).truncated === true);
+    return truncatedSetTypes(sets).size > 0;
 }
 
 function breakLabel(type: string): string {

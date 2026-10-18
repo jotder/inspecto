@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ReconApiService } from 'app/inspecto/api';
 import { ReconRunResult } from 'app/inspecto/reconciliation';
@@ -228,6 +228,21 @@ describe('ReconciliationFormDialog', () => {
         fixture.detectChanges();
         expect(c.testResult()).toBeNull();
         expect(fixture.nativeElement.querySelector('inspecto-alert')?.textContent).toContain('exists on each dataset');
+    });
+
+    it('an edit during Test definition discards the old answer and re-enables the button', () => {
+        const pending = new Subject<ReconRunResult>();
+        const { c, fixture } = create({ run: () => pending });
+        pickSides(c);
+        c.form.patchValue({ keyColumns: ['id'] });
+        c.testDefinition();
+        expect(c.testing()).toBe(true);
+        c.form.patchValue({ name: 'edited while testing' });
+        expect(c.testing()).toBe(false);
+        pending.next(RUN);
+        fixture.detectChanges();
+        expect(c.testResult()).toBeNull();
+        expect(c.testing()).toBe(false);
     });
 
     it('renders with no a11y violations', async () => {

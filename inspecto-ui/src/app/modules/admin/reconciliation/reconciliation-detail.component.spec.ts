@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { EMPTY, of, throwError } from 'rxjs';
+import { EMPTY, of, Subject, throwError } from 'rxjs';
 import { statusRowClasses } from 'app/inspecto/components/status-badge.component';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
@@ -27,7 +27,11 @@ import { formatNumber } from 'app/inspecto/viz/number-format';
 import { fmtDateTime } from 'app/inspecto/format';
 
 /** The export ends in a Blob download: capture the file name and the CSV text instead of navigating jsdom. */
-function captureDownload(): { name: () => string | undefined; text: () => Promise<string> } {
+function captureDownload(): {
+    name: () => string | undefined;
+    text: () => Promise<string>;
+    bytes: () => Promise<Uint8Array>;
+} {
     let blob: Blob | undefined;
     let name: string | undefined;
     URL.createObjectURL = vi.fn((b: Blob | MediaSource) => {
@@ -40,6 +44,7 @@ function captureDownload(): { name: () => string | undefined; text: () => Promis
     });
     return {
         name: () => name,
+        bytes: async () => new Uint8Array(await (blob as Blob).arrayBuffer()),
         text: () =>
             new Promise((resolve) => {
                 const reader = new FileReader();
@@ -90,6 +95,8 @@ async function create(
     opts: {
         path?: string;
         day?: string;
+        /** The raw `?offset=` the page opens with. */
+        offset?: string;
         /** The server-RECORDED lifecycle (`GET /recon/{id}/state`, R2-03). */
         breaks?: ReconBreak[];
         lastRunAt?: string | null;
@@ -157,6 +164,7 @@ async function create(
                         queryParamMap: convertToParamMap({
                             ...(opts.path ? { path: opts.path } : {}),
                             ...(opts.day ? { day: opts.day } : {}),
+                            ...(opts.offset ? { offset: opts.offset } : {}),
                         }),
                     },
                 },
@@ -1019,7 +1027,9 @@ describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/
         const next = el.querySelector<HTMLButtonElement>('[data-testid="page-next"]');
         expect(next?.disabled).toBe(false);
         expect(el.querySelector<HTMLButtonElement>('[data-testid="page-prev"]')?.disabled).toBe(true);
-        expect(el.querySelector('[data-testid="break-pager"]')?.textContent).toContain('Rows 1–16 · more follow');
+        expect(el.querySelector('[data-testid="break-pager"]')?.textContent).toContain(
+            'Rows 1–16 · More in: Only in A',
+        );
     });
 
     it('never holds more than 50 Breaks: All types shares the budget across the sets, one type gets all of it', async () => {
@@ -1151,7 +1161,8 @@ describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/
     it('with no summary the card shows this page with a + when more follow', async () => {
         const { c } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
         expect(c.countText('missing_right')).toBe('2+');
-        expect(c.countText('missing_left')).toBe('0+');
+        // Only the set the server cut carries a +; a set that came back whole is exactly its count.
+        expect(c.countText('missing_left')).toBe('0');
     });
 
     it('exports EVERY matching Break through the server, 5,000 at a time, not just the page', async () => {
@@ -1184,6 +1195,128 @@ describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('inspecto-data-table [aria-label="Export CSV"]')).toBeNull();
         expect(el.querySelector('[data-testid="export-csv"]')).not.toBeNull();
+    });
+
+    it('puts + only on the set that was cut, and names it in the pager', async () => {
+        const { fixture, c } = await create({
+            sets: { missing_right: set(['A1', 'A2'], true), missing_left: set(['B1', 'B2', 'B3'], false) },
+        });
+        expect(c.countText('missing_right')).toBe('2+');
+        expect(c.countText('missing_left')).toBe('3');
+        expect(c.countText('value_break')).toBe('0');
+        const el = fixture.nativeElement as HTMLElement;
+        const headings = Array.from(el.querySelectorAll('h2')).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
+        expect(headings.some((h) => h?.endsWith('(2+)'))).toBe(true);
+        expect(headings.some((h) => h?.endsWith('(3)'))).toBe(true);
+        expect(el.querySelector('[data-testid="break-pager"]')?.textContent).toContain('More in: Only in A');
+        expect(el.querySelector('[data-testid="break-pager"]')?.textContent).not.toContain('Only in B');
+    });
+
+    it('names every cut set in the pager, in filter order', async () => {
+        const { c } = await create({
+            sets: { value_break: set(['V1'], true), missing_right: set(['A1'], true), missing_left: set(['B1']) },
+        });
+        expect(c.moreIn()).toBe('Only in A, Value breaks');
+    });
+
+    it('a set heading reads N of TOTAL when the day summary knows the total', async () => {
+        const summary = {
+            groups: 9,
+            matchedKeys: 5,
+            byType: { missing_right: 12345, missing_left: 3, value_break: 0 },
+        };
+        const { c } = await create({
+            sets: { missing_right: set(['A1', 'A2'], true), missing_left: set(['B1', 'B2', 'B3']) },
+            summary,
+        });
+        expect(c.setCountText('missing_right')).toBe('2 of 12,345');
+        expect(c.setCountText('missing_left')).toBe('3 of 3');
+    });
+
+    it('"Show all types, first page" returns to page 1 even though the type is already All', async () => {
+        const { fixture, c, breaks, navigate } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
+        breaks.mockResolvedValueOnce({});
+        c.movePage(1); // a stale / shrunk page: empty
+        await tick(fixture);
+        expect(c.pageIndex()).toBe(1);
+        expect(c.drillBreaks()).toHaveLength(0);
+        breaks.mockResolvedValueOnce({ missing_right: set(['A1', 'A2'], true) });
+        c.setType('all');
+        await tick(fixture);
+        expect(c.pageIndex()).toBe(0);
+        expect(c.missingA()).toHaveLength(2);
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 16, 0);
+        expect(navigate).toHaveBeenLastCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { type: null, offset: null } }),
+        );
+    });
+
+    it('the empty-state button itself goes back to the first page', async () => {
+        const { fixture, c, breaks } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
+        breaks.mockResolvedValueOnce({});
+        c.movePage(1);
+        await tick(fixture);
+        breaks.mockResolvedValueOnce({ missing_right: set(['A1'], false) });
+        const empty = (fixture.nativeElement as HTMLElement).querySelector('inspecto-empty-state button');
+        (empty as HTMLButtonElement).click();
+        await tick(fixture);
+        expect(c.pageIndex()).toBe(0);
+    });
+
+    it('a slower answer for an earlier day never overwrites the later day summary', async () => {
+        const { fixture, c, page } = await create({ sets: {} });
+        const first = new Subject<unknown>();
+        const second = new Subject<unknown>();
+        page.mockReturnValueOnce(first as never).mockReturnValueOnce(second as never);
+        const summary = (n: number) => ({
+            summary: { groups: 1, matchedKeys: 0, byType: { missing_right: n, missing_left: 0, value_break: 0 } },
+        });
+        c.setDay('2026-09-24');
+        await tick(fixture);
+        c.setDay('2026-09-23');
+        await tick(fixture);
+        second.next({ day: '2026-09-23', availableDays: [], ...summary(222) });
+        second.complete();
+        await tick(fixture);
+        first.next({ day: '2026-09-24', availableDays: [], ...summary(111) });
+        first.complete();
+        await tick(fixture);
+        expect(c.day()).toBe('2026-09-23');
+        expect(c.countText('missing_right')).toBe('222');
+    });
+
+    it('ignores a ?offset= beyond 1,000,000 or a non-integer, but honours a sane one', async () => {
+        const huge = await create({ sets: {}, offset: '2000000' });
+        expect(huge.c.pageIndex()).toBe(0);
+        TestBed.resetTestingModule();
+        const fractional = await create({ sets: {}, offset: '16.5' });
+        expect(fractional.c.pageIndex()).toBe(0);
+        TestBed.resetTestingModule();
+        const sane = await create({ sets: {}, offset: '32' });
+        expect(sane.c.pageIndex()).toBe(2);
+    });
+
+    it('neutralises formula-looking cells in the export and starts the file with a UTF-8 BOM', async () => {
+        const { c, breaks } = await create({ sets: {} });
+        breaks.mockResolvedValueOnce({
+            missing_right: {
+                rows: [
+                    { key: { region: '=HYPERLINK("http://x")', product: 'v' }, a: { amount: 1 } },
+                    { key: { region: '@SUM(A1)', product: 'v' }, a: { amount: -5 } },
+                ],
+                rowCount: 2,
+                truncated: false,
+            },
+        });
+        const dl = captureDownload();
+        await c.exportCsv();
+        const bytes = await dl.bytes();
+        expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+        const text = new TextDecoder().decode(bytes);
+        expect(text).toContain(`"'=HYPERLINK(""http://x"")`);
+        expect(text).toContain("'@SUM(A1)");
+        expect(text).not.toMatch(/(^|,|\n)=HYPERLINK/);
     });
 
     it('has ONE primary Run now and a differently-named Reload that does not recompute', async () => {
