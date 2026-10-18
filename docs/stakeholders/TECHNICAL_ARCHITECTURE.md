@@ -10,7 +10,7 @@ virtual threads) with an embedded DuckDB analytical engine, plus one Angular ope
 thin per-module jars on a jlinked runtime. There is no external database to install: storage is files under each
 Space's roots, with Postgres as an optional Operational DB family.
 
-What a customer runs is an **Offering**: a tier (Personal, Professional, Enterprise; Preview bundles everything)
+What a customer runs is an **Offering**: a tier (Basic, Standard, Advanced; Preview bundles everything)
 plus add-ons plus content packs, composed in `offerings/*.toon`. A module is usable only when it is Installed in
 the build, Enabled for the Space, and Permitted for the user.
 
@@ -98,6 +98,7 @@ Permitted.
 
 ## 9. Go deeper
 
+- [Solution overview](SOLUTION_OVERVIEW.md) — level 0, the entry page of the suite.
 - [Solution pages](solutions/README.md) — one per content pack, plus three journeys (file to dashboard, alert to
   closed Case, changing configuration safely).
 - [Module pages](modules/README.md) — one per module, each on the same nine-heading template with a flow diagram.

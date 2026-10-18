@@ -6,6 +6,7 @@
 
 | Audience | Read this | Then, if needed |
 |---|---|---|
+| **New to the suite (any audience)** | [`SOLUTION_OVERVIEW.md`](SOLUTION_OVERVIEW.md) — level 0: what it does, which Offering, the map into solutions and modules | [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) |
 | **Executive / sponsor** | [`EXECUTIVE_BRIEF.md`](EXECUTIVE_BRIEF.md) | — |
 | **Product owner / business analyst** | [`PRODUCT_CAPABILITIES.md`](PRODUCT_CAPABILITIES.md) | [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (full MoSCoW) · [`../roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) |
 | **Solution architect / integrator** | [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) | [solution pages](solutions/README.md) · [module pages](modules/README.md) · the [OKF bundle](../okf/index.md) · [`../api/openapi-v1.json`](../api/openapi-v1.json) |

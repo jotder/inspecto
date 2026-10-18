@@ -1,6 +1,6 @@
 # Solution suite documentation — plan (`SOLUTION-SUITE-DOCS-1`)
 
-> **Status:** 🟡 IN FLIGHT 2026-10-17 — all five waves started in parallel (operator `/goal`), decisions taken below. Follows the rewrite of
+> **Status:** ✅ SHIPPED 2026-10-18 — all five waves built, L0 [`SOLUTION_OVERVIEW.md`](../stakeholders/SOLUTION_OVERVIEW.md) written, review pass done (edition names conformed to Basic/Standard/Advanced, Link Analysis offering corrected). Move to `plans-archive/` once the operator accepts. Decisions taken below. Follows the rewrite of
 > `docs/stakeholders/TECHNICAL_ARCHITECTURE.md` (level 1). Operator ask: a next-level architecture and solution
 > breakdown, down to small modules such as maker-checker, so that system users understand how things work.
 
@@ -114,6 +114,7 @@ then vocabulary, doc-link, citation guards; a verifier checks one claim per sect
   exactly what a module page does. Existing OKF concepts are linked from the pages, not moved or rewritten.
 - **D-SS2** — Repo docs only; no in-product help panel yet (no route, no UI work).
 - **D-SS3** — Internal only; nothing published outside the repo.
+- **D-SS5** — L0 lives at `docs/stakeholders/SOLUTION_OVERVIEW.md` (an audience tree, not a root `docs/*.md`); the earlier line that no `SOLUTION_SUITE.md` is created still holds.
 - **D-SS4** — All five waves run at once as seven writers on disjoint files; the lead owns every shared file
   (indexes, `TECHNICAL_ARCHITECTURE.md`). Diagrams: shared helpers `tools/doc-diagrams/svglib.py`, one script
   per page.
