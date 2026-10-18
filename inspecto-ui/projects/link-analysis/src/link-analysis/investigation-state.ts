@@ -263,6 +263,25 @@ export function identityErrorMessage(err: unknown, fallback: string): string {
     }
 }
 
+/**
+ * LA-17 "Merge with...": the two typed Working Set ids of a two-node selection, as `{type, value}` pairs for the identity form.
+ * Refused (with the words for a tooltip) unless exactly two entity ids are chosen and neither is a masked alias - the server
+ * refuses an alias as an identity key (LA-19), and a masked caller cannot read the real value.
+ */
+export type MergePair = { a: { type: string; value: string }; b: { type: string; value: string } };
+export function mergePairOf(ids: string[]): { pair: MergePair; reason: '' } | { pair: null; reason: string } {
+    if (ids.length !== 2) return { pair: null, reason: 'Select exactly two entities to merge them.' };
+    const split = ids.map((id) => {
+        const i = id.indexOf(':');
+        return i > 0 ? { type: id.slice(0, i), value: id.slice(i + 1) } : null;
+    });
+    const [a, b] = split;
+    if (!a || !b || !a.value || !b.value) return { pair: null, reason: 'Both nodes must be typed entities.' };
+    if (a.value.startsWith(MASKED_PREFIX) || b.value.startsWith(MASKED_PREFIX))
+        return { pair: null, reason: 'A masked entity cannot be merged: only its alias is visible, and an identity needs the real value.' };
+    return { pair: { a, b }, reason: '' };
+}
+
 /** The `maskingMode` pseudonym prefix (D-U6) — `masked:<16 hex>`. */
 const MASKED_PREFIX = 'masked:';
 

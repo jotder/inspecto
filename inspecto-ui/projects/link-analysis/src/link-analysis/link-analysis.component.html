@@ -856,6 +856,18 @@
                                         <mat-icon svgIcon="heroicons_outline:no-symbol"></mat-icon>
                                     </button>
                                 }
+                                @if (investigation.canvas()) {
+                                    <button
+                                        mat-icon-button
+                                        (click)="mergeSelected()"
+                                        [disabled]="!!mergeUnavailable()"
+                                        [matTooltip]="mergeUnavailable() || 'Merge with... assert that the two selected nodes are one entity'"
+                                        aria-label="Merge the two selected nodes into one identity"
+                                        data-testid="la-selection-merge"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:arrows-pointing-in"></mat-icon>
+                                    </button>
+                                }
                                 <button
                                     mat-icon-button
                                     (click)="openAttachToCase()"

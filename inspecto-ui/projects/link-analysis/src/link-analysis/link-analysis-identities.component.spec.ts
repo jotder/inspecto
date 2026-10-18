@@ -12,6 +12,8 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { identityKeyOf } from './investigation-state';
 import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
+import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { mergePairOf } from './investigation-state';
 
 @Component({
     standalone: true,
@@ -49,9 +51,11 @@ interface Options {
     groups?: IdentityGroup[];
     canManage?: boolean;
     listError?: number;
+    session?: boolean;
 }
 
-function create({ groups = [GROUP], canManage = true, listError }: Options = {}) {
+function create({ groups = [GROUP], canManage = true, listError, session = false }: Options = {}) {
+    const store = { mergeDraft: signal<unknown>(null), canvas: signal<unknown>({}), apply: vi.fn(async () => true), error: signal('') };
     const inv = {
         listIdentityGroups: vi.fn(() =>
             listError ? http(listError, 'no capability') : of({ groups, atSeq: 3, headSeq: 3, headHash: 'h' }),
@@ -71,6 +75,7 @@ function create({ groups = [GROUP], canManage = true, listError }: Options = {})
             { provide: LA_FEATURES, useValue: { ops: signal(false), exchange: signal(false), geoLink: signal(true) } },
             { provide: LensService, useValue: { canManageIncidents: signal(canManage) } },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: TYPES }) } },
+            ...(session ? [{ provide: InvestigationSessionStore, useValue: store }] : []),
         ],
     });
     const fixture = TestBed.createComponent(Host);
@@ -81,7 +86,7 @@ function create({ groups = [GROUP], canManage = true, listError }: Options = {})
         await fixture.whenStable();
         fixture.detectChanges();
     };
-    return { fixture, cmp, inv, dialog, next, el, settle };
+    return { fixture, cmp, inv, dialog, next, el, settle, store };
 }
 
 describe('identityKeyOf (LA-17 slice 2)', () => {
@@ -195,5 +200,61 @@ describe('LinkAnalysisIdentitiesComponent (LA-17 slice 2)', () => {
         expect(el.textContent).toContain('needs the Incident-management capability');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
         expect(el.querySelector('form')).toBeNull();
+    });
+});
+
+describe('mergePairOf (LA-17 "Merge with...")', () => {
+    it('takes exactly two typed, unmasked entities', () => {
+        expect(mergePairOf(['msisdn:+447700900123', 'imsi:234150000000001'])).toEqual({
+            pair: { a: { type: 'msisdn', value: '+447700900123' }, b: { type: 'imsi', value: '234150000000001' } },
+            reason: '',
+        });
+        expect(mergePairOf(['msisdn:+44']).pair).toBeNull();
+        expect(mergePairOf(['a:1', 'b:2', 'c:3']).reason).toContain('exactly two');
+        expect(mergePairOf(['plain', 'imsi:1']).reason).toContain('typed entities');
+    });
+
+    it('is refused, with the reason, when either node is a masked alias (LA-19)', () => {
+        expect(mergePairOf(['msisdn:masked:0123456789abcdef', 'imsi:1'])).toEqual({
+            pair: null,
+            reason: expect.stringContaining('masked entity cannot be merged'),
+        });
+        expect(mergePairOf(['imsi:1', 'msisdn:masked:0123456789abcdef']).pair).toBeNull();
+    });
+});
+
+describe('LinkAnalysisIdentitiesComponent "Merge with..." hand-off', () => {
+    it('prefills the form from the hand-off and clears it, writing nothing', async () => {
+        const { cmp, inv, store, settle } = create({ session: true });
+        await settle();
+        store.mergeDraft.set({ a: { type: 'msisdn', value: '+447700900123' }, b: { type: 'imsi', value: '234150000000001' } });
+        await settle();
+        expect(cmp.assertForm.getRawValue()).toMatchObject({ typeA: 'msisdn', valueA: '+447700900123', typeB: 'imsi', valueB: '234150000000001' });
+        expect(store.mergeDraft()).toBeNull();
+        expect(inv.assertIdentity).not.toHaveBeenCalled();
+    });
+
+    it('offers, never forces, a resolve step after a successful assert, and seals it on request', async () => {
+        const { cmp, el, store, settle } = create({ session: true });
+        await settle();
+        cmp.assertForm.setValue({ typeA: 'msisdn', valueA: '+44 1', typeB: 'imsi', valueB: '2', reason: 'same SIM' });
+        await cmp.assertSame();
+        await settle();
+        expect(store.apply).not.toHaveBeenCalled();
+        (el.querySelector('[data-testid="la-seal-resolve"]') as HTMLButtonElement).click();
+        await settle();
+        expect(store.apply).toHaveBeenCalledWith({ op: 'resolve' });
+        expect(el.querySelector('[data-testid="la-seal-resolve"]')).toBeNull();
+        await expectNoA11yViolations(el);
+    });
+
+    it('offers nothing without an open Investigation', async () => {
+        const { cmp, el, store, settle } = create({ session: true });
+        store.canvas.set(null);
+        await settle();
+        cmp.assertForm.setValue({ typeA: 'msisdn', valueA: '+44 1', typeB: 'imsi', valueB: '2', reason: 'x' });
+        await cmp.assertSame();
+        await settle();
+        expect(el.querySelector('[data-testid="la-seal-resolve"]')).toBeNull();
     });
 });

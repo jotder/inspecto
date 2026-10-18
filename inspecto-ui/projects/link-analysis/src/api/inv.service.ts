@@ -402,6 +402,8 @@ export type InvestigationOpRequest =
     | { op: 'window'; window: InvestigationWindow | 'full' }
     | { op: 'exclude'; ids: string[]; reason: string }
     | { op: 'hide' | 'keep'; ids: string[] }
+    /** LA-17 `resolve`: seals the identity groups at `atSeq` (default the head) - a VIEW; traversal stays raw. */
+    | { op: 'resolve'; atSeq?: number }
     /** LA-19: `note` ≤ 2000 chars; every id must be in the Working Set. ⛔ Never send `confidence` — its scale is
      *  undecided (D-U9) and the server refuses it with 422. */
     | { op: 'annotate'; ids: string[]; note: string }

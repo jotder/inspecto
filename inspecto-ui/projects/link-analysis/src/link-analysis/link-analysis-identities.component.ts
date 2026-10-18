@@ -1,6 +1,6 @@
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -16,6 +16,7 @@ import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-sta
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { identityErrorMessage, identityKeyOf } from './investigation-state';
+import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { isUnavailable } from './link-analysis-template.dialogs';
 
@@ -77,6 +78,15 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                     }
                     @if (notice()) {
                         <inspecto-alert variant="success" title="Identity resolution">{{ notice() }}</inspecto-alert>
+                    }
+                    @if (offerResolve()) {
+                        <div class="flex items-center gap-2" role="group" aria-label="Show the merge in this Investigation">
+                            <span class="text-secondary">Show this merge in the open Investigation?</span>
+                            <button mat-stroked-button type="button" (click)="sealResolve()" data-testid="la-seal-resolve">
+                                Add a resolve step
+                            </button>
+                            <button mat-button type="button" (click)="offerResolve.set(false)">Not now</button>
+                        </div>
                     }
                     @if (!unavailable()) {
                         <form
@@ -196,6 +206,10 @@ export class LinkAnalysisIdentitiesComponent {
     private lens = inject(LensService);
     private fb = inject(FormBuilder);
     readonly features = inject(LA_FEATURES);
+    /** Only present inside the Link Analysis screen; the standalone Entity Lists page has none, and then nothing below applies. */
+    private session = inject(InvestigationSessionStore, { optional: true });
+    /** After a successful assert inside an open Investigation: offered, never forced (a `resolve` step is a view, not a rewrite). */
+    readonly offerResolve = signal(false);
 
     readonly groups = signal<IdentityGroup[] | null>(null);
     readonly found = signal<IdentityGroup | null>(null);
@@ -223,6 +237,13 @@ export class LinkAnalysisIdentitiesComponent {
     readonly lookupForm = this.fb.nonNullable.group({ type: [''], value: [''] });
 
     constructor() {
+        // "Merge with..." on the canvas: prefill the form, then clear the hand-off. The form's own rules still apply on submit.
+        effect(() => {
+            const draft = this.session?.mergeDraft();
+            if (!draft) return;
+            this.assertForm.patchValue({ typeA: draft.a.type, valueA: draft.a.value, typeB: draft.b.type, valueB: draft.b.value });
+            this.session?.mergeDraft.set(null);
+        });
         // Off the module every route 503s, and without the capability every read 403s — no call for either.
         if (this.features.geoLink() && this.canManage()) void this.load();
     }
@@ -264,7 +285,19 @@ export class LinkAnalysisIdentitiesComponent {
             this.notice.set(
                 `Asserted #${res.assertion.seq} — the group now holds ${res.group.members.length} identifiers.`,
             );
+            this.offerResolve.set(!!this.session?.canvas());
         });
+    }
+
+    /** Seals the identity groups into the open Investigation at the new head: the existing `resolve` op, nothing new. */
+    async sealResolve(): Promise<void> {
+        if (!this.session) return;
+        if (await this.session.apply({ op: 'resolve' })) {
+            this.offerResolve.set(false);
+            this.notice.set('Sealed a resolve step: the Investigation now shows the merged identities.');
+        } else {
+            this.error.set(this.session.error() || 'The resolve step was refused.');
+        }
     }
 
     async lookup(): Promise<void> {

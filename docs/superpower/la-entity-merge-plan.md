@@ -77,3 +77,28 @@ op-log hash and masked aliases; recommend declining rewrite.
   needs a real-HTTP probe before relying on the LA-19 rule above.
 * Suggested smallest follow-up (SPA only, no backend): node-context action "Merge with..." on two selected nodes prefilling the existing form,
   followed by an offered `resolve` op. Not built: it is a UI change on a surface already shipped and needs the operator's confirmation first.
+
+## 7. LA-19 probe result (2026-10-18) - FAILED, step 2 (SPA "Merge with...") NOT built
+
+Approved order (pending operator confirmation): probe first; on failure stop and report. Probe in `ControlApiEntityIdentityTest`:
+* PASS (kept): `retractResponseNeverCarriesARawMaskedKey` - retract is by seq; its response renders masked keys only.
+* FAIL (committed `@Disabled`): `assertRefusesAMaskedAliasAndWritesNothing` - asserting `msisdn:masked:<16hex>` (the alias a masked
+  analyst holds for a node) returns 201 and appends a permanent Space-wide `identity.asserted` fact on a garbage literal key.
+  Not a read leak (the response re-masks it), but it is an integrity hole and it blocks "Merge with..." from selected nodes,
+  because the SPA only holds aliases for masked nodes. No existing masking error code exists to reuse.
+* Decision owed: refuse an alias-shaped value in `EntityIdentityRoutes.typedKey` (422, new reason text or a new error code), or
+  have the server resolve the alias (reveal needs `canRevealLinkEntities`, in-Investigation only).
+
+## 8. Alias refusal and "Merge with..." as built (2026-10-18; decisions pending operator confirmation)
+
+* **Fix (fail-closed, refuse not resolve):** `EntityIdentityRoutes.refuseAlias` (uses `MaskTokens.TOKEN_PREFIX`, the predicate the other
+  routes use) 422s an alias-shaped value in `POST /inv/entity-identities` (`a`/`b`) and in `POST /inv/entity-identities/import` (any Dataset
+  row), BEFORE any fact is appended. Server-side alias resolution is declined (would need `canRevealLinkEntities`). Probes:
+  `ControlApiEntityIdentityTest.assertRefusesAMaskedAliasAndWritesNothing`, `ControlApiEntityIdentityImportTest.aMaskedAliasInTheDatasetRefusesTheImportAndWritesNothing`.
+  Other fact writers: retract takes a seq (safe, probe passes); resolve/seed carry no identity facts.
+* **SPA:** selection-bar *Merge with...* (Investigation only; `mergePairOf`) prefills the existing assert form through
+  `InvestigationSessionStore.mergeDraft` - nothing is written until the analyst adds a reason and confirms. After a successful assert in an open
+  Investigation, *Add a resolve step* is OFFERED (`{op:'resolve'}`, added to the SPA op union; the server op already existed). Disabled with a
+  tooltip when the capability is missing, the selection is not exactly two entities, or either is a masked alias.
+* Residual: the toast tells the analyst to go to the Investigation tab; there is no automatic tab switch. The canvas button has no browser
+  walk-through (unit-tested via `mergePairOf` and the identities component; `mergeUnavailable` itself has no spec).

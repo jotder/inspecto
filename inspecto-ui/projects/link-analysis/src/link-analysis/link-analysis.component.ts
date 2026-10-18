@@ -213,7 +213,7 @@ import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
-import { idsInWorkingSet, rawIdsOf } from './investigation-state';
+import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { AiExplainComponent } from '@inspecto/core/ai-assist/ai-explain.component';
@@ -1734,6 +1734,28 @@ export class LinkAnalysisComponent implements OnInit {
     readonly attachUnavailable = computed(() =>
         this.lens.canManageIncidents() ? '' : 'Attaching to a Case needs the Incident management capability.',
     );
+
+    /** LA-17 "Merge with...": enabled only inside an Investigation, with the capability, on two unmasked typed entities. */
+    readonly mergeUnavailable = computed(() => {
+        if (!this.lens.canManageIncidents()) return 'Merging identities needs the Incident management capability.';
+        const ws = this.investigation.workingSet();
+        const ids = this.selectedOnCanvas().flatMap((id) => {
+            const node = (this.canvasData()?.nodes ?? []).find((n) => n.id === id);
+            return node ? idsInWorkingSet(node, ws) : [];
+        });
+        return mergePairOf(ids).reason;
+    });
+
+    /** Hands the two selected entities to the Identity section (Investigation tab); nothing is written until it is confirmed there. */
+    mergeSelected(): void {
+        if (this.mergeUnavailable()) return;
+        const ws = this.investigation.workingSet();
+        const ids = this.selectedNodes().flatMap((n) => idsInWorkingSet(n, ws));
+        const { pair } = mergePairOf(ids);
+        if (!pair) return;
+        this.investigation.mergeDraft.set(pair);
+        this.toastr.info('Prefilled in the Identity section of the Investigation tab - add a reason and confirm there.');
+    }
 
     /** One step: seal what is on screen and attach it to a Case (optionally linking the open Investigation too). */
     openAttachToCase(): void {

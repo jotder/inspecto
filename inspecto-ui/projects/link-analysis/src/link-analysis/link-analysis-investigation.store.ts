@@ -1,3 +1,4 @@
+import type { MergePair } from './investigation-state';
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -130,6 +131,8 @@ export class InvestigationSessionStore {
     readonly selected = signal<G6Node | null>(null);
     /** LA-SEED-CONNECT-1 (b): the ids of one connected pair's example route, set by a click on its row; the canvas emphasises it. */
     readonly highlightRoute = signal<string[] | null>(null);
+    /** LA-17 "Merge with...": two typed Working Set ids handed to the identity form, which prefills from it and clears it. */
+    readonly mergeDraft = signal<MergePair | null>(null);
     /** Draw the Working Set (true) or the query graph — seeds are picked from the latter. */
     readonly showWorkingSet = signal(true);
 
