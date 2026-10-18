@@ -19,4 +19,6 @@ Rules:
 - No `#` lines (TOON has no comments).
 - `node tools/render-product-map.mjs` writes the views (CSV, Excel, mind-map HTML) to `target/product-map/`, merging prices from
   `private/prices.csv` (`orderCode,listPrice,currency`) when it exists.
+- `node tools/product-map-import.mjs <edited.csv|edited.xlsx> [--sheet "Price list"] [--write]` brings commercial edits back
+  (title, billing, support, status, prices). It is a dry run without `--write`, and it refuses structural edits.
 - `node tools/product-map-seed.mjs` adds items for new modules, Add-ons, packs and Editions. It never overwrites an existing file.

@@ -1,7 +1,7 @@
 # Product Map: plan
 
 > 🟢 **PLAN 2026-10-18 (`PRODUCT-MAP-1`): decisions D-PM1…D-PM6 were taken by the operator on 2026-10-18 (§8).
-> S0 (glossary), S1 (format, seed, gitignore), S2 (guard in CI) and S3 (CSV, XLSX, mind map) are done; S4 and S5 are not built.**
+> S0 (glossary), S1 (format, seed, gitignore), S2 (guard in CI), S3 (CSV, XLSX, mind map) and S4 (import) are done; S5 is not built.**
 > **Goal:** one place that is easy to manage, laid out like a mind map, that describes every **Product Map Item**:
 > modules, Add-ons, Solution packs, **Functionalities** and **Editions**. Pricing, support and sales use it, and it
 > can produce a **customer-specific build** (an Offering made of only what a customer buys). People and agents both
@@ -117,7 +117,15 @@ The guard checks each value against the manifest, so a Functionality cannot clai
    not `prices.toon`**: TOON keys cannot hold the `-` in an Order Code, and pricing staff work in CSV.
 4. **`product-map-import.mjs`**: CSV/Excel → files, **only for the commercial columns** (title, Order Code,
    billing model, support, status, and prices, which go to `private/`). It shows a diff and refuses changes to
-   ids/parents/modules. Agents never set prices.
+   ids/parents/modules. Agents never set prices. ✅ **Built (S4)** with `product-map-import.test.mjs`. As built: a dry run
+   by default, and `--write` applies only when the changed tree passes `check-product-map`. Rows are matched by `id`,
+   or by `orderCode` for the Price list sheet. Importable columns: title, billable, orderCode, billingModel,
+   supportTier, supportOwner, status, listPrice and currency; an empty cell removes the field. Refused: any change to
+   kind, parent, link, enforcement or docs, or an unknown id; one refusal stops the whole import. editions/modules
+   are ignored with a note. Excel's TRUE/FALSE is read as true/false. Files are rewritten in the seed's key order, so
+   an edit changes only its own lines. XLSX is read with `node:zlib` (deflated entries, shared strings). Live check
+   2026-10-18: an openpyxl-saved workbook with three edits imported as a two-line item diff plus one
+   `private/prices.csv` row.
 5. **`customer-build.mjs <customer>`**: from `private/customers/<id>.toon`, resolves the Order Codes to modules
    plus their `requires.modules` closure and writes `offerings/customer-<id>.toon`. Then the **existing**
    `check-offerings.mjs` and `package.ps1` build it. It also writes a bill of materials (Order Codes, prices,
@@ -141,7 +149,7 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 | S1 ✅ | file format + `product-map-seed.mjs` + reviewed seed + `.gitignore` entry | done 2026-10-18: 87 items (6 layers, 47 modules, 15 Add-ons, 15 Solution packs, 4 Editions) |
 | S2 ✅ | `check-product-map.mjs` in the guards job | a missing module item, a bad `parent:`, an impossible `enforcement` or a committed price fails CI |
 | S3 ✅ | `render-product-map.mjs`: CSV + XLSX + mind-map HTML | the price list and the Edition matrix open in Excel |
-| S4 | `product-map-import.mjs` round trip | edit a price in Excel → import → a one-line change in `private/prices.csv` |
+| S4 ✅ | `product-map-import.mjs` round trip | edit a price in Excel → import → a one-line change in `private/prices.csv` |
 | S5 | `customer-build.mjs` + the **demo-telco** pilot (D-PM6) | `package.ps1` builds a bundle with only demo-telco's modules; the bill of materials matches |
 | S6 (later) | DuckDB query file; support view (module → owner/runbook); `usage` billing once metering exists | on demand |
 

@@ -331,7 +331,7 @@ jobs:
       # and Industry packs, covers every one of them, holds no price (prices live only in the gitignored product-map/private/) and no
       # copied technical fact, and claims only an enforcement the build can honour. Reads files only; no build.
       - name: Guard — Product Map items link to real modules and Offerings, and hold no prices
-        run: node tools/check-product-map.mjs && node --test tools/check-product-map.test.mjs tools/render-product-map.test.mjs
+        run: node tools/check-product-map.mjs && node --test tools/check-product-map.test.mjs tools/render-product-map.test.mjs tools/product-map-import.test.mjs
 
       # jlink lock guard (MODULE-REORG-P3-THIN-JARS): the derived runtime module set is the ONLY source package.ps1
       # uses, so every edition must have a well-formed lock section. No build; the JDK-name check is skipped without a JDK.
