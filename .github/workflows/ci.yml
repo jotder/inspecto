@@ -327,6 +327,12 @@ jobs:
       - name: Guard — Offerings reference real, manifested modules
         run: node tools/check-offerings.mjs && node --test tools/check-offerings.test.mjs
 
+      # Product Map guard (PRODUCT-MAP-1 S2): product-map/<kind>/<name>.toon names real manifests, Offerings, add-ons, Space Templates
+      # and Industry packs, covers every one of them, holds no price (prices live only in the gitignored product-map/private/) and no
+      # copied technical fact, and claims only an enforcement the build can honour. Reads files only; no build.
+      - name: Guard — Product Map items link to real modules and Offerings, and hold no prices
+        run: node tools/check-product-map.mjs && node --test tools/check-product-map.test.mjs
+
       # jlink lock guard (MODULE-REORG-P3-THIN-JARS): the derived runtime module set is the ONLY source package.ps1
       # uses, so every edition must have a well-formed lock section. No build; the JDK-name check is skipped without a JDK.
       - name: Guard — jlink module lock covers every edition

@@ -1,7 +1,7 @@
 # Product Map: plan
 
 > 🟢 **PLAN 2026-10-18 (`PRODUCT-MAP-1`): decisions D-PM1…D-PM6 were taken by the operator on 2026-10-18 (§8).
-> S0 (glossary) and S1 (format, seed, gitignore) are done; S2…S5 are not built.**
+> S0 (glossary), S1 (format, seed, gitignore) and S2 (guard in CI) are done; S3…S5 are not built.**
 > **Goal:** one place that is easy to manage, laid out like a mind map, that describes every **Product Map Item**:
 > modules, Add-ons, Solution packs, **Functionalities** and **Editions**. Pricing, support and sales use it, and it
 > can produce a **customer-specific build** (an Offering made of only what a customer buys). People and agents both
@@ -98,7 +98,7 @@ The guard checks each value against the manifest, so a Functionality cannot clai
    ships (the LA showcases) is seeded `billable: false`, `status: preview`. An Add-on whose module another Add-on also
    names (`incidents` and `workflowSla` both resolve to `ops`) is seeded `enforcement: contract`, since it cannot be
    left out of a build on its own. Commercial fields (billing model, support tier, Order Code) are placeholders.
-2. **`check-product-map.mjs`** (guard, runs in CI with the other guards): every `module:` is a real manifest id;
+2. **`check-product-map.mjs`** (guard, runs in CI with the other guards; ✅ **built (S2)** with `check-product-map.test.mjs`. As built, "no price and no copied fact" is enforced by an **allowed-keys list**, not a list of banned names, so a new field has to be added to the guard deliberately): every `module:` is a real manifest id;
    every non-internal module has an item; every `parent:` resolves (no cycles); `billable:true` has an `orderCode`
    and a `billing.model`; Order Codes are unique; `enforcement` is possible for the module; no technical fact is
    duplicated; **no price field appears outside `product-map/private/`**.
@@ -132,7 +132,7 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 |---|---|---|
 | S0 ✅ | glossary terms; decisions signed | done 2026-10-18 |
 | S1 ✅ | file format + `product-map-seed.mjs` + reviewed seed + `.gitignore` entry | done 2026-10-18: 87 items (6 layers, 47 modules, 15 Add-ons, 15 Solution packs, 4 Editions) |
-| S2 | `check-product-map.mjs` in the guards job | a missing module item, a bad `parent:`, an impossible `enforcement` or a committed price fails CI |
+| S2 ✅ | `check-product-map.mjs` in the guards job | a missing module item, a bad `parent:`, an impossible `enforcement` or a committed price fails CI |
 | S3 | `render-product-map.mjs`: CSV + XLSX + mind-map HTML | the price list and the Edition matrix open in Excel |
 | S4 | `product-map-import.mjs` round trip | edit a price in Excel → import → a one-line change in `private/prices.toon` |
 | S5 | `customer-build.mjs` + the **demo-telco** pilot (D-PM6) | `package.ps1` builds a bundle with only demo-telco's modules; the bill of materials matches |
