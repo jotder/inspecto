@@ -117,8 +117,11 @@ order, or `min / max / sum / avg` over a masked column answers 422 (inference ch
 reveals. Design, path inventory and the open decisions D-M1..D-M7:
 [`bi-query-masking-design.md`](../../../superpower/bi-query-masking-design.md). Tests:
 `ControlApiBiQueryMaskingTest`, `ExplorationMaskingSpaceKeyTest`.
-**Not covered:** `/db/table` and `/db/query`, Report Job exports, Exchange snapshots, the assistant's query tool, a numeric
-derivation of a numeric key in a saved query.
+Also covered since 2026-10-13: `/db/table` and `/db/query`, scheduled Report exports (`ReportRowMasking`), Exchange snapshots
+(D-M6 (a)), numeric key derivations. **2026-10-18:** a column classified `PII` stays unmasked in `typed` mode by decision (the
+telecom pack does not claim `PII`; use `maskingMode: all`); a table Widget's `limit` is a server-side row limit, so a top-N
+tile is masked like any other result. Retired to BACKLOG §6: D-M5 `revealKeys`, D-M4, live-mode Exchange grants, other
+file-writing Job types. Open on `BI-QUERY-MASKING-1`: only the operator's security review.
 
 ## Row cap on `/bi/query`: ordered and honestly flagged (`BI-QUERY-TRUNCATION-1`, shipped 2026-10-08)
 

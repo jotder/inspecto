@@ -19,7 +19,7 @@ timestamp: 2026-10-10T00:00:00Z
 > and an `anomaly-model` component is unknown to the SPA, which then hides every anomaly surface.
 > Built 2026-10-10 in slices S1..S5 (`ANOMALY-DETECTION-1`); the design and its lane notes are archived at
 > [`anomaly-detection-design.md`](../../../archived-documents/plans-archive/anomaly-detection-design.md).
-> Open items: `ANOMALY-DETECTION-RESIDUALS-1` in [BACKLOG](../../../BACKLOG.md).
+> Open items: none (`ANOMALY-DETECTION-RESIDUALS-1` closed 2026-10-18); the live check left is `ANOMALY-UI-FINDINGS-1` in [BACKLOG](../../../BACKLOG.md).
 
 An **Anomaly Score** (GLOSSARY: *Anomaly Model* = the Type, *Anomaly Score* = the Instance, *Feature*,
 *Peer Group*) answers *"is this entity behaving unlike itself, or unlike its peers, and why?"*. It is a 0–100
@@ -246,9 +246,15 @@ factor (`measure: max(score)`) — a documented pattern, no code.
 
 ## Deliberate deferrals
 
-Tracked in `ANOMALY-DETECTION-RESIDUALS-1`: the dashboard tile (the Widget layer lacks a Widget-level filter and
-a table row limit, and `/bi/query` does not mask entity keys in scores Datasets — a top-10 Widget stays out of
-templates until BI masks); pack golden extension (needs multi-week corpora); hour buckets; the LA panel's Risk Score model gate. Later: an ML scorer behind the same explanation
+`ANOMALY-DETECTION-RESIDUALS-1` closed 2026-10-18. **The dashboard tile is BUILT:** the telco-fraud template ships
+`tf_subscriber_anomaly_latest` (a Dataset over the derived store `anomaly_scores_tf_subscriber_usage_latest`, `entity_key`
+classified MSISDN) and the table Widget `tf_unusual_subscribers_top10` on `telco_fraud_overview` (group by `entity_key`,
+`band`; `max(score)`; `tableSort` `max_score` desc; `limit: 10`). A table Widget's `options.limit` is now a SERVER-side row
+limit (`table.plugin.ts`), so `/bi/query` returns, and masks, only the top rows; no Widget-level filter was needed, because the
+`_latest` store holds one row per entity. ⚠ The golden run does not execute `anomaly.score` (no anomaly module in that test),
+so the tile reads an absent store until the Job's first run; its masking and top-N are pinned over real HTTP by
+`ControlApiBiQueryMaskingTest.anAnomalyTopTenTileIsMaskedOrderedAndLimitedForAViewer`. Retired to BACKLOG §6: hour buckets;
+the LA panel's Risk Score model gate. The pack goldens are property tests (2026-10-12). Later: an ML scorer behind the same explanation
 shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
 Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
 collision-free key.)
