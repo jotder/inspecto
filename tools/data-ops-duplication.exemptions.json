@@ -33,5 +33,7 @@
   {"category":"a","file":"inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java","member":"csv","reason":"RFC-4180 CSV field escape for the audit-log CSV export (doubles \" inside a CSV cell), not SQL"},
   {"category":"a","file":"features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/ReportRenderer.java","member":"csvCell","reason":"RFC-4180 CSV cell quoting (after formula neutralising) for a rendered regulatory report, not SQL"},
   {"category":"a","file":"platform/inspecto-engine/src/main/java/com/gamma/job/ReportJob.java","member":"csv","reason":"RFC-4180 CSV cell quoting for a Report Job CSV output, not SQL"},
-  {"category":"a","file":"platform/inspecto-etl/src/main/java/com/gamma/etl/CsvIngester.java","member":"csv","reason":"RFC-4180 quoting of a file name in the ingest source-id CSV line, not SQL"}
+  {"category":"a","file":"platform/inspecto-etl/src/main/java/com/gamma/etl/CsvIngester.java","member":"csv","reason":"RFC-4180 quoting of a file name in the ingest source-id CSV line, not SQL"},
+  {"category":"a","file":"platform/inspecto-analytics/src/main/java/com/gamma/analytics/cohort/Retention.java","member":"literal","reason":"formats a LocalDateTime as a TIMESTAMP literal for the kernel's own SQL form; a typed value with no string content, so nothing to quote; the shared builders have no inline typed-literal form (typedOperand binds)"},
+  {"category":"a","file":"platform/inspecto-analytics/src/main/java/com/gamma/analytics/time/ChangePoint.java","member":"lit","reason":"formats a finite double as a CAST(... AS DOUBLE) literal for the kernel's own SQL form; a typed value with no string content, so nothing to quote; the shared builders have no inline typed-literal form (typedOperand binds)"}
 ]
