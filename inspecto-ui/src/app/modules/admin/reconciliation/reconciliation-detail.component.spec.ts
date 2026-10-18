@@ -1106,13 +1106,35 @@ describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/
             byType: { missing_right: 12345, missing_left: 2, value_break: 7 },
         };
         const withTotals = await create({ sets: { missing_right: set(['A1'], true) }, summary });
-        expect(withTotals.c.discrepancies()).toEqual({ text: '12,354', none: false });
+        expect(withTotals.c.discrepancies()).toEqual({ text: '12,354', none: false, partial: false });
         TestBed.resetTestingModule();
         const filtered = await create({ sets: { missing_right: set(['A1'], false) } });
         filtered.breaks.mockResolvedValueOnce({ value_break: set([], false) });
         filtered.c.setType('value_break');
         await filtered.fixture.whenStable();
         expect(filtered.c.discrepancies().none).toBe(false);
+    });
+
+    it('a type the filter excluded reads as unknown, and the last page caption shows the real row range', async () => {
+        const { fixture, c, breaks } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
+        breaks.mockResolvedValueOnce({ value_break: set(['V1', 'V2', 'V3'], true) });
+        c.setType('value_break');
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(c.countText('missing_left')).toBe('–');
+        expect(c.discrepancies().partial).toBe(true);
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Filtered view');
+        breaks.mockResolvedValueOnce({ value_break: set(['V4', 'V5'], false) });
+        c.movePage(1);
+        await fixture.whenStable();
+        expect(c.pageFrom()).toBe(51);
+        expect(c.pageTo()).toBe(52);
+    });
+
+    it('drops a URL type this Reconciliation cannot show', async () => {
+        const { c } = await create({ sets: {} });
+        expect(c.typeOptions().some((o) => o.value === 'cardinality_break')).toBe(false);
+        expect(c.typeFilter()).toBe('all');
     });
 
     it('with no summary the card shows this page with a + when more follow', async () => {

@@ -81,7 +81,13 @@
             <div class="flex items-center gap-3">
                 <inspecto-status-badge
                     [value]="discrepancies().none ? 'success' : 'warning'"
-                    [label]="discrepancies().none ? 'Balanced (0 Breaks)' : discrepancies().text + ' Discrepancies'"
+                    [label]="
+                        discrepancies().none
+                            ? 'Balanced (0 Breaks)'
+                            : discrepancies().partial
+                              ? 'Filtered view'
+                              : discrepancies().text + ' Discrepancies'
+                    "
                 />
                 <div class="flex flex-col">
                     <span class="text-sm font-medium">
@@ -334,7 +340,7 @@
 
         @if (hasMore() || pageIndex() > 0) {
             <nav class="mt-4 flex items-center justify-end gap-3" aria-label="Break pages" data-testid="break-pager">
-                <span class="text-secondary text-sm tabular-nums">
+                <span class="text-secondary text-sm tabular-nums" aria-live="polite">
                     Rows {{ pageFrom() }}–{{ pageTo() }}{{ hasMore() ? ' · more follow' : '' }}
                 </span>
                 <button

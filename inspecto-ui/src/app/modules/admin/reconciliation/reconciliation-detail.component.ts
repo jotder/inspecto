@@ -327,8 +327,10 @@ export class ReconciliationDetailComponent implements OnInit {
     private dayTotal(type: BreakSetType): number | null {
         const sum = this.daySummary();
         if (!sum || this.path()) return null;
-        const pair = this.side() === 'c' ? sum.pairs?.find((p) => p.side === 'c') : (sum.pairs?.[0] ?? sum);
-        const n = (pair?.byType ?? sum.byType)[type];
+        // Side C reads only its own pair — never the A-to-B counts a missing pair would fall back to.
+        const byType =
+            this.side() === 'c' ? sum.pairs?.find((p) => p.side === 'c')?.byType : (sum.pairs?.[0] ?? sum).byType;
+        const n = byType?.[type];
         return typeof n === 'number' ? n : null;
     }
 
@@ -336,6 +338,8 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly countText = (type: BreakSetType): string => {
         const total = this.dayTotal(type);
         if (total !== null) return formatNumber(total);
+        // A type the filter excluded was never requested: its count is unknown, not zero.
+        if (this.typeFilter() !== 'all' && this.typeFilter() !== type) return '–';
         const onPage = this.drillBreaks().filter((b) => b.type === type).length;
         const mayHaveMore = this.hasMore() && (this.typeFilter() === 'all' || this.typeFilter() === type);
         return mayHaveMore ? `${onPage}+` : String(onPage);
@@ -352,12 +356,14 @@ export class ReconciliationDetailComponent implements OnInit {
         const totals = types.map((t) => this.dayTotal(t));
         if (totals.every((t): t is number => t !== null)) {
             const n = totals.reduce((sum, t) => sum + t, 0);
-            return { text: formatNumber(n), none: n === 0 };
+            return { text: formatNumber(n), none: n === 0, partial: false };
         }
         const n = this.drillBreaks().length;
         return {
             text: this.hasMore() ? `${n}+` : String(n),
             none: n === 0 && !this.hasMore() && this.typeFilter() === 'all' && this.pageIndex() === 0,
+            // One type only (or a later page): not the day's total, so the banner must not claim it.
+            partial: this.typeFilter() !== 'all' || this.pageIndex() > 0,
         };
     });
 
@@ -372,7 +378,13 @@ export class ReconciliationDetailComponent implements OnInit {
 
     /** First and last row number of this page (1-based), for the pager caption. */
     readonly pageFrom = computed(() => this.pageIndex() * this.pageSize + 1);
-    readonly pageTo = computed(() => (this.pageIndex() + 1) * this.pageSize);
+    /** Last row of this page: a full page while more follow, else the first row plus the longest set shown. */
+    readonly pageTo = computed(() => {
+        if (this.hasMore()) return (this.pageIndex() + 1) * this.pageSize;
+        const counts = new Map<string, number>();
+        for (const b of this.drillBreaks()) counts.set(b.type, (counts.get(b.type) ?? 0) + 1);
+        return this.pageFrom() - 1 + Math.max(0, ...counts.values());
+    });
 
     /** Aging histogram over the open breaks in this scope (`BREAK-AGING-1`); the rollup is shared. */
     readonly ageBuckets = computed(() => openAgeBuckets(this.drillBreaks()));
@@ -731,6 +743,8 @@ export class ReconciliationDetailComponent implements OnInit {
                 this.loading.set(false);
                 this.loadPromoted(r.id);
                 this.loadState(r.id);
+                // A type from the URL that this Reconciliation cannot show (Duplicate keys without a cardinality).
+                if (!this.typeOptions().some((o) => o.value === this.typeFilter())) this.typeFilter.set('all');
                 void this.compute();
             },
             error: (e) => {
@@ -780,6 +794,7 @@ export class ReconciliationDetailComponent implements OnInit {
             if (!this.day() && res.day) this.day.set(res.day);
         } catch {
             // the picker stays empty; the Breaks still compute (for the latest day, server-side)
+            this.daySummary.set(null);
         }
     }
 
@@ -787,6 +802,7 @@ export class ReconciliationDetailComponent implements OnInit {
     setDay(day: string): void {
         if (this.computing() || day === this.day()) return;
         this.day.set(day);
+        this.daySummary.set(null);
         const paged = this.pageIndex() > 0;
         this.pageIndex.set(0);
         void this.router.navigate([], {

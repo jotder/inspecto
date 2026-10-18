@@ -33,7 +33,6 @@
                         [disabled]="recording() || running() || !result()"
                         data-testid="record-run"
                         matTooltip="Saves this day's Breaks as the run of record: new Breaks get a first-seen date, Breaks that now match auto-close, resolutions carry forward."
-                        aria-describedby="record-run-hint"
                     >
                         @if (recording()) {
                             <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
@@ -41,10 +40,6 @@
                         <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
                         <span class="ml-1">Record run</span>
                     </button>
-                    <span id="record-run-hint" class="sr-only">
-                        Saves this day's Breaks as the run of record: new Breaks get a first-seen date, Breaks that now
-                        match auto-close, resolutions carry forward. Opening the Board never records.
-                    </span>
                 }
             </ng-container>
         </inspecto-page-header>

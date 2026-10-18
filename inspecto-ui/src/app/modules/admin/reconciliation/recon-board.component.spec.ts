@@ -213,12 +213,9 @@ describe('ReconBoardComponent', () => {
         const reload = el.querySelector('[data-testid="reload"]');
         expect(reload?.getAttribute('aria-label')).toBe('Reload');
         expect(el.querySelector('[aria-label="Refresh"]')).toBeNull();
-        const record = el.querySelector('[data-testid="record-run"]');
-        const hint = el.querySelector('#record-run-hint');
-        expect(record?.getAttribute('aria-describedby')).toContain('record-run-hint');
-        expect(hint?.textContent).toContain('first-seen date');
-        expect(hint?.textContent).toContain('auto-close');
-        expect(hint?.textContent).toContain('Opening the Board never records');
+        const tip = el.querySelector('[data-testid="record-run"]')?.getAttribute('mattooltip') ?? '';
+        expect(tip).toContain('first-seen date');
+        expect(tip).toContain('auto-close');
     });
 
     it('shows a skeleton and the elapsed time, not a bare spinner, while the day is compared (U4)', async () => {

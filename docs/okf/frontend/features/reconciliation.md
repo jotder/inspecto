@@ -444,7 +444,8 @@ back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model 
   the pager is *Previous / Next* with a "Rows 51–100 · more follow" caption, not a `mat-paginator`. The count cards
   and the banner read the **whole day** from the Board's cached `/recon/run` summary (`byType`, per pair); they fall
   back to this page's count with a `+` when a Board path scopes the view (the summary is unscoped) or the summary is
-  not known. *Resolved* and *Open breaks by age* are labelled "this page".
+  not known; a type the filter excluded reads "–" and the banner says "Filtered view" rather than claiming a total.
+  *Resolved* and *Open breaks by age* are labelled "this page". A `?type=` the Reconciliation cannot show resets to *All types*.
 * **Break-type filter** (All types · Only in A · Only in B · Value breaks · Duplicate keys when a cardinality is
   declared) is the route's own `type` parameter. Filter and page live in the URL (`?type=`, `?offset=`) next to
   `day`; a type, side or day change returns to page 1. An empty filtered page gets its own empty state, never
