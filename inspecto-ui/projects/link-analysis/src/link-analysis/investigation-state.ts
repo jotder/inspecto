@@ -271,6 +271,9 @@ export function identityErrorMessage(err: unknown, fallback: string): string {
 export type MergePair = { a: { type: string; value: string }; b: { type: string; value: string } };
 export function mergePairOf(ids: string[]): { pair: MergePair; reason: '' } | { pair: null; reason: string } {
     if (ids.length !== 2) return { pair: null, reason: 'Select exactly two entities to merge them.' };
+    // A bare pseudonym `masked:<hex>` would split into type "masked" and slip past the value check below.
+    if (ids.some((id) => id.startsWith(MASKED_PREFIX)))
+        return { pair: null, reason: 'A masked entity cannot be merged: only its alias is visible, and an identity needs the real value.' };
     const split = ids.map((id) => {
         const i = id.indexOf(':');
         return i > 0 ? { type: id.slice(0, i), value: id.slice(i + 1) } : null;

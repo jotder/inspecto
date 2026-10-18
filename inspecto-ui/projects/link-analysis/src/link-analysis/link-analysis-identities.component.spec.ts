@@ -221,6 +221,15 @@ describe('mergePairOf (LA-17 "Merge with...")', () => {
         });
         expect(mergePairOf(['imsi:1', 'msisdn:masked:0123456789abcdef']).pair).toBeNull();
     });
+
+    it('is refused for the bare pseudonym id masked:<hex> too (the untyped alias the live graph draws)', () => {
+        const refused = {
+            pair: null,
+            reason: expect.stringContaining('masked entity cannot be merged'),
+        };
+        expect(mergePairOf(['masked:0123456789abcdef', 'masked:fedcba9876543210'])).toEqual(refused);
+        expect(mergePairOf(['imsi:1', 'masked:0123456789abcdef'])).toEqual(refused);
+    });
 });
 
 describe('LinkAnalysisIdentitiesComponent "Merge with..." hand-off', () => {
