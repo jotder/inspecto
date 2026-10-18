@@ -5,6 +5,8 @@
 > read-only reviews run in parallel (backend, UI, a measured baseline), then every top finding was checked against the code
 > before it went into this plan. **What is NOT known:** behaviour above about 400k rows. No benchmark or test above that
 > exists, so every claim about 10M rows is a hypothesis until slice B0 measures it.
+> 🟢 **Lane A (backend) 2026-10-18: B0 measured and B1 built; B2 and B3 closed unbuilt** (no failure at 10M key groups, no deep-offset
+> cost): numbers, verdicts on P2/P4/P5/P6 and the as-built shared grain are in the OKF concept below. UI lanes B and C are separate.
 > As-built behaviour: [`okf/frontend/features/reconciliation.md`](../okf/frontend/features/reconciliation.md); module page:
 > [`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md).
 

@@ -99,19 +99,23 @@ public final class ReconRunJob implements Job {
                 dsId -> DatasetRelation.relationSql(datasetFor.apply(dsId), dataRoot, views), dataRoot, day);
         ReconService.Spec spec = scoped.spec();
 
-        Map<String, Object> summary = ReconService.dayRun(spec, 0, 0, 0, 0, 0).day().summary();
-        Map<String, Object> byType = summary.get("byType") instanceof Map<?, ?> bt ? cast(bt) : Map.of();
+        // ONE grain: the summary and the Breaks are both read from it, so each side is scanned once (RECON-UPLIFT-1 B1).
+        Map<String, Object> summary;
         // The counts cover EVERY pair (A<->B and, on a 3-way Reconciliation, A<->C): the same Breaks the run
         // records. The run summary's byType is the A<->B pair alone, so it is only the fallback when the Breaks
         // cannot be computed (the run is then also not recorded, and says so).
         List<ReconBreaks.Break> fresh = null;
         String computeError = null;
-        try {
-            fresh = ReconBreaks.compute(spec, ReconStateStore.MAX_BREAKS);
-        } catch (Exception e) {
-            computeError = e.getMessage();
-            ctx.log().warn("could not compute the reconciliation Breaks", "reconciliation", reconId, "error", computeError);
+        try (ReconService.Grain grain = ReconService.openGrain(spec)) {
+            summary = grain.summary();
+            try {
+                fresh = ReconBreaks.compute(grain, ReconStateStore.MAX_BREAKS);
+            } catch (Exception e) {
+                computeError = e.getMessage();
+                ctx.log().warn("could not compute the reconciliation Breaks", "reconciliation", reconId, "error", computeError);
+            }
         }
+        Map<String, Object> byType = summary.get("byType") instanceof Map<?, ?> bt ? cast(bt) : Map.of();
         long missingLeft = fresh == null ? num(byType.get("missing_left")) : count(fresh, "missing_left");
         long missingRight = fresh == null ? num(byType.get("missing_right")) : count(fresh, "missing_right");
         long valueBreak = fresh == null ? num(byType.get("value_break")) : count(fresh, "value_break");
