@@ -86,23 +86,11 @@ boot. The JDBC driver ships as the `postgresql.jar` sidecar in Standard and Adva
 
 ## 6. Screens
 
-- **Operational DB** (`inspecto-ui/src/app/modules/admin/settings/operational-db.component.ts`):
-  what each store family uses, and a connection test. There is no save; the database is a
-  deployment choice.
-- **Data browser** and **Catalog** for reading stores ([data-plane](../../layer/platform/plan-data-plane.md) §3.9).
-- **Component history dialog** (`inspecto-ui/src/app/inspecto/components/component-history.dialog.ts`)
-  and the Pipeline editor's history.
+Moved to [Storage — screens](user-guide-storage.md).
 
 ## 7. API
 
-| Route | Purpose |
-|---|---|
-| `GET /system/operational-db`, `POST /system/operational-db/test` | store roster and connection test |
-| `GET /db/catalog`, `GET /db/table`, `POST /db/query` | data browser over stores |
-| `GET /config/{kind}/{name}`, `POST /config/write`, `POST /config/patch` | configuration read and write |
-| `/components/{type}/{id}/versions`, `…/versions/{version}/restore` | component history |
-| `GET /pipelines/{name}/history`, `POST …/history/{version}/restore` | Pipeline history |
-| `GET` / `PUT /settings/pipeline-history` | Pipeline history depth |
+Moved to [Storage — API](api-storage.md).
 
 ## 8. Interactions
 

@@ -61,23 +61,11 @@ last valid version of a broken file. See [toon-config](../config/spec-toon-confi
 
 ## 6. Screens
 
-Settings → Incident governance:
-
-- `inspecto-ui/src/app/modules/admin/settings/incident-governance.component.ts` — policies, rules, workflows;
-- `inspecto-ui/src/app/modules/admin/settings/workflow-diagram.component.ts` — graphical state-diagram editor;
-- `inspecto-ui/src/app/modules/admin/settings/workflow-state-editor.component.ts`;
-- SLA badges in the inbox from `slaBadges()` in `inspecto-ui/src/app/modules/admin/objects/mail-model.ts`.
+Moved to [Workflow and SLA — screens](user-guide-workflow-sla.md).
 
 ## 7. API
 
-| Route | Gate | Handler |
-|---|---|---|
-| `GET /workflows/{type}` | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| `POST /components/{kind}`, `PUT` / `DELETE /components/{kind}/{id}` (kind `workflow`, `sla-policy`, `escalation-rule`) | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java` |
-| `POST /components/{kind}/{id}/versions/{v}/restore` | `canAdminister` | same |
-
-`{kind}` is `workflow`, `sla-policy` or `escalation-rule`. A write that would strand live objects in a
-removed state answers 409.
+Moved to [Workflow and SLA — API](api-workflow-sla.md).
 
 ## 8. Interactions
 

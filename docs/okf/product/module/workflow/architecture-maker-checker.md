@@ -78,24 +78,11 @@ expiresAfterHours: 168
 
 ## 6. Screens
 
-- **Operations > Pending Changes** (`/pending-changes`, `inspecto-ui/src/app/modules/admin/pending-changes/`):
-  waiting or all changes; author, reason, expiry, decision and a line diff. Approve / Decline show only with
-  `canApproveChanges`; Withdraw only to the author.
-- **Settings > Approvers** (`inspecto-ui/src/app/modules/admin/settings/approver-roster.component.ts`).
-- The policy has no dedicated screen found in the SPA; it is set through `PUT /settings/approval`.
+Moved to [Maker-checker (Pending Changes) — screens](user-guide-maker-checker.md).
 
 ## 7. API
 
-| Route | Gate | Notes |
-|---|---|---|
-| `GET /settings/approval` | read | carries `failedClosed` |
-| `PUT /settings/approval` | `canAdminister`; 403 with no Authenticator | empty body 422 - send `{"approval": {}}` to turn off |
-| `GET /pending-changes[?status&kind]` | read | capped at 500, `total` + `truncated` |
-| `GET /pending-changes/{id}` | read | with `current` and `proposed` |
-| `GET /pending-changes/{id}/diff` | read | line diff over both contents as TOON |
-| `POST /pending-changes/{id}/approve` · `/decline` | `canApproveChanges` | four-eyes, roster, stale check |
-| `POST /pending-changes/{id}/withdraw` | author only | status `withdrawn` |
-| `GET|PUT /settings/approvers` | PUT `canAdminister` | the roster |
+Moved to [Maker-checker (Pending Changes) — API](api-maker-checker.md).
 
 ## 8. Interactions
 

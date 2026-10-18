@@ -108,3 +108,14 @@ runtime Expressions*. Design of record:
 * **The `when:` guard has no author-time validation.** `WhenGuard` is a package-private *runtime* evaluator
   with no published grammar, so a bad guard is caught fail-closed at fire time. Hand-rolling a second
   grammar in TypeScript is the failure mode to avoid.
+
+## Screens
+
+Screens for Jobs and scheduler. Design and internals: [Jobs and scheduler architecture](architecture-jobs-scheduler.md).
+
+- **Jobs** (`inspecto-ui/src/app/modules/admin/jobs/jobs.component.ts`): schedules mode (list,
+  trigger, enable, reschedule, edit, delete) and reporting mode (`/jobs/metrics`, `/jobs/runs`,
+  `/jobs/failures`). The authoring form is generated from `GET /jobs/types/{id}`. Run detail is
+  `job-run-detail.dialog.ts`.
+- **Scheduler settings** (`inspecto-ui/src/app/modules/admin/settings/scheduler.component.ts`):
+  concurrency and DuckDB memory limit, each with its provenance.

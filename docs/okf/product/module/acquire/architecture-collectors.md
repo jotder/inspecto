@@ -111,27 +111,11 @@ JVM switches: `-Dacquire.ledger.backend` (`memory` | `db`), `-Dacquire.pollSecon
 
 ## 6. Screens
 
-- **Collectors** — route `collectors`, `inspecto-ui/src/app/modules/admin/collectors/collectors.component.ts`,
-  with the detail drawer `collector-detail.dialog.ts`.
-- **Connections** — route `settings/connections` (the old `connections` path redirects),
-  `inspecto-ui/src/app/modules/admin/connections/connections.component.ts`, plus the graded probe /
-  explore / sample view `connection-workbench.component.ts`.
+Moved to [the user guide](user-guide-collectors.md#screens).
 
 ## 7. API
 
-From `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java` and `ConnectionRoutes.java`:
-
-| Route | Gate |
-|---|---|
-| `GET /collectors` | read |
-| `POST /collectors/{id}/notify` | `canOperateRuns`; body ignored, triggers a scan; audited `collector.notified` |
-| `GET /metrics/acquisition` | read |
-| `GET /connections`, `GET /connections/{id}` | read |
-| `POST /connections`, `PUT /connections/{id}`, `DELETE /connections/{id}` | `canOnboardConnections` |
-| `POST /connections/{id}/test`, `POST /connections/test`, `POST /connections/{id}/probe` | `canOnboardConnections` |
-| `GET /connections/{id}/explore`, `GET /connections/{id}/sample` | read |
-
-Gates are listed in `platform/inspecto-access/src/main/java/com/gamma/access/CapabilityManifest.java`.
+Moved to [Collectors — API](api-collectors.md).
 
 ## 8. Interactions
 

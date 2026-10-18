@@ -60,22 +60,11 @@ An add-on over the platform base. It reads Entity Lists (`entity-list` module), 
 
 ## 6. Screens
 
-- **Screening** (`/screening`, `inspecto-ui/src/app/modules/admin/screening/`): the hit queue filtered by state,
-  hit detail with history, decide actions, and the **Check name** dialog
-  (`inspecto-ui/src/app/modules/admin/screening/check-name.dialog.ts`).
+Moved to [Screening — screens](user-guide-screening.md).
 
 ## 7. API
 
-| Route | Gate | Notes |
-|---|---|---|
-| `POST /screening/check` | read-shaped | `{subjects[], lists[], threshold?, maxMatches?}`; a POST so names never ride in a URL |
-| `GET /screening/hits?state=` | read | newest first |
-| `GET /screening/hits/{id}` | read | one hit |
-| `GET /screening/hits/{id}/reveal` | reveal | unmasked value for a permitted caller |
-| `POST /screening/hits/{id}/decide` | `canWorkIncidents` | `{decision, reason, version}` |
-
-Decide gate order: capability -> no write root 503 -> body 422 -> unknown hit 404 -> forged record 409 -> stale
-`version` 409 -> transition not allowed 409 -> save under the store lock. Ids must match `sh-<14 digits>-<6 hex>`.
+Moved to [Screening — API](api-screening.md).
 
 ## 8. Interactions
 

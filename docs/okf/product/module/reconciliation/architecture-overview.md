@@ -78,33 +78,11 @@ State: `<write-root>/recon-state/<id>.json`, written atomically and jailed under
 
 ## 6. Screens
 
-Route `/reconciliation` (`inspecto-ui/src/app/modules/admin/reconciliation/reconciliation.routes.ts`):
-
-- `/reconciliation` — list (`reconciliations.component.ts`), authoring via `reconciliation-form.dialog.ts`;
-- `/reconciliation/:id` — the Board (`recon-board.component.ts`): grain rows, totals, Break summary, filters;
-- `/reconciliation/:id/breaks` — Breaks page (`reconciliation-detail.component.ts`), assignment via
-  `recon-assign.dialog.ts`.
-
-Shared logic sits in `inspecto-ui/src/app/inspecto/reconciliation/` (`recon-board.ts`, `reconciliation-types.ts`).
+Moved to [the user guide](user-guide-reconciliation.md#screens).
 
 ## 7. API
 
-Handler: `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java`.
-
-| Route | Gate | Purpose |
-|---|---|---|
-| `POST /recon/columns` | — | column inventory + cross-side auto-matches |
-| `POST /recon/run` | — | one day of the Board: `{id \| config, day?, limit?, offset?, filter?, sample?}` |
-| `POST /recon/breaks` | — | paged Break sets, optional dimension `path` |
-| `POST /recon/rows` | — | raw rows behind one key (cardinality evidence) |
-| `POST /recon/promote` | `canManageIncidents` | one Break → Incident, deduped on Break identity |
-| `GET /recon/promoted` | — | Incidents promoted from a Reconciliation |
-| `GET /recon/state`, `GET /recon/{id}/state` | — | recorded state |
-| `POST /recon/{id}/record` | `canOperateRuns` | compute and merge all Breaks |
-| `POST /recon/{id}/breaks/status` | `canOperateRuns` | `status: resolved \| open \| assigned`, `note?`, `assignee?` |
-
-Authoring uses `/components/reconciliation/{id}` ([component registry](../processor/spec-component-registry.md)).
-Fail-closed: write root unset 503, unknown id 404, unusable config or failing query 422.
+Moved to [Reconciliation — API](api-reconciliation.md).
 
 ## 8. Interactions
 

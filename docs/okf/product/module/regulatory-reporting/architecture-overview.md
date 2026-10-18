@@ -58,27 +58,11 @@ into the same path jail as the `report` Job's `out_dir`.
 
 ## 6. Screens
 
-- **Regulatory reports** (`/regulatory-reports`, `inspecto-ui/src/app/modules/admin/regulatory-reports/`): list
-  with status filters, the draft dialog, approve / decline / retry, and the template editor
-  (`inspecto-ui/src/app/modules/admin/regulatory-reports/report-template.dialog.ts`).
+Moved to [Regulatory Reporting — screens](user-guide-regulatory-reporting.md).
 
 ## 7. API
 
-| Route | Capability |
-|---|---|
-| `GET /regulatory-reports/templates` | read |
-| `GET /regulatory-reports[?status=&template=&caseId=&incidentId=]` | read |
-| `GET /regulatory-reports/{id}` | read (with `sourceChanged`, `approverCheck`) |
-| `POST /regulatory-reports` | `canWorkIncidents` |
-| `POST /regulatory-reports/{id}/request-approval` | `canWorkIncidents` |
-| `POST /regulatory-reports/{id}/approve`, `/decline`, `/retry` | `canApproveChanges` |
-| `GET /regulatory-reports/{id}/verify` | re-hashes the delivered file against its `.sha256` sidecar |
-| `PUT`, `DELETE /regulatory-reports/templates/{id}` | `canApproveChanges` |
-
-Draft gates, in order: capability -> write root 503 -> unknown body key 422 -> template unknown or broken 422 ->
-not exactly one of `caseId` / `incidentId` 422 -> unread or non-scalar input 422 -> no operational objects 503 ->
-subject absent or out of scope 404 -> a member Incident out of scope 403 -> drop directory refused 422 -> render
-refused 422 -> saved `draft`.
+Moved to [Regulatory Reporting — API](api-regulatory-reporting.md).
 
 ## 8. Interactions
 

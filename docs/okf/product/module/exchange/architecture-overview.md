@@ -55,27 +55,11 @@ answers 409. `ExchangeBootHook` installs the host seams at boot; without the mod
 
 ## 6. Screens
 
-- **Catalog - Sharing** (`inspecto-ui/src/app/modules/admin/catalog/sharing.component.ts`): offers, grant
-  requests and decisions.
-- Share actions on the Studio Datasets and Widgets lists
-  (`inspecto-ui/src/app/modules/admin/studio/datasets/datasets.component.ts`,
-  `inspecto-ui/src/app/modules/admin/studio/widgets/widgets.component.ts`).
+Moved to [Exchange (multi-entity sharing) — screens](user-guide-exchange.md).
 
 ## 7. API
 
-| Route | Capability (owning Space's role table) |
-|---|---|
-| `GET /exchange/offers[?owner=]` | read |
-| `POST /exchange/offers` | `canOfferDatasets` |
-| `POST /exchange/signal-offers` | `canOfferSignals` |
-| `POST /exchange/refresh` | `canOfferDatasets` |
-| `POST /exchange/requests` | `canRequestShares` |
-| `POST /exchange/grants/{id}/approve`, `deny`, `revoke` | `canApproveShares` |
-| `POST /exchange/grants/{id}/pin` / `/expiry` | `canRequestShares` / `canApproveShares` |
-| `GET /exchange/grants[?space=]` | read |
-| `GET /exchange/datasets/{owner}/{item}`, `/widgets/...`, `/views/...` | read; Widgets and views render-only |
-
-Routes are un-prefixed (not under `/spaces/{id}`). Transitions are audited and signalled at the HTTP edge.
+Moved to [Exchange (multi-entity sharing) — API](api-exchange.md).
 
 ## 8. Interactions
 

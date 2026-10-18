@@ -101,23 +101,11 @@ The census of every block is [pipeline-config-keys](../config/spec-pipeline-conf
 
 ## 6. Screens
 
-- **Pipeline editor** (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-editor.component.ts`,
-  graph in `pipeline-editor-graph.component.ts`): palette, node forms generated from the served
-  attribute specs, dry run, save and history. UI reference:
-  [pipeline-editor](user-guide-pipeline-editor.md).
-- **Runs and Run detail**: trigger, pause, resume, drain ([parsing-ingest](architecture-parsing-ingest.md) §6).
+Moved to [the user guide](user-guide-pipelines.md#screens).
 
 ## 7. API
 
-| Route | Purpose |
-|---|---|
-| `GET /pipelines`, `/pipelines/combined`, `/pipelines/authored`, `/pipelines/authored/{id}` | lists and one Pipeline |
-| `GET /pipelines/node-types`, `GET /pipelines/processor-catalog` | palette and node specs |
-| `GET /pipelines/{name}/graph`, `PUT /pipelines/{name}/graph`, `GET …/graph/raw`, `GET …/document` | read and save the graph |
-| `POST /pipelines/authored/{id}/dry-run`, `/run`, `/trigger` | dry run, test run and trigger |
-| `GET /pipelines/{name}/history`, `…/history/{version}`, `…/history/diff`, `POST …/history/{version}/restore` | saved versions |
-| `POST /pipelines/{name}/rename`, `GET` / `POST …/settings`, `POST …/label`, `POST …/save-as-template` | rename, settings, template |
-| `GET /pipelines/{name}/related`, `GET /config/pipeline/{name}/impact` | dependants and impact |
+Moved to [Pipelines and Steps — API](api-pipelines-steps.md).
 
 ## 8. Interactions
 

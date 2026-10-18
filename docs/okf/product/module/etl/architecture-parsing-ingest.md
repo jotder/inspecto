@@ -101,22 +101,11 @@ All keys live in the Pipeline's `*_pipeline.toon`; the full list is
 
 ## 6. Screens
 
-- **Pipeline editor, Parse definition** (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-parse-definition.component.ts`):
-  frontend choice, grammar form rendered from the parser's served `grammarSchema`, and a sample preview.
-- **Run detail** (`inspecto-ui/src/app/modules/admin/run-detail/run-detail.component.ts`): tabs
-  Batches, Files, Lineage, Quarantine and Commits, plus "View the rejected rows".
-- **Processing status** (`inspecto-ui/src/app/modules/admin/processing-status/processing-status.component.ts`):
-  problem files per Pipeline.
+Moved to [Parsing and ingest — screens](user-guide-parsing-ingest.md).
 
 ## 7. API
 
-| Route | Purpose |
-|---|---|
-| `GET /parsers`, `POST /parsers/{id}/preview`, `/parsers/asn1/profile` | parser list and compute-only preview |
-| `POST /config/preview/parsing`, `POST /config/preview/schema` | preview the parse and the cast of a draft |
-| `GET /runs/{name}/batches`, `/files`, `/lineage`, `/quarantine`, `/commits`, `/outputs` | Run-detail ledgers |
-| `GET /runs/{name}/errors?file=` | the reject rows for one file (bounded, reports `truncated`) |
-| `POST /runs/{name}/trigger`, `/pause`, `/resume`, `/reprocess`, `/replay-rejects` | operator actions |
+Moved to [Parsing and ingest — API](api-parsing-ingest.md).
 
 ## 8. Interactions
 

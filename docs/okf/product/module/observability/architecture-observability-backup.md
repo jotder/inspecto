@@ -87,25 +87,11 @@ All path parameters resolve against the Space config root through `PathJail.requ
 
 ## 6. Screens
 
-- **Overview** (`inspecto-ui/src/app/modules/admin/dashboard/dashboard.component.ts`): readiness,
-  status, report percentiles, acquisition tiles, raw `/metrics` behind a toggle.
-- **Events** (`inspecto-ui/src/app/modules/admin/events/events.component.ts`) and **Audit log**
-  (`inspecto-ui/src/app/modules/admin/audit-logs/audit-logs.component.ts`).
-- **Processing status** and **Run detail** ([parsing-ingest](../etl/architecture-parsing-ingest.md) §6).
-- **Jobs** for backup and restore; there is no dedicated backup screen and no metrics browser.
+Moved to [Observability and backup — screens](user-guide-observability-backup.md).
 
 ## 7. API
 
-| Route | Purpose |
-|---|---|
-| `GET /metrics` | Prometheus exposition (public) |
-| `GET /metrics/acquisition` | acquisition tiles as JSON (authenticated, core) |
-| `GET /health`, `GET /ready`, `GET /health/details` | probes; details is auth-gated |
-| `GET /status`, `/status/problem-files`, `/report`, `/runs/{name}/report` | run reporting |
-| `GET /events`, `/events/search`, `/events/export`, `/events/views` | event ledger |
-| `GET /signals`, `/signals/stream` | Signal read view |
-| `GET /audit/search`, `/audit/export`, `/audit/verify` | audit trail |
-| `POST /jobs/{name}/trigger?dryRun=true` | preview a backup or retention task |
+Moved to [Observability and backup — API](api-observability-backup.md).
 
 ## 8. Interactions
 

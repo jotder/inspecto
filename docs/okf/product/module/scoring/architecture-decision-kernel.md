@@ -76,19 +76,11 @@ for rules with `invoke-api`. Decision Rules are a governed kind under [maker-che
 
 ## 6. Screens
 
-- **Decision Rules** list and form (`inspecto-ui/src/app/modules/admin/decision-rules/`), with the shared
-  condition editor `inspecto-ui/src/app/inspecto/query/query-condition-group.component.ts` and the consequence
-  catalogue client `inspecto-ui/src/app/inspecto/decision/consequence.ts`.
+Moved to [Decision Kernel (Decision Rules and the Condition Language) — screens](user-guide-decision-kernel.md).
 
 ## 7. API
 
-| Route | Purpose |
-|---|---|
-| `GET|POST /decision-rules` | list, create (503 no write root, 422 bad body, 409 duplicate) |
-| `GET|PUT|DELETE /decision-rules/{name}` | read, update, delete (404 unknown) |
-| `POST /decision-rules/{name}/simulate` | evaluate `when` over body `sampleRows`; returns `matched`, `total`, `checkedAt` |
-| `POST /decision-rules/{name}/apply` | run platform consequences for one record |
-| `GET /decision-rules/consequences` | every action with `available`, `reason`, `module` |
+Moved to [Decision Kernel (Decision Rules and the Condition Language) — API](api-decision-kernel.md).
 
 ## 8. Interactions
 

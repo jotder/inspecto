@@ -67,22 +67,11 @@ own gates and audit.
 
 ## 6. Screens
 
-Under `inspecto-ui/src/app/modules/admin/`: **Assist** (`assist/`), **Agent chat** (`agent-chat/`),
-**Diagnoses** (`diagnoses/`), **Approvals** (`approvals/`), **Autonomy** (`autonomy/`), **Learning**
-(`learning/`). In-context explain / draft / status widgets: `inspecto-ui/src/app/inspecto/ai-assist/`.
+Moved to [AI assist — screens](user-guide-ai-assist.md).
 
 ## 7. API
 
-| Route | Gate |
-|---|---|
-| `POST /assist/{intent}` | per-skill |
-| `GET /assist/diagnoses`, `/assist/metrics`, `/assist/skills`, `/assist/settings` | read |
-| `POST /assist/settings` | `canAdminister` |
-| `POST /assist/settings/test` | `canAuthorWorkbench` (real outbound call) |
-| `POST /agent/sessions`, `/agent/sessions/{id}/...` | session owner |
-| `POST /agent/tools/{name}`, `/agent/tools/{name}/derive` | the tool's declared capability |
-| `/agent/triage-runs`, `/agent/feedback` | triage and learning |
-| `/agent/approvals`, `/agent/policy`, `/agent/policy/kill-switch`, `/agent/actions` | approvals and autonomy |
+Moved to [AI assist — API](api-ai-assist.md).
 
 ## 8. Interactions
 

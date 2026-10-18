@@ -74,24 +74,11 @@ Retention is a maintenance Job of type `event_prune` with a **required** `retent
 
 ## 6. Screens
 
-- **Events** (route `events`, `inspecto-ui/src/app/modules/admin/events/events.component.ts`) - filterable
-  event grid; `event-detail.dialog.ts` shows one event's attributes.
-- **Audit log** (route `audit`, `inspecto-ui/src/app/modules/admin/audit-logs/audit-logs.component.ts`) -
-  read-only; flattens `AUDIT` / `ACCESS_DENIED` attributes (actor, action, target, ip) into columns.
+Moved to [the user guide](user-guide-events.md#screens).
 
 ## 7. API
 
-| Route | Gate |
-|---|---|
-| `GET /events` (on `/api/v1`: cursor-paginated, `limit` 1..500) | none beyond AuthN |
-| `GET /events/search`, `GET /events/export`, `GET /events/{id}` | none beyond AuthN |
-| `GET /events/views` | none beyond AuthN |
-| `POST /events/views`, `POST /events/views/{id}/delete` | `canAuthorWorkbench` |
-| `GET /audit/search`, `GET /audit/export` (core; `type` must be `AUDIT` or `ACCESS_DENIED`, anything else is 400), `GET /audit/route-inventory` | none beyond AuthN |
-| `GET /audit/verify`, `GET /audit/anchors`, `POST /audit/anchors`, `POST /audit/anchors/rebaseline` | `canAdminister` |
-
-Filter parameters on search: `level`, `type`, `pipeline`, `correlationId`, `q`, `from`, `to`, `limit`,
-`offset`. Contract: `docs/api/openapi-v1.json`.
+Moved to [Events and event log — API](api-events.md).
 
 ## 8. Interactions
 

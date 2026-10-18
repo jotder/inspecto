@@ -2272,3 +2272,12 @@ The decisions behind these (D-M1 stands; D-UP1…D-UP8 with the `canUploadData` 
 ### Footer AI-explain
 
 The page-title row in the footer renders the explain control through the `LA_AI_ASSIST` host slot (`<inspecto-la-host-slot [component]="aiExplain" [inputs]=...>`), as the header does, not a direct `@inspecto/core/ai-assist` import: the library's `no-restricted-imports` rule forbids host edges outside `la-host`.
+
+## Screens
+
+Screens for Link Analysis. Design and internals: [Link Analysis architecture](architecture-overview.md).
+
+- **Studio - Link Analysis** (`studio/link-analysis`), **Entities** (`studio/entities`) and **Geo map**
+  (`studio/geo-map`), all from the library `inspecto-ui/projects/link-analysis/`.
+- The standalone **la-app** shell (`inspecto-ui/projects/la-app/`), served by the same host.
+- Public embed view at `GET /public/investigations/{token}`.

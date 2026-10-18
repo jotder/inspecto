@@ -89,31 +89,11 @@ Space ids match `[a-z0-9][a-z0-9-]{0,62}`; `default` is reserved and cannot be r
 
 ## 6. Screens
 
-- **Settings → Spaces** (`inspecto-ui/src/app/modules/admin/spaces/spaces.component.ts`): list, create,
-  rename, delete, import; the template picker is
-  `inspecto-ui/src/app/modules/admin/spaces/space-template-gallery.dialog.ts`. `/spaces` redirects to
-  `settings/spaces` (`inspecto-ui/src/app/app.routes.ts`).
-- **Settings → Modules** (`inspecto-ui/src/app/modules/admin/settings/module-settings.component.ts`): the
-  per-Space module switches, through `inspecto-ui/src/app/inspecto/api/module-settings.service.ts`.
-- Request prefixing for the selected Space: `inspecto-ui/src/app/inspecto/api/space.interceptor.ts`.
+Moved to [Spaces — screens](user-guide-spaces.md).
 
 ## 7. API
 
-Server-global, un-prefixed (`SpaceRoutes`):
-
-| Route | Purpose |
-|---|---|
-| `GET /spaces` | list Spaces |
-| `GET /spaces/_meta` | `{multiSpace}` capability probe |
-| `GET /spaces/templates` | template gallery (empty on a single-tenant server) |
-| `POST /spaces` | create; optional `template` |
-| `POST /spaces/import` | create a new Space from a zip |
-| `PUT /spaces/{id}` | rename / re-describe |
-| `DELETE /spaces/{id}?purge=` | deregister, or also delete files |
-
-Whole-Space zip (`inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java`): `GET /spaces/{id}/export`,
-`POST /spaces/{id}/import/preview`, `POST /spaces/{id}/import`. Gates: `GET /modules` (`ModulesRoutes`),
-`GET|PUT /settings/modules` (`ModuleSettingsRoutes`; `PUT` needs `canAdminister`).
+Moved to [Spaces — API](api-spaces.md).
 
 ## 8. Interactions
 

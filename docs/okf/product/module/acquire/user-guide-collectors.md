@@ -19,3 +19,13 @@ Route `/collectors` (Workbench nav group). Lists configured collection tasks in 
 *(Renamed from "Sources" per the Source→Collector glossary flip, GLOSSARY §2/§3. <!-- vocab-allow: names the rename itself -->
 The route, folder and service had already moved; this doc had not — it still claimed `/sources`,
 `SourcesService` and an "Acquisition" nav group.)*
+
+## Screens
+
+Screens for Collectors. Design and internals: [Collectors architecture](architecture-collectors.md).
+
+- **Collectors** — route `collectors`, `inspecto-ui/src/app/modules/admin/collectors/collectors.component.ts`,
+  with the detail drawer `collector-detail.dialog.ts`.
+- **Connections** — route `settings/connections` (the old `connections` path redirects),
+  `inspecto-ui/src/app/modules/admin/connections/connections.component.ts`, plus the graded probe /
+  explore / sample view `connection-workbench.component.ts`.

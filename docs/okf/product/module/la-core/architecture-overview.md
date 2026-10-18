@@ -67,27 +67,11 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
 
 ## 6. Screens
 
-- **Studio - Link Analysis** (`studio/link-analysis`), **Entities** (`studio/entities`) and **Geo map**
-  (`studio/geo-map`), all from the library `inspecto-ui/projects/link-analysis/`.
-- The standalone **la-app** shell (`inspecto-ui/projects/la-app/`), served by the same host.
-- Public embed view at `GET /public/investigations/{token}`.
+Moved to [the user guide](user-guide-link-analysis.md#screens).
 
 ## 7. API
 
-Grouped; the authoritative list is each module's `META-INF/inspecto/module.toon`.
-
-| Group | Routes |
-|---|---|
-| Exploration | `POST /inv/projection`, `/inv/projection/neighbors`, `/inv/traversal/recursive-paths`, `/inv/pattern/*`, `POST /geo/projection`, `/geo/routes` |
-| Investigations | `GET`/`POST /inv/investigations`, `.../ops`, `/undo`, `/reorder`, `/replay`, `/log`, `/working-set`, `/members`, `/case` |
-| Four-eyes | `GET /inv/pending`, `.../pending/{id}/approve`, `/deny` |
-| Drafts | `.../drafts`, `/rebase`, `/promote`, `/discard`, `/conflicts` |
-| Dossier, embeds | `.../dossier`, `/dossier/bundle`, `/verify`, `.../embeds` |
-| Graph, index | `GET /inv/graph/algorithms`, `POST /inv/graph/runs`, `GET /inv/index`, `POST /inv/index/builds` |
-| Entities | `/inv/entity-types`, `/inv/entity-identities`, `/inv/entities/{type}/{key}/profile` |
-| geo-link | `.../measures`, `/data-changes`, `/alert-rules`, `/standing-detection` |
-
-Request gate order: authenticate -> rate limit -> ABAC -> module enabled -> capability -> open gate (member, policy).
+Moved to [Link Analysis — API](api-link-analysis.md).
 
 ## 8. Interactions
 
