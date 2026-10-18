@@ -81,6 +81,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
             new String[]{"POST", "/inv/inbound/investigations"},              // InvestigationInboundRoutes (alert -> Investigation)
             new String[]{"POST", "/inv/deep-links/resolve"},                  // InvestigationInboundRoutes ("Open in Inspecto LA")
             new String[]{"GET", "/inv/integration"},                          // IntegrationRoutes (connector settings)
+            new String[]{"POST", "/inv/uploads/x"},                           // UploadRoutes (LA-ANALYST-UPLOAD-1: Standard and above)
             new String[]{"POST", "/inv/investigations/x/handoff"});           // IntegrationRoutes (case hand-off)
 
     @AfterEach

@@ -31,6 +31,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/schema/overlap-profile"},
             {"POST", "/inv/graph/runs"},
             {"POST", "/inv/index/builds"},
+            {"POST", "/inv/uploads/([^/]+)"},   // LA-ANALYST-UPLOAD-1: buffers up to upload.max_bytes and writes disk
             {"POST", "/inv/projection"},
             {"POST", "/inv/reference-rows"},
             {"POST", "/inv/case-history"},

@@ -1030,6 +1030,56 @@
         "x-optional-module" : true
       }
     },
+    "/inv/uploads/{collector}" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Land an analyst CSV in an upload-enabled Collector's inbox",
+        "operationId" : "postInvUploadsByCollector",
+        "description" : "LA-ANALYST-UPLOAD-1. Raw CSV body (UTF-8), `?name=<file>.csv` (bare name, must match the Collector's file pattern), optional `replace=true`. Lands bytes only; the Collector's Pipeline parses, types, masks and quarantines. Needs canUploadData. Refusals: 503 no write root, 422 bad name / not a CSV / empty / zip-XLSX / NUL / not UTF-8, 403 path-shaped name or D-U7 four-eyes row budget, 404 unknown or non-upload Collector, 413 over upload.max_bytes or upload.daily_bytes, 409 name already in the inbox, 429 rate limit.",
+        "parameters" : [ {
+          "name" : "collector",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "name",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "replace",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "text/csv" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Landed. Envelope data: collector, pipeline, file, bytes, sha256, replaced, landedAt."
+          },
+          "default" : {
+            "description" : "Error envelope (see #/components/schemas/Envelope)."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/entity-identities/{entityidentityId}/retract" : {
       "post" : {
         "tags" : [ "inv" ],

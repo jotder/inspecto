@@ -200,6 +200,8 @@ class LaLimitCatalogueParityTest {
         d.put(LaLimit.IDENTITY_IMPORT_DEFAULT, 1_000L);
         d.put(LaLimit.IDENTITY_IMPORT_MAX, 10_000L);
         d.put(LaLimit.IDENTITY_IMPORT_TIMEOUT_S, 10L);
+        d.put(LaLimit.UPLOAD_MAX_BYTES, 25L * 1024 * 1024);
+        d.put(LaLimit.UPLOAD_DAILY_BYTES, 200L * 1024 * 1024);
         d.put(LaLimit.INPUT_ID_LENGTH, 512L);
         d.put(LaLimit.INPUT_MAX_IDS, 1_000L);
         d.put(LaLimit.INPUT_NOTE_LENGTH, 2_000L);

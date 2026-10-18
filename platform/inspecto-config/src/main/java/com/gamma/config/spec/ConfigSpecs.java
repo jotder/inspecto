@@ -311,6 +311,11 @@ public final class ConfigSpecs {
                 // run-time log line only, so a typo silently archived nothing. No spec defaults, as above.
                 // ── completeness KPI K2 file template (operator, 2026-10-06) — separate from
                 // gap_detection.sequence, whose GapDetector grammar and live detector are untouched ──
+                // ── analyst upload (LA-ANALYST-UPLOAD-1, D-UP1): a LOCAL Collector an analyst may land a CSV in ──
+                FieldSpec.withDefault("collector.accepts_upload", "Accepts analyst upload", FieldType.BOOL, false,
+                        "A local-connector Collector whose poll directory an analyst may land a CSV in through "
+                                + "POST /inv/uploads/{collector}. The Pipeline and its schema still decide parsing, typing and "
+                                + "masking; the upload only places the file. Default false (no upload)."),
                 FieldSpec.of("collector.gap_detection.file_template", "File sequence template", FieldType.STRING,
                         "Optional template with a date token and an optional {seq} token, e.g. CDR_{yyyyMMddHH}_{seq}_* "
                                 + "or XDR_{yyyyMMdd}.csv (date-only: one file per date bucket). The kpi.completeness "

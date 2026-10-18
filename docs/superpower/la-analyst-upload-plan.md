@@ -1,6 +1,6 @@
 # LA analyst upload - bring your own spreadsheet (i2-gap 2, roadmap D4) - PLAN
 
-Status: DESIGN ONLY (2026-10-18). Nothing built: every code slice depends on decision D-UP1 (see "Slice analysis").
+Status: BUILT 2026-10-18 after the decisions below were assistant-decided on the operator's delegation (**pending operator confirmation**). See "As built" at the end.
 Roadmap D4 stance: "templates first, upload route later". This is the "later". Vocabulary per docs/GLOSSARY.md
 (Collector, Pipeline, Dataset, Investigation, Incident, Expectation).
 
@@ -67,14 +67,14 @@ identity import of the landed Dataset (DuckDB). Checklist items: `CapabilityMani
 `node tools/openapi-merge.mjs --write`, `AbsentGeoLinkRoutes.SURFACE`, `tools/route-gating-report.mjs`.
 Unit-level only: `-pl la/inspecto-la-api -Dtest=...`; the full reactor only at GAUNTLET.
 
-## 7. Slice analysis (why nothing was built)
+## 7. Slice analysis (superseded: built once D-UP1..D-UP3 were decided)
 
 Every slice is decision-bound: the route needs a landing target (D-UP1); size cap and quota are policy numbers (D-UP2); the
 capability is a role-model choice (D-UP3). A pure helper (name validator, counting limiter, zip sniff) would be speculative
 code with no caller until D-UP1 lands. Decision-free slice: none. Once D-UP1..D-UP3 are answered the build is one
 `UploadRoutes` class plus the checklist, roughly M.
 
-## 8. Decisions owed (operator)
+## 8. Decisions (assistant-decided 2026-10-18 on the operator's delegation; pending operator confirmation)
 
 | ID | Question | Recommendation |
 |----|----------|----------------|
@@ -86,3 +86,17 @@ code with no caller until D-UP1 lands. Decision-free slice: none. Once D-UP1..D-
 | D-UP6 | Free-form sheets: may the analyst map columns in the UI? | No in the first cut: the Collector schema defines columns; mismatches quarantine. |
 | D-UP7 | Retention / deletion of landed upload files. | Same as feed files; no analyst delete in the first cut. |
 | D-UP8 | UI scope: route-only first (like `/import`) or an Investigation upload pane. | Route first, pane second under `angular-ui`. |
+
+Decided as recommended above, with: D-UP3 granted by default to the roles that hold `canBuildLinkIndex` (operations, support, power, admin; super holds all);
+D-UP7 no extra retention logic in v1 (landed files follow the Collector's existing retention - FOLLOW-UP); D-UP8 route first, UI pane later.
+
+## 9. As built (2026-10-18)
+
+- Route `POST /inv/uploads/{collector}?name=<file>.csv[&replace=true]`, `UploadRoutes` (la-api); capability `canUploadData` (Roles + `CapabilityManifest`); rate class EXPENSIVE (429); module.toon route + openapi fragment merged; basic edition: 503 with the other Investigation routes.
+- **Collector flag:** `collector.accepts_upload: true` (new `ConfigSpecs` field, `PipelineConfig.Collector.acceptsUpload`). Only a LOCAL poll Collector, not Dataset-fed. The bridge `HostUploadLandingPort` (geo-link, `UploadLandingPort` in la-core) resolves it by Collector id or Pipeline name. Unknown / not opted in / not local all answer one 404.
+- **Gate order as built** (cheap refusals before the body is read): capability 401/403 -> write root 503 -> name missing 422 -> path-shaped name 403 (`PATH_JAIL_VIOLATION`) -> Collector 404 -> charset / `.csv` / the Collector's include patterns 422 -> size 413 (declared length refused before reading; chunked refused after cap+1 bytes) -> empty / zip-XLSX / NUL / non-UTF-8 422 -> resolved path jailed 403 -> four-eyes 403 -> same name in inbox 409 (`replace=true` opts in) -> daily quota 413 -> atomic temp + move (`AtomicFiles`).
+- **Deviation from section 4 gate 8:** classification/masking is NOT re-judged at upload (the Pipeline's schema and the Dataset read still mask exactly as for any Dataset). The gate is the existing D-U7 four-eyes ROW budget (`four_eyes_budget_above`, rows = lines in the file) via `InvRoutes.refuseIfSensitive`; no threshold set means no gate, as for every other D-U7 read.
+- Limits: `LaLimit.UPLOAD_MAX_BYTES` (`upload.max_bytes`, 25 MiB) and `UPLOAD_DAILY_BYTES` (`upload.daily_bytes`, 200 MiB). Daily total is a per-Space ledger `<config root>/audit/la-uploads/<UTC day>.bytes` (counts landed bytes only; read-modify-write under one JVM lock, so a multi-node deployment would not share it - FOLLOW-UP).
+- Audit: `EventType.LA_UPLOAD` per attempt after the capability gate (collector, file, bytes, sha256, outcome, refusing gate); never row content.
+- Residuals / follow-ups: (1) the 409 sees only a file still in the inbox - a same-name file already ingested is caught by the Collector's own duplicate mode (checksum), not by the route; (2) retention of landed files (D-UP7) and any analyst-side delete; (3) the visual Pipeline editor round-trip of `collector.accepts_upload` is not separately tested (fails closed to "no upload" if dropped); (4) UI pane (D-UP8); (5) GET status of an upload (design section 3, second cut); (6) the lying-Content-Length case is covered by the declared-length and chunked tests, not by a raw-socket test.
+- Tests: `ControlApiAnalystUploadTest` (geo-link, 14 real-HTTP tests: capability 401/403/403, 503, 422 name, 403 jail, 404 x2, 422 pattern, 422 content, 413 declared + chunked, 413 quota, 403 four-eyes, 409 + replace, 429, audit + sha, atomic landing under a concurrent reader, end-to-end upload -> ingest -> identity import) plus the touched guards (`CapabilityManifestTest`, `AbsentModuleRoutesTest`, `LaLimitCatalogueParityTest`, `LinkAnalysisRateClassCoverageTest`, `ContractFragmentsTest`, `OpenApiPathsContractTest`, `ControlApiBasicEditionLinkAnalysisTest`).

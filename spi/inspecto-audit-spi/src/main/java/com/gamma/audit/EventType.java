@@ -147,6 +147,9 @@ public final class EventType {
      *  slice 2) — one event per identity fact. {@code kind}, {@code seq}, {@code assertionSeq} (the assertion the fact
      *  made or retracted) and {@code groupSize} — never the keys. */
     public static final String ENTITY_IDENTITY_CHANGED = "ENTITY_IDENTITY_CHANGED";
+    /** An analyst upload was attempted ({@code POST /inv/uploads/{collector}}, LA-ANALYST-UPLOAD-1) - landed or refused.
+     *  {@code collector}, {@code file}, {@code bytes}, {@code sha256}, {@code outcome}, {@code gate}; never row content. */
+    public static final String LA_UPLOAD = "LA_UPLOAD";
     /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
      *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
     public static final String GEO_PROJECTED = "GEO_PROJECTED";

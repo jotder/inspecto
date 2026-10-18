@@ -216,6 +216,10 @@ public enum LaLimit {
             "The most identity rows one import reads."),
     IDENTITY_IMPORT_TIMEOUT_S("identity.import_timeout_s", Layer.SPACE, false, "identity", "s", 10, 1, 300,
             "Statement timeout of one identity import."),
+    UPLOAD_MAX_BYTES("upload.max_bytes", Layer.SPACE, false, "upload", "bytes", 25L * 1024 * 1024, 1, 1_073_741_824L,
+            "The largest file one analyst upload may land (D-UP2)."),
+    UPLOAD_DAILY_BYTES("upload.daily_bytes", Layer.SPACE, false, "upload", "bytes", 200L * 1024 * 1024, 1, 107_374_182_400L,
+            "The most bytes the Space's analyst uploads may land in one UTC day (D-UP2)."),
 
     // ── entity profile (SPACE; la-entity-profile-plan §4.4 / §4.5) ──────────────────────────────────────────────
     ENTITY_PROFILE_TIMEOUT_S("entity_profile.timeout_s", Layer.SPACE, false, "entity_profile", "s", 30, 1, 600,

@@ -844,7 +844,7 @@ public final class PipelineConfig {
                          String dataset,
                          Duplicate duplicate, Guarantee guarantee, GapDetection gapDetection,
                          Fetch fetch, Retry retry, CircuitBreaker circuitBreaker, PostActionConfig postAction,
-                         Incremental incremental, String discovery) {
+                         Incremental incremental, String discovery, boolean acceptsUpload) {
         public Collector {
             includes = List.copyOf(includes);
             excludes = List.copyOf(excludes);

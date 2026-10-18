@@ -456,7 +456,7 @@ final class PipelineConfigParser {
         Map<String, Object> src = castMapAt(raw, "collector");
         if (src == null)
             return new Collector(pipelineName, "local", new ArrayList<>(List.of(filePattern)), List.of(), -1,
-                    null, null, null, null, null, null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null, null, null, null, null, false);
 
         String id             = opt(src, "id", pipelineName);
         String connector      = opt(src, "connector", "local").toLowerCase();
@@ -585,7 +585,7 @@ final class PipelineConfigParser {
 
         return new Collector(id, connector, includes, excludes, recursiveDepth, stability, connection,
                 dataset, duplicate, guarantee, gapDetection, fetch, retry, circuitBreaker, postAction,
-                incremental, discovery);
+                incremental, discovery, "true".equalsIgnoreCase(String.valueOf(src.getOrDefault("accepts_upload", "false")).trim()));
     }
 
     /**

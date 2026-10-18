@@ -90,6 +90,8 @@ public final class CapabilityManifest {
             new Entry("POST", "/inv/entity-identities", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/entity-identities/import", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/entity-identities/([^/]+)/retract", Roles.CAN_MANAGE_INCIDENTS),
+            // UploadRoutes (LA-ANALYST-UPLOAD-1, D-UP3) - lands an analyst's CSV in an upload-enabled Collector's inbox: its own verb.
+            new Entry("POST", "/inv/uploads/([^/]+)", Roles.CAN_UPLOAD_DATA),
             // InvestigationRoutes, LA-19 controls (operator 2026-09-24) — revealing a masked entity (D-U6) and
             // deciding a pending sensitive expand (D-U7, four-eyes) are oversight acts with their own capabilities.
             new Entry("POST", "/inv/investigations/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),
