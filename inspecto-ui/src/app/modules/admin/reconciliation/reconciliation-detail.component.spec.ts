@@ -306,7 +306,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
 
     it('reads ONE day: the URL day goes to the Breaks request, and the picker lists the days with data', async () => {
         const { c, breaks, page, fixture } = await create({ day: '2026-09-25' });
-        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-25', 50, 0);
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-25', 16, 0);
         expect(page).toHaveBeenCalledWith(expect.anything(), { day: '2026-09-25', offset: 0, limit: 1, filter: 'all' });
         expect(c.availableDays()).toEqual(['2026-09-26', '2026-09-25']);
         const legend = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Band legend"]');
@@ -319,7 +319,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         c.setDay('2026-09-25');
         expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { day: '2026-09-25' } }));
         await vi.waitFor(() =>
-            expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-25', 50, 0),
+            expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-25', 16, 0),
         );
     });
 
@@ -365,7 +365,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
 
     it('scopes to the Board dimension path from ?path=', async () => {
         const { c, breaks } = await create({ path: 'region:EU' });
-        expect(breaks).toHaveBeenCalledWith(expect.anything(), { region: 'EU' }, null, 'b', '2026-09-26', 50, 0);
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), { region: 'EU' }, null, 'b', '2026-09-26', 16, 0);
         expect(c.missingA()).toHaveLength(0);
         expect(c.valueBreaks()).toHaveLength(1);
     });
@@ -544,7 +544,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
 
         c.setSide('c');
         await vi.waitFor(() => expect(c.computing()).toBe(false));
-        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), c.path(), null, 'c', '2026-09-26', 50, 0);
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), c.path(), null, 'c', '2026-09-26', 16, 0);
         expect(c.valueBreaks()[0]).toMatchObject({ pair: 'AC', status: 'open', firstSeenAt: acSeen });
         expect(c.valueBreaks()[0].note).toBeUndefined();
         expect(c.ageText(c.valueBreaks()[0])).toBe('5d');
@@ -1013,13 +1013,23 @@ describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/
 
     it('asks for ONE page — 50 rows from offset 0 — and offers Next only when the server says more follow', async () => {
         const { fixture, c, breaks } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
-        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 50, 0);
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 16, 0);
         expect(c.hasMore()).toBe(true);
         const el = fixture.nativeElement as HTMLElement;
         const next = el.querySelector<HTMLButtonElement>('[data-testid="page-next"]');
         expect(next?.disabled).toBe(false);
         expect(el.querySelector<HTMLButtonElement>('[data-testid="page-prev"]')?.disabled).toBe(true);
-        expect(el.querySelector('[data-testid="break-pager"]')?.textContent).toContain('Rows 1–50 · more follow');
+        expect(el.querySelector('[data-testid="break-pager"]')?.textContent).toContain('Rows 1–16 · more follow');
+    });
+
+    it('never holds more than 50 Breaks: All types shares the budget across the sets, one type gets all of it', async () => {
+        const plain = await create({ sets: {} });
+        expect(plain.c.pageSize() * 3).toBeLessThanOrEqual(50);
+        plain.c.typeFilter.set('value_break');
+        expect(plain.c.pageSize()).toBe(50);
+        TestBed.resetTestingModule();
+        const card = await create({ sets: {}, patch: { raw: { cardinality: 'one_to_one' } } });
+        expect(card.c.pageSize() * 4).toBeLessThanOrEqual(50);
     });
 
     it('shows no pager when everything fits on one page', async () => {
@@ -1033,17 +1043,17 @@ describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/
         breaks.mockResolvedValueOnce({ missing_right: set(['A3'], false) });
         c.movePage(1);
         await tick(fixture);
-        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 50, 50);
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 16, 16);
         expect(c.missingA().map((b) => b.key)).toEqual(['A3 · voice']);
         expect(c.hasMore()).toBe(false);
         expect(navigate).toHaveBeenLastCalledWith(
             [],
-            expect.objectContaining({ queryParams: { type: null, offset: 50 } }),
+            expect.objectContaining({ queryParams: { type: null, offset: 16 } }),
         );
         breaks.mockResolvedValueOnce({ missing_right: set(['A1', 'A2'], true) });
         c.movePage(-1);
         await tick(fixture);
-        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 50, 0);
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 16, 0);
         expect(c.missingA()).toHaveLength(2);
     });
 
@@ -1129,6 +1139,7 @@ describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/
         await fixture.whenStable();
         expect(c.pageFrom()).toBe(51);
         expect(c.pageTo()).toBe(52);
+        expect(c.pageSize()).toBe(50);
     });
 
     it('drops a URL type this Reconciliation cannot show', async () => {

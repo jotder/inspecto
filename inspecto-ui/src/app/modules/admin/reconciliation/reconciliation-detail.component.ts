@@ -110,7 +110,18 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly typeFilter = signal<BreakTypeFilter>('all');
     /** Zero-based page of the Breaks; the server cuts each Break set at `pageSize` from `pageIndex * pageSize`. */
     readonly pageIndex = signal(0);
-    readonly pageSize = RECON_DEFAULT_PAGE_SIZE;
+    /**
+     * Rows a page may hold in all. The route cuts EACH Break set at `limit`, so on *All types* every set gets an equal
+     * share (`floor(budget / types)`); one chosen type gets the whole budget. Either way a page is at most this many rows.
+     */
+    private readonly pageBudget = RECON_DEFAULT_PAGE_SIZE;
+    readonly pageSize = computed(() =>
+        this.typeFilter() === 'all'
+            ? Math.floor(this.pageBudget / Math.max(1, this.typeOptions().length - 1))
+            : this.pageBudget,
+    );
+    /** The `?offset=` the page opened with; applied once the Reconciliation is known (its type count sets the page size). */
+    private pendingOffset = 0;
     /** True when the server reports more Breaks after this page (a set came back `truncated`). */
     readonly hasMore = signal(false);
     /** True while a full CSV export is paging through the server. */
@@ -377,10 +388,10 @@ export class ReconciliationDetailComponent implements OnInit {
     ]);
 
     /** First and last row number of this page (1-based), for the pager caption. */
-    readonly pageFrom = computed(() => this.pageIndex() * this.pageSize + 1);
+    readonly pageFrom = computed(() => this.pageIndex() * this.pageSize() + 1);
     /** Last row of this page: a full page while more follow, else the first row plus the longest set shown. */
     readonly pageTo = computed(() => {
-        if (this.hasMore()) return (this.pageIndex() + 1) * this.pageSize;
+        if (this.hasMore()) return (this.pageIndex() + 1) * this.pageSize();
         const counts = new Map<string, number>();
         for (const b of this.drillBreaks()) counts.set(b.type, (counts.get(b.type) ?? 0) + 1);
         return this.pageFrom() - 1 + Math.max(0, ...counts.values());
@@ -731,7 +742,7 @@ export class ReconciliationDetailComponent implements OnInit {
         const type = this.route.snapshot.queryParamMap.get('type');
         if (BREAK_TYPE_FILTERS.includes(type as BreakTypeFilter)) this.typeFilter.set(type as BreakTypeFilter);
         const offset = Number(this.route.snapshot.queryParamMap.get('offset'));
-        if (Number.isInteger(offset) && offset > 0) this.pageIndex.set(Math.floor(offset / this.pageSize));
+        if (Number.isInteger(offset) && offset > 0) this.pendingOffset = offset;
         this.destroyRef.onDestroy(() => this.elapsed.stop());
         // Labels only: a failed read leaves the sides named by their ids.
         this.datasetsApi
@@ -745,6 +756,7 @@ export class ReconciliationDetailComponent implements OnInit {
                 this.loadState(r.id);
                 // A type from the URL that this Reconciliation cannot show (Duplicate keys without a cardinality).
                 if (!this.typeOptions().some((o) => o.value === this.typeFilter())) this.typeFilter.set('all');
+                if (this.pendingOffset > 0) this.pageIndex.set(Math.floor(this.pendingOffset / this.pageSize()));
                 void this.compute();
             },
             error: (e) => {
@@ -838,7 +850,7 @@ export class ReconciliationDetailComponent implements OnInit {
             relativeTo: this.route,
             queryParams: {
                 type: this.typeFilter() === 'all' ? null : this.typeFilter(),
-                offset: this.pageIndex() ? this.pageIndex() * this.pageSize : null,
+                offset: this.pageIndex() ? this.pageIndex() * this.pageSize() : null,
             },
             queryParamsHandling: 'merge',
             replaceUrl: true,
@@ -874,8 +886,8 @@ export class ReconciliationDetailComponent implements OnInit {
                 type,
                 side,
                 this.day(),
-                this.pageSize,
-                this.pageIndex() * this.pageSize,
+                this.pageSize(),
+                this.pageIndex() * this.pageSize(),
             );
             this.hasMore.set(anyTruncated(sets));
             // Tagged with the pair they were computed on — the recorded state holds both pairs of a 3-way.

@@ -437,10 +437,10 @@ back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model 
 **RECON-UPLIFT-1 lane B — Breaks page and Board (2026-10-18, as built).** Plan:
 [`reconciliation-uplift-plan.md`](../../../superpower/reconciliation-uplift-plan.md) (U1, U3, U4, U6).
 
-* **Breaks page pages on the server.** Every compute sends `limit` (50, `RECON_DEFAULT_PAGE_SIZE`) and
-  `offset = pageIndex × 50` to `/recon/breaks`, and a page REPLACES the last one (never appended). ⚠ The route cuts
-  **each Break set** at `limit`, so an *All types* page can hold up to four sets of 50 (≤ 200 rows, and 50 when one
-  type is chosen). `/recon/breaks` returns **no total**: `truncated` on a set is the only "more follow" signal, so
+* **Breaks page pages on the server, and a page is at most 50 rows.** Every compute sends `limit` and
+  `offset = pageIndex × limit` to `/recon/breaks`, and a page REPLACES the last one (never appended). The route cuts
+  **each Break set** at `limit`, so *All types* gives every set an equal share (`floor(50 / types)`: 16 for three
+  types, 12 for four) and one chosen type gets the whole 50 (`pageSize()`). `/recon/breaks` returns **no total**: `truncated` on a set is the only "more follow" signal, so
   the pager is *Previous / Next* with a "Rows 51–100 · more follow" caption, not a `mat-paginator`. The count cards
   and the banner read the **whole day** from the Board's cached `/recon/run` summary (`byType`, per pair); they fall
   back to this page's count with a `+` when a Board path scopes the view (the summary is unscoped) or the summary is
