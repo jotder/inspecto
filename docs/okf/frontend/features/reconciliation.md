@@ -478,6 +478,38 @@ back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model 
   and the Board's edit pencil (and `edit()` itself), because each writes the `reconciliation` Component whose
   PUT the server gates on that capability. *Run* stays `canOperateRuns`.
 
+**RECON-UPLIFT-1 lane B — Breaks page and Board (2026-10-18, as built).** Plan:
+[`reconciliation-uplift-plan.md`](../../../superpower/reconciliation-uplift-plan.md) (U1, U3, U4, U6).
+
+* **Breaks page pages on the server, and a page is at most 50 rows.** Every compute sends `limit` and
+  `offset = pageIndex × limit` to `/recon/breaks`, and a page REPLACES the last one (never appended). The route cuts
+  **each Break set** at `limit`, so *All types* gives every set an equal share (`floor(50 / types)`: 16 for three
+  types, 12 for four) and one chosen type gets the whole 50 (`pageSize()`). `/recon/breaks` returns **no total**: `truncated` on a set is the only "more follow" signal, so
+  the pager is *Previous / Next* with a "Rows 51–100 · more follow" caption, not a `mat-paginator`. The count cards
+  and the banner read the **whole day** from the Board's cached `/recon/run` summary (`byType`, per pair); they fall
+  back to this page's count with a `+` when a Board path scopes the view (the summary is unscoped) or the summary is
+  not known; a type the filter excluded reads "–" and the banner says "Filtered view" rather than claiming a total.
+  *Resolved* and *Open breaks by age* are labelled "this page". A `?type=` the Reconciliation cannot show resets to *All types*.
+* **Break-type filter** (All types · Only in A · Only in B · Value breaks · Duplicate keys when a cardinality is
+  declared) is the route's own `type` parameter. Filter and page live in the URL (`?type=`, `?offset=`) next to
+  `day`; a type, side or day change returns to page 1. An empty filtered page gets its own empty state, never
+  "Healthy".
+* **CSV export** pages `/recon/breaks` at the server's 5,000 limit through the current filter and path (cap 50,000
+  rows, with a toast) and writes `type, key, column, left, right, diff, impact, status, ageDays, assignee` with the
+  recorded lifecycle overlaid. It never shows those rows, so the screen still holds one page. The tables' own
+  *Export CSV* is switched off (`[exportable]="false"`): it would export only the loaded page. Column sort in the tables
+  re-orders the loaded page only; `/recon/breaks` has no server sort.
+* **Controls (U3).** Detail page: one filled **Run now** (recompute), and the icon is **Reload** (re-reads the
+  recorded statuses, assignees and Incident links without recomputing); the banner's duplicate button is gone. Board:
+  the icon is **Reload**; **Record run** carries a tooltip plus an `aria-describedby` hint saying what it persists.
+* **Progress (U4).** `ElapsedTimer` (`recon-elapsed.ts`) drives a table-shaped `<inspecto-skeleton>` and "Comparing …
+  N s" on both pages; the seconds are `aria-hidden` so the status region does not announce every tick. The dashboard
+  widget keeps its spinner (outside this lane).
+* **Design system (U6).** The banner now uses the card surface (`bg-card … shadow`) in place of the literal
+  `border-gray-200 dark:border-gray-700`; `lint:tokens` and the axe assertions pass.
+* Not verified against a real backend: the preview was driven against a mock API (no reconciliation data was
+  available), so paging, filter, export and the URL round trip are proven on the SPA side only.
+
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
 review sheet: [`reviews/reconciliation.md`](../../../archived-documents/superpower-reviews/reconciliation.md).

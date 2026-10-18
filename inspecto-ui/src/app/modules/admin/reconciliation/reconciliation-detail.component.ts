@@ -1,10 +1,9 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
@@ -14,7 +13,8 @@ import { ReconRowsResult } from 'app/inspecto/api/recon.service';
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { DataTableComponent } from 'app/inspecto/data-table';
+import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
+import { DataTableComponent, downloadCsv, toCsv } from 'app/inspecto/data-table';
 import { FlatTreeRow, TreeNode, TreeTableComponent, varianceCell } from 'app/inspecto/tree-table';
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -37,10 +37,15 @@ import {
     ReconciliationsService,
     ReconBreak,
     reconCardinality,
+    RECON_DEFAULT_PAGE_SIZE,
+    ReconBreakSets,
+    ReconByType,
+    ReconPair,
     reconciliationTitle,
     ReconState,
     ReconToolbarComponent,
 } from 'app/inspecto/reconciliation';
+import { ElapsedTimer } from './recon-elapsed';
 import { ReconExecService } from './recon-exec.service';
 import { ReconAssignData, ReconAssignDialog } from './recon-assign.dialog';
 import { DatasetsService } from '../studio/datasets/datasets.service';
@@ -68,12 +73,12 @@ import { humanizeColumn } from 'app/inspecto/viz/column-label';
         MatButtonModule,
         MatButtonToggleModule,
         MatIconModule,
-        MatProgressSpinnerModule,
         MatTooltipModule,
         DataTableComponent,
         TreeTableComponent,
         InspectoEmptyStateComponent,
         InspectoAlertComponent,
+        InspectoSkeletonComponent,
         StatusBadgeComponent,
         ReconToolbarComponent,
     ],
@@ -92,12 +97,40 @@ export class ReconciliationDetailComponent implements OnInit {
     private dialog = inject(MatDialog);
     private lens = inject(LensService);
     private session = inject(SessionService);
+    private destroyRef = inject(DestroyRef);
 
     readonly recon = signal<Reconciliation | null>(null);
     /** The server-recorded run + Break lifecycle (R2-03); null until read. */
     readonly state = signal<ReconState | null>(null);
     readonly loading = signal(true);
     readonly computing = signal(false);
+    /** Seconds since the running compute started — the loading cue beside the skeleton (U4). */
+    readonly elapsed = new ElapsedTimer();
+    /** The Break-type filter (U1) — `all` asks the server for every type, one at a time otherwise. */
+    readonly typeFilter = signal<BreakTypeFilter>('all');
+    /** Zero-based page of the Breaks; the server cuts each Break set at `pageSize` from `pageIndex * pageSize`. */
+    readonly pageIndex = signal(0);
+    /**
+     * Rows a page may hold in all. The route cuts EACH Break set at `limit`, so on *All types* every set gets an equal
+     * share (`floor(budget / types)`); one chosen type gets the whole budget. Either way a page is at most this many rows.
+     */
+    private readonly pageBudget = RECON_DEFAULT_PAGE_SIZE;
+    readonly pageSize = computed(() =>
+        this.typeFilter() === 'all'
+            ? Math.floor(this.pageBudget / Math.max(1, this.typeOptions().length - 1))
+            : this.pageBudget,
+    );
+    /** The `?offset=` the page opened with; applied once the Reconciliation is known (its type count sets the page size). */
+    private pendingOffset = 0;
+    /** True when the server reports more Breaks after this page (a set came back `truncated`). */
+    readonly hasMore = signal(false);
+    /** True while a full CSV export is paging through the server. */
+    readonly exporting = signal(false);
+    /** The day's Break counts per type (whole day, unscoped) — from the Board's cached run; null when unknown. */
+    private readonly daySummary = signal<{
+        byType: ReconByType;
+        pairs?: { side: string; byType: ReconByType }[];
+    } | null>(null);
     readonly lastEvaluated = signal<Date | null>(new Date());
     /** Date AND time — a bare wall-clock time is ambiguous once the data is as of an earlier day. */
     readonly fmtDateTime = fmtDateTime;
@@ -266,8 +299,9 @@ export class ReconciliationDetailComponent implements OnInit {
      * carry (the next recorded run keeps them too); an `auto_closed` record's status/note/assignee do not — the
      * Break is live again, so it is open until a run records its return.
      */
-    readonly drillBreaks = computed<ReconBreak[]>(() => {
-        const live = this.liveBreaks() ?? [];
+    readonly drillBreaks = computed<ReconBreak[]>(() => this.overlay(this.liveBreaks() ?? []));
+
+    private overlay(live: ReconBreak[]): ReconBreak[] {
         const persisted = this.persistedById();
         return live.map((b) => {
             // the Break's own day first; an undated record (written before the per-day lifecycle) still overlays
@@ -285,7 +319,7 @@ export class ReconciliationDetailComponent implements OnInit {
                 ? { ...aged, status: p.status, note: p.note, assignee: p.assignee }
                 : aged;
         });
-    });
+    }
 
     readonly missingA = computed(() => this.drillBreaks().filter((b) => b.type === 'missing_right'));
     readonly missingB = computed(() => this.drillBreaks().filter((b) => b.type === 'missing_left'));
@@ -296,6 +330,72 @@ export class ReconciliationDetailComponent implements OnInit {
         this.cardinality() ? this.drillBreaks().filter((b) => b.type === 'cardinality_break') : [],
     );
     readonly resolvedCount = computed(() => this.drillBreaks().filter((b) => b.status === 'resolved').length);
+
+    /**
+     * The day's Break count for one type, from the Board's cached run (so a card reads the whole day, not the page);
+     * null when a Board path scopes the view (the summary is unscoped) or the summary is not known.
+     */
+    private dayTotal(type: BreakSetType): number | null {
+        const sum = this.daySummary();
+        if (!sum || this.path()) return null;
+        // Side C reads only its own pair — never the A-to-B counts a missing pair would fall back to.
+        const byType =
+            this.side() === 'c' ? sum.pairs?.find((p) => p.side === 'c')?.byType : (sum.pairs?.[0] ?? sum).byType;
+        const n = byType?.[type];
+        return typeof n === 'number' ? n : null;
+    }
+
+    /** What a count card shows: the day's total, else this page's count with a `+` when more follow. */
+    readonly countText = (type: BreakSetType): string => {
+        const total = this.dayTotal(type);
+        if (total !== null) return formatNumber(total);
+        // A type the filter excluded was never requested: its count is unknown, not zero.
+        if (this.typeFilter() !== 'all' && this.typeFilter() !== type) return '–';
+        const onPage = this.drillBreaks().filter((b) => b.type === type).length;
+        const mayHaveMore = this.hasMore() && (this.typeFilter() === 'all' || this.typeFilter() === type);
+        return mayHaveMore ? `${onPage}+` : String(onPage);
+    };
+
+    /**
+     * How many Breaks the banner reports: the day's total over every type when the Board summary is known, else
+     * this page's count (with a `+` when more follow). `none` is true only when that count is genuinely zero, so an
+     * empty FILTERED page never reads "Balanced".
+     */
+    readonly discrepancies = computed(() => {
+        const types: BreakSetType[] = ['missing_right', 'missing_left', 'value_break'];
+        if (this.cardinality()) types.push('cardinality_break');
+        const totals = types.map((t) => this.dayTotal(t));
+        if (totals.every((t): t is number => t !== null)) {
+            const n = totals.reduce((sum, t) => sum + t, 0);
+            return { text: formatNumber(n), none: n === 0, partial: false };
+        }
+        const n = this.drillBreaks().length;
+        return {
+            text: this.hasMore() ? `${n}+` : String(n),
+            none: n === 0 && !this.hasMore() && this.typeFilter() === 'all' && this.pageIndex() === 0,
+            // One type only (or a later page): not the day's total, so the banner must not claim it.
+            partial: this.typeFilter() !== 'all' || this.pageIndex() > 0,
+        };
+    });
+
+    /** The Break-type filter's options; Duplicate keys only when a cardinality is declared. */
+    readonly typeOptions = computed<{ value: BreakTypeFilter; label: string }[]>(() => [
+        { value: 'all', label: 'All types' },
+        { value: 'missing_right', label: 'Only in A' },
+        { value: 'missing_left', label: `Only in ${this.sideLetter()}` },
+        { value: 'value_break', label: 'Value breaks' },
+        ...(this.cardinality() ? [{ value: 'cardinality_break' as const, label: 'Duplicate keys' }] : []),
+    ]);
+
+    /** First and last row number of this page (1-based), for the pager caption. */
+    readonly pageFrom = computed(() => this.pageIndex() * this.pageSize() + 1);
+    /** Last row of this page: a full page while more follow, else the first row plus the longest set shown. */
+    readonly pageTo = computed(() => {
+        if (this.hasMore()) return (this.pageIndex() + 1) * this.pageSize();
+        const counts = new Map<string, number>();
+        for (const b of this.drillBreaks()) counts.set(b.type, (counts.get(b.type) ?? 0) + 1);
+        return this.pageFrom() - 1 + Math.max(0, ...counts.values());
+    });
 
     /** Aging histogram over the open breaks in this scope (`BREAK-AGING-1`); the rollup is shared. */
     readonly ageBuckets = computed(() => openAgeBuckets(this.drillBreaks()));
@@ -639,6 +739,11 @@ export class ReconciliationDetailComponent implements OnInit {
         const id = this.route.snapshot.paramMap.get('id') ?? '';
         this.path.set(decodePath(this.route.snapshot.queryParamMap.get('path')));
         this.day.set(this.route.snapshot.queryParamMap.get('day'));
+        const type = this.route.snapshot.queryParamMap.get('type');
+        if (BREAK_TYPE_FILTERS.includes(type as BreakTypeFilter)) this.typeFilter.set(type as BreakTypeFilter);
+        const offset = Number(this.route.snapshot.queryParamMap.get('offset'));
+        if (Number.isInteger(offset) && offset > 0) this.pendingOffset = offset;
+        this.destroyRef.onDestroy(() => this.elapsed.stop());
         // Labels only: a failed read leaves the sides named by their ids.
         this.datasetsApi
             .list()
@@ -649,6 +754,9 @@ export class ReconciliationDetailComponent implements OnInit {
                 this.loading.set(false);
                 this.loadPromoted(r.id);
                 this.loadState(r.id);
+                // A type from the URL that this Reconciliation cannot show (Duplicate keys without a cardinality).
+                if (!this.typeOptions().some((o) => o.value === this.typeFilter())) this.typeFilter.set('all');
+                if (this.pendingOffset > 0) this.pageIndex.set(Math.floor(this.pendingOffset / this.pageSize()));
                 void this.compute();
             },
             error: (e) => {
@@ -694,9 +802,11 @@ export class ReconciliationDetailComponent implements OnInit {
                 this.exec.page(r, { day: this.day(), offset: 0, limit: 1, filter: 'all' }),
             );
             this.availableDays.set(res.availableDays ?? []);
+            this.daySummary.set(res.summary ?? null);
             if (!this.day() && res.day) this.day.set(res.day);
         } catch {
             // the picker stays empty; the Breaks still compute (for the latest day, server-side)
+            this.daySummary.set(null);
         }
     }
 
@@ -704,13 +814,47 @@ export class ReconciliationDetailComponent implements OnInit {
     setDay(day: string): void {
         if (this.computing() || day === this.day()) return;
         this.day.set(day);
+        this.daySummary.set(null);
+        const paged = this.pageIndex() > 0;
+        this.pageIndex.set(0);
         void this.router.navigate([], {
             relativeTo: this.route,
-            queryParams: { day },
+            queryParams: { day, ...(paged ? { offset: null } : {}) },
             queryParamsHandling: 'merge',
             replaceUrl: true,
         });
         void this.compute();
+    }
+
+    /** Narrow to one Break type (or all) — back to the first page, kept in the URL like the day. */
+    setType(type: BreakTypeFilter): void {
+        if (this.computing() || type === this.typeFilter()) return;
+        this.typeFilter.set(type);
+        this.pageIndex.set(0);
+        this.syncUrl();
+        void this.compute();
+    }
+
+    /** Move one page (±1) — Next only while the server said more follow. */
+    movePage(delta: 1 | -1): void {
+        if (this.computing()) return;
+        const next = this.pageIndex() + delta;
+        if (next < 0 || (delta > 0 && !this.hasMore())) return;
+        this.pageIndex.set(next);
+        this.syncUrl();
+        void this.compute();
+    }
+
+    private syncUrl(): void {
+        void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: {
+                type: this.typeFilter() === 'all' ? null : this.typeFilter(),
+                offset: this.pageIndex() ? this.pageIndex() * this.pageSize() : null,
+            },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+        });
     }
 
     /** Switch the compared side (3-way) and recompute. */
@@ -719,6 +863,8 @@ export class ReconciliationDetailComponent implements OnInit {
         // flight, so flipping `side` here regardless would re-label the headers over the OLD rows.
         if (this.computing()) return;
         this.side.set(side);
+        this.pageIndex.set(0);
+        this.syncUrl();
         void this.compute();
     }
 
@@ -727,12 +873,23 @@ export class ReconciliationDetailComponent implements OnInit {
         const r = this.recon();
         if (!r || this.computing()) return;
         this.computing.set(true);
+        this.elapsed.start();
         const side = this.side();
         try {
             // The Breaks are of ONE day and carry it (per-day lifecycle), so learn the latest day before computing.
             if (this.day()) void this.loadDays(r);
             else await this.loadDays(r);
-            const sets = await this.exec.breaks(r, this.path(), null, side, this.day());
+            const type = this.typeFilter() === 'all' ? null : (this.typeFilter() as BreakSetType);
+            const sets = await this.exec.breaks(
+                r,
+                this.path(),
+                type,
+                side,
+                this.day(),
+                this.pageSize(),
+                this.pageIndex() * this.pageSize(),
+            );
+            this.hasMore.set(anyTruncated(sets));
             // Tagged with the pair they were computed on — the recorded state holds both pairs of a 3-way.
             const pair = side === 'c' ? 'AC' : 'AB';
             const day = this.day() ?? undefined;
@@ -742,11 +899,74 @@ export class ReconciliationDetailComponent implements OnInit {
             this.lastEvaluated.set(new Date());
         } catch (e) {
             this.liveBreaks.set(null);
+            this.hasMore.set(false);
             this.impacts.set({});
             this.dupImpacts.set({});
             this.toastr.error(apiErrorMessage(e, 'Could not compute the break sets'));
         } finally {
             this.computing.set(false);
+            this.elapsed.stop();
+        }
+    }
+
+    /** Re-read what the server RECORDED (statuses, assignees, Incident links) without recomputing the Breaks. */
+    reloadRecorded(): void {
+        const r = this.recon();
+        if (!r) return;
+        this.loadState(r.id);
+        this.loadPromoted(r.id);
+    }
+
+    /**
+     * Download EVERY Break the current filter matches as CSV — paged through the server at its largest page
+     * (5,000) and never shown in the table, so the page still holds one page. Stops at {@link EXPORT_CAP} rows.
+     */
+    async exportCsv(): Promise<void> {
+        const r = this.recon();
+        if (!r || this.exporting()) return;
+        this.exporting.set(true);
+        const side = this.side();
+        const day = this.day() ?? undefined;
+        const pair: ReconPair = side === 'c' ? 'AC' : 'AB';
+        const type = this.typeFilter() === 'all' ? null : (this.typeFilter() as BreakSetType);
+        const rows: Record<string, unknown>[] = [];
+        let capped = false;
+        try {
+            for (let offset = 0; ; offset += EXPORT_PAGE) {
+                const sets = await this.exec.breaks(r, this.path(), type, side, day, EXPORT_PAGE, offset);
+                const live = breaksFromSets(r, sets).map((b) => ({ ...b, pair, ...(day ? { day } : {}) }));
+                const impacts = breakImpacts(r, sets);
+                const dups = duplicateImpacts(r, sets);
+                for (const b of this.overlay(live)) {
+                    const impact = (b.type === 'cardinality_break' ? dups : impacts)[b.key];
+                    rows.push({
+                        type: breakLabel(b.type),
+                        key: b.key,
+                        column: b.column ?? '',
+                        left: b.leftValue ?? '',
+                        right: b.rightValue ?? '',
+                        diff: b.diff ?? '',
+                        impact: impact ?? '',
+                        status: b.status,
+                        ageDays: breakAgeDays(b) ?? '',
+                        assignee: b.assignee ?? '',
+                    });
+                }
+                if (!anyTruncated(sets)) break;
+                if (rows.length >= EXPORT_CAP) {
+                    capped = true;
+                    break;
+                }
+            }
+            downloadCsv(`${r.id}-breaks-${day ?? 'latest'}`, toCsv(rows, EXPORT_COLUMNS));
+            if (capped)
+                this.toastr.warning(
+                    `Exported the first ${formatNumber(rows.length)} Breaks — narrow the filter for the rest.`,
+                );
+        } catch (e) {
+            this.toastr.error(apiErrorMessage(e, 'Could not export the Breaks'));
+        } finally {
+            this.exporting.set(false);
         }
     }
 
@@ -860,6 +1080,26 @@ function withRecorded(state: ReconState | null, reconciliation: string, b: Recon
         ...base,
         breaks: known ? base.breaks.map((x) => (lifecycleId(x) === id ? b : x)) : [...base.breaks, b],
     };
+}
+
+type BreakSetType = 'missing_left' | 'missing_right' | 'value_break' | 'cardinality_break';
+type BreakTypeFilter = 'all' | BreakSetType;
+const BREAK_TYPE_FILTERS: readonly BreakTypeFilter[] = [
+    'all',
+    'missing_right',
+    'missing_left',
+    'value_break',
+    'cardinality_break',
+];
+/** The server's largest Break page; the export reads at it to make the fewest requests. */
+const EXPORT_PAGE = 5000;
+/** The export stops here — more rows than this wants a narrower filter, not a bigger download. */
+const EXPORT_CAP = 50_000;
+const EXPORT_COLUMNS = ['type', 'key', 'column', 'left', 'right', 'diff', 'impact', 'status', 'ageDays', 'assignee'];
+
+/** True when any returned Break set says more rows follow it. */
+function anyTruncated(sets: ReconBreakSets): boolean {
+    return Object.values(sets).some((set) => !!set && (set as { truncated?: boolean }).truncated === true);
 }
 
 function breakLabel(type: string): string {

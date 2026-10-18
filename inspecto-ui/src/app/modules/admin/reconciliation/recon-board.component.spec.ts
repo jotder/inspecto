@@ -208,6 +208,24 @@ describe('ReconBoardComponent', () => {
         expect(el.querySelector('[data-testid="record-run"]')?.textContent).toContain('Record run');
     });
 
+    it('names the icon Reload (not Refresh) and explains what Record run persists (RECON-UPLIFT-1 U3)', async () => {
+        const { el } = await create();
+        const reload = el.querySelector('[data-testid="reload"]');
+        expect(reload?.getAttribute('aria-label')).toBe('Reload');
+        expect(el.querySelector('[aria-label="Refresh"]')).toBeNull();
+        const tip = el.querySelector('[data-testid="record-run"]')?.getAttribute('mattooltip') ?? '';
+        expect(tip).toContain('first-seen date');
+        expect(tip).toContain('auto-close');
+    });
+
+    it('shows a skeleton and the elapsed time, not a bare spinner, while the day is compared (U4)', async () => {
+        const { el } = await create({ page: () => new Subject<ReconRunResult>(), settle: false });
+        const loading = el.querySelector('[data-testid="board-loading"]');
+        expect(loading?.querySelector('inspecto-skeleton')).not.toBeNull();
+        expect(loading?.querySelector('mat-progress-spinner')).toBeNull();
+        expect(loading?.textContent).toMatch(/\d+ s/);
+    });
+
     it('"Record run" records the SELECTED day server-side and shows the recorded lifecycle', async () => {
         const { c, record, toastr } = await create({ params: { day: '2026-09-25' } });
         c.record();

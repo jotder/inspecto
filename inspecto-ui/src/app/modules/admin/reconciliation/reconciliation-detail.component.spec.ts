@@ -26,6 +26,29 @@ import { Dataset } from '../studio/datasets/dataset-types';
 import { formatNumber } from 'app/inspecto/viz/number-format';
 import { fmtDateTime } from 'app/inspecto/format';
 
+/** The export ends in a Blob download: capture the file name and the CSV text instead of navigating jsdom. */
+function captureDownload(): { name: () => string | undefined; text: () => Promise<string> } {
+    let blob: Blob | undefined;
+    let name: string | undefined;
+    URL.createObjectURL = vi.fn((b: Blob | MediaSource) => {
+        blob = b as Blob;
+        return 'blob:test';
+    });
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        name = this.download;
+    });
+    return {
+        name: () => name,
+        text: () =>
+            new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result));
+                reader.readAsText(blob as Blob);
+            }),
+    };
+}
+
 /** Same reference fixture as the Board/pure-engine specs: MEA only-A, APAC only-B, EU/data value break. */
 const LEFT = [
     { region: 'EU', product: 'voice', amount: 100 },
@@ -79,6 +102,8 @@ async function create(
         sets?: ReconBreakSets;
         rows?: ReturnType<typeof vi.fn>;
         datasets?: Partial<Dataset>[];
+        /** The Board run's whole-day `summary` (the day's Break counts per type). */
+        summary?: unknown;
         /** The Lens' `canOperateRuns` (the Assign gate); default true. */
         canOperateRuns?: boolean;
         /** What the Assign dialog closes with; when set, MatDialog is stubbed. */
@@ -110,9 +135,15 @@ async function create(
     // fails on an undefined method rather than on what it is asserting.
     const promoted =
         opts.promoted ?? vi.fn(() => of({ reconciliation: current.id, promoted: {}, total: 0, truncated: false }));
-    const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+    const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() };
     // The day picker's list: one row of the Board's (server-cached) run for the URL's day.
-    const page = vi.fn(() => of({ day: '2026-09-26', availableDays: ['2026-09-26', '2026-09-25'] }));
+    const page = vi.fn(() =>
+        of({
+            day: '2026-09-26',
+            availableDays: ['2026-09-26', '2026-09-25'],
+            ...(opts.summary ? { summary: opts.summary } : {}),
+        }),
+    );
     const navigate = vi.fn();
     TestBed.configureTestingModule({
         imports: [ReconciliationDetailComponent],
@@ -162,6 +193,7 @@ async function create(
         promoted,
         toastr,
         setBreakStatus,
+        state,
         dialog,
     };
 }
@@ -274,7 +306,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
 
     it('reads ONE day: the URL day goes to the Breaks request, and the picker lists the days with data', async () => {
         const { c, breaks, page, fixture } = await create({ day: '2026-09-25' });
-        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-25');
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-25', 16, 0);
         expect(page).toHaveBeenCalledWith(expect.anything(), { day: '2026-09-25', offset: 0, limit: 1, filter: 'all' });
         expect(c.availableDays()).toEqual(['2026-09-26', '2026-09-25']);
         const legend = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Band legend"]');
@@ -287,7 +319,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         c.setDay('2026-09-25');
         expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { day: '2026-09-25' } }));
         await vi.waitFor(() =>
-            expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-25'),
+            expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-25', 16, 0),
         );
     });
 
@@ -333,7 +365,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
 
     it('scopes to the Board dimension path from ?path=', async () => {
         const { c, breaks } = await create({ path: 'region:EU' });
-        expect(breaks).toHaveBeenCalledWith(expect.anything(), { region: 'EU' }, null, 'b', '2026-09-26');
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), { region: 'EU' }, null, 'b', '2026-09-26', 16, 0);
         expect(c.missingA()).toHaveLength(0);
         expect(c.valueBreaks()).toHaveLength(1);
     });
@@ -512,7 +544,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
 
         c.setSide('c');
         await vi.waitFor(() => expect(c.computing()).toBe(false));
-        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), c.path(), null, 'c', '2026-09-26');
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), c.path(), null, 'c', '2026-09-26', 16, 0);
         expect(c.valueBreaks()[0]).toMatchObject({ pair: 'AC', status: 'open', firstSeenAt: acSeen });
         expect(c.valueBreaks()[0].note).toBeUndefined();
         expect(c.ageText(c.valueBreaks()[0])).toBe('5d');
@@ -963,6 +995,232 @@ describe('ReconciliationDetailComponent — readable side names (R2-16)', () => 
 
     it('renders the named sides with no a11y violations', async () => {
         const { fixture } = await create({ datasets: DATASETS });
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+/** RECON-UPLIFT-1 lane B: the Breaks page pages on the server, filters by type, exports, and has one Run now. */
+describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/U3/U4)', () => {
+    const set = (keys: string[], truncated = false) => ({
+        rows: keys.map((k) => ({ key: { region: k, product: 'voice' }, a: { amount: 10 } })),
+        rowCount: keys.length,
+        truncated,
+    });
+    const tick = async (fixture: { whenStable(): Promise<unknown>; detectChanges(): void }) => {
+        await fixture.whenStable();
+        fixture.detectChanges();
+    };
+
+    it('asks for ONE page — 50 rows from offset 0 — and offers Next only when the server says more follow', async () => {
+        const { fixture, c, breaks } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 16, 0);
+        expect(c.hasMore()).toBe(true);
+        const el = fixture.nativeElement as HTMLElement;
+        const next = el.querySelector<HTMLButtonElement>('[data-testid="page-next"]');
+        expect(next?.disabled).toBe(false);
+        expect(el.querySelector<HTMLButtonElement>('[data-testid="page-prev"]')?.disabled).toBe(true);
+        expect(el.querySelector('[data-testid="break-pager"]')?.textContent).toContain('Rows 1–16 · more follow');
+    });
+
+    it('never holds more than 50 Breaks: All types shares the budget across the sets, one type gets all of it', async () => {
+        const plain = await create({ sets: {} });
+        expect(plain.c.pageSize() * 3).toBeLessThanOrEqual(50);
+        plain.c.typeFilter.set('value_break');
+        expect(plain.c.pageSize()).toBe(50);
+        TestBed.resetTestingModule();
+        const card = await create({ sets: {}, patch: { raw: { cardinality: 'one_to_one' } } });
+        expect(card.c.pageSize() * 4).toBeLessThanOrEqual(50);
+    });
+
+    it('shows no pager when everything fits on one page', async () => {
+        const { fixture, c } = await create({ sets: { missing_right: set(['A1'], false) } });
+        expect(c.hasMore()).toBe(false);
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="break-pager"]')).toBeNull();
+    });
+
+    it('Next replaces the page rather than appending — the page never holds more than one page', async () => {
+        const { fixture, c, breaks, navigate } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
+        breaks.mockResolvedValueOnce({ missing_right: set(['A3'], false) });
+        c.movePage(1);
+        await tick(fixture);
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 16, 16);
+        expect(c.missingA().map((b) => b.key)).toEqual(['A3 · voice']);
+        expect(c.hasMore()).toBe(false);
+        expect(navigate).toHaveBeenLastCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { type: null, offset: 16 } }),
+        );
+        breaks.mockResolvedValueOnce({ missing_right: set(['A1', 'A2'], true) });
+        c.movePage(-1);
+        await tick(fixture);
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 16, 0);
+        expect(c.missingA()).toHaveLength(2);
+    });
+
+    it('refuses Next when no more follow, and Previous on the first page', async () => {
+        const { c, breaks } = await create({ sets: { missing_right: set(['A1'], false) } });
+        const calls = breaks.mock.calls.length;
+        c.movePage(1);
+        c.movePage(-1);
+        expect(breaks.mock.calls.length).toBe(calls);
+        expect(c.pageIndex()).toBe(0);
+    });
+
+    it('filters by Break type: the type goes to the server and the page resets', async () => {
+        const { fixture, c, breaks, navigate } = await create({ sets: { missing_right: set(['A1'], true) } });
+        breaks.mockResolvedValueOnce({ value_break: set([], false) });
+        c.setType('value_break');
+        await tick(fixture);
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), null, 'value_break', 'b', '2026-09-26', 50, 0);
+        expect(navigate).toHaveBeenLastCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { type: 'value_break', offset: null } }),
+        );
+        expect(c.typeFilter()).toBe('value_break');
+    });
+
+    it('offers Duplicate keys in the filter only when a cardinality is declared', async () => {
+        const plain = await create({ sets: {} });
+        expect(plain.c.typeOptions().map((o) => o.value)).not.toContain('cardinality_break');
+    });
+
+    it('offers Duplicate keys when the Reconciliation declares a cardinality', async () => {
+        const card = await create({ sets: {}, patch: { raw: { cardinality: 'one_to_one' } } });
+        expect(card.c.typeOptions().map((o) => o.value)).toContain('cardinality_break');
+    });
+
+    it('explains an empty filtered page instead of calling the Reconciliation healthy', async () => {
+        const { fixture, c, breaks } = await create({ sets: { missing_right: set(['A1'], false) } });
+        breaks.mockResolvedValueOnce({ value_break: set([], false) });
+        c.setType('value_break');
+        await tick(fixture);
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('No Breaks on this page');
+        expect(text).not.toContain('Healthy');
+    });
+
+    it('count cards read the whole day from the Board summary, not the page', async () => {
+        const summary = {
+            groups: 9,
+            matchedKeys: 5,
+            byType: { missing_right: 12345, missing_left: 2, value_break: 7 },
+        };
+        const { fixture } = await create({ sets: { missing_right: set(['A1'], true) }, summary });
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('12,345');
+    });
+
+    it('the banner counts the whole day, and an empty filtered page never reads Balanced', async () => {
+        const summary = {
+            groups: 9,
+            matchedKeys: 5,
+            byType: { missing_right: 12345, missing_left: 2, value_break: 7 },
+        };
+        const withTotals = await create({ sets: { missing_right: set(['A1'], true) }, summary });
+        expect(withTotals.c.discrepancies()).toEqual({ text: '12,354', none: false, partial: false });
+        TestBed.resetTestingModule();
+        const filtered = await create({ sets: { missing_right: set(['A1'], false) } });
+        filtered.breaks.mockResolvedValueOnce({ value_break: set([], false) });
+        filtered.c.setType('value_break');
+        await filtered.fixture.whenStable();
+        expect(filtered.c.discrepancies().none).toBe(false);
+    });
+
+    it('a type the filter excluded reads as unknown, and the last page caption shows the real row range', async () => {
+        const { fixture, c, breaks } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
+        breaks.mockResolvedValueOnce({ value_break: set(['V1', 'V2', 'V3'], true) });
+        c.setType('value_break');
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(c.countText('missing_left')).toBe('–');
+        expect(c.discrepancies().partial).toBe(true);
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Filtered view');
+        breaks.mockResolvedValueOnce({ value_break: set(['V4', 'V5'], false) });
+        c.movePage(1);
+        await fixture.whenStable();
+        expect(c.pageFrom()).toBe(51);
+        expect(c.pageTo()).toBe(52);
+        expect(c.pageSize()).toBe(50);
+    });
+
+    it('drops a URL type this Reconciliation cannot show', async () => {
+        const { c } = await create({ sets: {} });
+        expect(c.typeOptions().some((o) => o.value === 'cardinality_break')).toBe(false);
+        expect(c.typeFilter()).toBe('all');
+    });
+
+    it('with no summary the card shows this page with a + when more follow', async () => {
+        const { c } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
+        expect(c.countText('missing_right')).toBe('2+');
+        expect(c.countText('missing_left')).toBe('0+');
+    });
+
+    it('exports EVERY matching Break through the server, 5,000 at a time, not just the page', async () => {
+        const { c, breaks } = await create({ sets: { missing_right: set(['A1'], false) } });
+        breaks
+            .mockResolvedValueOnce({ missing_right: set(['A1', 'A2'], true) })
+            .mockResolvedValueOnce({ missing_right: set(['A3'], false) });
+        const dl = captureDownload();
+        await c.exportCsv();
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 5000, 0);
+        expect(breaks).toHaveBeenCalledWith(expect.anything(), null, null, 'b', '2026-09-26', 5000, 5000);
+        expect(dl.name()).toBe('med_vs_bill-breaks-2026-09-26.csv');
+        const lines = (await dl.text()).split('\n');
+        expect(lines[0]).toBe('type,key,column,left,right,diff,impact,status,ageDays,assignee');
+        expect(lines).toHaveLength(4);
+        expect(lines[3]).toContain('A3 · voice');
+        expect(c.exporting()).toBe(false);
+    });
+
+    it('a failed export toasts and re-enables the button', async () => {
+        const { c, breaks, toastr } = await create({ sets: {} });
+        breaks.mockRejectedValueOnce(new Error('boom'));
+        await c.exportCsv();
+        expect(toastr.error).toHaveBeenCalled();
+        expect(c.exporting()).toBe(false);
+    });
+
+    it('turns the tables own export off (it would export only the page) and offers one full export', async () => {
+        const { fixture } = await create({ sets: { missing_right: set(['A1'], false) } });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('inspecto-data-table [aria-label="Export CSV"]')).toBeNull();
+        expect(el.querySelector('[data-testid="export-csv"]')).not.toBeNull();
+    });
+
+    it('has ONE primary Run now and a differently-named Reload that does not recompute', async () => {
+        const { fixture, c, breaks, state } = await create({ sets: { missing_right: set(['A1'], false) } });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelectorAll('[data-testid="run-now"]')).toHaveLength(1);
+        expect(el.querySelector('[data-testid="run-now"]')?.textContent).toContain('Run now');
+        expect(el.querySelector('[data-testid="reload"]')?.getAttribute('aria-label')).toBe('Reload');
+        expect(el.textContent).not.toContain('Run Reconciliation Now');
+        expect(el.querySelector('[aria-label="Refresh"]')).toBeNull();
+        const computed = breaks.mock.calls.length;
+        const reads = state.mock.calls.length;
+        c.reloadRecorded();
+        expect(breaks.mock.calls.length).toBe(computed);
+        expect(state.mock.calls.length).toBe(reads + 1);
+    });
+
+    it('shows elapsed time and a skeleton — not a bare spinner — while the Breaks compute', async () => {
+        const { fixture, c, breaks } = await create({ sets: {} });
+        let release: (v: ReconBreakSets) => void = () => undefined;
+        breaks.mockReturnValueOnce(new Promise<ReconBreakSets>((res) => (release = res)));
+        void c.compute();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const loading = el.querySelector('[data-testid="breaks-loading"]');
+        expect(loading?.textContent).toContain('Comparing');
+        expect(loading?.textContent).toMatch(/\d+ s/);
+        expect(el.querySelector('inspecto-skeleton')).not.toBeNull();
+        expect(el.querySelector('mat-progress-spinner')).toBeNull();
+        await expectNoA11yViolations(el);
+        release({});
+        await tick(fixture);
+        expect(el.querySelector('[data-testid="breaks-loading"]')).toBeNull();
+    });
+
+    it('renders the filter and pager with no a11y violations', async () => {
+        const { fixture } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

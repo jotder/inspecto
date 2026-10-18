@@ -19,8 +19,9 @@
                     mat-icon-button
                     (click)="run()"
                     [disabled]="running() || loading()"
-                    matTooltip="Refresh"
-                    aria-label="Refresh"
+                    matTooltip="Reload this page from the server"
+                    aria-label="Reload"
+                    data-testid="reload"
                 >
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
@@ -31,6 +32,7 @@
                         (click)="record()"
                         [disabled]="recording() || running() || !result()"
                         data-testid="record-run"
+                        matTooltip="Saves this day's Breaks as the run of record: new Breaks get a first-seen date, Breaks that now match auto-close, resolutions carry forward."
                     >
                         @if (recording()) {
                             <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
@@ -90,13 +92,13 @@
         />
 
         @if (running()) {
-            <div
-                class="text-secondary mt-8 flex items-center justify-center gap-3 text-sm"
-                role="status"
-                data-testid="board-loading"
-            >
-                <mat-progress-spinner diameter="24" mode="indeterminate" aria-hidden="true" />
-                <span>{{ comparing() }}</span>
+            <!-- U4: a table-shaped skeleton plus the elapsed time (hidden from assistive tech: no tick announcements) -->
+            <div class="mt-6" role="status" aria-busy="true" data-testid="board-loading">
+                <p class="text-secondary mb-3 text-sm">
+                    <span>{{ comparing() }}</span>
+                    <span aria-hidden="true" class="ml-2 tabular-nums">{{ elapsed.seconds() }} s</span>
+                </p>
+                <inspecto-skeleton [lines]="6" height="2.25rem" />
             </div>
         } @else if (pages.error(); as message) {
             <inspecto-alert class="mt-4 block" variant="error" title="The comparison failed">

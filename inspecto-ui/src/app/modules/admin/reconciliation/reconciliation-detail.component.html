@@ -40,17 +40,27 @@
                     <mat-button-toggle value="tables">Tables</mat-button-toggle>
                     <mat-button-toggle value="grouped">Grouped</mat-button-toggle>
                 </mat-button-toggle-group>
-                @if (computing()) {
-                    <mat-progress-spinner diameter="16" mode="indeterminate" />
-                }
+                <!-- U3: Reload re-reads what is RECORDED (statuses, assignees, Incident links); Run now recomputes
+                     the Breaks. Two different acts, one filled primary. -->
                 <button
                     mat-icon-button
-                    (click)="compute()"
-                    [disabled]="computing()"
-                    matTooltip="Refresh"
-                    aria-label="Refresh"
+                    (click)="reloadRecorded()"
+                    matTooltip="Reload recorded statuses and Incident links"
+                    aria-label="Reload"
+                    data-testid="reload"
                 >
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                </button>
+                <button
+                    mat-flat-button
+                    color="primary"
+                    (click)="compute()"
+                    [disabled]="computing()"
+                    matTooltip="Compare the Datasets again and list the Breaks"
+                    data-testid="run-now"
+                >
+                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
+                    <span class="ml-1">Run now</span>
                 </button>
             </ng-container>
         </inspecto-page-header>
@@ -67,20 +77,22 @@
         />
 
         <!-- Execution & Health Status Banner -->
-        <div
-            class="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-card p-4 shadow-sm dark:border-gray-700"
-        >
+        <div class="bg-card mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-4 shadow">
             <div class="flex items-center gap-3">
                 <inspecto-status-badge
-                    [value]="drillBreaks().length === 0 ? 'success' : 'warning'"
+                    [value]="discrepancies().none ? 'success' : 'warning'"
                     [label]="
-                        drillBreaks().length === 0 ? 'Balanced (0 Breaks)' : drillBreaks().length + ' Discrepancies'
+                        discrepancies().none
+                            ? 'Balanced (0 Breaks)'
+                            : discrepancies().partial
+                              ? 'Filtered view'
+                              : discrepancies().text + ' Discrepancies'
                     "
                 />
                 <div class="flex flex-col">
                     <span class="text-sm font-medium">
                         {{
-                            drillBreaks().length === 0
+                            discrepancies().none
                                 ? 'All records matched within tolerance'
                                 : 'Discrepancies require investigation'
                         }}
@@ -95,41 +107,36 @@
                     </span>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <button mat-stroked-button color="primary" (click)="compute()" [disabled]="computing()">
-                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
-                    <span class="ml-1">Run Reconciliation Now</span>
-                </button>
-            </div>
         </div>
 
         <!-- Count cards -->
         <div class="mt-6 grid grid-cols-2 gap-4 {{ cardinality() ? 'sm:grid-cols-5' : 'sm:grid-cols-4' }}">
             <div class="bg-card rounded-2xl p-4 shadow">
                 <div class="text-secondary text-sm">Only in A</div>
-                <div class="mt-1 text-2xl font-bold">{{ missingA().length }}</div>
+                <div class="mt-1 text-2xl font-bold">{{ countText('missing_right') }}</div>
                 <div class="text-secondary mt-1 text-xs">missing right</div>
             </div>
             <div class="bg-card rounded-2xl p-4 shadow">
                 <div class="text-secondary text-sm">Only in B</div>
-                <div class="mt-1 text-2xl font-bold">{{ missingB().length }}</div>
+                <div class="mt-1 text-2xl font-bold">{{ countText('missing_left') }}</div>
                 <div class="text-secondary mt-1 text-xs">missing left</div>
             </div>
             <div class="bg-card rounded-2xl p-4 shadow">
                 <div class="text-secondary text-sm">Matched, different</div>
-                <div class="mt-1 text-2xl font-bold">{{ valueBreaks().length }}</div>
+                <div class="mt-1 text-2xl font-bold">{{ countText('value_break') }}</div>
                 <div class="text-secondary mt-1 text-xs">value breaks</div>
             </div>
             @if (cardinality()) {
                 <div class="bg-card rounded-2xl p-4 shadow" data-testid="duplicates-card">
                     <div class="text-secondary text-sm">Duplicate keys</div>
-                    <div class="mt-1 text-2xl font-bold">{{ duplicates().length }}</div>
+                    <div class="mt-1 text-2xl font-bold">{{ countText('cardinality_break') }}</div>
                     <div class="text-secondary mt-1 text-xs">{{ cardinality() }}</div>
                 </div>
             }
             <div class="bg-card rounded-2xl p-4 shadow">
                 <div class="text-secondary text-sm">Resolved</div>
                 <div class="mt-1 text-2xl font-bold">{{ resolvedCount() }}</div>
+                <div class="text-secondary mt-1 text-xs">on this page</div>
             </div>
         </div>
 
@@ -137,7 +144,7 @@
             <!-- BREAK-AGING-1: open breaks by age. Counts OPEN only — settled work would make the
                  backlog look older the more of it you cleared. -->
             <div class="mt-6" aria-label="Open breaks by age">
-                <div class="text-secondary mb-2 text-sm font-medium">Open breaks by age</div>
+                <div class="text-secondary mb-2 text-sm font-medium">Open breaks by age (this page)</div>
                 <div class="flex flex-wrap gap-2">
                     @for (b of ageBuckets(); track b.bucket) {
                         <inspecto-chip variant="outline" tone="neutral">
@@ -161,15 +168,67 @@
             </div>
         }
 
+        <!-- U1: the Break-type filter, the CSV export and the pager. The server cuts every Break set at one page. -->
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+            <mat-button-toggle-group
+                [value]="typeFilter()"
+                (change)="setType($event.value)"
+                [disabled]="computing()"
+                hideSingleSelectionIndicator
+                aria-label="Break type"
+                data-testid="type-filter"
+            >
+                @for (o of typeOptions(); track o.value) {
+                    <mat-button-toggle [value]="o.value">{{ o.label }}</mat-button-toggle>
+                }
+            </mat-button-toggle-group>
+            <span class="flex-auto"></span>
+            <button
+                mat-stroked-button
+                type="button"
+                (click)="exportCsv()"
+                [disabled]="exporting() || computing()"
+                matTooltip="Download every Break this filter matches, not only this page"
+                data-testid="export-csv"
+            >
+                <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                <span class="ml-1">{{ exporting() ? 'Exporting…' : 'Export CSV' }}</span>
+            </button>
+        </div>
+
+        @if (computing()) {
+            <!-- U4: elapsed time plus a table-shaped skeleton. The seconds are hidden from assistive tech so a
+                 status region does not announce every tick. -->
+            <div class="mt-4" role="status" aria-busy="true" data-testid="breaks-loading">
+                <p class="text-secondary mb-3 text-sm">
+                    Comparing {{ leftLabel() }} with {{ sideDataset() }}…
+                    <span aria-hidden="true" class="tabular-nums">{{ elapsed.seconds() }} s</span>
+                </p>
+                @if (drillBreaks().length === 0) {
+                    <inspecto-skeleton [lines]="6" height="2.25rem" lastLineWidth="60%" />
+                }
+            </div>
+        }
+
         @if (drillBreaks().length === 0 && !computing()) {
             <div class="mt-8">
-                <inspecto-empty-state
-                    icon="heroicons_outline:check-circle"
-                    title="Healthy — 0 breaks detected"
-                    message="Both sides agree within tolerance for every key in this scope. Re-evaluate to verify against the latest dataset partitions."
-                    actionLabel="Run Reconciliation Now"
-                    (action)="compute()"
-                />
+                @if (typeFilter() === 'all' && pageIndex() === 0) {
+                    <inspecto-empty-state
+                        icon="heroicons_outline:check-circle"
+                        title="Healthy — 0 breaks detected"
+                        message="Both sides agree within tolerance for every key in this scope. Run again to verify against the latest dataset partitions."
+                        actionLabel="Run now"
+                        (action)="compute()"
+                    />
+                } @else {
+                    <inspecto-empty-state
+                        icon="heroicons_outline:funnel"
+                        title="No Breaks on this page"
+                        message="Nothing matches this Break type here. Go back to the first page or show every type."
+                        actionLabel="Show all types, first page"
+                        (action)="setType('all')"
+                    />
+                }
             </div>
         } @else if (viewMode() === 'tables') {
             <!-- The three record sets (design §5) -->
@@ -184,6 +243,8 @@
                         </h2>
                         <inspecto-data-table
                             tier="standard"
+                            [exportable]="false"
+                            [pageSize]="pageSize()"
                             sourceName="recon-only-in-a"
                             exportName="recon-only-in-a"
                             stateKey="recon-only-in-a"
@@ -205,6 +266,8 @@
                         </h2>
                         <inspecto-data-table
                             tier="standard"
+                            [exportable]="false"
+                            [pageSize]="pageSize()"
                             sourceName="recon-only-in-b"
                             exportName="recon-only-in-b"
                             stateKey="recon-only-in-b"
@@ -223,6 +286,8 @@
                         </h2>
                         <inspecto-data-table
                             tier="standard"
+                            [exportable]="false"
+                            [pageSize]="pageSize()"
                             sourceName="recon-value-breaks"
                             exportName="recon-value-breaks"
                             stateKey="recon-value-breaks"
@@ -243,6 +308,8 @@
                         </h2>
                         <inspecto-data-table
                             tier="standard"
+                            [exportable]="false"
+                            [pageSize]="pageSize()"
                             sourceName="recon-duplicate-keys"
                             exportName="recon-duplicate-keys"
                             stateKey="recon-duplicate-keys"
@@ -269,6 +336,34 @@
                     noRowsTitle="No breaks"
                 />
             </div>
+        }
+
+        @if (hasMore() || pageIndex() > 0) {
+            <nav class="mt-4 flex items-center justify-end gap-3" aria-label="Break pages" data-testid="break-pager">
+                <span class="text-secondary text-sm tabular-nums" aria-live="polite">
+                    Rows {{ pageFrom() }}–{{ pageTo() }}{{ hasMore() ? ' · more follow' : '' }}
+                </span>
+                <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="movePage(-1)"
+                    aria-label="Previous page of Breaks"
+                    [disabled]="computing() || pageIndex() === 0"
+                    data-testid="page-prev"
+                >
+                    Previous
+                </button>
+                <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="movePage(1)"
+                    aria-label="Next page of Breaks"
+                    [disabled]="computing() || !hasMore()"
+                    data-testid="page-next"
+                >
+                    Next
+                </button>
+            </nav>
         }
 
         @if (selected(); as b) {

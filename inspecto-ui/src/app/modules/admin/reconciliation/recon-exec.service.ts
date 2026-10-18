@@ -35,11 +35,13 @@ export class ReconExecService {
     async breaks(
         recon: Reconciliation,
         path?: Record<string, string> | null,
-        type?: 'missing_left' | 'missing_right' | 'value_break' | null,
+        type?: 'missing_left' | 'missing_right' | 'value_break' | 'cardinality_break' | null,
         side: SideKey = 'b',
         day?: string | null,
+        limit?: number,
+        offset?: number,
     ): Promise<ReconBreakSets> {
-        return firstValueFrom(this.api.breaks(serverConfig(recon), path, type, side, undefined, undefined, day));
+        return firstValueFrom(this.api.breaks(serverConfig(recon), path, type, side, limit, offset, day));
     }
 }
 

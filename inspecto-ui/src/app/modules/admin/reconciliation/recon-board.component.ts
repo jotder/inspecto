@@ -1,5 +1,15 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    OnInit,
+    computed,
+    effect,
+    inject,
+    signal,
+    untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,6 +21,7 @@ import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, LensService, ReconApiService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import {
     ageBucketLabel,
     bandFor,
@@ -44,6 +55,7 @@ import {
 import { humanizeColumn } from 'app/inspecto/viz/column-label';
 import { DatasetsService } from '../studio/datasets/datasets.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { ElapsedTimer } from './recon-elapsed';
 import { ReconExecService } from './recon-exec.service';
 import { ReconPageLoader } from './recon-page.loader';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
@@ -80,6 +92,7 @@ interface TotalLine {
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
+        InspectoSkeletonComponent,
         ReconGrainTableComponent,
         ReconToolbarComponent,
         ChipComponent,
@@ -105,6 +118,8 @@ export class ReconBoardComponent implements OnInit {
     readonly pages = new ReconPageLoader(this.exec, this.destroyRef);
     readonly result = this.pages.result;
     readonly running = this.pages.loading;
+    /** Seconds since the running comparison started — the loading cue beside the skeleton (U4). */
+    readonly elapsed = new ElapsedTimer();
     /** The view state, read from the URL query params (`day`, `filter`, `offset`, `limit`, `sample`) — never saved. */
     readonly query = signal<ReconRunQuery>({ offset: 0, limit: RECON_DEFAULT_PAGE_SIZE, filter: 'all' });
     /** The server-recorded run + Break lifecycle (R2-03) — what the aging strip reads. */
@@ -116,6 +131,14 @@ export class ReconBoardComponent implements OnInit {
     readonly savingBands = signal(false);
     /** Dataset id → readable label, read once on open (R2-16); empty until then, so sides show their ids. */
     readonly datasetNames = signal<Record<string, string>>({});
+
+    constructor() {
+        effect(() => {
+            const running = this.running();
+            untracked(() => (running ? this.elapsed.start() : this.elapsed.stop()));
+        });
+        this.destroyRef.onDestroy(() => this.elapsed.stop());
+    }
 
     readonly bands = computed(() => this.recon()?.bands ?? DEFAULT_BANDS);
 
