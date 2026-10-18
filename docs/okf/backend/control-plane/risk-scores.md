@@ -326,4 +326,4 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
   ⚠ **Audit vs storage.** A pruned run's factors are gone, so that score is no longer reproducible. That loss
   happens only when the operator opts in, and the default is to keep everything.
 - A row written before a column was classified stays raw: **by design, won't fix** (history is never rewritten).
-- Tracked as P3 `ASSURE-RISK-SCORE-RESIDUALS-1`.
+- Was P3 `ASSURE-RISK-SCORE-RESIDUALS-1`, closed 2026-10-18 (every item shipped or decided; the indicator-arithmetic refusal is in BACKLOG §6).

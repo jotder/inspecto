@@ -27,7 +27,7 @@ open. ⚠ **`GET /jobs/{name}` does not carry the flag**, so the detail panel ca
 safe today only because the panel is always mounted `embedded`, and its write buttons render only in the
 full-page header, which no route reaches. A future full-page detail needs the flag served there first.
 
-## Run with parameters (TELCO-FRAUD-DEMO-DATE-1, 2026-10-14)
+## Run with parameters (TELCO-FRAUD-DEMO-DATE-1, 2026-10-14; row closed 2026-10-18)
 
 Row action and detail-pane button **Run with parameters…** (2026-10-17: the embedded side panel's compact header now
 carries it beside the close X, gated on `LensService.canOperateRuns()`; the full-page header keeps its button under the

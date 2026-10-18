@@ -525,7 +525,7 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
     carries `config/examples/sla-escalation-examples.md` — labelled, INERT markdown (an Incident and a Case policy
     plus Escalation Rules) because a template can never carry live governance (`GOVERNANCE_ONLY`, refused on every
     import a new Space's included); `TemplateGovernanceExamplesTest` runs every example through the real parsers.
-    **Closed 2026-10-04 (operator):** `ASSURE-WORKFLOW-SLA-1` is closed. Residuals are P3 (`ASSURE-WORKFLOW-SLA-RESIDUALS-1`): the
+    **Closed 2026-10-04 (operator):** `ASSURE-WORKFLOW-SLA-1` is closed. Residuals were P3 `ASSURE-WORKFLOW-SLA-RESIDUALS-1`, closed 2026-10-18 (the recheck retired to BACKLOG §6 under operator delegation): the
     sweep-time deleted-assignee recheck (recommended policy when built: skip the reassign, still notify / raise priority, one
     WARN per breach) waits for an IAM customer and a real `PrincipalDirectory`; a graphical state-diagram *editor* — operator asked
     2026-10-11, shipped `0d6e0280e` (see *UI* below). The live-preview pass of Settings ▸ Incident governance was done 2026-10-04 (see *UI* below).
