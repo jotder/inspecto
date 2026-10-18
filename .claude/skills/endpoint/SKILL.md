@@ -47,11 +47,16 @@ House style for control-plane routes. The core is **auth-free** — no auth/scop
   modules **SKIPPED — unverified, not passing**. ⛔ **A targeted `-Dtest=` run of your own new test class
   will NOT catch it** (measured 2026-09-22: a new settings route passed its own 4 tests and every guard,
   and still took the whole reactor red). The route checklist is: register → `CapabilityManifest` if gated
-  → **the absent-module stub if the route lives in an OPTIONAL module** → **openapi-v1.json** →
+  → **the module's `module.toon` `provides.routes` if the route lives in an OPTIONAL module** → **openapi-v1.json** →
   `tools/route-gating-report.mjs` if mutating.
-- 🔴 **A route in an OPTIONAL edition module must ALSO be listed in that module's absent-module stub**
-  (`AbsentGeoLinkRoutes.SURFACE` for `inspecto-geo-link`). The core declares no dependency on these
-  modules — deliberately, since Basic must not ship them — so **that hand-kept table is the ONLY
+- 🔴 **A route in an OPTIONAL edition module must ALSO be declared in that module's manifest**
+  (`provides.routes` in its `META-INF/inspecto/module.toon`, e.g. `la/inspecto-la-api`,
+  `la/inspecto-geo-link`; then `node tools/openapi-merge.mjs --write` for the fragment).
+  ⚠ *Corrected 2026-10-18:* the hand-kept `AbsentGeoLinkRoutes.SURFACE` table this bullet used to name is
+  **retired** (the `Absent*` stubs are generated from the manifests since 2026-10-07);
+  `AbsentModuleRoutesTest` and `LaApiRoutesManifestParityTest` now guard the manifest, and the history below
+  is why that guard exists. The core declares no dependency on these
+  modules — deliberately, since Basic must not ship them — so **that declared list is the ONLY
   thing the core can see**, and TWO mechanisms read it: the 503 "not installed" stubs a Basic build
   serves, and the OpenAPI skeleton generator. ⛔ **Omit it and you get two silent failures from one
   mistake**: the path **404s instead of 503ing** on Basic (a 404 reads as "wrong URL" and sends the
