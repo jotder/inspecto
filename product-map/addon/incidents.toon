@@ -10,4 +10,4 @@ billing:
 support:
   tier: standard
 status: ga
-docs: docs/stakeholders/modules/incidents.md
+docs: docs/okf/product/addon/incidents/index.md

@@ -33,6 +33,7 @@ a new distilled section for the agentic framework.
 
 ## Capabilities — the subject tier (new 2026-09-08)
 
+* [Product hubs](product/index.md) — **one hub per Product Map Item** (`product/<kind>/<name>/`), each indexing the same ten document slots (plan, spec, architecture, features, feature-db, user-guide, admin-guide, api, tests, brochure). Pilot 2026-10-19 (`PRODUCT-DOCS-HUB-1`).
 * [Capabilities](capabilities/index.md) — **one document per capability**, keyed to the area IDs fixed by
   [`GLOSSARY.md` §14](../GLOSSARY.md#14-capability-areas-the-functional-spine) (⚠ not by
   `REQUIREMENTS.md` §3, which is now an index of these documents rather than their source). Answers *what was required · what is built · what is left · what was refused* in one
