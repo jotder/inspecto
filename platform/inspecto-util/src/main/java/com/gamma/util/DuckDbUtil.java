@@ -13,8 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * Shared DuckDB JDBC utilities used by {@code com.gamma.sql.ParquetSummarizer},
- * {@code com.gamma.sql.PartitionSummarizer}, and {@code com.gamma.inspector.CollectorProcessor} (core).
+ * Shared DuckDB JDBC utilities used by {@code com.gamma.inspector.CollectorProcessor} (core) and the engine's ingest strategies.
  *
  * <p>Central home for every recurring DuckDB boilerplate pattern:
  * <ul>

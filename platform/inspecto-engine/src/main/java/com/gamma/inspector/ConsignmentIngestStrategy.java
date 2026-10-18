@@ -59,7 +59,7 @@ interface ConsignmentIngestStrategy {
     /** Best-effort {@code DROP TABLE IF EXISTS} — logs a warning on failure, never throws. */
     static void dropTable(Connection conn, String table) {
         try (Statement st = conn.createStatement()) {
-            st.execute("DROP TABLE IF EXISTS \"" + table + "\"");
+            st.execute("DROP TABLE IF EXISTS " + SqlIdent.q(table));
         } catch (Exception e) {
             log.warn("best-effort drop table {} failed: {}", table, msg(e));
         }
@@ -68,7 +68,7 @@ interface ConsignmentIngestStrategy {
     /** Best-effort {@code DROP VIEW IF EXISTS} — logs a warning on failure, never throws. */
     static void dropView(Connection conn, String view) {
         try (Statement st = conn.createStatement()) {
-            st.execute("DROP VIEW IF EXISTS \"" + view + "\"");
+            st.execute("DROP VIEW IF EXISTS " + SqlIdent.q(view));
         } catch (Exception e) {
             log.warn("best-effort drop view {} failed: {}", view, msg(e));
         }
@@ -827,8 +827,8 @@ interface ConsignmentIngestStrategy {
         for (Consignment.Member m : owners) {
             String copy = table + "__m" + m.srcId();
             try (java.sql.Statement st = conn.createStatement()) {
-                st.execute("DROP TABLE IF EXISTS \"" + copy + "\"");
-                st.execute("CREATE TABLE \"" + copy + "\" AS SELECT * FROM \"" + table + "\" WHERE __src_id = " + m.srcId());
+                st.execute("DROP TABLE IF EXISTS " + SqlIdent.q(copy));
+                st.execute("CREATE TABLE " + SqlIdent.q(copy) + " AS SELECT * FROM " + SqlIdent.q(table) + " WHERE __src_id = " + m.srcId());
             }
             try {
                 // the member is its own branch-ledger scope: a second call under the same scope would read as
@@ -842,7 +842,7 @@ interface ConsignmentIngestStrategy {
                 bounds.putAll(w.bounds());
             } finally {
                 try (java.sql.Statement st = conn.createStatement()) {
-                    st.execute("DROP TABLE IF EXISTS \"" + copy + "\"");
+                    st.execute("DROP TABLE IF EXISTS " + SqlIdent.q(copy));
                 }
             }
         }
