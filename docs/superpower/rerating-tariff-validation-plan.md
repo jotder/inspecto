@@ -299,7 +299,7 @@ generator is split per feature (disjoint files). Nothing here edits `telco-ra`, 
 - Matrix: [`stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md) rows C and Q.
 - Revenue assurance pack: [`stakeholders/solutions/revenue-assurance.md`](../stakeholders/solutions/revenue-assurance.md).
 - Reconciliation module: [`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md); uplift plan
-  [`reconciliation-uplift-plan.md`](reconciliation-uplift-plan.md).
+  [`reconciliation-uplift-plan.md`](../archived-documents/plans-archive/reconciliation-uplift-plan.md).
 - Analytics Kernel: [`okf/backend/analytics-kernel.md`](../okf/backend/analytics-kernel.md); [`analytics-core-plan.md`](analytics-core-plan.md).
 - Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).
 

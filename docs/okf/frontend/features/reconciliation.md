@@ -141,7 +141,7 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
   pruned 173 ms; `/recon/breaks` compute 495 ms → 124 ms; breaks over a 1,000-key sample 757 ms → 160 ms; a repeated
   breaks/rows request is now a cache read-back (~10 µs) instead of a recompute.
 * **At scale, and one scan per side** (`RECON-UPLIFT-1` lane A, 2026-10-18; plan
-  [`reconciliation-uplift-plan.md`](../../../superpower/reconciliation-uplift-plan.md)). Until then nothing above ~400k rows
+  [`reconciliation-uplift-plan.md`](../../../archived-documents/plans-archive/reconciliation-uplift-plan.md)). Until then nothing above ~400k rows
   was measured. `ReconPerfTest#scaleProbe` (`RECON_PERF=1 RECON_PERF_DAYS=1 RECON_PERF_KEYS=<n>`; the two settings also
   resize the older tests, so set them only when running the probe alone) measures ONE day of N key groups × 3 sides
   (HLR/CRM/CBS, ≈ 2 % of keys broken), default sandbox (1 GB, 2 threads, 30 s per statement), 12-CPU / 32 GB laptop that
@@ -527,7 +527,7 @@ back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model 
   afterwards, see *Review fixes after the merge* above.
 
 **RECON-UPLIFT-1 lane B — Breaks page and Board (2026-10-18, as built).** Plan:
-[`reconciliation-uplift-plan.md`](../../../superpower/reconciliation-uplift-plan.md) (U1, U3, U4, U6).
+[`reconciliation-uplift-plan.md`](../../../archived-documents/plans-archive/reconciliation-uplift-plan.md) (U1, U3, U4, U6).
 
 * **Breaks page pages on the server, and a page is at most 50 rows.** Every compute sends `limit` and
   `offset = pageIndex × limit` to `/recon/breaks`, and a page REPLACES the last one (never appended). The route cuts

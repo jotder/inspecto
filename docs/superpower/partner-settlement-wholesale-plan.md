@@ -329,7 +329,7 @@ engine's behaviour if reversed.
 - [`stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md) rows C, H, Q and its gap table.
 - [`stakeholders/solutions/revenue-assurance.md`](../stakeholders/solutions/revenue-assurance.md): the `telco-ra` pack.
 - `group-regulator-assurance/research/R7-mvno-roll-up-and-wholesale.md` (git-excluded working set, not linked) §4.1, §4.2, §4.4, §5, §7.2.
-- [`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md), [`reconciliation-uplift-plan.md`](reconciliation-uplift-plan.md).
+- [`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md), [`reconciliation-uplift-plan.md`](../archived-documents/plans-archive/reconciliation-uplift-plan.md).
 - [`stakeholders/modules/workflow-sla.md`](../stakeholders/modules/workflow-sla.md), [`stakeholders/modules/case-management.md`](../stakeholders/modules/case-management.md).
 - [`okf/capabilities/spaces/spaces.md`](../okf/capabilities/spaces/spaces.md) §3.5 (`telco-ra`, `mobile-money`, `aml` pack precedents).
 - [`GLOSSARY.md`](../GLOSSARY.md): binding vocabulary.
