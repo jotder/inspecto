@@ -2225,3 +2225,35 @@ The SPA half of the inbound deep link; the wire contract and the server rules ar
   `forwarding-relay` pattern pack is *Relay chain (any link kind)*; the Value Measures read *Time to withdrawal* and
   *Withdrawal concentration*; the measures form says sender / receiver and *Intermediary list*. Specs that need the
   telecom binding install `TELECOM_PACK_FIXTURE` (`graph/domain-profile.testing.ts`).
+
+## i2-gap work on the canvas and the selection bar (as built 2026-10-18)
+
+The decisions behind these were **assistant-decided under operator delegation and are pending operator confirmation**; the plans are `docs/superpower/la-canvas-styling-plan.md`, `la-visual-query-plan.md` and `la-entity-merge-plan.md`.
+
+### Industry-pack relabels on the legend and pattern picker
+
+- The canvas legend (`inspecto-link-analysis-legend` in `link-analysis-overlays.component.ts`, used by the studio and the saved-view widget) draws the active pack's `link_kind.<kind>` on link-kind chips and `entity_type.<kind>` on node rows; the pattern picker (`link-analysis-toolbox.component`: `packOptions()`, `packDescription()`) draws `pattern.<pack id>` as the option label, and the term's `definition`, when stated, replaces the pack description.
+- **Display text only.** `data-kind`, the hidden-kind set, the saved view and the loaded pack's id keep the raw kind or id. A key the pack does not state falls back to the raw kind or the pack's own label. Lookup is `termLabel(domainProfile(activeDomainProfileId()), ...)`, so it is reactive when the packs arrive and needs no input on either host.
+- Typology terms (`term.<id>`: SIM box, IRSF, Wangiri) have no surface: the SPA draws no glossary. A glossary popover is not built.
+
+### Built-in Entity Type glyph icons
+
+- `catalog-graph.ts`: `GLYPH_LIBRARY` holds inlined Heroicons outline paths (MIT; the attribution is in the comment there), `ENTITY_TYPE_GLYPH` keys nine Entity Type ids (subscriber, imsi, imei, msisdn, wallet, account, agent, handset, cell) to a glyph, and `entityTypeIcon(...)` builds the icon tile. The shared icon picker gains the same glyphs.
+- Opt-in: `<inspecto-graph-view [entityIcons]>`; Link Analysis sets it. An explicit per-kind shape override (Display menu `nodeShapes`) **wins** over the icon; a type with no glyph keeps its plain shape. No runtime sprite extraction and no pack field. Conditional formatting stays deferred.
+
+### Search around (loaded-graph mode)
+
+- `search-around.ts` is the pure model: `SearchAroundSpec`, `stepsToSearchAround(steps)` and `searchAroundToSteps(spec)` convert between plain-language conditions and the existing `PatternStep[]`. `link-analysis-search-around.component.ts` (presentational, OnPush) is the form: start type, then per condition a direction, a link kind and a neighbour type, a words list and the *Search around* button.
+- Wired into the toolbox Pattern section: a *Steps / Search around* toggle appears only while `aroundSpec()` is non-null. Editing the form rewrites `patternSteps`; the button runs the same `runPattern`, so there is one execution path.
+- **Hidden for a temporal motif** (`stepsToSearchAround` returns null; only the step list can show it) and for any motif that is not a plain path. Loaded-graph mode only: it leaves no Investigation trace, like the motif builder.
+- **Not built:** the beyond-the-graph mode (chained `expand`), a neighbour type on `expand` (the rung offers only Direction and Link kinds, so the form states that Expand never follows a neighbour type; adding one needs a decision entry, not a twelfth op), OR / branching, temporal conditions. Not driven in a live preview.
+
+### Merge with... (selection bar)
+
+- Selection-bar action, Investigation only. `mergePairOf` (`investigation-state.ts`) takes the two selected entities and `InvestigationSessionStore.mergeDraft` carries the pair into `LinkAnalysisIdentitiesComponent`, which **prefills** the existing *Assert same entity* form. Nothing is written until the analyst adds a reason and confirms.
+- After a successful assert in an open Investigation the form **offers** *Add a resolve step* (`{op:'resolve'}`, added to the SPA op union; the server op already existed). Merges stay a view (no id rewrite).
+- **Disabled with a tooltip** when the capability is missing, the selection is not exactly two entities, or either is a masked alias (the server also refuses an alias, see the backend concept §6.7). The toast points to the Investigation tab; there is no automatic tab switch. `mergeUnavailable` has no spec of its own.
+
+### Footer AI-explain
+
+The page-title row in the footer renders the explain control through the `LA_AI_ASSIST` host slot (`<inspecto-la-host-slot [component]="aiExplain" [inputs]=...>`), as the header does, not a direct `@inspecto/core/ai-assist` import: the library's `no-restricted-imports` rule forbids host edges outside `la-host`.
