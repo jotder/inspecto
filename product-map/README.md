@@ -21,4 +21,7 @@ Rules:
   `private/prices.csv` (`orderCode,listPrice,currency`) when it exists.
 - `node tools/product-map-import.mjs <edited.csv|edited.xlsx> [--sheet "Price list"] [--write]` brings commercial edits back
   (title, billing, support, status, prices). It is a dry run without `--write`, and it refuses structural edits.
+- `node tools/customer-build.mjs <customer> [--bundle <edition-bundle-dir>]` reads `private/customers/<customer>.toon`
+  (`id`, `title`, `edition`, `orderCodes[N]`) and writes the customer Offering, a priced bill of materials and, with `--bundle`,
+  a trimmed copy of the Edition bundle to `target/customers/<customer>/`.
 - `node tools/product-map-seed.mjs` adds items for new modules, Add-ons, packs and Editions. It never overwrites an existing file.

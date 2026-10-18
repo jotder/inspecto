@@ -1,7 +1,7 @@
 # Product Map: plan
 
-> 🟢 **PLAN 2026-10-18 (`PRODUCT-MAP-1`): decisions D-PM1…D-PM6 were taken by the operator on 2026-10-18 (§8).
-> S0 (glossary), S1 (format, seed, gitignore), S2 (guard in CI), S3 (CSV, XLSX, mind map) and S4 (import) are done; S5 is not built.**
+> 🟢 **PLAN 2026-10-18 (`PRODUCT-MAP-1`): decisions D-PM1…D-PM8 were taken by the operator on 2026-10-18 (§8).
+> S0 (glossary), S1 (format, seed, gitignore), S2 (guard in CI), S3 (CSV, XLSX, mind map), S4 (import) and S5 (customer build, demo-telco pilot) are done; only S6 (later, on demand) remains.**
 > **Goal:** one place that is easy to manage, laid out like a mind map, that describes every **Product Map Item**:
 > modules, Add-ons, Solution packs, **Functionalities** and **Editions**. Pricing, support and sales use it, and it
 > can produce a **customer-specific build** (an Offering made of only what a customer buys). People and agents both
@@ -126,11 +126,33 @@ The guard checks each value against the manifest, so a Functionality cannot clai
    an edit changes only its own lines. XLSX is read with `node:zlib` (deflated entries, shared strings). Live check
    2026-10-18: an openpyxl-saved workbook with three edits imported as a two-line item diff plus one
    `private/prices.csv` row.
-5. **`customer-build.mjs <customer>`**: from `private/customers/<id>.toon`, resolves the Order Codes to modules
-   plus their `requires.modules` closure and writes `offerings/customer-<id>.toon`. Then the **existing**
-   `check-offerings.mjs` and `package.ps1` build it. It also writes a bill of materials (Order Codes, prices,
-   support tier, and each item's enforcement) for the quote and for support. Items with `enabled-gate` also go
-   into the customer's default `modules.toon`.
+5. **`customer-build.mjs <customer>`**: ✅ **Built (S5)** with `customer-build.test.mjs`. Two operator decisions
+   (2026-10-18) changed the design above:
+   - **D-PM7, what an Edition means in a customer build:** the Edition gives the *platform*, meaning its modules that
+     no Add-on names, plus its posture. Only the Add-ons, Solution packs and module/Functionality items the customer
+     buys are added. An item outside the Edition is refused, because its jar is not in that Edition's bundle.
+   - **D-PM8, packaging = trim, not a new `package.ps1` path:** `package.ps1 -Edition <E>` builds the Edition bundle
+     as today. `customer-build --bundle <dir>` copies it to `target/customers/<id>/bundle` and removes the jars and
+     per-jar SBOMs of the modules left out, plus every Space Template not bought. It filters `modules.list`, stamps
+     `edition.properties` with `customer=` and `offering=`, and adds `customer-<id>.toon` and `customer-bom.csv`.
+     `package.ps1`, `bundle-modules.mjs`, `offering-classpath.mjs` and their guards are unchanged.
+   As built: the customer Offering and the priced bill of materials are written to `target/customers/<id>/`, **not**
+   `offerings/`, since a customer's name is client data (D-PM3). The bill of materials has four line types:
+   `edition`, `bought`, `required` (a module kept only because a bought item needs it, so charging for it is a
+   decision) and `installed-not-sold`. The copy shipped inside the bundle has **no price columns**. A bought Space
+   Template's needs are **derived** from the manifests (`config/jobs/*` `type:` → `provides.jobTypes`;
+   `config/registry/<kind>s/` → `provides.configKinds`) and kept the same way as a `requires.modules` edge.
+   `enabled-gate` items going into a default `modules.toon` is **not built**, because no item uses `enabled-gate` yet.
+
+   **Pilot (D-PM6), 2026-10-18.** demo-telco = Standard + `INS-AO-LINK-ANALYSIS` + `INS-SP-TELCO-FRAUD`. The resolution
+   kept 12 optional modules and left out 12. `telco-fraud` pulled in Anomaly Detection (its `anomaly.score` Job and
+   Anomaly Model), which pulled in `entity-list`; both appear as `required` lines. A Standard bundle built by
+   `package.ps1` (42 jars) was trimmed to 30 jars and one Space Template. Booted with placeholder OIDC values, as the
+   `package.ps1` boot smoke does, both bundles were healthy with no ERROR lines. Against the untrimmed bundle, the
+   trimmed one discovered no route modules from `actionrequests`, `exchange`, `ops`, `opsapi`, `recon`,
+   `regreporting`, `risk` or `screening`, and kept `la`, `geolink`, `anomaly` and `entitylist`. ⚠ `GET /modules`
+   could not be read: with `inspecto-oidc.jar` present every route needs a token, and no identity provider was
+   attached. The proof is the boot log's `route module discovered` lines.
 
 ## 5. Who edits what
 
@@ -150,7 +172,7 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 | S2 ✅ | `check-product-map.mjs` in the guards job | a missing module item, a bad `parent:`, an impossible `enforcement` or a committed price fails CI |
 | S3 ✅ | `render-product-map.mjs`: CSV + XLSX + mind-map HTML | the price list and the Edition matrix open in Excel |
 | S4 ✅ | `product-map-import.mjs` round trip | edit a price in Excel → import → a one-line change in `private/prices.csv` |
-| S5 | `customer-build.mjs` + the **demo-telco** pilot (D-PM6) | `package.ps1` builds a bundle with only demo-telco's modules; the bill of materials matches |
+| S5 ✅ | `customer-build.mjs` + the **demo-telco** pilot (D-PM6) | `package.ps1` builds a bundle with only demo-telco's modules; the bill of materials matches |
 | S6 (later) | DuckDB query file; support view (module → owner/runbook); `usage` billing once metering exists | on demand |
 
 ## 7. Risks
@@ -163,6 +185,13 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 - **A bought item pulls in another.** `requires.modules` edges cross Add-ons: Screening needs `ops` and `entity-list`,
   Action Requests needs `notify-channels`, Anomaly needs `entity-list`. `customer-build.mjs` (S5) must list such
   modules on the bill of materials as "included because X needs it", so the price is a decision and not an accident.
+- **A pack's Case Rule is not detected (S5 residual).** Ops configs under a Template's `config/ops/` (for example
+  `telco-fraud`'s Case Rule) name no owner in any manifest, so `customer-build` cannot derive that they need `ops` /
+  `case-management`. In the demo-telco pilot that Case Rule loads inert. The fix is a manifest declaration
+  (`provides.configKinds` or a suffix list) for ops configs.
+- **The combined edition SBOM over-declares a trimmed bundle (S5 residual).** `sbom/inspecto-<edition>.{cdx,spdx}.json`
+  still lists the removed jars. The per-jar SBOMs are removed correctly. Over-declaring is the safe direction, but
+  the document is no longer exact.
 - **Private folder lost.** `product-map/private/` is not in git, so it needs its own backup. S1 documents where.
 
 ## 8. Decisions (operator, 2026-10-18)
@@ -175,3 +204,5 @@ The guard checks each value against the manifest, so a Functionality cannot clai
 | D-PM4 | Any Product Map Item can be billable; each one declares `enforcement: build \| enabled-gate \| contract`. | sales can price at any level, and support knows what is really installed; module boundaries stay technical |
 | D-PM5 | Billing models: `included`, `flat`, `per-user`, `per-space`, `per-node`. `usage` waits until a deal needs it and metering exists. | each of the five can be counted from facts the product already holds |
 | D-PM6 | The S5 pilot is a made-up customer, **demo-telco**: Standard + Link Analysis Add-on + the `telco-fraud` Space Template. | the parts already exist and are tested; no real customer data |
+| D-PM7 | In a customer build the Edition gives the platform (modules no Add-on names, plus posture); only bought Add-ons, Solution packs and items are added. | Otherwise a Standard customer gets every Standard Add-on and there is nothing to choose |
+| D-PM8 | A customer bundle is produced by trimming the Edition bundle `package.ps1` builds; `package.ps1` is not taught an `-Offering` path. | No change to the guarded packaging seams |
