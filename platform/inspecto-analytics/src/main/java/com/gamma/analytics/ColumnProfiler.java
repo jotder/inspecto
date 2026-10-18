@@ -13,7 +13,7 @@ import java.util.function.UnaryOperator;
  * top-k values and an equal-width histogram of one column. SQL builders only: the caller runs the statement on its own
  * connection, sandbox or Dataset port. Every identifier is quoted with {@link SqlIdent}; the relation is the caller's
  * already-safe SQL (a quoted table name, or a parenthesised subquery with its alias). Definitions and callers:
- * {@code docs/okf/backend/analytics-kernel.md} § Column profiler.
+ * {@code docs/okf/product/module/analytics/spec.md} § Column profiler.
  *
  * <h2>Two layouts of the same statistics</h2>
  * <ul>

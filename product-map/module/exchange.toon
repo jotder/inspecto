@@ -5,4 +5,4 @@ parent: layer.features
 module: exchange
 billable: false
 status: ga
-docs: docs/stakeholders/modules/exchange.md
+docs: docs/okf/product/module/exchange/index.md

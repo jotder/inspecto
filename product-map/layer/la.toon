@@ -3,3 +3,4 @@ kind: layer
 title: Link Analysis modules
 billable: false
 status: ga
+docs: docs/okf/product/layer/la/index.md

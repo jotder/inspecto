@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
 
-/** Golden-value conformance tests: one hand-computed figure per definition in docs/okf/backend/analytics-kernel.md. */
+/** Golden-value conformance tests: one hand-computed figure per definition in docs/okf/product/module/analytics/spec.md. */
 class StatsTest {
 
     private static final double EPS = 1e-12;

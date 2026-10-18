@@ -3,10 +3,10 @@
 > **Audience:** engineers and operators investigating production behaviour. This is the deep, "nitty-gritty"
 > reference: how each component actually works, what it emits (events + metrics), what state it writes to disk,
 > which `-D` flags govern it, and how to diagnose issues. For *config authoring* see
-> [`configuration.md`](okf/backend/config/configuration.md); for the *design rationale* of the Pipeline engine see
-> [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md); for *acquisition feature depth* see
-> [`data-acquisition-framework.md`](okf/backend/acquisition/data-acquisition-framework.md); for the *edition/build model* see
-> [`EDITIONS.md`](EDITIONS.md). Short, focused fixes live in [`troubleshooting.md`](okf/backend/build-run/troubleshooting.md).
+> [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md); for the *design rationale* of the Pipeline engine see
+> [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md); for *acquisition feature depth* see
+> [`data-acquisition-framework.md`](okf/product/module/acquire/spec-framework-design.md); for the *edition/build model* see
+> [`EDITIONS.md`](EDITIONS.md). Short, focused fixes live in [`troubleshooting.md`](okf/product/layer/platform/architecture-troubleshooting.md).
 
 ---
 
@@ -180,7 +180,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 - **Failure modes:** field/schema mismatch → quarantine (`field_mismatch`); unreadable → `unreadable`;
   readable but **zero ingestable rows** (empty / header-only) → quarantine (`empty`) so it is consumed
   once instead of being rediscovered and reprocessed every poll cycle (an EMPTY batch never backs up/marks);
-  `year=NULL` partitions (see [`troubleshooting.md`](okf/backend/build-run/troubleshooting.md)); a `BATCH_FAILED` with `offendingFile`.
+  `year=NULL` partitions (see [`troubleshooting.md`](okf/product/layer/platform/architecture-troubleshooting.md)); a `BATCH_FAILED` with `offendingFile`.
 
 ### 5.3 Pipeline-graph engine (`com.gamma.pipeline`, `com.gamma.pipeline.exec`)
 - **Responsibility:** the pipeline-as-graph layer. `PipelineLift` lifts the canonical `*_pipeline.toon`
@@ -196,13 +196,14 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   `BranchCommitCoordinator`/`BranchCommitLog`, optional data-plane provenance
   (`-Dprovenance.backend=duckdb` + `-Dprovenance.db.url`; `GET /provenance?flow=&batch=`).
 - ⚠ **The `*_flow.toon` authoring surface is RETIRED**
-  ([`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) §16):
+  ([`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md) §16):
   grandfathered flows stay readable/runnable/deletable, never newly written.
-- **Deep dives (design of record):** the [`okf/backend/pipeline-graph/`](okf/backend/pipeline-graph/index.md)
-  bundle — `pipeline-graph-design.md`, `editable-round-trip.md`, `live-execution.md` (views,
-  provenance, incremental watermarks, failure modes), `step-park-drain.md`, `multi-location-ingest.md`.
+- **Deep dives (design of record):** the [`module.engine` hub](okf/product/module/engine/index.md)
+  — `architecture-pipeline-graph.md`, `spec-editable-round-trip.md`, `spec-live-execution.md` (views,
+  provenance, incremental watermarks, failure modes), `spec-step-park-drain.md`; plus
+  `architecture-multi-location-ingest.md` in the [`module.acquire` hub](okf/product/module/acquire/index.md).
   Reusable `use:` components (`ComponentStore`/`ComponentRegistry`) →
-  [`component-registry.md`](okf/backend/components/component-registry.md).
+  [`component-registry.md`](okf/product/module/processor/spec-component-registry.md).
 
 ### 5.4 Jobs (`com.gamma.job`) + the deletion fence
 - **Responsibility:** scheduled/triggered downstream work. Types: `ENRICH`, `REPORT`, `MAINTENANCE`, `FLOW`.
@@ -424,7 +425,7 @@ write-root 503 → unsafe name 422 → path jail 403 → conflict 409 is shared,
 **Versioned surface:** every business route below is served **only** under the `/api/v1/…` prefix —
 the paths are written version-free for brevity, so read `GET /jobs` as `GET /api/v1/jobs`. A bare
 unversioned business path is not served, and `/api/<anything-not-v1>` returns a JSON 404 rather than
-the SPA shell. The v1 transport contract (`docs/okf/capabilities/control-api/control-api.md` §3; provenance `docs/archived-documents/plans-archive/api-contract-design.md`): responses wrapped
+the SPA shell. The v1 transport contract (`docs/okf/product/module/processor/plan-control-api.md` §3; provenance `docs/archived-documents/plans-archive/api-contract-design.md`): responses wrapped
 in the `{data, metadata, links, permissions, diagnostics}` envelope, errors as
 `{error:{errorCode, message, …}}` with machine-readable codes (`spi/auth/ErrorCodes.java`), gzip
 negotiated ≥ 1 KiB. Every request gets a `Correlation-ID` (caller-supplied or issued), echoed as a
@@ -470,24 +471,24 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 - **Objects:** `GET/POST /objects`, `GET /objects/{id}`, `POST /objects/{id}/ack|resolve|transition|links|comments|attachments|rca`,
   `GET /objects/{id}/links|graph|comments|attachments`, `GET /rca/templates`.
 - **Pipelines** (each line names its OKF owner; re-verified against `Pipeline*Routes` 2026-09-01):
-  - `GET /pipelines`, `/pipelines/node-types`, `/pipelines/combined` — list + palette catalog → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
-  - `GET /pipelines/{n}/graph` — lifted read-only graph projection → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
-  - `GET /pipelines/{n}/graph/raw` — lossless editable graph for the editor → [`editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md).
-  - `PUT /pipelines/{n}/graph` *(canAuthorWorkbench)* — save the graph over the canonical `*_pipeline.toon` (THE authoring write) → [`editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md).
-  - `GET /pipelines/{n}/document` — read-only Markdown projection for sign-off (`X-Config-Fingerprint`) → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
-  - `GET|POST /pipelines/{n}/settings` — pipeline settings read/write → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
-  - `POST /pipelines/{n}/label` — display label → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
-  - `POST /pipelines/{n}/save-as-template` — clone into a template → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
-  - `GET /pipelines/{n}/bundle` — selective export zip (pipeline + dependency closure + secret-free requirements) → [`editable-round-trip.md` §21](okf/backend/pipeline-graph/editable-round-trip.md).
+  - `GET /pipelines`, `/pipelines/node-types`, `/pipelines/combined` — list + palette catalog → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md).
+  - `GET /pipelines/{n}/graph` — lifted read-only graph projection → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md).
+  - `GET /pipelines/{n}/graph/raw` — lossless editable graph for the editor → [`editable-round-trip.md`](okf/product/module/engine/spec-editable-round-trip.md).
+  - `PUT /pipelines/{n}/graph` *(canAuthorWorkbench)* — save the graph over the canonical `*_pipeline.toon` (THE authoring write) → [`editable-round-trip.md`](okf/product/module/engine/spec-editable-round-trip.md).
+  - `GET /pipelines/{n}/document` — read-only Markdown projection for sign-off (`X-Config-Fingerprint`) → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md).
+  - `GET|POST /pipelines/{n}/settings` — pipeline settings read/write → [`pipeline-identity.md`](okf/product/module/processor/spec-pipeline-identity.md).
+  - `POST /pipelines/{n}/label` — display label → [`pipeline-identity.md`](okf/product/module/processor/spec-pipeline-identity.md).
+  - `POST /pipelines/{n}/save-as-template` — clone into a template → [`pipeline-identity.md`](okf/product/module/processor/spec-pipeline-identity.md).
+  - `GET /pipelines/{n}/bundle` — selective export zip (pipeline + dependency closure + secret-free requirements) → [`editable-round-trip.md` §21](okf/product/module/engine/spec-editable-round-trip.md).
   - `POST /pipelines/import?name=&conflict=refuse|overwrite|rename` *(canAuthorWorkbench, raw zip body)* — import a bundle as an inactive retargeted draft → same owner.
-  - `POST /pipelines/{n}/rename`, `POST /pipelines/rename/resume` — two-phase rename + crash resume → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
-  - `GET /pipelines/{n}/related` — cross-entity neighbourhood → [`pipeline-related.md`](okf/backend/control-plane/pipeline-related.md).
-  - `POST /pipelines/authored/{n}/run?to={nodeId}` *(canAuthorWorkbench)* — scratch-only run-to-here over real inbox files; never a production run → [`pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md).
-  - `POST /pipelines/authored/{n}/trigger` *(canOperateRuns)* — fire a real run (mirrors `POST /jobs/{n}/trigger`) → [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md).
-  - `POST /pipelines/authored/{n}/dry-run` — bounded sample on a throwaway DuckDB → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
-  - `GET /pipelines/authored[/{n}[/raw]]`, `DELETE /pipelines/authored/{n}` — read/delete of authored entries incl. grandfathered flows (the `*_flow.toon` CRUD surface is retired — no POST/PUT here) → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) §16.
-  - `POST /runs/{n}/drain` *(canOperateRuns)* — complete a PARKED Consignment (also listed under ingest runs above) → [`step-park-drain.md`](okf/backend/pipeline-graph/step-park-drain.md).
-  - `POST /jobs/runs/{runId}/replay` *(canOperateRuns)* — re-fire a finished/failed at-rest job run (configured defaults; `replay:<runId>` linkage in the new run's trigger; 409 while running) → [`execution-lanes.md`](okf/backend/pipeline-graph/execution-lanes.md).
+  - `POST /pipelines/{n}/rename`, `POST /pipelines/rename/resume` — two-phase rename + crash resume → [`pipeline-identity.md`](okf/product/module/processor/spec-pipeline-identity.md).
+  - `GET /pipelines/{n}/related` — cross-entity neighbourhood → [`pipeline-related.md`](okf/product/module/processor/spec-pipeline-closure.md).
+  - `POST /pipelines/authored/{n}/run?to={nodeId}` *(canAuthorWorkbench)* — scratch-only run-to-here over real inbox files; never a production run → [`pipeline-test-run.md`](okf/product/module/engine/spec-pipeline-test-run.md).
+  - `POST /pipelines/authored/{n}/trigger` *(canOperateRuns)* — fire a real run (mirrors `POST /jobs/{n}/trigger`) → [`live-execution.md`](okf/product/module/engine/spec-live-execution.md).
+  - `POST /pipelines/authored/{n}/dry-run` — bounded sample on a throwaway DuckDB → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md).
+  - `GET /pipelines/authored[/{n}[/raw]]`, `DELETE /pipelines/authored/{n}` — read/delete of authored entries incl. grandfathered flows (the `*_flow.toon` CRUD surface is retired — no POST/PUT here) → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md) §16.
+  - `POST /runs/{n}/drain` *(canOperateRuns)* — complete a PARKED Consignment (also listed under ingest runs above) → [`step-park-drain.md`](okf/product/module/engine/spec-step-park-drain.md).
+  - `POST /jobs/runs/{runId}/replay` *(canOperateRuns)* — re-fire a finished/failed at-rest job run (configured defaults; `replay:<runId>` linkage in the new run's trigger; 409 while running) → [`execution-lanes.md`](okf/product/module/engine/spec-execution-lanes.md).
 - **Components:** `GET /components/{type}[/{id}]` *(single-GET carries a strong `ETag`=content hash; `If-None-Match`→304)*,
   `POST/PUT/DELETE` *(503; PUT honours `If-Match`→409 `CONFLICT_STALE_VERSION`; DELETE 409 if referenced)*,
   `POST /components/{transform|grammar|schema|sink}/{id}/test` *(503)*,
@@ -560,7 +561,7 @@ remove the marker/ledger entry. Remember markers/ledger are written **LAST** in 
 marker and *will* re-pick the file.
 
 **Output lands in `year=NULL/month=NULL/day=NULL`.** Partition columns weren't derived. See
-[`troubleshooting.md`](okf/backend/build-run/troubleshooting.md) (partition extraction) — usually a schema/derive mis-config.
+[`troubleshooting.md`](okf/product/layer/platform/architecture-troubleshooting.md) (partition extraction) — usually a schema/derive mis-config.
 
 **A batch failed.** `GET /pipelines/{n}/batches` (status FAILED) or `events/search?type=BATCH_FAILED` → attrs
 `error`, `offendingFile`, `errorRows`. Per-file: `GET /pipelines/{n}/files` + the `errors/` CSV. Quarantined
@@ -631,12 +632,12 @@ are computed at scrape time by `MetricsService`'s collector. Confirm the service
 ---
 
 ## 13. Cross-references
-- Config authoring & all TOON keys → [`configuration.md`](okf/backend/config/configuration.md)
-- Acquisition feature depth (connectors, watermark, retry/circuit/post-actions, bastion) → [`data-acquisition-framework.md`](okf/backend/acquisition/data-acquisition-framework.md)
-- Pipeline engine design (IR, lift, validator, executor, T32 live-exec) → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md), [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md)
+- Config authoring & all TOON keys → [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md)
+- Acquisition feature depth (connectors, watermark, retry/circuit/post-actions, bastion) → [`data-acquisition-framework.md`](okf/product/module/acquire/spec-framework-design.md)
+- Pipeline engine design (IR, lift, validator, executor, T32 live-exec) → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md), [`live-execution.md`](okf/product/module/engine/spec-live-execution.md)
 - Editions / build flavors → [`EDITIONS.md`](EDITIONS.md) · Branch & release policy → [`BRANCHING.md`](BRANCHING.md)
-- Architecture overview → [`stage1-architecture.md`](okf/backend/engine/stage1-architecture.md) · Operator console → [`operator-console.md`](archived-documents/operator-console.md)
-- Short fixes (DuckDB/PG view quirks, partition extraction) → [`troubleshooting.md`](okf/backend/build-run/troubleshooting.md)
+- Architecture overview → [`stage1-architecture.md`](okf/product/module/engine/architecture-stage1.md) · Operator console → [`operator-console.md`](archived-documents/operator-console.md)
+- Short fixes (DuckDB/PG view quirks, partition extraction) → [`troubleshooting.md`](okf/product/layer/platform/architecture-troubleshooting.md)
 
 ---
 

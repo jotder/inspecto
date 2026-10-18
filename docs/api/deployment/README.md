@@ -1,6 +1,6 @@
 # `docs/api/deployment/` — WSO2 gateway + Keycloak realm blueprints (W6)
 
-> Companion to the [Control API capability spec](../../okf/capabilities/control-api/control-api.md) §3.12 (the design of record; the 2026-07-06 design is archived provenance at [`api-contract-design.md`](../../archived-documents/plans-archive/api-contract-design.md) §8)
+> Companion to the [Control API capability spec](../../okf/product/module/processor/plan-control-api.md) §3.12 (the design of record; the 2026-07-06 design is archived provenance at [`api-contract-design.md`](../../archived-documents/plans-archive/api-contract-design.md) §8)
 > (security architecture) and [`../../EDITIONS.md`](../../EDITIONS.md) (Standard edition assembly).
 > These are **illustrative starting points**, not a tested live deployment — this sandbox has no
 > running WSO2/Keycloak instance to verify against. Adapt hostnames, realm/API names, and throttling
@@ -225,5 +225,5 @@ paths tolerate Nimbus's default bounded clock skew (60 s) on `exp`/`nbf`.
 Case-type/business-function data-scoped grants (rbac-groundwork §4 Q2 — **closed 2026-07-08**, SEC-7d) and the
 `canOnboardConnections` split (Q1 — **closed 2026-07-22**, implemented) both shipped and are simply not modeled in
 this blueprint; Enterprise multi-realm/multi-tenant federation still needs a product decision. Decisions of
-record: `../../okf/capabilities/security/security.md` §4. *(Corrected 2026-09-08: this paragraph called both
+record: `../../okf/product/module/access/plan-security.md` §4. *(Corrected 2026-09-08: this paragraph called both
 questions "still open" for seven weeks after they closed.)*

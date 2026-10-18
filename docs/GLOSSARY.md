@@ -4,7 +4,7 @@
 > names, API paths, docs, and conversation must all use the **canonical term** below. The rename rolls out
 > **UI → model → backend** (the migration map is §13). The rules that make this file binding are §0; how the
 > concepts relate to one another is §10 (Component metamodel) and §11 (Graphs & Relationships), with the
-> platform-wide shape in [`okf/living-operational-system.md`](okf/living-operational-system.md) and the
+> platform-wide shape in [`okf/product/layer/platform/architecture-living-system.md`](okf/product/layer/platform/architecture-living-system.md) and the
 > per-area spine in §14.
 >
 > *Provenance, not authority (2026-09-10):* the two pre-lock analyses this vocabulary was derived from —
@@ -87,7 +87,7 @@ Type; the Space created from it is the Instance. Templates are a **server-global
 (`orders-starter`; since 2026-09-30 `business-assurance`, `telco-fraud` and `telco-ra` — the generic half of
 Telecom Revenue Assurance).** The four verticals this entry used to call "shipped" (Telecom Revenue Assurance, Fraud
 Management, Financial Auditing, Link Analysis) were mock-only seed packs deleted with the mock backend on
-2026-08-31 — `okf/capabilities/spaces/spaces.md` §5 (corrected 2026-09-08). *(Added Wave 0, 2026-07-02.)*
+2026-08-31 — `okf/product/module/config/plan-spaces.md` §5 (corrected 2026-09-08). *(Added Wave 0, 2026-07-02.)*
 
 **Metadata Bundle** — A selective, artifact-level export file (**configuration only, never data rows**) for
 moving definitions between Inspecto instances (staging → production): dataset metadata, Widgets, Dashboards,
@@ -95,7 +95,7 @@ saved Link-Analysis/Geo-Map views, Pipelines, and their registry pieces (grammar
 connections, secrets masked). Import previews new-vs-existing per artifact with a per-item overwrite/skip
 choice. UI: Settings → *Import & Export*, plus a reusable export/import menu on every editor, studio
 saved-view toolbar and library list. Distinct from the whole-space zip bundle and from **Space Template**.
-*(Added 2026-07-06; provenance `docs/archived-documents/plans-archive/metadata-bundle.md`; as-built `okf/backend/control-plane/metadata-bundle.md`.)*
+*(Added 2026-07-06; provenance `docs/archived-documents/plans-archive/metadata-bundle.md`; as-built `okf/product/module/processor/spec-metadata-bundle.md`.)*
 
 **Bundle v2 / self-describing subgraph** — A Metadata Bundle that carries its own lineage and origin so the
 target can validate it without re-deriving refs: each item's outgoing **refs** (marked `included` if the
@@ -104,14 +104,14 @@ SHA-256 **contentHash** of the config), and the bundle's top-level **requires** 
 its contract with the target). The import **fit-check** classifies each item *new / exists / drifted*
 (contentHash ≠ target's ⇒ **drift**; identical ⇒ idempotent) and each require *satisfied / missing*. v1 files
 still import. *(Added 2026-07-06 R6; provenance `docs/archived-documents/plans-archive/transportability-plan.md`,
-`docs/archived-documents/plans-archive/metadata-network-design.md` §4; as-built `okf/backend/control-plane/metadata-bundle.md`.)*
+`docs/archived-documents/plans-archive/metadata-network-design.md` §4; as-built `okf/product/module/processor/spec-metadata-bundle.md`.)*
 
 ---
 
 ## 1-A. Personas & Surfaces
 
 > Added Wave 0 (2026-07-02). The persona/Lens model as built is
-> [`okf/capabilities/surfaces/surfaces.md`](okf/capabilities/surfaces/surfaces.md). *(Provenance: the Wave-0
+> [`okf/product/layer/product/plan-surfaces.md`](okf/product/layer/product/plan-surfaces.md). *(Provenance: the Wave-0
 > review `archived-documents/plans-archive/frontend-review-and-completion-plan.md`, not maintained.)*
 
 **Lens** — A persona-scoped view of the one operator console: **Business** (consume data, investigate
@@ -120,7 +120,7 @@ operational features). A Lens filters navigation and toolbars; it is **not** a p
 the security module and maps onto Lenses. ⛔ Never use *Lens* to mean an authorization: a Lens is
 self-selected and freely switchable; a **Role** is assigned and enforced.
 
-**Demo User** — A **sign-in identity for an offline demo build only** (`inspecto-demo-auth`, never an edition): a named entry in a Space's `config/demo-users.toon` that holds one or more **Roles** of that Space's role table, chosen from the sign-in page's picker with no password. It becomes a real authenticated subject, so RBAC, owner-only views and the audit trail behave as they would for the same Roles. ⛔ Not *persona* (that word belongs to the **Lens** model), and never a security feature: the module refuses to load unless the control plane is bound to loopback. As built: [`okf/backend/editions/local-testing-without-iam.md`](okf/backend/editions/local-testing-without-iam.md) §Path A.
+**Demo User** — A **sign-in identity for an offline demo build only** (`inspecto-demo-auth`, never an edition): a named entry in a Space's `config/demo-users.toon` that holds one or more **Roles** of that Space's role table, chosen from the sign-in page's picker with no password. It becomes a real authenticated subject, so RBAC, owner-only views and the audit trail behave as they would for the same Roles. ⛔ Not *persona* (that word belongs to the **Lens** model), and never a security feature: the module refuses to load unless the control plane is bound to loopback. As built: [`okf/product/layer/platform/admin-guide-local-testing.md`](okf/product/layer/platform/admin-guide-local-testing.md) §Path A.
 
 **Role** — An **assigned authorization** (security-module editions): a named grant set held by a user
 (e.g. Business User, Pipeline Developer, Operations/Support, Power User, Admin, Super User). A user may hold
@@ -129,7 +129,7 @@ are granted within them) but are enforced server-side, unlike Lenses. **Data-def
 (2026-07-23):** the role → Capability/data-scope table is a per-space `roles.toon` settings doc
 (`GET/PUT /access/roles`) overlaying a shipped seed — role *assignment* stays in the IdP (claims);
 only the *definitions* are authorable. Enforcement stays out of the auth-free core.
-*(Added 2026-07-03; provenance: `archived-documents/plans-archive/rbac-groundwork.md`; decisions of record: `okf/capabilities/security/security.md` §4.)*
+*(Added 2026-07-03; provenance: `archived-documents/plans-archive/rbac-groundwork.md`; decisions of record: `okf/product/module/access/plan-security.md` §4.)*
 
 **Capability** — One named authorization question the UI gates on (e.g. `canAuthorWorkbench`,
 `canOperateRuns`, `canTriageRequirements` — `LensService`). The **seam between Lens and Role**: in the
@@ -140,7 +140,7 @@ never on Lens identity. *(Added 2026-07-03.)*
 **Access Catalog** — The canonical tree of gateable surface: menu groups → panes → functionalities
 (action nodes, each bound to exactly one Capability). Derived from the navigation config + the Capability
 seam; persisted per Space (`access-catalog` component kind). *(Added 2026-07-14; provenance:
-`archived-documents/plans-archive/lens-access-config-design.md`; as-built: `okf/capabilities/security/security.md` §3.7.)*
+`archived-documents/plans-archive/lens-access-config-design.md`; as-built: `okf/product/module/access/plan-security.md` §3.7.)*
 
 **Access Profile** — One subject's sparse **Grant** map over the Access Catalog; `subjectType` is `lens`
 today (Builder/Ops/Business visibility shaping) and `role` under RBAC — same document, same editor, only
@@ -156,7 +156,7 @@ UI copy in the Lens era says **Shown / Hidden / Inherit**. *(Added 2026-07-14.)*
 per-subject access grant on that one component. Distinct from the **Exchange** family
 (Offer / Share Grant), which shares an item *across Spaces* — an Exchange grant names a consumer
 Space, a Share names a Role or user. No `shares` key = the component is unrestricted (legacy
-behavior). *(Added 2026-07-23, RBAC R3 — `okf/backend/editions/auth-security.md`.)*
+behavior). *(Added 2026-07-23, RBAC R3 — `okf/product/module/access/admin-guide-auth-security.md`.)*
 
 **Access Policy** — An authorable **allow/deny statement over Attributes** (Advanced policy engine):
 `{name, effect: allow|deny, target: {actions?, resourceKinds?}, when: <condition>}` in a per-space
@@ -164,7 +164,7 @@ behavior). *(Added 2026-07-23, RBAC R3 — `okf/backend/editions/auth-security.m
 grammar over `subject.* / resource.* / env.*`. ⛔ Never bare *Rule* or *Policy Rule* — "Rule" belongs to
 the dataset-side families (Expectation / Alert Rule / Decision Rule). Authoring is core; *evaluation*
 ships only in the Advanced `inspecto-policy` module. *(Added 2026-07-23, ABAC A2 —
-`okf/backend/editions/auth-security.md`.)*
+`okf/product/module/access/admin-guide-auth-security.md`.)*
 
 **Safety Policy** — What a Space's **runs may touch**: filesystem roots, network hosts, Connector schemes,
 DuckDB extensions, output formats, caps and progress-state advances. One `safety-policy.toon` per tier —
@@ -214,7 +214,7 @@ delivery itself must be named.
 Catalog ▸ *Onboard Stream / Onboard Reference* opens a stage rail (Collection → Parsing → Schema/Keys →
 [Enrichment] → Go-live) that authors the real Stage-1 pipeline config server-side; a draft is just an
 `active: false` pipeline. One "onboard" verb product-wide. ⛔ never "wizard" in UI copy. *(Shipped 2026-07-16;
-seams: `docs/okf/backend/control-plane/onboarding-authoring.md`.)*
+seams: `docs/okf/product/module/processor/api-onboarding-authoring.md`.)*
 
 **Consignment** — A set of one or more files ingested and processed together as one unit of work. ⛔ *Batch*
 in this entity sense (renamed 2026-08-03, §13 — ✅ **rolled out in the Java code 2026-08-31**: the types are
@@ -254,7 +254,7 @@ D-3). *(Split lands amendment Phase 1; until then `*_schema.toon` still conflate
 > them broke `component_draft` for two slices. Renaming either is a breaking change to on-disk directories and
 > the UI `ComponentType` union, so the collision **stood deliberately** — say *"schema component"* or *"schema
 > config"* whenever the reading is not obvious from context, and never resolve one to the other's spec.
-> → `okf/frontend/features/inline-ai-authoring.md`. **Resolution now scheduled (2026-08-05):** the ELT final
+> → `okf/product/module/intelligence/user-guide-inline-ai-authoring.md`. **Resolution now scheduled (2026-08-05):** the ELT final
 > amendment's Phase 1 splits the TOON schema config into **Schema** (structure, CSV) + **Mapping** (CSV),
 > retiring the two-shape collision inside the already-MAJOR release.
 
@@ -301,8 +301,8 @@ own flat output Schema. A single source file holding several record kinds (an XM
 multi-layout fixed-width file) is decomposed into one Segment per kind, and each Segment becomes **one output
 table** and **one Catalog node**. Authored as `parsing.plugin.segments` (legacy `processing.segments`);
 `PipelineConfig.Schemas.segments` is `@PublicApi since 2.0.0`. As built:
-`okf/capabilities/ingestion/ingestion.md`, `okf/backend/engine/parser-plugins.md`. ⛔ Not a path token, not a
-time slice, and ⛔ unrelated to the *market* segment in `docs/stakeholders/` — an accidental homonym.
+`okf/product/module/etl/plan-ingestion.md`, `okf/product/module/engine/spec-parser-plugins.md`. ⛔ Not a path token, not a
+time slice, and ⛔ unrelated to the *market* segment in the brochures — an accidental homonym.
 
 **Field Classification** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`)* — A per-Schema-field **sensitivity label**
 (`PII`, `INTERNAL`, …) carried in the `fields[]` header of a schema TOON and in the Components CSV. 🔴 **It is
@@ -335,7 +335,7 @@ a job can re-run it with different values. A first-class Component kind (`rule-t
 and note it is **not** a fourth member of the triad above: it carries no engine, it is a stored query shape. The
 `:fieldValue` placeholder namespace is distinguished from `$`-Parameters and `${ENV:…}` secrets in §7.
 
-**Anomaly Model** *(added 2026-10-10, operator decision D-AD1 — ANOMALY-DETECTION-1; as built: [`okf/backend/control-plane/anomaly-scores.md`](okf/backend/control-plane/anomaly-scores.md))* — The authored
+**Anomaly Model** *(added 2026-10-10, operator decision D-AD1 — ANOMALY-DETECTION-1; as built: [`okf/product/module/anomaly/spec-anomaly-scores.md`](okf/product/module/anomaly/spec-anomaly-scores.md))* — The authored
 **Type** (Component kind `anomaly-model`) that scores each entity against its own history and its **Peer Group**: a
 set of **Features**, a baseline window, seasonality and thresholds. ⛔ Not a **Risk Score** model (absolute weighted
 factors), not a `baseline` **Expectation** (batch data quality).
@@ -355,7 +355,7 @@ each contribution held to its factor's cap, stored with its **factors** so every
 is the `risk-score` Component kind (a **Type**); the per-entity row the `risk.score` Job writes is its instance.
 Not a fourth rule engine: it scores, and an ordinary Alert Rule over its scores Dataset raises the Incidents.
 ⛔ Not the Link Analysis *suspicion score* (a client-side graph centrality composite), and ⛔ never "risk
-rating" / "fraud score" for this concept. As built: [`okf/backend/control-plane/risk-scores.md`](okf/backend/control-plane/risk-scores.md).
+rating" / "fraud score" for this concept. As built: [`okf/product/module/scoring/spec-risk-scores.md`](okf/product/module/scoring/spec-risk-scores.md).
 
 **Prediction** *(added 2026-10-12, operator decision OD-1 — PREDICTIVE-ANALYTICS-1; design only, nothing built: [`superpower/predictive-analytics-design.md`](superpower/predictive-analytics-design.md))* — The umbrella word for what the Predictive Analytics add-on produces: a **Customer Segment** assignment, a **Churn Score** or a **Forecast**, each stored with its inputs so it is recomputable. A Prediction is not an **Anomaly Score** and not a **Risk Score**.
 
@@ -396,7 +396,7 @@ SPI, declared grain `RECORD | FILE | BATCH`). ⛔ *Node* (user-facing) → **Ste
 `sink.*` kinds, and the CONTROL node `gap` (the never-executed `adapter` / `alert` / `event` types were deleted, operator, 2026-10-06) — remains the **compile-target set** the
 verbs lower onto; it leaves the user surface at the amendment's Phase 5 but is still the served palette
 until then. ⚠ **The closure is superseded (D0-B, 2026-08-09, `archived-documents/plans-archive/platform-services-plan.md`
-§5.2; as-built: `okf/backend/control-plane/platform-services.md`):** the enumeration was closed on purpose, but its real guarantee is compiler **totality** — *a
+§5.2; as-built: `okf/product/module/processor/spec-platform-services.md`):** the enumeration was closed on purpose, but its real guarantee is compiler **totality** — *a
 pipeline that parses is a pipeline that runs* — and that guarantee survives an open **Step-kind registry**:
 every registered Step kind must carry an execution mode (**`LOWERED`** — contributes SQL lowering — or
 **`EXECUTED`** — imperative Java, stage 2), and a node whose type has neither is refused fail-closed at
@@ -405,7 +405,7 @@ follow the same open-registry posture **Job types** already have (`JobTypeProvid
 
 > ⚠ **An embedded Job and a sub-Pipeline are NOT Steps** *(corrected 2026-08-02 — this entry asserted they
 > were; no `job` or sub-pipeline id has ever existed in `BuiltinNodeType`).* This is not an oversight:
-> §3.8 of [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md)
+> §3.8 of [`okf/product/module/engine/architecture-pipeline-graph.md`](okf/product/module/engine/architecture-pipeline-graph.md)
 > makes **in-motion (Pipeline) vs at-rest (Job)** a binding line, so an at-rest operator cannot be an
 > in-motion node. The two compose as **producer/consumer over a shared store**, never by nesting: a Job
 > fires on the Pipeline's `on_commit`, or binds by store name to a `sink.view` (the designated hand-off —
@@ -436,15 +436,15 @@ Grammar inline and untouched, and later edits to the template reach nothing that
 component and bound the Step via `use: grammar/<id>`. That `use:` form stays **read-supported** in the
 engine (a hand-authored file may still carry it) but is **never authored**, and opening such a Step in the
 editor migrates it to an independent inline copy on save. As built:
-[`okf/backend/pipeline-graph/editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md)
+[`okf/product/module/engine/spec-editable-round-trip.md`](okf/product/module/engine/spec-editable-round-trip.md)
 (the read path that must not be tidied away as dead code) and
-[`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md). *(Provenance:
+[`okf/product/module/config/user-guide-grammar-config.md`](okf/product/module/config/user-guide-grammar-config.md). *(Provenance:
 `archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`, not maintained.)*
 ⛔ not "parser config" / "parse options" in UI copy — one concept, one word. ✅ **UI DONE** (2026-08-04):
 the shared `<inspecto-grammar-editor>` (`inspecto/grammar/`) is the one authoring surface for both the
 Onboarding Parsing stage and the Pipelines `parse` node dialog, renamed `ParserConfigDialog` →
 `GrammarEditorDialog`; the node label "Configure parser" → "Edit Grammar". See
-`okf/frontend/features/grammar-config.md`.
+`okf/product/module/config/user-guide-grammar-config.md`.
 
 **Pipeline Template** *(added 2026-10-11)* — A **Pipeline** config saved with `template: true` through the
 pipeline editor's *Save as template…*, listed by `GET /pipelines`, and offered as a starting point by
@@ -453,7 +453,7 @@ Grammar Template) you **copy** from it, never bind to it: the copy drops `templa
 name wherever a value still carries the template's, and later edits to the template reach nothing started from it. A template is never
 runnable (`template` + `active` is refused). ⛔ Not a **Space Template**, which creates a whole Space; a
 Pipeline Template seeds one Pipeline draft inside the current Space. As built:
-`okf/frontend/features/onboarding.md`.
+`okf/product/layer/product/user-guide-onboarding.md`.
 
 **Decode Profile** *(operator decision D10, 2026-09-25)* — One vendor's ASN.1 decode settings kept **once**,
 in a satellite `.toon` file whose single top-level block is `asn1:` (the same keys a Pipeline's
@@ -463,7 +463,7 @@ of repeating it. Unlike a **Grammar Template** it is **referenced, not copied**:
 reaches every Pipeline that names it. A key the Pipeline sets wins over the profile, and `segments` is
 replaced whole, never merged (D5). Not a registry kind and not a transform language: it holds no transforms.
 ⛔ not *Access Profile* (a different concept, §1-A) · ⛔ not *transform config* / *tx config*. As built:
-[`okf/backend/engine/parser-plugins.md`](okf/backend/engine/parser-plugins.md).
+[`okf/product/module/engine/spec-parser-plugins.md`](okf/product/module/engine/spec-parser-plugins.md).
 
 **Transform** — Reshapes/derives/aggregates (cubes) data. When it materializes output it produces a **Derived
 Table**. **Amendment v1.0 (D-4):** the `transform` Step verb covers filter / derive / **reference join**
@@ -506,8 +506,8 @@ is read. ⛔ There is no `mode: streaming` value; it is a block, not an enum.
 **Sink** — Writes processed records to a destination. The lakehouse Sink writes **Parquet into a Table**.
 
 **Load** *(added 2026-08-13 — operator decision; as built:
-[`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) ·
-[`okf/frontend/features/schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md).
+[`okf/product/module/etl/user-guide-pipeline-editor.md`](okf/product/module/etl/user-guide-pipeline-editor.md) ·
+[`okf/product/module/etl/user-guide-schema-mapping.md`](okf/product/module/etl/user-guide-schema-mapping.md).
 Provenance: `archived-documents/plans-archive/definition-surface-unification-plan.md` §4b)* —
 The third **definition stage/drawer** in the unified pipeline editor (**Collector → Parse → Load**): create
 the **Schema** (derive from the parsed sample or import), author the **Mapping** (per-field rules incl.
@@ -519,7 +519,7 @@ pipeline-level activation action. *(2026-09-05: the Load **drawer's** mapping gr
 Load pane — was deleted with `transform.map`; the projection is authored in the **Record Transformer**
 (Transform pane) and the checklist chip keeps the Load name.)*
 
-**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/capabilities/pipeline-execution/pipeline-execution.md` §3.2. Owned by the
+**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/product/module/engine/plan-pipeline-execution.md` §3.2. Owned by the
 **Scheduler**.
 
 ---
@@ -539,7 +539,7 @@ of what a Pipeline landed. Its kinds are an **open registry** keyed by string id
 Phase 3 S3 (table-entry `collect`), deferred by its own design spike as genuine new design. **Job is again the
 canonical user-facing term** for any scheduled Executable over data at rest (maintenance, periodic
 report/enrich, dataset operations); the authoring contract **shipped 2026-08-07/10** and is described in
-[`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md) § *The parameter contract & runtime
+[`okf/product/module/processor/spec-jobs.md`](okf/product/module/processor/spec-jobs.md) § *The parameter contract & runtime
 Expressions*. Table-entry Pipelines remain an *additive complement* (S3 design
 of record), never the Job's replacement; §13 row.
 
@@ -554,7 +554,7 @@ defines *when*, not *what*.
 *(Was `Run ⊇ Batch ⊇ File` until 2026-08-03; see the Consignment entry in §2 and the §13 row. Identity is
 `(consignment_id, run_id)` — the run is the attempt, so a reprocess is a new Run over the same Consignment.)*
 
-**Archive** *(added 2026-08-26; as-built in `okf/backend/engine/unpack-stage.md`)* — A **container file** the
+**Archive** *(added 2026-08-26; as-built in `okf/product/module/acquire/spec-unpack-stage.md`)* — A **container file** the
 operator drops in the inbox that holds many inner files: `.zip`, `.tar`, `.tar.gz`. Expanded by the **Unpack**
 stage at the Collector *before* Consignments are planned, so its contents become ordinary Files from birth. An
 Archive is **not** a Consignment and can outlive one (500 entries at `collector.consignment.max_files: 100` plans five), which
@@ -585,7 +585,7 @@ canonical; **Expression** is. Canonical style is **lowercase-dotted** (`$event_d
 *(Not to be confused with the `$name` tokens inside a `sql.template` Job's SQL body — those are that Job's own
 declared **Parameters**. How the two `$` namespaces coexist is settled at step 4 of the plan.)*
 
-**Platform Service** *(added 2026-08-09, D0; as-built in `okf/backend/control-plane/platform-services.md`)* — An engine facility
+**Platform Service** *(added 2026-08-09, D0; as-built in `okf/product/module/processor/spec-platform-services.md`)* — An engine facility
 exposed to Jobs, packs and (stage 2) executable Steps through the `PlatformServices` typed lookup, granted
 by a declared `requires:` list that **fails closed at registration** (unknown or build-absent service id
 refuses the type/pack). Menu: `notifications` · `mail` · `incidents` · `objects` · `schema` · `consignment-status` · `datasets` · `link-index` · `analytics` · `alerts` *(added 2026-08-10; the others since; the owner concept's menu table is authoritative)*. The menu grows **by demand**, never speculatively. Every
@@ -593,7 +593,7 @@ mutating service defines its dry-run behaviour (record, don't act — MNT-1 exte
 that word is RBAC's (`CapabilityManifest` route gates → `Roles.KNOWN_CAPABILITIES`); ⛔ not *Controller
 Service* — NiFi's term implies user-instantiated enable/disable resources, deliberately that plan's stage 3.
 
-**Execution pool** *(added 2026-09-24; as-built in [`okf/backend/engine/consignment-concurrency.md`](okf/backend/engine/consignment-concurrency.md) §2a)* —
+**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/engine/spec-consignment-concurrency.md`](okf/product/module/engine/spec-consignment-concurrency.md) §2a)* —
 A named, server-defined admission tier for **Consignments** (`scheduler.toon` `pools:`), chosen by a Pipeline
 with `processing.pool`. It answers only "may this start now" and never widens a thread or memory cap; an
 unknown name runs in the always-present `default` pool. ⛔ not *queue* (waiting is a state of an admission,
@@ -629,7 +629,7 @@ compaction) remain the Phase-2 backlog.
 Table** (so it lives inside the **Dataset** umbrella) — "Matrix" is the label the Catalog and Studio are meant
 to show for it, not a new model type. **Surfaced 2026-08-04**: the Catalog labels `DERIVED_TABLE` **Matrix** (`nodeKindLabel()`, §13); the
 materialization itself is `task: materialize` (DAT-4, 2026-07-08) — ⚠ no UI action triggers it and no committed job
-schedules one (`okf/capabilities/data-plane/data-plane.md` §5). *(This entry said "not yet surfaced as of 2026-07-20"
+schedules one (`okf/product/layer/platform/plan-data-plane.md` §5). *(This entry said "not yet surfaced as of 2026-07-20"
 until 2026-09-08.)* Not a description of a shipped
 screen. ⛔ "Cube" stays a *verb* (the Transform action that produces it), never the asset's noun.
 
@@ -717,7 +717,7 @@ missing-right | value-break**. Lifecycle `open → assigned → resolved | auto-
 key re-matches within tolerance on a later run; manual resolutions (with a note) and assignments (an
 `assignee`) are preserved across runs. A Break that auto-closed and reappears is **re-opened** (the same
 Break, a **recurrence**), not a new one. *(`assigned`, occurrences and recurrence added 2026-09-26,
-`ASSURE-BREAK-LIFECYCLE-1` — as built: `okf/frontend/features/reconciliation.md`.)*
+`ASSURE-BREAK-LIFECYCLE-1` — as built: `okf/product/module/reconciliation/user-guide-reconciliation.md`.)*
 Breaks can raise **Incidents** (future). *(Lifecycle locked with the product owner 2026-07-03, shipped as
 C9 — `archived-documents/superpower-reviews/reconciliation.md`.)*
 
@@ -726,7 +726,7 @@ C9 — `archived-documents/superpower-reviews/reconciliation.md`.)*
 ## 8. Observability
 
 **Signal** — A lightweight **emitted fact** — it *announces, never decides* (the Signal network,
-okf/living-operational-system, The thesis). One envelope — as built, the 13-field `Signal` record `{ signalId, type, at, severity, source, subject, correlationId, causationId, space, actor, message, payload, schemaVersion }` (`okf/capabilities/observability/observability.md` §3.1; this entry showed the seven-field design sketch until 2026-09-08)
+okf/living-operational-system, The thesis). One envelope — as built, the 13-field `Signal` record `{ signalId, type, at, severity, source, subject, correlationId, causationId, space, actor, message, payload, schemaVersion }` (`okf/product/module/observability/plan-observability.md` §3.1; this entry showed the seven-field design sketch until 2026-09-08)
 where `source` is a metadata **Ref** (`rel:'emits'`) to the producer. Every run, job, Alert Rule firing, failed
 Expectation, Decision Consequence and operator action emits one, to a single **signal ledger**. **Event, Alert and
 Notification are *views* over this one ledger, not parallel stores** (unified in R4). ⚠️ §6-proposed → **binding**.
@@ -801,7 +801,7 @@ Manager pane, the user guide, the controls matrix, and `ObjectType.CASE`). For t
 Case** below.
 Managed in the **Case Manager** pane; lifecycle open → investigating → escalated → resolved → closed.
 Its **Contents** are the member Incidents it `CONTAINS` (correlation links); business-flavoured vs the
-operational Incident (provenance: `archived-documents/plans-archive/case-management-design.md`; decisions of record: `okf/capabilities/incidents/incidents.md` §4).
+operational Incident (provenance: `archived-documents/plans-archive/case-management-design.md`; decisions of record: `okf/product/addon/incidents/plan-incidents.md` §4).
 
 **Merge** *(of Cases)* — Combine two or more Cases into one **surviving** Case managed as one: members,
 tags and watchers move to the survivor; the absorbed Cases close with a `MERGED_INTO` trace link and
@@ -876,9 +876,9 @@ RBAC data scopes, and despite its name it is not the *type of a Case*.
 
 **Investigation** — The Link Analysis **enquiry object**: an ordered, replayable log of analyst ops (`seed`, `expand`, `exclude`, `hide`, `keep`) over a graph, plus the Working Set it evaluates to. ⛔ It is a **child of a Case**, never a Case itself (a Case groups Incidents; an Investigation is one line of enquiry within one). Its Type half is an **Investigation Template**. Named by operator decision `D-E1` (2026-09-22): the code already implied it — the routes are `/inv/*`, the capability is `INV-1`, and `InvRoutes` spells it out. ✅ **Backend built 2026-09-23** (`LA-10` in [`link-analysis-backlog-plan.md`](archived-documents/plans-archive/link-analysis-backlog-plan.md) §5.5): routes `/inv/investigations*`, classes `InvestigationRoutes` / `InvestigationEvaluator` in `com.gamma.geolink` (deliberately not a package named `investigation`, which two other trees already use). ✅ **Investigation Template backend built 2026-09-23** (`LA-23`, plan §5.8): the saved METHOD of an Investigation — seeds become parameters, and the analyst's `exclude` / `hide` / `keep` stay with the Investigation that made them (`D-E8`) — instantiated into a new Investigation over the same or another Dataset with the same column roles; routes `/inv/investigations/{id}/template` and `/inv/investigation-templates/{id}[/instantiate]`, class `InvestigationTemplateRoutes`. ⚠ The SPA does not use the Template yet. ⛔ Do not confuse it with **Rule Template** (`rule-template`, a saved parameterised query). ⛔ Do not confuse it with the Assistant's **Triage Run** (§9), which took this word in the pre-2026-09-22 plan and gave it up under `GLOSSARY-CASE-1`.
 
-**Graph Run** — One execution of one Link Analysis graph algorithm (of 29) on the server over an Investigation's Working Set, started with `POST /inv/graph/runs`, polled, cancellable, and ending in exactly one of `COMPLETED`, `CANCELLED`, `BUDGET_EXCEEDED` or `FAILED`. It carries a **Graph Budget** (`maxNodes`, `maxEdges`, `timeoutMs`; the budget is part of the Graph Run, not a separate object): a run past its budget ends `BUDGET_EXCEEDED` with NO result, never a smaller answer shaped like a complete one. The browser runs the same algorithms under the per-Space node caps; the Graph Run is the path above them. Capability `canRunLinkGraphAnalysis`; settings `graph_run.*`; classes `GraphRunService` / `GraphRunRoutes`. As built in `okf/frontend/features/link-analysis.md` §*Graph Run*. ⛔ Not a **Run** (a Pipeline or Job execution) and not a **Triage Run** (§9); never *graph job* or *analysis job*.
+**Graph Run** — One execution of one Link Analysis graph algorithm (of 29) on the server over an Investigation's Working Set, started with `POST /inv/graph/runs`, polled, cancellable, and ending in exactly one of `COMPLETED`, `CANCELLED`, `BUDGET_EXCEEDED` or `FAILED`. It carries a **Graph Budget** (`maxNodes`, `maxEdges`, `timeoutMs`; the budget is part of the Graph Run, not a separate object): a run past its budget ends `BUDGET_EXCEEDED` with NO result, never a smaller answer shaped like a complete one. The browser runs the same algorithms under the per-Space node caps; the Graph Run is the path above them. Capability `canRunLinkGraphAnalysis`; settings `graph_run.*`; classes `GraphRunService` / `GraphRunRoutes`. As built in `okf/product/module/la-core/user-guide-link-analysis.md` §*Graph Run*. ⛔ Not a **Run** (a Pipeline or Job execution) and not a **Triage Run** (§9); never *graph job* or *analysis job*.
 
-**Draft** *(Link Analysis; named by operator decision `D16`, 2026-09-30; **vocabulary only, no code yet**; the build is option-D phase `D-7`)* — One analyst's **private, forkable copy of an Investigation's working state** (its op log, groupings and dynamic filter lists, evaluated Working Set and Graph Run results), forked from a pinned baseline of the Investigation and **promoted** back into it (rebase, conflicts reported; `D18`). One Draft per analyst per Investigation by default (`D17`); the sizing target is 20 analysts and 50 concurrent Drafts (`D21`). A Draft is **exploration, not evidence**: a Dossier is built only from the promoted Investigation (`D20`). **Type vs Instance:** there is no Draft *Type*; a Draft is always an Instance, and the reusable counterpart is the **Investigation Template** (the saved method), never a "Draft template". Verbs: *fork* a Draft, *promote* a Draft. ⛔ Never **sandbox** (the **SQL sandbox**, `SqlSandboxPolicy`, stays the only sanctioned "sandbox"), **workspace** or **scratch** for this concept; ⛔ not **Branch** (reserved for version control). ⛔ **Not a Pipeline draft** and not **Import as draft** (bundle load-as-draft): those mean *an authored config object that is staged, `active: false`, not yet live* (§2 Onboard; `okf/backend/control-plane/metadata-bundle.md`). The disambiguation is by owner: in Link Analysis copy a bare "draft" means a **Draft**; in config-authoring copy it means *staged*. Not the Incident-side *Draft → Sent* email status (§9) either. Not an **Investigation** (the shared, owned enquiry the Drafts fork) and not a **Case**.
+**Draft** *(Link Analysis; named by operator decision `D16`, 2026-09-30; **vocabulary only, no code yet**; the build is option-D phase `D-7`)* — One analyst's **private, forkable copy of an Investigation's working state** (its op log, groupings and dynamic filter lists, evaluated Working Set and Graph Run results), forked from a pinned baseline of the Investigation and **promoted** back into it (rebase, conflicts reported; `D18`). One Draft per analyst per Investigation by default (`D17`); the sizing target is 20 analysts and 50 concurrent Drafts (`D21`). A Draft is **exploration, not evidence**: a Dossier is built only from the promoted Investigation (`D20`). **Type vs Instance:** there is no Draft *Type*; a Draft is always an Instance, and the reusable counterpart is the **Investigation Template** (the saved method), never a "Draft template". Verbs: *fork* a Draft, *promote* a Draft. ⛔ Never **sandbox** (the **SQL sandbox**, `SqlSandboxPolicy`, stays the only sanctioned "sandbox"), **workspace** or **scratch** for this concept; ⛔ not **Branch** (reserved for version control). ⛔ **Not a Pipeline draft** and not **Import as draft** (bundle load-as-draft): those mean *an authored config object that is staged, `active: false`, not yet live* (§2 Onboard; `okf/product/module/processor/spec-metadata-bundle.md`). The disambiguation is by owner: in Link Analysis copy a bare "draft" means a **Draft**; in config-authoring copy it means *staged*. Not the Incident-side *Draft → Sent* email status (§9) either. Not an **Investigation** (the shared, owned enquiry the Drafts fork) and not a **Case**.
 
 **Working Set** *(Link Analysis)* — What an **Investigation** currently shows: the entities and links its op log evaluates to, recomputed by replaying the log (`/replay`) and sealed per step. It is derived state, never an authored object; **Graph Runs**, Pattern and **Value Measure** tools, Alerts on an Investigation and the **Dossier** all read it. ⛔ Not a **Dataset** (the Working Set is bounded and lives inside one Investigation), not a saved **View**, and not a **Draft** (a Draft is a private copy of the log that yields its own Working Set).
 
@@ -897,7 +897,7 @@ RBAC data scopes, and despite its name it is not the *type of a Case*.
 **Diagnosis** — An AI-assisted root-cause analysis of a failing Run or Collector that produces an **Incident** with
 a suggested fix.
 
-**Audit Log** — The append-only *who-did-what* trail (config changes, permission grants, data exports, refused attempts — *not* logins, and not tamper-evident; `okf/capabilities/observability/observability.md` §3.3).
+**Audit Log** — The append-only *who-did-what* trail (config changes, permission grants, data exports, refused attempts — *not* logins, and not tamper-evident; `okf/product/module/observability/plan-observability.md` §3.3).
 **Distinct** from the operational Event stream.
 
 ---
@@ -905,7 +905,7 @@ a suggested fix.
 ## 10. Component Metamodel (cross-cutting)
 
 > Every authored artifact above is a **Component**. The metamodel is the spine; see
-> [`archived-documents/plans-archive/COMPONENT_GRAPH.md`](archived-documents/plans-archive/COMPONENT_GRAPH.md) and [`archived-documents/plans-archive/component-model.md`](archived-documents/plans-archive/component-model.md) (provenance); the requirement of record is `okf/capabilities/metamodel/metamodel.md`.
+> [`archived-documents/plans-archive/COMPONENT_GRAPH.md`](archived-documents/plans-archive/COMPONENT_GRAPH.md) and [`archived-documents/plans-archive/component-model.md`](archived-documents/plans-archive/component-model.md) (provenance); the requirement of record is `okf/product/module/config/plan-metamodel.md`.
 
 **Component** — A configured, named, persisted **instance**: `{ kind, name, config, parts?, wiring? }`. Atomic =
 no parts/wiring; composite = parts + a wiring strategy.
@@ -925,7 +925,7 @@ writing: the proposed content, the kind + name it targets, the base version the 
 reason, created / expires-at. It is **approved** (applied through the same route it was proposed through),
 **declined**, or it **expires**; a change whose base moved underneath it is closed as **stale**. Four-eyes:
 the approver must be a different person from the author. *(Added 2026-09-26, `ASSURE-MAKER-CHECKER-1`; as
-built: [`okf/backend/config/config-safety.md`](okf/backend/config/config-safety.md).)* ⛔ never "Change
+built: [`okf/product/module/config/spec-config-safety.md`](okf/product/module/config/spec-config-safety.md).)* ⛔ never "Change
 Request" — that word means a commercial CR. ⛔ Not an agent approval: the `/agent/approvals` inbox governs
 what the assistant may do, not whether a human's config change lands.
 
@@ -934,7 +934,7 @@ Rule's `invoke-api` consequence) and held for a second person's approval before 
 **Connection**, the method, the payload rendered at creation, an idempotency key, and its delivery — attempts and
 the last response. Approved / declined four-eyes (`canApproveChanges`), then sent with bounded retries; a failed
 one can be retried under the same key. *(Added 2026-09-27, operator decision D-P1, `ASSURE-ACTION-REQUESTS-1`; as
-built: [`okf/backend/control-plane/action-requests.md`](okf/backend/control-plane/action-requests.md).)* ⛔ never
+built: [`okf/product/module/action-requests/spec.md`](okf/product/module/action-requests/spec.md).)* ⛔ never
 "webhook call" or "outbound action" for this — a **webhook** is the `sink.webhook` Step or a notification
 channel, neither of which is approved. ⛔ Not a **Pending Change**: that holds a config change; this holds a call.
 
@@ -944,7 +944,7 @@ its maker types (the narrative), rendered ONCE from a **Report Template** and fi
 *draft → pending → approved → submitted | failed*, plus *declined* (the checker refused it) and *expired*; a
 different person (`canApproveChanges`) approves it, and approving **submits** it. ⛔ *rejected* is reserved for a
 regulator's refusal — never the checker's (that is *declined*). *(Added 2026-10-09, `REGULATORY-REPORTING-1`; as built:
-[`okf/backend/control-plane/regulatory-reporting.md`](okf/backend/control-plane/regulatory-reporting.md).)* ⛔ Not a
+[`okf/product/module/regulatory-reporting/spec.md`](okf/product/module/regulatory-reporting/spec.md).)* ⛔ Not a
 **Report** Job (a scheduled table export) and not a **Pending Change** (that holds config).
 
 **Report Template** — The definition of one regulator format: its output **fields** (each a source path into the
@@ -961,7 +961,7 @@ template.
 names and CIDR ranges an **Action Request** may reach although the egress policy denies their address class by
 default (loopback, link-local, private, CGNAT, this host…). A host entry lifts only the private classes; a CIDR lifts
 its range. Default empty. *(Added 2026-09-27, `ASSURE-ACTION-REQUESTS-1`; as built:
-[`okf/backend/control-plane/action-requests.md`](okf/backend/control-plane/action-requests.md) §*The egress policy*.)*
+[`okf/product/module/action-requests/spec.md`](okf/product/module/action-requests/spec.md) §*The egress policy*.)*
 ⛔ Not an Access Profile or an access policy: it governs where a call may go, not who may make it.
 
 **Approval Policy** — The per-Space, per-kind setting (`approval.toon`, `GET|PUT /settings/approval`) that
@@ -974,8 +974,8 @@ applies. Default off.
 
 > Relationships are becoming load-bearing (a future **Link Analysis Studio**). The words *graph · node · edge ·
 > link · relationship · lineage* are the most overloaded in the system — this section keeps them distinct.
-> Relationships as built: [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md) ·
-> [`okf/capabilities/metamodel/metamodel.md`](okf/capabilities/metamodel/metamodel.md). *(Provenance: the
+> Relationships as built: [`okf/product/module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) ·
+> [`okf/product/module/config/plan-metamodel.md`](okf/product/module/config/plan-metamodel.md). *(Provenance: the
 > pre-lock concept graph `archived-documents/plans-archive/COMPONENT_GRAPH.md`, not maintained.)*
 
 **Graph** — A queryable relationship object: **Nodes** + typed **Edges** that can be traversed, analyzed (paths,
@@ -1015,7 +1015,7 @@ Never use Entity/Link for artifacts (Component/Part) or assets (Asset/Lineage).
 Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.
 Built **frontend-first in the Link Analysis Studio** (C5, 2026-07-04); the backend projection + schema
 relationships shipped later — V1 is complete, V2+ is open backlog. As built:
-[`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md). *(Provenance:
+[`okf/product/module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md). *(Provenance:
 `archived-documents/plans-archive/link-analysis-and-graphsource.md` and the two studio plans, not maintained.)*
 
 **Inspecto LA** *(the product; named by operator decision `ED-1`, `LA-EDITIONS-1`, 2026-10-17)* — The **product** that
@@ -1056,7 +1056,7 @@ neutral vocabulary (`generic`). A Domain Profile **relabels; it never adds a con
 word (AC-09). ⛔ Not a *Persona lens* (§1-A, a UI annotation of a person's role) and not the **Entity Type Profile** /
 **Entity Profile** pages below (facts about the data). ⛔ Never bare *pack* for it: *pack* alone is ambiguous (pattern
 pack, Job Pack, Solution pack); say *Industry pack* (§15). As built:
-[`okf/backend/modules/link-analysis.md`](okf/backend/modules/link-analysis.md) §3.6.
+[`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §3.6.
 
 **Entity Type Profile** *(Link Analysis, decided 2026-10-15, D-EP1; plan [`archived-documents/plans-archive/la-entity-profile-plan.md`](archived-documents/plans-archive/la-entity-profile-plan.md))* — What the Space's Datasets say about one **Entity Type**, computed on demand and cached until a new File lands: the Dataset columns bound to it, volume and fill rate, sentinel values, value shapes, time span and per-day timeline, freshness, lineage, link and relationship statistics. Aggregates only: it never names an identifier. Read by `GET /inv/entity-types/{id}/profile`; shown on the **Entities** page. ⛔ Not an *Access Profile* or a *Decode Profile* (different concepts); ⛔ not a Dataset profile (it spans every Dataset the type appears in).
 
@@ -1104,7 +1104,7 @@ the same list, entry and subject. Stored as a signed record under `screening-hit
 (it does not ride the Alert → Incident chain), and the set of open hits is ⛔ not a *review queue* (queues stay deleted, D-P4):
 say *open Screening Hits*.
 
-### Geo (Geo Map Analysis) *(added 2026-07-05; as built: [`okf/frontend/features/geo-map.md`](okf/frontend/features/geo-map.md))*
+### Geo (Geo Map Analysis) *(added 2026-07-05; as built: [`okf/product/module/geo-link/user-guide-geo-map.md`](okf/product/module/geo-link/user-guide-geo-map.md))*
 
 **Geo Map Analysis Studio** — The Builder-lens Studio pane (`/studio/geo-map`, Phase 1) for geographic
 investigation: pick a **GeoSource** + **GeoQuery**, render on the offline MapLibre host, investigate (search,
@@ -1184,7 +1184,7 @@ names); `*_job.toon`'s `flow:`→`pipeline:` key (`ParameterResolver` dual-reads
 `pipeline` job type's `ParameterDecl` schema is now `pipeline`); JSON response keys dual-emit `pipeline`
 alongside the retained `flow` (`PipelineProjection.graph()`'s `flows`/`pipelines` top-level array and each
 node/edge's `flow`/`pipeline` field, `ViewRoutes`/`ViewDefinition`'s `flow`/`pipeline`, the `/provenance`
-routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** — the words a user READS were never part of the tier plan and had drifted furthest: ~50 operator-visible strings still said "flow" (404 `no authored flow '<id>'`, `422 flow validation failed`, `Invalid flow '<name>'`, the conservation-imbalance ALERT body, `unsafe flow id`, the `[FLOWJOB]` log tag, a `ConfigSpecs` attribute description, three UI labels). All renamed; the surviving `flow` strings are exactly the CONTRACTS this row's earlier tiers deliberately kept — the dual-emit JSON keys, the legacy `flow:` job key, the `?flow=` query param and the `flow` agent-tool argument. Pinned by the new `flow-message` rule in `tools/check-vocabulary.mjs`, which tells a contract from a message BY SHAPE (a contract is the bare token `"flow"`; a message is a sentence), so no rename is forced on a caller-facing key. **Tier 3 wire cutover DONE 2026-09-24** (`feat!:`, rides 4.0.0 — `okf/backend/control-plane/api-stability.md` release notes): the JSON dual-emit ENDED — `ViewDefinition.toMap`, `ViewRoutes`, `LineageRoutes` and `PipelineProjection.combined` emit only `pipeline`/`pipelines`; the `@PublicApi` record component `ViewDefinition.flow` is now `pipeline`; the view-definition dual-READ of `flow:` was dropped too (nothing on disk carried `flow:` alone; `spaces/ucc/.../sites_active_view.toon` migrated, its guard allowlist entry deleted); the `pipeline_author` agent-tool argument and result key are `pipeline` (its one caller, the pipeline editor, moved in the same change; `flowSchemaJson`/`constrainedFlow` became `pipelineSchemaJson`/`constrainedPipeline`). **Still dual-read, not part of this cutover:** the `flow:` key of a `type: pipeline` `*_job.toon` and the `?flow=` query param. |
+routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** — the words a user READS were never part of the tier plan and had drifted furthest: ~50 operator-visible strings still said "flow" (404 `no authored flow '<id>'`, `422 flow validation failed`, `Invalid flow '<name>'`, the conservation-imbalance ALERT body, `unsafe flow id`, the `[FLOWJOB]` log tag, a `ConfigSpecs` attribute description, three UI labels). All renamed; the surviving `flow` strings are exactly the CONTRACTS this row's earlier tiers deliberately kept — the dual-emit JSON keys, the legacy `flow:` job key, the `?flow=` query param and the `flow` agent-tool argument. Pinned by the new `flow-message` rule in `tools/check-vocabulary.mjs`, which tells a contract from a message BY SHAPE (a contract is the bare token `"flow"`; a message is a sentence), so no rename is forced on a caller-facing key. **Tier 3 wire cutover DONE 2026-09-24** (`feat!:`, rides 4.0.0 — `okf/product/module/api/plan-api-stability.md` release notes): the JSON dual-emit ENDED — `ViewDefinition.toMap`, `ViewRoutes`, `LineageRoutes` and `PipelineProjection.combined` emit only `pipeline`/`pipelines`; the `@PublicApi` record component `ViewDefinition.flow` is now `pipeline`; the view-definition dual-READ of `flow:` was dropped too (nothing on disk carried `flow:` alone; `spaces/ucc/.../sites_active_view.toon` migrated, its guard allowlist entry deleted); the `pipeline_author` agent-tool argument and result key are `pipeline` (its one caller, the pipeline editor, moved in the same change; `flowSchemaJson`/`constrainedFlow` became `pipelineSchemaJson`/`constrainedPipeline`). **Still dual-read, not part of this cutover:** the `flow:` key of a `type: pipeline` `*_job.toon` and the `?flow=` query param. |
 | Data Store | **Dataset** | Studio datasets UI; `dataset-types.ts` (already "Dataset" — verify no "store" labels); backend `ComponentStore` stays = *physical store*, not a Dataset |
 | Data Source *(browsable origin)* | **Stream** (event/fact) + **Reference** (dimension) | ✅ **DONE end-to-end** (2026-07-14, uncommitted on `master`; plan `archived-documents/plans-archive/source-collector-stream-reference-rename.md`). Two Catalog data-origin concepts (§3): **Stream** = time-series/append-only event origin; **Reference** = mutable/versioned dimension origin → **Reference Dataset** (§6-B). Backend: `NodeKind.SOURCE→STREAM`, `IdScheme` token `source:→stream:`; `GET /catalog/streams` now emits `kind:"STREAM"`; **new `GET /catalog/references`** (REFERENCE_DATASET origins). UI: Catalog **References** tab added alongside the existing **Streams** tab; `NodeKind` union + graph glyph/colour tokens realigned `SOURCE→STREAM`. The acquisition *config* is **Connection** + **Collector**. |
 | Cube *(noun / summary asset)* | **Matrix** | ✅ **DONE** (2026-08-04, additive label, not a model rename — no version bump). User-facing name for a summary **Derived Table** (§6-B); the model type stays `Derived Table` / `NodeKind.DERIVED_TABLE`. Landed: `nodeKindLabel()` (`inspecto-ui/.../inspecto/graph/catalog-graph.ts`) maps `DERIVED_TABLE`→"Matrix" for the Catalog legend, graph-node tooltip, and node-detail dialog (incl. its neighbour grid). No prior UI copy said "Cube" as a noun (only the `heroicons_outline:cube` icon id and the sanctioned verb sense in GLOSSARY/USER_GUIDE, both correctly kept — see §5 of the archived `vocabulary-and-config-contract-plan.md`). Persisted materialization is still Phase C. |
@@ -1198,7 +1198,7 @@ routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** —
 | `EVENT_TABLE` / `TRANSFORMED_TABLE` / `REFERENCE_TABLE` | **`TABLE`** / **`DERIVED_TABLE`** / **`REFERENCE_DATASET`** | ✅ **DONE** (breaking → 5.0): `NodeKind` enum + all usages (`IdScheme`, `CatalogOverlay`, `MetadataGraphService`, `KpiToSqlSkill`, `SuggestConfigSkill`) + 5 test files; FE `models.ts` union + `node-detail.dialog.ts` `isStore()` + `catalog-graph.ts` shape/glyph. Id tokens (`event`/`xform`/`ref`) unchanged. ⚠️ `/catalog/graph` emits the new enum values (no alias). |
 | `LineageRow` *(file→partition rows)* | **Provenance** *(concept)* | `platform/inspecto-etl/src/main/java/com/gamma/etl/LineageRow.java`, `ConsignmentAuditWriter`; the asset graph keeps the name *Lineage* |
 | Node *(user-facing, pipeline canvas)* | **Step** | ✅ **DONE — verified against source 2026-09-08** (amendment Phase 5). ⚠ This row read "NOT STARTED" long after it shipped; its own cited plan already said so at `elt-final-amendment-plan.md` §5 (*Control plane & UI*) ("`step-types` endpoint + UI slices S1–S4 SHIPPED 2026-08-06 … **Phase 5's verify gate is now met**"). **UI copy:** ~20 user-visible strings in the editor say **Step** — `aria-label="Step palette"` and `<h2>Steps</h2>` (`pipeline-editor.component.html:500,507`), `"Rename Step"` (`pipeline-inspector.component.ts:185`), `"Pipeline Steps"` (`pipeline-step-cards.component.ts:44`), `"Test this Step"` (`pipeline-config-definition.component.ts:254`). **Route:** `GET /pipelines/step-types` was served and read until the Recipe view went (`6d3c68fa`), then **retired 2026-09-24** with its contract (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`); `/pipelines/node-types` (+ `/pipelines/processor-catalog`) is the palette's one source — the rollout's "serve both" ended. **`NodeConfigDialog` copy:** target **obsolete** — the class was retired in `17accbef` when configuration moved into the non-modal definition drawer, so there was nothing to rename (⚠ `pipeline-step-cards.component.ts:326` still *names* it in a comment; do not reintroduce it). Internal `PipelineNode`/`BuiltinNodeType`/`NodeAttributes` KEPT as documented. ⚠ **One live residual:** `pipeline-inspector.component.ts:58` renders `<h3>Node · {id}</h3>` whenever `[compact]` is unset — which the read-only properties tab does (`pipeline-editor.component.html:801`). ⛔ The "node" strings in `pipelines.component.html` are the **topology** mode (the cross-pipeline STORE graph, "genuinely a different question" — `pipelines.component.ts:34-36`): a different concept, not this row's debt. |
-| Job *(user-facing, at-rest data work)* | **Job** *(kept — un-banned)* | **REVERSED 2026-08-06** (operator decision; same posture as the Source→Collector row's 2026-07-14 reversal). The planned migration to table-entry Pipelines (amendment Phases 3/6) is superseded: its enabling slice S3 was deferred as genuine new design, while Jobs are the shipped at-rest surface (9 registered types; cron/on_pipeline/on_signal/manual triggers). Jobs panes/routes and `*_job.toon` stay canonical; the authoring contract **shipped 2026-08-07/10** (`okf/backend/control-plane/jobs.md`). Engine internals unchanged; table-entry Pipelines proceed as an *additive* thread (S3a–d design of record), not a replacement. |
+| Job *(user-facing, at-rest data work)* | **Job** *(kept — un-banned)* | **REVERSED 2026-08-06** (operator decision; same posture as the Source→Collector row's 2026-07-14 reversal). The planned migration to table-entry Pipelines (amendment Phases 3/6) is superseded: its enabling slice S3 was deferred as genuine new design, while Jobs are the shipped at-rest surface (9 registered types; cron/on_pipeline/on_signal/manual triggers). Jobs panes/routes and `*_job.toon` stay canonical; the authoring contract **shipped 2026-08-07/10** (`okf/product/module/processor/spec-jobs.md`). Engine internals unchanged; table-entry Pipelines proceed as an *additive* thread (S3a–d design of record), not a replacement. |
 | Enrichment *(file kind + Step name)* | **table-entry Pipeline** / `transform: {join:}` | **NARROWED to nothing — 2026-09-06 operator decision after grounding** (same posture as the `Job` row's 2026-08-06 reversal; as-built verified 2026-09-08). The plan's own words: "**re-decided 2026-09-06 (operator, after grounding): KEEP `enrichment` first-class and NARROW D-4** — `enrichment` is not deprecated and not read-only; only single-join enrichments expressible as one at-rest chain migrate, join+aggregate over a landed store stays on `enrichment`. The one committed fixture (`orders_daily_enrich.toon`) is join+aggregate, so NOTHING migrates" (`archived-documents/plans-archive/elt-final-amendment-plan.md` §8, *Phases 3/6 user-surface scope SUPERSEDED*). As-built confirms it: `ENRICHMENT` is a first-class TRANSFORM (`BuiltinNodeType.java:167`), present in `ConfigSpecs.TYPES` (`:31-33`), with the full `/enrichment` surface incl. `POST` (`EnrichmentRoutes.java:38-49`); `EnrichmentEngine` is live with four production callers (`EnrichmentService.java:205`, `EnrichJob.java:41`, `EnrichmentProcessor.java:53`, `EnrichmentRoutes.java:148`); no converter exists in `tools/`. The *target* spelling shipped separately and **additively** as `transform.join` (`BuiltinNodeType.java:148`, `RowShaper.java:166`, `NodeAttributes.java:382`). ⛔ **Not a pending rename — do not re-file it as one.** ⚠ The plan calls `D4-ENRICH-1` closed, but that ID appears nowhere in `BACKLOG.md`: the closure is recorded only there. |
 | `materialize` *(maintenance task as Matrix authoring)* | **`summarize` Step** | **DROPPED as done-by-absence — D-7, 2026-09-06.** `BACKLOG.md` §6: "Decided 2026-09-06, keep as designed: … D-7 `materialized` is done-by-absence"; the plan: "**D-7 DROPPED as done-by-absence** (no authored config spells `materialized`; `MaterializeTask` is a Job, not authoring)" (`elt-final-amendment-plan.md` §8, *Phases 3/6 user-surface scope SUPERSEDED*). Verified 2026-09-08: **zero** occurrences of `materialized` in any `*.toon` under `spaces/` or `inspecto/`. The `summarize` Step shipped **independently** — `TRANSFORM_SUMMARIZE` (`BuiltinNodeType.java:156`), executing `RowShaper.java:173` → `:462`, contract `step-types.contract.json:520-521` (retired 2026-09-24; `node-attributes.contract.json` still pins its specs) — while `MaterializeTask` remains a maintenance **Job** (`MaterializeTask.java:28-33`, dispatched at `MaintenanceJob.java:179` `case "materialize"`). The two share only the **measure grammar**: "one measure grammar across the summarize node, materialize jobs and BI queries" (`BuiltinNodeType.java:152-154`) — never the compile-target coupling this row described. The **Matrix** noun (summary Derived Table, Cube row above) is unaffected. |
 | `mapping:` *(block inside `*_schema.toon`)* | **Mapping** *(own CSV component kind)* | 🟡 **PARTIAL — Phase 1 slice 3 shipped, two touchpoints open** (verified against source 2026-09-08; the row read "NOT STARTED"). ✅ Mapping **is** a registered CSV component kind (`ComponentRegistry.java:51` `CSV_KINDS = Set.of("mapping")`, `:58` the `mappings`→`mapping` entry). ✅ The schema TOON codec splits and re-merges: `ConfigWriteRoutes.java:236-246` `splitMapping` writes the sibling CSV and strips `rules`, `ConfigFileSupport.java:146-158` `mergeSiblingMapping` reads it back (`ComponentStore.java:212`). ✅ Editor UI shipped — `'mapping'` in the `ComponentType` union and `COMPONENT_TYPES`, `POST /components/mapping/validate` (`components.service.ts:16,32,248`), `mapping-editor.dialog.ts`. ⛔ **OPEN (a):** `ConfigSpecs` has **no `mapping()` spec at all** — `mapping.canonicalName` is still declared as a *schema* field (`ConfigSpecs.java:697-712`), `TYPES` (`:31-33`) omits `"mapping"`, and `forType` (`:40-51`) has no `mapping` case. ⛔ **OPEN (b):** the one-shot fixture conversion never ran — **24 committed `*_schema.toon` still carry an inline `mapping:` block**, and the single `*_mapping.csv` in the tree is **untracked**, so **zero committed fixtures are migrated**. |
@@ -1214,7 +1214,7 @@ routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** —
 **Migration underway** (the *2b* coordinated breaking change, toward the pending **4.0.0** — one term per
 verified PR). ✅ = the rename has landed (see the touchpoint cell for the commit); unmarked rows are the agreed
 target, not yet started. ⚠ **"toward 5.0" was wrong — corrected 2026-08-27: nothing after 3.x has ever been
-released, so the next release is 4.0.0** (see `okf/backend/control-plane/api-stability.md` §*Release baseline*).
+released, so the next release is 4.0.0** (see `okf/product/module/api/plan-api-stability.md` §*Release baseline*).
 **Save Batch→Consignment for last** (largest blast radius). ⚠ **Its "39 `@PublicApi` types ⇒ needs a version
 bump" figure is stale and its premise is untested** — re-measured 2026-08-27: **81** files mention `Batch`,
 **29** carry `@PublicApi`, and only **8** of those exist in `v3.11.0` (the newest ancestor release):
@@ -1230,11 +1230,11 @@ When a rename lands, mark its row ✅ and record the commit.
 
 The **fifteen capability areas** are the one subject axis every other view keys to: `REQUIREMENTS.md` §3's
 requirement IDs, `BACKLOG.md` rows, `EDITIONS.md` gating debt and commit messages all cite them, and each
-area owns exactly one **capability spec** under `docs/okf/capabilities/<directory>/` (template:
+area owns exactly one **capability spec**, the `plan-<area>.md` file of the product hub it belongs to (`docs/okf/product/…`, see `docs/INDEX.md`) (template:
 `archived-documents/plans-archive/docs-consolidation-plan.md` §5.2). The **ID prefixes are stable traceability handles and never
 change**; the *names* below are the canonical ones and replace the headings `REQUIREMENTS.md` §3 used
-before this pass. A directory name is the most expensive name to change later, so nothing may be created
-under `okf/capabilities/` except through this table.
+before this pass. A directory name is the most expensive name to change later, so no new capability spec may be
+created except through this table.
 
 | ID prefix(es) | Canonical area name | Directory | Defined by | Rename note |
 |---|---|---|---|---|
@@ -1291,7 +1291,7 @@ under `compliance/evidence/` that a **Compliance Control** holds, each naming th
 SBOM is the one machine-generated member. ⚠ **An evidence file is an attestation *about* a source, never the
 source itself** — the **Audit Log** (§9) is the source. Nothing validates that an evidence claim is still
 true, and one of them is currently false where the product changed underneath it
-(`okf/capabilities/compliance/compliance.md` §3.4). ⛔ Not **Tool Evidence** (§12).
+(`okf/product/layer/platform/plan-compliance.md` §3.4). ⛔ Not **Tool Evidence** (§12).
 
 **Guard** — A repo-level check that fails the build or the push when a stated invariant is broken: the
 vocabulary, secret, doc-link, gate-tally, dependency-review and coverage guards plus the processor-board
@@ -1300,7 +1300,7 @@ vocabulary, secret, doc-link, gate-tally, dependency-review and coverage guards 
 
 ---
 
-## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; concepts `okf/backend/module-taxonomy.md`, `okf/backend/module-reorganisation-decisions.md`)*
+## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; concepts `okf/product/layer/platform/architecture-module-taxonomy.md`, `okf/product/layer/platform/plan-module-reorganisation-decisions.md`)*
 
 **Platform module** — A horizontal Maven module that the rest of the system builds on (for example
 `inspecto-engine`): its **Build role** is *Platform module*. ⛔ Not **Platform Service** (§6-A — the grantable

@@ -30,4 +30,4 @@ s.box(700, 300, 200, 70, 'gray', 'SecretResolver', 'ENV / SYS core; FILE /\nKEYS
 s.arrow(140, 300, 140, 240, dash=True)
 s.arrow(360, 300, 360, 240, dash=True)
 s.arrow(580, 300, 580, 240, dash=True)
-s.save('docs/stakeholders/modules/assets/identity-access.svg')
+s.save('docs/okf/product/assets/identity-access.svg')

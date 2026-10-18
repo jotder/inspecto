@@ -109,7 +109,7 @@ const USER_FACING = [
 // as the reason root canon is a named file list. Naming a gap is not closing it. `docs/wiki/` was in no
 // list at all.
 //
-// What the gap was hiding: `docs/roadmap/STAKEHOLDER_OVERVIEW.md` — the document an executive reads, and
+// What the gap was hiding: `docs/okf/product/layer/product/brochure-stakeholder-overview.md` — the document an executive reads, and
 // `INDEX.md`'s own stakeholder set — tripped `bare-flow` 46 times and `issue-key` 4 times while this
 // guard reported green. §11 of it told the reader to stand up a `type: flow` job, which is not a real
 // job type: past a certain age a banned synonym stops being wrong vocabulary and becomes wrong
@@ -158,20 +158,20 @@ const DOC_TREES_LABEL = `{all tracked *.md minus ${DOC_SKIP.join(', ')}}`;
 // Anything else is a stale doc and must be FIXED — that is how this pass found the `sources.md`/
 // "Source Connectors" residue of the shipped Source→Collector rename.
 const DOC_ALLOW = {
-    'docs/okf/backend/engine/db-layer.md::data-store':
+    'docs/okf/product/module/engine/spec-db-layer.md::data-store':
         'Sanctioned sense: "Business-data stores" read via a DuckDB sandbox is the physical backend, not a Dataset.',
     // The vocabulary-and-config-contract plan's two entries were RETIRED 2026-08-04 when the plan shipped
     // and moved to docs/archived-documents/plans-archive/ (a permanently unscanned tier). The
     // stale-allowlist rule named both the moment the file left this scope — the self-retirement working as
     // designed, rather than two exemptions quietly outliving the debt they described.
-    'docs/okf/frontend/features/link-analysis.md::source-acquisition-entity':
+    'docs/okf/product/module/la-core/user-guide-link-analysis.md::source-acquisition-entity':
         'Different concept: link-analysis "Sources" are `GraphSource` renderer feeds, not acquisition entities.',
     // A `grammar-config.md::source-acquisition-entity` entry lived here for one commit (2026-08-26). It is
     // gone because the OPERATOR TOOK THE RENAME instead of the exemption: the schema-fields editor's column
     // is headed **Selector** now — exactly the `raw.fields[].selector` it renders — so the doc describing it
     // no longer uses a reserved word and needs no allowance. Preferred outcome: an exemption records that a
     // banned word is tolerated somewhere, and every one of them is a small ongoing cost.
-    'docs/okf/backend/log.md::bare-flow':
+    'docs/okf/product/layer/platform/spec-change-log.md::bare-flow':
         'Historical changelog: the entry records the `flow-graph`→`pipeline-graph` directory rename itself.',
 
     // ── root canon (added with the tier, 2026-08-29) ──────────────────────────────────────────────
@@ -250,7 +250,7 @@ const RULES = [
         //
         // The trailing-noun exemption covers the *data-origin* axis, which is NOT the acquisition entity:
         //   · `[-\s]` not `\s` — "Source-of-truth" is the same sense as "source of truth" and was a live
-        //     false positive (docs/okf/frontend/architecture.md) until the hyphen was allowed here;
+        //     false positive (docs/okf/product/layer/product/architecture.md) until the hyphen was allowed here;
         //   · path/format/size describe the origin artefact ("Source path", "Source size equals local
         //     size"), never the configured collection task.
         // ⚠ Do NOT add `connector` here: the SPI is `CollectorConnector`, so "Source Connector" is a real

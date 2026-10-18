@@ -2,7 +2,7 @@
 
 **Status:** 🟡 DESIGN 2026-10-18 — nothing built. §8 decisions taken by the assistant under operator delegation (2026-10-18) — **PENDING OPERATOR CONFIRMATION**; S0 (decisions + GLOSSARY) done, S1+ not started.
 **Row:** `docs/BACKLOG.md` §4, `AGENTIC-INVESTIGATION-1` (P2, competitive gap AA).
-**Competitors:** Mobileum RAID Agentic and Subex AI Agent Squads (see `stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`, rows AA and the gap table).
+**Competitors:** Mobileum RAID Agentic and Subex AI Agent Squads (see `okf/product/layer/product/brochure-competitive-matrix.md`, rows AA and the gap table).
 
 ## 1. Goal
 

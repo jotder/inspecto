@@ -2619,7 +2619,7 @@ $docsExcludedFiles = @(
 # Trees/files that MUST survive the exclusion. A filter that also drops wanted docs is worse than
 # shipping the archive, so this is asserted after the copy rather than trusted.
 $docsRequiredEntries = @(
-    'okf', 'stakeholders', 'api', 'ui', 'ops', 'roadmap', 'wiki',
+    'okf', 'api',   # every current doc lives in okf/product/ hubs since PRODUCT-DOCS-HUB-1 (2026-10-19)
     'INDEX.md', 'GLOSSARY.md', 'USER_GUIDE.md', 'ADVANCED_GUIDE.md', 'EDITIONS.md'
 )
 

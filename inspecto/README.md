@@ -68,7 +68,7 @@ The agent **proposes; tested endpoints dispose** — every state-changing sugges
 applied with the human's credential, confirm-first. Generated SQL is validated in a locked-down
 sandbox (no filesystem/extension access, statement allow-list). Air-gapped builds omit hosted
 SDKs entirely, so "local-only" is a packaging guarantee, not a flag. Full design rationale:
-[Assistant capability spec](../docs/okf/capabilities/assistant/assistant.md).
+[Assistant capability spec](../docs/okf/product/module/agent/plan-assistant.md).
 
 ---
 
@@ -98,7 +98,7 @@ many typed streams). Stage-1 transformations are **stateless and per-record** �
 column selection, partition-key derivation, light date composition — which keeps every batch an
 embarrassingly parallel, crash-isolated unit. Heavy work (joins, aggregation, cross-record logic)
 is the job of **Stage-2 enrichment**, which runs over the committed Parquet output. Full rationale:
-[Architecture & Design](../docs/okf/backend/engine/stage1-architecture.md#design-philosophy--scope).
+[Architecture & Design](../docs/okf/product/module/engine/architecture-stage1.md#design-philosophy--scope).
 
 ---
 
@@ -167,7 +167,7 @@ from the repository root instead.
 ## 2. Onboard a new source
 
 A source is described by **three config files** under a space's `config/<source>/` directory
-(e.g. `spaces/<id>/config/<source>/` — see [Spaces](../docs/okf/backend/config/configuration.md#spaces-multi-project-layout)).
+(e.g. `spaces/<id>/config/<source>/` — see [Spaces](../docs/okf/product/module/config/admin-guide-configuration-reference.md#spaces-multi-project-layout)).
 Only the first is hand-authored; the other two are generated and then tuned.
 
 | File | Authored | Purpose |
@@ -188,8 +188,8 @@ ura.bat create-schema <source> path\to\sample.csv config\<source>\<source>_gen.t
 
 Then review the generated files. The full field reference — every `csv_settings` knob,
 `transformType` (`DIRECT` / `CONCAT_DT` / `FILENAME_DATE`), multi-schema dispatch, and the type
-mapping — is in the [Configuration Reference](../docs/okf/backend/config/configuration.md). For proprietary/binary
-formats, write a `StreamingFileIngester` plugin instead of a schema; see [Plugin Ingester](../docs/okf/backend/engine/plugins.md).
+mapping — is in the [Configuration Reference](../docs/okf/product/module/config/admin-guide-configuration-reference.md). For proprietary/binary
+formats, write a `StreamingFileIngester` plugin instead of a schema; see [Plugin Ingester](../docs/okf/product/module/engine/spec-plugin-ingester.md).
 
 > **`.toon` gotchas:** no `#` comments (parsing stops at the first one); quote any value
 > containing `:` (Windows paths, JDBC URLs); the map-vs-tabular array choice is load-bearing.
@@ -230,14 +230,14 @@ java -cp target/inspecto-processor-<version>.jar com.gamma.inspector.MultiCollec
 
 `MultiCollectorProcessor` runs every `*_pipeline.toon` it finds (files or directories), bounded by
 `-Dsources.max`, with each source failure-isolated in its own virtual-thread lane. See
-[Operations → Multiple sources in one process](../docs/okf/backend/build-run/operations-reference.md#multiple-sources-in-one-process).
+[Operations → Multiple sources in one process](../docs/okf/product/layer/platform/admin-guide-operations-reference.md#multiple-sources-in-one-process).
 
 ## 6. Pre-ETL utilities
 
 `MainApp` exposes a suite of independent commands for sourcing, staging, extracting, and archiving
 raw deliveries *before* the pipeline picks them up — driven by the `search`, `copy_tars`, and
 `backup` sections of the same pipeline `.toon`. Run `ura.bat` / `ura.sh` with no arguments to list
-them. Details: [Operations → Pre-ETL utilities](../docs/okf/backend/build-run/operations-reference.md).
+them. Details: [Operations → Pre-ETL utilities](../docs/okf/product/layer/platform/admin-guide-operations-reference.md).
 
 ## 7. Stage-2 enrichment (joins & aggregation)
 
@@ -245,8 +245,8 @@ Stage-1 deliberately avoids joins and aggregation. When you need them, define an
 (`*_enrich.toon`): it registers reference tables and Stage-1 partitions as DuckDB views, runs a
 `transform` SQL, and writes an idempotent partitioned result. Jobs are **event-driven** (fire when
 an upstream batch commits) or **schedule-driven**, hold a per-job lock, and can self-chain. Inspect
-runs and lineage via `/enrichment*` (below). Reference: [Architecture](../docs/okf/backend/engine/stage1-architecture.md)
-and [Operations](../docs/okf/backend/build-run/operations-reference.md).
+runs and lineage via `/enrichment*` (below). Reference: [Architecture](../docs/okf/product/module/engine/architecture-stage1.md)
+and [Operations](../docs/okf/product/layer/platform/admin-guide-operations-reference.md).
 
 If you don't want to hand-write the SQL, the optional `kpi-to-sql` skill (step 11) drafts and
 sandbox-validates it from a business description.
@@ -437,20 +437,20 @@ pass a deterministic oracle (config parser / **sandboxed DuckDB**) + repair loop
 see them — so they're crash-safe and parse-safe. "Valid" ≠ "correct", though: review the surfaced
 interpretation (chosen join keys, KPI definition, sample rows) before applying. See the
 [skill catalog](#the-assist-skill-catalog-all-shipped-all-draft-only--confirm-first) above and the
-[security guardrails](../docs/okf/capabilities/assistant/assistant.md#36-the-gated-write-path).
+[security guardrails](../docs/okf/product/module/agent/plan-assistant.md#36-the-gated-write-path).
 
 ## 12. Output, audit & troubleshooting
 
 **Output** lands as Hive-partitioned Parquet/CSV under `database/<source>/` (e.g.
 `.../year=2020/month=04/day=03/<table>_out.parquet`). Optionally registered into a DuckLake
-catalog — see [Integrations](../docs/okf/backend/integrations.md).
+catalog — see [Integrations](../docs/okf/product/layer/platform/api-integrations-ducklake.md).
 
 **Audit** is three-layered: a per-file status CSV (`status/<source>/`), a per-batch summary, and an
 input→output **lineage matrix** — all also queryable via the Control API (`/pipelines/{name}/files`,
 `/batches`, `/lineage`). Per-run logs land in `logs/<source>/` when `dirs.log_dir` is set.
 
 **When something fails:** check the quarantine directory and reason, the status CSV, and
-[Troubleshooting](../docs/okf/backend/build-run/troubleshooting.md) for common failures and fixes. The `explain-entity`
+[Troubleshooting](../docs/okf/product/layer/platform/architecture-troubleshooting.md) for common failures and fixes. The `explain-entity`
 and `diagnose-and-alert` skills can synthesize a root-cause from the same audit data if the agent
 is enabled.
 
@@ -458,9 +458,9 @@ is enabled.
 DB + DuckDB spill) to `dirs.temp` on your data volume, not the system `/tmp`. If a huge file still
 exhausts that volume, set `processing.duckdb.temp_directory` to a roomier disk and/or enable
 `processing.chunking` to stream the file in bounded chunks — see
-[Configuration → Large files](../docs/okf/backend/config/configuration.md#large-files-scratch-location--auto-chunking).
+[Configuration → Large files](../docs/okf/product/module/config/admin-guide-configuration-reference.md#large-files-scratch-location--auto-chunking).
 For a huge **custom** (binary/ASN.1/proprietary) file, the CSV chunker doesn't apply — implement a
-[`StreamingFileIngester`](../docs/okf/backend/engine/plugins.md#the-streamingfileingester-spi) so the framework bounds heap/scratch.
+[`StreamingFileIngester`](../docs/okf/product/module/engine/spec-plugin-ingester.md#the-streamingfileingester-spi) so the framework bounds heap/scratch.
 
 ---
 
@@ -480,15 +480,15 @@ This README is the overview + user guide. Detailed topics live under [`../docs/`
 
 | Doc | Covers |
 |---|---|
-| [Architecture & Design](../docs/okf/backend/engine/stage1-architecture.md) | The two-stage engine (M..N multiplexer + enrichment), behavior-injection seams, directory layout, deliberate non-goals |
-| [Configuration Reference](../docs/okf/backend/config/configuration.md) | The three config files, configuration by source format, multi-schema dispatch, type mapping |
-| [Plugin Ingester](../docs/okf/backend/engine/plugins.md) | The `StreamingFileIngester` interface, segment schemas, the `TypedRecordIngester` reference plugin |
-| [Operations](../docs/okf/backend/build-run/operations-reference.md) | Pre-ETL utilities, batch processing & concurrency, multi-source orchestration, output structure, audit logs, deployment |
+| [Architecture & Design](../docs/okf/product/module/engine/architecture-stage1.md) | The two-stage engine (M..N multiplexer + enrichment), behavior-injection seams, directory layout, deliberate non-goals |
+| [Configuration Reference](../docs/okf/product/module/config/admin-guide-configuration-reference.md) | The three config files, configuration by source format, multi-schema dispatch, type mapping |
+| [Plugin Ingester](../docs/okf/product/module/engine/spec-plugin-ingester.md) | The `StreamingFileIngester` interface, segment schemas, the `TypedRecordIngester` reference plugin |
+| [Operations](../docs/okf/product/layer/platform/admin-guide-operations-reference.md) | Pre-ETL utilities, batch processing & concurrency, multi-source orchestration, output structure, audit logs, deployment |
 | [Operator Console (Inspector)](../docs/USER_GUIDE.md) | The web UI: connecting with tokens, every screen, common operator tasks, dev vs. prod serving, troubleshooting |
-| [Integrations](../docs/okf/backend/integrations.md) | DuckLake registration and the pg_duckdb warehouse query layer |
-| [Troubleshooting](../docs/okf/backend/build-run/troubleshooting.md) | Common failures and fixes |
-| [Assistant](../docs/okf/capabilities/assistant/assistant.md) | The assist-agent design: skills, model tiering, oracles, security guardrails |
+| [Integrations](../docs/okf/product/layer/platform/api-integrations-ducklake.md) | DuckLake registration and the pg_duckdb warehouse query layer |
+| [Troubleshooting](../docs/okf/product/layer/platform/architecture-troubleshooting.md) | Common failures and fixes |
+| [Assistant](../docs/okf/product/module/agent/plan-assistant.md) | The assist-agent design: skills, model tiering, oracles, security guardrails |
 
 Engineering notes (not user-facing): [design decisions & ADRs](../docs/PROJECT_NOTES.md) ·
-[performance & bottleneck analysis](../docs/okf/backend/build-run/performance.md) · [test coverage](../docs/okf/backend/build-run/guard-coverage.md) ·
-[API stability policy](../docs/okf/backend/control-plane/api-stability.md).
+[performance & bottleneck analysis](../docs/okf/product/layer/platform/tests-performance.md) · [test coverage](../docs/okf/product/layer/platform/tests-guard-coverage.md) ·
+[API stability policy](../docs/okf/product/module/api/plan-api-stability.md).

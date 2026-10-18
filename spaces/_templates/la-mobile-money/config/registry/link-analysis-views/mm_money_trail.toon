@@ -1,5 +1,5 @@
 name: mm_money_trail
-description: "Mobile-money wallets, agents and merchants linked by every kind (p2p, cash_in, cash_out, merchant_pay, shared_device, shared_id), one link per transaction with ts and amount on the link. Start from HUB-01: 25 STRUCT wallets pay in, 98 percent leaves within minutes through RELAY-1/2/3 to the cash-out agent AG-39. Planted stories: docs/ops/la-showcase-mm-runbook.md."
+description: "Mobile-money wallets, agents and merchants linked by every kind (p2p, cash_in, cash_out, merchant_pay, shared_device, shared_id), one link per transaction with ts and amount on the link. Start from HUB-01: 25 STRUCT wallets pay in, 98 percent leaves within minutes through RELAY-1/2/3 to the cash-out agent AG-39. Planted stories: docs/okf/product/solution-pack/la-mobile-money/admin-guide-showcase-runbook.md."
 sourceId: entity-projection
 layout: force
 profile: finance

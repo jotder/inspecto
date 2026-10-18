@@ -1,7 +1,7 @@
 # 5G / IoT / cloud / digital service assurance: a plan for a file-fed platform
 
 > 🟡 **PLAN 2026-10-18 (`PACK-5G-IOT-ASSURANCE-1`): design only, nothing built.** Competitive gap **U** (5G, IoT, cloud and
-> digital service assurance) is **N** for Inspecto in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md):
+> digital service assurance) is **N** for Inspecto in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../okf/product/layer/product/brochure-competitive-matrix.md):
 > LATRO, Mobileum and TEOCO sell it (TEOCO's HELIX is 5G service assurance), Subex and Neural are partial or adjacent. The
 > backlog row says "not designed; build when a prospect names it". This plan designs it **for the platform Inspecto is**:
 > a file- and event-feed platform with **no probes and no inline path**. It is deliberately narrow: it assures what
@@ -15,7 +15,7 @@
 >
 > **Method.** Read on 2026-10-18: matrix rows U, F, X, A, P; the `PACK-5G-IOT-ASSURANCE-1` row; `docs/GLOSSARY.md`; the
 > `telco-ra`, `telco-fraud` and `business-assurance` Space Templates (Pipelines, Schemas, Jobs, KPIs, Alert Rules, the
-> `anomaly-models/tf_subscriber_usage.toon` model); `okf/backend/engine/parser-plugins.md`; `okf/backend/control-plane/anomaly-scores.md`;
+> `anomaly-models/tf_subscriber_usage.toon` model); `okf/product/module/engine/spec-parser-plugins.md`; `okf/product/module/anomaly/spec-anomaly-scores.md`;
 > the two earlier plans; and the git-excluded MVNO RFP working set (`docs/superpower/rfp-mvno-assurance/`: the
 > `compliance-matrix.xlsx` Compliance Matrix sheet, `gap-register.md`, `build-plan.md`, `assurance-content-catalog.xlsx`).
 > Where this plan says "exists", a file was read; where it says "not run", it was read, not executed.
@@ -184,7 +184,7 @@ SIM count times days, not raw session count. **U0 measures it** (D-5G8).
   `offerings/standard.toon` `contentPacks`; the Preview edition carries everything. ⚠ Only `basic.toon` and `standard.toon`
   list `contentPacks`: verify at U7 how Advanced inherits before claiming it. Use Basic / Standard / Advanced / Preview only.
 - **No new root-level `docs/*.md`.** On ship, as-built facts go into the OKF concept for Space Templates
-  (`okf/capabilities/spaces/spaces.md`), solution pages under `stakeholders/solutions/`.
+  (`okf/product/module/config/plan-spaces.md`), solution pages under `stakeholders/solutions/`.
 
 ## 8. Traceability to the MVNO RFP working set
 
@@ -296,14 +296,14 @@ so it cannot collide with the re-rating, settlement, SIM-box or IRSF lanes; the 
 
 - `BACKLOG.md`: only the **text** of row `PACK-5G-IOT-ASSURANCE-1` (now points at this plan, names the demand gate); no new row, no count change.
 - `INDEX.md`: this plan's row in the in-flight table.
-- On ship (U7): distil as-built facts into `okf/capabilities/spaces/spaces.md`, add solution pages under `stakeholders/solutions/`,
+- On ship (U7): distil as-built facts into `okf/product/module/config/plan-spaces.md`, add solution pages under `stakeholders/solutions/`,
   update matrix row U, then `git mv` this plan to `archived-documents/plans-archive/`. Anything still open goes to `BACKLOG.md` first.
 
 ## References
 
-- Matrix: [`stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md) rows U, F, X, A, P.
+- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows U, F, X, A, P.
 - Earlier plans: [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md), [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md).
-- Parsers: [`okf/backend/engine/parser-plugins.md`](../okf/backend/engine/parser-plugins.md). Anomaly Detection: [`okf/backend/control-plane/anomaly-scores.md`](../okf/backend/control-plane/anomaly-scores.md).
+- Parsers: [`okf/product/module/engine/spec-parser-plugins.md`](../okf/product/module/engine/spec-parser-plugins.md). Anomaly Detection: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md).
 - Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).
 - RFP working set (git-excluded, this checkout only): `docs/superpower/rfp-mvno-assurance/` (`compliance-matrix.xlsx`, `gap-register.md`, `build-plan.md`, `assurance-content-catalog.xlsx`).
 

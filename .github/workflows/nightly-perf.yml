@@ -3,7 +3,7 @@
 # Runs ONE existing benchmark — PluginIngestBenchmark, streaming plugin ingest → PARQUET, 1,000,000 rows,
 # 30 day-partitions — at a FIXED size and fails the job when union-mode throughput drops below the floor.
 #
-# The floor is set from a MEASURED local baseline, not a guess (okf/backend/build-run/performance.md,
+# The floor is set from a MEASURED local baseline, not a guess (okf/product/layer/platform/tests-performance.md,
 # "Nightly throughput floor"): three runs on 2026-09-29, 12-core Windows dev host, JDK 27, union mode =
 # 192,881 / 148,906 / 138,636 rows/s. Floor = 50,000 rows/s, ~2.8x headroom under the slowest run, because
 # a shared 4-vCPU hosted runner is slower and noisier than the dev host. Tighten it only from measured

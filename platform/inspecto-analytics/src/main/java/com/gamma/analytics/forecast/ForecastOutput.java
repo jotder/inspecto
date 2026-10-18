@@ -22,7 +22,7 @@ import java.util.List;
  *
  * The columns are described with the score output contract's {@link Column} (name, DuckDB type, Dataset role) — the
  * same column vocabulary — but not its schema: a forecast is indexed by time, not by entity, and has no 0–100 scale,
- * band names, model version or {@code _latest} swap (see {@code docs/okf/backend/analytics-kernel.md} § Forecasting).
+ * band names, model version or {@code _latest} swap (see {@code docs/okf/product/module/analytics/spec.md} § Forecasting).
  */
 public final class ForecastOutput {
     private ForecastOutput() {}

@@ -28,7 +28,7 @@ Three convictions anchor every requirement:
 3. **Operable by design** — every Run is crash-isolated and idempotent; everything is captured as
    Signals, Metrics, audit, and managed objects.
 
-The north star ([`okf/living-operational-system.md`](okf/living-operational-system.md))
+The north star ([`okf/product/layer/platform/architecture-living-system.md`](okf/product/layer/platform/architecture-living-system.md))
 frames the platform as **seven cooperating networks over one Component metamodel** (Data · Signal ·
 Decision · Execution · Metadata · Presentation · Security), so it can evolve from deterministic rules to
 AI-driven autonomy without redesign.
@@ -98,21 +98,21 @@ AI-driven autonomy without redesign.
 
 | Area | IDs | Requirement of record |
 |---|---|---|
-| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](okf/capabilities/acquisition/acquisition.md) §2 |
-| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](okf/capabilities/ingestion/ingestion.md) §2 |
-| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](okf/capabilities/pipeline-authoring/pipeline-authoring.md) §2 |
-| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](okf/capabilities/pipeline-execution/pipeline-execution.md) §2 |
-| `DAT` — **Data plane** | `DAT-1` … `DAT-6` | [`data-plane/data-plane.md`](okf/capabilities/data-plane/data-plane.md) §2 |
-| `BI · INV` — **Studio** | `BI-1` … `BI-8` · `INV-1` … `INV-4` | [`studio/studio.md`](okf/capabilities/studio/studio.md) §2 |
-| `OPS` — **Observability & maintenance** | `OPS-1` … `OPS-6` | [`observability/observability.md`](okf/capabilities/observability/observability.md) §2 |
-| `INC` — **Alerts & Incidents** | `INC-1` … `INC-5` | [`incidents/incidents.md`](okf/capabilities/incidents/incidents.md) §2 |
-| `SPC` — **Spaces & tenancy** | `SPC-1` … `SPC-5` | [`spaces/spaces.md`](okf/capabilities/spaces/spaces.md) §2 |
-| `MET` — **Component metamodel & Catalog** | `MET-1` … `MET-5` | [`metamodel/metamodel.md`](okf/capabilities/metamodel/metamodel.md) §2 |
-| `API` — **Control API** | `API-1` … `API-7` | [`control-api/control-api.md`](okf/capabilities/control-api/control-api.md) §2 |
-| `SEC` — **Security** | `SEC-1` … `SEC-9` | [`security/security.md`](okf/capabilities/security/security.md) §2 |
-| `AGT · EOI` — **Assistant** | `AGT-1`, `AGT-2`, `AGT-3`, `AGT-4`, `AGT-5`, `AGT-6a`, `AGT-6b` · `EOI-1` … `EOI-7` | [`assistant/assistant.md`](okf/capabilities/assistant/assistant.md) §2 |
-| `UI` — **Surfaces & Lenses** | `UI-1` … `UI-8` | [`surfaces/surfaces.md`](okf/capabilities/surfaces/surfaces.md) §2 |
-| `PKG` — **Editions & packaging** | `PKG-1` … `PKG-4` | [`editions/editions.md`](okf/capabilities/editions/editions.md) §2 |
+| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](okf/product/module/acquire/plan-acquisition.md) §2 |
+| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](okf/product/module/etl/plan-ingestion.md) §2 |
+| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](okf/product/module/etl/plan-pipeline-authoring.md) §2 |
+| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](okf/product/module/engine/plan-pipeline-execution.md) §2 |
+| `DAT` — **Data plane** | `DAT-1` … `DAT-6` | [`data-plane/data-plane.md`](okf/product/layer/platform/plan-data-plane.md) §2 |
+| `BI · INV` — **Studio** | `BI-1` … `BI-8` · `INV-1` … `INV-4` | [`studio/studio.md`](okf/product/layer/product/plan-studio.md) §2 |
+| `OPS` — **Observability & maintenance** | `OPS-1` … `OPS-6` | [`observability/observability.md`](okf/product/module/observability/plan-observability.md) §2 |
+| `INC` — **Alerts & Incidents** | `INC-1` … `INC-5` | [`incidents/incidents.md`](okf/product/addon/incidents/plan-incidents.md) §2 |
+| `SPC` — **Spaces & tenancy** | `SPC-1` … `SPC-5` | [`spaces/spaces.md`](okf/product/module/config/plan-spaces.md) §2 |
+| `MET` — **Component metamodel & Catalog** | `MET-1` … `MET-5` | [`metamodel/metamodel.md`](okf/product/module/config/plan-metamodel.md) §2 |
+| `API` — **Control API** | `API-1` … `API-7` | [`control-api/control-api.md`](okf/product/module/processor/plan-control-api.md) §2 |
+| `SEC` — **Security** | `SEC-1` … `SEC-9` | [`security/security.md`](okf/product/module/access/plan-security.md) §2 |
+| `AGT · EOI` — **Assistant** | `AGT-1`, `AGT-2`, `AGT-3`, `AGT-4`, `AGT-5`, `AGT-6a`, `AGT-6b` · `EOI-1` … `EOI-7` | [`assistant/assistant.md`](okf/product/module/agent/plan-assistant.md) §2 |
+| `UI` — **Surfaces & Lenses** | `UI-1` … `UI-8` | [`surfaces/surfaces.md`](okf/product/layer/product/plan-surfaces.md) §2 |
+| `PKG` — **Editions & packaging** | `PKG-1` … `PKG-4` | [`editions/editions.md`](okf/product/layer/platform/plan-editions.md) §2 |
 
 ⚠ **Two of the seventeen areas have no rows here, and that is correct.** `CMP` (**Compliance**) was
 orphaned across `EDITIONS.md` and `compliance/controls-matrix.md` and never had a `REQUIREMENTS.md`
@@ -140,10 +140,10 @@ library. The split is fixed by `GLOSSARY.md` §14, not chosen here.
 | NFR-4 | **Air-gap operation** | Full function without egress; hosted-AI SDKs physically absent; offline basemap/geocoder | SHIPPED |
 | NFR-5 | **Accessibility** | WCAG 2.2 AA; axe-core CI gate | SHIPPED |
 | NFR-6 | **API compatibility** | SemVer; versioned `/api/v1` as the sole business surface (unversioned routes retired 2026-07-25, API-5); `@PublicApi` embedding policy | SHIPPED |
-| NFR-7 | **Compliance posture (Professional)** | SOC2 / ISO27001 / FedRAMP / HIPAA / PCI scope; small SBOM as a deliberate compliance asset | PARTIAL (module shipped; certifications not started) — ⚠ **owner 2026-09-08: [`okf/capabilities/compliance/compliance.md`](okf/capabilities/compliance/compliance.md)**. This is not one undifferentiated gap: it is **seven named items** in `compliance/controls-matrix.md` §4, six needing an external party or org authorship and **one needing only a named owner and a cadence**; the board's check is a line-anchored count that reads 7 and closes at 0. ⚠ The "small SBOM" claim is qualified by measurement — the reactor resolves **94** third-party artifacts, which is why generation moved per-bundle |
+| NFR-7 | **Compliance posture (Professional)** | SOC2 / ISO27001 / FedRAMP / HIPAA / PCI scope; small SBOM as a deliberate compliance asset | PARTIAL (module shipped; certifications not started) — ⚠ **owner 2026-09-08: [`okf/product/layer/platform/plan-compliance.md`](okf/product/layer/platform/plan-compliance.md)**. This is not one undifferentiated gap: it is **seven named items** in `compliance/controls-matrix.md` §4, six needing an external party or org authorship and **one needing only a named owner and a cadence**; the board's check is a line-anchored count that reads 7 and closes at 0. ⚠ The "small SBOM" claim is qualified by measurement — the reactor resolves **94** third-party artifacts, which is why generation moved per-bundle |
 | NFR-8 | **Scale ceiling** | Single-node by design; Enterprise distributed tier is the opt-in escape hatch | ACCEPTED CONSTRAINT — escape hatch **design SIGNED 2026-09-10** as T5 partitioned scale-out (Enterprise; its lease + shared state are also Professional's T4 DR) → `superpower/enterprise-scale-out-plan.md` |
-| NFR-9 | **Quality gates** | GAUNTLET (full reactor tests + UI lint/test/build), token lint, ~~a11y gate~~, ~~live smoke~~ | 🟡 SHIPPED — ⚠ **understated and misstated (corrected 2026-09-09; owner [`okf/capabilities/tooling/tooling.md`](okf/capabilities/tooling/tooling.md) §2)**: there is **no a11y gate step** (axe rides unit specs), and **live smoke exists only in `release.yml`, which has never executed**. The row names none of the **nine repo guards** nor the coverage floors — the substance of what is enforced. ⚠ Load-bearing: `compliance/controls-matrix.md` ISO 8.25–8.31 cites NFR-9 as its only evidence |
-| NFR-10 | **Vocabulary discipline** | One concept → one word; banned synonyms never appear in UI/model/API/docs (GLOSSARY §0) | 🔴 SHIPPED — **both halves of this cell were wrong (corrected 2026-09-09)**. (a) Not "enforced in review": it is `tools/check-vocabulary.mjs`, wired into `ci.yml` **and** `.githooks/pre-push`, and cited by name as CC8 evidence. (b) The scope claim far exceeds the guard — of the **seven** hard bans in `CLAUDE.md`, **three have NO rule at all** (bare *Rule*, *Metric* BI, *Data Source*), *Issue* is enforced only in config KEYS and *Source* only in prose. Owner: [`okf/capabilities/tooling/tooling.md`](okf/capabilities/tooling/tooling.md) §2 | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
+| NFR-9 | **Quality gates** | GAUNTLET (full reactor tests + UI lint/test/build), token lint, ~~a11y gate~~, ~~live smoke~~ | 🟡 SHIPPED — ⚠ **understated and misstated (corrected 2026-09-09; owner [`okf/product/layer/platform/plan-tooling.md`](okf/product/layer/platform/plan-tooling.md) §2)**: there is **no a11y gate step** (axe rides unit specs), and **live smoke exists only in `release.yml`, which has never executed**. The row names none of the **nine repo guards** nor the coverage floors — the substance of what is enforced. ⚠ Load-bearing: `compliance/controls-matrix.md` ISO 8.25–8.31 cites NFR-9 as its only evidence |
+| NFR-10 | **Vocabulary discipline** | One concept → one word; banned synonyms never appear in UI/model/API/docs (GLOSSARY §0) | 🔴 SHIPPED — **both halves of this cell were wrong (corrected 2026-09-09)**. (a) Not "enforced in review": it is `tools/check-vocabulary.mjs`, wired into `ci.yml` **and** `.githooks/pre-push`, and cited by name as CC8 evidence. (b) The scope claim far exceeds the guard — of the **seven** hard bans in `CLAUDE.md`, **three have NO rule at all** (bare *Rule*, *Metric* BI, *Data Source*), *Issue* is enforced only in config KEYS and *Source* only in prose. Owner: [`okf/product/layer/platform/plan-tooling.md`](okf/product/layer/platform/plan-tooling.md) §2 | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
 
 ---
 
@@ -165,7 +165,7 @@ Studio persistence · component metamodel + R1–R6 rework · multi-space · `/a
    2026-07-08; the last residual, **GCS-native** (`connector: gcs`: the GCS JSON API + service-account
    OAuth2, beyond the S3-interop mode), shipped 2026-07-22 — SDK-free (RS256 JWT→bearer on JDK crypto),
    stub-tested offline. The prior "defer, offline-blocked" note was based on a stale assumption that
-   native GCS needed a Google SDK jar; it does not. See `okf/backend/acquisition/connectors.md`.
+   native GCS needed a Google SDK jar; it does not. See `okf/product/module/connectors/spec-connectors.md`.
 2. **SEC-7** — *CLOSED 2026-07-08* (SEC-7d data-scoped grants shipped: attribute-scope model signed by
    product in-session; `caseType` visibility enforced server-side across list/read/mutate/graph on the
    Objects surface; scopes resolved by the security module). Boundary noted: the event/audit streams
@@ -183,7 +183,7 @@ caveat (live e2e via `examples/06-serve/pipeline-job`).*
 ### SHOULD (remaining — each scoped)
 
 - **OPS-5** Provenance conservation on live data — *not code: the verification protocol is written
-  and signed (`docs/ops/provenance-conservation-verification.md`); running it needs the first live
+  and signed (`docs/okf/product/layer/platform/tests-provenance-conservation.md`); running it needs the first live
   deployment. Owner: ops, first live deployment.*
 - **AGT-6a** AI behind every screen (inline NL authoring) — *promoted Could→Should 2026-07-25 and scoped
   in `archived-documents/plans-archive/agt-6-plan.md` §3: phases A1 (one shared inline surface) → A2 (four-pane adoption wave:
@@ -218,7 +218,7 @@ scope cuts and the P1–P5 phasing, all since shipped).*
 - **MET-5** Component version history — *scoped (see §3.10 row): ~1 shift, no migration.*
 - ~~**AGT-5 P1–P5**~~ — **COMPLETE 2026-07-21** (+ polish): phased per the now-archived
   `plans-archive/embedded-intelligence-plan.md` §8; the EOI-7(a) gate lifted 2026-07-08 (pinned v0.1.0, no
-  moving SNAPSHOT) and P1–P5 all shipped. As-built in `okf/backend/agent/embedded-intelligence.md`; only the
+  moving SNAPSHOT) and P1–P5 all shipped. As-built in `okf/product/module/intelligence/architecture-embedded-intelligence.md`; only the
   follow-ons in `BACKLOG.md` §2 remain open (embedding recall PARKED, eoiagent `DryRunProvider` seam, the
   QA-only/local-models-only scope cuts).
 - **AGT-6b** Multi-step agent graphs — *scoped 2026-07-25 in `archived-documents/plans-archive/agt-6-plan.md` §4 and kept
@@ -271,11 +271,11 @@ template gallery + apply).*
 | R1 | ~~Authored-Pipeline go-live verified only against synthetic data~~ **RESOLVED 2026-07-07** — live seeded `type: pipeline` run verified (`examples/06-serve/pipeline-job`) | — |
 | R2 | ~~eoiagent SNAPSHOT churn (moving dependency)~~ **RESOLVED 2026-07-08** — v0.1.0 cut + pinned (EOI-7a); CI builds the tag | — |
 | R3 | ~~Professional jlink runtime unverified vs Nimbus~~ **RESOLVED 2026-07-07** — module set verified sufficient (PKG-4) | — |
-| R4 | ~~Per-resource permissions & X-Actor rejection incomplete on Professional~~ **RETIRED 2026-09-08** — both halves shipped 2026-07-07/08 (`X-Actor` rejected outright when an `Authenticator` is active; `permissions[]` emitted); see `okf/capabilities/security/security.md` §2 | — |
+| R4 | ~~Per-resource permissions & X-Actor rejection incomplete on Professional~~ **RETIRED 2026-09-08** — both halves shipped 2026-07-07/08 (`X-Actor` rejected outright when an `Authenticator` is active; `permissions[]` emitted); see `okf/product/module/access/plan-security.md` §2 | — |
 | R5 | Provenance conservation checks unproven on live data | OPS-5 live verification alongside R1's seeded run |
-| R6 | ~~Structured (non-SQL) Queries still client-compiled~~ **ACCEPTED AS DESIGN 2026-07-22** (product sign-off) — not a risk. The builder UI emits valid SQL that `QueryExecutor` runs; a server-side structured compiler would duplicate that for no functional gain. Server 422 on non-SQL bodies stays the explicit, deliberate contract. Revisit only if an external API consumer must submit structured bodies directly. | Closed — `okf/backend/control-plane/queries.md` |
+| R6 | ~~Structured (non-SQL) Queries still client-compiled~~ **ACCEPTED AS DESIGN 2026-07-22** (product sign-off) — not a risk. The builder UI emits valid SQL that `QueryExecutor` runs; a server-side structured compiler would duplicate that for no functional gain. Server 422 on non-SQL bodies stays the explicit, deliberate contract. Revisit only if an external API consumer must submit structured bodies directly. | Closed — `okf/product/module/processor/spec-queries.md` |
 | R7 | Prompt injection / data egress once intelligence deepens | AGT-5 design: context-as-data, privacy classes P0–P3, approval gates, kill switch |
-| R8 | ~~Open product questions: case-type data-scoped grants, `canOnboardConnections` split, sunset timing~~ **RESOLVED 2026-07-22** (product sign-off): case-type grants = SEC-7d attribute-scope model (shipped, no further per-type role UI); `canOnboardConnections` = split out + implemented (Admin-only grant on the connection write routes); sunset timing = moot — the unversioned surface was **retired outright** 2026-07-25 (API-5), mechanism and all. | Closed — `okf/backend/editions/auth-security.md` |
+| R8 | ~~Open product questions: case-type data-scoped grants, `canOnboardConnections` split, sunset timing~~ **RESOLVED 2026-07-22** (product sign-off): case-type grants = SEC-7d attribute-scope model (shipped, no further per-type role UI); `canOnboardConnections` = split out + implemented (Admin-only grant on the connection write routes); sunset timing = moot — the unversioned surface was **retired outright** 2026-07-25 (API-5), mechanism and all. | Closed — `okf/product/module/access/admin-guide-auth-security.md` |
 | R9 | Feature matrix (2026-07-02) drifting from reality | This document is the reconciled view; update **both** on the next planning pass |
 
 ---
@@ -284,11 +284,11 @@ template gallery + apply).*
 
 | Document | What it grounds |
 |---|---|
-| [`api/README.md`](api/README.md) · [`okf/backend/control-plane/api-v1.md`](okf/backend/control-plane/api-v1.md) | The `/api/v1` contract as built — envelope, error catalog, OpenAPI, ETag concurrency, `/bootstrap` (API-1…5) |
-| [`okf/living-operational-system.md`](okf/living-operational-system.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
+| [`api/README.md`](api/README.md) · [`okf/product/module/processor/api-v1.md`](okf/product/module/processor/api-v1.md) | The `/api/v1` contract as built — envelope, error catalog, OpenAPI, ETag concurrency, `/bootstrap` (API-1…5) |
+| [`okf/product/layer/platform/architecture-living-system.md`](okf/product/layer/platform/architecture-living-system.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
 | [`BACKLOG.md`](BACKLOG.md) | Every open row, ranked; §6 the standing refusals; §7 the duplicate map |
-| [`okf/backend/agent/embedded-intelligence.md`](okf/backend/agent/embedded-intelligence.md) | The Assistant's autonomy ladder and tool surface as built (AGT-5, complete 2026-07-21) |
-| [`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) · [`roadmap/STAKEHOLDER_OVERVIEW.md`](roadmap/STAKEHOLDER_OVERVIEW.md) | Horizons; value proposition; maturity |
+| [`okf/product/module/intelligence/architecture-embedded-intelligence.md`](okf/product/module/intelligence/architecture-embedded-intelligence.md) | The Assistant's autonomy ladder and tool surface as built (AGT-5, complete 2026-07-21) |
+| [`okf/product/layer/platform/plan-roadmap.md`](okf/product/layer/platform/plan-roadmap.md) · [`okf/product/layer/product/brochure-stakeholder-overview.md`](okf/product/layer/product/brochure-stakeholder-overview.md) | Horizons; value proposition; maturity |
 | [`EDITIONS.md`](EDITIONS.md) | Edition capability tiers |
 | [`GLOSSARY.md`](GLOSSARY.md) | Binding vocabulary (§0 rules; §13 rename status) |
 | [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) | Per-feature TOON shapes + runnability constraints |

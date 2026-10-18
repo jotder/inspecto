@@ -16,7 +16,7 @@ import java.util.OptionalDouble;
  * Run via {@code requires: [analytics]} and looked up as {@code ctx.services().get(AnalyticsAccess.class)}. A deliberately
  * small surface over {@code platform/inspecto-analytics}: the canonical statistics, the column profiler's SQL over a
  * granted Dataset read, and the one time-grain truncation. Every definition, input rule and DuckDB twin is the kernel's
- * ({@code docs/okf/backend/analytics-kernel.md}); this interface adds none of its own.
+ * ({@code docs/okf/product/module/analytics/spec.md}); this interface adds none of its own.
  *
  * <h3>Why the interface is here and the maths is there</h3>
  * The kernel is foundation-only and may never reach the engine, while a Platform Service interface must be

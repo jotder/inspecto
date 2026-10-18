@@ -24,4 +24,4 @@ for i, (label, color, items) in enumerate(COLS):
 mid = Y0 + BH / 2
 for i in range(3):
     s.arrow(X0 + i * STEP + BW + 2, mid, X0 + (i + 1) * STEP - 2, mid)
-s.save('docs/stakeholders/solutions/assets/solution-revenue-assurance.svg')
+s.save('docs/okf/product/assets/solution-revenue-assurance.svg')

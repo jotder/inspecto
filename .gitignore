@@ -178,7 +178,7 @@ inspecto-dedup-ledger.db*
 ~$*
 
 # Generated deliverables: regenerate with scripts/generate_whitepaper_docx.py, never commit the binary
-docs/stakeholders/*.docx
+docs/okf/product/**/*.docx
 
 # Code-signing material: never in git (P3h per-jar signing keystores are the operator's, supplied at release time)
 *.p12

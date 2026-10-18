@@ -5,3 +5,4 @@ parent: layer.providers
 module: oidc
 billable: false
 status: ga
+docs: docs/okf/product/module/oidc/index.md

@@ -58,7 +58,7 @@ class Svg:
         self.o.append(f'<text x="{x:g}" y="{y:g}" text-anchor="{anchor}" font-size="{size}" fill="{color}">{esc(t)}</text>')
 
     def save(self, rel_path):
-        """rel_path is relative to the repo root, e.g. docs/stakeholders/modules/assets/x.svg."""
+        """rel_path is relative to the repo root, e.g. docs/okf/product/assets/x.svg."""
         self.o.append('</svg>')
         os.makedirs(os.path.dirname(rel_path), exist_ok=True)
         with open(rel_path, 'w', encoding='utf-8') as fh:

@@ -48,7 +48,7 @@ const abort = (msg) => { console.error(`✗ Bundle-spaces guard could not run: $
 // ── mode 2: check a BUILT bundle (package.ps1 runs this on the bundle it is about to zip) ───────
 //   node tools/check-bundle-spaces.mjs --bundle <dir> [--demo-auth --ui la-app]
 // Exception (operator 2026-10-12): only the demo-auth la-app bundle may carry exactly one Space, `la-showcase`
-// (the rule lives in tools/bundle-spaces-rule.mjs; see docs/ops/la-showcase-variants-runbook.md).
+// (the rule lives in tools/bundle-spaces-rule.mjs; see docs/okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md).
 const argv = process.argv.slice(2);
 if (argv.includes('--bundle')) {
   const dir = argv[argv.indexOf('--bundle') + 1];

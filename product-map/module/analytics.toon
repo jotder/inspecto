@@ -5,3 +5,4 @@ parent: layer.platform
 module: analytics
 billable: false
 status: ga
+docs: docs/okf/product/module/analytics/index.md

@@ -360,7 +360,7 @@ def build_whitepaper_docx(md_path: Path, output_path: Path):
 # the previous generator hardcoded `c:\sandbox\inspecto-clean\...` and could not run on another
 # checkout at all.
 REPO = Path(__file__).resolve().parent.parent
-SOURCE_MD = REPO / "docs" / "stakeholders" / "INSPECTO_ENTERPRISE_WHITEPAPER.md"
+SOURCE_MD = REPO / "docs" / "okf" / "product" / "layer" / "product" / "brochure-enterprise-whitepaper.md"
 
 if __name__ == "__main__":
     out_file = Path(sys.argv[1]) if len(sys.argv) > 1 else SOURCE_MD.with_suffix(".docx")

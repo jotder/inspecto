@@ -5,4 +5,4 @@ parent: layer.features
 module: case-management
 billable: false
 status: ga
-docs: docs/stakeholders/modules/case-management.md
+docs: docs/okf/product/module/case-management/index.md

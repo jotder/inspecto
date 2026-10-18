@@ -1,0 +1,135 @@
+---
+type: Feature
+title: Studio
+description: The Builder-lens BI authoring hub — Datasets, Query Library, Viz Library / Widget Builder, Dashboard Builder — with real persistence via the widened component store.
+resource: inspecto-ui/src/app/modules/admin/studio/
+tags: [feature, studio, bi, dataset, query, widget, dashboard]
+timestamp: 2026-07-07T00:00:00Z
+---
+
+# Studio
+
+The Builder surface for BI authoring under `/studio`. Vocabulary is Type→Instance throughout
+([`GLOSSARY.md`](../../../../GLOSSARY.md) §7): a **Visualization Type** is the template; a **Widget** is the
+configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout of Widgets.
+
+* **Panes** — the **Query Library** (`/studio/queries` — author SQL + `$`-Parameters, preview the Result Set offline),
+  the **Viz Library** (searchable Widget gallery) with the **Widget Builder**, and the
+  **Dashboard Builder** (quick-filter bar, drill-through drawer, time grain, PNG export). The
+  investigation studios live alongside: [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md) and [Link Analysis](../../module/la-core/user-guide-link-analysis.md).
+  ⚠ **Datasets is NOT a Studio pane** (corrected 2026-09-08): `/studio/datasets` — and the Studio root —
+  redirect to `/catalog/datasets`, because a Dataset became a Catalog asset in Phase B.2.
+* **Visualization Types** come from the `VizPlugin` registry (`src/app/inspecto/viz/`) — charts, tables,
+  scatter, funnel, …; **Measures** (never "metrics" in the BI sense) drive aggregations in Explore.
+* **Persistence is real** — datasets/widgets/dashboards/queries are writable component kinds since W3/W4
+  (`/components` + ETag/If-Match; [backend registry](../../module/processor/spec-component-registry.md));
+  a Widget's result runs on DuckDB via [`POST /bi/query`](../../module/processor/spec-queries.md) and the
+  Query Library previews through `DatasetRowsService` (`/db/table`, `/db/query`). ⚠ *(This line named
+  `POST /queries/{id}/run` until 2026-09-08; that route has **no client caller at all** — see the
+  [`DAT`](../platform/plan-data-plane.md) and [`Studio`](plan-studio.md) specs.)*
+* **Curated starter templates** — `GET /bi/templates` lists the seed pack (`BiTemplates`): `kpi-overview`,
+  `quality-monitor` and, since 2026-09-02, the temporal `trend-monitor` (two `line` widgets over
+  `event_date` at `month` grain + a KPI); `POST /bi/templates/{id}/apply` writes them as ordinary
+  components bound to the caller's Dataset (409 on an id collision, `prefix` to disambiguate). Enrichment
+  is the continuous BACKLOG §7 C7 item.
+* **Widgets are library citizens** — identity + tags, the browsable Viz Library gallery, a standalone
+  `WidgetHost` render path, and one shared `DatasetResultService` result layer: it runs
+  `POST /bi/query` (DuckDB) and unmappable specs (named-Measure SQL, OR filters) fail honestly.
+  ⚠ *(Until 2026-09-08 this said "offline the same specs run byte-identically on AlaSQL" — that arm went
+  with the mock backend; AlaSQL survives only as the data-table Pro editor's own client-side SQL.)* Sharing/RBAC stays gated on the security module.
+* **A Widget can read a saved Query (QUERY-BOUND-WIDGET-1, 2026-09-27).** The Widget Builder's *Saved query*
+  picker (shown once a Dataset is picked) offers the Query Library's `type:sql` queries over **that** Dataset,
+  plus *None* to unbind; picking another Dataset unbinds. The binding persists as the Widget's `queryId`, and
+  `WidgetHost` + the builder preview put it on the `QuerySpec` → `biQueryBody` sends it as the `/bi/query`
+  body's `query`. `BiRoutes` then loads the query **at run time** (never baked at save), resolves its
+  `$`-parameter defaults exactly like `/queries/{id}/run` (`QueryRoutes.declaredParams`), and compiles
+  `WITH "__bound_query" AS (<query text>) SELECT … FROM "__bound_query"` — the whole statement re-passes
+  `SqlGuard`, in the same `QueryExecutor` sandbox with the Dataset view registered, so the query's own
+  `WHERE` reaches the Widget. Refusals: a missing or not-visible (`ComponentAccess.canView`) query → 404
+  *"no query 'x'"*; a non-`sql` query, no text, a query over a different Dataset, or an unsafe text → 422.
+  A query-bound tile that fails shows a *Bound query unavailable* alert (`tile-query-error`), not a blank
+  chart; since 2026-09-27 **every** failed tile run does the same (`widget-host`'s `runError`, a *Data
+  unavailable* alert `tile-run-error` carrying the server message) — dashboard tiles and the Menu viewer
+  inherit it; an `ok` run with zero rows stays the `empty` no-data state, a revoked shared grant keeps
+  *Access revoked*. ⚠ A query-bound Widget is **not embeddable** (`embedQueryBody` returns null — the public query
+  surface cannot run a saved query). ⚠ No caller-supplied parameter values cross yet: only the query's
+  declared defaults + session context apply.
+* **The rows seam — `DatasetRowsService` (2026-08-14, split S2 slice B).** What a Dataset's `sourceName`
+  resolves to is asked in ONE place (`src/app/inspecto/viz/dataset-rows.service.ts`): it reads the
+  real store over `GET /db/table`, or `POST /db/query` with the dataset's Query Core model compiled by
+  `compileSql`. ⚠ *(Until 2026-09-08 this named an offline arm serving `inspecto/mock/sample-sources.ts`, a path that no longer exists,
+  and an AlaSQL arm for `sql()`.)* `sql()` runs authored SQL server-guarded and
+  `columns()` answers the declared columns, else a 1-row probe. It is the layer UNDER
+  `DatasetResultService`: that one runs a `QuerySpec`, this one supplies rows a screen reads directly.
+  ⚠ **Every result is a PAGE** — it carries `truncated` and an `error` string, and a consumer that
+  counts or lists must say so (the drill-through drawer and the Queries preview both do). Before this,
+  every consumer did a synchronous `SAMPLE_SOURCES[name]` lookup, so a live deployment showed sample data
+  or nothing.
+* **A virtual Dataset is its SQL (2026-09-26, `VIRTUAL-DATASET-SQL-1`).** A `kind: virtual` Dataset
+  saves the SQL the editor last showed — builder-generated or hand-edited — as a top-level **`sql`** key
+  beside `sourceName`; `query` (the Query Core model) only re-seeds the editor. The server reads `sql` as
+  the Dataset's relation in `DatasetRelation`: the text passes `SqlGuard` on **every read** (the store name
+  is the one trusted relation, after the path jail), then `WITH "<sourceName>" AS (<the physicalRef read of
+  that store>) SELECT * FROM (<sql>) AS __virtual`, with calculated columns wrapped on top as for any
+  Dataset. So `/datasets/{id}/rows`, `/bi/query`, materialize, reports and Reconciliation all read it, and
+  `DatasetRowsService` reads a saved Dataset carrying `sql` through `/datasets/{id}/rows`. The editor's
+  `<inspecto-query-panel [serverRun]="true">` offers **Run on server** (`POST /db/query`, DuckDB — the
+  in-browser AlaSQL Run has no `strptime`), and a successful run re-tags the columns from the SQL's result.
+  Before this, every server reader refused a virtual Dataset ("must declare a 'view' or a 'physicalRef'"),
+  and `compileSql` silently dropped a hand-edited `sqlOverride` from row previews (it is now preferred).
+  **Session decision (2026-09-26):** persist the SQL rather than compile the builder model in Java — one
+  compiler (the TS one), and the text previewed is the text BI evaluates; a second Java compiler of the
+  model would be a hand-kept mirror. ⚠ A virtual Dataset saved before this has no `sql` and still 422s on
+  the server (no compat shim): open it and Save. ⛔ `sql` beside a `view` or `physicalRef` is refused as
+  ambiguous. ⚠ The SQL can read only its own `sourceName` — any other relation is not in scope and 422s.
+  A store rename (`POST /pipelines/{id}/rename`) rewrites `sourceName` AND the SQL's relation references
+  (2026-09-27, `VIRTUAL-DATASET-SQL-RENAME-1`): `SqlGuard.renameBaseTable` locates each unqualified
+  `BASE_TABLE` named the old store in DuckDB's `json_serialize_sql` tree and splices the new name (always double-quoted — a
+  new id may be a keyword) in at its `query_location` (a UTF-8 BYTE offset, converted to a char index) — the author's text (comments, spacing) survives; columns, aliases and literals spelled
+  like the store are untouched. ⛔ Never regex, never `json_deserialize_sql` (it re-spells the statement).
+  ⚠ Left unchanged (and so still 422 at read, fail closed): SQL that does not parse, a CTE shadowing the
+  store name, a schema-qualified ref (`main.old`), or text at a location that is not the bare/quoted name.
+  ⚠ The editor preview reads the store the `/db/query` way (CSV too); the saved relation reads it the
+  `physicalRef` way (Parquet under `storeReadRoot`) — the same for every pipeline-shaped store.
+* ⛔ **The sample-row folds must stay — but not for the reason this bullet used to give.** Since the mock
+  backend was deleted they are **not** offline arms: a backend failure surfaces. They are retained under
+  decision `MOCK-DEAD-COMPUTE-1` (2026-08-31) as the **reference folds** the live paths are asserted to
+  agree with, and as the vehicle the example graph and geo case studies are pinned through — delete them
+  and the guards go with them (corrected 2026-09-08). They share one `sampleDatasetRows` (there were two divergent copies; the Reconciliation one
+  dropped column metadata and so compared numbers and dates as strings).
+* **A widget's time grain travels on the wire (2026-08-14).** `QuerySpec.grains` (group-by column →
+  `day|week|month`) is the ONE source of truth: each plugin's `buildQuery` fills it from the channel
+  controls, offline `bucketSpecRows` buckets exactly those columns, and live `biQueryBody` sends them as
+  the `/bi/query` body's `grains` key for `MeasureCompiler` to compile to `DATE_TRUNC`
+  ([queries](../../module/processor/spec-queries.md)). Before this the grain existed only as a
+  client-side row rewrite over the x channel, so the server grouped by the un-truncated timestamp while
+  the demo bucketed correctly. ⛔ **Do not re-add a client-side fold for this** — a fold cannot bucket
+  rows the server already aggregated. ⚠ The server returns the bucket as **text** in the UI's own format
+  (`YYYY-MM-DD` / `YYYY-MM`), aliased back to the raw column's name, so both paths label their categories
+  identically. ⚠ Only *grouped* columns may carry a grain — the server 422s otherwise, and `biQueryBody`
+  drops a stale one rather than letting it fail the whole widget.
+* ⚠ **`DatasetResultService.run` takes rows as a thunk.** Its live branch maps the spec to `/bi/query`
+  and never reads rows — a ten-tile dashboard would otherwise fetch and discard ten pages.
+* **The store picker lists real stores (2026-08-14, split S2 slice A).** The Dataset editor's
+  `sourceName` field offers catalogued stores, not a hardcoded sample table: `DatasetRowsService.stores()`
+  reads `/db/catalog` — and offers its **business** groups only — an `ops:*` table needs a group id that a
+  Dataset's `sourceName` cannot carry. Create mode lands on the first catalogued store; an unreadable
+  catalog says so rather than rendering as "this space has no stores"; and a saved dataset's own source
+  stays in the list even when the catalog no longer names it, because a `mat-select` whose value is
+  absent from its options renders BLANK. ⛔ The filed `storeOptionLoader` was deliberately **not** built —
+  the only field naming a store is this `mat-select`, and the expectation form's `target` is a
+  pipeline/job, a different vocabulary. Build it when a schema-form field genuinely names a store.
+* ⛔ **A Dataset's `sourceName` is never defaulted (2026-08-14).** `DatasetsService.fromContent`'s old
+  `?? 'data'` fallback named a key that does not exist, so a dataset stored without a source read
+  **empty everywhere**, indistinguishable from an empty store. It stays blank instead. The write that
+  produced that shape was Catalog go-live's auto-registration ([catalog](user-guide-catalog.md)), which now sets
+  `sourceName` to the store it registers — the dataset kind's own validator has always said *"A source is
+  required"*, but nothing ran it on that path.
+* **Forms** follow ask-the-minimum + `uniqueNameValidator` on create
+  ([forms & state](spec-forms-state.md)).
+
+Design of record (archived):
+[`report-builder-design.md`](../../../../archived-documents/plans-archive/report-builder-design.md) ·
+[`widget-library-spec.md`](../../../../archived-documents/plans-archive/widget-library-spec.md) ·
+[`studio-implementation-plan.md`](../../../../archived-documents/plans-archive/studio-implementation-plan.md) ·
+[`studio-bi-improvements-plan.md`](../../../../archived-documents/plans-archive/studio-bi-improvements-plan.md).

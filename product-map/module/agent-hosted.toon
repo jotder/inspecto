@@ -5,3 +5,4 @@ parent: layer.providers
 module: agent-hosted
 billable: false
 status: ga
+docs: docs/okf/product/module/agent-hosted/index.md

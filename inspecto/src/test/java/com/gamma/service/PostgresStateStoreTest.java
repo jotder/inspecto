@@ -69,7 +69,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * <p>⚠ Skipping means this coverage does not run by default — including in CI. That is the deliberate
  * cost of dropping the embedded engine, and it is the shape
- * {@code okf/backend/build-run/guard-coverage.md} warns about, so the skip message names exactly how to
+ * {@code okf/product/layer/platform/tests-guard-coverage.md} warns about, so the skip message names exactly how to
  * turn it back on rather than passing quietly.
  *
  * <h2>Runbook — the command that actually works (proven 2026-09-12, PG 18.6 in Docker)</h2>
@@ -147,7 +147,7 @@ class PostgresStateStoreTest {
      * <p>An {@code assumeTrue} inside {@code @BeforeAll} aborts the whole container, and surefire then
      * reports <b>"Tests run: 0, Skipped: 0"</b> — the class disappears from the totals with no trace of
      * why, which is the silently-disarmed guard this repo keeps paying for
-     * ({@code okf/backend/build-run/guard-coverage.md}). Per-test, every method is reported as SKIPPED
+     * ({@code okf/product/layer/platform/tests-guard-coverage.md}). Per-test, every method is reported as SKIPPED
      * <em>with this message</em>, so the absent coverage is visible in the count and in the report.
      */
     @BeforeEach

@@ -36,7 +36,7 @@ artifactId:
 Reactor = **13 modules** (build order below; WS-D 2026-07-22 added `inspecto-engine`, then split
 `inspecto-etl`, `inspecto-event`, and `inspecto-acquire` out of it the same day, increments 2–4).
 Authoritative shape, version management, and the module-extraction playbook:
-[`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
+[`okf/product/layer/platform/architecture-reactor.md`](okf/product/layer/platform/architecture-reactor.md).
 
 | Dir | Role | artifactId / jar |
 |---|---|---|
@@ -67,28 +67,28 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 | Topic | Doc |
 |---|---|
-| **What a capability REQUIRED / has BUILT / has LEFT / REFUSED** (new tier 2026-09-08) | [`okf/capabilities/`](okf/capabilities/index.md) — one doc per area ID; **9 of 17 slots written** as of 2026-09-08 (`ACQ` pilot, then `SEC` · `INC` · `API` · `SPC` · `MET` · `DAT` · `ING` · `OPS`). Each one's §2 is the requirement-of-record and **overrides `REQUIREMENTS.md` §3 and `EDITIONS.md` where they differ**; §5 lists what is not built. The remaining 8 slots are named in [`GLOSSARY.md`](GLOSSARY.md) §14 and sized in [`docs-consolidation-plan.md`](archived-documents/plans-archive/docs-consolidation-plan.md) §5.1. ⚠ The `okf/` sections answer only "what is built", and answer it by CODE LAYER |
+| **What a capability REQUIRED / has BUILT / has LEFT / REFUSED** (new tier 2026-09-08) | the `plan-*.md` files in the [product hubs](okf/product/index.md) — one doc per area ID; **9 of 17 slots written** as of 2026-09-08 (`ACQ` pilot, then `SEC` · `INC` · `API` · `SPC` · `MET` · `DAT` · `ING` · `OPS`). Each one's §2 is the requirement-of-record and **overrides `REQUIREMENTS.md` §3 and `EDITIONS.md` where they differ**; §5 lists what is not built. The remaining 8 slots are named in [`GLOSSARY.md`](GLOSSARY.md) §14 and sized in [`docs-consolidation-plan.md`](archived-documents/plans-archive/docs-consolidation-plan.md) §5.1. ⚠ The `okf/` sections answer only "what is built", and answer it by CODE LAYER |
 | Production investigation (process/events/metrics/state/`-D` flags/Control API/troubleshooting) | [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **living doc** |
-| Pipeline-graph design (IR, lift, validator, executor, registry, T-checklist §14) | [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) |
-| Live execution of authored Pipelines (`JobType.PIPELINE`, T32) | [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md) |
-| The token model + decisions D1–D10 | [`okf/backend/engine/node-types.md`](okf/backend/engine/node-types.md) § *The token model* · [`okf/capabilities/pipeline-authoring/pipeline-authoring.md`](okf/capabilities/pipeline-authoring/pipeline-authoring.md) § *Decisions* *(the plan was archived 2026-09-10)* |
+| Pipeline-graph design (IR, lift, validator, executor, registry, T-checklist §14) | [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md) |
+| Live execution of authored Pipelines (`JobType.PIPELINE`, T32) | [`live-execution.md`](okf/product/module/engine/spec-live-execution.md) |
+| The token model + decisions D1–D10 | [`okf/product/module/engine/spec-node-types.md`](okf/product/module/engine/spec-node-types.md) § *The token model* · [`okf/product/module/etl/plan-pipeline-authoring.md`](okf/product/module/etl/plan-pipeline-authoring.md) § *Decisions* *(the plan was archived 2026-09-10)* |
 | Execution residuals — X3 park detail · X2 cross-lane provenance · X1 bounded COMMIT retry (**SHIPPED + archived 2026-09-02**; X4/X5 sketches in BACKLOG §4) | [`execution-residuals-plan.md`](archived-documents/plans-archive/execution-residuals-plan.md) |
-| Pipeline editor UI (Recipe/graph views, drawer, attribute forms) | [`pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) |
+| Pipeline editor UI (Recipe/graph views, drawer, attribute forms) | [`pipeline-editor.md`](okf/product/module/etl/user-guide-pipeline-editor.md) |
 | **Pipelines workbench as a GENERIC ingest-authoring surface (2026-09-22)** — where it stands per format × surface, and the plan to make every trust surface give one answer | [`pipelines-workbench-moscow.md`](archived-documents/plans-archive/pipelines-workbench-moscow.md) (v2, all 26 shipped Pipelines swept; §3.1 coverage matrix — ARCHIVED 2026-09-23, executed) · [`workbench-trust-plan.md`](archived-documents/plans-archive/workbench-trust-plan.md) (`WB-01`..`WB-20`, decisions `D2`–`D9` awaiting signature, §8 exit contract with a 30-day stall clock) · ⚠ the *Recipe view* named on this page's editor row **no longer exists** (`6d3c68fa`, 2026-09-18) — `pipeline-editor.md:550` records the removal |
-| Authoring redesign for business users — the sectioned Parse pane (Delimited first: compact property rows, plain-language labels, grounded defaults, ONE "Columns that come out" table) + the **SQL-first** `transform.sql` Step (the 2026-09-03 Simple fields grid was superseded and deleted the same day the operator reviewed it live) (**SHIPPED + archived 2026-09-04**: `98ffc90b` · `7e13dd82` · `d012f721` · `c119a6af` (steps: home) · `1d557bbd` (one property-row idiom, no Description) · `24171333` (SQL-first); follow-ons in BACKLOG §4 AUTHORING-REDESIGN-1) | as-built: [`grammar-config.md`](okf/frontend/features/grammar-config.md) (Parse pane) · [`schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md) §0 (Transform pane) · [`pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) · [`catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) (engine) · decisions + R1–R12 review: [`parse-pane-redesign-plan.md`](archived-documents/plans-archive/parse-pane-redesign-plan.md), [`sql-transform-v1-plan.md`](archived-documents/plans-archive/sql-transform-v1-plan.md); mockup source `archived-documents/plans-archive/assets/authoring-redesign-mockup/` |
-| **Pipeline authoring finalized (2026-09-04, `0a2fa82f`)** — the redesign's open seams closed in one pass: the **`sql` Recipe verb** (between `transform` and `summarize`; `RecipeCompiler`/`RecipeConverter` round-trip `{sql, fields}`, so `GET /pipelines/{id}/recipe` no longer throws `UNSUPPORTED_STEP` on a SQL Step — mid-branch it compiles but deliberately does NOT arm, `RouteArming.BRANCH_STEP_KINDS` excludes it) and **`POST /components/transform/describe`** over `TypeFlow.describe`, which fills "Comes out as" and surfaces DuckDB's binder message as-you-type without executing a row. 🔴 Three defects were found by reading, not by tests: the describe route ran author SQL with NO `SqlGuard` and no sandbox (a `DESCRIBE` never executes the plan, but the binder OPENS a `read_csv('…')` target to infer its schema — the one author-SQL entry point that could read arbitrary files; now guarded, with a negative test whose probe is a CSV that really exists); hand-written SQL in CodeMirror could not be SAVED at all (`valueChange` bound straight to the signal emitted no `dirtyChange`, and `canApply()` refused `sqlOnly` outright); and the Load pane's new legacy-`columns` fallback would have written `rules` beside a surviving `columns`, which `RowShaper.columnsOf` PREFERS — a save that is real and dead at once. Two more came from DRIVING the pane on a real backend: it sent VARCHAR for every upstream column, so `AMOUNT * 2` over a declared DOUBLE was reported as a binder error and BLOCKED Apply (a false refusal — the declared types now travel via `[upstreamColumnTypes]`), and the JDBC wrapper line ("…closed pending query result") led every message, so the first thing the author read was driver plumbing. Also: only a 422 blocks Apply (offline/404/503 must never lock the author out), and the Parse↔Sink `partitions[]` stale-Apply race is closed by re-reading the companion before the write. Verified `mvn -o clean test` exit 0 (23 modules, 3971/0/0/5) + UI gate exit 0 (2788 tests). ⚠ The commit itself was created by a CONCURRENT peer session sweeping the working tree, so its message under-describes the three defects above — this row and BACKLOG `AUTHORING-REDESIGN-1` are the provenance. | [`schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md) §0 · [`catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) · [`pipeline-config-keys.md`](okf/backend/pipeline-graph/pipeline-config-keys.md) · [`grammar-config.md`](okf/frontend/features/grammar-config.md) · BACKLOG `AUTHORING-REDESIGN-1` (a)/(h)/(n1)/(n2)/(n3)/(o) |
-| Step park & drain (disabled route branches, `POST /runs/{n}/drain`) | [`step-park-drain.md`](okf/backend/pipeline-graph/step-park-drain.md) |
-| Branch-aware ingest executor (armed `route:`, engagement) | [`branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md) |
-| Data acquisition framework (Phases A–F, connectors, dedup, watermarks) | [`data-acquisition-framework.md`](okf/backend/acquisition/data-acquisition-framework.md) |
-| All TOON config keys | [`configuration.md`](okf/backend/config/configuration.md) |
+| Authoring redesign for business users — the sectioned Parse pane (Delimited first: compact property rows, plain-language labels, grounded defaults, ONE "Columns that come out" table) + the **SQL-first** `transform.sql` Step (the 2026-09-03 Simple fields grid was superseded and deleted the same day the operator reviewed it live) (**SHIPPED + archived 2026-09-04**: `98ffc90b` · `7e13dd82` · `d012f721` · `c119a6af` (steps: home) · `1d557bbd` (one property-row idiom, no Description) · `24171333` (SQL-first); follow-ons in BACKLOG §4 AUTHORING-REDESIGN-1) | as-built: [`grammar-config.md`](okf/product/module/config/user-guide-grammar-config.md) (Parse pane) · [`schema-mapping-authoring.md`](okf/product/module/etl/user-guide-schema-mapping.md) §0 (Transform pane) · [`pipeline-editor.md`](okf/product/module/etl/user-guide-pipeline-editor.md) · [`catalog-vs-executors.md`](okf/product/module/engine/spec-catalog-vs-executors.md) (engine) · decisions + R1–R12 review: [`parse-pane-redesign-plan.md`](archived-documents/plans-archive/parse-pane-redesign-plan.md), [`sql-transform-v1-plan.md`](archived-documents/plans-archive/sql-transform-v1-plan.md); mockup source `archived-documents/plans-archive/assets/authoring-redesign-mockup/` |
+| **Pipeline authoring finalized (2026-09-04, `0a2fa82f`)** — the redesign's open seams closed in one pass: the **`sql` Recipe verb** (between `transform` and `summarize`; `RecipeCompiler`/`RecipeConverter` round-trip `{sql, fields}`, so `GET /pipelines/{id}/recipe` no longer throws `UNSUPPORTED_STEP` on a SQL Step — mid-branch it compiles but deliberately does NOT arm, `RouteArming.BRANCH_STEP_KINDS` excludes it) and **`POST /components/transform/describe`** over `TypeFlow.describe`, which fills "Comes out as" and surfaces DuckDB's binder message as-you-type without executing a row. 🔴 Three defects were found by reading, not by tests: the describe route ran author SQL with NO `SqlGuard` and no sandbox (a `DESCRIBE` never executes the plan, but the binder OPENS a `read_csv('…')` target to infer its schema — the one author-SQL entry point that could read arbitrary files; now guarded, with a negative test whose probe is a CSV that really exists); hand-written SQL in CodeMirror could not be SAVED at all (`valueChange` bound straight to the signal emitted no `dirtyChange`, and `canApply()` refused `sqlOnly` outright); and the Load pane's new legacy-`columns` fallback would have written `rules` beside a surviving `columns`, which `RowShaper.columnsOf` PREFERS — a save that is real and dead at once. Two more came from DRIVING the pane on a real backend: it sent VARCHAR for every upstream column, so `AMOUNT * 2` over a declared DOUBLE was reported as a binder error and BLOCKED Apply (a false refusal — the declared types now travel via `[upstreamColumnTypes]`), and the JDBC wrapper line ("…closed pending query result") led every message, so the first thing the author read was driver plumbing. Also: only a 422 blocks Apply (offline/404/503 must never lock the author out), and the Parse↔Sink `partitions[]` stale-Apply race is closed by re-reading the companion before the write. Verified `mvn -o clean test` exit 0 (23 modules, 3971/0/0/5) + UI gate exit 0 (2788 tests). ⚠ The commit itself was created by a CONCURRENT peer session sweeping the working tree, so its message under-describes the three defects above — this row and BACKLOG `AUTHORING-REDESIGN-1` are the provenance. | [`schema-mapping-authoring.md`](okf/product/module/etl/user-guide-schema-mapping.md) §0 · [`catalog-vs-executors.md`](okf/product/module/engine/spec-catalog-vs-executors.md) · [`pipeline-config-keys.md`](okf/product/module/config/spec-pipeline-config-keys.md) · [`grammar-config.md`](okf/product/module/config/user-guide-grammar-config.md) · BACKLOG `AUTHORING-REDESIGN-1` (a)/(h)/(n1)/(n2)/(n3)/(o) |
+| Step park & drain (disabled route branches, `POST /runs/{n}/drain`) | [`step-park-drain.md`](okf/product/module/engine/spec-step-park-drain.md) |
+| Branch-aware ingest executor (armed `route:`, engagement) | [`branch-aware-ingest.md`](okf/product/module/engine/spec-branch-aware-ingest.md) |
+| Data acquisition framework (Phases A–F, connectors, dedup, watermarks) | [`data-acquisition-framework.md`](okf/product/module/acquire/spec-framework-design.md) |
+| All TOON config keys | [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md) |
 | Editions (Personal/Professional/Enterprise = build flavors); feature × edition board; Step Processor catalog table | [`EDITIONS.md`](EDITIONS.md) |
 | Branch & release policy (versions=branches; merge-forward; SemVer+CC) | [`BRANCHING.md`](BRANCHING.md) |
-| Parsing/grammar | [`parsing-options-reference.md`](okf/backend/config/parsing-options-reference.md), [`delimited-grammar-design.md`](archived-documents/plans-archive/delimited-grammar-design.md) |
-| Perf benchmarks & tuning | [`performance.md`](okf/backend/build-run/performance.md) |
-| Strategy / roadmap / stakeholder decks | [`roadmap/`](roadmap/) |
+| Parsing/grammar | [`parsing-options-reference.md`](okf/product/module/engine/spec-parsing-options.md), [`delimited-grammar-design.md`](archived-documents/plans-archive/delimited-grammar-design.md) |
+| Perf benchmarks & tuning | [`performance.md`](okf/product/layer/platform/tests-performance.md) |
+| Strategy / roadmap / stakeholder decks | [`roadmap/`](okf/product/index.md) |
 | Curated index of all current docs | [`INDEX.md`](INDEX.md) |
-| Engineering knowledge bundle (OKF, consolidated 2026-07-07) | [`okf/`](okf/index.md) — sections [`frontend/`](okf/frontend/index.md) · [`backend/`](okf/backend/index.md) · [`agentic/`](okf/agentic/index.md) |
-| Requirements-of-record + MoSCoW · stakeholder set | [`REQUIREMENTS.md`](REQUIREMENTS.md) · [`stakeholders/`](stakeholders/README.md) |
+| Engineering knowledge bundle (OKF, consolidated 2026-07-07) | [`okf/`](okf/product/index.md) — sections [`frontend/`](okf/product/index.md) · [`backend/`](okf/product/index.md) · [`agentic/`](okf/product/index.md) |
+| Requirements-of-record + MoSCoW · stakeholder set | [`REQUIREMENTS.md`](REQUIREMENTS.md) · [`stakeholders/`](okf/product/index.md) |
 
 ---
 
@@ -111,7 +111,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   exposition) — joining `inspecto-oidc` and `inspecto-policy`. Personal answers their surfaces **503
   naming the module**, never 404. 🔴 The load-bearing one was `/metrics`: a `PUBLIC_PATH` on an edition
   that ships no authenticator and binds every interface. Recipe + traps:
-  [editions model](okf/backend/editions/editions-model.md). ✅ **EDG-01 COMPLETE 2026-09-08** — all six
+  [editions model](okf/product/layer/platform/architecture-editions-model.md). ✅ **EDG-01 COMPLETE 2026-09-08** — all six
   cells are now true of the build; the plan is archived. ⚠ The two hardest cells each had to change what
   the product PROMISES, not just where code lives: cell 6 kept a narrow core `/audit/*` read because
   gating `/events*` would have removed Personal's Audit-log screen (§Audit promises it), and cell 7
@@ -131,7 +131,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   seam: `/spaces/{id}/…` (`ControlApi.dispatch` strips + MDC-binds; un-prefixed → current/default). Space CRUD
   (no restart): `GET/POST /spaces`, `DELETE /spaces/{id}?purge=` (purge = opt-in file removal). **No flat
   fallback** — migrate once via `com.gamma.service.SpaceMigrator`. Editions/auth stay future SPI (no
-  `if(edition==)`). → [`configuration.md` §Spaces](okf/backend/config/configuration.md#spaces-multi-project-layout).
+  `if(edition==)`). → [`configuration.md` §Spaces](okf/product/module/config/admin-guide-configuration-reference.md#spaces-multi-project-layout).
   **UI (Stage 7):** `SpacesService` (signals) + a global `spaceInterceptor` rewrite `/api/<p>` →
   `/api/spaces/<id>/<p>` so every feature service stays space-agnostic (no-op single-tenant = byte-identical);
   header space-switcher + `modules/admin/spaces` admin (CRUD + per-space/per-data-source zip export + import
@@ -578,7 +578,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   `OPS-03` (2026-09-14) each `Db*Store` borrows a connection per operation, so two operations on one
   store can interleave on a pooled source; DuckDB is unchanged. ⛔ New read-then-write code needs ONE
   borrow **and** a DB predicate (`ON CONFLICT`, a fenced `WHERE`) — `synchronized` will not save it.
-  Full account, including the two audited exceptions: `okf/backend/engine/db-layer.md` §2.
+  Full account, including the two audited exceptions: `okf/product/module/engine/spec-db-layer.md` §2.
 
 - 🔴 **An SPI whose absence removes a safety property must be fail-CLOSED, and two were not.**
   `SpiSlot` routes discovery through `OptionalSpi`, which catches `ServiceConfigurationError` so an
@@ -1021,7 +1021,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   event-time column and both had to take the local route instead: ingest uses the schema's date `PartitionDef`,
   Pipeline sinks use their own `partitions[].source`. This is why `DatasetRelation.temporalColumn` has **no
   caller** despite being built for exactly that job — see
-  [`okf/backend/engine/consignment-addressing.md`](okf/backend/engine/consignment-addressing.md) §2.
+  [`okf/product/module/engine/spec-consignment-addressing.md`](okf/product/module/engine/spec-consignment-addressing.md) §2.
 
 - **Removing a component from a record that is persisted as JSON breaks reading the history.** A bare
   `new ObjectMapper()` fails on unknown properties by default, and every append-only JSONL store here uses one
@@ -1193,7 +1193,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   ⚠ **The ingest lane got its own hierarchy on 2026-08-25** — `ConcurrencyBroker` (per-Pipeline / per-space /
   per-server Consignment caps + a 1–3 priority share), hot-tunable from Settings ▸ Scheduler. The **T (job) lane
   is deliberately out of its scope**, so `-Djobs.maxConcurrentRuns` remains the only bound on Runs. See
-  [`okf/backend/engine/consignment-concurrency.md`](okf/backend/engine/consignment-concurrency.md).
+  [`okf/product/module/engine/spec-consignment-concurrency.md`](okf/product/module/engine/spec-consignment-concurrency.md).
 - **Incident resolution is hard-gated backend-side** (I1, 2026-07-24) — `ObjectService.commit()` rejects
   INCIDENT→RESOLVED (422) unless `attributes.postmortem` has a timeline + cause-analysis + corrective-action
   entry and `dueAt` is set; mirrors the UI `mail-model.ts` `postmortemGaps` soft-warn. Keep the two in sync.
@@ -1400,7 +1400,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   same probe passing afterwards is then real proof the race is gone. ⚠ **A retry/poll helper was not a fix but
   a FALSE one** — after the boot cycle there is no second sync inside any sane deadline, so `awaitTotal`'s
   10s loop could never recover the miss; it only widened the window it was papering over. Fix + the
-  seed-before-boot rule: `e5e4ee8f`; mechanism in `okf/backend/build-run/operations-reference.md`
+  seed-before-boot rule: `e5e4ee8f`; mechanism in `okf/product/layer/platform/admin-guide-operations-reference.md`
   § "Status backend".
 - **⚠ A full reactor build can fail TRANSIENTLY in an untouched module on Windows — re-run before
   believing it.** *(Kept for the diagnosis technique; the CAUSE is the entry above, not staleness.)* Twice on 2026-09-12 `mvn -o clean test -Pedition-advanced` died in the `asn-*` subtree
@@ -1585,7 +1585,7 @@ Twice in one shift a change passed its own targeted test class and broke the sui
 red-in-suite is invisible exactly where it costs most: the change looks verified.
 
 🔴 Writing the lesson down does not make it apply itself. The first instance was documented in
-`okf/backend/build-run/guard-coverage.md` hours before the second one shipped.
+`okf/product/layer/platform/tests-guard-coverage.md` hours before the second one shipped.
 
 ⚠ **The sibling rule, from the same programme: a DECISION's premise is a hypothesis too.** `D3` was
 signed on *“every shipped Pipeline lives in a per-Pipeline directory”*, implemented twice and reverted
@@ -1618,13 +1618,13 @@ one command, and it would have saved a signing and two implementations.
   and **per chunk** in chunked mode. ⚠ Since 2026-08-29 that multiplicity is load-bearing: those callers pass a
   **write scope** so the batch's shared branch-commit ledger keeps their sinks distinct — without it the second
   and later writes read as "already committed" and their rows vanish. See
-  [`okf/backend/engine/branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md) §"The lane fork".)
+  [`okf/product/module/engine/spec-branch-aware-ingest.md`](okf/product/module/engine/spec-branch-aware-ingest.md) §"The lane fork".)
   The durable registry (`DbConsignmentOutputStore`, plan §11.3) is **default-off** and `ServiceStores` degrades a
   failed open to `null`, so **never read a missing registry row as proof a file does not exist** — `ConsignmentManifest`/
   `ManifestStore` stays the artifact of record. Note also that no per-file row count exists at write time (a
   multi-file partitioned `COPY` reports none): ingest sums `LineageCollector`'s per-`(srcId, partition)` counts,
   while enrichment and sinks use `ConsignmentOutputs.countByPartition` (needs no `__src_id`).
-  → [`db-layer.md`](okf/backend/engine/db-layer.md) §3.9.
+  → [`db-layer.md`](okf/product/module/engine/spec-db-layer.md) §3.9.
 - **Platform Services — the one way a Job reaches an engine facility** (2026-08-09, plan Stage 1 S1-1…S1-7).
   `PlatformServiceRegistry` is built at boot in `CollectorService` and **must be populated before
   `JobService` is constructed** (its constructor registers built-ins and scans packs, and registration
@@ -1658,7 +1658,7 @@ one command, and it would have saved a signing and two implementations.
   straight from `IDENTIFIED`), not `resolve`. `ALERT` is the one that starts `OPEN` with `RESOLVED` terminal.
 - **`com.gamma.util` CLI cluster** (~11 `main()` tools: `MainApp`, `TarExtractor`, …) sits at low coverage and is
   **kept by decision** (self-contained; `MainApp` is wired into `package.ps1`/ops). Tested engine+control-plane
-  is ~86%. Long-term: extract the CLI cluster to its own module. → [`performance.md`](okf/backend/build-run/performance.md).
+  is ~86%. Long-term: extract the CLI cluster to its own module. → [`performance.md`](okf/product/layer/platform/tests-performance.md).
 
 ---
 
@@ -1700,12 +1700,12 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   `inspecto/**` + `modules/admin/**` (allowlist: `chart-tokens.ts`, `status-badge.component.ts`). Status/level
   colors come from `<inspecto-status-badge>` only. `rgba(var(--gamma-…))` is allowed.
 - **a11y gate** — `expectNoA11yViolations(el)` (`inspecto/testing/a11y.ts`, axe-core) in component specs; runs in
-  CI. Manual WCAG: `docs/ui/accessibility-audit.md`.
+  CI. Manual WCAG: `docs/okf/product/layer/product/tests-accessibility-audit.md`.
 - **Shared design system**: `status-badge` / `empty-state` / `skeleton` / `grid` (+ `noRowsOverlay`) /
   `connectivity-banner` / `ai-assist`. Living gallery at `/design`. **Since 2026-09-22 it also owns the page
   chrome** — `page-header` / `filter-bar` / `stat-tile` / `section-tabs` / `bulk-actions`. The programme
   shipped and was archived 2026-09-22; its as-built facts and measured traps are
-  [`okf/frontend/conventions/page-chrome.md`](okf/frontend/conventions/page-chrome.md) — read that, not the
+  [`okf/product/layer/product/spec-page-chrome.md`](okf/product/layer/product/spec-page-chrome.md) — read that, not the
   bullets below, when the two disagree. A routed pane renders its title, subtitle, help affordance and actions through
   `<inspecto-page-header>`; it owns the page's ONLY `<h1>`, at the shared `text-title` size (22 px).
 - 🔴 **An absent optional module is `isFeatureAbsent(err)`, not an error** (2026-09-22, `api-base.ts`):
@@ -1731,7 +1731,7 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 - **`<inspecto-ai-assist>`** (`inspecto/ai-assist/`, AGT-6a) is the ONE inline AI authoring surface —
   panes **adopt** it, never fork it. The pane names a non-mutating agent tool, passes its own context as
   `[args]`, and applies the returned draft through **its own** validated route (the surface has no write
-  path, so the human stays the audited actor). → `okf/frontend/features/inline-ai-authoring.md`.
+  path, so the human stays the audited actor). → `okf/product/module/intelligence/user-guide-inline-ai-authoring.md`.
 - 🔴 **A root-level `{ provide: MatDialog, useValue: … }` in a component spec is SILENTLY IGNORED** (found
   2026-07-27). `MatDialogModule` sits in the standalone component's own `imports` and provides `MatDialog` at
   the **element** level, which shadows the TestBed root provider — `catalog.component.spec.ts` had mocked it
@@ -1821,7 +1821,7 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   2026-08-04: the server publishes them** on `GET /pipelines/node-types` (`attributes[]`, from
   `NodeAttributes.java`), so `pipelines/node-attributes.ts` is a **fallback**, not the source. Change a node
   attribute in BOTH, or the committed `inspecto/contracts/node-attributes.contract.json` drift check fails on one
-  of the two sides (deliberately — see `okf/frontend/features/pipeline-editor.md`). Adding an `AttributeType` still
+  of the two sides (deliberately — see `okf/product/module/etl/user-guide-pipeline-editor.md`). Adding an `AttributeType` still
   needs `FindingsSpec.TYPES` widened, which `NodeAttribute` now delegates to.
 - **Optimistic mutations** — `optimisticMutate({apply,commit,reconcile,rollback,onError})` (`inspecto/api/
   optimistic.ts`); reassign arrays (`rows=[...]`) so the grid re-renders.
@@ -1841,7 +1841,7 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   offline sample page otherwise. ⛔ Never re-introduce a `SAMPLE_SOURCES[ds.sourceName]` lookup in a
   feature: that synchronous read is why Studio showed sample data against a real backend. Results are
   **pages** (honour `truncated`, surface `error`). Detail + the ⛔ on the three offline arms that must NOT
-  be converted: `okf/frontend/features/studio.md` and the `angular-ui` skill.
+  be converted: `okf/product/layer/product/user-guide-studio.md` and the `angular-ui` skill.
 - **BI widget/dashboard content shape** — a `widget` component is `{vizType, datasetId, controls, options}`
   (channel mapping, NOT a raw query spec); a `dashboard` is `{name, tiles:[{widgetId, span}]}`. Anything
   writing these server-side (e.g. `BiTemplates`) must emit this shape or the Studio can't render it.

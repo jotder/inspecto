@@ -12,7 +12,7 @@
  * `BatchGraphRunner` — a class that has not existed since the 2026-08-31 Consignment rename, while
  * `ConsignmentGraphRunner` has two production callers. Nine capability specs' §8 sections describe running
  * this check and, until this file, told the next shift it existed only in a session scratchpad
- * (`okf/capabilities/tooling/tooling.md` §5.2 item 1 — this area's own disease, self-inflicted).
+ * (`okf/product/layer/platform/plan-tooling.md` §5.2 item 1 — this area's own disease, self-inflicted).
  *
  * ── WHAT IT CHECKS ────────────────────────────────────────────────────────────────────────────────
  *
@@ -128,7 +128,7 @@ const TICK = /`([^`\n]+)`/g;
 
 /**
  * A line may cite a path that is GONE when it says so. Several docs quote a dead path deliberately —
- * `okf/capabilities/studio/studio.md` names the deleted mock's `sample-sources.ts` as the very finding it
+ * `okf/product/layer/product/plan-studio.md` names the deleted mock's `sample-sources.ts` as the very finding it
  * is reporting, and its §8 predicted "one MISSING hit is deliberate" before this guard existed. The rule
  * is the same shape as check B's: an author who states the absence has recorded it, not rotted. What the
  * guard is for is the UNMARKED claim — a doc that still talks about a file as if it were there.

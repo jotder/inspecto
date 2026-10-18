@@ -24,4 +24,4 @@ s.box(320, 180, 250, 60, 'coral', 'WebhookChannel  id=webhook', 'POST JSON via W
 s.box(320, 265, 250, 60, 'coral', 'HttpWebhookSinkTransport', 'Pipeline webhook sink, PinnedHttp')
 s.arrow(640, 165, 570, 210, dash=True)
 s.arrow(640, 245, 290, 225, dash=True)
-s.save('docs/stakeholders/modules/assets/notifications.svg')
+s.save('docs/okf/product/assets/notifications.svg')

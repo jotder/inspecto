@@ -1,6 +1,6 @@
 # `docs/api/` — the machine-readable v1 API contract
 
-> Companion to [`okf/capabilities/control-api/control-api.md`](../okf/capabilities/control-api/control-api.md) (**the design of record** — §3.1 the guidelines, §3.8 what the test proves, §4 the decisions; the 2026-07-06 design is archived provenance at [`api-contract-design.md`](../archived-documents/plans-archive/api-contract-design.md))
+> Companion to [`okf/product/module/processor/plan-control-api.md`](../okf/product/module/processor/plan-control-api.md) (**the design of record** — §3.1 the guidelines, §3.8 what the test proves, §4 the decisions; the 2026-07-06 design is archived provenance at [`api-contract-design.md`](../archived-documents/plans-archive/api-contract-design.md))
 > and [`../ADVANCED_GUIDE.md`](../ADVANCED_GUIDE.md) §10 (the as-built route reference). Enforced against
 > the live server by `inspecto/src/test/java/com/gamma/control/ApiContractTest.java`.
 

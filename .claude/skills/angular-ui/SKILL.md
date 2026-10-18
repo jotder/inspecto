@@ -20,7 +20,7 @@ frontend that stays **maintainable, scalable, testable, and consistent** over ye
 becomes enterprise-scale.
 
 > **Before writing any code, read this file and the linked artifacts. After writing, satisfy the
-> Definition of Done (§12).** The full a11y findings live in `docs/ui/accessibility-audit.md`; the
+> Definition of Done (§12).** The full a11y findings live in `docs/okf/product/layer/product/tests-accessibility-audit.md`; the
 > living component gallery is the in-app `/design` route (`modules/admin/design-system/`).
 
 ## 0. Non-negotiables (the build breaks or review fails otherwise)
@@ -385,14 +385,14 @@ src/app/
   ⚠ Four of the five L1 tools take **structured** input, not natural language — don't build an NL box on
   them without scoping the model hop (BACKLOG AGT-6a · A5). Details + the per-pane gotchas (target-vs-table
   vocabularies, the `kind`+`min`/`max` same-patch trap, the Queries `type` switch):
-  `docs/okf/frontend/features/inline-ai-authoring.md`.
+  `docs/okf/product/module/intelligence/user-guide-inline-ai-authoring.md`.
 - **Import as draft in an editor → `<inspecto-transfer-menu [importDraft]="true" (draftImported)>` +
   `<inspecto-import-draft-banner>`** (`inspecto/transfer/`, 2026-09-25; Dashboard/Widget/Dataset editors). The
   dialog hands back an `ImportDraft`; the host adopts it UNSAVED (placement via `draftPlacement`, cross-editor
   via `ImportDraftHandoff`) and saves through its OWN route, with `If-Match` from a fresh read when the id
   exists. Editors only — never libraries/Settings. ⚠ A host that takes a handed-off draft must SKIP its plain
   stored load, or the async stored copy lands second and overwrites the draft. Details:
-  `docs/okf/backend/control-plane/metadata-bundle.md` § *Import as draft*.
+  `docs/okf/product/module/processor/spec-metadata-bundle.md` § *Import as draft*.
 - **"Explain this screen" on a pane → `<inspecto-ai-explain>`** (`inspecto/ai-assist/`, AGT-6a A4). The
   read-only sibling of the above: one icon button for the pane's header action row —
   `<inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline','Step','Trigger']" />` — that resolves each
@@ -414,7 +414,7 @@ src/app/
   can only answer "nothing" is worse than none); and the Incidents/Cases `object-detail` header, shown only
   when `obj.correlationId` is set and getting the timeline half **alone** — an Incident has no pipeline, so
   there is no live state to read (the independent degrade working, not a gap to fill with a pipeline
-  lookup). Details: `docs/okf/frontend/features/inline-ai-authoring.md`.
+  lookup). Details: `docs/okf/product/module/intelligence/user-guide-inline-ai-authoring.md`.
   ⚠ **A `[rowActions]` column on a wide grid is horizontally virtualized out of view** — ag-Grid reports it
   as displayed while no header/button is in the DOM. Add `[pinActions]="true"` (this cost a preview cycle on
   the Alerts grid, whose 7 columns already fill the viewport).
@@ -756,7 +756,7 @@ in use. Look there before picking a class — do not invent a token.
   to new component specs. Runs in CI via `npm run test:coverage` (⚠ **not** `test:ci` — CI switched on
   2026-09-08 so the coverage floors are measured; `ui.yml` records why). `color-contrast` + page-level rules are
   excluded in jsdom — contrast is covered by the token guard + the manual audit.
-- Known/deferred findings: `docs/ui/accessibility-audit.md` (e.g. F1 chart `<canvas>` text alternative).
+- Known/deferred findings: `docs/okf/product/layer/product/tests-accessibility-audit.md` (e.g. F1 chart `<canvas>` text alternative).
 
 ## 7. API integration
 
@@ -987,6 +987,6 @@ in use. Look there before picking a class — do not invent a token.
 ---
 
 **Source of truth for current patterns (all shared, profile-independent):** this skill, the in-app
-`/design` gallery (`modules/admin/design-system/`), and `docs/ui/accessibility-audit.md`. When code and
+`/design` gallery (`modules/admin/design-system/`), and `docs/okf/product/layer/product/tests-accessibility-audit.md`. When code and
 this skill disagree, fix one of them — don't silently diverge. For build/test/run commands see the
 `build-verify` skill; for backend API contracts see `java-backend`.

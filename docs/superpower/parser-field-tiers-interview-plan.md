@@ -11,7 +11,7 @@
 >
 > ✅ **The load-bearing half stays in the current tier**, not here: the two questions, the
 > **pre-agreed analysis rule**, the capture marks and the deliverable are in
-> [`okf/frontend/features/grammar-config.md`](../okf/frontend/features/grammar-config.md)
+> [`okf/product/module/config/user-guide-grammar-config.md`](../okf/product/module/config/user-guide-grammar-config.md)
 > §"The D13 field-tier session". ⛔ **That rule's entire evidentiary force comes from being agreed
 > BEFORE the session — re-grounding a refuted PREMISE is not re-deriving the RULE, and the rule below is
 > untouched.**
@@ -66,7 +66,7 @@ sheets, and the analysis rule that converts observations into tier assignments.
 - **Facilitator rule:** think-aloud, no steering. Answer a direct question only after logging
   it as an **ASKED** mark (the ask itself is data).
 - **Tasks** (each starts from the Pipelines list, ends at a green test run —
-  Build → Test is the journey of record, `okf/backend/engine/pipeline-test-run.md`):
+  Build → Test is the journey of record, `okf/product/module/engine/spec-pipeline-test-run.md`):
   1. Onboard the **csv** sample (delimited lane — the richest field set).
      🔴 **RE-GROUNDED: "4 tabs" is wrong.** The pane shows **three collapsible sections**, the first
      expanded (`grammar-editor.component.ts:236-248`), labelled *"How the file is written" / "How values
@@ -189,7 +189,7 @@ gap pass unnamed, or the session will answer question 2 from the lanes where not
 ## Deliverable of the session
 
 One PR: updated `tier:` values in `parsing-attributes.ts`, each change annotated with the observation
-that earned it; plus a decision note on question 2 into `okf/frontend/features/grammar-config.md`.
+that earned it; plus a decision note on question 2 into `okf/product/module/config/user-guide-grammar-config.md`.
 Then this plan returns to `plans-archive/` per the docs lifecycle and the board row closes.
 
 🔴 **RE-GROUNDED: the `node-attributes.ts` half is IMPOSSIBLE and is struck.** Since NODE-TYPE-MIRRORS-1

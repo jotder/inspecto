@@ -5,3 +5,4 @@ parent: layer.la
 module: geo-link
 billable: false
 status: ga
+docs: docs/okf/product/module/geo-link/index.md

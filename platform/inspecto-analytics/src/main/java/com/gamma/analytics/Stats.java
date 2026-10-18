@@ -6,7 +6,7 @@ import java.util.OptionalDouble;
 /**
  * The canonical statistics of the Analytics Kernel (ANALYTICS-CORE-1 M1): ONE written definition each, so two modules
  * asking for "the median" or "the 95th percentile" of the same values get the same number. Pure, stateless, JDK only.
- * The definitions, and which DuckDB function each one matches, are in {@code docs/okf/backend/analytics-kernel.md};
+ * The definitions, and which DuckDB function each one matches, are in {@code docs/okf/product/module/analytics/spec.md};
  * {@code StatsDuckDbParityTest} proves the JVM and DuckDB forms agree.
  *
  * <h2>Input rules (every function)</h2>

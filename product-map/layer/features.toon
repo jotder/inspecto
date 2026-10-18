@@ -3,3 +3,4 @@ kind: layer
 title: Feature modules
 billable: false
 status: ga
+docs: docs/okf/product/layer/features/index.md

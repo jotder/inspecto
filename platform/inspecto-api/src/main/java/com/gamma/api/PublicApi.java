@@ -19,7 +19,7 @@ import java.lang.annotation.Target;
  *
  * <p>Anything <em>not</em> annotated is internal: it may change or disappear in
  * any release, with no notice. Do not depend on unmarked types from outside the
- * framework. See {@code docs/okf/backend/control-plane/api-stability.md} for the
+ * framework. See {@code docs/okf/product/module/api/plan-api-stability.md} for the
  * full policy and the current marked surface.
  *
  * <p><b>The promise binds only within a <em>released</em> major.</b> The newest

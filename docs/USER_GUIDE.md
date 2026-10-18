@@ -14,8 +14,8 @@ in [`GLOSSARY.md`](GLOSSARY.md) — the canonical vocabulary — so if a word he
 > then dip into individual screens as you need them.
 >
 > **How a part works underneath.** This guide is screen by screen. For how each module works end to end
-> (maker-checker, Decision Rules, Alerts, Cases …) see the [module pages](stakeholders/modules/README.md); for how
-> modules combine into a solution, the [solution pages](stakeholders/solutions/README.md).
+> (maker-checker, Decision Rules, Alerts, Cases …) see the [module pages](okf/product/index.md); for how
+> modules combine into a solution, the [solution pages](okf/product/index.md).
 
 > **Editions & personas.** Inspecto ships in build *editions* (Personal / Professional / Enterprise),
 > and each user views it through a *Lens* (Business / Builder / Ops). An edition can add or remove
@@ -397,7 +397,7 @@ edges you can pan, zoom, and select. A toolbox provides layouts and analysis alg
 paths, neighborhoods, centrality, and community detection. A saved investigation is a **Link
 Analysis View** you can return to (and, for entity-projection sources, surface as a graph Widget).
 For the full walkthrough — building a graph, the analysis and pattern tools, Investigations and evidence — see the
-[Link Analysis user manual](ui/link-analysis-user-manual.md).
+[Link Analysis user manual](okf/product/module/la-core/user-guide-manual.md).
 
 <a id="menus"></a>**Menus (Menu Builder)** — Where you customize the sidebar for your team. It's a
 two-pane authoring page: an editable menu tree on the left and a **live preview** on the right. The

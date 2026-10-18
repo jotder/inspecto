@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// LA-DEMO-GUARDS-1 / DR-T3 - "the engine names no la-* class" (docs/okf/backend/modules/link-analysis.md section 2).
+// LA-DEMO-GUARDS-1 / DR-T3 - "the engine names no la-* class" (docs/okf/product/module/la-core/architecture.md section 2).
 // The host reaches Link Analysis only through ServiceLoader SPIs it owns; one `import com.gamma.la.*` (or a fully
 // qualified use) in inspecto/src/main would silently make the optional modules mandatory. Any mention of the two
 // packages in a main-source .java file - import, qualified name, even a comment - fails. No exemptions.

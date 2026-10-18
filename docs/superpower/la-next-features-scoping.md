@@ -4,7 +4,7 @@
 Link Analysis rows in BACKLOG section 3.12. This page says, per row, what is genuinely left (checked against code on
 `origin/master` `299becc07`), the smallest build slices, the gates each touches, and the decisions the operator must take
 before a slice starts. It is a plan: when a row ships, distil the as-built facts into
-[`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md), move leftovers to the BACKLOG and
+[`okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md), move leftovers to the BACKLOG and
 `git mv` this page to the plans archive. The tracker for everything else is
 [`link-analysis-roadmap.md`](link-analysis-roadmap.md).
 
@@ -258,7 +258,7 @@ Items 1 and 2 can run in parallel lanes; the embed lane must not share files wit
 ## References
 
 * [`link-analysis-roadmap.md`](link-analysis-roadmap.md) - embed section and the live-detection section
-* [`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md) and
-  [`okf/backend/modules/link-analysis.md`](../okf/backend/modules/link-analysis.md)
+* [`okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md) and
+  [`okf/product/module/la-core/architecture.md`](../okf/product/module/la-core/architecture.md)
 * [`archived-documents/plans-archive/la-embed-view-design.md`](../archived-documents/plans-archive/la-embed-view-design.md) and
   [`archived-documents/plans-archive/la-live-detection-design.md`](../archived-documents/plans-archive/la-live-detection-design.md)

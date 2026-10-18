@@ -47,7 +47,7 @@ tagged by `__src_id`. "Name every output per member" therefore means **splitting
   second member silently overwrites the first. This is the main correctness risk and needs its own test.
 * Versioned reference stores write `baseName + "__v_" + batchId` ("batch-unique, never overwrite") and must keep
   doing so; the fix must not touch them.
-* It does NOT help node-local output trees (documented at-least-once contract, `okf/backend/engine/ingestion.md`
+* It does NOT help node-local output trees (documented at-least-once contract, `okf/product/module/engine/spec-ingestion.md`
   section *Failover is at-least-once*).
 
 **Alternative to the row's option (a), cheaper.** Keep one file per batch but make the batch id stable under
@@ -64,7 +64,7 @@ Recommendation: (a).
 | 1 | Per-member output split behind a pipeline setting `processing.output_per_member` (default OFF, then flip), one shared helper used by the 4 call sites | M | DECISION (D1) |
 | 2 | Stem-collision guard: reject / disambiguate two surviving members with the same output stem, fail closed | S | SAFE (can land first; also protects today's single-file path) |
 | 3 | Flip the pinned test to assert 2 and add: per-member naming survives a re-planned superset; drain resume uses the same names; lineage rows sum per file; reference-store naming unchanged | S | follows slice 1 |
-| 4 | Docs: `okf/backend/engine/ingestion.md`, HA/DR runbook paragraph | S | follows slice 1 |
+| 4 | Docs: `okf/product/module/engine/spec-ingestion.md`, HA/DR runbook paragraph | S | follows slice 1 |
 
 **Gate / security.** No new route, no gate. Data-path change only: it touches the commit ordering that
 `CommitFence` and the lease protect, so run `KillBeforeAckDuplicateTest`, the lease/failover tests and the lineage
@@ -152,8 +152,8 @@ says it is LA's call. No work for this lane; keep as parked.
 ## 5. `ASSURE-RISK-SCORE-RESIDUALS-1`, item (7)
 
 **Verified premise.** `RiskScoreModel.Factor` holds `measure` as a string (`count` or `agg(field)`) compiled by
-`MeasureCompiler` (`RiskScoreModel.java:76-100`), and `okf/backend/control-plane/risk-scores.md:306` says there is
-no arithmetic and no saved-Measure reference "because none exists". `okf/capabilities/studio/studio.md` item 4 confirms
+`MeasureCompiler` (`RiskScoreModel.java:76-100`), and `okf/product/module/scoring/spec-risk-scores.md:306` says there is
+no arithmetic and no saved-Measure reference "because none exists". `okf/product/layer/product/plan-studio.md` item 4 confirms
 "a Measure has no server home": the Dataset editor's `NamedMeasure {id, label, expression}` is client-side only and
 the wire carries validated `{agg, field}` pairs. So the premise holds; the second half of item (7) is a **platform**
 decision (making a Measure a server concept), not a Risk Score change.
@@ -187,12 +187,12 @@ edit, and a classified column inside an expression.
 ## 6. `Bundle / Exchange - "load as draft" residuals`
 
 **Verified.** Every slice shipped 2026-09-25, plus the 2026-10-04 and 2026-10-06 follow-ups (the row says so and
-`okf/backend/control-plane/metadata-bundle.md` carries the as-built). The only open bullet is **"a browser pass
+`okf/product/module/processor/spec-metadata-bundle.md` carries the as-built). The only open bullet is **"a browser pass
 over the six editors"** (Dashboard, Widget, Dataset, authored Pipeline, Link Analysis view, Geo map view).
 
 | # | Slice | Size | Class |
 |---|---|---|---|
-| E1 | Drive **Import as draft...** in each of the six editors against a demo build: banner shows, Save goes through the editor's own route with `If-Match` and a diff for an existing id, integrity findings re-checked just before Save, LA / Geo Save shows `LaTransfer.recheck` findings, an unauthorised caller sees no Import-as-draft. Record pass or fail per editor in `okf/backend/control-plane/metadata-bundle.md`. | M (browser, one build) | SAFE; needs a running demo build and the Browser pane, so it is not for a docs-only lane |
+| E1 | Drive **Import as draft...** in each of the six editors against a demo build: banner shows, Save goes through the editor's own route with `If-Match` and a diff for an existing id, integrity findings re-checked just before Save, LA / Geo Save shows `LaTransfer.recheck` findings, an unauthorised caller sees no Import-as-draft. Record pass or fail per editor in `okf/product/module/processor/spec-metadata-bundle.md`. | M (browser, one build) | SAFE; needs a running demo build and the Browser pane, so it is not for a docs-only lane |
 
 Gate implications: none new (writes go through each editor's existing gated route). Close the row when E1 is
 recorded; file any finding as its own row (do not widen this one). Rank: lowest of the seven; do it alongside
@@ -233,7 +233,7 @@ consent would see its storage figures in another Space's ledger. Keep the Signal
 **Verified.** The row is open; the archived design (`archived-documents/plans-archive/findings-spec-authoring-ui-design.md`
 section 1 and section 8) defines the persona (case-management lead, not a developer), tasks T1-T8 and the real
 criterion: **T2, T6, T7 and T5 done unaided, pass or fail per task** (D10 there). The proxy session
-(`okf/frontend/features/objects.md`, *Proxy acceptance session 2026-09-29*) found five defects; **all five are closed**
+(`okf/product/module/ops/user-guide-objects.md`, *Proxy acceptance session 2026-09-29*) found five defects; **all five are closed**
 on the board (`FINDINGS-EDITOR-CHOICE-BINDING-1` 2026-09-29, `CASE-DETAIL-DOCUMENT-SCROLL-1` 2026-09-30,
 `CASE-FIRST-OBJECT-DEAD-END-1` 2026-10-03 with the empty-state message, `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1` per
 the 2026-09-29 board note). **`FINDINGS-PER-CASE-TYPE-1`** (the form applies to every Case) is named in the board note
@@ -397,13 +397,13 @@ then D8, D5, D6, D9-D13 (each a yes/no that mostly resolves to "not now").
 * **D7** mask classified entity keys in `/bi/query` and `/queries/{id}/run` result rows unless the caller holds the reveal capability, as its OWN gated, reviewed row (it changes every BI consumer); the anomaly top-N tile stays out until then.
 * **D8** pack goldens assert properties; exact goldens stay in the module's own corpora. **D9** hour buckets deferred until a pack or customer needs sub-day scoring.
 * **D10** Measures stay `{agg, field}` pairs (no server `measure` kind). **D11** no free-form arithmetic in a Risk Score factor; the supported way is a Dataset calculated column (documented). **D12/D13** Space comparison: only the two API-hygiene slices (serve the axes list, typed 202); no scheduled/authored cross-Space comparison and no persisted comparison rows.
-* **D14** the D6 think-aloud session is prepared (script in `ui/d6-think-aloud-script.md`); running it needs a real Case-desk lead.
+* **D14** the D6 think-aloud session is prepared (script in `okf/product/module/la-core/tests-think-aloud-script.md`); running it needs a real Case-desk lead.
 
 ## References
 
-`docs/BACKLOG.md` (the seven rows); `okf/backend/engine/ingestion.md`; `okf/backend/engine/parser-plugins.md`;
-`superpower/parsing-repeated-child-design.md`; `okf/backend/control-plane/anomaly-scores.md`;
-`okf/backend/control-plane/risk-scores.md`; `okf/capabilities/studio/studio.md`;
-`okf/backend/control-plane/metadata-bundle.md`; `okf/backend/control-plane/jobs.md`;
-`okf/frontend/features/objects.md`; `archived-documents/plans-archive/findings-spec-authoring-ui-design.md`;
+`docs/BACKLOG.md` (the seven rows); `okf/product/module/engine/spec-ingestion.md`; `okf/product/module/engine/spec-parser-plugins.md`;
+`superpower/parsing-repeated-child-design.md`; `okf/product/module/anomaly/spec-anomaly-scores.md`;
+`okf/product/module/scoring/spec-risk-scores.md`; `okf/product/layer/product/plan-studio.md`;
+`okf/product/module/processor/spec-metadata-bundle.md`; `okf/product/module/processor/spec-jobs.md`;
+`okf/product/module/ops/user-guide-objects.md`; `archived-documents/plans-archive/findings-spec-authoring-ui-design.md`;
 `archived-documents/plans-archive/space-comparison-design.md`.

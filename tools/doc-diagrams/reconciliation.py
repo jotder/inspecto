@@ -28,4 +28,4 @@ s.text(560, 132, 'reappears (recurrence)', size=10)
 s.arrow(830, 234, 830, 330, label='absentRuns = 3')
 s.text(20, 405, 'Transitions on a run come from ReconBreaks.merge (POST /recon/{id}/record or the recon.run Job); '
        'assign / resolve / open come from POST /recon/{id}/breaks/status.', size=10)
-s.save('docs/stakeholders/modules/assets/reconciliation.svg')
+s.save('docs/okf/product/assets/reconciliation.svg')

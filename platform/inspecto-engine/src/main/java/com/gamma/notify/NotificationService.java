@@ -134,7 +134,7 @@ public final class NotificationService implements NotificationAccess, AutoClosea
         if (!suppression.armed() && System.getProperty(SuppressionList.TTL_PROPERTY) != null) {
             log.warn("-D{} is set but delivery suppression is NOT armed ({}). Hard bounces and complaints "
                             + "will NOT stop further sends. Set -Ddelivery.receipts.backend to a durable "
-                            + "store (see okf/backend/engine/db-layer.md §3.12).",
+                            + "store (see okf/product/module/engine/spec-db-layer.md §3.12).",
                     SuppressionList.TTL_PROPERTY,
                     receipts == null ? "no receipt store wired"
                             : "the receipt store is in-memory, so bounce evidence is evicted");

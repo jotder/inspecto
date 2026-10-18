@@ -190,7 +190,7 @@ to `RecordTransform` on 2026-09-08. Those two cells now contradict the ~90 lines
 
 The page is wrong; the "reportedly 16 / 6 with `collector` declared" reading is right. See §0.4.
 
-Wrong cells / claims in `docs/okf/backend/pipeline-graph/pipeline-config-keys.md`:
+Wrong cells / claims in `docs/okf/product/module/config/spec-pipeline-config-keys.md`:
 
 | Site | Says | Truth |
 |---|---|---|
@@ -300,11 +300,11 @@ count. `catalog-vs-executors.md:40`–`:50` is the very section that documents t
 opening line still carries the pre-fold total.
 
 ⚠ **Two more live sites carry 121 and are not named in the row:**
-- `docs/okf/frontend/features/pipeline-editor.md:121` — *"121 processors, **every one visible**"*
+- `docs/okf/product/module/etl/user-guide-pipeline-editor.md:121` — *"121 processors, **every one visible**"*
 - `docs/BACKLOG.md:161` — *"121 processors: 34 delivered / **16 partial / 69 planned**"* (three wrong
   numbers in one clause)
 
-A third, `docs/okf/frontend/features/schema-mapping-authoring.md:366`, says *"the 121-processor
+A third, `docs/okf/product/module/etl/user-guide-schema-mapping.md:366`, says *"the 121-processor
 catalog"* inside a **historical narrative** about what evidence existed when a mockup was drawn. That one
 is arguably correct-as-history and should not be mechanically bumped.
 
@@ -358,7 +358,7 @@ the seven `parser.*` frontends), `:120`, `:145`, `:169`, `:192`, `:213`, `:244`,
 body beneath it; the plan's diagnosis ("not bumped when `lookup` landed") is right.
 
 ⚠ **Adjacent same-defect site, not named in the row:**
-`docs/okf/backend/pipeline-graph/index.md:31` — *"all 15 delivered Step kinds"*. The two pages must
+`docs/okf/product/index.md:31` — *"all 15 delivered Step kinds"*. The two pages must
 agree, so it needs the same bump.
 
 ---
@@ -443,9 +443,9 @@ extractions taken during this pass.
 
 | Site | Defect | Same class as |
 |---|---|---|
-| `docs/okf/backend/pipeline-graph/index.md:31` | "all 15 delivered Step kinds" | 5.5 |
-| `docs/okf/frontend/features/pipeline-editor.md:121` | "121 processors" | 5.3 |
+| `docs/okf/product/index.md:31` | "all 15 delivered Step kinds" | 5.5 |
+| `docs/okf/product/module/etl/user-guide-pipeline-editor.md:121` | "121 processors" | 5.3 |
 | `docs/BACKLOG.md:161` | "121 processors: 34 delivered / 16 partial / 69 planned" | 5.3 + 5.4 |
-| `docs/okf/backend/engine/node-types.md:140` | `RowShaper.java:494-512` (real `:554`) | 5.6 |
+| `docs/okf/product/module/engine/spec-node-types.md:140` | `RowShaper.java:494-512` (real `:554`) | 5.6 |
 | `inspecto-engine/.../PipelineProjection.java:71-72` | stale javadoc: "`map` authors a `transform.map` node in the GRAPH editor" | 5.2 — a CODE comment, one file from the correct list |
-| `docs/okf/frontend/features/schema-mapping-authoring.md:366` | "the 121-processor catalog" | 5.3, but **historical narrative** — do not mechanically bump |
+| `docs/okf/product/module/etl/user-guide-schema-mapping.md:366` | "the 121-processor catalog" | 5.3, but **historical narrative** — do not mechanically bump |

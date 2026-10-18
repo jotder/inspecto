@@ -109,7 +109,7 @@ interface ConsignmentIngestStrategy {
      * multi-member batch by its batch id, and a one-survivor batch by that survivor's own stem, so they cannot
      * collide inside a batch. The key is case-folded because the output tree may sit on a case-insensitive
      * filesystem. ⚠ This guards WITHIN a batch only: a later batch holding {@code b/x.bin} still replaces an
-     * earlier batch's {@code x_out} for the same partition (see {@code okf/backend/engine/ingestion.md}).
+     * earlier batch's {@code x_out} for the same partition (see {@code okf/product/module/engine/spec-ingestion.md}).
      */
     static MemberAudit claimOutputStem(Map<String, Consignment.Member> claimed, Consignment.Member m, String stem,
                                        PipelineConfig cfg, java.time.LocalDateTime mStart) throws java.io.IOException {

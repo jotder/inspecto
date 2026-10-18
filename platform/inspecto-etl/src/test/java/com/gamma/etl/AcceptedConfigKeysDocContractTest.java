@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AcceptedConfigKeysDocContractTest {
 
-    private static final String DOC = "docs/okf/backend/pipeline-graph/pipeline-config-keys.md";
+    private static final String DOC = "docs/okf/product/module/config/spec-pipeline-config-keys.md";
     private static final String OPEN = "<!-- generated:accepted-config-keys -->";
     private static final String CLOSE = "<!-- /generated:accepted-config-keys -->";
 

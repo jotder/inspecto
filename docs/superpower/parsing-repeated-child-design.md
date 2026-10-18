@@ -19,7 +19,7 @@ declared; (g) `derive_non_numeric` / `derive_no_match` are logged per file (INFO
 (h) `ASN1-DERIVE-NOT-IN-GRAMMAR` is NOT implemented (needs the compiled grammar's schema walk); open.
 Tests: `DeriveSpecTest` (13), `Asn1RecordIngesterDeriveTest` (5) over synthetic case `repeated_child`. Operator decision
 2026-10-11: design it now. Home: the Decode Profile (`platform/inspecto-etl/src/main/java/com/gamma/etl/DecodeProfile.java`,
-shipped C1-C4 2026-09-25; as-built in `docs/okf/backend/engine/parser-plugins.md`). When the work ships, distil
+shipped C1-C4 2026-09-25; as-built in `docs/okf/product/module/engine/spec-parser-plugins.md`). When the work ships, distil
 into that concept, move leftovers to `docs/BACKLOG.md`, and `git mv` this plan to
 `archived-documents/plans-archive/`.
 

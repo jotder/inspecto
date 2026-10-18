@@ -85,7 +85,7 @@ matter for how you run them:
   (each branch pairs with its own `sinks[]` destination), so the at-rest lift refuses it.
 
 The full reference — every key of every Step kind, the refusals, and the palette's pending processors —
-is [`docs/okf/backend/pipeline-graph/step-catalog.md`](../../docs/okf/backend/pipeline-graph/step-catalog.md).
+is [`docs/okf/product/module/etl/spec-step-catalog.md`](../../docs/okf/product/module/etl/spec-step-catalog.md).
 
 | Step (verb → node type) | What it does · the keys it takes | Example | Run |
 |---|---|---|---|

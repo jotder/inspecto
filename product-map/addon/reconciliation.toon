@@ -10,4 +10,4 @@ billing:
 support:
   tier: standard
 status: ga
-docs: docs/stakeholders/modules/reconciliation.md
+docs: docs/okf/product/addon/reconciliation/index.md

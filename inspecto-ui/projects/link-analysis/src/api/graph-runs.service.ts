@@ -5,7 +5,7 @@ import { apiErrorMessage, apiUrl, toParams } from '@inspecto/core/api/api-base';
 import { limitRefusalMessage } from '@inspecto/link-analysis/link-analysis/limit-refusal';
 
 /**
- * LA separation D-4 step 7 — the server side of graph analysis (`GraphRunRoutes`, as built in `docs/okf/frontend/features/link-analysis.md`
+ * LA separation D-4 step 7 — the server side of graph analysis (`GraphRunRoutes`, as built in `docs/okf/product/module/la-core/user-guide-link-analysis.md`
  * §Graph Run): start a **Graph Run** over an Investigation's Working Set, poll it, cancel it. The browser keeps running every
  * algorithm locally under its cap; this is what runs above it.
  *

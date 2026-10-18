@@ -1,12 +1,12 @@
 # Link Analysis — demo readiness plan (defending the architecture page with the live application)
 
 **Status: IN FLIGHT 2026-10-11 — waves 1-4 BUILT and pushed (`27fdd6928`, `c137ae2c4`); Draft working scope (`9d31226b2`, `ca701abe1`); 2026-10-11 the la-showcase seed ran live, the smoke runner ran 8/9 (its two findings fixed: `1dd5f1b09`, `8ed160f67`) and a first browser pass covered Settings (read only), Members, the Draft cycle and DR-D1. Open: an editing Settings pass, a sealed Compare, DR-D2..D8 and Evidence/algorithm views on screen, the index staleness review (per-row notes in `docs/BACKLOG.md` §3.12).** Written after a five-way audit of
-[`okf/backend/modules/link-analysis.md`](../okf/backend/modules/link-analysis.md) (the claims) against the application
+[`okf/product/module/la-core/architecture.md`](../okf/product/module/la-core/architecture.md) (the claims) against the application
 on `origin/master` (code, the live API of the Enterprise demo bundle on :8096, and the real UI driven as Demo Users).
 Backlog rows: `LA-DEMO-SEED-1`, `LA-DEMO-DEFECTS-1`, `LA-DEMO-INDEX-1`, `LA-UI-MEMBERS-DRAFTS-1`,
 `LA-UI-SETTINGS-MASKING-1`, `LA-UI-EVIDENCE-1`, `LA-ALGO-UI-PARITY-1`, `LA-DEMO-GUARDS-1` (all in BACKLOG §3.12).
 This page lives in `docs/superpower/` while the work is in flight; when it ships, distil the as-built facts into
-`okf/frontend/features/link-analysis.md` and archive it.
+`okf/product/module/la-core/user-guide-link-analysis.md` and archive it.
 
 ## 0. Operator decisions (2026-10-10)
 
@@ -153,7 +153,7 @@ acceptance test a reviewer can run. "→ row" names the BACKLOG row that carries
 | 9 | `admin` | A new day lands → `pipeline.commit` → index version N+1 → *Edge index* shows it; a path answer says "from index vN" | DR-T1, DR-U4, DR-U5 |
 | 10 | slides | 10^8: full build 852 s, append 31 s (synthetic corpus, 1.8 M nodes); 10^9 is an extrapolation | evidence |
 
-**Seed status (2026-10-10, the `la-showcase` template + `tools/seed-la-showcase.mjs`; see `docs/okf/capabilities/spaces/spaces.md` 3.5.6).** DR-S1..S6, S7 (`la-showcase-off`),
+**Seed status (2026-10-10, the `la-showcase` template + `tools/seed-la-showcase.mjs`; see `docs/okf/product/module/config/plan-spaces.md` 3.5.6).** DR-S1..S6, S7 (`la-showcase-off`),
 S8 (inert sample policy), S9 (launch configs `inspecto-la-app`, `inspecto-personal`; Postgres runbook step) and S10 (`LaShowcaseGoldenTest`) are built; the seed script is unit-tested
 against a mocked `fetch` and not yet run live. Steps that now have their data: 2 (the seeded Investigation; the staged next-day file), 5 (`fm.manager` is the second approver), 7
 (`la-showcase-off`), 8 (bound rule + `la_detect`), 9 (`la_index_build` on `pipeline.commit`). Steps still waiting on UI or behaviour lanes: 3 (DR-D4), 4 (DR-D2), 8 (DR-U9), 9 (DR-U4, DR-U5). The

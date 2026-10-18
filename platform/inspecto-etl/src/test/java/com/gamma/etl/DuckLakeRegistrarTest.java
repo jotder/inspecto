@@ -226,7 +226,7 @@ class DuckLakeRegistrarTest {
                 "the message must name the property that made this fatal: " + boom.getMessage());
     }
 
-    // The spelling okf/backend/integrations.md shipped as THE example. It reads like a shared catalog and
+    // The spelling okf/product/layer/platform/api-integrations-ducklake.md shipped as THE example. It reads like a shared catalog and
     // is not one: no recognised backend prefix, so DuckLake reads it as a path too (AIRGAP-DUCKLAKE-PG-1,
     // re-measured 2026-09-14). Refusing it is deliberate, not a mis-classification.
     @Test

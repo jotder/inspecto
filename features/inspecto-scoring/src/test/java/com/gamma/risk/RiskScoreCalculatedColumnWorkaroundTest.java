@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * ASSURE-RISK-SCORE-RESIDUALS-1 item (7): a Risk Score factor has no arithmetic, so the supported workaround is to
  * put the arithmetic in a Dataset {@code calculated} column and aggregate THAT column. This test is the worked
- * example in {@code okf/backend/control-plane/risk-scores.md}: it must stay in step with that doc.
+ * example in {@code okf/product/module/scoring/spec-risk-scores.md}: it must stay in step with that doc.
  */
 class RiskScoreCalculatedColumnWorkaroundTest {
 

@@ -200,7 +200,7 @@ class ApiContractTest {
      *
      * <p>⛔ <b>This test does not decide whether that is acceptable.</b> Documenting 300-odd routes and
      * keeping deliberate exemplar coverage are both defensible, and the choice is the operator's — it is
-     * recorded as owed in {@code okf/capabilities/control-api/control-api.md} §5. What is NOT defensible
+     * recorded as owed in {@code okf/product/module/processor/plan-control-api.md} §5. What is NOT defensible
      * is the number being unknown, so this measures it, prints it on every run, and ratchets it.
      *
      * <p>⚠ <b>Why the assertions are floors and not equalities.</b> A per-route live → doc comparison is

@@ -1,7 +1,7 @@
 # Partner / settlement / wholesale: plan (`PACK-PARTNER-SETTLEMENT-1`, settlement half)
 
 > 🟡 **PLAN 2026-10-18: design only, nothing built.** Closes competitive gap **Q** (partner / settlement / wholesale) in
-> [`stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md). Gap **C** (re-rating) has
+> [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md). Gap **C** (re-rating) has
 > its own plan, written in parallel by a sibling session; this plan states only the **contract it needs from it** (§5) and
 > does not design re-rating. Decisions below are marked **PS-D1…PS-D10**: each is a recommendation awaiting the operator
 > (§11), with how to reverse it. **What is NOT known:** no real partner statement, TAP file or MVNO wholesale invoice has been
@@ -18,8 +18,8 @@ Checked against the tree on 2026-10-18.
 | `ic_statement` feed | Five columns: `STATEMENT_ID`, `PARTNER`, `EVENT_DATE`, `MINUTES`, `AMOUNT` (USD, `DECIMAL(18,4)`). One line per partner and day. No period, currency, direction, destination, version, or control total. | `config/ic_statement/ic_statement_schema.toon` |
 | `ic_rates` Reference | Two columns: `PARTNER`, `RATE_PER_MIN`. **Not effective-dated**, no direction, destination class, tier or currency. | `config/ic_rates/ic_rates_schema.toon` |
 | `mobile-money` Reconciliation `mm_partner_settlement` | The only true Reconciliation against a partner file: ledger `BILL_PAY` rows vs settlement lines per transaction, `cardinality: one_to_many`, absolute tolerance 0.01. Per-transaction, not per-period. | `spaces/_templates/mobile-money/config/registry/reconciliations/mm_partner_settlement.toon` |
-| Reconciliation add-on | Two or three Datasets compared at a key grain; four Break types; Break lifecycle `open / assigned / resolved / auto_closed` with recurrence; `recon.run` Job; one deduped Incident per Reconciliation on a breach; Break → Incident via `POST /recon/promote`. | [`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md) |
-| Incidents, Cases, Workflow & SLA | A Case groups Incidents (Case Rule auto-groups); Impact (suspected / confirmed / recovered / prevented) on an Incident or Case; an authored `workflow` **per object type**; an SLA Policy per object type (targets per priority on a business calendar); Escalation Rule once per breach. | [`stakeholders/modules/workflow-sla.md`](../stakeholders/modules/workflow-sla.md), [`stakeholders/modules/case-management.md`](../stakeholders/modules/case-management.md) |
+| Reconciliation add-on | Two or three Datasets compared at a key grain; four Break types; Break lifecycle `open / assigned / resolved / auto_closed` with recurrence; `recon.run` Job; one deduped Incident per Reconciliation on a breach; Break → Incident via `POST /recon/promote`. | [`okf/product/module/reconciliation/architecture-overview.md`](../okf/product/module/reconciliation/architecture-overview.md) |
+| Incidents, Cases, Workflow & SLA | A Case groups Incidents (Case Rule auto-groups); Impact (suspected / confirmed / recovered / prevented) on an Incident or Case; an authored `workflow` **per object type**; an SLA Policy per object type (targets per priority on a business calendar); Escalation Rule once per breach. | [`okf/product/module/workflow/architecture-workflow-sla.md`](../okf/product/module/workflow/architecture-workflow-sla.md), [`okf/product/module/case-management/architecture-overview.md`](../okf/product/module/case-management/architecture-overview.md) |
 | Regulatory Reporting add-on | Report Templates rendered to XML / CSV / JSON from a Case or Incident, four-eyes approval, file-drop submission, audit log. | matrix row T |
 | R7 research | The host–MVNO settlement mechanics (§4.2), dispute causes (§4.4) and controls C1…C23 (§5); controls C8, C9, C18 are the settlement ones. | `group-regulator-assurance/research/R7-mvno-roll-up-and-wholesale.md` (a git-excluded working set, so not linked) |
 
@@ -262,7 +262,7 @@ planted findings and benign look-alikes, regenerate with a system property, as e
 | **S5** | **Disputes.** Case Rule, authored CASE workflow (PS-D5), SLA Policy and Escalation Rule for `CASE`, dispute-window Alert Rule, Impact mapping (PS-D6). | a planted mismatch becomes an Incident, groups into one Case per `(partner, cycle)`, moves through `DISPUTED → AGREED → CREDIT_PENDING`, and a Case near its window end alerts; the Case's Impact reads as mapped | golden through the Control API (real HTTP, as `TelcoRaGoldenTest` does); a workflow `problems()` unit test on the authored file |
 | **S6** | **Aging and accruals.** `settlement_aging`, `settlement_accrual`, KPIs (open disputed amount, aged > 60 days, accrued unbilled), `settlement_overview` dashboard, runbook. | KPI tiles render on the corpus; a late statement is an accrual before `statement_due` and a finding after | golden: every dashboard tile renders (the `mobile-money` assertion) |
 | **S7** | **Evidence pack.** `settlement-dispute-pack` Report Template over a Case. | the rendered CSV / JSON names the rate and run id for every disputed line, and a line with no re-rating run is refused (422), not exported blank | template-render unit test; four-eyes path asserted |
-| **S8** | **Docs and registration.** okf concept `docs/okf/capabilities/spaces/spaces.md` §3.5.x, a solution page `stakeholders/solutions/partner-settlement.md`, matrix row Q refreshed, `offerings/*.toon` and `tools/check-offerings.mjs`, glossary entries (§13), `docs/INDEX.md`, this plan distilled and `git mv`ed to `archived-documents/plans-archive/`. | all guards green: vocabulary, doc links, offerings, product map (`tools/check-product-map.mjs`) | the guards named |
+| **S8** | **Docs and registration.** okf concept `docs/okf/product/module/config/plan-spaces.md` §3.5.x, a solution page `stakeholders/solutions/partner-settlement.md`, matrix row Q refreshed, `offerings/*.toon` and `tools/check-offerings.mjs`, glossary entries (§13), `docs/INDEX.md`, this plan distilled and `git mv`ed to `archived-documents/plans-archive/`. | all guards green: vocabulary, doc links, offerings, product map (`tools/check-product-map.mjs`) | the guards named |
 | **W1…W3** | Wholesale and roaming (§9). **Demand-gated**; W1 first (it reuses S3 on a hosting agreement). | a named prospect or the operator's call | per slice at that time |
 
 **Smallest useful cut: S0 + S1 + S2 + S3.** That alone lifts row Q from the flat-rate voice control to agreement-aware,
@@ -321,15 +321,15 @@ engine's behaviour if reversed.
 - **PS-D0 (recommended): split the row** into `PACK-PARTNER-SETTLEMENT-1` (gap Q, this plan) and `PACK-RERATING-1` (gap C, the
   sibling plan), once the sibling plan lands, so each row has one owner and one definition of done. Not done here because
   the sibling session owns that text.
-- `docs/stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md` rows C and Q carry the corrected description from §1 at S8, not now
+- `docs/okf/product/layer/product/brochure-competitive-matrix.md` rows C and Q carry the corrected description from §1 at S8, not now
   (this session edits only this plan, the INDEX entry and the BACKLOG row).
 
 ## 15. References
 
-- [`stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md) rows C, H, Q and its gap table.
-- [`stakeholders/solutions/revenue-assurance.md`](../stakeholders/solutions/revenue-assurance.md): the `telco-ra` pack.
+- [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows C, H, Q and its gap table.
+- [`okf/product/solution-pack/business-assurance/architecture-revenue-assurance.md`](../okf/product/solution-pack/business-assurance/architecture-revenue-assurance.md): the `telco-ra` pack.
 - `group-regulator-assurance/research/R7-mvno-roll-up-and-wholesale.md` (git-excluded working set, not linked) §4.1, §4.2, §4.4, §5, §7.2.
-- [`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md), [`reconciliation-uplift-plan.md`](../archived-documents/plans-archive/reconciliation-uplift-plan.md).
-- [`stakeholders/modules/workflow-sla.md`](../stakeholders/modules/workflow-sla.md), [`stakeholders/modules/case-management.md`](../stakeholders/modules/case-management.md).
-- [`okf/capabilities/spaces/spaces.md`](../okf/capabilities/spaces/spaces.md) §3.5 (`telco-ra`, `mobile-money`, `aml` pack precedents).
+- [`okf/product/module/reconciliation/architecture-overview.md`](../okf/product/module/reconciliation/architecture-overview.md), [`reconciliation-uplift-plan.md`](../archived-documents/plans-archive/reconciliation-uplift-plan.md).
+- [`okf/product/module/workflow/architecture-workflow-sla.md`](../okf/product/module/workflow/architecture-workflow-sla.md), [`okf/product/module/case-management/architecture-overview.md`](../okf/product/module/case-management/architecture-overview.md).
+- [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5 (`telco-ra`, `mobile-money`, `aml` pack precedents).
 - [`GLOSSARY.md`](../GLOSSARY.md): binding vocabulary.

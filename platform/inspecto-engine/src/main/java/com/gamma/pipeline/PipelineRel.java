@@ -38,8 +38,8 @@ import com.gamma.api.PublicApi;
  * is only ever READ (the executor and validator skip it as a cross-pipeline trigger), and the other two
  * are declared vocabulary with no producer at all. D2 moves that outcome set to Signals.
  *
- * <p>See {@code docs/okf/backend/engine/node-types.md} (the token model — the design of record) and
- * {@code docs/okf/backend/pipeline-graph/pipeline-graph-design.md} §1 (the token rule and the relation
+ * <p>See {@code docs/okf/product/module/engine/spec-node-types.md} (the token model — the design of record) and
+ * {@code docs/okf/product/module/engine/architecture-pipeline-graph.md} §1 (the token rule and the relation
  * inventory) — ⚠ an earlier citation named §3.2 and §15, neither of which exists in that file.
  * Provenance only, not maintained:
  * {@code docs/archived-documents/plans-archive/pipeline-spec.md} §11.

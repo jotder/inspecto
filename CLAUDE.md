@@ -84,22 +84,23 @@ confusing or ambiguous. In all UI text, model/field names, API routes, config ke
 Docs live in exactly three tiers; **`docs/INDEX.md` is the map** and must be updated in the same
 change that adds or retires a doc:
 
-1. **Current knowledge → `docs/okf/`** (one concept per file, cross-linked) plus
-   the small root canon (GLOSSARY, INDEX, REQUIREMENTS, BACKLOG, USER_GUIDE, PROJECT_NOTES,
-   BRANCHING, EDITIONS, FEATURE_INVENTORY, ADVANCED_GUIDE) **and the audience- and surface-specific
-   trees** `docs/stakeholders/`, `docs/api/`, `docs/ui/`, `docs/ops/`, `docs/roadmap/`, `docs/wiki/`
-   and root `compliance/`. ⚠ Those six trees went unstated here until 2026-09-09 (consolidation
-   step 9) even though `tools/check-vocabulary.mjs` has always scanned them — **a tier definition
-   that omits part of its own tier is how a doc ends up with no stated home**, and it is the
-   condition step 9 exists to end.
+1. **Current knowledge → one product hub per Product Map Item:
+   `docs/okf/product/<kind>/<name>/`** (mirrors `product-map/<kind>/<name>.toon`; `PRODUCT-DOCS-HUB-1`,
+   2026-10-19). File name = slot: `plan` · `spec` · `architecture` · `features` · `feature-db` ·
+   `user-guide` · `admin-guide` · `api` · `tests` · `brochure`, as `<slot>.md` or `<slot>-<topic>.md`.
+   Platform-wide backend docs → `layer/platform`; UI-wide and whole-product sales docs →
+   `layer/product`. A hub's `index.md` is generated (`node tools/render-product-docs.mjs`) — never
+   hand-edit it. Plus the small root canon (GLOSSARY, INDEX, REQUIREMENTS, BACKLOG, USER_GUIDE,
+   PROJECT_NOTES, BRANCHING, EDITIONS, FEATURE_INVENTORY, ADVANCED_GUIDE), the HTTP contract
+   `docs/api/` and root `compliance/`. ⛔ Never create another docs tree or a doc outside a hub.
 2. **Active plans → `docs/superpower/`** — a plan lives here ONLY while its work is in flight.
    **When the work ships: distill the durable as-built facts (decisions, seams, gotchas, deliberate
-   deferrals) into the matching OKF concept, move still-open items to `docs/BACKLOG.md`, then
+   deferrals) into the matching product hub (`docs/okf/product/…`), move still-open items to `docs/BACKLOG.md`, then
    `git mv` the plan to `docs/archived-documents/plans-archive/`.** The `handoff` skill checks this.
 3. **History → `docs/archived-documents/`** — kept for provenance, never maintained, never linked
    as current.
 
-Never create a new root-level `docs/*.md` topic file — new knowledge goes into an OKF concept
+Never create a new root-level `docs/*.md` topic file — new knowledge goes into a product hub
 (or an existing canon file).
 
 ## Working artifacts stay in the repo

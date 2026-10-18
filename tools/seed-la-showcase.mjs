@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Seeds the RUNTIME state of the `la-showcase` Space (LA-DEMO-SEED-1: DR-S1, S4, S5) over HTTP, as the right Demo Users.
 // Investigations, members, Entity Lists, identity facts, a Case and a bound Alert Rule have no registry kind, so no Space
-// Template can carry them; this script is the documented home. See docs/okf/capabilities/spaces/spaces.md (la-showcase).
+// Template can carry them; this script is the documented home. See docs/okf/product/module/config/plan-spaces.md (la-showcase).
 //
 //   node tools/seed-la-showcase.mjs --scaffold <spacesRoot>      offline, BEFORE the server starts: lay down the Space folders
 //   node tools/seed-la-showcase.mjs [--base URL] [--space id]    DRY RUN: print every call it would make, change nothing

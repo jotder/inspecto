@@ -1,5 +1,5 @@
 physicalRef: claims_links
-description: "Insurance-claims Link Analysis showcase - ONE link Dataset built by the claims_links Job from claim, claim_party, provider_bill and accident_location. kind is one of claimed_with, same_accident, serviced_by, represented_by, referred_to, shares_phone, shares_address; via names the claim, accident or shared value; event_date is the day of ts. src and dst hold claimants and providers: an endpoint column carries ONE Entity Type, so both are the masked type party. Planted stories: docs/ops/la-showcase-claims-runbook.md. Synthetic."
+description: "Insurance-claims Link Analysis showcase - ONE link Dataset built by the claims_links Job from claim, claim_party, provider_bill and accident_location. kind is one of claimed_with, same_accident, serviced_by, represented_by, referred_to, shares_phone, shares_address; via names the claim, accident or shared value; event_date is the day of ts. src and dst hold claimants and providers: an endpoint column carries ONE Entity Type, so both are the masked type party. Planted stories: docs/okf/product/solution-pack/la-claims/admin-guide-showcase-runbook.md. Synthetic."
 eventDate: event_date
 columns[7]{name,type,classification}:
   src,string,PARTY

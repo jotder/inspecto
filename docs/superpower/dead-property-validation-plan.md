@@ -33,7 +33,7 @@ Every fact the BACKLOG row asserts is **CONFIRMED**:
 pipeline-spec gap 10) derives, from source, **every block `PipelineConfigParser` reads** and compares
 it to **every block `ConfigSpecs.pipeline()` declares**. The residue is
 `UNDECLARED_BLOCKS` — 16 entries, *"may only ever SHRINK"*. Current knowledge:
-`docs/okf/backend/pipeline-graph/pipeline-config-keys.md`.
+`docs/okf/product/module/config/spec-pipeline-config-keys.md`.
 
 ⇒ **The union `declared ∪ parser-only` IS the accepted-names map for `pipeline`.** It does not need
 inventing; it needs *moving into production code* so a checker can enforce it and a doc can be
@@ -121,7 +121,7 @@ configs first; recorded as remaining work, not silently skipped.
 
 ## 3. The generated doc
 
-`docs/okf/backend/pipeline-graph/pipeline-config-keys.md` gains a block delimited by
+`docs/okf/product/module/config/spec-pipeline-config-keys.md` gains a block delimited by
 `<!-- generated:accepted-config-keys -->` … `<!-- /generated:accepted-config-keys -->`, rendered from
 `AcceptedConfigKeys` by `AcceptedConfigKeysDocContractTest`. The test **fails with the exact expected
 text** when the two disagree, so the doc cannot drift from the map the checker enforces — the row's

@@ -22,7 +22,7 @@ import java.util.TreeSet;
  * {@code PipelineKeyCoverageContractTest} has derived from source since 2026-08-31. That test now
  * ratchets THIS field rather than a copy of it, so the checker, the ratchet and the generated doc are
  * one list and drift is not representable. Current knowledge:
- * {@code docs/okf/backend/pipeline-graph/pipeline-config-keys.md}.
+ * {@code docs/okf/product/module/config/spec-pipeline-config-keys.md}.
  *
  * <p>🔴 <b>The granularity is the BLOCK, and that is a correctness constraint, not a shortcut.</b>
  * Leaf drift inside a declared block is real and known — {@code dirs.errors}, {@code dirs.quarantine},

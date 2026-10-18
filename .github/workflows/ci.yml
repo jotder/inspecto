@@ -27,7 +27,7 @@ jobs:
   # These fifteen pure-Node checks used to be the first steps of `test`, cheapest-first, ahead of the
   # reactor. A job stops at its first failing step, so a stale generated table — a P3 at most — silenced
   # the ENTIRE test suite for a day on 2026-09-16 (three stacked failures surfaced one per run; see
-  # okf/backend/build-run/guard-coverage.md "three unrelated defects behind ONE red gate"). Running them
+  # okf/product/layer/platform/tests-guard-coverage.md "three unrelated defects behind ONE red gate"). Running them
   # as a sibling job keeps every guard AND the tests reporting on the same push: a red guard no longer
   # buys silence for the expensive signal behind it. Nothing here needs the JDK, Postgres or the
   # eoiagent checkout, which is why it can run without them.
@@ -331,7 +331,7 @@ jobs:
       # and Industry packs, covers every one of them, holds no price (prices live only in the gitignored product-map/private/) and no
       # copied technical fact, and claims only an enforcement the build can honour. Reads files only; no build.
       - name: Guard — Product Map items link to real modules and Offerings, and hold no prices
-        run: node tools/check-product-map.mjs && node tools/check-product-docs.mjs && node --test tools/check-product-docs.test.mjs tools/check-product-map.test.mjs tools/render-product-map.test.mjs tools/product-map-import.test.mjs tools/customer-build.test.mjs
+        run: node tools/check-product-map.mjs && node tools/render-product-docs.mjs --check && node tools/check-product-docs.mjs && node --test tools/check-product-docs.test.mjs tools/check-product-map.test.mjs tools/render-product-map.test.mjs tools/product-map-import.test.mjs tools/customer-build.test.mjs
 
       # jlink lock guard (MODULE-REORG-P3-THIN-JARS): the derived runtime module set is the ONLY source package.ps1
       # uses, so every edition must have a well-formed lock section. No build; the JDK-name check is skipped without a JDK.
@@ -432,7 +432,7 @@ jobs:
       # com.gamma.asn:asn-core:0.1.0-SNAPSHOT" the first time it ever got to run. It had looked healthy
       # locally only because a developer's `~/.m2` is warm from past builds: a guard passing on
       # environment state rather than on the thing it checks. Installing here costs one shade pass and
-      # makes the guard actually executable. See okf/backend/build-run/guard-coverage.md.
+      # makes the guard actually executable. See okf/product/layer/platform/tests-guard-coverage.md.
       #
       # `-Pedition-advanced` (GUARD-SWEEP-1a, 2026-09-07): the profile is MODULES-ONLY — it adds
       # inspecto-oidc, inspecto-secrets, inspecto-geo-country and inspecto-policy, which are absent from the default <modules> and were
@@ -457,7 +457,7 @@ jobs:
       # environment-gated. ⚠ A module with ZERO tests writes no jacoco.exec and so vanishes from the
       # denominator rather than dragging it down — immaterial here (~800 lines across 4 modules) but the
       # reason the percentage is not a measure of "code with tests". See
-      # okf/backend/build-run/guard-coverage.md.
+      # okf/product/layer/platform/tests-guard-coverage.md.
       #
       # Tee'd to a log for the reactor-verdict guard below (REACTOR-VERDICT-CI-1, 2026-09-25). ⚠ `shell: bash`
       # is LOAD-BEARING, not decoration: GitHub runs an unspecified shell as `bash -e {0}` WITHOUT pipefail,
@@ -513,7 +513,7 @@ jobs:
       # as all-UNCERTAIN and judges nothing. The root is the Space base, the one `SpaceBootstrap` would register.
       # ⛔ REPORT ONLY by default — every exit is swallowed into a warning. Set the repository variable
       # `AFFECTED_CONTRACTS_FLAGS` (e.g. `--fail-on-breaking`, or `--fail-on-affected`) to make it gate; then a
-      # non-zero exit from any root fails the step. See okf/backend/control-plane/pipeline-related.md.
+      # non-zero exit from any root fails the step. See okf/product/module/processor/spec-pipeline-closure.md.
       - name: Report — Pipelines, dependents and contracts this PR's config change reaches
         if: github.event_name == 'pull_request'
         env:
@@ -585,7 +585,7 @@ jobs:
 
       # Offline vulnerability scan (ASSURE-OPERABILITY-1, D-P3). tools/vuln-scan.mjs matches every coordinate
       # in tools/dependencies.lock against an OSV-format DB SNAPSHOT supplied at $VULN_DB_DIR — mirrored on a
-      # connected host and carried in (okf/backend/build-run/operations.md, "Offline vulnerability scan"); it
+      # connected host and carried in (okf/product/layer/platform/admin-guide-launch-flags.md, "Offline vulnerability scan"); it
       # never downloads anything. Fails on an unwaived HIGH/CRITICAL (or UNKNOWN-severity) finding; waivers
       # live in compliance/vuln-waivers.json with a reason and an expiry. The self-test always runs.
       # ⚠ A hosted runner carries no snapshot, so without the VULN_DB_DIR repository variable the scan is

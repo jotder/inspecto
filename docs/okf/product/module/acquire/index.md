@@ -2,29 +2,28 @@
 type: ProductItem
 title: Acquisition and collectors
 item: module.acquire
-description: Collectors reach remote systems through Connections, fetch each complete file once and land it in a Pipeline's inbox.
-resource: platform/inspecto-acquire/, providers/inspecto-connectors/, providers/inspecto-connectors-kafka/
-tags: [product-item, module, acquisition, collectors, connectors]
-timestamp: 2026-10-19T00:00:00Z
+description: Documentation hub for module.acquire — every document about it, by slot.
+tags: [product-item, module]
 ---
 
 # Acquisition and collectors (`module.acquire`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
-> [`module.acquire`](../../../../../product-map/module/acquire.toon). Editions and dependencies are read from
-> the Product Map — never restated here.
+> [`module.acquire`](../../../../../product-map/module/acquire.toon). Editions, add-ons, order codes and dependencies are read
+> from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
+> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | linked | [Acquisition & connectivity capability spec (`ACQ`)](../../../capabilities/acquisition/acquisition.md) |
-| spec | linked | [Framework](../../../backend/acquisition/framework.md) · [Connectors](../../../backend/acquisition/connectors.md) · [Full design](../../../backend/acquisition/data-acquisition-framework.md) |
-| architecture | linked | [L3 module page — Collectors](../../../../stakeholders/modules/collectors.md) · [Advanced guide §5.1](../../../../ADVANCED_GUIDE.md#51-acquisition-comgammaacquire-comgammainspector-inspecto-connectors) |
-| features | linked | [L3 module page §1–§3](../../../../stakeholders/modules/collectors.md) |
-| feature-db | missing | generated in wave 3 |
-| user-guide | linked | [UI: Collectors](../../../frontend/features/collectors.md) · [UI: Collector config](../../../frontend/features/collector-config.md) · [User guide](../../../../USER_GUIDE.md) |
-| admin-guide | linked | [Remote connectors — operator runbook](../../../backend/acquisition/connectors-runbook.md) |
-| api | linked | [L3 module page §7](../../../../stakeholders/modules/collectors.md) · [OpenAPI contract](../../../../api/openapi-v1.json) |
-| tests | missing | tests live in `platform/inspecto-acquire/src/test`, `providers/inspecto-connectors/src/test` — no test-case document yet |
+| plan | current | [Acquisition & connectivity (ACQ)](plan-acquisition.md) |
+| spec | current | [Data acquisition — the original requirement](spec-framework-design.md) · [Unpack stage — decompression at the Collector](spec-unpack-stage.md) |
+| architecture | current | [Collectors](architecture-collectors.md) · [Data Acquisition Framework](architecture-framework.md) · [Multi-location ingest — the composition pattern](architecture-multi-location-ingest.md) |
+| features | missing | |
+| feature-db | missing | |
+| user-guide | current | [Collector configuration (the one surface)](user-guide-collector-config.md) · [Collectors](user-guide-collectors.md) |
+| admin-guide | missing | |
+| api | missing | |
+| tests | missing | |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `linked` (lives elsewhere until migrated) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-offerings — holds offerings/<id>.toon (docs/okf/backend/module-taxonomy.md, Offerings) against the module manifests and the
+// check-offerings — holds offerings/<id>.toon (docs/okf/product/layer/platform/architecture-module-taxonomy.md, Offerings) against the module manifests and the
 // edition build tables. NOT wired into ci.yml yet (follow-up); check-module-architecture.mjs prints a one-line status.
 //
 //   node tools/check-offerings.mjs [--root .]      exit 1 on any finding

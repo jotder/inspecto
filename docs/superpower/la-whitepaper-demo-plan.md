@@ -3,10 +3,10 @@
 **Status: PLAN 2026-10-15, not yet rehearsed.** Audience: CISO, lead architect, forensic and audit reviewers. Length: 35 to 40 minutes plus questions.
 Purpose: every PROVEN row of the whitepaper's Claims Register (section 7 of the Link Analysis whitepaper, `LINK_ANALYSIS_WHITEPAPER.md`, written 2026-10 and not yet committed)
 is shown live or by a named test, and every NOT YET / DOCUMENTED row is said out loud. It reuses the scenes, personas and seed of the
-[demo runbook](../ops/la-demo-runbook.md) (S1 to S15); it does not replace it. Variants (Postgres store, Personal) are in the
-[variants runbook](../ops/la-showcase-variants-runbook.md); Q&A answers are in the [stakeholder Q&A](../ops/la-stakeholder-qa.md).
+[demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (S1 to S15); it does not replace it. Variants (Postgres store, Personal) are in the
+[variants runbook](../okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md); Q&A answers are in the [stakeholder Q&A](../okf/product/module/la-core/tests-stakeholder-qa.md).
 
-When this ships: distil the as-built facts into `okf/frontend/features/link-analysis.md`, then `git mv` this plan to `archived-documents/plans-archive/`.
+When this ships: distil the as-built facts into `okf/product/module/la-core/user-guide-link-analysis.md`, then `git mv` this plan to `archived-documents/plans-archive/`.
 
 ## 1. Ground rules
 
@@ -30,8 +30,8 @@ When this ships: distil the as-built facts into `okf/frontend/features/link-anal
 | T9 | 4 | SHA-256 Dossier, tamper-evident (2.3) | S11 Verify, then the prepared tampered manifest shows NOT verified | `fm.analyst` | verified, then not verified with the failing step named | `ControlApiDossierTest` |
 | T10 | 3 | Drafts, atomic promotion (2.4) | S9 fork, step, rebase, promote | `fm.analyst`, `fm.manager` | the base Investigation is untouched until promote | draft tests in the runbook |
 | T11 | 3 | Ephemeral embed, auto-revoke (5.5) | S14 mint, public GET with headers, revoke, repeat (403/404); per-Space frame allow-list | `admin` by `curl`, then the viewer | token shown once; DENIED and REVOKED audit rows | `ControlApiInvestigationEmbedTest` |
-| T12 | 2 | Data trust strip (freshness, coverage, quarantine) | the Data trust strip on a graph; one stale or late file | `fm.analyst` | as-of, Files, in-the-index state | `docs/ops/la-data-trust-live-drive.md` |
-| T13 | 2 | Scale and limits (6, 7) | S15 evidence slide, recorded numbers only: 10^8 edges lookups about 43 ms, build 368 to 852 s | slides | benchmark table | `InvTraversalBench`; 10^9 run plan `docs/ops/la-index-scale-run-plan.md` |
+| T12 | 2 | Data trust strip (freshness, coverage, quarantine) | the Data trust strip on a graph; one stale or late file | `fm.analyst` | as-of, Files, in-the-index state | `docs/okf/product/module/la-core/tests-data-trust-live-drive.md` |
+| T13 | 2 | Scale and limits (6, 7) | S15 evidence slide, recorded numbers only: 10^8 edges lookups about 43 ms, build 368 to 852 s | slides | benchmark table | `InvTraversalBench`; 10^9 run plan `docs/okf/product/module/la-storage/tests-index-scale-run.md` |
 
 Total 45 minutes at rehearsal pace. **Cut line for 35 minutes:** drop T10 and T12, shorten T3. **Hard keep:** T5, T6, T7, T9 (the four a security reviewer tests).
 
@@ -64,5 +64,5 @@ Total 45 minutes at rehearsal pace. **Cut line for 35 minutes:** drop T10 and T1
 ## References
 
 * Whitepaper: the Link Analysis whitepaper (`LINK_ANALYSIS_WHITEPAPER.md`, under the stakeholders docs folder); plain text on purpose, because it was untracked when this plan was written. Make this a link once it is committed.
-* Runbook: [`la-demo-runbook.md`](../ops/la-demo-runbook.md), section 4 (claims we do NOT make) and section 7 (last rehearsal)
+* Runbook: [`la-demo-runbook.md`](../okf/product/module/la-core/admin-guide-demo.md), section 4 (claims we do NOT make) and section 7 (last rehearsal)
 * Readiness plan: [`la-demo-readiness-plan.md`](la-demo-readiness-plan.md)

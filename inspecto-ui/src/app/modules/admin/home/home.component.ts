@@ -56,7 +56,7 @@ const CLOSED_INCIDENT = new Set(['RESOLVED', 'ARCHIVED']);
  * ⛔ **Nothing here branches on the edition string.** Every difference between a Personal and an
  * Enterprise Home is driven by `SessionService`'s module flags (derived from what actually registered)
  * and by the subject's capabilities — the shell's standing rule
- * (`docs/okf/capabilities/surfaces/surfaces.md` §3.2). The `edition` field is inert and unread.
+ * (`docs/okf/product/layer/product/plan-surfaces.md` §3.2). The `edition` field is inert and unread.
  *
  * **Five data sources, each behind a CHEAP call.** The two the mockups carried and the first build dropped —
  * "Expectations breached" and "Datasets written" — landed 2026-09-16 (`HOME-TILES-1`) only once the backend

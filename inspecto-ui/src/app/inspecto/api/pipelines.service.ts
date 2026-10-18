@@ -150,7 +150,7 @@ export interface PipelineNodeType {
     authorable?: boolean;
     /**
      * The node's config vocabulary, published by the server (§3.1 of
-     * `docs/okf/frontend/features/pipelines.md`). This is the SOURCE for the node dialog's
+     * `docs/okf/product/module/etl/user-guide-pipelines.md`). This is the SOURCE for the node dialog's
      * form; `node-attributes.ts` is the offline/mock fallback for when the catalog has not loaded.
      *
      * An empty array is meaningful and different from `undefined`: it means the server says this type has

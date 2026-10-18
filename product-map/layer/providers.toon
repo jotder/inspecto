@@ -3,3 +3,4 @@ kind: layer
 title: Providers
 billable: false
 status: ga
+docs: docs/okf/product/layer/providers/index.md

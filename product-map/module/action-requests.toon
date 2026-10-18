@@ -5,4 +5,4 @@ parent: layer.features
 module: action-requests
 billable: false
 status: ga
-docs: docs/stakeholders/modules/action-requests.md
+docs: docs/okf/product/module/action-requests/index.md

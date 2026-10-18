@@ -2,7 +2,7 @@
 
 > 🟢 **BUILT — every Must, every Should, and Could C1–C6, C8, C9** (2026-10-17 and 2026-10-18). Open: C7 (blocked on
 > DuckDB 2.0) and the follow-ups in §10. Row: `ANALYTICS-CORE-1` in `docs/BACKLOG.md`. As-built:
-> `okf/backend/analytics-kernel.md` and `okf/backend/engine/db-layer.md` (one SQL building path).
+> `okf/product/module/analytics/spec.md` and `okf/product/module/engine/spec-db-layer.md` (one SQL building path).
 >
 > | Batch | Built | Decisions |
 > |---|---|---|
@@ -55,7 +55,7 @@ hand-written SQL:
 | Duplicate | Count today | Shared home that already exists |
 |---|---|---|
 | Private SQL identifier / literal quoting helpers (`q`, `ident`, `lit`, `literal`, `quoteIdent`…) | **~30** in ~25 files across 9 modules (engine 13, LA api/core 11, anomaly, scoring, reconciliation, expectation, DuckLake registrar…); a few `esc`/`quote` hits are HTML/XML escapers, not SQL | `SqlBuilder.quoteIdent` (`inspecto-util`) — underused; bound parameters used only in `ConditionSql` / `MeasureCompiler` |
-| Hand-built `read_parquet(` / `read_csv(` outside `SqlViews` | **~29 files** across 10 modules (engine 12, etl 4, processor 3, LA storage 2…) — some are legitimate ingest readers | `SqlViews` — the recorded rule is "`SqlViews` owns the read OPTIONS; nobody concatenates their own `read_*(`" (`okf/backend/engine/db-layer.md`) |
+| Hand-built `read_parquet(` / `read_csv(` outside `SqlViews` | **~29 files** across 10 modules (engine 12, etl 4, processor 3, LA storage 2…) — some are legitimate ingest readers | `SqlViews` — the recorded rule is "`SqlViews` owns the read OPTIONS; nobody concatenates their own `read_*(`" (`okf/product/module/engine/spec-db-layer.md`) |
 | JVM re-implementation of the Measure grammar | `WorkingSetMeasures` (geo-link, 258 LOC) re-applies `count / sum / avg / min / max / countDistinct` in Java | `MeasureCompiler` |
 | Aggregation done in the JVM where SQL could do it | `ObjectService.analytics`, `CaseOperations.evaluateCaseRule`, `ReportService` percentiles | the store's own SQL / the kernel |
 | Score outputs written per kind | Anomaly and Risk Score each write history + `_latest`, bands, explanation | none yet (M7) |
@@ -239,7 +239,7 @@ decisions), with the load-bearing facts re-checked: file sizes of `RobustStats`,
 list at `MeasureCompiler.java:30`; `la-graph`'s only dependency (Jackson); the ML jars in `tools/dependencies.lock`
 (ONNX / DJL, used by the Assistant only). Prior decisions: `predictive-analytics-design.md` §1, §4, §7, §9a;
 `archived-documents/plans-archive/anomaly-detection-design.md` §17; `parked-rows-scoping-2026-10-12.md` §9a;
-`okf/backend/control-plane/screening.md`; `okf/backend/modules/link-analysis.md`; `okf/backend/pipeline-graph/step-catalog.md`.
+`okf/product/module/screening/spec.md`; `okf/product/module/la-core/architecture.md`; `okf/product/module/etl/spec-step-catalog.md`.
 Not verified: DuckDB 1.5.6's exact list of built-in string-similarity functions (checked at S1), LOC of the
 smaller helper classes.
 
@@ -247,7 +247,7 @@ smaller helper classes.
 
 Taken by the assistant on the model-kernel lane (Spearman, C2, C3, C4) under the operator's standing delegation ("take
 decisions smartly, with reasons"). None is confirmed by the operator yet; each can be reversed. As built:
-`okf/backend/analytics-kernel.md` § Model kernels. Numbers D-AN10… belong to the time-series / Measures lane.
+`okf/product/module/analytics/spec.md` § Model kernels. Numbers D-AN10… belong to the time-series / Measures lane.
 
 | # | Decision | Why |
 |---|---|---|

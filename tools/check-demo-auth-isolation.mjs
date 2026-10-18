@@ -150,7 +150,7 @@ if (problems.length) {
     fail(
         `${DEMO} can reach a non-demo bundle:\n  - ${problems.join('\n  - ')}\n` +
             `  The Demo User sign-in has NO real authentication. Only \`package.ps1 -DemoAuth\` may stage it,\n` +
-            `  and only in place of inspecto-oidc.jar (docs/okf/backend/editions/local-testing-without-iam.md).`,
+            `  and only in place of inspecto-oidc.jar (docs/okf/product/layer/platform/admin-guide-local-testing.md).`,
     );
 }
 console.log(

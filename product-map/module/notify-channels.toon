@@ -5,3 +5,4 @@ parent: layer.providers
 module: notify-channels
 billable: false
 status: ga
+docs: docs/okf/product/module/notify-channels/index.md

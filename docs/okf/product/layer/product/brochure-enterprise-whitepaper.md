@@ -1,0 +1,732 @@
+# Inspecto — Enterprise Product & Solutions Whitepaper
+> **Sovereign Data Operations: the end-to-end platform for environments where data cannot leave**
+> *Audience: CIOs, CTOs, Enterprise Data Architects, Heads of Revenue Assurance and Fraud, Compliance Officers*
+> *Publication: September 2026 · Document version **1.2***
+
+> **Release basis.** This edition describes Inspecto **at the close of Sprint 8** — the Professional bundle as
+> shipped on 2026-09-10 plus the seven Sprint 8 rows (`EVENTS-DURABLE-1`, `AIRGAP-EXTENSIONS-1`,
+> `DEPLOY-SERVICE-WRAPPER-1`, `BREAK-INCIDENT-1`, `BREAK-AGING-1`, `INCIDENT-KPI-MTTR-1`,
+> `SIGNAL-STALE-TILES-1`), the scale-out plan's phases A and B (the Professional DR tier), and the `PKG-5`
+> decision that bundles the embedded assistant. Two items are described as **signed design**, not shipped
+> code, and are marked where they appear: the Enterprise Kubernetes tier (T5) and the Postgres query
+> surface. Before any external use, confirm against `BACKLOG.md` §0 that this basis holds. Every count in
+> this document is derived from the committed contracts by `tools/check-doc-counts.mjs`; every measured
+> figure cites its benchmark; the claims register it is written to is `brochure-competitive-landscape.md` §4.
+
+---
+
+# 1 · Executive summary — one artifact, the whole operation
+
+**Inspecto** is a lean, superfast, configuration-driven platform for **Data Acquisition, Processing, Reconciliation, Business Intelligence, Investigation and Operational management**, delivered as  a single self-contained artifact. It can run on a laptop, an air-gapped bare-metal server, or a container cluster — with **zero external runtime services** in its Personal and Professional forms, and scale out with exactly two declared
+dependencies (PostgreSQL and S3-compatible object storage) at Enterprise scale.
+
+It embraces the principles of Data Mesh, allowing data to be treated as a product and enabling data mesh architectures with decentralized data ownership and data governance. It provides the necessary tools and capabilities to implement data mesh architectures, including data discovery, data quality, data governance, and data access control.
+
+It embeds vectorised processing engine over an open Parquet lakehouse, and collapses the tool categories a regulated enterprise otherwise buys, integrates and secures separately:
+
+```
+             WHAT A REGULATED ESTATE USUALLY RUNS                         WHAT INSPECTO SHIPS
+ ┌────────────────────────────────────────────────────────┐    ┌─────────────────────────────────────────┐
+ │ Ingest (NiFi / Airbyte)  ──►  Storage (Hadoop / S3)    │    │            ONE ~90 MB ARTIFACT          │
+ │        │ glue script            │ glue script          │    │  Acquire ► Parse ► Lakehouse ► Reconcile│
+ │ Quality (Great Expectations) ── BI (Superset/Tableau)  │    │  ► Breaks ► Incidents ► Investigate     │
+ │        │ glue script            │ glue script          │ VS │  ► Explain (offline AI)                 │
+ │ Alerting (PagerDuty)  ──►  Ticketing (ServiceNow)      │    │                                         │
+ │ Investigation (i2)    ──►  Graph DB (Neo4j)            │    │  one config file per feed               │
+ └────────────────────────────────────────────────────────┘    │  one audit trail across all of it       │
+   • many VMs, many vendors, many contracts                    │  one vendor, one bill                   │
+   • every seam is a script somebody maintains                 └─────────────────────────────────────────┘
+   • cloud egress the regulator forbids
+```
+
+### Three structural failures Inspecto removes
+
+1. **The glue-code liability.** Specialist tools are wired together with scripts and webhooks. When an
+   upstream partner changes a file layout, the seam fails silently and the dashboard keeps rendering
+   yesterday's number. Inspecto's lifecycle is one declarative configuration end to end, and a fault at any stage is a first-class **Signal** that carries to every downstream Dataset, tile and Incident.
+2. **The egress exclusion.** Observability, analytics and AI platforms are cloud-first. Central banks,
+   defence, sovereign government and telecom operators under data-residency law cannot legally send them
+   data. Inspecto runs fully offline — including its AI — with **no outbound network call in its
+   air-gapped profile**, and the release pipeline asserts that with a test.
+3. **The cluster tax.** Distributed frameworks were designed for servers with 4–8 cores. A modern node has
+   64–128 cores and NVMe. For most enterprise feeds, coordination costs more than it delivers. Inspecto's
+   vectorised single-node engine ingests **over half a million rows per second on a 12-column feed**,
+   measured; and when one node is genuinely not enough, Enterprise partitions the same artifact across
+   Kubernetes.
+
+### Four enterprise pillars
+
+1. **Uncompromising in-process performance.** Ingest over half a million rows per second natively on a
+   single core, with sub-microsecond cell latency and sub-second interactive BI queries. A single 8-to-32-core
+   node processes billions of records daily without distributed cluster coordination or JVM garbage collection
+   storms.
+2. **Continuous observability, lineage and provenance.** First-class Signals, automatic graph-based asset
+   lineage, run-level conservation invariants ($N_{\text{in}} = N_{\text{out}} + N_{\text{quarantined}} + N_{\text{filtered}}$),
+   and deterministic causation chaining (`causationId`) from raw consignment to visual KPI tile.
+3. **Radical maintainability.** A single ~90 MB self-contained binary, declarative `.toon` configuration
+   with GitOps promotion and schema-drift tolerance, crash-isolated execution, self-healing breaks, and 19
+   clean SPI extension points that eliminate custom fork debt.
+4. **Rapid, air-gapped deployment.** Production-ready in 5 minutes via bundled `systemd` and Windows
+   Service wrappers (`DEPLOY-SERVICE-WRAPPER-1`), turnkey vertical Space Templates, and 100 % sovereign
+   air-gapped portability with zero outbound network calls, verified by CI.
+
+---
+
+# 2 · Architecture — collapsing the stack along its seams
+
+```
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                          OPERATOR CONSOLE — three Lenses                │
+  │      Business Lens        │      Builder Lens       │     Ops Lens      │
+  │  dashboards · KPIs ·      │  Workbench (Connections,│  Runs · Signals · │
+  │  Requirements · lineage   │  Collectors, Pipelines) │  Alerts →         │
+  │                           │  Studio (Datasets,      │  Incidents →      │
+  │                           │  Queries, Widgets,      │  Cases · Approvals│
+  │                           │  Dashboards, Link, Geo) │                   │
+  └───────────┬─────────────────────────┬─────────────────────┬─────────────┘
+              ▼                         ▼                     ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │              CONTROL PLANE — versioned REST /api/v1 (OpenAPI)          │
+  │  OIDC/PKCE SSO · RBAC · ABAC (Enterprise) · optimistic concurrency     │
+  │  (If-Match) · four-stage write gate · single-dispatch audit trail      │
+  └───────────┬───────────────────────────────────────────────┬────────────┘
+              ▼                                               ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │                              DATA PLANE                               │
+  │ ┌──────────────────────────┐              ┌────────────────────────┐  │
+  │ │ ACQUISITION & PARSING    │              │ RECONCILIATION & OPS   │  │
+  │ │ SFTP·FTPS·FTP·S3·GCS·JDBC│              │ Dataset vs Dataset     │  │
+  │ │ ASN.1 CDRs · fixed-width │              │ Breaks · auto-close ·  │  │
+  │ │ delimited·xlsx·json·regex│              │ aging · promotion      │  │
+  │ │ dedup · gap detection ·  │              │ Alerts → Incidents →   │  │
+  │ │ schema-drift detection   │              │ Cases · SLA sweeps     │  │
+  │ └────────────┬─────────────┘              └───────────▲────────────┘  │
+  │              ▼                                        │               │
+  │ ┌─────────────────────────────────────────────────────┴────────────┐  │
+  │ │        VECTORISED PARQUET LAKEHOUSE (embedded DuckDB)            │  │
+  │ │  Hive partitioning · DuckLake catalog · Query Library · Studio   │  │
+  │ └──────────────────────────────────────────────────────────────────┘  │
+  └───────────────────────────────────┬───────────────────────────────────┘
+                                      ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │        EMBEDDED INTELLIGENCE — local models, zero egress                │
+  │  7 reflex skills  │  23-tool deliberative belt  │  autonomy ladder L0–L3│
+  └─────────────────────────────────────────────────────────────────────────┘
+```
+
+### The seams — collapsing the fragmented enterprise stack
+
+Where conventional enterprise architectures assemble a dozen disparate products wired with brittle glue scripts,
+Inspecto collapses those separate tool categories along their natural boundaries into one unified, in-process
+substrate:
+
+1. **Acquisition & parsing.** Scheduled Collectors handle watermarking, deduplication, decompression, sequence
+   gap detection, and schema-drift alerting across **10**<!--count:parsing-frontend-tokens--> parsing frontends
+   (including telecom-grade ASN.1 CDRs, fixed-width binary, delimited text, and JSON). Ingest streams directly
+   into columnar memory via DuckDB's native Appender — replacing separate NiFi or Airbyte deployments.
+2. **Pipelines & transformation.** Declarative DAGs of typed Steps and visual Pipelines transform, clean,
+   and enrich streams with reference data directly in SQL or the visual Workbench canvas. Downstream outputs
+   feed subsequent stages without intermediate file re-serialization or Kafka bus hops — replacing standalone
+   dbt, Spark, or Airflow infrastructure.
+3. **The vectorised lakehouse.** Embedded DuckDB executes vectorised SQL directly over Hive-partitioned
+   columnar Parquet on local NVMe storage or S3-compatible object stores. The DuckLake catalog delivers atomic
+   commit boundaries and transactional visibility across concurrent readers — replacing complex Snowflake,
+   Databricks, or Hadoop clusters.
+4. **Reconciliation & automated quality.** Declarative Dataset-vs-Dataset reconciliation matching with exact,
+   absolute, or percentage tolerances. Variances become stateful Breaks with complete regulatory aging and
+   auto-closing lifecycles, supported by quality Signals at ingest — replacing isolated Great Expectations or
+   bespoke SQL audit scripts.
+5. **Operational incidents & SLA management.** First-class Signals feed the operational lifecycle:
+   Signals → Alerts → Incidents → Cases, with configurable SLA sweeps, automated breach notifications, and
+   root-cause analysis (MTTR/MTTD) — replacing external PagerDuty or ServiceNow dependencies for data-plane ops.
+6. **Dashboard Studio & visual analytics.** An integrated self-service BI Studio with parameterized queries,
+   live KPI cards, and dashboard tiles bound directly to Datasets. Eliminates external BI platforms (Tableau,
+   Superset) and guarantees that dashboard queries execute against warm columnar Parquet without pre-computed cubes.
+7. **Forensic Link Analysis & offline Geo.** Server-side entity and link projection powered by DuckDB graph
+   algorithms (PageRank, Louvain community detection, fraud pattern packs), paired with a 100 % offline MapLibre
+   vector Geo studio — replacing separate graph databases (Neo4j) and GIS servers.
+8. **Security, identity & audit governance.** Delegated OIDC/PKCE authentication against enterprise IAM
+   (Keycloak, Okta, Entra, WSO2), with fine-grained RBAC and Enterprise ABAC tenant isolation. Single-dispatch,
+   append-only, actor-attributed audit logging, path jail containment, and cryptographic SBOMs provide compliance
+   with SOC 2, ISO 27001, and NIST 800-53 — replacing third-party governance and PAM tools.
+9. **Spaces: multi-tenancy without cluster tax.** Complete logical and physical isolation: configurations,
+   Pipelines, Datasets, Dashboards, and Incidents reside in a dedicated Space tree with its own lakehouse.
+   Multiple business units (Revenue Assurance, Fraud, Internal Audit) run side by side on one install. The
+   cross-Space Exchange shares Datasets with attribution and zero-copy semantics.
+10. **Embedded intelligence with zero cloud egress.** An in-process assistant with 7 reflex skills and a
+    23-tool deliberative belt operating across a governed autonomy ladder (L0 explain → L1 draft → L2 act with
+    approval). Runs entirely on local perimeters with zero outbound cloud calls, enforced by CI guard tests.
+
+### Why the seams are the product
+
+Specialists compete inside functional silos. Inspecto's true value lies in what happens **between** them,
+because nothing has to be integrated across vendor boundaries:
+
+* **Reactive health & transitive staleness.** When an upstream Collector detects a sequence gap or schema drift,
+  it raises a `SEQUENCE_GAP` or `SCHEMA_DRIFT` **Signal**. The Signal traverses the Catalog's lineage graph;
+  **every downstream Dataset and every dashboard tile bound to it is instantly badged `stale` with the Signal as
+  its tooltip** (`SIGNAL-STALE-TILES-1`). Business users are never misled by stale data. When the feed recovers
+  and the pipeline commits, the badges clear automatically.
+* **Deterministic causation threading.** An Incident opened from a reconciliation Break or quality breach carries
+  a `causationId` and `correlationId` tracing directly back through the pipeline run to the exact consignment,
+  raw file, and row offset. Root-cause analysis is grounded in cryptographic certainty, not cross-system log correlation.
+* **Self-healing operational loops.** Timing variances between upstream and downstream systems generate Breaks that
+  auto-close the moment subsequent consignments reconcile the difference, eliminating manual ticket churn.
+* **Single unified audit stream.** The entire journey — from raw ingestion and transformation to break promotion,
+  incident resolution, and configuration update — lands in one append-only, actor-attributed audit trail,
+  not fragmented across four vendor exports.
+
+
+
+---
+
+# 3 · Acquisition & the vectorised lakehouse
+
+```
+  ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+  │  Feeds           │     │  Parsers         │     │  PartitionWriter │
+  │  · raw CDRs      ├────►│  · native DuckDB ├────►│  · stage & reveal│
+  │  · delimited/xlsx│     │  · vectorised    │     │  · Hive layout   │
+  │  · fixed / binary│     │  · quarantine    │     │  · catalog commit│
+  └──────────────────┘     └──────────────────┘     └────────┬─────────┘
+                                                             ▼
+                                                    ┌──────────────────┐
+                                                    │ Parquet lakehouse │
+                                                    │ + DuckLake catalog│
+                                                    └──────────────────┘
+```
+
+### 3.1 File-native acquisition of the hard formats
+
+Inspecto specialises in the formats generic ETL engines struggle with:
+
+* **Telecom-grade ASN.1 decoding.** A 154-file decoder subsystem with vendor corpora processes raw Call
+  Detail Records from switch manufacturers out of the box — a capability generic data platforms do not have.
+* **Binary and text fixed-width**, both record modes (line-oriented and byte-layout).
+* **Delimited, xlsx, JSON and regex-text** frontends, all first-class node types —
+  **7**<!--count:parser-node-types--> `parser.*` node types over **6**<!--count:builtin-parsers-->
+  DuckDB-native built-ins, plus a plugin lane for anything proprietary.
+* **Connectors** for SFTP, FTPS, FTP, S3, Google Cloud Storage and JDBC databases, with retry and backoff,
+  delivered in **every edition**.
+* **Schema-drift detection.** When a delimited feed's header changes — even a rename at equal width — the
+  batch still commits and one WARN Signal names exactly what moved.
+* **Quarantine and error isolation.** Rows with schema mismatches or unreadable encodings are segregated
+  into per-file error ledgers; healthy rows proceed.
+* **Requirements triage.** Paste the business requirement; the platform maps it to the Datasets,
+  Expectations and KPIs that satisfy it, and shows what is still missing.
+
+### 3.2 The vectorised lakehouse
+
+* **Embedded DuckDB** executes vectorised SQL directly against columnar Parquet — no external database cluster to run, patch or licence.
+* **Hive-partitioned layout** (`year=/month=/day=`) gives partition pruning for historical analysis for free.
+* **Atomic visibility.** Writes are staged and revealed atomically; with the DuckLake catalog, a file is visible to every reader exactly when its catalog transaction commits — never partially.
+* **Air-gapped by construction.** The DuckDB extensions the engine uses ship inside the bundle; an air-gapped install never reaches for the network, and a release test fails if it could.
+* **Query Library** — reusable SQL queries with `$`-parameters, executed live on the embedded engine, and the substrate for Widgets, Dashboards, KPIs and Reports in the Studio.
+* **A metadata model you can export.** The whole Space — Collectors, Pipelines, Datasets, Queries, Dashboards — round-trips through a versioned **Metadata Bundle** with drift detection, so environments are promoted by diff, not by hand.
+
+---
+
+# 4 · Reconciliation → Breaks → Incidents
+
+```
+  Feed A ──┐
+           ├──► [Reconciliation] ──► match? ──no──► ┌──────────────┐
+  Feed B ──┘        ▲                                │    BREAK     │ open → resolved
+              key columns ·                          │  key · type  │      → auto_closed
+              tolerance (exact /                     │  first seen  │  aging 0-30·30-60·60-90·90+
+              absolute / percent)                    └──────┬───────┘
+                                                            ▼ promote
+                                                     ┌──────────────┐
+                                                     │   INCIDENT   │ SLA · assignee · RCA
+                                                     │  causationId │ MTTR · MTTD
+                                                     └──────────────┘
+```
+
+### 4.1 Dataset-vs-Dataset reconciliation
+In banking, insurance and telecommunications, the gap between an upstream generation feed and the
+downstream billing or ledger system is revenue. Inspecto reconciles Datasets declaratively: key columns,
+compare columns, and a tolerance per column that is **exact, absolute or percentage**. It runs as
+vectorised SQL, so a full-volume join across millions of records is seconds, not a batch window.
+
+### 4.2 The Break lifecycle
+Unlike BI tools that chart a variance, Inspecto manages each discrepancy as a stateful **Break**:
+* **Created** with the key, the side that is missing or mismatched, and the run that found it.
+* **Auto-closed** when a later run no longer observes it — a timing difference that resolves itself
+  costs nobody a click.
+* **Aged** from first observation, and bucketed **0–30 · 30–60 · 60–90 · 90+ days** for audit and
+  regulatory reporting.
+* **Promoted** to an Incident in one action, carrying the Break key, the reconciliation and the run as
+  evidence — deduplicated, so a Break promoted twice opens one Incident.
+
+### 4.3 Incident management and root-cause analysis
+* **Alerts → Incidents → Cases**, with assignees, SLA deadlines, notes, links and tags.
+* **Threaded causation.** Every Incident carries a `causationId` back through the run to the batch and the
+  raw file.
+* **RCA and post-mortems** annotated on the Incident, in the console.
+* **MTTR and MTTD** on the KPI report — with the detection anchor stated (first Signal at the
+  Incident's causation root → Incident opened), so the number is defined, not implied.
+
+---
+
+# 5 · Forensic investigation — Link Analysis and offline Geo
+
+```
+  ┌────────────────────────────────────┐   ┌────────────────────────────────────┐
+  │        LINK ANALYSIS STUDIO        │   │          GEO MAP STUDIO            │
+  │ server-side entity/link projection │   │ offline MapLibre basemap + vectors │
+  │ PageRank · betweenness · closeness │   │ heatmaps · origin-destination     │
+  │ eigenvector · degree               │   │ routes · time slider + playback   │
+  │ Louvain · label propagation ·      │   │ measure · radius · polygon · notes│
+  │ connected components               │   │ layer manager · GeoJSON overlays  │
+  │ six pattern packs · suspicion score│   │ saved Geo Views                   │
+  └────────────────────────────────────┘   └────────────────────────────────────┘
+```
+
+### 5.1 Link Analysis
+Uncover fraud rings, laundering networks and coordinated behaviour without a separate graph database:
+* **Server-side projection.** Relational Datasets are projected into entity/link graphs by DuckDB
+  aggregation on the server; the browser receives a graph, not a table.
+* **Centrality** — PageRank, betweenness, closeness, eigenvector and degree — to find the actors that
+  matter.
+* **Community detection** — Louvain, label propagation and connected components.
+* **Six pattern packs** for common topologies: *Circular flow*, *Layering chain*, *Pass-through
+  intermediary*, *Inbound collector*, *Call-forwarding relay*, *Shared associates*.
+* **Suspicion scoring** that composes connectivity and pattern hits into a ranked list of nodes to look
+  at first, plus saved Views so an investigation resumes where it stopped.
+
+### 5.2 Geo Map Analysis
+* **100 % offline.** A bundled MapLibre basemap with vector land, boundaries and places — no tile server,
+  no internet.
+* **Origin-destination routes**, **heatmaps**, a **time slider with playback**, and an intelligence
+  toolbox — measure, radius, polygon and notes — over a layer manager with GeoJSON overlays.
+* **Saved Geo Views** for repeatable analysis.
+
+---
+
+# 6 · Embedded intelligence — explain, draft, act with approval
+
+```
+                          THE GOVERNED AUTONOMY LADDER
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ L3  BOUNDED AUTONOMY (Enterprise, opt-in)                               │
+  │     bounded remediation classes · hourly budgets · kill switch ·        │
+  │     mandatory SHADOW mode first                                         │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ L2  ACT WITH APPROVAL (Professional+)                                   │
+  │     the agent drafts; the Approvals Inbox shows the preview;            │
+  │     nothing executes until an operator approves; the approval is        │
+  │     actor-attributed and audited like any human action                  │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ L1  AUTHORING & DRAFTING                                                │
+  │     natural language → SQL, pipeline configs, schedules; human saves    │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ L0  EXPLAIN & INVESTIGATE                                               │
+  │     "why did batch 408 quarantine 12 % of rows?" — grounded RCA,        │
+  │     lineage, schema explanation · read-only · fully offline             │
+  └─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.1 Zero cloud egress, enforced
+Sending customer records or network logs to a commercial cloud LLM is prohibited in the environments
+Inspecto serves. The assistant connects only to **local inference runtimes** inside the customer's
+perimeter, and the build pipeline runs `EgressGuardTest`, which fails the release if a cloud model SDK
+ever enters the air-gapped artifact.
+
+### 6.2 Sell the ladder, not the ceiling
+* **Tier A — Explain & Investigate (L0–L1, all editions).** Diagnose a failed run from its error ledgers
+  and schema, explain a grammar, translate a question into a validated query. Highest value, lowest risk,
+  and it works in the deployments regulated buyers actually have.
+* **Tier B — Author & Act with Approval (L2, Professional+).** The agent drafts a fix — a delimiter, a field
+  width, a backfill. It lands in the **Approvals Inbox** with a preview. When approved, it executes through
+  **the same authenticated `/api/v1` routes a human uses**, producing an identical actor-attributed audit
+  entry.
+* **Tier C — Bounded Autonomy (L3, Enterprise).** Never lead with `AUTO`. Enable `SHADOW` for one action
+  class, review what it *would* have done in the `/autonomy` ledger, then promote that class with a
+  conservative hourly budget and a single-click kill switch.
+
+### 6.3 Seven reflex skills and a 23-tool belt
+Seven deterministic reflex skills ship: `DiagnoseAndAlertSkill`, `ExplainEntitySkill`, `KpiToSqlSkill`,
+`NlToScheduleSkill`, `ReportNarrativeSkill`, `ReportSqlSkill`, `SuggestConfigSkill`. For multi-step
+work the deliberative agent wields a **23-tool belt** — among them `kpi_report_builder`,
+`suggest_expectations`, `query_author`, `pipeline_author`, `projection_author`, `component_draft`,
+`config_schema`, `anomaly_scan`, `signal_timeline` and `diff_batches` — every mutating tool previewed
+before it is presented.
+
+---
+
+# 7 · Performance — measured capacity
+
+### The capacity thesis
+For workloads in the low billions of rows per day, a distributed cluster introduces more latency and
+operational friction than it removes. Inspecto's embedded engine does the work on one node — and
+partitions across nodes only when the arithmetic says so.
+
+### Measured figures
+*From `docs/okf/product/layer/platform/tests-performance.md` — JDK 26 / DuckDB 1.5.2, `PipelineBenchmark`, 2M-row
+files, re-measured with no regression at v3.9.0.*
+
+| Stage | Measured | Unit cost |
+|---|---|---|
+| **Native ingest, 12 columns** | **523,000 rows/s** | **0.16 µs per cell** |
+| Native ingest, 40 columns | 125,000 rows/s | 0.20 µs per cell |
+| Java fallback ingest (messy files, per core) | 0.65–1.0 µs per cell | — |
+| **Vectorised SQL transform** | **1,400,000 rows/s** | — |
+| **Parquet write** | **1,100,000 rows/s** | — |
+
+Ingest cost is roughly linear in **cells** (rows × columns) — wide schemas cost somewhat more per cell —
+so capacity at any width follows from the per-cell figure. Transform and write are never the bottleneck.
+
+### Measured end to end — the whole path under load
+*Full Collector path — acquire, parse, tag, transform, partitioned Parquet write, lineage — with every
+core busy on concurrent batches, 100-column records. Measured 2026-09-14 on a six-core development
+machine; the first line below is the measurement, the rest is arithmetic.*
+
+| | |
+|---|---|
+| End-to-end density on six cores | 8.1 million cells/s (81,000 rows/s at 100 columns) |
+| **Per physical core, end to end** | **~1.35 million cells/s** on a 2019 mobile core |
+| Per physical core, current Linux server | **~1.8–2.8 million cells/s** (×1.3–1.6 server core, ×1.0–1.3 Linux allocator) |
+
+### Sizing — one 8-core Linux node, 100-column records
+
+| | |
+|---|---|
+| Processing density | 14–22 million cells/s |
+| Throughput at 100 columns | 140,000–220,000 rows/s |
+| Daily volume, 100 % utilisation | 12–19 billion rows |
+| **Quotable, sized to peak (3–5× daily mean) with 50 % headroom** | **~2.5 billion rows per day per node** |
+
+### Scaling up the node — 8, 16 and 32 cores
+*Projected linearly from the per-core figure above. Inspecto scales by running batches concurrently
+(`processing.threads`, which now defaults to the host's cores), each on its own DuckDB connection; the
+engine divides the cores between concurrent batches automatically, so a bigger box is a configuration
+change, not a redesign. Measured scaling on the development machine: 12 batches gave 3.4× one batch.*
+
+| Node | Processing density | 100-column rows/s | 12-column rows/s | 100-column rows/day at 100 % | **Quotable, sized to peak** |
+|---|---|---|---|---|---|
+| **8 cores** | 14–22 M cells/s | 140–220 K | 1.2–1.8 M | 12–19 billion | **~2.5 billion/day** |
+| **16 cores** | 29–45 M cells/s | 290–450 K | 2.4–3.7 M | 25–39 billion | **~5 billion/day** |
+| **32 cores** | 58–90 M cells/s | 580–900 K | 4.8–7.5 M | 50–78 billion | **~10 billion/day** |
+
+Three conditions make the projection hold, and a sizing engagement checks all three:
+* **Enough concurrent batches.** A single file ingests on one thread; the node is busy only when at
+  least as many batches are in flight as it has cores. Many medium files scale; one giant file does not.
+* **Storage that keeps up.** At 32 cores the node writes on the order of 60–250 MB/s of Parquet at
+  peak, plus the raw-file reads — NVMe territory, not a network share.
+* **Clean delimited files.** These rates are the native lane. A file that needs footer-dropping or
+  fails a schema resolution falls to a Java lane that runs at roughly a third of them.
+* **Headroom for the console.** Dashboard queries, reconciliations and the assistant share the same
+  cores; the "sized to peak" column already leaves that room, the "100 %" column does not.
+
+Above 32 cores the honest answer is a **measurement on your feeds**, or Enterprise partitioning across
+nodes, which scales the same arithmetic without the single-box ceiling.
+
+> **The rule.** One 8-core node runs the daily CDR volume of a mid-sized operator or the clearing ledger
+> of a retail bank — no cluster. A trillion rows a day is real, and it is an **Enterprise** conversation:
+> on the order of 15–20 partitioned 32-core nodes of the same artifact, writing 100–270 TB of Parquet daily.
+
+### Architectural drivers of sub-microsecond performance
+
+Inspecto delivers high processing density not by managing distributed cluster overhead, but by eliminating it:
+
+* **In-process vectorised execution.** DuckDB runs directly inside the host process space via native JNI
+  bindings. There is zero network serialization, zero inter-process RPC latency, and zero TCP overhead between
+  cluster nodes. The CPU executes vector SIMD instructions directly against data arrays in local memory.
+* **Columnar Appender streaming.** The ingest lane utilizes DuckDB's native columnar `Appender`, streaming
+  decoded records directly into columnar memory buffers (~75× faster than traditional row-by-row JDBC translation).
+* **Columnar Parquet with Hive partition pruning.** Data is stored in standard Hive-partitioned directory
+  structures (`year=/month=/day=`). Analytical and reconciliation queries push filters directly to Parquet page
+  headers, reading only the necessary byte ranges from NVMe storage.
+* **Multi-threaded batch concurrency.** Each batch executes on its own ephemeral DuckDB connection.
+  Configured concurrency (`processing.threads`, defaulting to host CPU cores) divides workloads across available
+  cores cleanly, delivering near-linear scaling without thread contention or distributed consensus locks.
+* **Sub-second interactive BI queries.** Dashboards, KPI cards, and Matrix rollups in the Studio execute
+  SQL directly against warm columnar Parquet files, returning query results in sub-second response times without
+  requiring pre-aggregated OLAP cubes or separate reporting databases.
+* **Bounded, predictable memory footprint.** Processing uses fixed JVM heap allocations and managed native
+  off-heap buffers, eliminating the catastrophic "stop-the-world" garbage collection pauses that plague large
+  distributed JVM engines under skewed data volumes.
+
+---
+
+# 8 · Fault tolerance and disaster recovery
+
+### 8.1 In-process fault tolerance
+* **Crash-isolated batches.** Each batch runs on its own ephemeral DuckDB connection; one feed's failure
+  cannot touch another's.
+* **The markers-last commit order.** Catalog register → manifest → backup originals → **markers → ledger
+  last**. An interruption anywhere leaves no dirty state; the next run resumes idempotently.
+* **Restart as recovery.** Processing is stateless with respect to the JVM. The bundled **service
+  wrapper** (systemd unit; Windows service) restarts a dead process, which re-arms and resumes.
+* **A durable audit trail.** Every audited mutation and every Signal is written to rolling Parquet — and
+  in DR and Enterprise modes to PostgreSQL — so a restart loses nothing an auditor will ask for.
+
+### 8.2 The recovery ladder
+*Targets signed 2026-09-06 as contract service levels (`editions.md` §3.14).*
+
+| Tier | Profile | Edition | RPO | RTO | Mechanism |
+|---|---|---|---|---|---|
+| **T1** | workstation | Personal | ≤ 24 h | ≤ 4 h | daily config backup + local restore |
+| **T2** | single server | Professional | ≤ 1 h | ≤ 1 h | hourly config + daily full (post-checkpoint) + volume snapshot |
+| **T3** | gateway-fronted, multi-team | Enterprise | ≤ 15 min | ≤ 2 h | T2 + Postgres PITR/WAL + off-site copy |
+| **T4** | **active/passive warm standby** | **Professional** | **≤ 5–15 min** | **≤ 30 min** | streaming replica + spaces-tree sync + automatic lease failover |
+| **T5** | partitioned Kubernetes cluster | Enterprise | as T3/T4 | as T3/T4 | shared lakehouse; a lost pod loses nothing committed *(signed design)* |
+
+### 8.3 T4 — fault-tolerant DR in Professional
+* **Two sites, one artifact.** PostgreSQL streaming replication carries operational state; a scheduled
+  `spaces/` tree sync carries the lakehouse.
+* **Automatic failover.** A run lease with a heartbeat means the standby takes over the moment the active
+  node stops renewing — inside the 30-minute RTO, with no runbook step in the critical path.
+* **Backup, verify, restore — as jobs.** Scheduled backup and restore-verification run as ordinary jobs
+  with their own Signals, so a backup that would not restore is an Incident before it is a disaster.
+* **Honest dependency.** DR needs PostgreSQL. Professional without DR needs nothing.
+
+```
+  SITE A (active)                                  SITE B (warm standby)
+ ┌───────────────────────────┐                    ┌───────────────────────────┐
+ │ Inspecto ── lease holder  │                    │ Inspecto ── waits on lease│
+ │  Parquet lakehouse ───────┼── spaces sync ────►│  Parquet lakehouse        │
+ │  PostgreSQL state ────────┼── stream repl ────►│  PostgreSQL replica       │
+ └───────────────────────────┘                    └───────────────────────────┘
+```
+
+---
+
+# 9 · Governance, security and compliance
+
+```
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                        THE SECURITY PERIMETER                          │
+  │  Delegated IAM          │  Zero-egress core       │  Audit trail        │
+  │  · OIDC + PKCE          │  · offline maps + AI    │  · single dispatch  │
+  │  · Keycloak/Okta/Entra  │  · bundled extensions   │  · append-only,     │
+  │  · RBAC · ABAC (Ent.)   │  · EgressGuardTest      │    durable, attributed│
+  │  Secret hygiene         │  Supply chain           │  Write safety       │
+  │  · SecretsProvider seam │  · 95 locked deps       │  · four-stage gate  │
+  │  · no plaintext, ever   │  · CycloneDX + SPDX SBOM│  · path jail        │
+  │  · env/file/keystore/   │  · SHA-256 + GPG signed │  · If-Match         │
+  │    vault (by edition)   │    releases             │    concurrency      │
+  └────────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.1 Observability: end-to-end data lineage, provenance and the Signal ledger
+
+Inspecto provides built-in, native operational and data observability across the entire estate, eliminating the
+need for third-party monitoring agents or separate data lineage catalogues:
+
+* **The unified Signal backbone.** An append-only `EventStore` fed by a synchronous `EventLog` records every
+  operational state change, sequence gap, and threshold crossing as a structured `Signal`. Signals are first-class
+  citizens: queryable via `/signals`, streamable over server-sent events, and exportable for compliance auditing.
+* **Graph-based data lineage.** The metadata catalog automatically derives dependency graphs linking Collectors,
+  raw files, Pipelines, Datasets, Metrics, and Dashboard widgets. The `/lineage` endpoint exposes full upstream
+  and downstream ancestry at both dataset and consignment granularity, allowing operators to immediately evaluate
+  the blast radius of any upstream disruption.
+* **Data provenance and conservation invariants.** Every pipeline run tracks per-node and per-relationship
+  record counts in `DataProvenanceStore`. The platform verifies the conservation invariant ($N_{\text{in}} =
+  N_{\text{out}} + N_{\text{quarantined}} + N_{\text{filtered}}$) across every stage, rendering record counts as
+  visual edge-weight overlays directly on the pipeline canvas.
+* **Transitive staleness propagation.** When an upstream Collector detects a missing file or schema drift, it raises
+  a Signal that traverses the lineage graph, automatically badging downstream Datasets, KPI tiles, and Studio
+  widgets as `stale` with tooltips indicating the root cause (`SIGNAL-STALE-TILES-1`). When upstream commits fresh data,
+  the badges clear reactively without human intervention.
+* **Deterministic causation tracing.** Every Break, Alert, and Incident carries a threaded `causationId` and
+  `correlationId` tracing directly back through the pipeline run to the raw consignment, file name, and row offset,
+  enabling unambiguous root-cause analysis (MTTR/MTTD).
+* **Three-layer audit and telemetry.**
+  1. *Consignment audit ledgers* (`jobs_audit/`) recording execution status and duration;
+  2. *Data-plane provenance rows* capturing per-stage row transformations;
+  3. *Append-only, actor-attributed audit log* (`AuditTrail`) recording mutating `/api/v1` actions and access denials.
+  Operational metrics are exposed via Prometheus `/metrics` (optional module) and authenticated JSON `/metrics/acquisition`.
+* **Incident SLAs and automated sweeps.** Configurable SLA deadlines evaluated every 60 seconds, emitting
+  `OBJECT_SLA_BREACH` and dispatching to notification channels (webhook, email) upon breach, with executive KPI
+  reports tracking MTTR and MTTD trends.
+
+### 9.2 Compliance posture
+*Controls mapped in `compliance/controls-matrix.md`.*
+* **SOC 2 (Trust Services Criteria) — alignment.** CC6.1: credentials resolve at run time through the
+  `SecretsProvider` seam — environment, file, keystore, and vault or cloud key management by edition —
+  never plaintext, and a CI guard fails the build if a credential literal appears. CC6.7: zero telemetry,
+  zero tracking, an enforced lean dependency surface. CC8: **89<!--count:locked-dependencies--> locked third-party dependencies**, a
+  CycloneDX **and** SPDX bill of materials per bundle, SHA-256 checksums and detached GPG signatures on
+  every release.
+* **ISO/IEC 27001:2022 — alignment.** A.8.15–8.17: every state-changing API call passes one dispatch seam
+  (`AuditTrail`) into an **append-only, durable, actor-attributed** audit trail. A.8.2–8.5: authentication
+  delegated to the enterprise identity provider over OIDC with PKCE.
+* **NIST 800-53 / FedRAMP — alignment at the Moderate baseline.** Declarative configuration (`.toon`),
+  input validation at the write gate, and path containment (`PathJail`) against traversal. *Alignment of
+  the implementation statements — not an authorisation programme.*
+
+### 9.3 Write safety, by construction
+Every write to the control plane passes four gates in a fixed order — **write-root 503 → validation 422
+→ path jail 403 → conflict 409** — and only then acts, atomically. Concurrent editors are protected by
+`If-Match` optimistic concurrency, so the last writer never silently wins.
+
+### 9.4 Engineering you can audit
+The trust signal is the build itself: **over 4,000 automated tests** across the reactor, **ten CI guards**
+(secrets, vocabulary, dependency lock, SBOM module coverage, coverage floors, doc links, doc citations,
+doc counts, gate tally, byte hygiene), a versioned `/api/v1` OpenAPI contract enforced by test, and a
+release that is refused if any of them is red.
+
+---
+
+# 10 · Total cost of ownership, maintainability, deployment and evaluation
+
+### 10.1 What you stop paying for
+A structural comparison. Put your own figures against each line — the shape is what changes.
+
+| Cost driver | Multi-vendor stack | Inspecto |
+|---|---|---|
+| Compute | 8–15 VMs across ingest, queue, compute, BI, database, orchestration | 1 node (+1 standby for DR) |
+| Licences | separate ETL, BI, observability, ticketing and graph contracts | one platform licence |
+| Engineering | platform/DevOps engineers to keep the seams alive | a fraction of one data-operations role |
+| Compliance | one review, pen-test and SBOM per vendor | one artifact, one SBOM, one review |
+| Time to first feed | a sprint of integration | one configuration file |
+| Extension | bespoke code at every seam | **44**<!--count:spi-extension-points--> **extension points** plus a services model |
+
+### 10.2 Editions — one codebase, three build flavours
+
+```
+  ┌────────────────────────┐
+  │       ENTERPRISE       │  the cluster: partitioned scale-out on Kubernetes (T5, signed design)
+  │                        │  ABAC tenant isolation · gateway assertion trust · L3 autonomy
+  │                        │  + Postgres SQL/BI query surface over the lakehouse (signed design)
+  └───────────▲────────────┘
+              │
+  ┌───────────┴────────────┐
+  │      PROFESSIONAL      │  operate it, prove it, survive a node:
+  │                        │  OIDC SSO · HTTPS · RBAC · durable attributed audit ·
+  │                        │  Alerts → Incidents → Cases · Geo + Link Analysis ·
+  │                        │  backup/restore · notification channels · cross-Space Exchange ·
+  │                        │  fault-tolerant DR (T4) · Tier B "act with approval"
+  └───────────▲────────────┘
+              │
+  ┌───────────┴────────────┐
+  │        PERSONAL        │  the whole data plane, free, on a laptop:
+  │                        │  acquisition · every parser incl. ASN.1 · lakehouse · Query Library ·
+  │                        │  Studio dashboards · Reconciliation & Breaks · Spaces · Tier A assistant
+  └────────────────────────┘
+```
+
+*Personal finds the problem; Professional owns it; Enterprise scales it.* Reconciliation is free. The moment
+a Break needs an owner, an audit export or a second team, you are in Professional — because that is where
+those modules live. Enterprise adds nothing you must learn twice: the same artifact, as a pod, N times.
+
+### 10.3 Maintainability — zero cluster sprawl and declarative lifecycle
+
+Enterprise operations teams frequently spend more time nursing distributed infrastructure than delivering data
+insights. Inspecto is designed from first principles for radical operational simplicity:
+
+* **Zero cluster sprawl.** Collapses 6–8 separate distributed services (NiFi, Spark, ZooKeeper, Kafka,
+  PostgreSQL, Superset, Airflow, Neo4j) into one ~90 MB binary. Eliminates cross-service network flakiness,
+  version matrix incompatibilities, distributed consensus bugs, and multiple vendor patching cycles. Upgrades
+  are atomic: swap the binary, restart the process, and versioned migrations execute idempotently.
+* **Declarative configuration & GitOps lifecycle.** Everything authored — Collectors, Pipelines, Datasets,
+  Queries, Dashboards, and Alert Rules — is expressed in human-readable, schema-validated `.toon` files and
+  structured metadata. The complete state of a Space exports as a versioned **Metadata Bundle** with automated
+  drift detection, enabling seamless promotion through Dev, Staging, and Production environments via Git pull
+  requests instead of manual UI clicks.
+* **Crash-isolated execution.** Each batch runs on its own ephemeral DuckDB connection. A corrupted file or
+  malformed input is isolated to that specific consignment ledger; healthy feeds continue uninterrupted without
+  affecting adjacent pipelines or the host JVM.
+* **Markers-last atomic resilience.** Transactions adhere to a strict commit order: Catalog register →
+  manifest → backup originals → **markers → ledger last**. If power fails mid-batch, zero dirty state remains,
+  and the next execution resumes idempotently without manual database repair scripts.
+* **Self-healing operational loops.** Timing variances between upstream and downstream feeds generate Breaks
+  that auto-close the moment subsequent runs reconcile the variance. Downstream stale badges automatically clear
+  when fresh data commits. Operators focus exclusively on genuine business discrepancies rather than routine
+  alert noise.
+* **19 clean SPI extension points.** Custom connectors, proprietary parsers, bespoke transforms, and vault
+  integrations plug into formal Java SPIs discovered at startup. Extensions live as separate JARs on the classpath
+  — guaranteeing zero codebase fork debt, smooth version upgrades, and identical security and audit enforcement
+  for all plugins.
+
+### 10.4 Rapid deployment and air-gapped portability
+
+Inspecto eliminates lengthy deployment cycles and complex infrastructure prerequisites:
+
+* **Five-minute operational setup.** Download the ~90 MB binary, unpack, and launch with `./serve.sh` (Linux)
+  or `serve.bat` (Windows). The embedded columnar storage and vectorised compute require zero external
+  databases, message brokers, or storage daemons for Personal and Professional deployments.
+* **Bundled production service wrappers (`DEPLOY-SERVICE-WRAPPER-1`).** Production readiness is built in,
+  not left to bespoke shell scripting:
+  * **Linux:** Generates a hardened `systemd` unit file with automatic restart policies, journald logging
+    integration, and secure sandbox limits.
+  * **Windows:** Bundles a native Windows Service wrapper for enterprise Windows Server environments with
+    auto-start on boot and graceful shutdown handling.
+* **Turnkey Space Templates.** Onboard business verticals in minutes. Apply pre-configured Space Templates
+  containing ready-to-run collectors, parsing schemas, reconciliation rules, KPI queries, and dashboard layouts
+  for standard domains (Telecom CDR Revenue Assurance, Core Banking Ledger Reconciliation, Healthcare Claims
+  Audit, Anti-Money Laundering Link Analysis). New teams spin up in seconds without infrastructure re-provisioning.
+* **100 % sovereign air-gapped readiness.** Built for high-security perimeters where outbound internet access
+  is strictly forbidden. The single artifact pre-bundles all DuckDB engine extensions, offline GIS/MapLibre vector
+  basemaps, and ASN.1 vendor decoders. Zero phone-home telemetry, zero runtime cloud dependencies, continuously
+  enforced by the CI `EgressGuardTest`.
+* **Frictionless scale-out path.** Start on a single analyst laptop (Personal), promote to an enterprise
+  production server with automated active/passive disaster recovery (Professional T4), and scale out horizontally
+  across Kubernetes pods (Enterprise T5) using the exact same core artifact, configuration language, and API surface.
+
+### 10.5 Extend it, or have it extended — what happens when the shelf runs out
+No packaged product covers every estate. Inspecto is built so that what it does not do out of the box is
+reached through **one of three lanes, in order of cost**, with no fork and no integration project:
+
+```
+   LANE 1 · CONFIGURE            LANE 2 · PLUG IN                    LANE 3 · HAVE IT BUILT
+   .toon pipelines · SQL in the   a jar on the classpath implementing  Gamma Analytics builds the
+   Query Library · Space          one of 19 extension points —         plugin or the bespoke feature,
+   Templates · /api/v1            discovered at start-up, no rebuild   ships it in the same artifact
+   ─────────────────────────────  ─────────────────────────────────── ────────────────────────────────
+   hours · your team              days · your team or ours             weeks · ours, one contract
+```
+
+**Lane 1 — configuration.** Most gaps are not gaps. A new feed is a `.toon` file; a new measure, KPI or report
+is a query in the Query Library; a new department is a Space started from a template; a system that needs the
+data pulls it over the versioned `/api/v1`. Nothing is compiled.
+
+**Lane 2 — the 44**<!--count:spi-extension-points--> **extension points.** Every seam where estates differ is a
+Java interface the platform discovers on the classpath at start-up. A plugin jar dropped beside the artifact
+is live on the next start, versioned and audited like the product itself. Grouped by what you would need:
+
+| You need to… | Extension point | What it lets you add |
+|---|---|---|
+| **Bring your own feed** | `CollectorConnectorFactory` | a source protocol beyond SFTP, FTPS, FTP, S3, GCS and JDBC — a message queue, a vendor API, a mainframe transfer |
+| | `DecompressorPlugin` | a proprietary or encrypted archive format in the unpack stage |
+| | `ParserPlugin` | a file format the ten built-in frontends do not read — the ASN.1 vendor decoders already ship through this seam |
+| **Bring your own processing** | `PipelineNodeType` + `PipelineNodeExecutor` (classpath) or `StepExecutor` (pack) | a new pipeline node — a scoring model, a lookup against an external system, a custom transform — with its own attributes in the editor |
+| | `StepKindRegistry` | a new step kind for the flat `steps:` recipe |
+| | `ConsignmentProcessor` | a whole-batch processor for work that does not fit the row model |
+| | `JobTypeProvider` · `MaintenanceTaskProvider` | scheduled jobs and maintenance tasks with declared parameters and Signals, so they appear in the console like built-ins |
+| | `ExpressionProvider` | new words in the job-parameter and trigger vocabulary |
+| **Bring your own operations** | `NotificationChannel` · `DeliveryStatusAdapter` | a delivery channel beyond webhook and email (SMS gateway, a ticketing system) and its delivery-status callback |
+| | `DescriptionProvider` | column and table descriptions from your data catalogue, filled into the metadata graph |
+| | `HostedProviderPlugin` | a model provider for the embedded assistant beyond the bundled local runtimes |
+| **Bring your own security** | `SecretsProvider` | your vault or key-management service as the credential scheme |
+| | `Authenticator` · `AccessDecider` · `TokenRelay` | your identity provider's token shape, your authorisation policy, your gateway's assertion relay |
+| | `RouteModule` | your own authenticated routes under the same `/api/v1`, write gate and audit trail |
+
+Plugins keep the platform's guarantees: they resolve secrets through the same seam, their writes pass the same
+four-stage gate, and their actions land in the same audit trail. A plugin cannot bypass what a human cannot.
+
+**Lane 3 — have it built.** What falls outside both configuration and plugin is built for you: as a plugin
+where the seam exists, as a product feature where it should. It ships inside the same artifact, under the
+same test gates, and where it is generic it joins the product roadmap so you are not the only one carrying it.
+**One vendor, one config, one bill.**
+
+### 10.6 The 60-minute evaluation
+```
+  1. Download the ~90 MB bundle for your edition.
+  2. Launch:   ./serve.sh          (Linux)      or      serve.bat          (Windows)
+  3. Apply the included Space Template, or point a Collector at an existing feed.
+```
+Within the hour: ingest at native speed, watch a reconciliation produce Breaks, open an Incident from one,
+explore the result in a dashboard — and ask the offline assistant why a row was quarantined.
+
+* **Commercial inquiries:** *[commercial contact]*
+* **Documentation and blueprints:** *[documentation URL]*
+* **Vocabulary of record:** `docs/GLOSSARY.md`
+
+---
+
+*Version 1.2 supersedes 1.1 (September 2026). Changes: release basis stated; the edition ladder aligned
+to the signed tier decisions (DR at Professional, Kubernetes at Enterprise); every technical specific verified
+against the codebase or removed; counts derived; measured and projected figures distinguished; the
+security vocabulary aligned to the compliance register.*

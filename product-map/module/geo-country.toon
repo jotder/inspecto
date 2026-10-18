@@ -5,3 +5,4 @@ parent: layer.providers
 module: geo-country
 billable: false
 status: ga
+docs: docs/okf/product/module/geo-country/index.md

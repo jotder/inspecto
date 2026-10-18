@@ -273,7 +273,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     /**
      * One day's received volume for one pipeline, as the completeness KPI reads it
      * (completeness-KPI K1; design of record:
-     * docs/okf/capabilities/observability/observability.md §3.9 — the plan was archived 2026-09-09).
+     * docs/okf/product/module/observability/plan-observability.md §3.9 — the plan was archived 2026-09-09).
      *
      * @param recordDay the event-time day, or {@code null} for the <b>unknown-day</b> bucket — files whose
      *                  {@code record_day} was never established because the write path materialises no event

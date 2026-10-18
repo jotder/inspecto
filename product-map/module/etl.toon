@@ -5,3 +5,4 @@ parent: layer.platform
 module: etl
 billable: false
 status: ga
+docs: docs/okf/product/module/etl/index.md

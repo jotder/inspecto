@@ -4,7 +4,7 @@
 // WHAT IT IS: a zero-dependency matcher. It reads a component list — a CycloneDX SBOM written by
 // tools/sbom.mjs, or tools/dependencies.lock — and matches every Maven coordinate against an OSV-format
 // vulnerability DATABASE SNAPSHOT that is SUPPLIED at a known path. It never touches the network: the
-// snapshot is mirrored on a connected host and carried in (see docs/okf/backend/build-run/operations.md,
+// snapshot is mirrored on a connected host and carried in (see docs/okf/product/layer/platform/admin-guide-launch-flags.md,
 // "Offline vulnerability scan"). No scanner binary is installed; this script is the scanner.
 //
 // Snapshot layout (VULN_DB_DIR, or --db):

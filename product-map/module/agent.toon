@@ -5,3 +5,4 @@ parent: layer.features
 module: agent
 billable: false
 status: ga
+docs: docs/okf/product/module/agent/index.md

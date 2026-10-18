@@ -5,7 +5,7 @@ Usage:  python docs/superpower/assets/pkggraph.py <src-root>
         python docs/superpower/assets/pkggraph.py platform/inspecto-engine/src/main/java
 
 Used to measure and verify the C1/C2 cycle cuts (2026-08-27) and the whole-reactor
-census recorded in docs/okf/backend/modules/reactor.md.
+census recorded in docs/okf/product/layer/platform/architecture-reactor.md.
 
 Deliberate rules (each one exists because a naive version got it wrong here before):
   - strip block comments, line comments AND text blocks BEFORE scanning, so a

@@ -10,3 +10,4 @@ billing:
 support:
   tier: standard
 status: ga
+docs: docs/okf/product/solution-pack/industry-mobile-money/index.md

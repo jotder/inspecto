@@ -19,7 +19,7 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The name-contract check described in {@code docs/okf/backend/pipeline-graph/pipeline-config-keys.md}
+ * The name-contract check described in {@code docs/okf/product/module/config/spec-pipeline-config-keys.md}
  * (provenance only, not maintained: §3.3 of
  * {@code docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md}):
  * per node type, a key the UI declares must be the key the engine reads.

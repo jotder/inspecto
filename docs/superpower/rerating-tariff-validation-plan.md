@@ -1,7 +1,7 @@
 # Re-rating / tariff validation: a "smart" plan
 
 > 🟡 **PLAN 2026-10-18 (`PACK-RERATING-1`): design only, nothing built.** Competitive gap **C** (re-rating / tariff
-> validation) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md): Inspecto has one SQL
+> validation) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../okf/product/layer/product/brochure-competitive-matrix.md): Inspecto has one SQL
 > control in the `telco-ra` Space Template and nothing more, while LATRO, Mobileum, Neural and Araxxe sell re-rating and
 > Subex and TEOCO sell it partially. The row `PACK-PARTNER-SETTLEMENT-1` filed both gap C and gap Q together; this plan
 > takes the **re-rating half**. Gap Q (partner settlement) is planned in a sibling document and is **not** touched here.
@@ -51,7 +51,7 @@ a `-pl` command.
 ## 2. What "smart" means (and what it does not)
 
 Smart here is **deterministic, explainable and recomputable**, the same standard the platform holds Anomaly Scores and
-Risk Scores to ([`okf/backend/control-plane/anomaly-scores.md`](../okf/backend/control-plane/anomaly-scores.md)): every verdict
+Risk Scores to ([`okf/product/module/anomaly/spec-anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md)): every verdict
 stores the numbers it came from, so an auditor can recompute it. **No trained model, no external ML runtime** (recorded
 constraint of [`analytics-core-plan.md`](analytics-core-plan.md) §1). Eight capabilities, each a column or a Dataset, not a service:
 
@@ -77,8 +77,8 @@ kernel later.** Evidence:
 
 | Engine | Can it express re-rating? | Evidence |
 |---|---|---|
-| **SQL controls** (`sql.template`) | **Yes, for everything in S1–S7 except possibly stateful allowances at volume.** | `ra_rerating` already expresses effective dating, ambiguity and tolerance in one statement and is pinned by a golden corpus. The platform already runs the telco-fraud detection windows and the whole `telco-ra` chain as `sql.template` Jobs; layering through Job-written Datasets is the recorded design (it "avoids cycles, hidden cost and lineage ambiguity", [`okf/capabilities/spaces/spaces.md`](../okf/capabilities/spaces/spaces.md) §3.5, business-assurance pack). Window functions cover the allowance running balance (order by `EVENT_TS`, `XDR_ID`; `transform.analytics.running` is a shipped Step if a Pipeline form is wanted). ⚠ **Not yet measured:** allowance state at 10M+ rows (slice R0). |
-| **Reconciliation** | **Half.** Right for *re-rated total vs billed total* per subscriber and month; wrong for pricing. | It compares two or three Datasets at a key grain with `sum` or `count` and `exact` / `absolute` / `percent` tolerance, and gives the Break lifecycle (open, assigned, resolved, `auto_closed`, recurrence), dedupe and Incident promotion ([`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md) §4, §5). It has no arithmetic over rows, so it cannot price. Its strength is exactly the step `telco-ra` lacks: comparing the **independently re-rated** amount, not the rater's own charge, with the invoice. |
+| **SQL controls** (`sql.template`) | **Yes, for everything in S1–S7 except possibly stateful allowances at volume.** | `ra_rerating` already expresses effective dating, ambiguity and tolerance in one statement and is pinned by a golden corpus. The platform already runs the telco-fraud detection windows and the whole `telco-ra` chain as `sql.template` Jobs; layering through Job-written Datasets is the recorded design (it "avoids cycles, hidden cost and lineage ambiguity", [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5, business-assurance pack). Window functions cover the allowance running balance (order by `EVENT_TS`, `XDR_ID`; `transform.analytics.running` is a shipped Step if a Pipeline form is wanted). ⚠ **Not yet measured:** allowance state at 10M+ rows (slice R0). |
+| **Reconciliation** | **Half.** Right for *re-rated total vs billed total* per subscriber and month; wrong for pricing. | It compares two or three Datasets at a key grain with `sum` or `count` and `exact` / `absolute` / `percent` tolerance, and gives the Break lifecycle (open, assigned, resolved, `auto_closed`, recurrence), dedupe and Incident promotion ([`okf/product/module/reconciliation/architecture-overview.md`](../okf/product/module/reconciliation/architecture-overview.md) §4, §5). It has no arithmetic over rows, so it cannot price. Its strength is exactly the step `telco-ra` lacks: comparing the **independently re-rated** amount, not the rater's own charge, with the invoice. |
 | **Expectations** | **Only the tariff-table hygiene that is per row** (rate non-null, rate ≥ 0, plan and service referential). | An Expectation validates records against a Schema; an **overlap or gap between two rows** is a relation, not a record property, so it stays in SQL (S1). |
 | **Decision Rules** | No. | They route and transform records; they are not a pricing or comparison engine. |
 | **Alert Rule + Incident** | Yes, for S8. | `ra_leakage_found` already raises one Alert per control; a `by` on a root-cause column is the same mechanism (to confirm in R0: a high-cardinality `by`, `stormCap`). |
@@ -140,7 +140,7 @@ file itself (`TARIFF_VERSION_ID`, one row per version), which still works and co
 
 Zero-row `schema-seed.parquet` seeds are needed for the Datasets an Alert Rule or KPI reads, because the save gate
 reads the Dataset Schema and every pack Dataset is empty at apply (the `telco-ra` pattern,
-[`okf/capabilities/spaces/spaces.md`](../okf/capabilities/spaces/spaces.md) §3.5).
+[`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5).
 
 ### 5.3 The staged chain
 
@@ -290,17 +290,17 @@ generator is split per feature (disjoint files). Nothing here edits `telco-ra`, 
 - `BACKLOG.md`: a new P3 row **`PACK-RERATING-1`** after `PACK-PARTNER-SETTLEMENT-1` (the re-rating half, split out; the old
   row is left for the Q lane to narrow). Close it when R6 ships; file residuals as their own rows.
 - `INDEX.md`: this plan's row in the in-flight table.
-- On ship (R6): distil as-built facts into [`okf/capabilities/spaces/spaces.md`](../okf/capabilities/spaces/spaces.md) (a new
+- On ship (R6): distil as-built facts into [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) (a new
   subsection beside §3.5), add a solution page under `stakeholders/solutions/`, update the matrix row C, then `git mv` this
   plan to `archived-documents/plans-archive/`.
 
 ## References
 
-- Matrix: [`stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md) rows C and Q.
-- Revenue assurance pack: [`stakeholders/solutions/revenue-assurance.md`](../stakeholders/solutions/revenue-assurance.md).
-- Reconciliation module: [`stakeholders/modules/reconciliation.md`](../stakeholders/modules/reconciliation.md); uplift plan
+- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows C and Q.
+- Revenue assurance pack: [`okf/product/solution-pack/business-assurance/architecture-revenue-assurance.md`](../okf/product/solution-pack/business-assurance/architecture-revenue-assurance.md).
+- Reconciliation module: [`okf/product/module/reconciliation/architecture-overview.md`](../okf/product/module/reconciliation/architecture-overview.md); uplift plan
   [`reconciliation-uplift-plan.md`](../archived-documents/plans-archive/reconciliation-uplift-plan.md).
-- Analytics Kernel: [`okf/backend/analytics-kernel.md`](../okf/backend/analytics-kernel.md); [`analytics-core-plan.md`](analytics-core-plan.md).
+- Analytics Kernel: [`okf/product/module/analytics/spec.md`](../okf/product/module/analytics/spec.md); [`analytics-core-plan.md`](analytics-core-plan.md).
 - Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).
 
 ## 12. Measurements (filled by slice R0)

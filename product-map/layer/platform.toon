@@ -3,3 +3,4 @@ kind: layer
 title: Platform
 billable: false
 status: ga
+docs: docs/okf/product/layer/platform/index.md

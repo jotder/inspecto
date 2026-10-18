@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * <p><b>Enable it</b> by naming a provider — with neither property nor env var, every test SKIPS, and the
  * skip message says exactly how to turn it back on rather than passing quietly
- * ({@code okf/backend/build-run/guard-coverage.md}):
+ * ({@code okf/product/layer/platform/tests-guard-coverage.md}):
  *
  * <pre>{@code
  * -Dinspecto.test.oidc.issuer=https://localhost:9443/oauth2/token   (or INSPECTO_TEST_OIDC_ISSUER)

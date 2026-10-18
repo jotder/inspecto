@@ -5,3 +5,4 @@ parent: layer.features
 module: scoring
 billable: false
 status: ga
+docs: docs/okf/product/module/scoring/index.md

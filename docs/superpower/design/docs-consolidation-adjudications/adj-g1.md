@@ -365,7 +365,7 @@ an explicit ⚠ **Superseded** banner at `:131-133` and is correctly labelled hi
 
 ## Edit A — rows 1.1 + 1.2
 
-FILE: docs/okf/frontend/features/pipeline-editor.md
+FILE: docs/okf/product/module/etl/user-guide-pipeline-editor.md
 OLD:
 ```
 - **The pane (SQL-first, operator instruction 2026-09-04 — supersedes D5/D6):** one SQL `<textarea>`
@@ -393,7 +393,7 @@ NEW:
 
 ## Edit B — row 1.1 (the prohibition)
 
-FILE: docs/okf/frontend/features/pipeline-editor.md
+FILE: docs/okf/product/module/etl/user-guide-pipeline-editor.md
 OLD:
 ```
 - ⚠ `sql` is the single `NodeAttributes` entry; the engine reads nothing else. Do not add an authoring
@@ -412,7 +412,7 @@ NEW:
 
 ## Edit C — row 1.3
 
-FILE: docs/okf/frontend/features/schema-mapping-authoring.md
+FILE: docs/okf/product/module/etl/user-guide-schema-mapping.md
 OLD:
 ```
 - **No dedicated expression-builder UI exists anywhere** — no function picker, no column-picker-into-EXPR,
@@ -445,7 +445,7 @@ NEW:
 
 ## Edit D — row 1.4 (frontmatter)
 
-FILE: docs/okf/frontend/features/schema-mapping-authoring.md
+FILE: docs/okf/product/module/etl/user-guide-schema-mapping.md
 OLD:
 ```
 description: End-user authoring path for a dataset's schema (the redesigned Parse pane), the SQL-first transform.sql pane, the legacy transform.map rule grid, and transform.join lookup config — with the 2026-09-03 gap list annotated by what the redesign closed, absorbed or dropped.
@@ -459,7 +459,7 @@ resource: inspecto-ui/src/app/modules/admin/pipelines/pipeline-transform-sql-def
 
 ## Edit E — row 1.4 (`:25-26`)
 
-FILE: docs/okf/frontend/features/schema-mapping-authoring.md
+FILE: docs/okf/product/module/etl/user-guide-schema-mapping.md
 OLD:
 ```
 > that still exist — `SchemaEditorDialog`, the `transform.map` rule grid and the `transform.join` form
@@ -475,7 +475,7 @@ NEW:
 
 ## Edit F — rows 1.2 + 1.4 (the fourth account)
 
-FILE: docs/okf/frontend/features/index.md
+FILE: docs/okf/product/index.md
 OLD:
 ```
 * [Schema, Mapping & Transformation authoring](schema-mapping-authoring.md) - §0 the `transform.sql` Transform pane as built 2026-09-04 (Simple fields grid with five verbs that GENERATES the SQL, Advanced SQL that locks the Step, `{ sql, fields? }`, preview reuse — and what was deliberately not built), then the schema editor, the legacy `transform.map` rule grid and `transform.join` form; the 2026-09-03 gap list annotated with what the redesign closed/absorbed/dropped. The redesigned Parse pane itself is in [grammar-config](grammar-config.md).
@@ -487,7 +487,7 @@ NEW:
 
 ## Edit G — row 1.4 (the `pipeline-editor.md` mirror; the RULE survives)
 
-FILE: docs/okf/frontend/features/pipeline-editor.md
+FILE: docs/okf/product/module/etl/user-guide-pipeline-editor.md
 OLD:
 ```
 - The Load pane authors all four `TransformCompiler` types; a transform type it has never heard of
@@ -505,7 +505,7 @@ NEW:
 
 ## Edit H — row 1.5
 
-FILE: docs/okf/frontend/features/grammar-config.md
+FILE: docs/okf/product/module/config/user-guide-grammar-config.md
 OLD:
 ```
 - **ONE columns table — "Columns that come out"** (R11; `schema-fields-editor.component.html`): Use · `#` ·
@@ -522,7 +522,7 @@ NEW:
 
 ## Edit I — rows 1.6 (+ the one wrong pager number of 1.7)
 
-FILE: docs/okf/frontend/features/grammar-config.md
+FILE: docs/okf/product/module/config/user-guide-grammar-config.md
 OLD:
 ```
 > ⚠ **Amended 2026-09-04 by D8–D10 (decided, NOT built)** — see
@@ -548,7 +548,7 @@ NEW:
 
 ## Edit J — row 1.6 (same error, second file)
 
-FILE: docs/okf/frontend/features/schema-mapping-authoring.md
+FILE: docs/okf/product/module/etl/user-guide-schema-mapping.md
 OLD:
 ```
 Search over name and synonym; view-only filter chips **with counts**; a page-size choice that reaches
@@ -565,7 +565,7 @@ is the question a wide schema asks. ⚠ The two grids deliberately **do not** sh
 
 ## Edit K — row 1.9 (`pipeline-editor.md`, the stale list)
 
-FILE: docs/okf/frontend/features/pipeline-editor.md
+FILE: docs/okf/product/module/etl/user-guide-pipeline-editor.md
 OLD:
 ```
 - **Custody split**: a per-format parse Step (`PARSE_NODE_FRONTENDS`) defines in the right-dock
@@ -584,7 +584,7 @@ NEW:
 
 ## Edit L — row 1.9 (`grammar-config.md:118-121`)
 
-FILE: docs/okf/frontend/features/grammar-config.md
+FILE: docs/okf/product/module/config/user-guide-grammar-config.md
 OLD:
 ```
 - **Dialog custody unchanged** (R7): `openNodeConfig` (`pipeline-editor.component.ts:2126-2154`) already
@@ -604,7 +604,7 @@ NEW:
 
 ## Edit M — row 1.9 (`grammar-config.md:242-244`)
 
-FILE: docs/okf/frontend/features/grammar-config.md
+FILE: docs/okf/product/module/config/user-guide-grammar-config.md
 OLD:
 ```
 `GrammarEditorDialog` is left with two jobs: a **dangling** `use: grammar/<id>` whose component does not
@@ -630,7 +630,7 @@ the binary case is a deliberate keep. The binary case (`record: bytes`, detected
 
 ## Edit N — row 1.10 (`:338`)
 
-FILE: docs/okf/frontend/features/pipeline-editor.md
+FILE: docs/okf/product/module/etl/user-guide-pipeline-editor.md
 OLD:
 ```
   `Parse sample` lives in the sample strip; the FIRST derivation steers to the Types & columns tab;
@@ -645,7 +645,7 @@ NEW:
 
 ## Edit O — row 1.10 (`:368`)
 
-FILE: docs/okf/frontend/features/pipeline-editor.md
+FILE: docs/okf/product/module/etl/user-guide-pipeline-editor.md
 OLD:
 ```
 read-only in the Types tab and Column metadata list (it IS an output column, stamped at write

@@ -1,4 +1,4 @@
-"""Sequence diagram for docs/stakeholders/solutions/journey-file-to-dashboard.md (SOLUTION-SUITE-DOCS-1)."""
+"""Sequence diagram for docs/okf/product/layer/product/architecture-journey-file-to-dashboard.md (SOLUTION-SUITE-DOCS-1)."""
 import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from svglib import Svg
 
 ACTORS = [('Remote store','gray'),('Collector','teal'),('Stage-1 ingest','teal'),('Lakehouse','teal'),('Pipeline Run','teal'),('Dataset','blue'),('Dashboard','blue')]
@@ -21,4 +21,4 @@ for i, (a, b, label, dash) in enumerate(MSGS):
     else:
         s.arrow(x1, y, x2 - (6 if x2 > x1 else -6), y, dash)
         s.text(min(x1, x2) + 6, y - 5, f'{i + 1}. {label}', size=10.5)
-s.save('docs/stakeholders/solutions/assets/journey-file-to-dashboard.svg')
+s.save('docs/okf/product/assets/journey-file-to-dashboard.svg')

@@ -37,7 +37,7 @@ export function toToon(item) {
 /** Everything the seed derives, as { '<kind>/<name>': item }. Pure apart from reading the repo. */
 export function seed(root) {
     const items = {};
-    const docFor = (dir, name) => (existsSync(join(root, 'docs', 'stakeholders', dir, `${name}.md`)) ? `docs/stakeholders/${dir}/${name}.md` : undefined);
+    // `docs:` is not seeded: tools/render-product-docs.mjs writes each item's hub and points `docs:` at it (PRODUCT-DOCS-HUB-1).
     const put = (kind, name, item) => { items[`${kind}/${name}`] = { id: `${kind}.${name}`, kind, ...item }; };
 
     const files = execFileSync('git', ['ls-files', '*META-INF/inspecto/module.toon'], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean);
@@ -47,8 +47,7 @@ export function seed(root) {
         const m = parseToon(readFileSync(join(root, f), 'utf8'));
         if (!items[`layer/${layer}`]) put('layer', layer, { title: LAYER_TITLE[layer] ?? layer, billable: false, status: 'ga' });
         put('module', m.id, {
-            title: unquote(m.title) || m.id, parent: `layer.${layer}`, module: m.id, billable: false, status: 'ga',
-            docs: docFor('modules', m.id),
+            title: unquote(m.title) || m.id, parent: `layer.${layer}`, module: m.id, billable: false, status: 'ga'
         });
     }
 
@@ -68,7 +67,7 @@ export function seed(root) {
             put('addon', name, {
                 title: name.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()), offeringAddon: name, billable: true,
                 orderCode: code('AO', kebab(name)), enforcement: shared(a) || a.status !== 'built' ? 'contract' : 'build', billing: { model: 'flat' }, support: { tier: 'standard' },
-                status: a.status === 'built' ? 'ga' : 'planned', docs: docFor('modules', kebab(name)),
+                status: a.status === 'built' ? 'ga' : 'planned',
             });
         }
     }
@@ -80,8 +79,8 @@ export function seed(root) {
         const sold = offerings.some((o) => (o.contentPacks ?? []).includes(t));
         put('solution-pack', t, sold
             ? { title: unquote(name) || t, template: t, billable: true, orderCode: code('SP', t), enforcement: 'build', billing: { model: 'flat' },
-                support: { tier: 'standard' }, status: 'ga', docs: docFor('solutions', t) }
-            : { title: unquote(name) || t, template: t, billable: false, status: 'preview', docs: docFor('solutions', t) });
+                support: { tier: 'standard' }, status: 'ga' }
+            : { title: unquote(name) || t, template: t, billable: false, status: 'preview' });
     }
     const ipacks = execFileSync('git', ['ls-files', '*META-INF/inspecto/industry-packs/*'], { cwd: root, encoding: 'utf8' })
         .split('\n').filter(Boolean).map((p) => /industry-packs\/([^/]+)\//.exec(p)?.[1]).filter(Boolean);

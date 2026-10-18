@@ -5,3 +5,4 @@ parent: layer.la
 module: la-core
 billable: false
 status: ga
+docs: docs/okf/product/module/la-core/index.md

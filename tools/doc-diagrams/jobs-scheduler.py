@@ -17,4 +17,4 @@ s.box(720, 220, 200, 60, 'blue', 'Run Log + Artifacts', 'jobs_runs.csv, Signals'
 s.arrow(670, 140, 720, 70)
 s.arrow(670, 160, 720, 160, dash=True, label='dryRun')
 s.arrow(670, 180, 720, 250)
-s.save('docs/stakeholders/modules/assets/jobs-scheduler.svg')
+s.save('docs/okf/product/assets/jobs-scheduler.svg')

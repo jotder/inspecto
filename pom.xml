@@ -133,7 +133,7 @@
                      ⛔ /queues was in this cell when it was written (2026-09-08) and is NOT any more:
                      RETIRE-HALVES-1 deleted QueueRoutes/QueueRouter/QueueStore and the *_queue.toon
                      config kind outright on 2026-09-14 (commit 519673a7 — whose message describes only
-                     a whitepaper change; see okf/backend/control-plane/api-stability.md). The module's
+                     a whitepaper change; see okf/product/module/api/plan-api-stability.md). The module's
                      RouteModule service file lists ObjectRoutes, NoteRoutes and TagRoutes only.
                      ⚠ Amends OPS-01 (drops `objects` from Basic's stores) and SP-CTL-02 (a gap raises
                      the EVENT on Basic but no ALERT object). ⛔ NOT /alerts* — that is AlertsService

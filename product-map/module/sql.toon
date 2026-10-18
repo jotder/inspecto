@@ -5,3 +5,4 @@ parent: layer.platform
 module: sql
 billable: false
 status: ga
+docs: docs/okf/product/module/sql/index.md

@@ -66,7 +66,7 @@ export type SampleMode = 'own' | 'host';
 /**
  * THE Grammar editor — one surface for authoring how raw bytes become rows, shared by the Onboarding
  * Parsing stage and the Pipelines parse node. Before this existed the two were separate
- * implementations over separate stores; see `docs/okf/frontend/features/grammar-config.md`.
+ * implementations over separate stores; see `docs/okf/product/module/config/user-guide-grammar-config.md`.
  *
  * <p>**Canonical vocabulary:** this authors a **Grammar** (`docs/GLOSSARY.md` §Grammar). Never call it
  * "parser config" or "parse options" in UI copy — those are banned synonyms. *Parser* is the engine

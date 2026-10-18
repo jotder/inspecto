@@ -22,7 +22,7 @@ import java.util.List;
  * to drift. Do not move them up.
  *
  * <p>Both rules are measured facts about DuckDB, not style choices — see
- * {@code okf/backend/engine/duckdb.md} §<i>The source time zone for temporal data</i>.
+ * {@code okf/product/module/engine/spec-duckdb.md} §<i>The source time zone for temporal data</i>.
  */
 public final class SourceZoneGrammar {
 

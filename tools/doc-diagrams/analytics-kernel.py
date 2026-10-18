@@ -18,4 +18,4 @@ s.box(720, 220, 200, 56, 'purple', 'Link Analysis', 'profile, quantiles')
 for y in (88, 168, 248):
     s.arrow(220, y, 265, y)
     s.arrow(720, y, 675, y)
-s.save('docs/stakeholders/modules/assets/analytics-kernel.svg')
+s.save('docs/okf/product/assets/analytics-kernel.svg')

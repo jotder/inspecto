@@ -3,3 +3,4 @@ kind: layer
 title: Service contracts (SPI)
 billable: false
 status: ga
+docs: docs/okf/product/layer/spi/index.md

@@ -1,0 +1,346 @@
+---
+type: Feature
+title: Incidents & Cases (Objects)
+description: Operational objects in a mail-like 3-pane UI — one ObjectMailComponent serving /incidents and /cases via route data, with workflow-driven lifecycle, tags, and case management.
+resource: inspecto-ui/src/app/modules/admin/objects/object-mail.component.ts
+tags: [feature, objects, incidents, cases, operations, mail-ui, workflow]
+timestamp: 2026-07-16T00:00:00Z
+---
+
+# Incidents & Cases (Objects)
+
+Routes `/incidents` and `/cases` (Operations nav group) — a single `ObjectMailComponent` parameterized by
+route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
+[pane-reuse pattern](../../layer/product/spec-routing-navigation.md). The chain is **Alert → Incident → Case**
+([`GLOSSARY.md`](../../../../GLOSSARY.md) §9) — never "Issue". Backed by `ObjectsService`; offline via the
+the real ControlApi.
+
+* **Mail shell** — Gmail-metaphor 3 panes: folder nav (My Incidents / Escalated / Identified / Diagnosing /
+  Resolved / Archived + Tags) · list · detail panel; both side panes resize via the shared
+  `InspectoSplitDirective`. High volume loads honestly via the data-table's
+  [Load more strip](../../layer/product/spec-ds-data-table.md).
+  * The pinned "assigned to me" folder is named per type by `mineFolder()` in `mail-model.ts` — **My
+    Incidents** on `/incidents`, **My Cases** on `/cases`. ⚠ It was one literal "My Cases" on both panes
+    until 2026-09-26 (telco demo review): Incident and Case are distinct concepts (GLOSSARY §9).
+  * **"Me" is the signed-in Subject** — `currentOperator(SessionService.actor())`, falling back to the
+    Personal placeholder (`inspecto.operator` / `operator`) only when no one is signed in. 🔴 Until
+    2026-09-26 it was the placeholder everywhere: nothing in the SPA writes that key, so on OIDC or Demo User
+    sign-in the Mine folder matched no one and the create dialog offered "operator" as an assignee. The mail
+    pane reads it through a getter, so the folder counts follow the session.
+  * **Landing folder** — with no explicit choice (there is no folder in the URL and none remembered, so
+    only a click counts), the pane lands on the default (Identified / the workflow's `initial`) while it has
+    items, else the first non-empty folder in display order, else the default. Counts are client-side over
+    the one list fetch — no per-folder request. It runs once after the first load (and again when the
+    served CASE workflow lands after the list), never on Refresh; a folder or tag click always wins.
+* **Lifecycle** — `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED` (+ reopen → Diagnosing); priority
+  ladder Critical · Major · Minor · Low. The UI reads **`GET /workflows/{type}`** (BFS-ordered states)
+  instead of hardcoding transitions, so TOON-overridden workflows drive the same panes. Resolve requires
+  a resolution comment; a soft resolution-readiness warn checks timeline/cause-analysis/corrective
+  actions — a *mirror* of the **server-side hard gate** (I1, 2026-07-24: `ObjectService.commit` rejects
+  `INCIDENT → RESOLVED` with the same four checks; this line called it "a documented follow-up" until 2026-09-08).
+* **Create contract (product sign-off + enforced 2026-07-22)** — assignment is **direct**: an `assignee`,
+  optional at creation, settable at triage; queue-based routing is deferred (no multi-analyst consumer yet).
+  Mandatory at creation: **title** (400) **+ at least one linked entity** (a case/incident with nothing
+  linked isn't useful). `POST /objects` now takes a `links:[{to,relationship?}|id…]` array (≥1); the route
+  validates every target exists *before* `open()` so a dangling link can't orphan the object, then links
+  after opening — empty/absent `links` → 400, an unknown target → 404, `relationship` defaults to
+  `RELATED_TO` (`ObjectRoutes.createObject`). The create dialog collects them via a required "Linked
+  entities" multi-select + relationship select (`object-create.dialog`; a case defaults to `CONTAINS`, an
+  incident to `RELATED_TO`). **Unaffected:** the
+  auto-creation paths (`AlertService`/`DecisionRoutes`/`ExpectationRoutes`/`ReconRunJob`; `AlertService` and the Event bridge write the Alert store since 2026-10-08)
+  open objects directly via `ObjectService.open`, bypassing the route. **Bootstrap consequence:** the first
+  object in an empty space must come from an auto-creation path — there is nothing to link to yet, so the
+  dialog shows a "no existing objects to link to" hint and blocks manual creation until one exists.
+* **Lifecycle verbs are gated on `canWorkIncidents`** (operator, 2026-09-26) — Accept / Resolve / Reopen /
+  Archive, the Case workflow verbs (toolbar, detail panel, `/objects/{id}` page) render only with
+  `LensService.canWorkIncidents()` (identity capability, action node `incidents.work`), the grant the server
+  demands on `ack` / `resolve` / `transition` / `assign`. Accept self-assigns through `POST /objects/{id}/assign`,
+  not the `canAdminister` PATCH. ⚠ Priority, the Incident Escalate flag, tagging and merge are not these verbs
+  and keep their own gates (the PATCH and merge are `canAdminister` server-side, not hidden client-side).
+* **Triage is optimistic** — every bulk verb (accept / resolve / archive / reopen / escalate /
+  prioritize / tag / case actions) patches the loaded rows + open detail to the expected post-state,
+  then reconciles each row with the authoritative server object; failures reload
+  ([forms & state](../../layer/product/spec-forms-state.md)). Merge/split/create stay request→refetch.
+* **Tags & Tag Rules** — `/tags` + `/tags/rules`, auto-applied when an object opens; TOON-persisted,
+  survive restart. **Scope note (2026-07-25):** this is an *object-scoped* tag system — the registry and the
+  rules both assume the tagged thing is an Incident/Case. BACKLOG **D7** decided tags become a **generic
+  cross-entity** grouping concept (streams, Alert Rules, datasets, …) backed by a central registry plus a
+  `(tag, entity_kind, entity_id)` assignment store, i.e. **this system generalized**, not a second one built
+  beside it. ⚠ Note for anyone reading the old backlog row: its claim that "nothing writes `attributes.tags`"
+  was **simply false** — `ObjectService.ATTR_TAGS` (`= "tags"`) is written on manual apply, tag-rule merge,
+  rule-raised creation, merge union, and split. The narrow `GET /objects` tag filter that row dismissed as
+  "would silently match nothing" would in fact have worked. **D7 SHIPPED end-to-end 2026-07-26** — the
+  generalization landed, `attributes.tags` is now a **projection** of the central assignment store rather
+  than storage, and the cross-kind surface lives in the `/tags` pane. The mail pane's tag menu is still the
+  only place a tag is *applied*; as-built:
+  [`../processor/spec-tags.md`](../processor/spec-tags.md).
+* **Case management** — case **Contents** (member incidents) with **Split & Merge**; variable **Cause
+  Analysis** (`postmortem.causeAnalysis[]` + `causeMethod`); **Findings** (disposition/impact/records,
+  soft no-disposition prompt); team `assignees` + `targetDate`. **Rule-raised cases**: `CaseRule`
+  (`/cases/rules`, evaluate-on-demand, opens-or-attaches idempotently); **case analytics** via
+  `GET /objects/analytics?type=` (stat tiles + by-category bar; Studio-dataset binding is a follow-up).
+* **Impact + Disposition (WS-10, `ASSURE-IMPACT-LEDGER-1`, 2026-09-26).** `ImpactPanelComponent`
+  (`objects/impact-panel.component.ts`) shows an Incident's or Case's typed impact — suspected · confirmed ·
+  recovered · prevented, currency, period, basis — and the **server-derived** `outstanding` (read from the
+  object's top-level `impact` block; the form's own "outstanding" is a live preview only). With
+  `LensService.canWorkIncidents()` it edits through `ObjectsService.saveImpact` → `PUT /objects/{id}/impact`,
+  sending amounts as exact decimal strings and never `outstanding`; a 422 / 409 renders as an inline
+  `<inspecto-alert>`, no edit is offered on an `ARCHIVED` Incident, and on a RESOLVED Incident / CLOSED Case
+  (`lateOnly`) only Recovered and Prevented stay enabled — the server's late-recovery rule.
+  Mounted in the mail detail panel (`postmortem-panel`, above the Findings / postmortem) and on the detail
+  page's Overview (`[headingLevel]="2"` there — axe `heading-order`). ⚠ The currency-required rule is a
+  GROUP validator, which never puts the field into an error state, so its message is an explicit
+  `role="alert"` line, not a `<mat-error>`. **Resolve asks the Disposition for Incidents**: `ResolveDialog`
+  takes `askDisposition` and closes with `{comment, disposition?}`; the mail view's bulk resolve and the
+  detail page's Resolve both pass it to `transition(id, 'resolve', actor, disposition)`. The ladder is
+  `incident-disposition.ts` (`DISPOSITIONS`, the `incident-taxonomy.ts` shape), mirroring the server's
+  `FindingsSpec.DISPOSITIONS`. The Case analytics dialog shows *Confirmed (CUR)* / *Outstanding (CUR)* per
+  currency from `impact.byCurrency`. Specs: `impact-panel.component.spec.ts`, `resolve.dialog.spec.ts`,
+  `case-analytics.dialog.spec.ts`.
+  **Browser pass 2026-09-28** (`ASSURE-IMPACT-LEDGER-RESIDUALS-1` (4), a Personal-flavour server + `inspecto-ops`
+  on the classpath, driven in the Browser pane) found and fixed three defects: 🔴 **a late recovery could never
+  be saved** — the currency-required GROUP validator read `form.value`, which omits disabled controls, and a
+  late recovery disables currency, so it always said "a currency is required"; it and the outstanding preview
+  now read `getRawValue()`. 🔴 **amounts round-tripped through a `double`** — `ObjectImpact` amounts are now the
+  server's exact decimal strings, used verbatim as the edit's starting values (`Number()` only to format).
+  🔴 **the detail page offered no action on any Incident** — its hand-kept table named OPEN/ASSIGNED/IN_PROGRESS;
+  `ObjectDetailComponent` now reads `GET /workflows/{type}` (fallback: the server's built-in lifecycles). And
+  both resolve paths now honour the server's hard I1 gate: an Incident missing part of its resolution pattern
+  is named and left out, never offered "resolve anyway?" (`incidents.md` §4, 2026-09-28). Verified live:
+  record impact (currency refusal inline, then saved with the server's outstanding), resolve with a
+  Disposition from the mail view and from the detail page, and a late recovery on a RESOLVED Incident.
+* **Configurable Findings sections (C3 / BACKLOG D6) — SHIPPED end-to-end 2026-07-26.** The Findings field
+  set is deployment-authored: a **`findings-spec` ComponentStore kind** (one per `ObjectType`, id = the
+  lowercased type) resolved and served by **`GET /findings/{type}`**, rendered by `<inspecto-schema-form>`.
+  Since 2026-10-06 a Case type may add its own (`case.<caseType>`, optional; see `incidents.md`), and the
+  mail pane binds `detailFindingsSpec()`: the open Case's type spec when served, else the generic one.
+  Absent a component, `FindingsSpec.defaultFor()` serves today's exact shape
+  (disposition/recordsAffected/summary since WS-10 — `impactAmount` retired 2026-09-26, the Case's money is
+  its typed impact below — all `tier:'required'` + `required:false` — always
+  visible, never mandatory), so an unconfigured deployment is byte-for-byte unchanged. A present spec
+  **fully replaces** the default for its type; field-level merge is unsupported on purpose because it makes
+  "remove a section" inexpressible. Full rationale + the rejected alternatives:
+  [`plans-archive/findings-spec-plan.md`](../../../../archived-documents/plans-archive/findings-spec-plan.md).
+  **Writing a spec needs `canManageIncidents`, not `canAuthorWorkbench`** (D1 = (b), operator 2026-09-25):
+  the Case desk that resolves Cases authors its Findings, so `operations`/`support`/`admin`/`power` may save
+  one and the builder roles may not; every other component kind is unchanged
+  ([auth-security.md](../access/admin-guide-auth-security.md) has the route shape).
+  **Saving the values is collaboration (operator 2026-09-25)** — open to anyone who can see the Case, like a
+  comment, through its own route **`PUT /objects/{id}/findings {findings:{…}}`** (`ObjectRoutes.saveFindings`
+  → `ObjectService.saveFindings`). `PATCH /objects/{id}` stays `canAdminister` because it also edits priority /
+  severity / assignee, so the Findings save could not ride it. The route writes **only** the blob and its flat
+  copies, refuses any other body key (422 — it is not a way round the PATCH), keeps the scope guard's 404, and
+  audits an `OBJECT_ACTIVITY` event (`action: findings`, actor = the authenticated Subject). The flat
+  `recordsAffected` copy is now **derived on the server** from the blob (`""` when absent; the `impactAmount` copy
+  went with WS-10, 2026-09-26),
+  where the panel used to compute them. The panel's **team + target date** (C6) still go on the PATCH, and
+  only when that form was edited — so a viewer's Findings save succeeds, and their team edit would 403.
+  Pinned by `ControlApiFindingsWriteTest` (real scoped Subject without `canAdminister`).
+  **Values are validated too, since 2026-07-26** — `FindingsSpec.validateFindings(findings, previous)`,
+  called from `ObjectRoutes.validateFindings` on `PUT /objects/{id}/findings` and `PATCH /objects/{id}` (→ **422**): `select` membership,
+  `number` with `min`/`max`, `boolean`, and `pattern`; a section hidden by its `dependsOn` is skipped
+  entirely (the form never showed it, so it cannot be required). Four rules are load-bearing:
+  * **The `attributes.findings` JSON blob is the canonical home of Findings values** (D3 = (a), operator
+    2026-09-25 — no migration). Only a patch carrying `findings` is judged, and the blob is judged **as it
+    will be stored** (it replaces the stored one whole). 🔴 Until 2026-09-25 the gate judged **top-level**
+    attribute keys, where the panel never writes a Findings value: the panel's own saves were never
+    type-checked, and because it also sends the flat `impactAmount`/`recordsAffected` copies, a spec with a
+    `required: true` section refused **every correctly filled panel save** with 422 (reproduced by
+    `ControlApiFindingsSpecTest.theFindingsPanelsOwnSaveIsAcceptedWhenARequiredFieldIsFilled`). Top-level
+    keys — the flat copies included — are now ordinary attributes.
+  * **An undeclared key is never rejected** (inside the blob or out). `attributes` is a *shared* bag (it
+    also carries `tags`, `caseType`, `dueAt`, …), and a blob key no section declares is how a **removed**
+    field's stored value survives (D7).
+  * **An unchanged stored value is not re-judged.** The panel re-sends the whole blob on every save, and a
+    spec edit (a removed choice, a tightened bound) keeps the values Cases already hold; re-judging them would
+    refuse an edit to some *other* field on that Case. A changed value is always judged.
+  * **The gate is in `ObjectRoutes`, not `ObjectService`** — the spec lives in the space's `ComponentStore`,
+    an edge concern; the engine stays store-agnostic. `effectiveFindingsSpec` was extracted out of
+    `findingsSpecOf` so the read route and the write gate resolve the same spec exactly once.
+  `autocomplete` options stay *suggestions*, never a closed set — only `select` is closed.
+  ⚠ **Two premises in D6's wording were wrong** — if you remember the old framing, re-read this:
+  * *"Reuse the C6 workflow/TOON pattern"* — **not viable.** `*_workflow.toon` is a **boot-time scan of CLI
+    path arguments** (`ServiceBootstrap.resolveBySuffix`), with no write root, no CRUD and no hot reload;
+    cloning it would have shipped a config surface an operator cannot edit through the product. The
+    ComponentStore kind was chosen instead, and **still adds no endpoint** (D6's actual constraint) because
+    `/components/{type}` CRUD is generic — the kind inherits create/update/delete, ETags and version
+    history, joining the idiom `alert-rule`/`notification-rule`/`expectation` already use.
+  * *"the `attribute-spec` renderer"* — that is the **frontend** `<inspecto-schema-form>` driven by
+    `AttributeSpec[]`, **not** backend `ConfigSpecs`/`FieldSpec` (compiled-in Java for nine pipeline/Studio
+    config types, not runtime-authorable). Sections are therefore authored in the `AttributeSpec`
+    vocabulary and served verbatim; `ConfigSpecs` is deliberately untouched, since mapping the two shapes
+    (`path` vs `key`, `enumValues` vs `options`, `visibleWhen` vs `dependsOn`, no `tier` at all) would be
+    lossy for zero reuse.
+  * ⚠ **That canonical-frontend-shape choice is paid for by a hand-kept backend mirror, so it is pinned by
+    a cross-language contract test** (2026-08-15, the `MeasureCompiler.AGGS` idiom). One committed
+    artifact, `inspecto-ui/src/app/inspecto/contracts/attribute-spec.contract.json`, is compared by `FindingsSpecContractTest`
+    (Java) and `attribute-spec.contract.spec.ts` (TS), so neither side moves alone. Drift used to be
+    silent in the worse direction: a type added only in TypeScript makes the server **422 a section the
+    renderer could have drawn**, with an error naming a control the author's own form offers. The unions
+    are DERIVED from exported `ATTRIBUTE_TYPES`/`ATTRIBUTE_TIERS` arrays so the vocabulary is enumerable
+    at run time; `ATTRIBUTE_KEYS` comes from a `Record<keyof Required<AttributeSpec>, true>`, so adding a
+    field to the interface **fails to compile** until it is classified.
+  * ⚠ **`group` and `secret` are frontend-only** — on `AttributeSpec` but absent from
+    `FindingsSpec.SECTION_KEYS`, so authoring `group:` on a findings-spec is a 422 even though the form
+    would render it. Deliberate rather than accidental now: `secret` on a Findings value would be
+    misleading (it is stored and returned in `attributes` regardless), and `group` is an unasked-for
+    widening. The contract's `frontendOnlyKeys` records the pair and the Java side asserts the parser
+    really refuses them.
+  * **Validation is fail-closed at authoring time (422)** via a per-kind hook in `ComponentRoutes.writeComponent`:
+    unknown `type`/`tier`, a `select` with no `options`, an invalid `pattern`, `min > max`, a `dependsOn`
+    naming no sibling, an `objectType` disagreeing with the component id, and **unknown section keys**
+    (a typo'd `tier` silently defaulting is how a required field becomes invisible). A spec hand-edited into
+    an unreadable state on disk degrades to the built-in with a logged warning rather than 500ing triage.
+  * **UI consequences:** `Findings` is now an open `Record<string, string>` (`mail-model.ts`), the panel's
+    team + target date moved to a sibling `teamForm` (they are C6, not Findings), the flat
+    `recordsAffected` copy the C4 analytics roll-up sums is written **on every Findings
+    save** (by the server since 2026-09-25; the `impactAmount` copy retired with WS-10, 2026-09-26) — as `''` when the section is not configured, so removing that section blanks the roll-up for
+    each Case as it is next saved (corrected 2026-09-25; this line used to say "only while configured",
+    which the code never did) — and the soft no-disposition prompt on resolve **only fires while
+    `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the
+    ladder now lives in the backend default, which is its only home *(the offline mock backend was deleted 2026-08-31)*.
+* **Authoring UI — the *Findings fields* dialog (2026-09-25, BUILT; accepted on proxy 2026-09-29).** Design + the ten
+  signed decisions (archived 2026-09-29): [`findings-spec-authoring-ui-design.md`](../../../../archived-documents/plans-archive/findings-spec-authoring-ui-design.md).
+  A toolbar icon in the Cases pane (beside Case rules, D4) opens `FindingsSpecEditorDialog`
+  (`objects/findings-spec-editor.dialog.ts`) for the Case spec only (D2 — the dialog takes `data.objectType`, so
+  Incident is a one-line entry if a panel ever renders it). All rules live in the framework-free
+  `findings-spec-editor.model.ts`. As built:
+  * **Loads the effective spec** (`GET /findings/case`) plus the authored component (`GET
+    /components/findings-spec/case`, 404 ⇒ built-in) and badges **Built-in / Customised**. Saving the built-in
+    `POST`s the component; an authored one `PUT`s with `If-Match` (409 ⇒ "someone else changed these fields" +
+    Reload, never an overwrite). A 422 that gets past the client mirror shows verbatim. *Restore built-in* is a
+    `DELETE` behind a destructive confirm; *History* is the shared `ComponentHistoryDialog`.
+  * **Which form (2026-10-06, `FINDINGS-EDITOR-PER-CASE-TYPE-1`).** For Case a *Form* picker heads the dialog:
+    the shared form ("every Case without its own form"), each Case type that already has one (from
+    `GET /components/findings-spec`, ids `case.<caseType>`), or *A new Case type…*, which asks the type
+    (`CASE_TYPE_PATTERN`, the server's charset) and opens it seeded from the shared form (the effective spec
+    falls back; the authored read 404s, so Save `POST`s `{name: case.<t>, objectType: case, caseType: t}`).
+    Switching with unsaved edits asks to discard; declining restores the picker. On a type form the
+    destructive action reads *Use the shared form* (`DELETE` of that type's component). The scope sentence
+    names who a change reaches (`scopeText()`).
+  * **The built-in Impact field (2026-10-06, `FINDINGS-EDITOR-PER-CASE-TYPE-1`, operator option (c)).** Every
+    Case form carries the server's locked `impact` field (`IMPACT_KEY`, `isBuiltInImpact()` in the model). The
+    dialog shows a *Built-in: the Case's Impact* note, disables every control but *Name*, and offers no remove
+    button; the server 422s anything else. In the Findings panel its value is the Case's `impact.confirmed`
+    (`parseFindings` in `mail-model.ts`), and a save writes it through the impact path (truth:
+    `okf/product/addon/incidents/plan-incidents.md` §3.5).
+  * **Nothing technical on the default path:** five plain answer kinds (Choose one from a list · Short text ·
+    Long text · Number · Yes / No), keyed by `Record<AttributeType, …>` so a contract type added without a
+    plain label fails to compile; **Always shown / Under “More”** only (D5 — a stored `advanced` renders as a
+    third, kept-as-saved choice); *Must be filled in* separate from where it appears. Keys and choice values are
+    **derived from the label on first save and frozen after**; ID-style text / List of values / Suggested
+    values, `pattern`, and the stored key/values sit under a collapsed **Technical details** (D6).
+    The disclosure collapses again whenever another field is selected, the *Where it appears* radios carry an
+    explicit `aria-label` (so a reader never announces the stored `required`/`optional`), and the *Condition*
+    picker is `min-w-40` (at `w-28` its label squeezed the value *is* to "i.") — `FINDINGS-EDITOR-WORDING-1`, 2026-09-30.
+  * **"Show only when"** points at fields **above** only (the server accepts forward references — the picker
+    does not offer them), by local uid so a rename never breaks it; ⚠ **Number and List targets are not
+    offered**: the renderer compares with `===` and the server as text, so a numeric condition cannot be
+    authored to match on both sides. A Yes/No condition is written as a real boolean for the same reason.
+  * **Problems list** mirrors `FindingsSpec.fromMap` rule for rule in the field's label, and Save is disabled
+    while it is non-empty. **Removing** a saved field or choice warns generically that stored values stay but
+    stop showing (D7 — no count read); removing `recordsAffected` adds a Case-analytics warning (`ANALYTICS_KEYS`; an `impactAmount` field no longer
+    does — nothing sums it since WS-10).
+  * **Preview** is the real `<inspecto-schema-form>` over the draft, values carried across edits.
+  * **Gate:** Save / Add / Restore render only with `LensService.canManageIncidents()` (a new *identity*
+    capability, action node `incidents.manage` under Case Manager); everyone else sees the same screen
+    read-only. The components pane never lists the kind (D8).
+  * **Option C, not the recommended D (decided at build time).** The field editor is ONE reactive form, not a
+    per-field `<inspecto-schema-form>`: the schema form exposes no value-change output, so mixing it with the
+    bespoke controls would have needed a second sync path. The ten calls, in one line: D1 writes gated on
+    `canManageIncidents` (four literal `/components/findings-spec…` routes ahead of the generic ones,
+    `ControlApiFindingsSpecGateTest`) · D2 Case only · D3 the server validates the `attributes.findings` blob
+    · D4 a Cases-toolbar dialog · D5 no `advanced` · D6 technical properties under a collapsed disclosure ·
+    D7 generic removal warning · D8 off the Components pane · D9 **Findings field** · D10 one think-aloud.
+  * **Choice rows are tracked by their `FormControl` and edited IN PLACE** (2026-09-29,
+    `FINDINGS-EDITOR-CHOICE-BINDING-1`). `select()` still rebuilds `choiceControls` on a field switch, but
+    *Add / move / remove choice* push, splice or `removeAt` the array. ⚠ The old template tracked rows by
+    `$index` with `[formControlName]="i"`, and every choice edit re-ran `select()`: a row that stayed on
+    screen kept its index, so its directive never rebound and stayed wired to the removed control. What the
+    lead typed there went nowhere, and the draft kept an empty label. *Add choice* focuses the new box
+    (`afterNextRender`), not the field's Name (`FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1`).
+  * ⚠ **Not driven in a browser preview in the build shift** (`preview_start` serves the main checkout, and
+    the routes need a packaged `inspecto-ops`) — unit specs only (`findings-spec-editor.*.spec.ts`).
+  * 🔴 **ACCEPTANCE OWED (D10) — the BACKLOG row does NOT close on this build.** It closes on ONE think-aloud
+    session with a real Case-desk lead doing, unaided: T2 add a "Root cause category" dropdown · T6 show a
+    field only when Disposition = Recovered · T7 preview before saving · T5 remove a field. Record pass/fail per
+    task **here**, with the date and the lead's role. A real lead has not run it yet. ✅ **Accepted on PROXY 2026-09-29 (operator)**: see *Proxy acceptance session 2026-09-29* below. The real session is BACKLOG P3 `D6-REAL-USER-SESSION-1`.
+
+As-built designs (archived):
+[`incidents-mail-ui-design.md`](../../../../archived-documents/plans-archive/incidents-mail-ui-design.md) ·
+[`case-management-design.md`](../../../../archived-documents/plans-archive/case-management-design.md).
+
+## Proxy acceptance session 2026-09-29
+
+> ⚠ **This was a PROXY, not a real user.** An AI agent played a Case-desk lead who is not an engineer. The
+> operator accepted D6 on this basis on 2026-09-29. It does **not** replace the design's D10 criterion, a
+> think-aloud session with a real Case-desk lead, which stays owed as BACKLOG P3 `D6-REAL-USER-SESSION-1`. A proxy
+> already knows what a Findings spec is, so it under-reports confusion. Treat the findings below as a floor.
+
+**Setup.** An `origin/master` `4dbe84d1a` worktree, built with `package.ps1 -Edition Advanced -DemoAuth`. The
+committed `demo` Space was copied into the bundle, with a bundle-local `demo-users.toon`: *Demo Case Lead*
+(`operations`, which holds `canManageIncidents`) and *Demo Business Viewer* (`business`, which does not). The
+server ran on `:8097`, because `:8080` was held by a process this session did not start. The browser pane stayed
+at desktop size (1280×720).
+
+**Task.** Design a Findings form for a "SIM-box fraud" Case from scratch. It needs a required *Confirmed loss
+(SAR)*, a choice *Recovery route* (bar / refund / write-off), and *Notes* shown only when Recovery route =
+write-off. Then open a Case, fill the form, save it, and check that a missing required field blocks save.
+
+**Think-aloud (the proxy lead's own words, condensed).**
+1. *"I want the form for SIM-box cases. Case Manager has a row of icons, and one is labelled 'Findings fields
+   (what your team records)'. That must be it."* The dialog opened with the badge **Built-in** and the text "A
+   change applies to every Case". *"So I can't make one just for SIM-box. Every Case gets these questions. I'll
+   add mine and accept that."* → `FINDINGS-PER-CASE-TYPE-1`.
+2. *"Add field. It's called 'New field' and I type over it. Kind of answer: Number, since it's money. Is there a
+   currency? No, a number will do."* *Must be filled in* was easy to find, and the preview showed
+   "Confirmed loss (SAR)*" straight away. *"Good. That's what my team will see."*
+3. *"Recovery route: choose one from a list. Add choice. I typed 'bar' and it went into the NAME."* →
+   `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1`. *"I fixed the name and typed bar, refund, write-off into the three
+   boxes. Now it says '1 problem to fix before saving: Recovery route has a choice with no name'. All three have
+   names, I can see them! Save is greyed out."* Under Technical details the stored values read `BAR, CHOICE,
+   WRITE_OFF`. After clicking another field and coming back, Choice 2 was **empty**. Retyping it fixed the
+   problem. *"I'd have given up, or called IT."* → `FINDINGS-EDITOR-CHOICE-BINDING-1` (**P2**, blocks the task).
+4. *"Notes: long text. 'Show only when another field has an answer': Recovery route, is, write-off."* The field
+   picker lists only fields above, and leaves out the Number field, as designed. The condition word shows as
+   "i.". *"Fine, I can guess."* In the preview, choosing write-off made Notes appear, and choosing another
+   route hid it. *"That's exactly what I wanted."* Save closed the dialog with a "saved" toast.
+5. *"Open a Case. New case needs a Linked entity, and 'no existing objects to link to yet'. I'll make an
+   Incident first. New incident needs a linked entity too."* **Dead end.** → `CASE-FIRST-OBJECT-DEAD-END-1`.
+   *(Proxy deviation: an admin Demo User applied a `create-incident` Decision Rule over the API to seed one
+   Incident. This is the only step not done in the UI.)* After that, New case → link the Incident → Create
+   worked. The toast showed the raw id `Created CASE CASE-85fd…`.
+6. *"In the Case, Findings shows my fields and Save findings is greyed out. I clicked into Confirmed loss and
+   left it: 'Confirmed loss (SAR) is required'. Clear."* Filling in 125000 enabled Save. Choosing write-off made
+   Notes appear. Save findings showed "Findings saved". To reach the form I had to scroll, and the whole page
+   moved, leaving a blank strip at the top. → `CASE-DETAIL-DOCUMENT-SCROLL-1`.
+7. Signed in as *Demo Business Viewer*: the same dialog opened with "View only — Changing the Findings fields
+   needs permission to manage Incidents and Cases". Every editor input was disabled, and only *Close* and the
+   preview remained. *"Makes sense."*
+
+**Verified outside the think-aloud:**
+* The stored spec (`registry/findings-specs`) has `confirmedLossSar` of type `number` with `required: true`, and
+  `recoveryRoute` with values `BAR/REFUND/WRITE_OFF`. `notes` has `dependsOn {key: recoveryRoute, equals:
+  WRITE_OFF}`, and `owner: case.lead`.
+* The Case's `attributes.findings` holds `confirmedLossSar 125000`, `recoveryRoute WRITE_OFF` and the notes.
+* `PUT /objects/{id}/findings` with no `confirmedLossSar` → **422**.
+* Network calls seen: `GET components/findings-spec/case` 404 (built-in), `POST components/findings-spec` 200, and
+  `PUT …/findings` 200.
+
+**Result per step:** design the form: **PASS with help** (the P2 choice defect needed a workaround the
+lead would not find). Conditional Notes: **PASS**. Preview: **PASS**. Open a Case: **FAIL in an empty Space**
+(went through only via an API-seeded Incident). Fill + save: **PASS**. A missing required field blocks save:
+**PASS** (client inline error, and server 422). View-only: **PASS**.
+
+| # | Finding | Severity | Row |
+|---|---|---|---|
+| 1 | Text typed into a choice box that was on screen before a later *Add choice* is silently lost; the dialog reports "a choice with no name" while the box shows text | **P2** (blocks) | `FINDINGS-EDITOR-CHOICE-BINDING-1` |
+| 2 | Neither New case nor New incident can be created in a Space with no objects (mandatory link); the only guidance is "one must exist" | P3 (product decision; blocked the proxy) | `CASE-FIRST-OBJECT-DEAD-END-1` — ✅ shipped 2026-10-03: the rule stays; the create dialog's empty state names Decision Rules (create-incident action) as where the first Incident comes from and opens them |
+| 3 | One Findings form for every Case, so a "SIM-box" form has no home; loss can only be a plain Number and is separate from *Impact* | P3 (concept / wording) | `FINDINGS-PER-CASE-TYPE-1` — ✅ shipped 2026-10-06: a Case type (`attributes.caseType`) may author its own form as `findings-spec` `case.<caseType>`; the panel renders it for Cases of that type, the generic form otherwise (operator, 2026-10-06). The dialog's Case-type picker shipped 2026-10-06 (`FINDINGS-EDITOR-PER-CASE-TYPE-1`). The loss-vs-*Impact* half shipped 2026-10-06: a built-in, relabel-only Impact field on every Case form that IS the Case's Impact (operator, 2026-10-06) |
+| 4 | *Add choice* leaves focus in *Name*, so the next keystrokes rename the field | P3 | `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1` |
+| 5 | Radios are announced as "required"/"optional"; the condition word is truncated to "i."; *Technical details* (regex) stays open across fields | P3 (wording / a11y) | `FINDINGS-EDITOR-WORDING-1` — closed 2026-09-30 |
+| 6 | The Case detail panel does not scroll by itself; the whole document scrolls (blank band) and the list is squeezed to about 130 px | P3 | `CASE-DETAIL-DOCUMENT-SCROLL-1` — **fixed 2026-09-30**: the admin shell scrolls at document level, so the mail shell (`object-mail.component.html`) is now bounded to `calc(100dvh - 120px)` (64 px header + 56 px footer, as the Pipelines shell); folder nav, list and detail panel each scroll in their own area |
+| 7 | The create toast shows the raw id `CASE-<uuid>`; the built-in *Records affected* is Short text, not Number | cosmetic, not filed | — |
+
+Screenshots (session scratchpad, not committed): `d6-01` … `d6-12`. The Case-panel steps were checked
+in the DOM, because the pane's capture drew a blank band once the document had scrolled.

@@ -44,7 +44,7 @@ Read from the v1.5.6 release notes only (v1.5.3 to v1.5.5 notes not read). Bugfi
 
 - Parquet: a VARIANT-metadata fix (no `sorted_strings`), and geometry row-group pruning now copes with nulls and empties. Neither is a path this repo uses today.
 - Hive partitioning: partition columns now resolve for non-pushdown table functions, and MAX over a hive partition column after file pruning was fixed. Relevant to `read_parquet(hive_partitioning)` readers (LA storage); re-run the pruning measurements if a result ever looked odd.
-- ICU / strptime: "ICU strptime leaking time zone state between rows" is fixed; tz data moves to 2026c/2026d. Relevant to timestamp parsing and the session-TimeZone notes in `docs/okf/backend/control-plane/jobs.md`.
+- ICU / strptime: "ICU strptime leaking time zone state between rows" is fixed; tz data moves to 2026c/2026d. Relevant to timestamp parsing and the session-TimeZone notes in `docs/okf/product/module/processor/spec-jobs.md`.
 - WAL: the main WAL handle is closed before the rename during recovery (Windows-relevant).
 - Extensions: C-API symbol versioning unified and v1 APIs stabilised; httpfs/delta/iceberg bumped. Extensions stay ABI-bound to the exact engine version.
 - md5/hash functions and JDBC driver behaviour: no entry in the notes.

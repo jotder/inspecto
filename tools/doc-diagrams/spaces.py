@@ -19,4 +19,4 @@ s.box(40, 300, 260, 64, 'teal', 'spaces/<id>/', 'config/ data/ audit/ duckdb/\ns
 s.box(340, 300, 260, 64, 'purple', 'spaces/_templates/<id>/', 'template.toon + config/ (+ data/)')
 s.box(640, 300, 260, 64, 'gray', 'SpaceRoot.legacy()', 'no -Dspaces.root: flat CWD layout')
 s.arrow(340, 332, 300, 332)
-s.save('docs/stakeholders/modules/assets/spaces.svg')
+s.save('docs/okf/product/assets/spaces.svg')

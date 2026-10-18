@@ -1,0 +1,130 @@
+---
+type: Concept
+title: TOON Configuration
+description: ConfigCodec (JToon), the three config file types, PipelineConfigParser, and the tabular-array serialization gotcha.
+resource: platform/inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java
+tags: [config, toon, jtoon, parser, gotcha]
+timestamp: 2026-09-23T00:00:00Z
+---
+
+# TOON Configuration
+
+All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key reference: [`admin-guide-configuration-reference.md`](admin-guide-configuration-reference.md).
+
+* **`ConfigCodec`** (`platform/inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java`) — thin JToon wrapper:
+  `toMap` (**strict** decode) and `toToon` (canonical encode). Nothing else.
+  **One decode seam, and it is strict** (`CONFIGCODEC-LENIENT-IS-STRICT-1`, 2026-09-23). The seam is
+  `ToonHelper.decode` (`platform/inspecto-util/src/main/java/com/gamma/util/ToonHelper.java`); `ConfigCodec.toMap`
+  delegates to it and `ToonHelper.load(path)` wraps it, prefixing the path to any decode refusal
+  (`<path>: line N: …`). It lives in `inspecto-util`, not `inspecto-config`, because util is the
+  documented `com.gamma` leaf ([reactor](../../layer/platform/architecture-reactor.md)) and `ToonHelper`/`SchemaExtractor` read
+  TOON too; so the edge runs `inspecto-config → inspecto-util` (every consumer of config already had util).
+  Every former direct `JToon.decode` reader — `ToonHelper.load`, `SchemaExtractor`, `MainApp` (`ura`
+  CLI), `inspecto-exchange`'s `Ledger`/`ExchangeSnapshots` — now goes through it. `toMapStrict` and
+  `isStrictDecodable` were **deleted**: `toMap` was documented "lenient, tolerates `#` comments" but
+  JToon 1.0.9's `decode(String)` uses `DecodeOptions.DEFAULT`, which is `strict=true` — the two methods
+  had always decoded identically, so no caller ever had leniency to rely on. It was **not** made lenient
+  on purpose: non-strict JToon silently truncates a too-wide tabular row (`DECIMAL(18,2)` loses `2)`),
+  drops the missing columns of a too-narrow one and reads a bad array header as an empty list — the
+  falsification run of `ToonHelperTest` / `ConfigCodecTest` under `withStrict(false)` accepted both rows
+  with no error. Pinned by `ToonHelperTest` (strict + file/line) and `ConfigCodecTest`.
+  🔴 **JToon has no comment syntax, in either mode.** A raw `#` line is parsed as TOON, never skipped:
+  between two scalars it happens to be ignored, but above a block it **truncates the file there**, and the
+  load accepts the truncated map with no error and no warning — every key after the comment is silently
+  gone. Never author `#` comments in a live config; if you inherit one, decode the file and compare its
+  top-level key list.
+  **Gotcha**: `toToon` does **not** emit tabular-array format — a Java-constructed schema whose `fields`/
+  `rules` are `List<Map>` round-trips as nested maps and the parser then throws *"Array length mismatch:
+  declared N, found 0"*. Write test schemas as inline TOON strings, not via `toToon(schemaMap)`; round-trip is
+  only safe when the map was originally `JToon.decode`-d. See [gotchas](../../layer/platform/architecture-gotchas.md).
+  ⚠ **An unquoted comma-bearing value in a table row is REFUSED, by line** (`TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1`,
+  fixed 2026-09-23). The comma is also the row delimiter, so `AMT,"1",DECIMAL(18,2)` under
+  `fields[3]{name,selector,type}` is **four** values — genuinely ambiguous, so it is never guessed at.
+  JToon always refused it, but as a bare *"Tabular row value count (4) does not match header field count
+  (3)"*: no file, no line, no key. `ConfigRegistry` logged that as a WARN against the *pipeline* path and
+  skipped the Pipeline, while the bad line was in the *schema* file. Now the decode seam (`ToonHelper.decode`, behind
+  `ConfigCodec.toMap`) re-throws JToon's row-width refusal (and only that one — every other decode error passes through
+  unchanged) as *"line 7: a row of tabular array 'fields' {name,selector,type} has 4 values but its header
+  declares 3 columns — a ',' inside a value splits it; double-quote that value, e.g. "DECIMAL(18,2)""*, and
+  `PipelineConfigParser.readToon` prefixes the file — the one decode for the pipeline file and every
+  schema / segment / grammar file it references. `POST /validate {configPath}` answers that as **422**
+  (it was a 500).
+  **A Pipeline that does not load stays a ROW in `GET /pipelines`** (`PIPELINE-LOAD-FAILURE-INVISIBLE-1`,
+  operator decision 2026-09-23; it used to vanish behind a registry WARN). `ConfigRegistry.rebuild` still
+  WARNs and still keeps the file out of its index, but now also records a `LoadFailure` per path (the
+  registry is one per Space, so the failures are too), replaced wholesale on every rebuild so a fixed file
+  drops out on the next tick. `GET /pipelines` appends one `{name, path, loadError: {file, line?, message}}`
+  row per failure **after** the healthy rows, with no graph fields: `name` is the file-name stem
+  (`orders_pipeline.toon` → `orders`, since the declared name never parsed), `message` is the loader's own
+  text verbatim, and `file`/`line` are parsed out of its `<file>.toon: line N:` prefix — so `file` is the
+  **schema** when the bad row is in the schema — falling back to the pipeline file with no `line`.
+  **It can be opened for repair** (`SCHEMA-FILE-NAME-1` (d), 2026-09-25): `GET /pipelines/{name}/graph/raw`
+  for a name that is not loaded but IS a recorded failure answers the file's editable graph instead of
+  404 — lifted from a copy with its UNRESOLVABLE schema references set aside (the save gate's own
+  resolver, `ConfigRoutes.schemaFileFindings`) and `active: false`, which is exactly what fails the load;
+  every node config is still the raw file's (the parse node shows the dangling `schema_file`), `active` is
+  the file's own, a `loadError {file, line?, message}` rides along, and the ETag is over the raw file. A
+  file that still cannot be lifted is a 422 naming the load failure. `PUT …/graph` targets the failed
+  file's path when the name is not loaded (`registeredFile`) — without that a repair of a pipeline in a
+  subdirectory wrote a shadow `<root>/<name>_pipeline.toon`. Pinned by `ControlApiSchemaFileRefTest`.
+  🔴 **Decision: broken rows exist on that ONE route only.** `CollectorService.pipelines()`, `configs()`,
+  `all()`, `configForPath()` — everything the scheduler, the run/trigger routes, `/runs`, `/ready` and
+  `/health` counts, `/pipelines/combined`, lineage, metrics and the catalog read — are unchanged and never
+  see a failure, so nothing can schedule, run or count it (`POST /runs/<stem>/trigger` and
+  `GET /pipelines/<stem>/graph` are 404). No new route. In the SPA, `PipelinesService.list()` drops broken
+  rows for every picker/count consumer; only the Pipelines editor reads `listWithBroken()` and shows them
+  in its Open dialog ([pipeline editor](../etl/user-guide-pipeline-editor.md)). Pinned by
+  `ControlApiPipelineLoadErrorTest` (real HTTP, an unquoted `DECIMAL(18,2)` schema row) +
+  `ConfigRegistryTest`. ⚠ The file/line split reads the message TEXT: a loader that changes the
+  `readToon`/`ConfigCodec` prefix silently degrades `file` to the pipeline path (the message is still
+  shown verbatim).
+  `ToonHelper.load` prefixes the path the same way (`<path>: line N: …`), and it is **the one file
+  decode** (`CONFIGCODEC-CALLERS-NO-FILE-NAME-1`, 2026-09-23): the 15 readers that called
+  `ConfigCodec.toMap(Files.readString(p))` themselves — `DataSourceRoutes`, `DataSourceBundleResolver`,
+  `ConnectionProfile`, `AlertRule`, `RcaTemplate`, `MetadataValidateTask`, `ConfigMigrator`, ops
+  `Tag` / `TagRule` / `CaseRule` / `Workflow` — now call it, so their refusals name the file. Decoding a
+  **string** already in hand (a request body, a bundle entry) stays `ConfigCodec.toMap`. ⛔ Pinned by
+  `NoHandRolledToonFileDecodeContractTest` (`inspecto-config`), which text-scans every module's
+  `src/main/java` for `toMap(Files.read` / `JToon.decode(Files.read` and lists offenders, plus
+  `TagRuleTest`'s named-file refusal. ⚠ A missing file is now `FileNotFoundException` ("Toon file not
+  found"), not `NoSuchFileException` — both are `IOException`. `PipelineConfigParser.readToon` still reads
+  and prefixes by hand (same message shape); `ComponentStore`'s history read decodes text it also needs for
+  CSV kinds and swallows every error.
+* **`PipelineConfigParser`** (`platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
+  package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
+  `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does
+  those).
+  **Navigating it:** `parse()` is a sequence of `// ── section ──` blocks, one per config block, in the
+  order the file declares them. The seven largest are named methods — `parseTransformBlocks`,
+  `parseParsing`, `parseOutputAndSinks`, `parseSteps`, `parsePlugin`, `parseSchemas`, `parseCollector` —
+  leaving `parse()` itself at ~280 lines (was 801). ⚠ The split is by **state**, not size: a section became
+  a method only when it shares no locals with what follows. The head (identity/gates) and the
+  `processing`/`dirs` sections deliberately stay inline because their locals (`proc`, `dirs`) are read
+  throughout. `parseCollector` returns a `Collector`; `parseParsing` returns a private `Grammar` record
+  because five of its locals are read by `parsePlugin` further down.
+  **Schema-reference resolution: beside the config, never the JVM CWD** (W1b 2026-07-31 made it
+  config-relative first; `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` 2026-09-23 removed the CWD second). A relative
+  `schema_file` / `schemas[].schema_file` / `segments` / `grammar` / `mapping_file` value resolves through
+  `PathJail.resolveConfigRef` against **the config file's own directory** — so a bare `orders_schema.toon`
+  beside its pipeline is portable and the server loads it from any launch directory. A legacy
+  `spaces/<id>/config/...` value is refused (naming both paths) or not found. `fromMap(map)` has no
+  directory, so it keeps the CWD reading.
+  ⚠ **`dirs.*` is still CWD-only** — it was not part of W1b. *(Corrected 2026-09-08: this line used to say
+  `grammar` was CWD-only too. It is not — `resolveGrammarRef` delegates to `resolveSchemaRef(ref, configDir,
+  "grammar")` (`PipelineConfigParser.java:1181-1185`), so a `grammar` ref takes the same config-relative-first
+  branch as `schema_file`, including the `grammar:<id>` registry form.)*
+  *(Superseded 2026-09-23: `../` now resolves from the config's directory and the one jail judges it.)*
+  ⚠ The config-relative branch was contained (a `../` escape was skipped, not resolved); the CWD branch was
+  **not** jailed and is explicitly not a security boundary (see [gotchas](../../layer/platform/architecture-gotchas.md) and
+  `BACKLOG.md` §6).
+
+## The three config file types per source
+
+| File | Key groups |
+|---|---|
+| `<src>_gen.toon` | `csv_settings` (delimiter, engine, skip_* lines), `type_patterns` (dates/timestamps) |
+| `<src>_schema.toon` | `raw.fields[]` (name/selector/type), `mapping.fields[]` (name/from/fn/args — Record Transformer rows; a legacy `mapping.rules[]` is still read and converted), `partitions[]` |
+| `<src>_pipeline.toon` | `name`, `active`, `dirs.*`, `output.format/compression`, `processing.*` (threads, batch, csv_settings, schema_file, streaming, ingester/segments), `collector:` acquisition block |
+
+No `#` comments are allowed in any `.toon` file — there is only the strict parser, and it has no comment syntax. Writes go through
+[`ConfigSafetyValidator`](spec-config-safety.md).

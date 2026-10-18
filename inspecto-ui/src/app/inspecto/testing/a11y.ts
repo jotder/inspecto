@@ -5,7 +5,7 @@ import * as axe from 'axe-core';
  *
  * Runs axe against a rendered fixture's DOM and fails with a readable summary on any violation.
  * This is the automated half of the WCAG 2.2 AA work (UI/UX audit — Long-term #2); the manual
- * review lives in `docs/ui/accessibility-audit.md`.
+ * review lives in `docs/okf/product/layer/product/tests-accessibility-audit.md`.
  *
  * Rules disabled below either need real layout/painting (which jsdom does not do) or are
  * page-level checks that are meaningless against an isolated component fixture. Color-contrast in

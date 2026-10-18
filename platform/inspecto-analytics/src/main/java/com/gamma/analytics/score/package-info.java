@@ -5,6 +5,6 @@
  * ownership marker, the atomic {@code _latest} swap) is {@code com.gamma.alert.ScoreOutputWriter} in the engine, beside
  * {@code ScoreOutputDirs}; each kind's model spec, arithmetic and wording stay in its own module.
  *
- * <p>Reference: {@code docs/okf/backend/analytics-kernel.md}, section "Score output contract".
+ * <p>Reference: {@code docs/okf/product/module/analytics/spec.md}, section "Score output contract".
  */
 package com.gamma.analytics.score;

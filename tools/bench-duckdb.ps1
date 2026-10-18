@@ -3,7 +3,7 @@
 
     Like-for-like DuckDB benchmark: runs the SAME workloads against one DuckDB version and writes ONE JSON
     (<OutDir>/<Label>.json). Compare two runs with `node tools/bench-duckdb-compare.mjs a.json b.json`.
-    Docs: docs/okf/backend/build-run/performance.md ("DuckDB version comparison harness").
+    Docs: docs/okf/product/layer/platform/tests-performance.md ("DuckDB version comparison harness").
 
     Workloads (default = all but la100m):
       scan readers csv store      tools/bench/DuckDbBench.java (single-file launch, pure DuckDB JDBC; peak RSS recorded)

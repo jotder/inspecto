@@ -130,7 +130,7 @@
                  Nothing went red: the module's own tests have Nimbus on the compile classpath, and the
                  core-side auth tests inject a lambda via Authenticators.forTest - both halves green, the
                  join untested. Same shape as CONNECTORS-BUNDLE-1, same fix.
-                 See okf/backend/build-run/guard-coverage.md. -->
+                 See okf/product/layer/platform/tests-guard-coverage.md. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

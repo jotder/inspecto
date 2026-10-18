@@ -25,19 +25,19 @@
 > ⚠ **This plan REVISES signed decisions, and says so.** `NFR-8` already names the *"Enterprise
 > distributed tier"* as the *"opt-in escape hatch"* — it does **not** need reversing. What does: the
 > container decision **D1** (signed 2026-09-06: *"a container image as a convenience with orchestration
-> out of scope"*) and two refusals in `okf/capabilities/editions/editions.md` §6 — *Active/active
+> out of scope"*) and two refusals in `okf/product/layer/platform/plan-editions.md` §6 — *Active/active
 > deployment: ⛔ NOT OFFERED* and *Orchestration platform support: ⛔ OUT OF SCOPE "until that decision
 > changes."* That decision is changing. §2 carries the exact amendments, to be applied to the recording
 > documents **on sign-off, not before** — a contradicted-but-unamended decision is what caused a plan
 > archival to be reverted on 2026-09-09, and this repo's rule is amend, never silently contradict.
 >
-> **On approval + ship:** distil the as-built facts into `okf/capabilities/editions/editions.md`
+> **On approval + ship:** distil the as-built facts into `okf/product/layer/platform/plan-editions.md`
 > (a new §3.15 alongside the T1–T4 topologies) and `okf/backend/build-run/`, move still-open items to
 > `BACKLOG.md`, then archive this plan per the doc lifecycle.
 >
-> Companions: [`okf/capabilities/editions/editions.md`](../okf/capabilities/editions/editions.md)
+> Companions: [`okf/product/layer/platform/plan-editions.md`](../okf/product/layer/platform/plan-editions.md)
 > §3.9–§3.14 (the topologies, the signed RPO/RTO table, the T4 promote order) ·
-> [`roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) L1 (the four workstreams, sized XL) ·
+> [`okf/product/layer/platform/plan-roadmap.md`](../okf/product/layer/platform/plan-roadmap.md) L1 (the four workstreams, sized XL) ·
 > [`archived-documents/plans-archive/postgres-multi-user-plan.md`](../archived-documents/plans-archive/postgres-multi-user-plan.md)
 > §5–6 (the connection pool this plan un-parks) ·
 > [`archived-documents/plans-archive/deployment-topology-plan.md`](../archived-documents/plans-archive/deployment-topology-plan.md)
@@ -67,7 +67,7 @@ and the heap lease is `PipelineRunGuard implements RunLease` (there is no `HeapR
 | B: scopes (run, acquire, job arming, authored pipeline), `lastRunAtMs` on the lease | BUILT | `CollectorService.java:375-376,1636-1637` |
 | B: lease credentials, heartbeat in `/health` | BUILT | `HealthDetails.java:92` (live probe); board `HA-RUNLEASE-DB-CREDENTIALS-1` closed 2026-10-10 |
 | B: section 7 `RunLeaseContractTest` (two instances, one lease) | BUILT | `inspecto/src/test/.../RunLeaseContractTest.java` (4 tests); `DbRunLeaseTest` |
-| HA lanes 2026-10-10/11: kill -9 failover contract, graceful-stop lease release, cooperative cancel, exchange multi-pod snapshots | BUILT (not in the plan's text) | `okf/backend/engine/ingestion.md` Failover (line 72); `ops/ha-dr-drill-runbook.md:225-230`; `CommitFence.java`; board `HA-KILL9-DOUBLE-INGEST-1`, `HA-GRACEFUL-STOP-LEASE-RELEASE-1`, `EXCHANGE-SNAPSHOT-MULTIPOD-1`. Open: `HA-CANCEL-RESIDUALS-1` (P3) |
+| HA lanes 2026-10-10/11: kill -9 failover contract, graceful-stop lease release, cooperative cancel, exchange multi-pod snapshots | BUILT (not in the plan's text) | `okf/product/module/engine/spec-ingestion.md` Failover (line 72); `okf/product/layer/platform/admin-guide-ha-dr-drill.md:225-230`; `CommitFence.java`; board `HA-KILL9-DOUBLE-INGEST-1`, `HA-GRACEFUL-STOP-LEASE-RELEASE-1`, `EXCHANGE-SNAPSHOT-MULTIPOD-1`. Open: `HA-CANCEL-RESIDUALS-1` (P3) |
 | section 12 data-plane idempotency prerequisite (stable Consignment id, unique constraints, CAS) | PARTLY | `ConsignmentId.java:72` (content digest id); `DbFileStageStore` `UNIQUE (batch_id, source_id, relative_path, stage)` + `ON CONFLICT DO NOTHING`; `DbConsignmentOutputStore.java:127` `UNIQUE (consignment_id, path, run_id)`. UNKNOWN: that every write path keys on the new id; the `DbAcquisitionLedger` check-then-record window |
 | C 5.3 C1: static Space to pod map | BUILT | `partition.toon`, `SpacePartition.java`, `SpaceManager.java:156-184` |
 | C 5.3 C2: shared-inbox detection + cross-pod registry | BUILT | `DbInboxRegistry.java` (`INBOX-REGISTRY-CROSS-POD-1`) |
@@ -96,7 +96,7 @@ and the heap lease is `PipelineRunGuard implements RunLease` (there is no `HeapR
 
 Inspecto's scale ceiling is single-node by signed design (`NFR-8`, *accepted constraint*). Measured on
 one node it is fast — native ingest at 523K rows/s on 12 columns, DuckDB transforms at 1.4M rows/s
-(`okf/backend/build-run/performance.md`) — but wide telecom schemas bring the ceiling down hard: a
+(`okf/product/layer/platform/tests-performance.md`) — but wide telecom schemas bring the ceiling down hard: a
 537-column CDR projects to ~11K rows/s per batch, ~45K rows/s aggregate on a 16-core box. A tier-1
 operator at billions of records a day sits **at or beyond** that. The market read of 2026-09-10 also
 found the closest competitor (Definite) shipping the same DuckDB + DuckLake stack **on Kubernetes**.
@@ -448,7 +448,7 @@ a decision**, because the broker deliberately preserves FIFO per Pipeline and di
 
 **Admission-pool rules — ADOPTED 2026-09-15 as a design constraint on phase B (`DUCKLE-C10-ADMISSION-POOLS-1`);
 ✅ BUILT 2026-09-24 on `ConcurrencyBroker`, JVM-local** — as-built in
-[consignment-concurrency §2a](../okf/backend/engine/consignment-concurrency.md) (server `scheduler.toon`
+[consignment-concurrency §2a](../okf/product/module/engine/spec-consignment-concurrency.md) (server `scheduler.toon`
 `pools:`, Pipeline `processing.pool`, tickets with `queueReason`/`queueMs`, gauge
 `inspecto_pool_free_permits`). ⚠ Distributing the pool counters across pods is still U2's open work below.
 Recorded here because `RunLease` + `ConcurrencyBroker` are the seam they bind, and the deadlock rule is
@@ -837,7 +837,7 @@ Work:
   → ✅ the remaining half **SHIPPED 2026-09-13** as `INBOX-REGISTRY-CROSS-POD-1`: `DbInboxRegistry`, a shared
   `inbox_registry` table each pod publishes its own Spaces into and then audits in full, so C2's roster becomes
   fleet-wide wherever `-Dinbox.registry.backend` is set. ⚠ Still **detection**, still WARN-only — prevention is
-  the containment rule that was refused. Design of record: `okf/backend/engine/db-layer.md` §3.4.
+  the containment rule that was refused. Design of record: `okf/product/module/engine/spec-db-layer.md` §3.4.
 
   ⚠ **WARNS, never refuses** — same blast-radius reasoning as C1's unassigned-Space case: a config smell
   that may predate the check must not take down every Space on the pod.

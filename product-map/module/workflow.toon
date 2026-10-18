@@ -5,3 +5,4 @@ parent: layer.platform
 module: workflow
 billable: false
 status: ga
+docs: docs/okf/product/module/workflow/index.md

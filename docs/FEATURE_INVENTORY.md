@@ -9,7 +9,7 @@
 > **Point-in-time snapshot** (compiled 2026-06-20). Status tags — `[LIVE]` shipped, `[NATIVE]`/
 > `[PROPOSED]` not yet wired — and `file:line` references reflect the tree at that date; **verify
 > against current code** before relying on a specific line. The authoritative living docs are
-> [`configuration.md`](okf/backend/config/configuration.md) (all TOON keys), [`parsing-options-reference.md`](okf/backend/config/parsing-options-reference.md)
+> [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md) (all TOON keys), [`parsing-options-reference.md`](okf/product/module/engine/spec-parsing-options.md)
 > (frontend status), and [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) (runtime flags, events, metrics, Control API).
 >
 > **Which module ships in which edition** is not tabulated here: the generated *Offerings matrix* in [`EDITIONS.md`](EDITIONS.md) is the one place (module × edition, add-ons, deployment posture, jar counts).
@@ -25,7 +25,7 @@
 > **guided Stream/Reference onboarding** (2026-07-16: Catalog ▸ Onboard — draft = `active:false`
 > pipeline, stage rail, sample previews `POST /config/preview/parsing|schema`, `produces: reference`
 > origins + by-name enrichment binding, `POST /enrichment` hot-register; seams in
-> [`okf/backend/control-plane/onboarding-authoring.md`](okf/backend/control-plane/onboarding-authoring.md)).
+> [`okf/product/module/processor/api-onboarding-authoring.md`](okf/product/module/processor/api-onboarding-authoring.md)).
 > Current status lives in [`REQUIREMENTS.md`](REQUIREMENTS.md) §3 and the OKF bundle.
 
 ---
@@ -55,7 +55,7 @@
 | `.csv.gz` / `.bz2` / `.zip` compression | `file_pattern: "glob:**/*.{csv,csv.gz,csv.bz2}"` | `[LIVE]` `Compression` |
 | External grammar file (reusable `*.grammar.toon`) | `processing:` / `  grammar: config/x/x.grammar.toon` | `[LIVE]` |
 | Fixed-width text (`frontend: fixedwidth`, `record: line`) | `frontend: fixedwidth` / `fixedwidth:` / `  fields[N]{name,start,length}:` | `[LIVE]` `configuration.md` |
-| Fixed-length binary (`record: bytes`) | `processing:` / `  ingester: …FixedWidthRecordIngester` / `  ingester_config: { record_length: 256 }` | `[LIVE]` `okf/backend/config/parsing-options-reference.md` |
+| Fixed-length binary (`record: bytes`) | `processing:` / `  ingester: …FixedWidthRecordIngester` / `  ingester_config: { record_length: 256 }` | `[LIVE]` `okf/product/module/engine/spec-parsing-options.md` |
 | Plugin/segments (multi-event-type, e.g. CALL/SMS) | `processing:` / `  ingester: com.acme.MyIngester` / `  segments: { CALL: …, SMS: … }` | `[LIVE]` `StreamingPluginIngestStrategy` |
 | Multi-schema dispatch (column-count + filename glob) | `processing:` / `  schemas[N]{column_count,file_pattern,schema_file,table}:` | `[LIVE]` `configuration.md` · voucher pipeline |
 | `FILENAME_DATE` transform (date in filename) | `rules[1]{…}: EVENT_DATE,FILENAME\|prefix_,FILENAME_DATE` | `[LIVE]` `TransformCompiler` |
@@ -130,15 +130,15 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 | Node | Fragment | Doc |
 |---|---|---|
-| `transform.filter` | `- { id: keep, type: transform.filter, where: "amount > 0" }` | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
-| `transform.route` (case / clone) | `mode: case` (exclusive) or `mode: clone` (fan-out); `routes: [{rel,where},{rel,default:true}]` | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
-| `transform.derive` | `fields: [{name,type:EXPR,expr}]` | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
-| `transform.select` | `columns: [a,b,c]` | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
-| `transform.validate` | `check: "amount > 0"` → `valid` + `invalid` edges | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
-| `transform.dedup` | `key: [call_id]` | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
-| `transform.split` | UNNEST | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
-| `transform.merge` (fan-in) | `inputs: [a,b]` / `sql: "SELECT … JOIN … USING(id)"` | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
-| `sink.persistent` | `store: events` | `okf/backend/pipeline-graph/pipeline-graph-design.md` |
+| `transform.filter` | `- { id: keep, type: transform.filter, where: "amount > 0" }` | `okf/product/module/engine/architecture-pipeline-graph.md` |
+| `transform.route` (case / clone) | `mode: case` (exclusive) or `mode: clone` (fan-out); `routes: [{rel,where},{rel,default:true}]` | `okf/product/module/engine/architecture-pipeline-graph.md` |
+| `transform.derive` | `fields: [{name,type:EXPR,expr}]` | `okf/product/module/engine/architecture-pipeline-graph.md` |
+| `transform.select` | `columns: [a,b,c]` | `okf/product/module/engine/architecture-pipeline-graph.md` |
+| `transform.validate` | `check: "amount > 0"` → `valid` + `invalid` edges | `okf/product/module/engine/architecture-pipeline-graph.md` |
+| `transform.dedup` | `key: [call_id]` | `okf/product/module/engine/architecture-pipeline-graph.md` |
+| `transform.split` | UNNEST | `okf/product/module/engine/architecture-pipeline-graph.md` |
+| `transform.merge` (fan-in) | `inputs: [a,b]` / `sql: "SELECT … JOIN … USING(id)"` | `okf/product/module/engine/architecture-pipeline-graph.md` |
+| `sink.persistent` | `store: events` | `okf/product/module/engine/architecture-pipeline-graph.md` |
 | `sink.view` (no bytes; `derived_sql` registered) | `store: active_subs` / `source_store: subscriber` | `ADVANCED_GUIDE §5.3` |
 | `incremental_column` (flow job watermark) | in the `*_job.toon`: `flow: f` / `incremental_column: event_dt` | `ADVANCED_GUIDE §5.3` |
 
@@ -147,10 +147,10 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 | Feature | TOON skeleton | Doc |
 |---|---|---|
 | SFTP (key auth + bastion tunnel) | `connection: { id, connector: sftp, host, username, password: "${ENV:…}", tunnel: { host, username } }` | connections/cdr_sftp |
-| FTPS (TLS) | `options: { tls: explicit }` | `okf/backend/acquisition/data-acquisition-framework.md` |
-| SSH host-key pinning | `options: { host_key: "SHA256:<base64>" }` — a **fingerprint** (SHA256/SHA1 base64, or MD5 colon-hex); a raw `ssh-rsa AAAA…` key line is REJECTED. Use `{ known_hosts: … }` to pin from an OpenSSH file. | `okf/backend/acquisition/data-acquisition-framework.md` |
-| FTP passive port range (NAT) | `options: { passive_ports: "10000-10100" }` | `okf/backend/acquisition/data-acquisition-framework.md` |
-| DB-export source (JDBC + watermark) | `connection: { connector: db, options: { watermark_column: updated_at } }` | `okf/backend/acquisition/data-acquisition-framework.md` |
+| FTPS (TLS) | `options: { tls: explicit }` | `okf/product/module/acquire/spec-framework-design.md` |
+| SSH host-key pinning | `options: { host_key: "SHA256:<base64>" }` — a **fingerprint** (SHA256/SHA1 base64, or MD5 colon-hex); a raw `ssh-rsa AAAA…` key line is REJECTED. Use `{ known_hosts: … }` to pin from an OpenSSH file. | `okf/product/module/acquire/spec-framework-design.md` |
+| FTP passive port range (NAT) | `options: { passive_ports: "10000-10100" }` | `okf/product/module/acquire/spec-framework-design.md` |
+| DB-export source (JDBC + watermark) | `connection: { connector: db, options: { watermark_column: updated_at } }` | `okf/product/module/acquire/spec-framework-design.md` |
 | Secret via env / sys property | `password: "${ENV:MY_SECRET}"` / `"${SYS:my.prop}"` | `configuration.md` · `SecretResolver` |
 
 ### I — Acquisition (`collector:` block) [`ACQ`]

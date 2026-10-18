@@ -2,7 +2,7 @@
 
 **⚠️ CRITICAL - Read at session start**
 
-Fuller treatment in [docs/troubleshooting.md](../docs/okf/backend/build-run/troubleshooting.md).
+Fuller treatment in [docs/troubleshooting.md](../docs/okf/product/layer/platform/architecture-troubleshooting.md).
 
 ---
 
@@ -77,7 +77,7 @@ Learned the hard way on 2026-10-01 (D-S4 + D-1: 6 lanes, 3 of them started from 
    bundle lists), then run the **independent** verifier once on the combined result — a lane's own green is not the gate.
 4. **A closure script is a PREDICTION; `node tools/compile-clean.mjs` is the PROOF.** `tools/java-closure.mjs` predicts what a cut
    drags along; only a clean compile of the whole reactor says the cut is real. See
-   [build-test.md](../docs/okf/backend/build-run/build-test.md) "Proving a cut".
+   [build-test.md](../docs/okf/product/layer/platform/admin-guide-build-test.md) "Proving a cut".
 5. **An incremental `mvn compile` after a shared-interface change is a FALSE GREEN** (downstream modules not recompiled; 9 s, exit
    0). Always `clean`, and read the log, not the exit code.
 6. **A peer's STAGED file blocks a cherry-pick and an ff-merge in the main tree** — integrate through a clean worktree

@@ -30,8 +30,8 @@ import java.util.Map;
 /**
  * Applies a subject's enabled Decision Rules to its materialized output table before that table is
  * written — the live-execution wiring of the record-level consequences that
- * {@code /decision-rules/{name}/simulate} previews ({@code docs/okf/backend/control-plane/
- * decision-rules.md}). Three subjects hook in:
+ * {@code /decision-rules/{name}/simulate} previews ({@code docs/okf/product/module/processor/
+ * spec-decision-rules.md}). Three subjects hook in:
  * <ul>
  *   <li><b>pipeline batches</b> — the {@code transformed} table, between {@link com.gamma.etl.DataTransformer}
  *       and {@link PartitionWriter} ({@code ConsignmentIngestStrategy.writeAndTrace}), matched by

@@ -5,3 +5,4 @@ parent: layer.la
 module: la-store-pg
 billable: false
 status: ga
+docs: docs/okf/product/module/la-store-pg/index.md

@@ -10,3 +10,4 @@ billing:
 support:
   tier: standard
 status: ga
+docs: docs/okf/product/edition/advanced/index.md

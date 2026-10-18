@@ -68,9 +68,9 @@ billing:
 support:
   tier: standard                 # community | standard | premium
   owner: la-team
-  runbook: docs/ui/link-analysis-user-manual.md
+  runbook: docs/okf/product/module/la-core/user-guide-manual.md
 status: ga                       # planned | preview | ga | deprecated
-docs: docs/stakeholders/modules/link-analysis.md
+docs: docs/okf/product/module/la-core/architecture-overview.md
 ```
 
 ⚠ TOON has no comment syntax. The `#` notes above are for this page only.

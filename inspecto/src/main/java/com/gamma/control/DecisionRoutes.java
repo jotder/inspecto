@@ -39,7 +39,7 @@ import com.gamma.access.WriteGates;
  * {@link com.gamma.query.ConditionTree} (the same semantics the authoring UI previews offline) and
  * returns the real {@code matched}/{@code total} counts. A request with no {@code sampleRows} yields
  * {@code 0/0} — there is no ambient record source for a rule whose target is a pipeline/job, so the
- * sample is the row source (see {@code docs/okf/backend/control-plane/decision-rules.md}).
+ * sample is the row source (see {@code docs/okf/product/module/processor/spec-decision-rules.md}).
  * {@code apply} executes each consequence against the platform primitive that already exists —
  * {@code emit-signal} onto this space's Signal Ledger, {@code start-job} via {@link JobService},
  * {@code trigger-pipeline} via {@code CollectorService#triggerRunAsync}, {@code create-incident} by

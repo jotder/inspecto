@@ -32,7 +32,7 @@ export interface TagVocabularyChange {
  *
  * The **registry** (`GET/POST /tags`) and **Tag Rules** still live on `ObjectsService` where their only
  * callers are; this service is the cross-entity surface those predate. See
- * `okf/backend/control-plane/tags.md`.
+ * `okf/product/module/processor/spec-tags.md`.
  *
  * Two behaviors worth knowing before wiring UI to this:
  * - **Applying an unregistered tag is a 404**, not an implicit create — create it via

@@ -858,7 +858,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *        ERROR line is logged here first. {@code -XX:+ExitOnOutOfMemoryError} fires at allocation, so it
      *        works either way.</li>
      *  </ul>
-     *  Recorded in docs/okf/capabilities/control-api/control-api.md. */
+     *  Recorded in docs/okf/product/module/processor/plan-control-api.md. */
     private void errorBoundary(HttpExchange ex, Chain next) throws IOException {
         try {
             next.proceed(ex);

@@ -1,0 +1,117 @@
+---
+type: Concept
+title: HTTP Control API
+description: The JDK HttpServer control plane — manual DI, virtual-thread requests, the dispatch seam, route families, the /api/v1 surface, editions-aware auth.
+resource: inspecto/src/main/java/com/gamma/control/ControlApi.java
+tags: [control-plane, http, api, routes, v1, editions]
+timestamp: 2026-07-07T00:00:00Z
+---
+
+# HTTP Control API
+
+`ControlApi` (`inspecto/src/main/java/com/gamma/control/ControlApi.java`) is the control plane. It builds a
+`com.sun.net.httpserver.HttpServer` (JDK built-in, zero added deps), sets a
+`newVirtualThreadPerTaskExecutor()` (a fresh virtual thread per request), registers routes, and binds a
+single catch-all `dispatch` context on `/`.
+
+## Launch
+
+`ControlApi.main` is the server entry: if `-Dspaces.root` is set it `SpaceManager.discover(...)`s, else it
+builds a single `CollectorService` wrapped via `SpaceManager.single(...)`. Port from `-Dcontrol.port` (default
+8080); a shutdown hook closes the API + spaces. (`com.gamma.inspector.MainApp` is a **separate** CLI pre-ETL tool
+suite, not the server — see [build & run](../../layer/platform/admin-guide-launch-flags.md).)
+
+## `dispatch`
+
+Per request: strip an optional `/api` prefix (Angular dev-proxy); apply CORS if `-Dcontrol.cors` set; answer
+`OPTIONS` preflight; match the `/spaces/{id}/…` seam (extract + validate id, rewrite path, bind the `space`
+MDC — see [multi-space](architecture-multi-space.md)); match `routes` by pattern+method; fall through to static SPA assets
+for unmatched GETs (`-Dui.dir`); always clear the space MDC in `finally`.
+
+## Request-scoped attributes — never the JDK's exchange map
+
+Everything a stage stamps for later stages (`ATTR_EFFECTIVE_PATH`, `ATTR_SUBJECT`, `ATTR_RAW_BODY`,
+correlation id, idempotency, pagination, `ATTR_HELD_ROLES`, `ATTR_MATCHED_POLICY`) lives in
+`ApiContext.REQUEST_SCOPES` — a map keyed by exchange **identity**, dropped in the outermost stage's
+`finally` — accessed via `ApiContext.attr(ex, key[, value])` in-package and via the typed seams
+`Roles.configRoot` / `ComponentAccess.heldRoles` / `AccessDecider.matchedPolicy` from the security and
+policy modules. **Never store request state via `HttpExchange.set/getAttribute`:** on any pre-JDK-26
+runtime (the bundle embeds GraalVM 25) that map is the *shared HttpContext map*, one map for every
+in-flight request. The route-matching path once rode it, and concurrent bursts crossed requests — the
+server served one URL with another request's file (BACKLOG §5 BUNDLE-1, closed `fb1511c0`: 53/1200
+crossed on GraalVM 25, 0/3000 with the fix). The reactor gate runs on JDK 26, where exchange attributes
+are per-exchange — **it structurally cannot catch a regression here**; the pins are
+`ExchangeAttributeScopeTest` (two exchanges sharing one JDK map stay isolated, and the shared map stays
+empty) and, for behaviour, a concurrent probe against the *shipped* runtime
+(`inspecto-deploy/runtime/bin/java.exe`). The static handler's `-Dui.static.log=DEBUG` line logs
+`served=<file>` beside the request URL precisely so a crossed pairing is visible in one grep.
+
+## Route families
+
+Registered via `RouteModule`s: health/ready (`/health`,`/ready`), metrics (`/metrics`, Prometheus text),
+spaces (`/spaces`,`/spaces/_meta`), pipelines, jobs (`/jobs/{name}/runs|trigger`), events
+(`/events/search|export|views` — ⚠ the OPTIONAL `inspecto-observability` module since EDG-01 cell 6, 503 on Personal; the core audit read is `/audit/search|export`), connections, components ([registry](spec-component-registry.md)),
+objects (ops), catalog, config/assist, enrichment, per-space settings docs (`/settings/branding|geo` and
+`/nav/menus` — the Menu Builder tree; each a fixed-filename TOON in the space's config tree, PUT gated by
+write-root 503 + `canAuthorWorkbench`, no jail/conflict gates since nothing caller-supplied touches a path.
+**`/nav/menus` is gated by `canCurateMenus`** — split out of `canAuthorWorkbench` on 2026-07-25 (D4,
+shipped end-to-end `fc637b1b`/`0c375ff5`; `okf/product/module/access/admin-guide-auth-security.md`). ⚠ This paragraph said
+until 2026-09-08 that curation reused `canAuthorWorkbench` and that the split "stays an open product
+question" — both were superseded the same day they were written. Since UIE-7 (2026-09-25) the PUT also 422s
+an unsafe `kind: route` binding target and a `landing` that names no leaf — see
+[`surfaces.md` §3.4](../../layer/product/plan-surfaces.md))
+— plus the v1-era additions: `GET /bootstrap`
+(server capabilities incl. `features.authMode`), `/auth/*` (the Standard-edition BFF session routes),
+`POST /queries/{id}/run` (the `com.gamma.query` catalog, W4), and async run polling
+(`GET /jobs/runs/{runId}`, `GET /runs/runs/{runId}`).
+
+## Shared route plumbing (as-built 2026-08-27)
+
+Consolidated by the Phase-1 simplification arc (plan archived at
+`archived-documents/plans-archive/java-simplification-plan.md`). These are the homes to reuse — do
+not re-introduce per-class copies:
+
+- **`RouteErrors`** — the domain-exception → status mappers, one per contract shape:
+  `mapErrors` (404/400 lookup), `mapCaseErrors` (404/422/400 case workflow),
+  `mapPreviewErrors` (400/422 preview, takes a checked-throwing `PreviewSupplier`), plus
+  `exists(store,type,id)` / `existing(store,type,label,id)` — the component-existence gate that five
+  route classes used to copy, parameterised by type constant with the 404 noun as `label` so every
+  message stays byte-identical. ⚠ Sites whose mapping genuinely differs keep their local shape.
+- **`SpiSlot<T>`** — the edition-seam lookup (first-wins `ServiceLoader`, cached, `forTest` override).
+  `Authenticators` / `AccessDeciders` / `TokenRelays` are thin typed facades over one slot each; the
+  facade *names* are the documented seam and stay. ⛔ Do NOT generalise this to the collect-all
+  ServiceLoader sites (`Parsers`, `Decompressors`, `PipelineNodeTypes`, `JobPackManager`, …) — each
+  carries semantic per-element logic (id validation, override layering, best-suffix match,
+  same-classloader filter) and was measured as not worth unifying.
+- **`WriteGates`** — the 4-gate write chain, already fully converged before that arc (28 files, 120
+  call sites; no hand-rolled duplicates exist).
+
+**Route-module granularity.** `PipelineRoutes` (1677 lines, 20 routes) became
+`PipelineListRoutes` / `PipelineGraphRoutes` / `PipelineSettingsRoutes` / `PipelineRenameRoutes`
+plus `PipelineSupport` (the three genuinely shared statics: `liftedPipelines` — also
+`ComponentRoutes`' safe-delete check — `pipelinesRootOrNull`, `findingKey`). `ConfigRoutes`' 10
+routes became `ConfigPreviewRoutes` / `ConfigWriteRoutes` / `ConfigReadRoutes` plus
+`ConfigFileSupport`. ⚠ **`ConfigRoutes` still exists** and is no longer a `RouteModule` — it is the
+static findings-helper home (`schemaFileFindings`, `armedWithoutSchemaFindings`,
+`routeArmingFindings`, `unknownConnectionFindings`, `resolves`), because `PipelineRoutes`'
+successors, `RunRoutes`, `DataSourceRoutes` and `SchemaFileFindingsTest` all call it statically.
+Registration order in `ControlApi` is preserved and load-bearing (`/config/spec/…` must register
+before the generic two-segment read).
+
+## `/api/v1`
+
+Every business route is dispatched **only** under the versioned **`/api/v1`** prefix (API-5, 2026-07-25)
+with a success/error **envelope** (structured errors from the `ErrorCodes` catalog), `WriteGates`, a
+`Correlation-ID` response header, and gzip (W1). The unversioned allow-list is `isInfraRoute` (`/health`,
+`/ready`, `/metrics`, `/metrics/acquisition`); `recordLegacyUsage` and the whole sunset apparatus were
+**deleted** with the surface. *(This section described the legacy routes as still served until 2026-09-08.)*
+Contract detail: [API v1](api-v1.md); requirement of record:
+[Control API capability spec](plan-control-api.md).
+
+## Auth by edition
+
+The core/Personal edition is **auth-free**: every route is open — no token, guard, or login. On **Standard**
+the `inspecto-oidc` module (reactor-gated behind the `edition-standard` Maven profile) enforces OIDC by
+implementing the `Authenticator` / `Subject` / `TokenRelay` SPIs in `com.gamma.control` (see
+[auth & security](../access/admin-guide-auth-security.md)). The `-Dassist.write.root` 503 write-gate is **separate** from
+auth and stays in all editions.

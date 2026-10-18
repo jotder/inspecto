@@ -1,0 +1,435 @@
+---
+type: Reference
+title: Performance assessment & bottleneck analysis
+description: Measured stage-isolated benchmark results (JDK 26 / DuckDB 1.5.2 via PipelineBenchmark) — why ingest is the bottleneck, how its cost scales with total cells, the root causes, the concurrency model and the native-path resolution.
+resource: platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineBenchmark.java
+tags: [performance, benchmark, duckdb, ingest, concurrency, bottleneck]
+timestamp: 2026-07-16T00:00:00Z
+---
+
+# Performance Assessment & Bottleneck Analysis
+> **Deep reference — the detail tier.** Start at [Build & run section index](../../index.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `tests-performance.md` (docs consolidation, 2026-07-16).)*
+
+Measured on JDK 26 / DuckDB 1.5.2 via `PipelineBenchmark` (a stage-isolating
+benchmark in the test tree). Reproduce with:
+
+```
+mvn -Dtest=PipelineBenchmark -DfailIfNoTests=false -Dbench.run=true \
+    -Dbench.rows=2000000 -Dbench.cols=12 -Dbench.engine=java -Dbench.format=PARQUET test
+# swap -Dbench.engine=duckdb for the native reader
+```
+
+> **RESOLVED in v1.4.0** — the ingest bottleneck identified below is fixed by
+> the native `DuckDbCsvIngester` (see "Resolution" at the bottom). The analysis
+> is kept for the record and because the Java path remains the fallback for
+> messy-file configs.
+
+> **Re-measured v3.9.0 (engine modularity pass).** The behavior-injection refactor
+> ([design-notes D7](../../../../archived-documents/design-notes.md#d7--engine-modularity-pass-behavior-injection-seams--done-v390))
+> touched the **transform** stage (`DataTransformer` now delegates per-column SQL to
+> `TransformCompiler`) and the **write** stage (`PartitionWriter` resolves format via the
+> `OutputFormat` enum). Re-running the 2M-row × 12-col × PARQUET scenario on JDK 26 shows
+> **no regression** — transform `1.4–1.8 s` (≈1.1–1.4M rows/s) and write `1.9 s`
+> (≈1.0M rows/s), matching the pre-refactor figures in the table below. Expected: both
+> seams run **once per column / once per write**, not per row, so the vectorized per-row
+> cost is unchanged. Ingest re-measured at `3.5 s` (duckdb) / `15.6 s` (java), also in line.
+
+## Headline: ingest is the bottleneck
+
+For a 2,000,000-row × 12-column file → PARQUET, 30 date partitions:
+
+| Stage | Time | Throughput | Share |
+|---|---|---|---|
+| **ingest** (Java CSV parse + DuckDB appender) | **15.5 s** | 129K rows/s | **~78%** |
+| tag (union / `__src_id`) | 1.4 s | — | 7% |
+| transform (`CREATE TABLE AS SELECT`) | 1.4 s | 1.42M rows/s | 7% |
+| write (`COPY … PARTITION_BY` + reveal) | 1.8 s | 1.09M rows/s | 9% |
+| lineage (`GROUP BY`) | 0.02 s | — | <1% |
+
+The DuckDB-native stages (transform, write) run at **1.0–1.4M rows/s**. The
+Java-side ingest runs at **129K rows/s** — an order of magnitude slower — and
+dominates wall-clock time. Everything downstream of ingest is effectively free
+by comparison.
+
+## Ingest cost scales with total cells
+
+Ingest time is roughly linear in (rows × columns), at **~0.6–1.0 µs per cell**:
+
+| Columns | Ingest (2M rows) | rows/s | µs/cell |
+|---|---|---|---|
+| 3 | 5.2 s | 384K | 0.87 |
+| 12 | 15.5 s | 129K | 0.65 |
+| 40 | 79.3 s | 25K | 0.99 |
+
+**Implication for wide schemas.** The real workloads are wide:
+`voucher_unknown_76.toon` is 76 columns, and `SchemaSelector`'s own comments
+reference a 537-column CDR variant. Extrapolating at ~0.8 µs/cell:
+
+| Schema | Cols | 2M-row ingest (projected) |
+|---|---|---|
+| adjustment / generic | ~12 | ~16 s |
+| voucher | 76 | ~120 s (2 min) |
+| 537-col CDR | 537 | ~860 s (14 min) |
+
+Per-file ingest latency on the widest schemas is the practical ceiling on this
+pipeline's throughput.
+
+## Why ingest is slow — root causes
+
+Three costs in `CsvIngester`'s per-row loop, in rough order of impact:
+
+1. **Per-cell JNI into the DuckDB appender.** `appender.append(value)` is one
+   JNI crossing per cell — 40 cols × 2M rows = 80M native calls. This is the
+   single largest contributor and the reason cost scales with column count.
+   The appender *is* DuckDB's recommended bulk-insert API, so this is mostly
+   intrinsic; the lever is reducing the number of cells touched, not the API.
+
+2. **`parser.parseLine(line)` per line.** univocity's one-line-at-a-time API
+   re-initializes parser state per call. Its streaming iterator
+   (`beginParsing(reader)` + `parseNext()`) reuses internal buffers and is
+   materially faster for bulk parsing, but the current skip/junk/tail/echo
+   line-handling logic is built around `BufferedReader.readLine()`, so adopting
+   it is a non-trivial refactor (see "Recommended next steps").
+
+3. **Selector string-parse in the loop (FIXED in v1.3.3).** The previous code
+   ran `Integer.parseInt(String.valueOf(field.get("selector")))` for every cell
+   of every row — 24M string parses on a 2M×12 file. Hoisting the selectors to
+   an `int[]` once before the loop gave a measured **~13% ingest speedup**
+   (17.84 s → 15.49 s at 12 cols). Shipped.
+
+## Concurrency model (v1.5.0)
+
+Ingest is single-threaded *within* a file (sequential read; cannot be
+parallelized for one input). Aggregate throughput comes from batch-level
+parallelism: `CollectorProcessor` submits every batch to a virtual-thread executor
+bounded by `Semaphore(cfg.processing().threads())`, so up to `processing.threads` batches ingest
+simultaneously while blocked batches park cheaply instead of pinning platform
+threads. Per-file latency is still fixed by single-threaded ingest (now ~4–5×
+lower thanks to the native engine below).
+
+⚠ **Raising `processing.threads` helps the native lane; it helped the Java lane only after 2026-09-14.** Before
+that date the Java appender lane got SLOWER under concurrency: every per-batch temp DB ran DuckDB's default
+16 MB WAL auto-checkpoint, a synchronous write per ~10 appender flushes that serialised the batches on a
+laptop SSD (all workers parked in `duckdb_appender_flush`, CPU ~20 %). `ConsignmentIngestStrategy.configure()`
+now sets `checkpoint_threshold='1TB'` on those disposable connections. One limit remains on that lane, and it is
+**documented here rather than tracked** (`JAVA-INGEST-APPENDER-SERIAL-1` was CLOSED 2026-09-15 with no
+open engineering — this page owns the as-built): on Windows the process heap halves 12-way appender
+throughput versus Linux, because **DuckDB bundles jemalloc on Linux only**. ⇒ **run the ingest tier on
+Linux**; a Windows host is supported but pays that penalty on wide string appends, and it is an allocator
+difference, not a tuning knob — no `processing.*` setting recovers it. Delimited feeds on a clean config
+take the native lane and are not affected.
+
+⚠ **`readRecord`'s quote pre-scan was the other suspected limit, and measurement REFUTED it as one**
+(2026-09-14). A JFR profile attributed roughly a third of the Java lane's CPU to `endsInsideQuotedField`,
+so it was carried as "fold it into the univocity pass". An `indexOf` fast path now answers quote-free
+lines without the per-character walk, and it is **38× cheaper in isolation** (927 ns → 24 ns on a
+789-char, 100-column line) — yet end-to-end it is worth about **1.7 %** (100 cols, 4 × 100K rows,
+`engine=java`, `threads=1`: three baseline runs 24.29 / 24.42 / 24.45 s against two fixed runs
+23.73 / 24.20 s — consistent in direction, tiny in size). 🔴 **The lesson generalises: a third of the
+*Java* CPU is not a third of the *wall clock* when the lane spends most of its time in a native frame**
+(`duckdb_appender_flush`). ⛔ Do not schedule the larger univocity rework on that profile alone.
+
+⛔ **Do not reopen this lane for appender-flush batching or a Java-path concurrency cap** without a fresh
+measurement showing they buy something on top of the shipped fix. Those were remedies (a)-(c) on the
+original row; **none was built, and none is owed** — the fix came from (d), a cause nobody had listed.
+⚠ The row's own acceptance test — *"a two-batch Java-path run must take < 1.2× a one-batch run at equal
+total rows"* — is met; 12 batches went from 8K to **34.5K rows/s**.
+
+**Two controllable axes** (set both to keep the CPU honest):
+
+| Knob | Controls | Default |
+|---|---|---|
+| `processing.threads` | how many batches run concurrently (semaphore permits) | **logical cores** (was 4 until 2026-09-14) |
+| `processing.duckdb_threads` | `PRAGMA threads=N` per batch's DuckDB connection | 0 = **auto** (`cores ÷ threads`) |
+
+The inner/outer interaction: each concurrent batch opens its own DuckDB
+connection, and DuckDB defaults to one thread per core. So with `threads=4` and
+an *unmanaged* per-core default on a 16-core box you would momentarily have
+4 × 16 = 64 DuckDB workers fighting over 16 CPUs — the classic ~100%-sys / ~2%-user
+oversubscription stall (felt acutely on big-core boxes: 16 batches × 56 cores ≈ 896 workers).
+
+**Since v3.12.0 this is handled by default.** `duckdb_threads=0` (the default) now
+**auto-derives** `max(1, cores ÷ threads)` so the concurrent batches divide the cores
+(e.g. `threads=4` on 16 cores → 4 each; `threads=16` on 56 cores → 3 each). A single
+batch (`threads ≤ 1`) still gets all cores. Overrides:
+
+- **positive N** — use exactly `N` threads per batch (manual tuning; honored verbatim).
+- **`-1`** — opt out: leave DuckDB's per-core default even under concurrency (when you
+  deliberately want one batch to use the whole machine).
+
+`ConfigValidator` warns when an *explicit* `threads × duckdb_threads` exceeds the core
+count; the `0` default is self-managing and never trips it.
+
+### Inbox discovery — parallel duplicate check (v3.12.0)
+
+Before any batch runs, `CollectorProcessor` scans `dirs.poll` for matching files and drops the
+ones already processed in a prior run. The directory walk is one tree traversal, but the
+per-file duplicate check is a **filesystem stat** (`Files.exists` on the marker mirror under
+`dirs.markers`). On an inbox of tens of thousands of files that stat *latency* — not CPU —
+dominates the scan, and it serialises ahead of the first batch.
+
+The scan is now split: one walk collects the matching regular files, then the marker check
+runs in parallel (`parallelStream`, bounded to ≈ cores by the common pool — each task is a
+single short stat, so briefly parking a carrier is fine and there's no oversubscription).
+`BatchPlanner` re-sorts candidates by path, so parallelising the filter changes nothing about
+batch composition or output. Parallelism is gated on `processing.threads > 1`; a deliberately
+single-threaded run keeps its sequential scan, and it's skipped entirely when
+`duplicate_check.enabled = false` (no stat to do).
+
+## Resolution — native DuckDB CSV engine (v1.4.0)
+
+`DuckDbCsvIngester` replaces the Java parse+appender loop with DuckDB's native
+`read_csv` for well-formed files. Selectable via `csv_settings.engine`:
+
+| `engine` | Behaviour |
+|---|---|
+| `auto` (default) | Native reader when `skip_junk_lines`/`skip_tail_lines`/`skip_tail_columns` are all `0`; Java parser otherwise. No semantic change for any messy-configured source. |
+| `duckdb` | Always native (operator accepts the too-many-columns rejection difference). |
+| `java` | Always the original Java parser. |
+
+**Measured speedup** (2M rows → PARQUET, JDK 26 / DuckDB 1.5.2):
+
+| Cols | Java ingest | DuckDB ingest | Speedup |
+|---|---|---|---|
+| 12 | 15.7 s (127K r/s) | 3.8 s (523K r/s) | **4.1×** |
+| 40 | 80.2 s (25K r/s) | 16.0 s (125K r/s) | **5.0×** |
+
+The speedup grows with column count — exactly where the Java path was worst.
+Projected onto the wide schemas: the 537-col CDR file drops from ~14 min to
+~3 min of ingest per 2M-row file.
+
+**Correctness.** `DuckDbCsvIngesterTest.parityWithJavaEngineOnCleanFile` asserts
+byte-identical table contents between the two engines on clean input. Short
+rows, footers, and blank lines are rejected identically via
+`ignore_errors=true, null_padding=false`; rejected rows are captured from
+DuckDB's `reject_errors` table into the same `errors/<base>_errors.csv` the Java
+path writes. The existing `ConsignmentIngestorTest` / `CollectorProcessorPollTest`
+configs are clean, so `auto` already runs them through the native engine and
+they pass unchanged.
+
+**The one semantic difference** (documented, handled by routing): DuckDB rejects
+rows with *more* columns than declared (`TOO MANY COLUMNS`); the Java path keeps
+them and ignores the extras. That's what `skip_tail_columns` is for, so `auto`
+routes any config using it to the Java path. `ConfigValidator` warns if `duckdb`
+is forced alongside `skip_tail_columns > 0`.
+
+## Remaining options (not pursued — native engine made them unnecessary)
+
+- **univocity streaming (`parseNext()`)** would speed up the Java *fallback*
+  path, but the fallback now only runs for genuinely messy files where
+  throughput matters less. Revisit only if a high-volume source genuinely needs
+  `skip_tail_columns`.
+- **Raise `batch.max_files` / `threads`** still helps aggregate throughput
+  regardless of engine (more files in flight). `ConfigValidator` warns when
+  `threads > 1` but `batch.max_files = 1`.
+
+## What's already fast — leave it alone
+
+- **transform / write / lineage** run at 1–1.4M rows/s on DuckDB's vectorized
+  engine. No optimization needed; don't add complexity here.
+- **PARQUET vs CSV output** — write cost is dominated by the DuckDB `COPY`, not the
+  format. The post-COPY reveal (a two-step atomic rename per partition file) is cheap
+  at low fan-out; at *high* partition cardinality the serial rename loop starts to show,
+  so since **v3.12.0** the reveal runs in parallel once there are ≥ 16 staged files
+  (`PartitionWriter.REVEAL_PARALLEL_THRESHOLD`) — each file targets a distinct partition
+  directory so the renames don't contend, and the temp name embeds the staged file name
+  so parallel reveals into the same directory can't collide. Below the threshold it stays
+  a sequential loop (byte-identical to before, no fork/join overhead).
+- **Partition fan-out** is cheap: 30 distinct dates → 30 output files added no
+  measurable cost over a single partition. Thousands of partitions (high-cardinality
+  partition keys) is where the parallel reveal above earns its keep.
+
+## Executed-Step bridge cost (S2-2, 2026-09-28)
+
+This prices an `EXECUTED` pipeline Step, which is imperative JVM code between map and the write,
+against the fused flat lane. The source is `BridgeSpikeBenchmark` in
+`platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/`, run on JDK 27 and DuckDB 1.5.2 with 12
+cores, an in-memory database and 2M mixed-type rows. Figures are the median of 5 warm runs, node plus
+the same Parquet `COPY`.
+
+| Variant | 10 cols rows/s | 50 cols rows/s | ÷ fused (10 / 50) |
+|---|---:|---:|---|
+| V0 fused (nothing between) | 4.81M | 815K | 1.00× / 1.00× |
+| V1 one extra built-in CTAS | 3.47M | 618K | 1.39× / 1.32× |
+| V2 JDBC read + Appender write | 150K | 20.8K | 32× / 39× |
+
+The bridge costs ~0.6–0.9 µs per cell. That is the same order as the Java CSV parse above, and it scales
+with cells the same way. The full method and the conclusions are in
+[Platform Services §7b](../../module/processor/spec-platform-services.md#7b-s2-2--the-bridge-spike-measured-2026-09-28).
+
+S2-3 added variant **S**: the V2 no-op as a real `StepExecutor`, run through `StepRunner` with its own
+thread, watchdog and engine-owned appender. The harness asserts that S's node time is within 1.5× of
+V2's. On 2026-09-28, at 2M rows × 10 columns and 3 runs, S took 5,808 ms against V2's 6,254 ms. The
+seam adds nothing to the bridge. That day's host was about twice as fast as the S2-2 run: V2 came in at
+27.9× fused, not 32×.
+
+Reproduce:
+
+```
+mvn -o -pl :inspecto-engine -am test -Dtest=BridgeSpikeBenchmark -Dsurefire.failIfNoSpecifiedTests=false     -Dbench.run=true -Dbench.rows=2000000 -Dbench.cols=10,50 -Dbench.runs=5
+```
+
+## Very large single files (3.10.0)
+
+For a multi-hundred-GB / TB single file the bottleneck is **scratch**, not CPU — DuckDB's
+native `read_csv` already parallelises across the whole file. Two changes target scratch:
+
+- **Scratch off `/tmp`.** The per-batch temp DB + DuckDB spill default to `dirs.temp` (data
+  volume), tunable via `processing.duckdb.{temp_directory,memory_limit,max_temp_directory_size}`.
+  Previously both went to `java.io.tmpdir` (system `/tmp`), which fails fast on big inputs.
+- **One materialization, not 2–3×.** Native (`read_csv`) batches stream `read_csv → transform →
+  COPY` through lazy views, so only the `transformed` table is materialised (peak scratch ~1×
+  the decoded data) instead of `raw_f<id>` + `raw_input` + `transformed` (~2–3×). A *single-member*
+  batch streams its one file through a `raw_input` view; a *multi-member* batch (v3.12.0) builds one
+  lazy `read_csv` view per member and `UNION ALL`s them into a single `raw_input` view that one
+  transform pulls through — so a consolidated many-file batch is also materialised exactly once
+  rather than copying every member into `raw_f<id>` then into `raw_input` first. Per-member
+  quarantine is preserved (each member is probed with a `COUNT(*)` over its view; an unreadable
+  file throws and is quarantined individually). Fewer intermediate writes also means less I/O —
+  faster, not just smaller. The `transformed` table is deliberately kept (the DuckDB-AVX2 COPY
+  workaround depends on it). *(The Java parse engine still stages per-member tables — line-by-line
+  parsing can't stream through a view.)*
+- **`processing.chunking`** bounds peak scratch to ~one chunk regardless of file size; the split
+  is a single sequential read (cheap vs the materialization it avoids). Chunks process
+  sequentially today — each is already internally multi-threaded, so cores stay busy.
+
+### Plugin ingestion: one SPI, two size-routed modes
+
+Custom (binary / proprietary / ASN.1) files go through the single `StreamingFileIngester` SPI; the
+framework picks an execution mode per batch by file size (`processing.streaming.large_file_bytes`,
+default 256 MB):
+
+- **Union mode** (many small files) — members accumulate into per-member raw tables, which are then
+  consolidated through a lazy `UNION ALL` **view** (since v3.12.0) that one transform/write pulls
+  through per batch. Output is **consolidated** (one set of partition files), and the fixed per-batch
+  cost is amortised across all packed files (raise `collector.consignment.max_files`). The view replaced an
+  intermediate physical `raw_<KEY>` table that every member's rows were copied into before transform,
+  so the batch now materialises once (`transformed_<KEY>`) instead of twice — peak scratch drops by
+  ~1× the segment's data and a full copy pass is gone. Mirrors the native CSV streaming-UNION path.
+- **Generation mode** (a huge single file) — records flush in bounded generations (default 5M rows via
+  `processing.streaming.flush_records`); peak heap and scratch stay bounded regardless of total size,
+  without any auto-chunker (which can't split an opaque format).
+
+**Insert path: DuckDB Appender, not JDBC.** Both `DuckDbRecordSink` and the reference
+`TypedRecordIngester` bulk-load via the DuckDB **Appender** API. Measured on 1M `ID,EVT_DATE` rows
+(`PluginIngestBenchmark`): the old JDBC `PreparedStatement.executeBatch` path ran ~6.9K rows/s; the
+Appender path runs **~520–530K rows/s — ~75× faster**, at parity with the native CSV `duckdb` engine.
+This is what makes union-mode many-small-files throughput acceptable and shrinks the single-threaded
+ingest trough that otherwise starves many-core hosts (see [troubleshooting → CPU](architecture-troubleshooting.md)).
+
+Mode comparison (`PluginIngestBenchmark`, 500K rows, PARQUET, 30 day-partitions): union ≈ 233K rows/s /
+30 consolidated files / 23 MB peak; generation (4 gens) ≈ 202K rows/s / 120 files / 15 MB peak — i.e.
+generation trades output fragmentation and a little throughput for bounded memory. See
+[plugins.md → execution modes](../../module/engine/spec-plugin-ingester.md#execution-modes--the-framework-picks-by-file-size) and
+[design-notes D9/D10](../../../../archived-documents/design-notes.md).
+
+## Nightly throughput floor (ASSURE-OPERABILITY-1, 2026-09-29)
+
+`.github/workflows/nightly-perf.yml` runs `PluginIngestBenchmark` nightly (and on `workflow_dispatch`) at a
+**fixed** size — 1,000,000 rows, 30 day-partitions, PARQUET — with `-Dbench.floorRowsPerSec=50000`. The
+benchmark asserts union-mode throughput against that property (unset = no floor, so manual runs are
+unchanged).
+
+Measured baseline the floor came from — three runs on 2026-09-29, 12-core Windows dev host, JDK 27,
+`mvn -o -pl :inspecto-engine -am test -Dtest=PluginIngestBenchmark ... -Dbench.rows=1000000`:
+
+| run | union rows/s | generation (4 gens) rows/s |
+|---|---|---|
+| 1 | 192,881 | 204,681 |
+| 2 | 148,906 | 132,695 |
+| 3 | 138,636 | 152,337 |
+
+Floor = **50,000 rows/s**, ~2.8× headroom under the slowest run, because a shared 4-vCPU hosted runner is
+slower and noisier than the dev host. The negative was checked: a floor of 100,000,000 fails the test with
+`union throughput … is below the floor`. ⚠ The size is part of the floor: at 200K rows the fixed per-batch
+cost dominates (measured 74K rows/s), so re-measure before changing `bench.rows`. ⚠ No runner number exists
+yet — the first nightly run is the first; tighten the floor only from runner numbers (logged as
+`floor check: union N rows/s`).
+
+## Mixed load: ingest while dashboards query (2026-09-29)
+
+`MixedLoadBenchmark` (`inspecto/src/test/java/com/gamma/inspector/`, gated on `-Dbench.run=true`) runs
+the same streaming plugin ingest (1M rows → PARQUET) while N threads loop `POST /api/v1/bi/query` against a
+real `ControlApi` over HTTP. The readers' Dataset is a view aggregating `range(2,000,000)` by a 30-value key —
+a CPU-bound dashboard query on the same host and DuckDB library; it does **not** read the files being
+written. Phases: readers alone (5 s), ingest alone, then both.
+
+```
+mvn -o -pl inspecto -am test -Dtest=MixedLoadBenchmark -Dsurefire.failIfNoSpecifiedTests=false \
+    -Dbench.run=true -Dbench.rows=1000000 -Dbench.readers=4
+```
+
+Measured 2026-09-29, same 12-core dev host, one run each:
+
+| readers | ingest alone | ingest + readers | reader p50 / p95 alone | reader p50 / p95 during ingest | errors |
+|---|---|---|---|---|---|
+| 4 | 200,778 rows/s | 159,692 rows/s (80%) | 548 / 743 ms, 7.0 q/s | 628 / 824 ms, 6.0 q/s | 0 |
+| 8 | 118,363 rows/s | 88,924 rows/s (75%) | 1,255 / 2,035 ms, 5.5 q/s | 1,434 / 2,479 ms, 5.1 q/s | 0 |
+
+Reading: concurrent dashboards cost ingest ~20–25% of its throughput and add ~15% to reader latency; no
+query failed. Reader throughput saturates near 5–7 q/s for this query shape regardless of reader count, so
+beyond ~4 readers the extra threads only queue (p50 doubles from 4 to 8). ⚠ The two "ingest alone" numbers
+differ 1.7× between runs on the same host — the dev host is shared, so compare phases *within* a run, not
+across runs. These are single runs on a developer box, not customer sizing (which stays parked).
+
+### Nightly mixed-load floor (2026-10-14)
+
+`nightly-perf.yml` job `mixed-load-floor` runs `MixedLoadBenchmark` at 1M rows with 4 readers and fails when
+ingest under reader load drops below **30,000 rows/s** (`-Dbench.mixedFloorRowsPerSec`) or reader p95 during
+that ingest exceeds **5,000 ms** (`-Dbench.readerP95CeilingMs`); both are unset = unchecked for manual runs.
+Three runs on the 12-core Windows dev host, JDK 27, 2026-10-14:
+
+| run | ingest alone | ingest + readers | reader p95 alone | reader p95 during ingest | errors |
+|---|---|---|---|---|---|
+| 1 | 316,380 rows/s | 243,624 rows/s (77%) | 450 ms | 639 ms | 0 |
+| 2 | 326,372 rows/s | 263,119 rows/s (81%) | 402 ms | 528 ms | 0 |
+| 3 | 304,336 rows/s | 253,346 rows/s (83%) | 485 ms | 633 ms | 0 |
+
+Both thresholds sit ~8x outside the worst run because the 4-vCPU hosted runner shares its cores between the
+ingest and four CPU-bound readers. Negatives checked: a floor of 1,000,000,000 and a ceiling of 1 ms each fail
+the test; the real thresholds pass. Nightly + on-demand only (never `ci.yml`).
+
+**Runner numbers and the throttle fix (2026-10-18).** The first runner runs (2026-10-14/15) passed; the
+2026-10-15 run logged ingest 635,419 rows/s alone, 241,086 rows/s (38%) under readers, reader p95 477 ms during
+ingest. 2026-10-16 and 10-17 went RED with `every /bi/query must answer 200 under load` (10-17: 652 of 705
+reader queries refused, p50 4 ms). Cause: the readers hit the production `/bi/query` dashboard bucket
+(`RateLimiter.dashboard()`, burst 120, then 2/s, one key since the benchmark is unauthenticated). The runner's
+solo phase alone spent 89 tokens (17.4 q/s), so the mixed phase got fast 429s. The benchmark was measuring the
+throttle. Fix: the dashboard bucket reads `-Dcontrol.rateLimit.dashboard.capacity` / `.refillPerSecond` like
+the other tunable buckets (a malformed or non-positive value keeps the default; `RateLimiterBudgetTest`), and
+`MixedLoadBenchmark` raises both to 1e9 for its own `ControlApi`. A failing reader run now also prints the
+refusals by HTTP status / exception. The thresholds are unchanged; ⚠ tighten them only from a green runner
+run after this fix.
+
+## DuckDB version comparison harness
+
+Like-for-like timing of the SAME workloads on two DuckDB versions (built for the 1.5.x to 2.0.x move). Run each side on an
+**idle machine** (no concurrent Maven/test work; it contaminates timings), with `JAVA_HOME` on JDK 27 (the JSON records the JVM).
+The JDBC jar for each version must be in `~/.m2`.
+
+```
+tools/bench-duckdb.ps1 -Label v1.5.6 -OutDir C:\bench -DuckDbVersion 1.5.6.0
+tools/bench-duckdb.ps1 -Label v2.0a  -OutDir C:\bench -DuckDbVersion 2.0.0-alpha43385-881
+node tools/bench-duckdb-compare.mjs C:\bench\v1.5.6.json C:\bench\v2.0a.json
+```
+
+Options: `-Workloads scan,readers,csv,store,la1m,la10m,la100m,engine` (default: all but `la100m`), `-Warmup 1 -Reps 3`,
+`-Scale 1.0` (row-count multiplier), `-CorpusDir`, `-ScaleDir`. One JSON per run (`<OutDir>/<Label>.json`: DuckDB `version()`,
+JVM, host, params, raw per-rep samples per metric, peak RSS) plus per-workload logs. The compare script reports medians,
+% delta (B vs A) and flags a delta as *within noise* when it is under max(5%, either side's p95 spread); `_ms` is
+lower-is-better, `_rps`/`_qps` higher-is-better.
+
+| Workload | Where it runs | Exercises |
+|---|---|---|
+| `scan` | `tools/bench/DuckDbBench.java` | 5M-row parquet Dataset: filter+aggregate, high-cardinality group-by, count distinct, top-N |
+| `readers` | `DuckDbBench.java` | 1/4/8 concurrent readers (`duplicate()` connections) on one file-backed database |
+| `csv` | `DuckDbBench.java` | 2M-row `read_csv`, transform SQL, `COPY ... PARTITION_BY` parquet (the `DuckDbCsvIngester` shape) |
+| `store` | `DuckDbBench.java` | file-backed INSERT / `ON CONFLICT` throughput in the dedup-ledger, status, events and status re-sync shapes (same SQL idioms as the `Db*Store` classes, not the classes themselves) |
+| `la1m`, `la10m`, `la100m` | `IndexScaleBench` via `mvn -o -pl :inspecto-la-storage` | index build (once per label), one-hop (1 and 20 keys), hub key, depth-2 walk; p50/p95 per rep. 1M/10M reuse the `-ScaleDir` data and build a per-label index under `<OutDir>`; `la100m` is **read-only** on the existing `idx-100000000` |
+| `engine` | `PluginIngestBenchmark` via `mvn -o -pl :inspecto-engine` | the engine's real streaming ingest, transform and partitioned parquet write, union and generation modes (1M rows x `-Scale`) |
+
+Gotchas: the two `mvn` workloads use `-Dduckdb.version=<v>` and the sibling jars already in `~/.m2` (no `-am`), and report no
+peak RSS; the harness cannot see which DuckDB the forked JVM loaded beyond that property, so read `duckdbVersion` from the
+`DuckDbBench` workloads. The `scan`/`csv` corpus is generated once into `-CorpusDir` and shared across labels; databases are
+never shared across versions (the storage format differs). Estimated wall time at `-Warmup 1 -Reps 3`: scan ~1 min,
+readers ~1 min, csv ~1 min, store ~1 min, la1m ~3 min, la10m ~8 min (index build each), engine ~4 min, la100m ~4 min (read-only).

@@ -1,0 +1,29 @@
+---
+type: ProductItem
+title: ETL model and step registry
+item: module.etl
+description: Documentation hub for module.etl — every document about it, by slot.
+tags: [product-item, module]
+---
+
+# ETL model and step registry (`module.etl`)
+
+> **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
+> [`module.etl`](../../../../../product-map/module/etl.toon). Editions, add-ons, order codes and dependencies are read
+> from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
+> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+
+| Slot | Status | Document |
+|---|---|---|
+| plan | current | [Ingestion & parsing (ING)](plan-ingestion.md) · [Pipeline authoring (PIP) — capability spec](plan-pipeline-authoring.md) |
+| spec | current | [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
+| architecture | current | [Parsing and ingest](architecture-parsing-ingest.md) · [Pipelines and Steps](architecture-pipelines-steps.md) |
+| features | missing | |
+| feature-db | missing | |
+| user-guide | current | [Enrichment](user-guide-enrichment.md) · [Pipeline Editor](user-guide-pipeline-editor.md) · [Pipelines (Authoring) — MOVED](user-guide-pipelines.md) · [Schema, Mapping & Transformation Authoring](user-guide-schema-mapping.md) |
+| admin-guide | missing | |
+| api | missing | |
+| tests | missing | |
+| brochure | n/a | per edition / solution pack |
+
+Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

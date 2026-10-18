@@ -20,4 +20,4 @@ s.path('M 815 150 L 815 40 L 545 40 L 545 60', dash=True)
 s.text(640, 34, 'reopen (clears closedAt)', size=10)
 s.text(20, 345, 'Actions arrive via POST /objects/{id}/transition or /resolve. A Space may replace this workflow '
        '(registry/workflows/ or *_workflow.toon).', size=10)
-s.save('docs/stakeholders/modules/assets/incidents.svg')
+s.save('docs/okf/product/assets/incidents.svg')

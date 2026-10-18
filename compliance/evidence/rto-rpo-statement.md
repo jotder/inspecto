@@ -2,7 +2,7 @@
 
 **What this is:** the recovery-objective statement the controls matrix (A1 / gap G6) requires,
 grounded in the shipped backup/restore capability. The *procedure* lives in
-[`docs/ops/backup-restore-runbook.md`](../../docs/ops/backup-restore-runbook.md) — this document
+[`docs/okf/product/module/backup/admin-guide-backup-restore.md`](../../docs/okf/product/module/backup/admin-guide-backup-restore.md) — this document
 states the objectives and records the drills; it does not restate the runbook.
 
 ## 1. Recovery capability (grounded — what the product does today)

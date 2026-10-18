@@ -5,3 +5,4 @@ parent: layer.providers
 module: connectors
 billable: false
 status: ga
+docs: docs/okf/product/module/connectors/index.md

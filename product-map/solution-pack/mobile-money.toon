@@ -10,4 +10,4 @@ billing:
 support:
   tier: standard
 status: ga
-docs: docs/stakeholders/solutions/mobile-money.md
+docs: docs/okf/product/solution-pack/mobile-money/index.md

@@ -1,0 +1,51 @@
+---
+type: Module
+title: Core Module (inspecto/)
+description: The composition root — control plane + application packages, ships the fat JAR. artifactId inspecto-processor. The ingestion engine was extracted to sibling modules in the WS-D split.
+resource: inspecto/
+tags: [module, core, composition-root, inspecto-processor]
+timestamp: 2026-07-22T00:00:00Z
+---
+
+# Core Module (`inspecto/`)
+
+The **composition root** (artifactId `inspecto-processor`, jar `inspecto.jar`) — the module that wires
+the object graph together and shades the single deployable fat JAR. It keeps **zero network/AI
+dependencies**: remote protocols live in [connectors](../connectors/architecture.md), hosted models in
+[agent-hosted](../agent-hosted/architecture.md).
+
+> **Not the engine anymore.** Before the WS-D reactor split (2026-07-22) `inspecto/` held the whole
+> engine; the engine was then extracted into the sibling modules below, and `inspecto/` now depends
+> *down* on them. Authoritative build order, version management, and the extraction playbook live in
+> [../../layer/platform/architecture-reactor.md](../../layer/platform/architecture-reactor.md).
+
+## What lives here now
+
+`inspecto/src/main/java/com/gamma/`: `service` (the always-on host — `CollectorService`, the
+[control API](../processor/api-control-api.md) wiring, [`SpaceManager`](../processor/architecture-multi-space.md)),
+`control` (the ~50 HTTP routes), `report`, `assist` (the assist SPI — [interface only](../agent/spec-assist-agent.md)),
+`exchange`, `expectation`, `intelligence`, and `model`.
+
+## Extracted engine modules (WS-D) — `inspecto/` depends down on these
+
+The concept docs are unchanged by the move; only the home module changed:
+
+- **`inspecto-engine`** (`inspecto-engine`) — the engine cluster: `signal`, `query`,
+  [`pipeline` / pipeline-graph](architecture-pipeline-graph.md), `inspector` ([DuckDB](spec-duckdb.md) sinks
+  plus the fat-jar entry points `CollectorProcessor` and `MainApp`), `ingester`, `ops`,
+  [`job`](../processor/spec-jobs.md), `enrich`, `alert`, `notify`, `catalog`.
+- **`inspecto-etl`** (`inspecto-etl`) — [`etl`](spec-ingestion.md): `PipelineConfig`, the
+  ingesters, batch planning, quarantine, lineage, [partitioned Parquet output](spec-output-sinks.md).
+- **`inspecto-event`** (`inspecto-event`) — [`event` + `metrics`](../event/spec-events-metrics.md):
+  the Operational-Intelligence event store + metric registry; owns `logback.xml`.
+- **`inspecto-acquire`** (`inspecto-acquire`) — the [acquisition framework](../acquire/architecture-framework.md):
+  connectors, connection profiles/registry/workbench, the fingerprint ledger, stability gate,
+  retry/circuit-breaker/rate-limit policies.
+- Foundation leaves **`inspecto-api`** (`@PublicApi`), **`inspecto-util`** (DuckDB access + CSV/file/tar
+  helpers), **`inspecto-config`** ([TOON config](../config/spec-toon-config.md) — spec/io/safety), and
+  **`inspecto-sql`** (the sandboxed read-only DuckDB SQL surface).
+
+Modularization is reactor-internal — the single `inspecto.jar` is unchanged (shade has no
+include-list, so the sibling modules' classes and resources bundle automatically).
+
+Build/run: see [build & test](../../layer/platform/admin-guide-build-test.md).

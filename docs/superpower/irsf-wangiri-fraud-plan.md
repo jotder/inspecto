@@ -1,7 +1,7 @@
 # Interconnect / wholesale fraud from CDRs (IRSF, Wangiri, flash-call / CLI): plan
 
 > 🟡 **PLAN 2026-10-18 (`PACK-IRSF-WANGIRI-1`): design only, nothing built.** Competitive gap **H** (interconnect / wholesale fraud:
-> Wangiri, IRSF, flash calls, CLI) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md):
+> Wangiri, IRSF, flash calls, CLI) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../okf/product/layer/product/brochure-competitive-matrix.md):
 > two per-subscriber detection windows exist in the `telco-fraud` Space Template and nothing at the **trunk, partner or
 > destination** level, where wholesale fraud is actually priced. This plan is **CDR-based only**: no signalling, no test calls,
 > no inline blocking (those are matrix rows F, G and I). It is written to be **RFP-compatible** (§12): every slice maps to the
@@ -9,7 +9,7 @@
 > with the reason. Decisions **D-IW1…D-IW10 are open** (§14). Every volume or latency claim is a hypothesis until slice IW0 measures it.
 >
 > **Method.** Read the matrix rows D, E, H, I; the `telco-fraud` template (Jobs, Alert Rules, KPI, runbook, Anomaly Model, Schemas, sample
-> CDR); `okf/capabilities/spaces/spaces.md` §3.5; the Anomaly Scores and Entity Lists concepts; `docs/GLOSSARY.md`; the two sibling plans
+> CDR); `okf/product/module/config/plan-spaces.md` §3.5; the Anomaly Scores and Entity Lists concepts; `docs/GLOSSARY.md`; the two sibling plans
 > (re-rating, partner settlement); and the RFP working set (`compliance-matrix.xlsx`, `gap-register.md`, `build-plan.md`,
 > `assurance-content-catalog.xlsx`). Every "exists" statement cites a file read on 2026-10-18.
 
@@ -24,9 +24,9 @@ Two `sql.template` Jobs, each writing one row per candidate entity per `window_d
 | `fraud_irsf` | Normalises `b_number` to E.164 digits, keeps **originated (`MO`) voice** whose number starts with **any** entry of the Job parameter `irsf_prefixes` (default `882,883,8818`), and sums calls and seconds **per `a_number`** for the day. | `spaces/_templates/telco-fraud/config/jobs/fraud_irsf_job.toon` |
 | `fraud_irsf` Alert Rule | `max(irsf_seconds) gt 3600`, `by msisdn`, `stormCap 500`, CRITICAL, runbook `fraud_irsf`; KPI `irsf_exposure_seconds` = `sum(irsf_seconds)`. | `registry/alert-rules/fraud_irsf.toon`, `registry/kpis/irsf_exposure_seconds.toon` |
 | `fraud_premium_rate` | Same shape over `premium_prefixes` (default `999900,999909`), but sums the CDR `charge` per caller; `gt 100`, WARNING. | `jobs/fraud_premium_rate_job.toon`, `alert-rules/fraud_premium_rate.toon` |
-| `fraud_wangiri` | Counts **ring targets** (MT calls of at most `max_ring_seconds` = 3) and the subset that **called the ringing number back** within `callback_hours` = 24, per **ringing (A) number**. The Alert Rule is on `max(callback_targets) gt 3`, so a pure ring burst with no callback never alerts, and a flash-call OTP sender stays silent by design. | `jobs/fraud_wangiri_job.toon`, `alert-rules/fraud_wangiri.toon`; behaviour note in `okf/capabilities/spaces/spaces.md` §3.5 |
+| `fraud_wangiri` | Counts **ring targets** (MT calls of at most `max_ring_seconds` = 3) and the subset that **called the ringing number back** within `callback_hours` = 24, per **ringing (A) number**. The Alert Rule is on `max(callback_targets) gt 3`, so a pure ring burst with no callback never alerts, and a flash-call OTP sender stays silent by design. | `jobs/fraud_wangiri_job.toon`, `alert-rules/fraud_wangiri.toon`; behaviour note in `okf/product/module/config/plan-spaces.md` §3.5 |
 | `tf_subscriber_usage` Anomaly Model | Daily outgoing voice seconds, SMS and data per `a_number` against the line's own last 28 days, `seasonality: weekday`, `minBaselinePoints 3`; its Alert Rule is created after the first run (pending). | `registry/anomaly-models/tf_subscriber_usage.toon` |
-| Golden test | `TelcoFraudTemplateGoldenTest` with fixed-seed `TelcoFraudCorpus` (seed `20260930`, fictional country code `999`, foreign callers `287` / `289`): planted offenders one above each threshold, look-alikes at each threshold, a flash-call OTP sender and a registered PBX line silent. | `okf/capabilities/spaces/spaces.md` §3.5 |
+| Golden test | `TelcoFraudTemplateGoldenTest` with fixed-seed `TelcoFraudCorpus` (seed `20260930`, fictional country code `999`, foreign callers `287` / `289`): planted offenders one above each threshold, look-alikes at each threshold, a flash-call OTP sender and a registered PBX line silent. | `okf/product/module/config/plan-spaces.md` §3.5 |
 | Runbooks and Incident flow | Runbook components linked from each Alert Rule; known false positives named as "no defence here" (a legitimate satellite-phone user). Per-offender Alert Rules (one Incident per offender) are built; Cases are made by hand or by a Case Rule. | `registry/runbooks/fraud_irsf.toon` |
 
 ### 1.2 The gap
@@ -38,7 +38,7 @@ Two `sql.template` Jobs, each writing one row per candidate entity per `window_d
 | G3 | The unit is **seconds per day**, one fixed threshold (3600 s), no cost, no time-of-day, no baseline. | A heavy legitimate caller and a fraud ramp look the same; a burst that runs for two hours at night is diluted into a day. The KPI is seconds, not money. |
 | G4 | No **new-destination** feature, no **spend velocity**, no **revenue-share indicator**. | The tell-tale IRSF shape (a line that never called this range before, now calling it for hours) is invisible. |
 | G5 | Wangiri alerts only on **callback victims** per ringing number; no ring-burst rate, no inbound-from-international filter, no **many-to-one** call-back view, no **number-range** roll-up. | A campaign spread over many A-numbers from one range, or one B-number collecting call-backs, is missed. |
-| G6 | The Anomaly Model is **day-bucket, subscriber-keyed**; `hour` is refused (`okf/backend/control-plane/anomaly-scores.md`: *bucket: day, 'hour' refused: not built*). It baselines the line, not the destination, trunk or partner. | No seasonality for a destination prefix or a partner; no intraday spike. |
+| G6 | The Anomaly Model is **day-bucket, subscriber-keyed**; `hour` is refused (`okf/product/module/anomaly/spec-anomaly-scores.md`: *bucket: day, 'hour' refused: not built*). It baselines the line, not the destination, trunk or partner. | No seasonality for a destination prefix or a partner; no intraday spike. |
 | G7 | Alerts and exemptions are **per subscriber**; exemptions are static parameters trusted as given (`exempt_msisdns`; backlog `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1` (h)). | No watch / allow / block Entity List fed by detection; false-positive control is a parameter edit. |
 | G8 | The "act" step of the runbook is **prose** ("bar international calls", "ask the partner to withhold settlement"). No recommended action travels with the Incident; no Impact is stamped. | Triage is manual, exposure is not on the Incident, FP / TP is not typed. |
 
@@ -48,7 +48,7 @@ A **CDR-only interconnect-fraud layer** built from configuration over engines th
 Datasets, Anomaly Models, Entity Lists, Alert Rules, Case Rules, runbooks, Impact. **No new Step Processor** (hold on new Steps is
 in force for velocity / baseline Steps, build-plan `D-16`; SQL windows are the recorded form) and **no new Job Type** in v1.
 Eight capabilities, each a Dataset or a column, deterministic and recomputable (the standard of
-[`anomaly-scores.md`](../okf/backend/control-plane/anomaly-scores.md): every verdict stores the numbers it came from):
+[`anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md): every verdict stores the numbers it came from):
 
 | # | Capability | What it is | Closes |
 |---|---|---|---|
@@ -97,7 +97,7 @@ calls or probes (rows F, G); no trained model (no ML runtime; RFP `FM-18` stays 
 
 Match is **longest prefix wins**, so a risky country entry can carry a more specific `normal` sub-range (today's "any prefix" cannot).
 The Reference is **a data origin, not an Entity List**: a prefix is a *range*, and Entity Lists hold typed entity keys (a range block is
-supported there as a number block, `okf/backend/control-plane/entity-lists.md`, but dimension data with class, cost and review dates is a Reference).
+supported there as a number block, `okf/product/module/entity-list/spec.md`, but dimension data with class, cost and review dates is a Reference).
 
 ### 4.2 Provenance, licensing and the seed that ships
 
@@ -120,7 +120,7 @@ supported there as a number block, `okf/backend/control-plane/entity-lists.md`, 
 ## 5. Detection features
 
 All windows are `sql.template` Jobs over the `cdr` Dataset and `destination_risk`, staged through Job-written Datasets (the recorded
-layering, [`okf/capabilities/spaces/spaces.md`](../okf/capabilities/spaces/spaces.md) §3.5), partition-incremental like the existing Jobs. Names below are
+layering, [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5), partition-incremental like the existing Jobs. Names below are
 proposals. **Every threshold is configuration**, in the Job parameters or the Alert Rule, as today.
 
 ### 5.1 IRSF (outbound, per subscriber, per day and per hour window)
@@ -286,7 +286,7 @@ it, and to hand it to the enforcement point after approval. Real-time or autonom
   `TARGET` (number, prefix, partner), `BASIS` (the feature table), `EXPOSURE` (suspected), `EXPIRES` (the recommendation lapses). The same
   Decision Rule's `invoke-api` consequence drafts an **Action Request** to a customer-owned Connection (the RTSC partner or a switch
   management API), which is **held for a four-eyes approval** and sent only after a *different* person approves, with bounded retries
-  and one idempotency key (`okf/backend/control-plane/action-requests.md`). The block entry in `iw-recommended-block` is written
+  and one idempotency key (`okf/product/module/action-requests/spec.md`). The block entry in `iw-recommended-block` is written
   only on approval.
 - **Form B, a named Consequence (optional, IW7).** A `recommend-block` Consequence registered through the Consequence provider seam
   (a `ConsequenceProvider` contribution), taking `ACTION`, `TARGET`, `BASIS`, `EXPIRES` as typed inputs and producing exactly Form A's
@@ -483,7 +483,7 @@ generator is split per feature (disjoint files). Nothing here edits `telco-fraud
 - `BACKLOG.md`: a new P3 row **`PACK-IRSF-WANGIRI-1`** after `PACK-RERATING-1` (competitive gap H); the board's row-count markers move
   with it. Close it when IW9 ships; file residuals as their own rows.
 - `INDEX.md`: this plan's row in the in-flight table (superpower tier).
-- On ship (IW9): distil as-built facts (decisions, seams, gotchas) into [`okf/capabilities/spaces/spaces.md`](../okf/capabilities/spaces/spaces.md) (a new
+- On ship (IW9): distil as-built facts (decisions, seams, gotchas) into [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) (a new
   subsection beside §3.5), add a solution page under `stakeholders/solutions/`, update the matrix row H, then `git mv` this plan to
   `archived-documents/plans-archive/`.
 - **Not touched by this plan:** the RFP working set (read-only here), `GLOSSARY.md` (this plan adds no new term: *recommend-block* is a Decision Rule
@@ -496,11 +496,11 @@ memory on a synthetic 5M-CDR day, hourly-cadence detection latency, the module o
 
 ## References
 
-- Matrix: [`stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`](../stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md) rows D, E, H, I.
-- `telco-fraud` as-built: [`okf/capabilities/spaces/spaces.md`](../okf/capabilities/spaces/spaces.md) §3.5.
-- Anomaly Models: [`okf/backend/control-plane/anomaly-scores.md`](../okf/backend/control-plane/anomaly-scores.md). Entity Lists:
-  [`okf/backend/control-plane/entity-lists.md`](../okf/backend/control-plane/entity-lists.md). Action Requests:
-  [`okf/backend/control-plane/action-requests.md`](../okf/backend/control-plane/action-requests.md).
+- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows D, E, H, I.
+- `telco-fraud` as-built: [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5.
+- Anomaly Models: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md). Entity Lists:
+  [`okf/product/module/entity-list/spec.md`](../okf/product/module/entity-list/spec.md). Action Requests:
+  [`okf/product/module/action-requests/spec.md`](../okf/product/module/action-requests/spec.md).
 - Sibling plans: [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md),
   [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md).
 - Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).

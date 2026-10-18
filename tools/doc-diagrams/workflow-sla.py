@@ -17,4 +17,4 @@ s.arrow(410, 192, 740, 192, dash=True, label='on: age (afterMinutes)')
 s.arrow(325, 224, 325, 300, label='resolve')
 s.text(20, 385, 'Each breach emits OBJECT_SLA_BREACH; each firing emits OBJECT_ESCALATED and records <rule>@<breach stamp> '
        'so a rule fires once per breach (max 500 firings per sweep).', size=10)
-s.save('docs/stakeholders/modules/assets/workflow-sla.svg')
+s.save('docs/okf/product/assets/workflow-sla.svg')

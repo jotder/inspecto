@@ -10,4 +10,4 @@ steps = [('not granted', 'empty'), ('built-in', 'notif/incid/\nalerts/link-index
 for i, (t, sub) in enumerate(steps):
     s.box(40 + i * 176, 170, 160, 90, 'coral' if i in (1, 2, 3) else 'gray', t, sub)
     if i: s.arrow(40 + i * 176 - 16, 215, 40 + i * 176, 215)
-s.save('docs/stakeholders/modules/assets/platform-services.svg')
+s.save('docs/okf/product/assets/platform-services.svg')

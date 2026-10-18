@@ -12,7 +12,7 @@
  *
  * package.ps1 generates these documents AFTER staging and BEFORE zipping, so they ship inside the archive
  * and are covered by its checksum and GPG signature. compliance/controls-matrix.md and
- * docs/okf/capabilities/compliance/compliance.md both rely on them. Nothing in the repo could catch the
+ * docs/okf/product/layer/platform/plan-compliance.md both rely on them. Nothing in the repo could catch the
  * gap: there was no test over the generator, and .github/workflows/release.yml merely copies its output.
  *
  * The claim "these two lists agree" is the thing that failed. This guard is that claim, made runnable.

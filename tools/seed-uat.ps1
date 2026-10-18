@@ -1,6 +1,6 @@
 # seed-uat.ps1 — build a UAT space with realistic data volume, entirely through the platform.
 #
-# Two phases (docs/ops/uat-seeding.md is the runbook):
+# Two phases (docs/okf/product/layer/platform/admin-guide-uat-seeding.md is the runbook):
 #   -Phase files  (default) OFFLINE: clone spaces/demo/config into a fresh gitignored spaces/uat
 #                 (every spaces/demo path inside the configs rewritten to spaces/uat), pre-create the
 #                 data axes, and generate -Days of realistic ORDERS_yyyyMMdd.csv into the inbox —

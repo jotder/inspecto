@@ -31,7 +31,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
  * store.
  *
  * Three things about this pane follow from the backend's design rather than from UI preference
- * (`okf/backend/control-plane/tags.md`):
+ * (`okf/product/module/processor/spec-tags.md`):
  *
  * - **Counts are per-caller.** The target list is filtered server-side to what the caller may see, so two
  *   users can legitimately get different counts for one tag. The count shown is "targets you can see",

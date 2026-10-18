@@ -5,3 +5,4 @@ parent: layer.platform
 module: api
 billable: false
 status: ga
+docs: docs/okf/product/module/api/index.md

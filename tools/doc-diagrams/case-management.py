@@ -18,4 +18,4 @@ s.path('M 320 132 L 320 330 L 725 330 L 725 292', dash=True)
 s.text(330, 322, 'merge: source Case goes straight to CLOSED (mergedInto, MERGED_INTO link)', size=10)
 s.text(20, 380, 'Split opens a new Case in OPEN with a SPLIT_FROM link; the original keeps its state. '
        'No reopen transition exists for a Case.', size=10)
-s.save('docs/stakeholders/modules/assets/case-management.svg')
+s.save('docs/okf/product/assets/case-management.svg')

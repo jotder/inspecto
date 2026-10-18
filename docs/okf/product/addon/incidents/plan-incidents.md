@@ -1,0 +1,1139 @@
+---
+type: Capability
+title: Alerts & Incidents (INC)
+description: The Alert → Incident → Case chain — Alert Rules and fired Alerts, promotion into managed Incidents, the operational-objects domain (lifecycle, SLA, escalation, queues, Cases, Findings, annotations, retention), notifications, and Diagnosis. The requirement of record for the INC area, its specification, its decisions, and what was refused.
+resource: features/inspecto-ops/, platform/inspecto-engine/src/main/java/com/gamma/alert, platform/inspecto-engine/src/main/java/com/gamma/notify, inspecto-ui/src/app/modules/admin/notification-center/
+tags: [inc, capability, alerts, alert-rules, incidents, cases, queues, escalation, sla, notifications, diagnosis, findings, retention]
+timestamp: 2026-09-08T00:00:00Z
+---
+
+# Alerts & Incidents — capability spec (`INC`)
+
+> **What this page is.** The single entry point for the INC capability: what was *required*, what is
+> *built*, what is *left*, and what was *refused*. It is the front door to the mechanism, not a copy of it —
+> §7 points at the `okf/` concepts that own the detail, and §5 points at `BACKLOG.md` rows rather than
+> restating them. Third of the capability specs; the template is
+> [`docs-consolidation-plan.md` §5.2](../../../../archived-documents/plans-archive/docs-consolidation-plan.md); the area name and
+> directory are fixed by [`GLOSSARY.md` §14](../../../../GLOSSARY.md#14-capability-areas-the-functional-spine).
+>
+> **Canonical vocabulary** (`GLOSSARY.md` §4, §8, §9 — binding). The chain is **Alert → Incident → Case**.
+> An **Alert Rule** watches an observability **Metric** (or, since 2026-09-06, a BI **Measure**) against a
+> threshold and fires an **Alert**. An **Incident** is a tracked operational problem, lifecycle
+> **Identified → Diagnosing → Resolved → Archived**; ⛔ never *Issue*. A **Case** groups related Incidents
+> under one investigation. **Annotation** is the umbrella for a **Note** or a **Tag** hung off an **Annotation
+> Target**. **Rule** is always qualified — Expectation / Alert Rule / Decision Rule / **Tag Rule** / **Case
+> Rule** — never bare. A **Diagnosis** is an AI-assisted root-cause analysis of a failing Run or Collector. A
+> **Notification** is the delivery of a Signal to a channel; **Event**, **Alert** and **Notification** are
+> *views* over one signal ledger, never parallel stores.
+
+## 1. Purpose & scope
+
+INC is everything that turns **a fact the platform noticed into work a person owns and closes**: the rule
+that decides a metric crossed a line, the Alert that records it, the promotion of a serious Alert into an
+Incident with an owner and a deadline, the Case that groups related Incidents, the escalation that fires
+when the deadline passes, the notification that reaches someone, and the retention that eventually removes
+the record. Its defining property is the **chain**: nothing in it is a free-standing list, every object is
+linked to the one that raised it.
+
+**In scope:** Alert Rules and their evaluation; fired Alerts; the promotion paths into Incidents (alert
+severity, Decision-Rule consequences, Expectation and reconciliation breaches, the gap and conservation
+bridges); the operational-objects domain — `ALERT` / `INCIDENT` / `CASE` / `TASK`, workflows, categorization,
+priority, assignment, links, the resolution pattern, the SLA sweep and escalation policies, queues and
+watchers; Cases with Contents, merge and split, Findings and Disposition, Case Rules; Notes and Tags as
+Annotations; `incident_purge` retention and `objects.analytics`; the notification feed, channels, rules,
+digests, preferences, delivery receipts and suppression; Diagnosis; and the Personal-edition gating of all of
+it.
+
+**Not in scope, and deliberately so:**
+
+| Adjacent concern | Whose it is |
+|---|---|
+| The signal ledger itself, `EventLog`, the Events screen, Metrics exposition | `OPS` — Observability & maintenance. INC *consumes* the ledger (an Alert Rule reads it) and *emits* into it (`ALERT_FIRED`, `OBJECT_*`) |
+| Expectations and Decision Rules as engines — the condition tree, `simulate`, record routing | `PIP` (execution) — `decision-rules.md`. INC owns only their `create-alert` / `create-incident` consequences |
+| Tags as a cross-entity label graph over Datasets, Dashboards, Widgets, saved views | `MET` — `tags.md`. INC owns the Incident/Case adopter and Tag Rules |
+| Who may author an Alert Rule or configure a channel (`canAuthorAlertRules`, `canAuthorWorkbench`) | `SEC` — the capability seam |
+| The Assistant's tools, model settings, the agent runtime | `AGT` — Assistant. INC owns the *Diagnosis* product surface and its (absent) Incident hand-off |
+| Which bundle carries `inspecto-ops` and `inspecto-notify-channels` | `PKG` — Editions & packaging. INC states *what* Personal loses, not how a module joins a profile |
+
+## 2. Requirements of record
+
+Five requirements from `REQUIREMENTS.md` §3.8 (that section was stripped to an index on 2026-09-09 — this file is their only home now). **Four of the five status or edition cells are wrong when read
+against the build** — the largest correction rate of the three specs so far, and the reason it is worth
+writing: three of the four went wrong on the same day, when EDG-01 cell 7 moved the whole objects domain
+out of Personal (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but none of these. ⚠
+**`EDITIONS.md`'s feature × edition matrix is authoritative for the Edition column**; this table mirrors it.
+
+| ID | Requirement | MoSCoW | Status | Edition |
+|---|---|---|---|---|
+| `INC-1` | **Alert Rules** watch Metrics (and, since 2026-09-06, Measures); fired **Alerts** with severity | Must | ✅ SHIPPED — ⚠ the authoring form cannot express a Measure rule (§5). **+ 2026-09-23 (LA-23):** a fourth rule kind watches a Measure over a Link Analysis Investigation's Working Set (`investigation:` + `relation:` + `measure:`), authored ONLY through the owner-gated `POST /inv/investigations/{id}/alert-rules` (the generic `/alerts/rules` refuses it) and evaluated only while the owner's binding matches; fires through the same ALERT → CRITICAL Incident path, scoped to the Investigation. Reads the SEALED Working Set, not current data — [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans-archive/link-analysis-backlog-plan.md) §5.8 | All (the *feed*); ALERT **objects** S/E; Investigation rules P/E (need `inspecto-geo-link`) |
+| `INC-2` | **Alert → Incident → Case** lifecycle, object-link graph, SLA, comments | Must | ✅ SHIPPED | **S/E** — was `All`; `inspecto-ops` since 2026-09-08 (CP-11) |
+| `INC-3` | **Notification** delivery channels (email / webhook) + per-user preferences | Must | 🟡 PARTIAL — feed + rules + receipts shipped; channels S/E; **preferences are one global set**; ~~`mail.send` reports success when no channel exists~~ ✅ returns **SKIPPED** since `ad29e683` (§5) | Feed All (CP-12) · channels **S/E** (CP-15) |
+| `INC-4` | Incident workflow depth: queues, escalation, watchers | ⛔ **WITHDRAWN** | ⛔ **RETIRED 2026-09-14 (`RETIRE-HALVES-1`)** — the queue family, the three watcher routes and the escalation engine are **deleted from the code**, not merely undocumented. Assignment is now person-only (`POST /objects/{id}/assign` takes `assignee`); the Incident object, the SLA breach sweep and triage stay. ⚠ `watchers` survives as an object **attribute** (the merge union feeds it) with no route. Re-file when a customer names on-call escalation. 🔁 **Escalation REVERSED 2026-09-29 (D-P4, `ASSURE-WORKFLOW-SLA-1`)**: authored Escalation Rules + SLA policy + Workflow are back with an authoring UI (see *Incident governance* below); queues and watcher routes stay retired | **n/a** — withdrawn, not gated |
+| `INC-5` | **Diagnosis**: AI-assisted RCA of a failing Run/Collector **producing an Incident** | Should | 🟡 **PARTIAL** — the RCA ships (`FailureReactor` → `DiagnosisStore`, `GET /assist/diagnoses`); **nothing creates an Incident from a Diagnosis** — the only bridge is a drafted Alert Rule (§3.9) | All |
+
+**Corrections this table makes to its predecessor**, each verified against source:
+
+- **`INC-2` and `INC-4` read `All`.** The whole `com.gamma.ops` domain — `/objects*`, `/notes*`,
+  `/tags*`, `/workflows/{type}`, `/findings/{type}`, `/cases/rules*`, `/rca/templates` — is the
+  optional `inspecto-ops` module since EDG-01 cell 7 (⛔ `/queues*` was in this list until
+  `RETIRE-HALVES-1` retired it, 2026-09-14). A Personal bundle answers **46 paths `503`** naming
+  the module (`AbsentModuleRoutes`), reports `features.ops = false`, and hides the Incidents, Case Manager
+  and Tags navigation. `EDITIONS.md` CP-11 recorded this on the day; `OPS-01` and `SP-CTL-02` were amended
+  on the day; these two rows were not. `BACKLOG.md` §5 lists `INC-3` as an edition-column mismatch and
+  misses the two larger ones.
+- **`INC-4` read a flat `SHIPPED`** over a backend-only delivery whose every mechanism had **no UI** —
+  the shape that makes a register untrustworthy. ⛔ **Resolved by deletion 2026-09-14 (`RETIRE-HALVES-1`):**
+  rather than build the missing UI, the operator retired the capability. `POST /queues`, the three
+  `watch|unwatch|watchers` routes, `QueueStore`/`QueueRouter` and `EscalationPolicy` are gone, so the
+  `QueueStore` Db-parity follow-on `REQUIREMENTS.md` noted in July is moot. What the SPA always had —
+  a direct `assignee`, an `escalated` boolean and the Case `ESCALATED` state — is now the whole truth.
+- **`INC-5` read `SHIPPED`** for a requirement whose defining clause is "producing an Incident". The
+  diagnoser subscribes to failed consignments, stores read-only `Diagnosis` records in a 256-entry ring, and
+  the UI's detail dialog offers a copyable `suggestedAlertRuleToon`. No code path in `com.gamma.agent.diagnose`
+  or `com.gamma.assist` references `ObjectType.INCIDENT`, `IncidentAccess` or `ObjectService`. A Diagnosis
+  reaches the incident workflow only if an operator turns the drafted rule into an Alert Rule and it later
+  fires. `GLOSSARY.md` §9 defines Diagnosis as producing an Incident; the glossary describes the intent, the
+  register must describe the build.
+- **`INC-1`** is right as written but hides a seam: the `AlertRule` record carries the BI-5 Measure shape
+  (`dataset` + `measure`, 2026-09-06) and the authoring pane's `ALERT_RULE_ATTRIBUTES` does not — a Measure
+  rule can be authored only as TOON.
+
+**Two edition-matrix rows this spec corrects in `EDITIONS.md`:** `JOB-01` lists `caserule.evaluate` and
+`objects.analytics` and `JOB-03` lists `incident_purge`, all three ✅ for Personal — but all three are
+registered by `inspecto-ops` (`OpsJobTypes`, `OpsMaintenanceTasks`) and are **unknown Job Types on a Personal
+build**. Cell 7 amended its two named neighbours and not these; the same class of miss
+`PROJECT_NOTES.md` warned about ("read what the neighbouring matrix rows promise").
+
+**One standing note no status token can carry:** ⛔ **`/alerts*` is not in the gated set.** `AlertService`
+lives in `inspecto-engine`, `AlertRoutes` in core, and the fired-alert feed is a bounded in-memory ring, so
+every edition evaluates rules and serves `GET /alerts`. What Personal loses is the **Incident** half: no
+Incident is promoted (`IncidentAccess` returns empty). A sequence gap or a conservation imbalance is a stored Alert on
+every edition (`EventAlertBridge`, 2026-10-08), so `SP-CTL-02` is ✅ on Personal too. **Working a fired Alert (2026-10-07):** rule-fired Alerts live in the Alert-owned
+store, not as objects, so an operator works one with `POST /alerts/{id}/ack` and `POST /alerts/{id}/resolve` (core
+`AlertRoutes`, `canWorkIncidents`, every edition) — the `id` and lifecycle `state` ride each `GET /alerts` entry; an unknown
+id is 404, a move illegal from the Alert's state (a second ack, anything after RESOLVED) is 422.
+
+## 3. Specification
+
+### 3.1 The chain, and where each link lives
+
+| Link | Module | Personal |
+|---|---|---|
+| Alert Rules, evaluation, fired-alert feed, `ALERT_FIRED` | `inspecto-engine` `com.gamma.alert` + core `AlertRoutes` | ✅ |
+| `ObjectType` | `inspecto-workflow` `com.gamma.workflow` (Base leaf module, MODULE-REORG-1 P7 slice 1) | present |
+| Promotion seam (`IncidentAccess`), `ObjectAccess` SPI, `AnnotationKinds`, `FindingsSpec`, `RcaTemplate` | `inspecto-engine` `com.gamma.objects` (core vocabulary) | present, inert |
+| The objects domain: `ObjectService`, workflows, queues, escalation, notes, tags, Case Rules, the three ops Job Types | **`inspecto-ops`** (`com.gamma.ops`, `com.gamma.opsapi`, `com.gamma.opsjob`) | ❌ 49 routes `503` |
+| Notification feed, rules, preferences, receipts, suppression, `mail.send` | `inspecto-engine` `com.gamma.notify` + core routes | ✅ (no transport) |
+| Delivery transports `SmtpEmailChannel`, `WebhookChannel` | **`inspecto-notify-channels`** | ❌ zero channels |
+| Diagnosis | `inspecto-agent` `com.gamma.agent.diagnose` + core `com.gamma.assist` | ✅ |
+
+### 3.2 Alert Rules
+
+`AlertRule` (`platform/inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`) is one record with **two
+shapes**: the ledger-metric shape — `metric` ∈ `error_rate | failed_batches | rejected_files | duration_ms`,
+comparator, threshold, `window`, optional `onPipeline` — and the **Measure shape** (BI-5, 2026-09-06) —
+`dataset` (a Dataset component id) + `measure` (`count | agg(field)`, agg ∈ count / countDistinct / sum /
+avg / min / max / median / stddev / variance / p05 / p25 / p75 / p90 / p95 / p99; an Investigation rule takes only
+the first six). Both take a `when` condition tree that scopes rows before aggregation (metric shape only).
+`severity` ∈ `INFO | WARNING | CRITICAL`. Rules are `alert-rule` components under `<write-root>/registry/alert-rules/`
+(`ComponentStore`, `ComponentRegistry` dir `alert-rules`), armed at boot by `ServiceBootstrap.loadAlerts` —
+promoted off raw `*_alert.toon` files 2026-07-18. ⚠ A leftover `*_alert.toon` is **not read by anything**.
+
+`comparator` ∈ `gt | gte | lt | lte` is **optional, default `gt`**, and `severity` is **optional, default
+`WARNING`** (both the `ConfigSpecs.alert` defaults, applied in the `AlertRule` constructor); an unknown value
+of either is a 422 on `/alerts/rules`. ⚠ Until 2026-09-24 an absent comparator or severity was an HTTP
+**500**: `Set.of(..).contains(null)` throws NPE rather than answering false, so the check escaped
+validation. The agent's draft validator (`AlertRuleValidator`, `diagnose-and-alert`) agrees: it flags only
+an unknown comparator/severity, and the skill writes the defaults into the draft explicitly.
+
+**What an operator reads** (R2-05, 2026-09-26). An optional **`description`** (`ConfigSpecs.alert`
+`alert.description`) is the rule's human name: a firing's ALERT and Incident are titled
+`<description> — <scope>`. Without one the title is generated by `Alert.title` — e.g. `Sum of exposure_sar
+on fraud_cases_open is above 298,668` (was `fm_open_exposure on fraud_cases_open`). The message/Incident
+description says the comparison in words with grouped numbers — `CRITICAL: Sum of exposure_sar on
+fraud_cases_open is 373,335.09, above the threshold of 298,668 (over current data)` (was `… sum(exposure_sar)
+is 373335.09 (threshold gt 298668 over current data)`). Numbers use `Locale.ROOT` symbols (same text on
+every machine), at most two decimals, and a non-zero value that would round to 0 keeps two significant
+digits. ⚠ Nothing parses these sentences: the machine ids (`rule`, `dataset`/`metric`, `measure`,
+`comparator`, raw `threshold`/`value`) stay in the objects' attributes and the `ALERT_FIRED` event / Signal
+payload. **Dataset and ledger-metric words** (2026-09-26 follow-up): a Dataset-scoped rule (measure or
+freshness) names its Dataset through `AlertService.datasetLabel(Function)`, wired in `CollectorService` to
+`DatasetMeasureProbe::label` (the same per-Space registry the measure probe reads). The rule: the Dataset's
+`description`, trailing period dropped, **only when ≤ 60 chars** (`DatasetMeasureProbe.MAX_LABEL` — a title is
+one line); else — or with no resolver, or no Dataset — the **id**. ⚠ Not its `name`: a Dataset's `name` IS
+its id (`ComponentStore.write` stamps it). So `Row count on open cases is 10, above the threshold of 5`; the
+Alert's `pipeline`, the event, the Signal and every attribute keep the id. Ledger metric ids read as words
+via `Alert.metricLabel` — `Error rate`, `Failed batches`, `Rejected files`, `Average duration (ms)` (it is
+the average), any other id snake_case → words — while the `metric` field / event attr stays e.g.
+`duration_ms`. Pipeline and Investigation scopes are unchanged. The UI authoring form asks `description` and authors both the ledger-metric and the Measure shape; a re-save
+keeps every stored key it does not model ([alerts feature](user-guide-alerts.md)).
+
+**Per-entity Measure rules — `by`** (`ASSURE-PER-ENTITY-ALERTS-1`, 2026-09-26). A Dataset Measure rule may
+add `by: [col, …]` (key columns; a list or one comma-separated string) and `stormCap` (default **100**,
+`AlertRule.DEFAULT_STORM_CAP`). `by` is refused on a ledger, freshness or Investigation rule, a key column must
+be a plain identifier, and `stormCap` without `by` is refused. Without `by` nothing changes — `toMap` emits
+neither key, and the rule takes the scalar path below. How it runs:
+- **Evaluation** — `DatasetMeasureProbe.breaches` compiles the Measure with `MeasureCompiler` (`groupBy` = the
+  key columns, every identifier `SqlIdent.q`-quoted) and wraps it in a breach filter built from the quoted
+  measure id, a fixed operator and a numeric literal, plus `COUNT(*) OVER ()` for the total; at most `stormCap`
+  rows come back. Wired in `CollectorService` beside the scalar probe (same per-Space roots).
+- **An Alert per RULE, an Incident per ENTITY** (`ALERT-PER-RULE-1`, operator decision 2026-10-14, BOTH model).
+  The first key to breach opens ONE Alert for the rule (`alertKey = <rule>|*`): a count of breached keys
+  (`Alert.value` = `breachedKeys`), **no entity named in its title or message** (`CRITICAL: 40 keys (by msisdn,
+  region) breach: <title>`), `firstBreachAt` / `lastBreachAt` (when the breach began, and when a key last joined
+  or left), `storm` true/false, and `breachedKeyDigests`, a comma list of at most `AlertService.MAX_DIGESTS`
+  (1000) 12-hex SHA-256 digests of the breached keys' `keyId` — the persisted open-key ledger, never the entity.
+  Every key that starts breaching afterwards is counted in that Alert, **updated in place**
+  (`AlertStore.update`, no new Alert, no new event); a key that heals leaves the count; the Alert resolves — with
+  the one `ALERT_CLEARED` + `alert-rule.cleared` Signal (`CLEARED: … no longer breaches alert rule X — no key still
+  breaches`) — only when the LAST key has healed, and a relapse after that opens a fresh Alert. At critical/error
+  each key that starts breaching ALSO opens its own **Incident** (per entity: `key`, `key.<column>`, the masked
+  title below), linked `ESCALATED_FROM` to the rule's one Alert. A warning rule has the Alert only: its keys are
+  visible as a count and digests, not by name.
+- **Edge-triggered per key, not cooldown-throttled** — while a key stays breached nothing is raised;
+  `AlertService.openKeys` (rule → key digests, plus the `*` storm flag) is the edge detector, seeded on a rule's
+  first sweep from its still-active Alert's `breachedKeyDigests` (the Alert store since 2026-10-07 — no longer
+  ALERT objects; db-layer.md §3.14) so a restart neither re-raises nor forgets. **Migration**: a Space stored
+  before the fold holds one Alert per key; the first sweep of its rule folds them (their digests become the rule's
+  one Alert, each old per-key Alert resolves as actor `alert-rule:<name>:per-rule-fold`, no event, no Incident
+  touched — `PerEntityAlertTest.perKeyAlertsStoredBeforeTheFoldAreFoldedIntoTheRulesOneAlert`). An Incident's
+  dedupe attribute stays `alertKey = <rule>|<col=value,…>` — the INJECTIVE `AlertService.keyId`: in a
+  value `\ , = |` are backslash-escaped and SQL NULL is `\0`, so two keys that read alike (`a="x, b=y", b="z"`
+  vs `a="x", b="y, b=z"`) or NULL vs the string `null` never share an Incident; the readable `keyLabel`
+  (NULL → `NULL`) is for titles and the `key` attribute only. The **Incident** also carries `key`,
+  `key.<column>` per key column, and the Measure `value`; its title is `<description> — <Dataset> for
+  msisdn=m7, region=EU` (or the generated title with the same suffix) — the entity lives on the Incident and a
+  caller who cannot reveal reads it masked (`ObjectReadMasking`, `TELCO-FRAUD-MASKED-DASHBOARD-1`); the Alert
+  carries none. Scope stays the Dataset id.
+- **Heal** — a key no longer breaching leaves the Alert's count (no event; the per-key line is the Incident's).
+  When the last key is gone the rule emits `ALERT_CLEARED` + an `alert-rule.cleared` Signal (correlation
+  `alert:<rule>|<dataset>|*`) and resolves its **ALERT** through `AlertRecords.resolveAlert` (answers `false`,
+  never throws). ⛔ **A machine heal NEVER
+  resolves the INCIDENT** (operator standing rule, 2026-09-26, with WS-10): an Incident resolves only with a
+  Disposition, which is a human decision a heal cannot know — so the heal does not even attempt it, and the
+  Incident stays open for its operator however complete its postmortem is (`PerEntityAlertObjectsTest`). A key
+  that relapses while its Incident is RESOLVED (by an operator; non-terminal until archived) **re-opens** that
+  Incident instead of being suppressed;
+  one whose Incident never left IDENTIFIED/DIAGNOSING is not re-opened, but either way the rule's Alert is
+  linked `ESCALATED_FROM` to that still-active Incident.
+- **Rule edits** — re-saving a `by` rule over different keys (another Dataset, Measure or `by`) or removing it
+  **retires** its open keys (`AlertService.retireKeys`): the edge state is dropped and the still-active
+  ALERT of the old rule resolves as actor `alert-rule:<name>:rule-changed`; no all-clear is emitted (nothing
+  recovered) and the Incidents stay with triage. A threshold/severity edit keeps the open keys.
+  A **scalar (no-`by`) Measure rule heals the same way** (`ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1`, 2026-09-28) —
+  see *Scalar Measure heal* below.
+- **Storm** — more than `stormCap` breaching keys: the rule's ONE Alert says so (`storm: true`, message `…; above
+  the storm cap of 100, one storm Incident stands for them all`) and ONE storm **Incident** (dedupe `<rule>|*`,
+  title `Storm: 40 keys breach — …`) replaces the per-key ones. While it rages no key opens or heals and the stored
+  digests are frozen (a capped read cannot see which keys healed); back under the cap the same Alert counts the
+  few keys again and each gets its own Incident.
+- **Unknown is not healed** — an empty probe answer (unreadable Dataset) neither fires nor resolves anything.
+- **Save-time check, fail closed** — `AlertRoutes.requireGroupingColumns` (every `/alerts/rules` write and a
+  Decision Rule's `create-alert`, and `/components/alert-rule` for a body carrying `by`) reads the Dataset's
+  Schema via `DatasetMeasureProbe.columns` — its relation's columns, as `GET /datasets/{id}/rows` serves them —
+  and 422s a missing column, or a Schema that cannot be read (unknown Dataset, no data yet). Names match exactly.
+  Since 2026-09-28 `/components/alert-rule` (create, update and version restore) and each `alert-rule` item of
+  `POST /bundle/import` (a per-item failure; `BiTemplates` writes no Alert Rules) run the whole of
+  `AlertRoutes.parse` — `AlertRule.fromMap`, the Investigation-rule refusal and this check — over the content as
+  stored (`name` = id), so it refuses exactly what `POST /alerts/rules` refuses; the Personal-edition refusal
+  (`AlertRoutes.editionRefused`) still answers first. ⚠ A body with neither `metric` nor `dataset` used to be an
+  HTTP **500** on both doors (`Set.of(..).contains(null)`, as with comparator/severity before 2026-09-24); it is
+  a 422 (`ControlApiAlertRuleWriteTest`).
+- **Case grouping** — unchanged: Incident titles and attributes are as before, so an existing Case Rule whose `q`
+  matches the rule's title (e.g. its `description`), or a Case Rule `groupBy` the key column, groups the per-key
+  Incidents. Nothing groups on the Alert: there is one per rule.
+- **Consumers** — the notification layer sees ONE `ALERT_FIRED` per rule onset (message with the count; the
+  per-entity breach is the Incident), the `alert-rule.fired` Signal is per rule (correlation
+  `alert:<rule>|<dataset>|*`), `GET /alerts` lists the rule's Alert once (its fired record follows the count),
+  and `EventAlertBridge` is unaffected (its Alerts have their own dedupe key).
+- **UI** — the Alert Rule dialog authors Measure rules too (2026-09-27): a *Watch* kind choice, Dataset, Measure,
+  **Incident per** (`by`, column suggestions from the Dataset) and **Storm cap**; the save-time 422 renders in
+  the dialog ([alerts feature](user-guide-alerts.md)).
+
+**Scalar Measure heal** (`ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1` (2), 2026-09-28). A Dataset Measure rule without
+`by` fires ONCE per open breach (an unchanged breach raises nothing new on later sweeps; `TELECOM-ALERT-REFIRE-1`, 2026-10-11 — it used to re-fire every cooldown), and gains the heal of one `by` key: `AlertService.openMeasures`
+(`<rule>|<dataset>` → breached at the last readable sweep; seeded on the rule's first sweep from a still-active
+ALERT, so a restart still heals) is the edge detector. On the breached → healthy edge `healMeasure` emits
+`ALERT_CLEARED` + an INFO `alert-rule.cleared` Signal (correlation `alert:<rule>|<dataset>`, the fired Signal's),
+clears the cooldown so a relapse fires at once, and resolves the rule's ALERT (looked up on the `rule` attribute).
+⛔ **The Incident is never resolved by the heal** — the same Disposition rule as the `by` path. A relapse whose
+Incident is still active (the dedupe on `rule` suppresses a second one) re-opens it if an operator RESOLVED it and
+links the new ALERT `ESCALATED_FROM` it either way (`promoteToIncident`, measure rules only). An empty probe answer
+neither fires nor heals; a never-breached rule is never "cleared". A re-save over another Dataset or Measure retires
+the old ALERT (actor `alert-rule:<name>:rule-changed`) and — as a delete does — clears its cooldown, so a
+re-created rule still breaching fires at once; the edge opens only when an Alert actually fired, so a heal never
+clears an Alert that was never raised. The Incident stays with triage. Ledger-metric and
+Investigation rules still have no heal.
+
+**Heal hysteresis** (`ALERT-HEAL-FLAP-1`, operator decision 2026-10-04: option A). A Dataset Measure rule (scalar or
+`by`) takes an optional **`healAfterSweeps`** (`alert.healAfterSweeps`, whole number 1–1000; default 1 = heal on the
+first healthy sweep, exactly the behaviour above, and not written back by `toMap`). With N > 1 the rule heals only
+after N *consecutive* healthy sweeps: `AlertService.healthyStreak` counts them per `rule|dataset` (scalar) or per
+`rule|dataset|<keyId>` (one `by` key, the storm included — damping is per rule or key, never per entity, G-42). A
+breach resets the streak; until it completes the Alert stays open, so a relapse raises nothing new (the scalar
+cooldown, or the key's open edge, still holds) and no all-clear is emitted. A storm sweep clears every streak of the
+rule (a capped read is not "healthy"); a delete or re-save over other keys retires them (`retireKeys`). Streaks are
+in memory — a restart re-seeds the open Alert and restarts the count. Fail closed: <1, non-integer, >1000, or on a
+ledger / freshness / Investigation rule → 422. Authored on the Alert Rule dialog (*Heal after sweeps*, Measure kind);
+tests `MeasureAlertTest`, `PerEntityAlertTest`, `ControlApiAlertRuleWriteTest`. Deferred: a value re-arm margin
+(option C), only if value-oscillation noise persists after this. Tests: `MeasureAlertTest` (engine), `ScalarMeasureAlertObjectsTest`
+(`inspecto-ops`, the real workflow).
+
+**Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min
+(`AlertService.java:411-413`); a breach emits `EventType.ALERT_FIRED` (`:227`) and the canonical
+`alert-rule.fired` Signal (`:243`), and appends to a **bounded in-memory ring** the feed reads
+(`GET /alerts`). `POST /alerts/evaluate` runs a sweep on demand. **The engine does not hot-load
+the registry**: `POST/PUT/DELETE /alerts/rules[/{name}]` (`AlertRoutes.java:44-48`, gated
+`canAuthorAlertRules`, fail-closed gate order, `ConfigCodec` + `AtomicFiles`) arm the rule in the running
+`AlertService` in-process; a restart re-arms from the files. Since 2026-08-10 an `alerts` Platform Service
+exists so `alert.evaluate` holds a real grant, and its dry-run stand-in must report "nothing was evaluated".
+
+**Runbooks (operator, 2026-10-10).** A **Runbook** is the `runbook` component kind
+(`registry/runbooks/<id>.toon`, `com.gamma.alert.Runbook`): linked guidance with no automation — `title`
+(required), `summary`, ordered `steps` (each `text` plus an optional `link: {kind, id}`, kind one of
+`dataset | query | dashboard | case`), `ownerRole` and `tags`. ⚠ `ownerRole`, not `owner`: `owner` is the R3
+author stamp `ComponentAccess.onCreate` writes on every component. Any other key is refused unless it is an
+`x-` annotation. It is authored through the generic `/components/runbook` door, so CRUD, history and restore are
+`ComponentStore`'s and the gate is **`canAuthorWorkbench`** (operator, 2026-10-10: guidance is authored content
+like a KPI or Dashboard, and a separate capability would need a literal route for no gain). No new route.
+An Alert Rule names one with `runbook: <id>`; `AlertRoutes.requireRunbook` (inside `parse`, so every Alert Rule
+door) refuses the save **422** when that Runbook does not exist in the Space, and fails closed (503) with no write
+root. A step link is checked for shape only, not existence (a Case is a runtime object, not a component) —
+a deliberate deferral. When the rule fires, `AlertService` stamps `runbook` into the Alert and Incident
+attributes (both the scalar and the per-entity paths), and the Incident/Case page (`ObjectDetailComponent`)
+mounts `<inspecto-runbook-panel>` for any object carrying that attribute — so a Case shows it when it carries
+the attribute. The panel reads the Runbook live, so an edit shows at once; a deleted Runbook renders an
+explained "not found" warning, and deleting a Runbook does NOT refuse while a rule still names it (deferral).
+Authoring pane: `/runbooks` (`modules/admin/runbooks/`); the Alert Rule form offers the id as an autocomplete.
+Masking: N/A — a Runbook holds authored guidance, never data values, so there is no field to mask.
+The telco-fraud template ships 13 (`fraud_<typology>`), one per Alert Rule, generated from the per-typology
+sections of `config/runbooks/telco-fraud-runbooks.md`, which stays for the shared guidance (windows, thresholds,
+exemptions, sizing). ⛔ Not the assistant's `runbook_operator` agent runbook (§ GLOSSARY *Runbook*).
+
+### 3.3 From an Alert to an Incident — five promotion paths, one seam
+
+Every path that opens an Incident automatically does so through **`IncidentAccess`**
+(`platform/inspecto-engine/src/main/java/com/gamma/objects/IncidentAccess.java`) — a Platform Service `incidents`,
+relocated to core and **narrowed** in EDG-01 cell 7 to return `Optional<String>` (the id) rather than the
+object; the dry-run substitute records and opens nothing; on Personal it is empty and every caller
+degrades to "no object".
+
+| Path | Where | Rule |
+|---|---|---|
+| **Severity promotion** | `AlertService.promoteToIncident` (`:304-334`) | a `CRITICAL` (or `error`) rule opens a deduped `INCIDENT` — one open Incident per rule + pipeline (a `by` rule: one per rule + key, §3.2) — beside the `ALERT`; lower severities stay alerts. Since 2026-08-10 the Incident carries an **`ESCALATED_FROM` link to the ALERT** (actor `alert-rule:<name>`). ⚠ A *suppressed* promotion adds no edge |
+| **Decision-Rule consequences** | `decision-rules.md` | `create-alert` records a signal **and** opens an object (2026-07-19); `create-incident` opens an Incident at any severity with no Alert Rule, deduped per rule (2026-07-24) |
+| **Expectation breach** | `ExpectationRoutes` | the original signal → Incident dedup + open pattern the others reuse |
+| **Reconciliation breach** | `ReconRunJob` (`jobs.md`) | same pattern, at **run** granularity — ONE aggregate Incident per reconciliation (scope = the reconciliation id), carrying only break counts |
+| **A single reconciliation Break** | `POST /recon/promote` (`ReconRoutes`) | 🆕 **2026-09-11 (`BREAK-INCIDENT-1`)** — an operator promotes ONE Break from the board; deduped on `(reconciliation, type, key, column)` with a composite **`breakId`** attribute as the dedupe attribute, carrying the break type, column and run id as evidence alongside it. ⚠ **Widened 2026-09-15 (`BREAK-DEDUPE-GRAIN-1`)** from `key` alone — one key breaking on two columns used to collapse into ONE Incident and the second promote was silently suppressed. 🔴 The attribute is a composite because the READ half indexes a SINGLE attribute (`activeAttributeIndex`), so a three-attribute dedupe would leave the offer unable to express the grain; its parts are escaped (`\` then `|`) because a recon `key` routinely contains `|`. It is one contract with the SPA's `breakId()`, which renders the byte-identical string. ⚠ It **coexists** with the row above rather than replacing it: the Job says *"this reconciliation is breaching"*, a promotion says *"**this** Break is being worked"*. 🔴 The backlog row that asked for it claimed the tree's only promotion was Alert→Incident — `ReconRunJob` had been opening Incidents since it shipped, so the gap was **granularity, not mechanism** |
+| **— and reading it back** | `GET /recon/promoted?reconciliation=<id>` (`ReconRoutes`) | 🆕 **2026-09-13 (`BREAK-INCIDENT-RESOLVE-1`)** — `breakId → incidentId` (the `(type, key, column)` identity, keyed by `breakKey` until 2026-09-15) for the Breaks whose Incident is still **ACTIVE**, so a reload no longer forgets what was promoted and a Break can be followed to the Incident working it. 🔴 **The active-only rule is the point**: `promote` suppresses a duplicate only while the Incident is non-terminal, so an ARCHIVED one means the Break is promotable again — both halves read `ObjectAccess.activeAttributeIndex`, which is why this is a server route and not the SPA filtering `GET /objects` by attribute. A client matching on mere existence would report an available action as unavailable. ⚠ Bounded at 1000 entries with a `truncated` flag and the TRUE `total` |
+| **Ledger bridges** | `EventAlertBridge` (`inspecto-engine`, `com.gamma.alert`; was `ops.EventObjectBridge` until 2026-10-08) | `SEQUENCE_GAP` and `PIPELINE_CONSERVATION_IMBALANCE` (+ its legacy name) → a stored **Alert** (`GET /alerts`, `POST /alerts/{id}/ack`) on every edition, no longer an ALERT object; a `SEQUENCE_GAP` ALSO opens ONE Incident (severity error, deduped on the event key, linked `ESCALATED_FROM` the Alert, `AlertService.raiseFromEvent(..., escalate)`) wherever the incidents service is present (2026-10-14; a conservation imbalance stays Alert-only) |
+
+Operator-created objects take the other door: `POST /objects` with **title + at least one link** (§3.4).
+The auto-creation paths bypass the route and call `ObjectService.open` directly — which is why the first
+object in an empty Space must come from one of them (there is nothing to link to yet).
+
+### MTTR, and why `closedAt` could not supply it
+
+`GET /objects/analytics?type=INCIDENT` has always reported a **`cycleTime`** — `closedAt − createdAt` over
+terminal objects. 🔴 **That is not MTTR for an Incident, and reading it as such overstates every number.**
+`closedAt` is stamped on the **terminal** state, and for an Incident the only terminal state is
+`ARCHIVED` (`Workflow.defaultFor`: `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`). An Incident resolved
+in two hours and archived a month later has a `closedAt` a month out. The analytics tile that showed this
+count was even **labelled "Resolved"** until 2026-09-11 — it counts archived objects.
+
+`INCIDENT-KPI-MTTR-1` (2026-09-11) adds **`ObjectService.ATTR_RESOLVED_AT`** (`resolvedAt`, epoch millis),
+stamped in `commit()` — the single place every status change lands, so no transition path can bypass it —
+whenever the target state is `RESOLVED`. `analytics()` then reports an **`mttr`** block beside
+`cycleTime`, and the UI renders both with the server's own `definition` string underneath.
+
+| Number | Anchor pair | Reads as |
+|---|---|---|
+| `cycleTime` | `createdAt` → `closedAt` | time to **archive** (the tidy-up is included) |
+| `mttr` | `createdAt` → `resolvedAt` | time to **resolve** |
+
+Three rules, each pinned by `ObjectServiceTest`:
+* ⚠ **Most recent resolution wins.** A reopened Incident's first resolution did not hold, so measuring to
+  it would report a fix that was not one. (Contrast `firstSeenAt` on a reconciliation Break, where FIRST is
+  the meaningful end — there the question is *"how long has this been wrong"*, here *"how long until it was
+  right"*.)
+* ⛔ **An object with no recorded resolution is EXCLUDED from the mean, never counted as zero.** Everything
+  resolved before this shipped has no stamp, so a freshly upgraded deployment reports `count: 0` and the UI
+  shows an em-dash rather than a fabricated average.
+* **The definition travels with the number.** Both blocks carry a `definition` string and the KPI tiles
+  render it; a KPI whose meaning is implied is what this row exists to stop.
+
+✅ **MTTD is built on a NARROWER anchor than first proposed** (`INCIDENT-KPI-MTTD-1`, 2026-09-15). The proposed
+anchor — the earliest Signal at the Incident's `causationId` root — needs an event-store read on the analytics
+path, a seam `ObjectService` does not have, and this row refused to fake it. What IS recorded without any new
+seam is the triggering event's OWN time: the Event bridge (`ops.EventObjectBridge` until 2026-10-08, now `EventAlertBridge`, which keeps `occurredAt` on the stored Alert) stamped
+`ObjectService.ATTR_OCCURRED_AT` (`occurredAt`, epoch ms) from `Event.ts()` at promotion, and `analytics()` adds
+`mttd = {count, avgMs, definition}` = `occurredAt → createdAt` over objects that carry the stamp. Same honesty
+rule as MTTR: `count` is the denominator, unstamped objects (hand-opened, Alert-Rule-opened) are EXCLUDED, so a
+deployment with no stamped objects reports count 0 — a true statement (since 2026-10-08 nothing writes an ALERT object, so `analytics(ALERT)` reads only legacy rows). The Case-analytics dialog shows an
+MTTD tile with the server's own definition. ⚠ Still absent: **MTTA** — nothing stamps an acknowledged-at
+(`ack()` records no timestamp), so it needs its own seam before it could exist.
+
+### How a Break is identified when it is promoted
+
+`POST /recon/run` and `/recon/breaks` recompute from SQL on every call and persist nothing. Until R2-03 the
+Break lifecycle lived only on the client (C9), so the Incident could not hold a foreign key to a Break row.
+⚠ **Since R2-03 (operator, 2026-09-26) recorded Breaks DO exist server-side** —
+`<write-root>/recon-state/<id>.json`, written by the `canOperateRuns` routes `POST /recon/{id}/record` and
+`/breaks/status` ([`reconciliation.md`](../../module/reconciliation/user-guide-reconciliation.md)) — but a promote still
+does not look one up: the Breaks page promotes LIVE Breaks, possibly before any run recorded them.
+
+Instead the identity is **reconstructed from the request**: `(reconciliation, key)`, which is stable across
+runs because it is what the comparison itself keys on. That pair is the dedupe key, so promoting the same
+Break twice — by two operators, or after a nightly re-run — suppresses the second. The recorded state keys
+on the very same identity string (`ReconBreaks.identity`, which `ReconRoutes.breakIdentity` delegates to),
+so the two agree without a join, and `runId` is the recorded `lastRunAt`. The Incident stays the durable
+artifact of the escalation.
+
+Two consequences worth knowing before changing anything here:
+
+- **The dedupe is on the KEY, not `(key, type, column)`.** One business key breaking on three columns is
+  one thing for an operator to investigate. ⚠ When the same key later breaks a *different* way, the open
+  Incident is reused and its attributes still describe the **first** observation.
+- **Suppression lasts until the Incident is ARCHIVED, not merely RESOLVED.** Dedupe is over non-terminal
+  objects, and for an Incident the only terminal state is `ARCHIVED`
+  (`Workflow.defaultFor`: `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`). So an operator who resolves a
+  promoted Break and sees it recur gets **no new Incident** until the old one is archived. That is the
+  existing workflow's rule rather than this route's choice, and it is pinned by
+  `ControlApiReconPromoteTest.suppressionLastsUntilTheIncidentIsArchivedNotMerelyResolved` — a change to
+  the Incident terminal set would silently change how recurring Breaks behave.
+
+⚠ The route reports a suppressed promotion as `{incidentId: null, deduped: true}` — it does **not** name
+the surviving Incident, because the `IncidentAccess` seam reports suppression without returning an id and
+widening the SPI for that alone was not worth it. A caller wanting the survivor lists the reconciliation's
+Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
+
+### 3.4 Incidents — the operational-objects domain
+
+`ObjectType` = `INCIDENT | CASE | TASK` (the `ALERT` value was retired 2026-10-08: an Alert is a record of the Alert store, `AlertLifecycle` holds its `OPEN → ACKNOWLEDGED → RESOLVED`; a stored legacy `ALERT` row, or a row of any type this build does not know, loads **inert** — listed by `GET /objects` with `inert:true` + a diagnostic, readable by id, every write on it a `409` naming the type, skipped by the SLA sweep / analytics / purge, never rewritten or dropped), one table `inspecto_ops_objects` when durable, else
+`InMemoryObjectStore` (`OpsEngineProvider.java:94-124` picks per store on `durable()`).
+Updates are **optimistic** (2026-10-04): every object carries a monotonic `version`, a stale write fails with `ObjectVersionConflictException`, `ObjectService` retries pure read-modify-writes and the edge answers a persistent loss as `409 CONFLICT_STALE_VERSION` — see `backend/engine/db-layer.md` §3.1. No client change is needed for server-side races; `PATCH /objects/{id}` does not yet accept an expected `version` (deferred — a client editing a whole object from a stale read still merges, it does not fail).
+
+- **Workflows** (`platform/inspecto-workflow/src/main/java/com/gamma/workflow/Workflow.java:150-192`): **INCIDENT `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**, `reopen`
+  from `RESOLVED|ARCHIVED → DIAGNOSING`, only `ARCHIVED` terminal; CASE `OPEN → INVESTIGATING → ESCALATED →
+  RESOLVED → CLOSED`. `GET /workflows/{type}` serves the BFS-ordered states so a TOON-overridden workflow
+  (`*_workflow.toon`, a boot-time scan) drives the same panes; `assign` **does not move status** (no
+  `ASSIGNED` state); `POST /objects/{id}/ack` has no action on any object type since the ALERT retirement (it answers the ordinary 422; Alerts are acknowledged on `POST /alerts/{id}/ack`).
+- **Categorization** is a 3-layer `attributes.category` path `L1/L2/L3` (`ObjectService.java:368-371`),
+  enforced by the UI at latest on *Accept* (the `CategorizeDialog` is forced before the transition).
+  **Priority** `CRITICAL · MAJOR · MINOR · LOW`. One **assignee** (the Incident Commander), optional at
+  creation, set at triage — assignment is **direct**; queue-based routing at creation was deferred
+  (product sign-off 2026-07-22).
+- **Create contract** (2026-07-22): `POST /objects` requires a title (≤400) and a `links: [{to,
+  relationship?} | id…]` array of **at least one** entry; every target is validated before `open()` so a
+  dangling link cannot orphan the object; `relationship` defaults to `RELATED_TO`. `LinkRelationship` ∈
+  `CONTAINS · ESCALATED_FROM · CAUSED_BY · RELATED_TO · MERGED_INTO · SPLIT_FROM`; the correlation graph is
+  served depth-1.
+- **The resolution pattern is a hard gate server-side** (I1, 2026-07-24): `ObjectService.commit`
+  (`:1311-1316`) rejects `INCIDENT → RESOLVED` unless `attributes.postmortem` holds a non-blank **timeline**
+  entry, a **cause analysis** entry (`causeAnalysis[]` + `causeMethod`, "5 Whys" default), a **corrective
+  action**, `dueAt` is set, **and `attributes.disposition` holds a ladder value** (WS-10, 2026-09-26)
+  (`incidentResolutionGaps`). The Disposition rides the resolve itself — `POST /objects/{id}/resolve` or
+  `/transition` body `disposition` (case-insensitive, stored in the ladder's spelling); an off-ladder value,
+  or a `disposition` on any move but an Incident's resolve (a Case's lives in its Findings) → 422. The resolve's
+  `OBJECT_ACTIVITY` event carries the `disposition`. **A reopen clears it** (blanked — the bag merge cannot
+  delete a key), so a re-resolve needs a fresh decision, never a stale one. 🔴 **The gate is keyed on what
+  DECIDES an Incident, not on the literal `RESOLVED`** (`SEC-IMPORT-OPS-CONFIGS-1`, 2026-09-26;
+  `ObjectService.decidesIncident`): `RESOLVED` **and every terminal state of the registered workflow except
+  `ARCHIVED`**. Before, a `*_workflow.toon` with a `CLOSED` terminal state (which an import could plant — now
+  refused, see [`auth-security.md`](../../module/access/admin-guide-auth-security.md)) finished an Incident in one move
+  with no Disposition and no postmortem. ⚠ `ARCHIVED` stays ungated **on purpose**: the default lifecycle
+  archives from anywhere (`IDENTIFIED|DIAGNOSING → ARCHIVED`, the mail Trash — `WorkflowTest`), a dismissal
+  that records no outcome, and `RESOLVED → ARCHIVED` already passed the gate. So a custom workflow buys nothing
+  the default does not already allow; the Disposition may ride a custom terminal move exactly as it rides a
+  resolve, and leaving that state clears it (`ObjectServiceTest.aCustomTerminalStateCannotFinishAnIncidentWithoutTheResolutionGate`).
+  The `disposition` body field (and the `Disposition` ladder enum) is documented on both operations in
+  `docs/api/openapi-v1.json` since 2026-09-28 — they are hand-written, no longer generated skeletons.
+  ⛔ A machine actor never resolves
+  an Incident (the per-entity Alert heal, §3.2). The UI's `postmortemGaps` soft-warn
+  is a *mirror* of the same four checks, not the gate. ⚠ `objects.md` and the archived design still call
+  the backend gate "a follow-up"; it shipped.
+- **SLA and escalation.** `dueAt` / `dueInMinutes` at creation; the sweep (`sweepIncidentSla`,
+  `ObjectService.java:830-905`, cadence `-Dobjects.sla.sweep.seconds`, default 60, `0` disables) stamps
+  `slaBreachedAt` once and emits `OBJECT_SLA_BREACH`. **The clock stops at `RESOLVED` and at every terminal
+  state of the Incident's registered workflow** (`IMPORT-RESIDUALS-1` (4), 2026-09-28) — the resolution gate's
+  set (`decidesIncident`) **plus** `ARCHIVED`: the gate exempts `ARCHIVED` because archiving records no outcome,
+  but an archived Incident is no longer worked either. Keyed on the state as well as `closedAt`, because an
+  Incident can sit in a terminal state with no `closedAt` (a workflow file that later made its state terminal,
+  an imported object) (`ObjectServiceTest.slaSweepSkipsEveryWorkflowTerminalStateButStillBreachesOpenOnes`). ⛔ **The `EscalationPolicy` that once ran on breach
+  is RETIRED (`RETIRE-HALVES-1`, 2026-09-14)** — a breach now emits its event and nothing else; no severity
+  bump, no re-routing, and `OBJECT_ESCALATED` is emitted by nothing (the `@PublicApi` constant stays for
+  stored events). The Case `targetDate` is a **loose** SLA — overdue hint only, no sweep.
+- **Incident governance — authored Workflow, SLA policy, Escalation Rules** (`ASSURE-WORKFLOW-SLA-1`, 2026-09-29). ✅ 2026-10-07: the Add Escalation Rule form has an "Advanced match (condition tree)" disclosure authoring the rule's optional `when` over the match context (`ESCALATION_CONTEXT_COLUMNS`); `escalationRuleContent(draft, stored)` carries every unmodelled key of a stored rule forward, so a save never drops `when`.
+  🔁 **This REVERSES part of `RETIRE-HALVES-1`.** INC-4's retirement deleted the escalation engine because it was a
+  backend nobody could see or author ("re-file when a customer names on-call escalation"). D-P4 (operator) named it:
+  **escalation comes back, with its authoring UI; queues and watcher routes stay deleted.** Three component kinds,
+  all written only through their literal `canAdminister` routes (`/components/workflow|sla-policy|escalation-rule`,
+  a governance change), versioned by `ComponentStore` (`.history/`, restore), held by the maker-checker policy like
+  every governable kind (`ApprovalPolicy.GOVERNABLE` derives from `WRITABLE_TYPES`), and **refused by every import**
+  — the generic `/components` door, `/bundle/import` items and a new Space's files included
+  (`ImportCapabilityGuard.GOVERNANCE_ONLY`; the dirs are out of `ImportPaths.REGISTRY_DIRS`, pinned by
+  `ImportLoaderInventoryTest.theGovernanceRegistryDirsAreRefusedToEveryImport`). The `*_workflow.toon` /
+  `*_escalation.toon` suffix refusals are unchanged.
+  - **Workflow** (`Workflow.fromComponent` / `problems()`, moved to `inspecto-workflow` `com.gamma.workflow` (formerly engine `com.gamma.objects`) so core can
+    validate at save): exactly one initial state, ≥ 1 terminal state, every state reachable, every non-terminal
+    state has a way out, no two transitions leave a state by one action; for an Incident a `RESOLVED` state,
+    `ARCHIVED` (if present) terminal, every non-terminal state able to FINISH (a path to `RESOLVED` or `ARCHIVED`
+    for an Incident, to a terminal state otherwise — a self-loop or a closed cycle is refused), and **no transition into a terminal state other than `ARCHIVED` except from
+    `RESOLVED`**. That is defence in depth: the runtime gate (`decidesIncident`) already gates every custom terminal
+    state, so a workflow cannot describe a path around the Disposition / postmortem gate AND could not use one. The
+    same validation now runs on `*_workflow.toon` at boot. Precedence: authored component > `*_workflow.toon` >
+    built-in. **Hot reload:** `GovernanceRegistry` (`inspecto-ops`) lists the three registry dirs on every read
+    and re-parses only a file whose mtime or size moved — whichever door wrote it (route, approval replay,
+    restore, hand edit). A file that fails validation at load keeps its **last valid version** in force; one
+    that was never valid contributes nothing (the lower layer serves). ⚠ The legacy single-tenant root has
+    no config dir, so `ControlApi` points its engine at `<assist.write.root>/registry`.
+    A PUT / restore / DELETE that drops a state live objects of that type occupy is refused **409**, naming each
+    state and its count (`ObjectAccess.countByStatus`; a delete is judged against the built-in, since core cannot
+    see `*_workflow.toon`) — `ControlApiWorkflowStrandTest`.
+    ⚠ **Hand edits are operator scope.** A file written straight into `registry/workflows|sla-policies|escalation-rules/`
+    takes effect on the next read like a routed save, but it bypasses the `canAdminister` gate, the maker-checker
+    hold, the 409 strand check and the audit trail — only the save-time validation is re-run at load. Filesystem
+    access to the config tree is an operator's, and that is where the control lives.
+  - **SLA policy** (`SlaPolicy`): per object type, targets per priority (`responseMinutes`, `resolutionMinutes`,
+    `*` = fallback) in a business calendar — working days, a same-day `start`–`end` window (no overnight
+    windows), ISO-date holidays, and an **IANA zone id, required** (`ZoneId.getAvailableZoneIds()`; an offset or
+    the host zone is refused). Windows are wall-clock, so a DST day keeps 09:00–17:00 and a 24x7 day loses its hour
+    (`SlaPolicyTest`). The sweep stamps `dueAt` / `responseDueAt` from `createdAt` (plus `slaPolicy`, `slaPriority`);
+    an operator-set `dueAt` (no `slaPolicy`) is left alone; a priority change recomputes until a breach is
+    recorded. A **response breach** = `responseDueAt` passed while the object is still in its workflow's initial
+    state — stamped `slaResponseBreachedAt`, emitted as `OBJECT_SLA_BREACH` with `target: response`, once. Every
+    object type with a policy (or an Escalation Rule) is swept, not only Incidents.
+  - **Escalation Rules** (`EscalationRule`, GLOSSARY §9): `on: breach` (`target: resolution|response`) or
+    `on: age` (`afterMinutes` since open), optional `priority` filter; actions `reassign`, `notify`,
+    `raisePriority`. Idempotent: the firing `<rule>@<breach stamp>` is written to `attributes.escalations` in the
+    same store write as the effect, so a rule never repeats for one breach. Audited: one `OBJECT_ESCALATED` per
+    firing (actor `escalation-rule:<id>`, WARN iff `notify`, which `builtin-escalation` turns into a
+    notification) plus `OBJECT_ASSIGNED` on a reassign; `escalated=true` is set, so the Incident shows in the
+    Escalated folder. Bounded: ≤ 50 rules loaded (`GovernanceRegistry.MAX_RULES`), ≤ 500 firings per sweep.
+    Resolved / archived / terminal objects are never escalated.
+    **Cases (operator 2026-10-03):** a Case is swept by the SAME `sweepIncidentSla` — its own `CASE` policy stamps
+    `dueAt` / `responseDueAt`, a breach is raised once, `CASE` Escalation Rules fire once per breach, and a closed /
+    terminal Case's clock is stopped (`GovernanceSweepTest.aCaseIsStampedBreachedAndEscalatedByItsOwnPolicyAndRulesOnly`).
+    No separate Case sweep exists or is needed. **`reassign` vs the IAM (operator 2026-10-03):** `PrincipalDirectory`
+    (`inspecto-auth-spi`, an edition SPI) is asked on every write door (`ComponentRoutes.validateKind`, so the route,
+    a version restore and a Space-Template seed alike). With a directory registered, an unknown user id OR a lookup
+    that throws is refused 422 (fail closed); with none registered — the offline editions, Personal / Standard / the
+    demo build — the id-shape check alone applies, the same standing as `POST /objects/{id}/assign`. ⚠ The core ships
+    NO implementation: no SCIM / user-lookup client exists in `inspecto-oidc` (it only validates tokens), so on
+    every shipped edition today the check is the id shape. It is checked at SAVE time only: a user deleted from the
+    IAM later is still assigned by the sweep. **Examples per Space Template (operator 2026-10-03):** each template
+    carries `config/examples/sla-escalation-examples.md` — labelled, INERT markdown (an Incident and a Case policy
+    plus Escalation Rules) because a template can never carry live governance (`GOVERNANCE_ONLY`, refused on every
+    import a new Space's included); `TemplateGovernanceExamplesTest` runs every example through the real parsers.
+    **Closed 2026-10-04 (operator):** `ASSURE-WORKFLOW-SLA-1` is closed. Residuals were P3 `ASSURE-WORKFLOW-SLA-RESIDUALS-1`, closed 2026-10-18 (the recheck retired to BACKLOG §6 under operator delegation): the
+    sweep-time deleted-assignee recheck (recommended policy when built: skip the reassign, still notify / raise priority, one
+    WARN per breach) waits for an IAM customer and a real `PrincipalDirectory`; a graphical state-diagram *editor* — operator asked
+    2026-10-11, shipped `0d6e0280e` (see *UI* below). The live-preview pass of Settings ▸ Incident governance was done 2026-10-04 (see *UI* below).
+  - **UI:** Settings ▸ *Incident governance* (`settings/incident-governance.component.ts`, model
+    `inspecto/governance/governance-model.ts`): the effective workflow as a list editor (initial, terminal,
+    transition rows), the SLA policy form and the Escalation Rules list; read-only without `canAdminister`; a 422
+    refusal is shown inline, a held write says it was submitted for approval. **Without `inspecto-ops` (2026-10-04, live preview):** `GET
+    /workflows/{type}` answers 503 `CAPABILITY_UNAVAILABLE`; the pane then shows *Not available in this edition* with
+    the server's reason and renders no editor — before, it offered an empty, savable form. **SLA on the object (2026-10-03):**
+    `slaBadges()` (`modules/admin/objects/mail-model.ts`) reads the server stamps only — never computes a clock —
+    and the detail header shows *Respond by* / *Due* while open and *Response breached* / *SLA breached* always;
+    the Incident/Case list prefixes a breach badge to the Description cell (no new column, so the list's width
+    floors hold). Specs `mail-model.spec.ts` (5) + `object-detail.component.spec.ts` (header + axe).
+    **Read-only state diagram (2026-10-03):** `settings/workflow-diagram.component.ts` draws the workflow beside the
+    transitions table from the form's live value (`workflowDraftView` signal, fed by `valueChanges`). Layout is the
+    pure `workflowDiagram()` in `governance-model.ts` (a column per BFS distance from the initial state; unreachable
+    states in a trailing dashed column; terminal = thick border; back-edges arc below, self-loops above). Design-token
+    colours only (`currentColor`). It is a described image (`role="img"` + a text alternative listing every move);
+    the table stays the accessible, editable equivalent.
+    **State-diagram editor (2026-10-11, `ASSURE-WORKFLOW-SLA-RESIDUALS-1` b):** `settings/workflow-state-editor.component.ts`
+    wraps the diagram with a States table (rename, initial radio, terminal checkbox, remove, add state) and From/To
+    *Connect states* selects; clicking two states on the diagram is a pointer shortcut for the same connect (the SVG stays a
+    described image, so the keyboard path is the table + selects). Edits are pure `WorkflowDraft → WorkflowDraft` functions in
+    `governance-model.ts` (`renameState`/`removeState`/`setInitialState`/`setTerminalState`/`connectStates`) written back into the
+    SAME form (`applyDraft`), so the saved `workflow` content is exactly what the table path saves — states are implicit
+    (initial ∪ terminal ∪ transition endpoints), there is no stored state list or layout, hence **auto-layout only** and a
+    just-added state with no transition is UI-local ("not saved until it has one"). A new connection has a blank action the
+    author names in the table. `workflowProblems()` mirrors `Workflow.problems()`/`fromMap` (same wording) as live,
+    advisory feedback — the server stays the judge and its 422 shows verbatim on save. ⚠ Keep it in step with the Java rules.
+  - **Tests:** `WorkflowValidationTest`, `SlaPolicyTest` (engine) · `GovernanceSweepTest` (ops: hot reload, a
+    hand-planted bypass file is not served, the gate still holds on a custom terminal state, policy stamping,
+    response breach, escalation once per breach, age + priority cap, the 50-rule bound) ·
+    `ControlApiGovernanceComponentsTest` (armed Subject: 401 / 403 `developer`+`operations` / 200 `admin` on all
+    twelve routes, the generic door refused even to `super`, 422s, history + restore, a held write approved by a
+    second administrator) · `ImportCapabilityGuardTest.aGovernanceKindIsRefusedOnEveryImportANewSpacesIncluded`.
+    Mutations run: dropping the "around RESOLVED" clause, the idempotency check, or the change detection each turn
+    the named tests red.
+- ⛔ **Queues and watcher routes are RETIRED** (`RETIRE-HALVES-1`, 2026-09-14). `*_queue.toon`,
+  `POST /queues`, `QueueRouter` and the three `watch|unwatch|watchers` routes are deleted; nothing had ever
+  called them. `POST /objects/{id}/assign` survives **person-only** (body `{assignee, actor?}`) and still
+  emits `OBJECT_ASSIGNED`. ⚠ The `watchers` **attribute** is NOT retired — `POST /objects/{id}/merge`
+  unions the watchers of the merged cases, so the field is live with no route to read it.
+- **RCA templates** (`RcaTemplate`, `RcaTemplateRegistry`, `GET /rca/templates`, 1 committed example
+  `orders_rca.toon`) seed the postmortem's cause-analysis structure; the **Postmortem** is the Incident's
+  resolution artifact, the **Findings** are the Case's (§3.5).
+- **`analytics(type)` reads every object** (`ASSURE-IMPACT-LEDGER-RESIDUALS-1` (1), 2026-09-28). It walks
+  `ObjectService.allMatching(filter)` — a lazy, oldest-first iterator holding one `ObjectQuery.MAX_LIMIT`
+  (10 000) page at a time — where it used to read ONE page and silently stop, so `total`, the breakdowns and
+  the impact sums undercounted past 10 000 objects of a type. `DbObjectStore` orders by `created_at, id` so
+  OFFSET pages neither overlap nor skip on a tie. ⚠ Offset paging, not a snapshot: an object purged mid-walk
+  can shift another across a page boundary. Pinned in both backends by
+  `ObjectServiceTest.analyticsCountsEveryObjectBeyondOneQueryPage*` (10 007 objects sharing one `createdAt`).
+  The same complete read now backs `sweepIncidentSla` (a newest-first single page never reached the OLDEST
+  overdue Incidents — `slaSweepBreachesTheOldestOverdueIncidentBeyondOneQueryPage`), `active()`,
+  `evaluateCaseRule` (+ its open-Case lookup), `applyTagRule` and `backfillTagAssignments`; the list-returning
+  ones keep their newest-first order and hold only their filtered hits.
+  One walk yields each id once (a per-walk Set), because a backdated insert mid-walk shifts the page boundary;
+  the sweep also re-reads the stored object before stamping, so a breach fires once and never overwrites a newer
+  status. `ARCHIVED` is skipped by name as well, so it stops the clock even in a workflow where it is not terminal.
+  `active()` (and `openCaseRaisedBy`) query with `ObjectQuery.openOnly` — `closed_at = 0` pushed into SQL — so the
+  terminal history is never read; the Java `isTerminal` filter stays for a state made terminal after its objects
+  were left open. ⚠ The reverse case — a state that STOPS being terminal while its objects keep `closed_at > 0` —
+  now drops those objects from `active()` until they are moved again.
+
+### An Entity's case history — `GET /objects/by-entity` (2026-10-11)
+
+`GET /objects/by-entity?type=<Entity Type>&id=<value>[&status=open|closed|all][&limit=1..200, default 50]` lists the
+Incidents and Cases that reference one Entity (an MSISDN, …), newest first:
+`[{kind: incident|case, id, title, status, severity?, createdAt, matchedOn, via?}]`, `metadata.pagination.total` = the
+visible match count. `id` and every stored value are folded with the space's Entity Type normaliser
+(`EntityTypes.normalise`; typed spellings `msisdn:+…` / `entity:msisdn:+…` accepted; under `e164` a leading `+` is not
+significant; an `id` typed as a DIFFERENT known Entity Type is a 422; the folded key must be ≥ 5 digits for a number
+type, ≥ 2 characters otherwise). `matchedOn`: `key.<column>` (a keyed Alert Rule attribute one of whose `_ . -`
+tokens IS the type id — `caller_msisdn` names msisdn, `excellent` does not name cell — or `key.entity_key`, the Risk / Anomaly Score rules),
+`entityKey` (an Incident minted from a Link Analysis Entity; a prefix counts as a type only when it is a KNOWN Entity
+Type id, so `entity:host:8080` matches as untyped), `member` (a Case CONTAINING a matched Incident; `via`
+names it). Ungated like `GET /objects`, under the same SEC-7d / ABAC post-filter: a hidden object — and a Case reached
+only through it — is absent and uncounted. 422 on an unknown type, missing / oversized / empty-folding `id`, bad
+`status` or `limit`. ⚠ Cost (2026-10-12): `DbObjectStore` keeps a derived side table `inspecto_ops_object_entity_ref`
+(`object_id, attr_key, value_lc` — the lower-cased `key.*` / `entityKey` values, plus one placeholder row per object;
+rewritten on create/update, deleted on delete, backfilled for unindexed rows when the store opens), and
+`ObjectStore.findByAttributeFragment` is one substring `LIKE` over THAT narrow table, then the objects by id in the
+`createdAt DESC, id DESC` window (newest 2 000 candidates). Results are unchanged because `EntityHistory` still re-checks
+every row exactly; candidates are only objects whose reference VALUE contains the fragment (the old scan also hit keys
+and unrelated attributes). Still O(rows in the side table): the store does not know the Entity Type normaliser, so an
+exact-key index would miss `00…` / separator spellings. The in-memory store keeps the JSON scan. When the window hits that cap, `metadata.pagination` carries
+`truncated: true` + a `message` and the response the `X-Inspecto-Truncated: true` header (`total` is then a lower
+bound). The route is on the standard per-subject rate-limit bucket (`ControlApi.isRateLimited`, 429 `RATE_LIMITED`); a stored value with
+separators inside the digits is not found. Not covered: an LA Investigation linked to a Case
+(`PUT /inv/investigations/{id}/case`) — that link lives in the Professional LA module, which `inspecto-ops` cannot see.
+No read audit (no object read is audited today).
+**Masked keys:** the same read is on the engine seam as `ObjectAccess.byEntity(writeRoot, exchange, type, key, status,
+limit)` (`ObjectServiceAccess` → `EntityHistory.query`, the route's own code: same matching, visibility and `truncated`),
+so Link Analysis's `POST /inv/case-history` can resolve an alias server-side and look it up without the raw id ever
+reaching the browser — see the Link Analysis module concept.
+
+### 3.5 Cases
+
+A Case's **Contents** are the Incidents it `CONTAINS` — links, never an `attributes.caseId` (refused, §6).
+**Merge** moves members, tags and watchers to the survivor and closes the absorbed Cases with a
+`MERGED_INTO` link and marker (`ObjectService.java:993-1021`); **Split** carves members into a new Case tied
+back by `SPLIT_FROM` (`:1052-1083`). Comments and attachments stay where they happened. A **Team** is
+`attributes.assignees` (the lead stays `assignee`); **Findings** = **Disposition** (`confirmed ·
+false-positive · recovered · written-off · inconclusive · duplicate · accepted-risk` —
+`FindingsSpec.DISPOSITIONS`, the ladder Incidents resolve with too) + impact + summary, with a *soft* no-disposition
+prompt on resolve and a *soft* open-member warning on close (both deliberately not hard gates).
+
+**Findings sections are deployment-authored** (D6 / C3, 2026-07-26): a `findings-spec` `ComponentStore`
+kind per `ObjectType`, served by `GET /findings/{type}`, rendered by `<inspecto-schema-form>`; absent ⇒
+`FindingsSpec.defaultFor()` reproduces today's exact shape; present ⇒ **fully replaces** the default
+(field-level merge refused because it makes "remove a section" inexpressible). Values are validated on
+`PATCH /objects/{id}` → `422` for a *declared* key only; an undeclared key is never rejected because
+`attributes` is a shared bag. The `AttributeSpec` vocabulary is pinned by a cross-language contract
+(`inspecto-ui/src/app/inspecto/contracts/attribute-spec.contract.json`, compared by `FindingsSpecContractTest` (Java) and `attribute-spec.contract.spec.ts` (TS)).
+
+**A Case type may have its own Findings form — optional** (`FINDINGS-PER-CASE-TYPE-1`, operator, 2026-10-06).
+A Case type is the existing `attributes.caseType` value (the SEC-7d data-scope dimension). Its form is a
+`findings-spec` component with id `case.<caseType>` (`caseType` = letters, digits, `-`, `_`; Case-only;
+id and content must agree, else `422`). `GET /findings/case.<caseType>` serves it, else the generic `case`
+spec, else the built-in default; the served `name` says which. `PATCH /objects/{id}` and
+`PUT /objects/{id}/findings` judge a Case's blob against the spec for its own `caseType` (fail closed,
+`422`). A type with no spec, or an unreadable one, keeps the generic form: additive, no migration. The SPA
+mail pane fetches the open Case's type spec (`findingsCaseType` in `mail-model.ts`) and falls back to the
+generic one. Authoring is the generic `/components/findings-spec` CRUD, which the *Findings fields* dialog drives through
+its *Form* picker (shared form, an existing Case type, or a new one; `FINDINGS-EDITOR-PER-CASE-TYPE-1`).
+
+**Every Case Findings form carries a built-in Impact field** (`FINDINGS-EDITOR-PER-CASE-TYPE-1`, option (c),
+operator, 2026-10-06). The section `impact` (`FindingsSpec.IMPACT_KEY`, type `number`, tier `required`,
+`required:false`) is appended to the built-in Case default, and `FindingsSpec.fromMap` refuses (`422`) a Case
+spec (generic or `case.<caseType>`) that drops it, re-keys it, retypes it or changes any property but its
+**label** (`builtInImpact(label)`). Its value **is the Case's typed `Impact.confirmed`**, never a Findings value:
+`PUT /objects/{id}/findings` takes `impact` out of the blob and, when it differs from the stored confirmed amount,
+writes it through `ObjectService.saveImpact` — keeping the stored currency, period, basis and other amounts —
+with the impact route's rules: `canWorkIncidents` (403; an unchanged re-send needs nothing, so Findings stay
+collaboration), `Impact.fromBody` validation (422, including "currency is required" on a Case with none yet),
+the closed-books rule (409) and the `action: impact` before/after audit. The Findings blob never holds it, and
+`PATCH /objects/{id}` refuses a Case blob carrying it (422), so the Impact panel and the Findings field are one
+stored value; the SPA's `parseFindings` reads the field from `impact.confirmed`. Incident specs are unaffected.
+Pinned by `ControlApiFindingsImpactFieldTest` and `FindingsSpecTest`.
+
+**Case Rules** (`CaseRule`, `/cases/rules`) are saved searches that auto-group: when ≥ *threshold* Incidents
+match within a *window* they are grouped under one Case, opened or attached idempotently. Evaluation is on
+demand from the pane **and** schedulable as the `caserule.evaluate` Job Type (`CaseRuleEvalJob`) — the
+archived design's "scheduler auto-evaluation is a follow-up" is stale. `objects.analytics` samples
+per-category counts into tall Parquet under `<dataDir>/ops_analytics/` as a `dataset` Run Artifact
+(2026-07-25); binding it as a Studio Dataset is unbuilt (§5). ⚠ **No committed `*_case_rule.toon` or
+`*_tag_rule.toon` exists.**
+
+**`groupBy` - one Case per offender (2026-10-14, `TELCO-FRAUD-STORY-GAPS-1`).** A Case Rule may name a key column (`groupBy: msisdn`); the rule then groups Incidents by the value of their `key.<column>` attribute (the per-entity key an Alert Rule stamps), so ONE offender's Incidents form one Case and two offenders never merge. `threshold` and `windowMinutes` apply per offender, an Incident without that attribute never matches, a late Incident joins only its own offender's open Case (`caseGroup` attribute on the Case). The Case carries only a digest of the value - a 12-hex `caseGroup` attribute and the first 6 in the title - never the raw key, since a Case is read by non-revealing viewers. (The Incidents' own `key.<column>` attributes are the masking lane's concern.) Absent `groupBy` nothing changes (one Case per rule). SPA: *Group by key* in the Case rules dialog. Pinned by `CaseRuleGroupByTest`.
+
+**Impact (WS-10, `ASSURE-IMPACT-LEDGER-1`, 2026-09-26).** An Incident and a Case carry one typed financial
+impact, `com.gamma.ops.Impact`: four non-negative decimals — **suspected · confirmed · recovered · prevented** —
+in one ISO 4217 **currency** (required once any amount is set), plus free-text **period** (≤ 64) and **basis**
+(≤ 2000). Stored as the JSON blob `attributes.impact`, amounts as plain decimal strings (≤ 6 places, < 10^15), so
+no `double` ever touches a stored value — and every read view returns them as **strings** too (2026-09-28, §4:
+a JSON number came back through the SPA as a rounded `double`). **`outstanding = confirmed − recovered` is derived on read and never
+stored**: `OperationalObject.toMap()` adds a top-level `impact` block with it on every read, and a body that
+sends `outstanding` is refused. Written only by `PUT /objects/{id}/impact {impact:{…}}` on `canWorkIncidents`
+(the `postmortem`/`category` narrow-route precedent — recording what an Incident cost is part of finishing it,
+and the `canAdminister` PATCH must not become the analyst's catch-all): `{}` clears it; 400 no/non-object
+`impact`; 422 an invalid value (an amount's text is bounded to 40 characters before it is parsed), any other
+body key, or an Alert/Task; **409 on an `ARCHIVED` Incident**, and — **late recoveries** (operator, 2026-09-26) —
+on a `RESOLVED` Incident or a `CLOSED` Case only `recovered` and `prevented` may still change, any other field
+→ 409 (reopen to change the rest); 404 unknown or out-of-scope. Audited as `OBJECT_ACTIVITY` `action: impact`
+with the stored value **`before` and `after`** and the request's actor. ⛔ **`PATCH /objects/{id}` and `POST /objects` refuse
+`attributes.impact` and `attributes.disposition` (422 naming the key)** — their free attribute bags would bypass the
+validation, the closed-books rule and the audit. **On a Case this IS the Findings impact** — the built-in Findings spec dropped its
+`impactAmount` section and the route its flat `impactAmount` copy (only `recordsAffected` remains), so there
+is one home for the money, not two. ⚠ A deployment-authored `findings-spec` may still declare an `impactAmount`
+key; it is then an ordinary scalar in the blob that nothing sums. `analytics()` sums the typed impact **per
+currency** (`impact.byCurrency.<ISO>` = `count` + the four amounts + `outstanding`) — never across currencies —
+and `objects.analytics` samples it as axis `impact.<ISO>`. **The impact ledger Dataset** (`impact_ledger`) is
+written by the same `objects.analytics` run — one row per Incident/Case with an impact per run, exact DECIMALs,
+`outstanding` and the Disposition included — so any Measure / Widget can read "money found / recovered /
+prevented" without a new seam (as-built + the freshness caveat: `okf/product/module/processor/spec-jobs.md`).
+
+### 3.6 Annotations — Notes and Tags
+
+Both address their subject as an **Annotation Target** `(targetKind, targetId)` from one shared vocabulary
+(`AnnotationKinds`, core; `AnnotationTargets` resolves them and applies `RowScope`). A **Note** is a comment
+or attachment *reference* (true upload refused, §6). **Tags** are a **central assignment store**, not a field:
+`attributes.tags` is a *projection* since D7 (2026-07-26) — written on manual apply, Tag-Rule merge,
+rule-raised creation, merge union and split, but never the source of truth. A **Tag Rule** is a saved
+search that auto-tags matching Incidents/Cases on open and can be applied in bulk. The mail pane's tag menu
+is still the only place a tag is *applied*; the `/tags` pane is a vocabulary pane. Mechanism: `tags.md`.
+
+### 3.7 Retention — `incident_purge` and the D5 tiers
+
+Retention is a **tier**, not a terminal state (D5, 2026-07-25): `CLOSED → ARCHIVED` and `ARCHIVED → purge`
+are two separate windows. `incident_purge` (a maintenance task, `IncidentPurgeTask`, `inspecto-ops`):
+`retention_days` **required, no default**; `max_count` default 1000; dry-run first; retention **derived**
+from `closedAt + retention_days`, never stamped; a legal hold is fail-safe and re-checked inside `purge()`;
+dependents (notes, links, tag assignments) are deleted **before** the object through **abstract** store
+methods — a silent no-op `default` was refused because it would orphan rows quietly. Scoped to
+`ObjectType.INCIDENT` because only its workflow has `ARCHIVED`. **G3 stance:** a purge is not "all trace
+removed" — the append-only ledger keeps the Incident's `OBJECT_ACTIVITY`, including the purge record.
+⛔ **Nothing schedules `incident_purge`, and nothing should**: a shipped default that hard-deletes business
+records is indefensible; the operator opts in with a Job.
+
+**Alert retention — `alert_purge` (2026-10-09, MODULE-REORG-P7-INCIDENTS).** The Alert-owned store
+(`AlertStore`, the `ALERTS` family) never deleted anything, so resolved Alert rows grew without bound on every
+edition. `alert_purge` is a **base** built-in task of the `maintenance` Job Type (`AlertPurgeTask`,
+`inspecto-engine`; Alerts carry no module gate, so it is a case of `MaintenanceJob`'s switch like `event_prune`,
+not a `MaintenanceTaskProvider`). **Schedule it** with a maintenance Job: `task: alert_purge`,
+`retention_days: 90` (cron as you like; run a dry run first). **Defaults:** `retention_days` absent = 90; present
+but blank / `0` / negative / non-numeric is **refused** (a mistyped window must never read as "delete everything");
+**nothing ships scheduled** — no default Job, so existing installs lose nothing until an operator opts in. **What is
+purged:** `RESOLVED` rows whose own `closedAt` is strictly before `now - retention_days`. **What is never purged:**
+`OPEN` and `ACKNOWLEDGED` Alerts (they carry the de-duplication state — a deleted active row would let its rule fire
+again), a resolved row closed exactly at the cutoff or inside the window, and a resolved row with no close time. Age
+only: an Alert's `incident_id` is a text reference into another store and nothing reads an Alert row back through an
+Incident (the Incident's `ESCALATED_FROM` edge has no node behind it), so a purged Alert leaves a harmless dangling
+reference. A purge also drops the purged Alerts from the live `GET /alerts` history, and a real purge that deleted
+rows writes one `AUDIT` row `alerts.purged` (`alerts_removed`, `purge_before`, `retention_days`). Without an Alert
+engine attached the task **fails** rather than reporting a silent success.
+
+### 3.8 Notifications
+
+Shipped 2026-06-29 as an **in-process MVP**, deliberately without a broker: `NotificationService` is an
+`EventLog` subscriber handing off to a virtual-thread executor; append-only `EventStore`; feed routes
+`/notifications/*` (list / unread-count / read / read-all / delete) and SSE `GET /notifications/stream`;
+`NotificationRateLimiter` (rolling per-hour cap on identical notifications — the anti-loop safeguard);
+`{{var}}` templates.
+
+- **Channels.** `NotificationChannel` is a `ServiceLoader` SPI; in-app is intrinsic, **email and webhook are
+  an edition seam** — `SmtpEmailChannel` (`notify.smtp.{host,from,to,user,pass}`) and `WebhookChannel`
+  (`notify.webhook.{url,token}`) live in `inspecto-notify-channels` since EDG-01 cell 1 and **Personal
+  registers zero channels**. Persisted destinations are a `channel` `ComponentStore` kind
+  (`GET/POST/PUT/DELETE /notifications/channels[/{id}]`, `canAuthorWorkbench`, `kind=EMAIL` with an invalid
+  target `422` at CRUD time) read live by dispatch; a `kind` with no discovered transport delivers nothing.
+  ⚠ `ChannelConfig` has no `template` field, so a destination cannot override the rule-level template.
+- **Rules** (`notification-rule` kind, `/notifications/rules*`, 2026-07-24) override the built-in
+  event → notification table; chosen as a `ComponentStore` kind over a boot-scanned TOON, matching the
+  channel precedent. `FLOW_CONSERVATION_IMBALANCE` gained a rule (category `ops`, `minLevel=WARN`) because
+  the bridge opens an ALERT object for both directions.
+- **Digest** is opt-in per destination (`digestMinutes`, 0 = immediate); in-app copies stay per event.
+- **Preferences** are **one global set** (`NotificationPreferences`: "per-user preferences arrive with the
+  auth module"), category × channel, critical categories locked on. The Notification Center's
+  Preferences tab edits that one set.
+- **Receipts and suppression.** Inbound delivery-status webhooks (D8, 2026-07-26): `statusAt` is
+  `Map<DeliveryStatus, Long>`, first observation wins, verification precedes every write, an unknown
+  `deliveryId` is `202`. `DbDeliveryReceiptStore` shipped 2026-09-07 and with it the **suppression
+  policy**: complaint ⇒ permanent; hard bounce ⇒ TTL (`-Dnotify.suppression.bounce.ttl`, default `P30D`);
+  ⛔ soft bounce **never** suppresses; `-Dnotify.suppression=off`. 🔴 It **arms itself only over a durable
+  store** — an evicting cache answering "never bounced" for evidence it forgot must not collapse into
+  "deliver". Unsuppress is an **override row** (`DELETE /notifications/suppressions?target=`) forgiving
+  history up to its timestamp; a later bounce re-suppresses.
+- ✅ **`mail.send` no longer succeeds with nothing sent** (fixed 2026-09-17). `MailSendJob` returns
+  `JobResult.skipped("no email channel configured — nothing sent")` — `SKIPPED`, neither green nor a red run
+  on every fire. It had returned `ok(...)` and `BACKLOG.md` §6 carried that as working-as-designed with a
+  disclosure, which the register's `INC-3` cell rightly called a defect: a scheduled mail job read green
+  forever on a bundle with no transport.
+
+### 3.9 Diagnosis
+
+`FailureReactor` (`features/inspecto-agent/src/main/java/com/gamma/agent/diagnose/FailureReactor.java:17-33`)
+subscribes to the `ConsignmentEventBus` for FAILED consignments and diagnoses them off-thread (bounded
+queue + virtual threads) through `HeuristicDiagnoser` and, when a model is configured, `ModelDiagnoser`;
+results land in `DiagnosisStore`, a **ring of 256**, and are served read-only by `GET /assist/diagnoses`.
+The UI (`/diagnoses`, `DiagnosisDetailDialog`) shows root cause, a heuristic-only flag and a
+**`suggestedAlertRuleToon`** the operator can copy. **That is the whole bridge to the chain.** No code in
+`com.gamma.agent.diagnose` or `com.gamma.assist` opens an Incident, and no UI affordance launches a
+Diagnosis from a failing Run — it is reactive to failure events only. The requirement's "producing an
+Incident" is unbuilt (§2, §5).
+
+### 3.10 What Personal loses, and how
+
+`ObjectAccess` (core SPI, `Optional.empty()` on Personal) is provided by `OpsEngineProvider`, which
+`inspecto-ops` registers under the **`com.gamma.service.ObjectEngineProvider`** service file — that file, plus
+the module's `RouteModule`, `JobTypeProvider` and `MaintenanceTaskProvider` registrations, is the whole switch. Because the objects domain was **constructed by mandatory core**, cell 7
+also needed a host-declared `ObjectEngineProvider` handle beside the seam — opening the stores needs
+`SpaceRoot` / `OperationalDb` from the module above the engine. With the module absent:
+`AbsentModuleRoutes` answers **49 paths `503`** naming the module; `BootstrapRoutes` sets `features.ops =
+api.hasRoute("POST", "/objects")` (`:82`) — derived from what registered, not declared; the SPA drops the
+`incidents`, `cases`, `tags` nav ids and the Incidents / Case Manager / Incident-detail panes render an
+explained `<inspecto-alert>` ("Operational objects not installed"), never a toast; `DecisionRoutes`
+(`:193-253`) splits its outcome three ways so an absent module is never reported as "Incident already open"
+— the defect verification caught. Three ops Job Types leave with the module (§2). ⛔ `/alerts*` stays.
+
+### 3.11 The UI seam
+
+One `ObjectMailComponent` serves `/incidents` and `/cases` by route data — a Gmail-metaphor 3-pane shell
+(folders My Incidents — My Cases on `/cases` — / Escalated / Identified / Diagnosing / Resolved / Archived + Tags · list · detail) reading
+`GET /workflows/{type}` rather than hard-coding transitions. Triage is **optimistic** (every bulk verb
+patches rows to the expected post-state, then reconciles with the server object); merge / split / create are
+request → refetch. `/alerts` (`AlertsComponent`) lists fired alerts and Alert Rules with a manual Evaluate
+and the `AlertRuleFormDialog`, gated on `LensService.canAuthorAlertRules`. The **Notification Center** has
+Channels / Rules / Deliveries / Preferences tabs and the bell reads the SSE stream with polling fallback.
+`/diagnoses` is a data table with a detail dialog. ⚠ Neither the Notification Center nor the preferences
+pane has an `okf/frontend` feature page (`features/index.md` says "not yet documented"); `alerts.md` and
+`diagnoses.md` are stubs under 1 KB.
+
+### 3.12 Public API surface
+
+`@PublicApi(since = "4.0.0")` on: `ObjectType`, `ObjectAccess`, `IncidentAccess`, `AnnotationKinds`,
+`FindingsSpec`, `RcaTemplate`, `TagAssignment`, `IdScheme` (core vocabulary, `inspecto-engine`);
+`ObjectService`, `ObjectStore`, `DbObjectStore`, `InMemoryObjectStore`, `ObjectQuery`, `OperationalObject`,
+`EscalationPolicy` (`inspecto-ops`). **Not** marked: `AlertRule`, `EventAlertBridge`, `OpsEngineProvider`.
+⚠ The `@PublicApi` marker records *intent*, not exposure — nothing after 3.x has shipped
+(`api-stability.md`). Making the dependent-cascade store methods **abstract** in MNT-14 was a MAJOR widening
+of an unreleased surface, and was chosen anyway because a default would orphan rows.
+
+## 4. Decisions
+
+Dated, one line each, with the reason. Only decisions that still bind are listed; where one reversed an
+earlier one, both appear.
+
+### The chain and its vocabulary
+
+| Date | Decision | Why |
+|---|---|---|
+| 2026-06-29 | Notifications ship as an **in-process MVP** — virtual-thread executor + append-only `EventStore`, **no broker** | A broker is a deployment dependency the target user counts do not justify; the idiom is the same one the run-claim seam uses |
+| 2026-06-29 | The SaaS-shaped requirement was cut to fit: **one global preference set**, IP + UA not GeoIP, login/MFA events deferred, 401/403 audited as `ACCESS_DENIED` | The core is auth-free; there is no user to prefer per |
+| 2026-07-06 (product) | R5 Decision Network: Alert-Rule and Expectation consequences mapped into the **`Consequence`** vocabulary; full kind promotion deferred | One word for "what a decision engine produces" across three rule engines |
+| 2026-10-10 (operator) | **Runbook** = a first-class `runbook` component kind, linked guidance with no automation; an Alert Rule links one by `runbook:` (dangling link refused at save) and its Incident/Case page shows it; authored through `/components/runbook` under `canAuthorWorkbench` | Turns the packs' Markdown runbooks into guidance a responder sees on the object, with history, without new routes |
+| 2026-07-07 (product) | **Build the Alert-Rule authoring pane**; new capability `canAuthorAlertRules` | Of the three rule engines Alert Rules alone had no UI authoring |
+| 2026-07-09 | Alert-rule writes **arm in-process**; the engine never hot-loads `*_alert.toon` | One arming path; a file watcher would be a second one the write route has to agree with |
+| 2026-07-12 (product) | `/incidents` + `/cases` become a **mail-like 3-pane UI**; lifecycle renamed **`IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**; priority `Critical · Major · Minor · Low` | Triage is an inbox; the old `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED` encoded assignment as a state |
+| 2026-07-12 | `assign` **does not move status**; `/ack` stays alert-only; only `ARCHIVED` is terminal; reopen clears `closedAt` | Ownership and progress are different axes |
+| 2026-07-12 | Case membership is **`CONTAINS` links**; `LinkStore` gains `remove()` (an amendment to its append-only contract) | One representation — the graph the UI and glossary already use |
+| 2026-07-12 | Merge survivor: the absorbed Case is **`CLOSED` + `mergedInto`**, not a `MERGED` state | A state that means "look elsewhere" is a link wearing a status |
+| 2026-07-12 | Open-member gate on Case close is a **soft warning** | Revisit only if the warning proves insufficient |
+| 2026-07-19 | **Severity promotion**: `CRITICAL`/`error` rules open a deduped Incident beside the Alert | A high-severity breach must enter triage, not only a feed |
+| 2026-07-19 | `create-alert` records a signal **and** opens an object | A consequence that only logs is not actionable |
+| 2026-07-22 (product) | **Create contract**: title + **≥ 1 link** mandatory; assignment **direct**, queue routing at creation **deferred** | An unlinked object is not useful; there is no multi-analyst consumer yet |
+| 2026-07-24 | **Resolution is hard-gated server-side** (I1): `commit()` rejects `→ RESOLVED` without the four postmortem sections | A UI-only check is bypassed by the API |
+| 2026-07-24 | `create-incident` consequence: an Incident at any severity, deduped per rule | Some conditions warrant triage without being alerts |
+| 2026-07-24 | Notification **rules** are a `ComponentStore` kind, not a boot-scanned TOON | Matches the `channel` precedent; the kind inherits CRUD, ETags and history for free |
+| 2026-07-24 | Digest is **opt-in per destination**; in-app copies stay per event | Batching is a delivery choice, not a fact about the event |
+| 2026-07-25 | **Retention is a tier** (D5): `CLOSED → ARCHIVED` and `ARCHIVED → purge` are two windows | "Archived" must not mean "about to be deleted" |
+| 2026-07-26 | **D7**: tags become a generic cross-entity concept — *this* system generalized, not a second one; `attributes.tags` becomes a projection | Two tag systems would drift; the old row's claim that nothing wrote `attributes.tags` was simply false |
+| 2026-10-06 (operator) | **A Case's Findings Impact field is built in and IS its typed Impact** (`FINDINGS-EDITOR-PER-CASE-TYPE-1`, option (c) of (a) keep separate / (b) mark any Number field / (c) built-in): one locked `impact` section (label renameable) on every Case form, valued as `Impact.confirmed`, written through the impact path and never stored in the blob | A lead's "Confirmed loss" as a free Number field was a second home for the Case's money that analytics never summed; a marked field (b) could be retyped or removed under the money. `confirmed` is the amount a Findings "loss" names; currency stays on the Impact panel (operator, 2026-10-06) |
+| 2026-07-26 | **D6 / C3**: Findings sections are a `findings-spec` kind that **fully replaces** the default; values validated `422`; the gate lives in `ObjectRoutes` | Field-level merge makes "remove a section" inexpressible; the engine stays store-agnostic |
+| 2026-10-06 | **FINDINGS-PER-CASE-TYPE-1**: per-Case-type Findings spec as component `case.<caseType>`, optional, falls back to the generic spec (operator, 2026-10-06) | A SIM-box form had no home; keying on the existing `caseType` attribute adds no new concept and needs no migration |
+| 2026-07-26 | D8 receipts: **first observation wins**; verification precedes every write; unknown id `202` | A provider retries; a later duplicate must not rewrite history |
+| 2026-07-27 | **MNT-14 `incident_purge`**: `retention_days` required, derived not stamped, legal hold fail-safe, dependents first through **abstract** methods, `INCIDENT` only, **never scheduled by default** | A shipped default that hard-deletes business records is indefensible; a silent no-op default would orphan rows |
+| 2026-07-27 | **G3**: a purge keeps the Incident's ledger trace, including the purge record | The ledger is append-only; that is the compliance claim |
+| 2026-08-10 | The promoted Incident is **linked `ESCALATED_FROM`** its Alert | The correlation must be traversable in the graph, not implied by shared attributes |
+| 2026-08-10 | An `alerts` Platform Service so `alert.evaluate` holds a real grant; dry-run must report "nothing evaluated" | A decorative grant hides a job that silently did nothing |
+| 2026-08-15 | The `AttributeSpec` vocabulary is pinned by a **cross-language contract test** | A type added only in TypeScript made the server `422` a section the renderer could draw |
+| 2026-09-06 | **Alert Rules widened to Measures** (BI-5): one record, two shapes; a thresholded Measure is a KPI alert | One rule kind for both senses of "a number crossed a line" |
+| 2026-09-06 | Bounce/complaint handling **stays manual until receipts persist**; no auto-disable of a channel | One bad address must not silence a channel |
+| 2026-09-07 | Suppression: complaint permanent, hard bounce TTL, **soft bounce never**, armed **only over a durable store**; unsuppress is an override row | An evicting cache cannot distinguish "clean" from "forgot"; pruning receipts would mask a dead address |
+| 2026-09-26 (operator) | **Working an Incident or Case is its own capability, `canWorkIncidents`**: `ack` / `resolve` / `transition` / `assign` moved from `canAdminister` (2026-09-15, `ROUTE-UNGATED-DEFAULT-1` step 2b) to it, seeded to `operations`, `support`, `power` and `admin` (`super` holds everything). Merge / split / `PATCH /objects/{id}` / Case-Rule evaluate **stay `canAdminister`**. Those four routes record the authenticated Subject as the actor; a body `actor` counts only without one (Personal). The SPA shows the lifecycle verbs only with `LensService.canWorkIncidents()` (action node `incidents.work`), and Accept self-assigns through `/assign`, not the PATCH | Only Admin/Super held `canAdminister`, so a fraud analyst on `operations` could not close their own Case and `power` could not work an Incident at all. Moving an object's state is the analyst's daily work; reshaping which Incidents a Case holds, or editing its fields wholesale, is not. Pinned by `ControlApiTriageGateTest` (seeded-role Subjects: 401 / 403 `business` / 200 `operations`, and a Case OPEN → investigate → resolve with Disposition CONFIRMED audited under the Subject) |
+| 2026-09-26 (operator) | **Narrow postmortem + category routes on `canWorkIncidents`** (`INCIDENT-FINISH-GATE-1`, "narrow route"): `PUT /objects/{id}/postmortem` (body `{postmortem:{…}}` → `attributes.postmortem`, the JSON blob the I1 resolution gate reads) and `PUT /objects/{id}/category` (body `{category:"…"}` → `attributes.category`). Each writes ONLY its one key, refuses any other with 422 (400 for a missing/malformed value), runs behind the scope guard, and is audited as an `OBJECT_ACTIVITY` event (`action` = the key) under `ApiContext.actor`. The postmortem panel and Accept's categorise step call them; priority / severity / assignee / tags / escalate / team / target date stay on the `canAdminister` PATCH | Resolving needs the postmortem and Accept needs a category, so without these an analyst could move an Incident but not finish it. Following the `PUT /objects/{id}/findings` precedent keeps the PATCH from becoming the analyst's catch-all. Pinned by `ControlApiIncidentFinishGateTest` (401 / 403 `business` / 200 `operations`, a foreign key → 422, and IDENTIFIED → DIAGNOSING → RESOLVED with a postmortem by an `operations` Subject) |
+| 2026-09-26 | **The SPA shows each disposition control only with the capability its route takes** (`CASE-UI-GATE-LEFTOVERS-1`): Priority, an Incident's Escalate flag, Merge, Split and the Case team / target-date fields render only with `LensService.canAdminister()`. **A comment's `author` is the signed-in Subject** on `POST /objects/{id}/comments` and `POST /notes/{kind}/{id}/comments`; the body's `author` counts only with no Subject (Personal) | A control the server refuses is a dead button; a body field must not re-attribute a Subject's words, as it may not re-attribute a lifecycle move. ⚠ Tagging still rides the PATCH and still shows to everyone — not in this call |
+| 2026-09-26 | **Typed impact on Incident and Case, one home** (WS-10, `ASSURE-IMPACT-LEDGER-1`): `attributes.impact` via `PUT /objects/{id}/impact` on `canWorkIncidents`; `outstanding` derived on read; the Findings `impactAmount` section and flat copy retired; a terminal object's impact is closed (409) | A narrow PUT follows the postmortem / category / findings precedent, where extending the PATCH would hand the analyst `canAdminister`'s fields. A stored `outstanding` drifts the first time `recovered` changes without it. Two homes for a Case's money (Findings `impactAmount` + the typed block) would disagree the day one is edited. Freezing a terminal object keeps a closed ledger closed — **amended the same day**: late recoveries (`recovered` / `prevented` only) stay writable on a RESOLVED Incident and a CLOSED Case, because money comes back after the outcome is decided; an ARCHIVED Incident stays fully closed. The PATCH refuses `impact` and `disposition`, and a reopen clears the Disposition |
+| 2026-09-26 | **An Incident resolves only with a Disposition** (WS-10): the ladder gains `DUPLICATE` and `ACCEPTED_RISK` (one list, `FindingsSpec.DISPOSITIONS`, shared by Cases' Findings); the value rides the resolve body and is gated in `ObjectService.commit` beside I1 | Resolved-with-no-outcome Incidents make every found / recovered / prevented KPI unreadable. Gated in `commit` so no route or caller can bypass it, as I1 is. Case stays soft (§6.2) — not in scope of the call |
+| 2026-09-29 (operator, `IMPORT-RESIDUALS-1` (5)) | **Archiving an undecided Incident stamps `ARCHIVED_UNDECIDED`**: `ObjectService.commit` sets it when an Incident moves to ARCHIVED with no Disposition, and records it as `disposition` on that move's `OBJECT_ACTIVITY` event; one archived WITH a Disposition keeps it; a reopen clears it as any reopen does. It is on `FindingsSpec.DISPOSITIONS` (and the SPA's `incident-disposition.ts`) but never chosen — `CHOOSABLE_DISPOSITIONS` excludes it, so a resolve sending it is 422 and a Case's Findings do not offer it. Archive stays ungated otherwise (still the Trash) | An archived Incident with a blank outcome was unreadable in every found / prevented KPI and indistinguishable from a data gap; stamping keeps archive a one-click dismissal while making "nobody decided" an explicit, countable value. The analytics ledger reads the stored value, so it needed no change. Pinned by `ObjectServiceTest.archivingAnUndecidedIncidentStampsArchivedUndecided` / `archivingAResolvedIncidentKeepsItsDisposition` / `aResolveCannotChooseArchivedUndecided`, `ControlApiIncidentFinishGateTest` (HTTP 422) and `resolve.dialog.spec.ts` |
+| 2026-09-28 (session, `ASSURE-IMPACT-LEDGER-RESIDUALS-1`) | **Impact amounts are decimal STRINGS on the wire** — `Impact.toMap()` emits `toPlainString()` (`"1000"`, never `1E+3`), so `GET /objects/{id}` and every read view carry `"confirmed":"123456789012345.123456"`; the `byCurrency` analytics totals stay numbers (read-only, never sent back) | The browser pass found the SPA parsing amounts into a `double` (~15 significant digits; an amount holds up to 21): an edit then rewrote the money, and on a RESOLVED Incident the untouched `confirmed` came back rounded, so the server 409'd every late recovery as a changed field. Breaking changes are free before any production release. Pinned by `ControlApiImpactTest.amountsReadBackAsExactStringsSoALateRecoveryCanResendThem` and `impact-panel.component.spec.ts` |
+| 2026-09-28 (session) | **The SPA mirrors the I1 hard gate instead of offering "resolve anyway?"** — the mail view leaves an Incident with an incomplete resolution pattern out of a resolve and names what is missing; the detail page says so before opening the dialog. The detail page takes its actions from `GET /workflows/{type}` (fallback: the server's built-in lifecycles) | The confirm offered a move the server always refuses; the comment was posted, then the resolve failed. The detail page's hand-kept INCIDENT table named states the workflow does not have (OPEN/ASSIGNED/IN_PROGRESS), so it offered no action — Resolve included — on any Incident |
+| 2026-09-28 (session) | **A retired flat `impactAmount` is not migrated** (`ASSURE-IMPACT-LEDGER-RESIDUALS-1` (3)) — closed | Nothing after 3.x shipped; no committed seed, fixture or tool writes one (grepped every `*.toon`, `*.json`, `*.py`, `*.mjs`, `*.ps1`, `*.sql` under `spaces/`, `tools/`); a legacy object's money is re-entered through the impact panel |
+
+### Editions
+
+| Date | Decision | Why |
+|---|---|---|
+| 2026-09-02 | **CP-12 split**: the in-app feed stays in every edition; delivery channels are CP-15 (Professional+) | The feed is the product's nervous system; a transport is a deployment |
+| 2026-09-07 (operator) | Gating is **`ServiceLoader` modules**, never `-D` switches | A switch leaves the code in the bundle |
+| 2026-09-07 | Cell 1: channels move to `inspecto-notify-channels`; Personal registers **zero** | `SmtpEmailChannel` had reached Personal through the connector sidecar, which is not edition-gated |
+| 2026-09-08 (operator) | Cell 7: the **whole `com.gamma.ops` domain** becomes `inspecto-ops`; `OPS-01` and `SP-CTL-02` amended; ⛔ `/alerts*` stays | Operational objects are a multi-operator workflow; Personal is single-user. A gap still raises the *event* everywhere |
+| 2026-09-08 | `features.ops` is **derived** from whether `POST /objects` registered | The flag cannot disagree with the build (contrast `authMode`, `SEC` §2) |
+
+## 5. Not built
+
+⛔ **Pointers, never copies.** Each row names its board id; the board is the authority for status and
+priority. A row with no id is flagged `UNTRACKED` and needs filing before it can be scheduled.
+
+### Tracked
+
+| Item | Board id | What remains |
+|---|---|---|
+| D8 notification residuals — soft-bounce retry scheduling, an SES/SNS adapter, GeoIP, auth-gated per-user preferences | `BACKLOG.md` §3 *Notifications (D8 residuals)*; §3 *D8-SUPPRESS-1* | The SNS adapter needs its own review (subscription confirmation + outbound cert fetch from an unauthenticated callback) |
+| `findings-spec` authoring UI | `BACKLOG.md` §3 *D6 spec-authoring UI* | Authored as TOON through generic `/components` CRUD today; nothing is broken without it |
+| ~~`kpi.completeness` Job Type — signal + deduped Incident on breach~~ | `BACKLOG.md` §3.5 *Completeness KPI* K4 | ✅ Shipped 2026-10-06 (`c16c9eab0`): one Incident per Pipeline, deduped on `pipeline` |
+| `TriageRunStore` interface + Postgres implementation; the 256-cap ring blocks AGT-5 embedding recall | `BACKLOG.md` §3 *Postgres multi-user*; §6 | Parked with the multi-user plan |
+| MNT-14 residuals — no UI, no shipped Job instance, retention derived not stamped, `INCIDENT` only | `BACKLOG.md` §6 *MNT-14* | Standing; the operator opts in |
+| Digest deliveries correlate to the digest, not per notification | `BACKLOG.md` §6 | `deliverWithReceipt` is the escape hatch |
+| D7 startup backfill is a full object scan | `BACKLOG.md` §6 | Deliberately unfixed: nothing measures startup |
+| ~~`mail.send` succeeds with nothing sent~~ ✅ **FIXED 2026-09-17 — see §above; it returns SKIPPED** | `BACKLOG.md` §6 (was: working-as-designed, disclosed) | ⚠ Kept for the trail: `REQUIREMENTS.md` INC-3 called it a defect while §6 called it by-design, and the disagreement was about its *category*. `ad29e683` settled it by changing the behaviour, so the row is spent, not adjudicated |
+
+### `UNTRACKED` — surfaced by this spec, no board row
+
+> ✅ **Filed 2026-09-09 (Sprint 2).** These findings are no longer untracked. The **cross-cutting** ones
+> — those no single area owned, which is why they sat here — are filed as cross-cutting
+> `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
+> starting point and read the row before acting on it:
+> `SPEC-GLOSSARY-1`.
+>
+> ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
+> area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
+> copying it onto the board would give it two homes and one of them would go stale. The board holds what
+> **crosses** areas; a spec holds what belongs to **one**. See
+> [`archived-documents/plans-archive/post-consolidation-sprints.md`](../../../../archived-documents/plans-archive/post-consolidation-sprints.md) §Sprint 2.
+
+| Item | Evidence | Why it matters |
+|---|---|---|
+| **Diagnosis → Incident** — the defining clause of `INC-5` | no `INCIDENT` / `IncidentAccess` reference under `com.gamma.agent.diagnose` or `com.gamma.assist` | A Should recorded shipped; the only bridge is a copyable drafted Alert Rule. Needs a product call: auto-open (deduped per consignment, through `IncidentAccess`) or retitle the requirement |
+| ~~**Queue / watcher / escalation-policy UI**~~ ✅ **CLOSED by deletion 2026-09-14** | `RETIRE-HALVES-1` | The gap was a backend with no user half. Retiring the backend closes it — the alternative was building a UI for a capability nobody asked for |
+| ~~**`QueueStore` Db parity**~~ ✅ **MOOT 2026-09-14** | `RETIRE-HALVES-1` | There is no `QueueStore` to give Db parity to |
+| ~~**An analyst can MOVE an Incident but not always COMPLETE one**~~ ✅ **FIXED 2026-09-26 — see §4, narrow postmortem + category routes** | `INCIDENT → RESOLVED` needs the four postmortem sections (`ObjectService.commit`); the panel and Accept's categorize step used to save through the `canAdminister` PATCH | Kept for the trail: they now ride `PUT /objects/{id}/postmortem` and `PUT /objects/{id}/category` on `canWorkIncidents` (operator, 2026-09-26) |
+| **Measure rules in the authoring form** | `AlertRule` has `dataset` + `measure`; `ALERT_RULE_ATTRIBUTES` has neither | The 2026-09-06 widening is TOON-only; the pane cannot express the glossary's own definition |
+| **`JOB-01` / `JOB-03` promise Personal three ops jobs** | `OpsJobTypes`, `OpsMaintenanceTasks` in `inspecto-ops` | Corrected in `EDITIONS.md` with this spec (notes on both rows) — recorded here because it is the cell-7 miss class, and the next gating cell will hit it again |
+| **`ChannelConfig.template`** — a destination cannot override the rule-level template | `events-metrics.md` "still open"; the plan it rode is archived | The slice's home (`event-signal-backbone-plan` S2) is in the archive and no row survived it |
+| **Studio-Dataset binding of `objects.analytics`** | `case-analytics-dataset-plan.md` is DRAFT, no code, uncited | The Parquet exists; nothing reads it as a Dataset |
+| **Notification Center / preferences have no `okf/frontend` page**; `alerts.md` and `diagnoses.md` are stubs | `features/index.md` "not yet documented" | The UI half of INC has less concept coverage than any other area so far |
+
+## 6. Refused & superseded
+
+**This section exists because a refused idea with no recorded refusal gets re-proposed.** `BACKLOG.md` §6
+does this for *work*; this does it for *design*, per capability. Each row states what was refused and the
+reason — the reason is the load-bearing half.
+
+### 6.1 Assignment as a state; membership as a field — REFUSED (2026-07-12)
+
+The old lifecycle carried `ASSIGNED` and `IN_PROGRESS`; the mail redesign removed both. Ownership
+(`assignee`) and progress (status) are different axes, and encoding one in the other made "reassign" a
+state transition. Likewise Case membership as `attributes.caseId` was refused: it would create a second
+representation beside the `CONTAINS` links the glossary, the UI and the correlation graph already use.
+
+### 6.2 Hard gates where a soft warning was chosen — and the one place the reverse happened
+
+Case close with open members, and Case resolve without a Disposition, are **soft warnings** by decision
+("revisit only if insufficient"). Incident resolution is the deliberate exception: I1 made the four-section
+postmortem a **server-side `422`**, because a UI-only check is bypassed by the API, and WS-10 (2026-09-26)
+added the Disposition to the same gate — every money KPI reads a resolved Incident's outcome, so an Incident
+with none cannot count as resolved. The Case's Disposition stays soft: it was not part of that call. ⚠ Two current docs
+(`objects.md`, the archived `case-management-design.md`) still describe the backend gate as a follow-up;
+`PROJECT_NOTES.md` and `ObjectService.commit` are right.
+
+### 6.3 A message broker; email in core — REFUSED (2026-06-29)
+
+Redis / RabbitMQ / Kafka were considered and refused: the in-process virtual-thread executor over an
+append-only `EventStore` is the house idiom and the target user counts do not justify a broker. Email is an
+**edition seam**, never core — a transport is a deployment concern and Personal ships none.
+
+### 6.4 Auto-disable on bounce; collapsing hard and soft bounce; pruning receipts to unsuppress — REFUSED (2026-09-06/07)
+
+One bad address must not silence a channel, so suppression is **per recipient**. Soft bounce never
+suppresses — collapsing it with hard bounce would stop mail to anyone once over quota. "Unsuppress by
+deleting the receipts" was rejected twice over: it is audit loss, and a permanent mask over a genuinely dead
+address; the override row forgives history up to a timestamp and lets a later bounce re-suppress.
+
+### 6.5 Findings: field-level merge, the `*_workflow.toon` pattern, `ConfigSpecs` reuse, `group`/`secret` — REFUSED (2026-07-26)
+
+A present `findings-spec` **replaces** the default whole because merge makes "remove a section" inexpressible.
+Cloning the C6 `*_workflow.toon` pattern was not viable — it is a boot-time scan of CLI path arguments with no
+write root, no CRUD and no hot reload, a config surface an operator cannot edit through the product. Mapping
+`AttributeSpec` onto backend `ConfigSpecs` / `FieldSpec` was lossy for zero reuse. `group` and `secret` are
+frontend-only keys and a `422` on a findings-spec by design — `secret` on a stored-and-returned attribute
+would mislead.
+
+### 6.6 `incident_purge` defaults — REFUSED (2026-07-27)
+
+No default `retention_days`; no scheduled instance; no silent `default` on the dependent-cascade store
+methods (shipped **abstract**, a MAJOR widening, because a default orphans rows quietly); no per-store hooks
+beside `JobService.objects()` (four independently-nullable fields would reintroduce the half-cascade). A
+purge is not "all trace removed" (G3).
+
+### 6.7 Receipt design refusals (D8, 2026-07-26)
+
+No provider-minted delivery id (the id is minted locally and embedded outbound, so the `@PublicApi`
+signature did not widen); no signature verification against a re-serialised `Map` (key order and whitespace
+do not survive); not the Ed25519 SendGrid verifier the plan specified — it is ECDSA P-256 / SHA-256.
+
+### 6.8 Case-management non-goals (2026-07-12)
+
+No true file upload for Case documents (references only — upload touches the air-gap and attack-surface
+posture and needs its own design); no auto-merge "similar cases" scoring (Case Rules are the hook); no
+moving comments or attachments between Cases on split (history stays where it happened); Cases do not get
+postmortems and Incidents do not get Contents, split/merge or a Team.
+
+### 6.9 `-D` switches for edition gating; scheduling `incident_purge` — REFUSED (operator, 2026-09-07 / 2026-07-27)
+
+Recorded here because both are INC consequences: a switch leaves the objects domain in the Personal bundle,
+and a default purge deletes business records.
+
+### 6.10 Superseded designs — what replaced them
+
+| Superseded | By | Where recorded |
+|---|---|---|
+| `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED` Incident lifecycle; *Issue* | `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`; *Incident* (2026-07-12) | `GLOSSARY.md` §9, §13 |
+| The list-and-detail `objects.component` | the 3-pane `ObjectMailComponent` (the old component was deleted) | `objects.md` |
+| `fiveWhys[5]` | variable-length `causeAnalysis[]` + `causeMethod`; legacy migrates on parse (I2) | archived `case-management-design.md` |
+| `CASE_DISPOSITIONS` in `mail-model.ts` | the backend default ladder + `findings-spec` | `objects.md` |
+| `attributes.tags` as storage | a projection of the central assignment store (D7) | `tags.md` |
+| "The engine hot-loads `*_alert.toon`" | in-process arming by the write routes | `events-metrics.md`, the archived authoring plan's own correction |
+| Alert Rules as raw files only | `ComponentStore`-backed CRUD (the `alert-rule` kind) | `decision-rules.md` |
+| "Scheduler auto-evaluation of Case Rules is a follow-up" | the `caserule.evaluate` Job Type | `jobs.md` |
+| "The backend resolution gate is a follow-up" | I1 shipped 2026-07-24 (`ObjectService.commit`) | `PROJECT_NOTES.md` §3 |
+| MNT-14 plan §3 G1 / G4 framing | marked wrong in the plan's own header; `jobs.md` is the account | archived `mnt-14-incident-retention-plan.md` |
+| D6's two premises ("reuse the C6 workflow/TOON pattern", "the `attribute-spec` renderer" = `ConfigSpecs`) | the `findings-spec` kind and the frontend `AttributeSpec` vocabulary | `objects.md` |
+| `DecisionConsequence` | `Consequence` (aliased for back-compat) | archived `decision-network-plan.md` |
+| The operations reference's curl walkthrough (`type=ISSUE`, `assign` → `start`, `-Dcontrol.token`) | rewritten with this spec: `INCIDENT`, `accept` → `resolve`, no token plane | `operations-reference.md` |
+| `USER_GUIDE.md`'s "open → in-progress → resolved" and "list-and-detail" | corrected with this spec | `USER_GUIDE.md` |
+| `STAKEHOLDER_OVERVIEW.md`'s "Issue & case management … open → assigned → in-progress → resolved → closed", "(cases/issues)", unconditional Personal availability | plan §8 cluster — reconciled at step 6, not here | — |
+
+## 7. As-built mechanism (pointers only)
+
+| Mechanism | Owning file | `resource:` | Read it for |
+|---|---|---|---|
+| Alert-rule authoring, severity promotion, the `ESCALATED_FROM` edge, notifications end to end (channels, rules, digest, receipts, suppression) | `docs/okf/product/module/event/spec-events-metrics.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | the long-form account §3.2, §3.3 and §3.8 were distilled from |
+| `caserule.evaluate`, `objects.analytics`, `mail.send`, **`incident_purge`** (D5 tiers, G3, the abstract cascade) | `docs/okf/product/module/processor/spec-jobs.md` (`Concept`) | `platform/inspecto-engine/src/main/java/com/gamma/job` | the retention account and the Job Types |
+| `create-alert` / `create-incident` consequences; Alert Rule `when` | `docs/okf/product/module/processor/spec-decision-rules.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | how a Decision Rule opens an object |
+| Tags as a cross-entity graph; the Incident/Case adopter; Tag Rules | `docs/okf/product/module/processor/spec-tags.md` (`Concept`) | `features/inspecto-ops/src/main/java/com/gamma/ops/tag` | addressing, the central store, the projection |
+| `inspecto_ops_objects`, durable vs in-memory stores, **"queues: none"**, `DbDeliveryReceiptStore` | `docs/okf/product/module/engine/spec-db-layer.md` (`Concept`) | `inspecto-engine` | what persists |
+| Edition gating as a mechanism; the cell-7 recipe items 18–27 | `docs/okf/product/layer/platform/architecture-editions-model.md` (`Concept`) | `pom.xml` | `ObjectAccess` + `ObjectEngineProvider`, the census traps |
+| The SLA sweep flags and the lifecycle walkthrough | `docs/okf/product/layer/platform/admin-guide-operations-reference.md` (`Reference`) §Retention · §SLA | — | the operator's curl sequence (rewritten with this spec) |
+| The Incidents & Cases UI: mail shell, create contract, optimistic triage, Findings spec, D7 | `docs/okf/product/module/ops/user-guide-objects.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/objects` | the only page titled for the domain |
+| Alerts pane · Diagnoses pane · Events pane | `docs/okf/product/addon/incidents/user-guide-alerts.md` · `diagnoses.md` · `events.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/{alerts,diagnoses}` | ⚠ the first two are stubs under 1 KB |
+| 🔴 **The operational-objects backend has no concept file.** `ObjectService`, the three workflows, categorization, the I1 gate, the SLA sweep, `EscalationPolicy`, queues and watchers, merge/split, Case Rules, `IncidentAccess`, `EventObjectBridge` are documented only in source, in eight scattered backend pages, and in this spec | *(none — gap; the plan predicted it: "no dedicated backend concept file exists anywhere")* | `features/inspecto-ops/src/main/java/com/gamma/ops` | the code. The `control-plane/index.md` enumeration has no Incident / Case / Objects entry at all |
+| 🔴 **Notification Center and preferences have no feature page** | *(none — gap)* | `inspecto-ui/src/app/modules/admin/notification-center` | the code |
+
+---
+
+## 8. Verification
+
+### 8.1 The objects domain — `features/inspecto-ops/src/test/` (39 files; runs only under `-Pedition-standard|enterprise`)
+
+⚠ **The default `mvn -o clean test` does not compile `inspecto-ops`.** A green default build proves nothing
+about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 at HEAD.
+
+| Class | Proves |
+|---|---|
+| `ObjectServiceTest` · `ObjectCoreTest` · `WorkflowTest` | the three workflows, `reopen`, `ARCHIVED` terminal, the I1 resolution gate, categorization |
+| `ObjectServiceQueueTest` · `ControlApiQueueRoutesTest` | `QueueRouter` routing, assign / watch / watchers routes |
+| `ObjectServiceCaseGroupTest` · `ControlApiCaseGroupTest` | Contents, merge (`MERGED_INTO`), split (`SPLIT_FROM`) |
+| `ObjectServiceCaseRuleTest` · `ControlApiCaseRuleTest` · `CaseRuleEvalJobTest` | Case Rules: threshold + window, open-or-attach idempotence, the Job Type |
+| `EventAlertBridgeTest` (`inspecto-engine`) · `ControlApiAlertFromEventTest` | `SEQUENCE_GAP` / conservation → a stored Alert, listed on `GET /alerts`, no ops module; a gap also opens a linked Incident when the incidents service exists (`aGapAlsoOpensOneLinkedIncident…`) |
+| `IncidentAccessTest` | the narrowed seam, dry-run opens nothing |
+| `AlertServicePersistenceTest` | fired alerts persisted as objects when the module is present |
+| `ControlApiFindingsSpecTest` | `GET /findings/{type}`, the `422` value gate, frontend-only keys refused |
+| `ControlApiFindingsImpactFieldTest` | The built-in Case Findings Impact field: 422 on a dropped / re-keyed / retyped / re-tiered / required spec (generic and per-type), a relabel accepted; a Findings save writes `Impact.confirmed` (rest kept, never in the blob, audited) and `objects/analytics` sums it; 403 without `canWorkIncidents` on a change, 200 on an unchanged re-send; 422 with no currency or a negative amount; the PATCH refuses it |
+| `ControlApiImpactTest` | `PUT /objects/{id}/impact`: 401 / 403 `business` (before existence-hiding) / 400 / 422 (ten invalid bodies, an Alert) / 409 `ARCHIVED` then writable after `reopen` / 404; `outstanding` derived and never stored; audit `before`/`after` under the Subject; per-currency analytics. The Personal 503 is `NoOperationalObjectsShipInThePersonalBuildTest` |
+| `ControlApiObjectsByEntityTest` | `GET /objects/by-entity`: 401, 422 per bad input, empty result, every `matchedOn` path, token-boundary columns, unknown prefixes, status filter, scope hiding, the truncation flag, 429 |
+| `FindByAttributeFragmentParityTest` | in-memory and DuckDB stores scan the same newest-first capped window |
+| `ControlApiObjectsTest` · `ControlApiObjectsPageTest` · `ControlApiScopedObjectsTest` | the create contract (≥1 link, `400`/`404`), paging, SEC-7d data scopes |
+| `ControlApiNoteRoutesTest` · `ControlApiTagRoutesTest` · `TagRuleTest` · `ObjectTagProjectionTest` · `TagAssignmentCoreTest` | Annotations: notes, tags as a projection, Tag Rules |
+| `IncidentPurgeTaskTest` · `RetentionSweepSeamTest` | `retention_days` required, dry-run, legal hold, dependents first |
+| `ObjectsAnalyticsJobTest` | the tall Parquet artifact |
+| `DbObjectStoreTest` · `InMemoryObjectStoreTest` · `DbLinkStoreTest` · `LinkCoreTest` · `NoteCoreTest` | store parity — ⚠ no queue-store counterpart exists to test |
+| `ControlApiDecisionRulesTest` · `ControlApiExpectationTest` | `create-alert` / `create-incident`; the Expectation → Incident path |
+| `WorkflowConfigLoadTest` | `*_workflow.toon` boot-time override |
+
+### 8.2 Alerts, notifications and diagnosis — the default reactor
+
+| Class | Module | Proves |
+|---|---|---|
+| `AlertRuleTest` | `inspecto-engine` | both record shapes parse; `when` scoping |
+| `ControlApiAlertRuleWriteTest` | `inspecto` | the write routes' gate order, in-process arming, `canAuthorAlertRules`; a `by` column outside the Dataset's Schema refused at both save doors; `/components/alert-rule` refuses every shape `/alerts/rules` refuses |
+| `PerEntityAlertTest` | `inspecto-engine` | `by` rules over real DuckDB: 40 keys → ONE Alert (count 40, digests, no entity) and 40 Incidents, re-fire → 0, restart seeding from the digests, a healed key leaves the count and the last heal resolves the Alert, never an Incident, storm cap → one Alert + one storm Incident, two rules over a key → two Alerts, the pre-fold per-key Alerts folded, unknown never heals, no-`by` unchanged |
+| `MeasureAlertTest` | `inspecto-engine` | scalar Measure rules: fire once per open breach (no re-fire while still breached), the heal edge (all-clear once, cooldown reset so a relapse fires at once), unknown never heals |
+| `ScalarMeasureAlertObjectsTest` | `inspecto-ops` | the real workflow for a no-`by` Measure rule: heal resolves the Alert never the Incident, relapse links / re-opens, restart seeding, retire on a Dataset change |
+| `PerEntityAlertObjectsTest` | `inspecto-ops` | the real workflow: a heal never resolves the Incident, even with a complete postmortem; a relapse after an operator's resolve re-opens it, an existing Case Rule groups 40 per-key Incidents into one Case |
+| `AlertPurgeStoreTest` · `AlertPurgeTaskTest` · `AlertRetentionPinTest` | `inspecto-engine` | `alert_purge`: old resolved deleted, recent / exact-boundary / no-close-time kept, `OPEN` and `ACKNOWLEDGED` never touched, dry run counts only, window 0/blank refused, DuckDB file reopened shows no resurrected row, the live history drops purged entries, the AUDIT row |
+| `NotificationServiceTest` | `inspecto-engine` | subscriber hand-off, rate limiter, preferences gating |
+| `ControlApiNotificationsTest` · `ControlApiNotificationChannelsTest` · `ControlApiNotificationRulesTest` · `ControlApiNotificationStreamTest` | `inspecto` | feed routes, channel CRUD (`422` on a bad EMAIL target), rules, the SSE stream |
+| `ControlApiCollectorNotifyTest` | `inspecto` | the ACQ push-notify seam that feeds the ledger |
+| `RcaTemplateTest` · `CollectorServiceRcaTest` | `inspecto-engine` · `inspecto` | RCA templates and their registry |
+| `FailureReactorTest` · `ModelDiagnoserTest` | `inspecto-agent` | failure subscription, off-thread diagnosis, the ring |
+| `SmtpEmailChannelTest` · `WebhookChannelTest` | `inspecto-notify-channels` | the transports (edition profile only) |
+| `NoChannelShipsInThePersonalBuildTest` | `inspecto` | Personal registers zero `NotificationChannel` providers |
+
+### 8.3 UI specs — `inspecto-ui/src/app/` (vitest)
+
+Fifteen specs sit on this mechanism: `object-mail.component.spec.ts`, `object-detail.component.spec.ts`,
+`case-contents.component.spec.ts`, `merge-cases.dialog.spec.ts`, `object-create.dialog.spec.ts`,
+`object-link.dialog.spec.ts`, `postmortem-panel.component.spec.ts`, `tag.dialog.spec.ts` (the mail pane,
+contents, merge, create contract, linking, postmortem, tagging); `alerts.component.spec.ts`,
+`alert-rule-form.dialog.spec.ts`; `notification-center.component.spec.ts`, `channel-form.dialog.spec.ts`,
+`rule-form.dialog.spec.ts`, `notifications.component.spec.ts` (the Center and the bell);
+`diagnoses.component.spec.ts`, `diagnosis-detail.dialog.spec.ts`.
+
+### 8.4 SPI contracts and Job Type registration
+
+| File | Provider |
+|---|---|
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.service.ObjectEngineProvider` | `com.gamma.ops.OpsEngineProvider` — the host-declared handle that makes `ObjectAccess` non-empty |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.spi.http.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the 42 paths `AbsentModuleRoutes` stands in for (the 7 Case-management paths moved to the optional `inspecto-case-management` module, MODULE-REORG-P7: `CaseRoutes`, feature `cases`; see the reorg plan "P7 Case Management as built") |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.job.JobTypeProvider` · `com.gamma.job.MaintenanceTaskProvider` | `OpsJobTypes$CaseRuleEvaluate`, `OpsJobTypes$ObjectsAnalytics` · `OpsMaintenanceTasks` (`incident_purge`) |
+| `providers/inspecto-notify-channels/src/main/resources/META-INF/services/com.gamma.notify.NotificationChannel` | `SmtpEmailChannel`, `WebhookChannel` |
+
+### 8.5 Runnable examples
+
+Committed config exercising the chain, all under `spaces/demo/config/` (mirrored in `inspecto-deploy/`):
+two Alert Rules as `alert-rule` components, armed at boot — `registry/alert-rules/orders_stream_failures.toon`
+(metric shape, `CRITICAL` → Incident) and `registry/alert-rules/orders_low_volume.toon` (measure shape; moved off the
+dead pre-2026-07-18 `orders/*_alert.toon` files 2026-09-23) — one RCA
+template (`ops/orders_rca.toon`). ⛔ `ops/demo_ops_queue.toon` no longer exists — deleted 2026-09-14 with the capability (`RETIRE-HALVES-1`).
+⛔ `ops/sla_escalation.toon` no longer exists either, deleted in the same change. ⚠ **Zero committed Case Rules, Tag Rules, notification rules or channel
+destinations**, and — by decision — no scheduled `incident_purge`.
+
+### 8.6 Guards
+
+`render-processor-board --check` used to pin `SP-CTL-02`'s Personal cell 🟡 through the `PARTIAL_ON_PERSONAL`
+override (the gap event fired everywhere; the ALERT object did not; the set is EMPTY since 2026-10-08, the bridge is core) — the
+generator could not express that until 2026-09-08 and its "just regenerate" advice would have flipped an
+operator-approved decision back to ✅. `NoChannelShipsInThePersonalBuildTest` and the cell-7 Personal
+baseline (23 modules / 3777 tests, `features.ops = false`) are the edition guards in test clothing.
+
+### 8.7 Named coverage gaps (verified absent, not assumed)
+
+| Gap | Evidence |
+|---|---|
+| **No test exercises Diagnosis → Incident** | there is no such path to test (§3.9) |
+| **No test that a Personal bundle answers all 49 object paths `503`** | `AbsentModuleRoutes` is exercised by the cell-7 baseline run, not by a route-by-route assertion |
+| ~~**`mail.send` on a transport-less bundle has no failing test**~~ ✅ **STALE 2026-09-17** | ~~its success is the recorded behaviour~~ — it returns **SKIPPED** since `ad29e683`, so the recorded behaviour changed and this line no longer describes the code |
+| **No end-to-end SMTP or webhook delivery against a real endpoint** | both transports are tested against in-process fakes; delivery-status webhooks against synthetic signatures |
+| **No committed Case Rule or Tag Rule** | `*_case_rule.toon` / `*_tag_rule.toon`: zero files (§8.5) |
+
+**Workflow & SLA beyond Incidents (pure decisions extracted 2026-10-09; no second consumer yet).** `Workflow`, `SlaPolicy` and `EscalationRule` are generic, and the pure SLA/escalation decisions now live in `inspecto-workflow` (`SlaDecisions` over a `GovernedItem` view); `ObjectService.sweepIncidentSla` adapts `OperationalObject` to it and keeps the writes, events and the cap. The policies are still keyed by the closed `ObjectType` enum, and no other module consumes them. Extracting a governed-item contract waits for a second provider (reconciliation breaks or Entity List reviews). The declined second-source design and its preconditions: [module-reorganisation-decisions](../../layer/platform/plan-module-reorganisation-decisions.md).

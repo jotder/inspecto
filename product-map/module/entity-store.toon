@@ -5,3 +5,4 @@ parent: layer.platform
 module: entity-store
 billable: false
 status: ga
+docs: docs/okf/product/module/entity-store/index.md

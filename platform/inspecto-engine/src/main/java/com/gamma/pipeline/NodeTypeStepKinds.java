@@ -11,7 +11,7 @@ import com.gamma.etl.StepKindRegistry;
  *
  * <p>⚠ Registration only — it says nothing about whether the type can EXECUTE. A descriptor without a
  * {@code PipelineNodeExecutor} loads and then throws at run time, naming the missing provider. Both
- * halves are separate registrations on purpose; see {@code okf/backend/engine/node-types.md}.
+ * halves are separate registrations on purpose; see {@code okf/product/module/engine/spec-node-types.md}.
  */
 public final class NodeTypeStepKinds implements StepKindRegistry {
 

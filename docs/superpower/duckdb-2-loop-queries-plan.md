@@ -223,6 +223,6 @@ Lane C and D need the machine quiet (benchmark timings); A and B are safe to run
 ## References
 
 - [`la-separation-feasibility-plan.md`](../archived-documents/plans-archive/la-separation-feasibility-plan.md) §7.10 — spikes `D-S1`..`D-S5`, decision `D9` (graph engine order), `DuckPGQ` dropped 2026-10-01.
-- [`../okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md) — the Link Analysis concept.
+- [`../okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md) — the Link Analysis concept.
 - `inspecto-geo-link/src/test/java/com/gamma/control/InvTraversalBench.java` — the measurement harness (gate `G-R4`).
 - `docs/GLOSSARY.md` — canonical vocabulary (Dataset, Working Set, Investigation, Pipeline).

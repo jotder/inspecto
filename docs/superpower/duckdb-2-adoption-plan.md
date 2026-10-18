@@ -22,7 +22,7 @@ order in which to build. The looping-query research is in
 
 ## 2. What was measured (serial, interleaved, same machine)
 
-Harness: `tools/bench-duckdb.ps1` (merged to master; see `okf/backend/build-run/performance.md`). Four sides run
+Harness: `tools/bench-duckdb.ps1` (merged to master; see `okf/product/layer/platform/tests-performance.md`). Four sides run
 strictly one after another — A1 (1.5.6), B1 (2.0), A2 (1.5.6), B2 (2.0), 60 s apart, `-Warmup 1 -Reps 3`. A difference is
 **real** only if it keeps its sign in both A-vs-B pairs and exceeds both same-version noise runs. Idle CPU before each side
 was 34 / 24 / 24 / 20 % (the operator's IDE and language servers idle at ~25 % and could not be removed).
@@ -66,7 +66,7 @@ ingest claims per call. If that is large, the ledger is slow on every version an
 Already on master (this session): the benchmark harness (`tools/bench-duckdb.ps1`, `tools/bench-duckdb-compare.mjs`,
 `tools/bench/DuckDbBench.java`, a `-Dinspecto.bench.idxDir` knob on `IndexScaleBench`) and the loop-query research plan.
 
-**Behaviour differences found on 2.0** (all recorded in `okf/backend/engine/duckdb.md` on the upgrade branch):
+**Behaviour differences found on 2.0** (all recorded in `okf/product/module/engine/spec-duckdb.md` on the upgrade branch):
 
 - `x -> …` lambda arrow is a Binder error; `lambda x: …` works (and works on 1.5.6, so it can ship before any pin move).
   `SET lambda_syntax='ENABLE_SINGLE_ARROW'` restores the arrow. User-authored Job / expression SQL still using the arrow
@@ -130,6 +130,6 @@ Lanes marked ∥ touch disjoint files and can run in parallel; the timing lanes 
 ## References
 
 - [`duckdb-2-loop-queries-plan.md`](duckdb-2-loop-queries-plan.md) — the 13-site loop inventory, the verified `USING KEY` / `ASOF` / window experiments and the candidate list C1–C11.
-- `okf/backend/build-run/performance.md` — how to run the comparison harness.
-- `okf/backend/engine/duckdb.md` — the engine's DuckDB concept (the 2.0 section lives on the upgrade branch until it merges).
+- `okf/product/layer/platform/tests-performance.md` — how to run the comparison harness.
+- `okf/product/module/engine/spec-duckdb.md` — the engine's DuckDB concept (the 2.0 section lives on the upgrade branch until it merges).
 - `docs/BACKLOG.md` §4 — `DUCKDB-2-MIGRATION-1` and `DUCKDB-2-SQL-AST-SPA-1` (on the upgrade branch).

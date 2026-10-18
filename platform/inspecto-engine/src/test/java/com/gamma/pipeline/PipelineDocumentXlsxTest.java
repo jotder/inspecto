@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>🔴 <b>What the gate still costs.</b> On a clean CI runner there is no binary to stage (CI populates no
  * cache), so the real write SKIPS there. Where it runs, it runs in STAGED mode — the file loaded by path, as
  * a bundle's launcher does — not "whatever loads". The shipped-bundle proof itself (no network, no
- * {@code ~/.duckdb}) is recorded in {@code docs/okf/capabilities/pipeline-authoring/pipeline-authoring.md} §3.0.
+ * {@code ~/.duckdb}) is recorded in {@code docs/okf/product/module/etl/plan-pipeline-authoring.md} §3.0.
  */
 class PipelineDocumentXlsxTest {
 

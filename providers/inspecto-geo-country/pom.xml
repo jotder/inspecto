@@ -103,7 +103,7 @@
             </plugin>
             <!-- SEC-SIDECAR-BOOT-1 (2026-09-07), carried over from inspecto-security by D-MR6: a THIN jar would lack
                  com/maxmind classes, and the resolver is resolved at startup by the core ServiceLoader seam.
-                 See okf/backend/build-run/guard-coverage.md. -->
+                 See okf/product/layer/platform/tests-guard-coverage.md. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

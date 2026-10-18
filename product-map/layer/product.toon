@@ -3,3 +3,4 @@ kind: layer
 title: Product host
 billable: false
 status: ga
+docs: docs/okf/product/layer/product/index.md

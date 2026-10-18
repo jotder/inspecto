@@ -40,7 +40,7 @@ sub-claim; 3.2's "the newer file is wrong").
 | 3.5 "`integrations.md:218`" | the `CollectorProcessor` attribution is at `:227`. |
 | 2.5 "three '(future)' claims" | two. The third (`:20-21`) is a correct phase-scoped statement. |
 | Group-3 merge hazard: "carrying the prose into `connectors.md` fails there because it has no waiver" | **REFUTED** — see answer A. The connectors half produces zero guard hits. |
-| Group-2 ⛔ "the mounted-share / UNC-jail security note … exists nowhere else" | substantially right. `docs/REQUIREMENTS.md:82` (ACQ-4) records the *rule*, `docs/okf/backend/config/config-safety.md:17` the *jail behaviour*; the operator **recipe** (`net use` / `mount -t nfs\|cifs`, `-Dassist.safety.roots=<roots>;X:\`) exists only at `data-acquisition-framework.md:108-115`. |
+| Group-2 ⛔ "the mounted-share / UNC-jail security note … exists nowhere else" | substantially right. `docs/REQUIREMENTS.md:82` (ACQ-4) records the *rule*, `docs/okf/product/module/config/spec-config-safety.md:17` the *jail behaviour*; the operator **recipe** (`net use` / `mount -t nfs\|cifs`, `-Dassist.safety.roots=<roots>;X:\`) exists only at `data-acquisition-framework.md:108-115`. |
 
 ## Adjacent defects found but not in the register
 
@@ -65,11 +65,11 @@ All OLD strings verified unique (`grep -cF` = 1, multi-line via a Python substri
 
 ### Row 2.1 — two edits, same file
 
-FILE: `docs/okf/backend/acquisition/data-acquisition-framework.md`
+FILE: `docs/okf/product/module/acquire/spec-framework-design.md`
 OLD: ``POST /sources/{id}/notify``
 NEW: ``POST /collectors/{id}/notify``
 
-FILE: `docs/okf/backend/acquisition/data-acquisition-framework.md`
+FILE: `docs/okf/product/module/acquire/spec-framework-design.md`
 OLD: ``audited as `source.notified`;``
 NEW: ``audited as `collector.notified`;``
 
@@ -78,33 +78,33 @@ settled — sweep it with 2.2, not here.)*
 
 ### Row 2.3
 
-FILE: `docs/okf/backend/acquisition/framework.md`
+FILE: `docs/okf/product/module/acquire/architecture-framework.md`
 OLD: ``across `stability.sizeChecks` cycles``
 NEW: ``across `stability.size_checks` cycles``
 
 ### Row 2.4 — two files
 
-FILE: `docs/okf/backend/acquisition/data-acquisition-framework.md`
+FILE: `docs/okf/product/module/acquire/spec-framework-design.md`
 OLD: ``the framework is built — Phases A–F shipped on `4.x`.**``
 NEW: ``the framework is built — Phases A–F have all shipped on `master`.** *(⚠ do not restore a `4.x` attribution: that branch and its `v4.0.0`/`v4.0.0-RC1` tags were deleted 2026-08-17 — `docs/BRANCHING.md:19`.)*``
 
-FILE: `docs/okf/backend/acquisition/index.md`
+FILE: `docs/okf/product/index.md`
 OLD: ``All six roadmap phases (A–F) ship on `4.x`.``
 NEW: `All six roadmap phases (A–F) have shipped.`
 
 ### Row 2.5 — two edits (the third sub-claim is refuted; no edit)
 
-FILE: `docs/okf/backend/acquisition/data-acquisition-framework.md`
+FILE: `docs/okf/product/module/acquire/spec-framework-design.md`
 OLD: `  * SSH Tunneling and Proxy (future)`
 NEW: ``  * SSH Tunneling and Proxy — **shipped**: `SshTunnel` for `sftp`/`ftp`/`ftps`/`db`, plus SOCKS5 (2026-07-20) and HTTP `CONNECT` (2026-08-13) proxy dial-through, extended to the PostgreSQL JDBC driver 2026-09-06``
 
-FILE: `docs/okf/backend/acquisition/data-acquisition-framework.md`
+FILE: `docs/okf/product/module/acquire/spec-framework-design.md`
 OLD: `object version comparison, event notification (future).`
 NEW: ``object version comparison, event notification (**shipped** — `POST /collectors/{id}/notify`, ACQ-6).``
 
 ### Row 3.1 — two files
 
-FILE: `docs/okf/backend/integrations.md`
+FILE: `docs/okf/product/layer/platform/api-integrations-ducklake.md`
 OLD:
 ```
 New protocols (S3/GCS/Azure, NFS/SMB) are future connectors that
@@ -120,7 +120,7 @@ share at the OS level and point the built-in `local` connector at it (see
 SPI without touching the core engine.
 ```
 
-FILE: `docs/okf/backend/modules/connectors.md`
+FILE: `docs/okf/product/module/connectors/architecture.md`
 OLD:
 ```
 Future connectors (S3, NFS/SMB) plug in via the same
@@ -134,15 +134,15 @@ SPI without touching the core.
 ```
 
 Optional companion (same file, same defect class, frontmatter):
-FILE: `docs/okf/backend/modules/connectors.md`
+FILE: `docs/okf/product/module/connectors/architecture.md`
 OLD: `description: Remote source connectors (SFTP/FTP/FTPS/DB) and all network dependencies, kept out of the core.`
 NEW: `description: The eight remote collector connectors (SFTP/FTP/FTPS/DB/S3/Kafka/Azure/GCS) and all network dependencies, kept out of the core.`
 
 ### Row 3.2 — root canon
 
 FILE: `docs/FEATURE_INVENTORY.md`
-OLD: ``| SSH host-key pinning | `options: { host_key: "ssh-rsa AAAA…" }` or `{ known_hosts: … }` | `okf/backend/acquisition/data-acquisition-framework.md` |``
-NEW: ``| SSH host-key pinning | `options: { host_key: "SHA256:<base64>" }` — a **fingerprint** (SHA256/SHA1 base64, or MD5 colon-hex); a raw `ssh-rsa AAAA…` key line is rejected. Use `{ known_hosts: … }` to pin from an OpenSSH file. | `okf/backend/integrations.md#ssh-host-key-pinning-sftp` |``
+OLD: ``| SSH host-key pinning | `options: { host_key: "ssh-rsa AAAA…" }` or `{ known_hosts: … }` | `okf/product/module/acquire/spec-framework-design.md` |``
+NEW: ``| SSH host-key pinning | `options: { host_key: "SHA256:<base64>" }` — a **fingerprint** (SHA256/SHA1 base64, or MD5 colon-hex); a raw `ssh-rsa AAAA…` key line is rejected. Use `{ known_hosts: … }` to pin from an OpenSSH file. | `okf/product/layer/platform/api-integrations-ducklake.md#ssh-host-key-pinning-sftp` |``
 
 ⚠ Two things in that NEW deliberately: the skeleton, **and** the Doc pointer. The current pointer
 (`data-acquisition-framework.md`) only names `options.host_key` at `:33` with no format, so it cannot
@@ -155,7 +155,7 @@ a reason to call either side wrong.
 
 ### Row 3.3 — two files
 
-FILE: `docs/okf/backend/modules/connectors.md`
+FILE: `docs/okf/product/module/connectors/architecture.md`
 OLD:
 ```
 artifactId `inspecto-connectors`. Holds **all network dependencies** (sshj + BouncyCastle for SFTP,
@@ -168,23 +168,23 @@ Apache commons-net for FTP/FTPS, the PostgreSQL JDBC driver, kafka-clients for t
 and gson for the native GCS JSON API) so the [engine core](engine.md) JAR has none.
 ```
 
-FILE: `docs/okf/backend/acquisition/connectors.md`
+FILE: `docs/okf/product/module/connectors/spec-connectors.md`
 OLD: `parsed with gson (parent-managed; already transitively on the classpath — no new fat-JAR jar).`
 NEW: ``parsed with gson — a **declared compile dependency** of this module (`inspecto-connectors/pom.xml:99`; version parent-managed). It was already on the classpath transitively, so declaring it adds no new fat-JAR jar.``
 
 ### Row 3.4
 
-FILE: `docs/okf/backend/integrations.md`
+FILE: `docs/okf/product/layer/platform/api-integrations-ducklake.md`
 OLD: ``references, never literals** — `${ENV:VAR}` reads an environment variable, `${SYS:prop}` a JVM system property.``
 NEW: ``references, never literals** — `SecretResolver` expands five forms at connect time: `${ENV:VAR}` (environment variable), `${SYS:prop}` (JVM system property), `${FILE:/path}` (a mounted secret file), `${KEYSTORE:alias}` (a `SecretKeyEntry` from the store named by `-Dsecrets.keystore.path`/`.type`/`.password`), and bare `${NAME}` (environment first, then system property). ⚠ **SEC-07: `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only** — they are served by the `inspecto-security` module's `SecretsProvider`; a Personal bundle refuses the scheme by name, which a connection test surfaces as its failure.``
 
 ### Row 3.5 — two edits, same file
 
-FILE: `docs/okf/backend/integrations.md`
+FILE: `docs/okf/product/layer/platform/api-integrations-ducklake.md`
 OLD: `3. **Run the ETL.** After each file is written, CollectorProcessor will:`
 NEW: ``3. **Run the ETL.** After each file is written, `DuckLakeRegistrar.register` (called from `ConsignmentIngestor`) will:``
 
-FILE: `docs/okf/backend/integrations.md`
+FILE: `docs/okf/product/layer/platform/api-integrations-ducklake.md`
 OLD: `the file is still marked processed and the failure is logged to stderr.`
 NEW:
 ```
@@ -266,11 +266,11 @@ DuckLake or pg_duckdb. Clean cut.
 
 | link | target half | verdict |
 |---|---|---|
-| `docs/okf/backend/acquisition/data-acquisition-framework.md:18` → `#remote-source-connectors-sftp--ftp--ftps` | **connectors half** | ⚠ the **only** inbound link to the retiring half. Must be re-pointed to `acquisition/connectors.md` in the same commit or it becomes a dead anchor. |
-| `docs/okf/backend/engine/stage1-architecture.md:117` → `#warehouse-query-layer--dbeaver-via-pg_duckdb` | warehouse half | survives a retitle **only if the `## Warehouse Query Layer — DBeaver via pg_duckdb` heading text is unchanged** (the anchor is derived from it). Keep that H2 verbatim. |
-| `docs/okf/backend/architecture-layers.md:197` — "(`pg_duckdb`) queries it externally — see `integrations.md`" | warehouse half | plain text, no anchor. Survives a retitle; **breaks on a file rename.** |
-| `docs/stakeholders/TECHNICAL_ARCHITECTURE.md:84` → whole file | warehouse half ("query the lakehouse via the warehouse layer (pg_duckdb)") | survives a retitle; breaks on a rename. Root-canon tier. |
-| `docs/okf/backend/index.md:41` — "Integrations … acquisition connectors + DuckLake/warehouse touchpoints" | **both** | must be rewritten either way: the description will be half-false after the split. |
+| `docs/okf/product/module/acquire/spec-framework-design.md:18` → `#remote-source-connectors-sftp--ftp--ftps` | **connectors half** | ⚠ the **only** inbound link to the retiring half. Must be re-pointed to `acquisition/connectors.md` in the same commit or it becomes a dead anchor. |
+| `docs/okf/product/module/engine/architecture-stage1.md:117` → `#warehouse-query-layer--dbeaver-via-pg_duckdb` | warehouse half | survives a retitle **only if the `## Warehouse Query Layer — DBeaver via pg_duckdb` heading text is unchanged** (the anchor is derived from it). Keep that H2 verbatim. |
+| `docs/okf/product/layer/platform/architecture-layers.md:197` — "(`pg_duckdb`) queries it externally — see `integrations.md`" | warehouse half | plain text, no anchor. Survives a retitle; **breaks on a file rename.** |
+| `docs/okf/product/layer/platform/architecture-technical.md:84` → whole file | warehouse half ("query the lakehouse via the warehouse layer (pg_duckdb)") | survives a retitle; breaks on a rename. Root-canon tier. |
+| `docs/okf/product/index.md:41` — "Integrations … acquisition connectors + DuckLake/warehouse touchpoints" | **both** | must be rewritten either way: the description will be half-false after the split. |
 | `docs/archived-documents/plans-archive/docs-consolidation-plan.md:166`, `:526-543` | the plan itself | in-flight; update with the work. |
 | `inspecto/README.md:393`, `:435` → `../docs/integrations.md` | warehouse half (both describe DuckLake/pg_duckdb) | **already dead** — `docs/integrations.md` has not existed since 2026-07-16. Pre-existing breakage; cheap to fix in the same pass. |
 | `.claude/ARCHITECTURE_MAP.md:41` → `docs/integrations.md` | — | **already dead**, same cause. |
@@ -282,4 +282,4 @@ DuckLake or pg_duckdb. Clean cut.
 3. Prefer **retitle in place over rename**: three live links and one dead pair address the file by
    *path*. A rename also relocates the `DOC_ALLOW` key (answer A) — which you are deleting anyway, so a
    rename is survivable, just more edits. `docs/INDEX.md` has **no** reference to this file, so the
-   tier-1 map needs nothing beyond `okf/backend/index.md:41`.
+   tier-1 map needs nothing beyond `okf/product/index.md:41`.

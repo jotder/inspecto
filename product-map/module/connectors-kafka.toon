@@ -5,3 +5,4 @@ parent: layer.providers
 module: connectors-kafka
 billable: false
 status: ga
+docs: docs/okf/product/module/connectors-kafka/index.md

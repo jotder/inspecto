@@ -11,4 +11,4 @@ s.path('M295 100 L295 170'); s.text(300, 140, 'policy off: write now', size=10)
 for i, (t, c) in enumerate([('approved', 'teal'), ('stale (409)', 'coral'), ('declined', 'gray'), ('withdrawn', 'gray'), ('expired', 'gray')]):
     s.box(420 + i * 102, 230, 94, 40, c, t)
 s.path('M850 100 L850 140 L467 140 L467 230'); s.text(560, 134, 'base version unchanged / changed', size=10)
-s.save('docs/stakeholders/modules/assets/maker-checker.svg')
+s.save('docs/okf/product/assets/maker-checker.svg')

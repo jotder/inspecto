@@ -20,7 +20,7 @@ import NODE_ATTRIBUTE_CONTRACT from 'app/inspecto/contracts/node-attributes.cont
  * key/value editor — and every type keeps that editor as a collapsed "Additional config" escape hatch.
  * The design notes that used to live in this file (the two filtering moments of `transform.filter`, why
  * `acquisition` reuses the shared collector table, why a connector's own options are not node config)
- * now live with the source: `NodeAttributes.java` and `okf/frontend/features/pipeline-editor.md`.
+ * now live with the source: `NodeAttributes.java` and `okf/product/module/etl/user-guide-pipeline-editor.md`.
  */
 const NODE_ATTRIBUTES = NODE_ATTRIBUTE_CONTRACT as Record<string, AttributeSpec[]>;
 

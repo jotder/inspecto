@@ -3,7 +3,7 @@
 **Status: BUILT and rehearsed on screen 2026-10-15 (steps B1-B5 and the dry run below) on the 2026-10-09 CSV extract; switched 2026-10-16 to one full production day in Parquet (section 6: 132 M records, links, index, thresholds recalibrated); the Space and data stay outside the repo.** Input: 20 Huawei IMS CDR extracts (`fct_huawei_ims`) at `C:\sandbox\data\IMS` (outside the repo, **never committed**:
 no data or client files in commits). This page records what the data holds, what graph a Link Analysis user can draw from it, and the build steps.
 Numbers in this page were measured on 2026-10-15 over the 19 distinct files; subscriber numbers are masked here on purpose.
-Existing showcase assets this reuses: [demo runbook](../ops/la-demo-runbook.md), the `la-showcase` Space Template, `tools/gen-la-telecom-data.py` (the synthetic telecom feeds).
+Existing showcase assets this reuses: [demo runbook](../okf/product/module/la-core/admin-guide-demo.md), the `la-showcase` Space Template, `tools/gen-la-telecom-data.py` (the synthetic telecom feeds).
 
 ## 1. What the data is
 
@@ -277,5 +277,5 @@ under the projection limits. To re-check on screen: the burst and device views a
 
 * Feed analysis: this page, section 1 (measured 2026-10-15)
 * Synthetic telecom feeds: [`la-telecom-demo-data.md`](../archived-documents/plans-archive/la-telecom-demo-data.md)
-* Runbook scenes: [`la-demo-runbook.md`](../ops/la-demo-runbook.md)
+* Runbook scenes: [`la-demo-runbook.md`](../okf/product/module/la-core/admin-guide-demo.md)
 * Companion plan: [`la-whitepaper-demo-plan.md`](la-whitepaper-demo-plan.md)
