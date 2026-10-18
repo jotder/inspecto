@@ -34,14 +34,14 @@ backlog row that would.
 | B | Generic reconciliation engine | Y | P | P | Y | Y | P | **Y** | Reconciliation add-on |
 | C | Re-rating / tariff validation | Y | P | Y | Y | P | Y | **P** | SQL controls in `telco-ra` only · `PACK-PARTNER-SETTLEMENT-1` (re-rating) |
 | D | Fraud management (rules over CDRs / events) | Y | Y | Y | Y | P | N | **Y** | Alerts + `telco-fraud` Space Template |
-| E | Bypass / SIM-box detection | Y | Y | Y | Y | N | Y | **P** | CDR-based only |
+| E | Bypass / SIM-box detection | Y | Y | Y | Y | N | Y | **P** | CDR-based only · `TELCO-BYPASS-SIMBOX-1` |
 | F | Signalling detection (SS7 / Diameter / SIP, probes, firewalls) | Y | P | Y | P | P | N | **N** | out of scope (network probes) |
 | G | Test call generation | Y | Y | Y | N | N | Y | **N** | out of scope (hardware / service) |
 | H | Interconnect / wholesale fraud (Wangiri, IRSF, flash calls, CLI) | Y | Y | Y | Y | P | Y | **P** | IRSF / Wangiri from CDRs; recharge, data-bypass and internal fraud typologies in `telco-fraud` |
 | I | Real-time / pre-call blocking | Y | P | Y | Y | N | N | **N** | `REALTIME-DECISIONING-1` |
 | J | Entity risk scoring | Y | P | Y | Y | N | N | **Y** | Scoring & Lists add-on |
 | K | Watch / deny lists | Y | P | P | Y | N | N | **Y** | Scoring & Lists (Entity Lists) |
-| L | Explainable ML anomaly detection | Y | Y | Y | Y | P | P | **Y** | Anomaly Detection add-on (shipped 2026-10-10): per-entity robust baselines with seasonality and peer groups, 0–100 score with a per-feature explanation — statistical, not ML (isolation forest is Could C4 of `ANALYTICS-CORE-1`) |
+| L | Explainable ML anomaly detection | Y | Y | Y | Y | P | P | **Y** | Anomaly Detection add-on (shipped 2026-10-10): per-entity robust baselines with seasonality and peer groups, 0–100 score with a per-feature explanation — statistical, not ML (isolation forest is Could C4 of `ANALYTICS-CORE-1`) · `ANOMALY-ML-SCORING-1` |
 | M | Link analysis / graph investigation | Y | P | P | P | N | N | **Y** | Link Analysis & Geo add-on |
 | N | Case management / investigation | P | Y | Y | Y | P | P | **Y** | Incidents + Case Management add-ons |
 | O | Workflow and SLA | N | P | P | P | P | N | **Y** | Workflow & SLA add-on |
@@ -49,8 +49,8 @@ backlog row that would.
 | Q | Partner / settlement / wholesale | P | Y | P | P | Y | P | **P** | partner-statement reconciliation in `telco-ra` · `PACK-PARTNER-SETTLEMENT-1` |
 | R | Mobile money / fintech assurance | Y | Y | Y | Y | N | Y | **Y** | `mobile-money` Space Template (wallet / bank / partner Reconciliation, agent fraud, KYC, provisioning) · `payment-fraud` (card-centric) |
 | S | AML typologies, sanctions / PEP screening | Y | N | N/P | P | N | N | **Y** | `aml` Space Template (structuring, threshold crossing, smurfing fan-in, watch-list traffic; shipped 2026-10-10) + Screening add-on (fuzzy name matching against Entity Lists, signed hits, four-eyes on `confirmed`; shipped 2026-10-09) |
-| T | Regulatory reporting (SAR / STR) | Y | N | P | N | N | N | **P** | Regulatory Reporting add-on MVP (shipped 2026-10-09): Report Templates rendered to XML / CSV / JSON from a Case or Incident, four-eyes approval, file-drop submission, audit log; regulator-specific SAR / STR formats are templates to author, not shipped |
-| U | 5G / IoT / cloud / digital service assurance | Y | P | Y | P | Y | P | **N** | candidate industry pack (cable / IPDR, digital) |
+| T | Regulatory reporting (SAR / STR) | Y | N | P | N | N | N | **P** | Regulatory Reporting add-on MVP (shipped 2026-10-09): Report Templates rendered to XML / CSV / JSON from a Case or Incident, four-eyes approval, file-drop submission, audit log; regulator-specific SAR / STR formats are templates to author, not shipped · `REGULATORY-SAR-STR-TEMPLATES-1` |
+| U | 5G / IoT / cloud / digital service assurance | Y | P | Y | P | Y | P | **N** | candidate industry pack (cable / IPDR, digital) · `PACK-5G-IOT-ASSURANCE-1` |
 | V | Sales, commissions, marketing, churn | Y | P | Y | N | N | N | **N** | `PREDICTIVE-ANALYTICS-1` (design-only), `PACK-SALES-MARKETING-1`; base: `ANALYTICS-CORE-1` S5 Forecasting & Prediction |
 | W | Identity / digital trust (caller ID, device, ID checks) | N | P | P | P | N | N | **N** | not planned |
 | X | Network analytics / capacity / inventory | P | P | P | N | Y | N | **N** | not planned (different buyer) |
@@ -78,8 +78,10 @@ tool.
 | Real-time / pre-call decisioning | LATRO, Mobileum, Neural | `REALTIME-DECISIONING-1` |
 | Partner settlement and re-rating | Subex, TEOCO (settlement); LATRO, Mobileum, Neural, Araxxe (re-rating) | `PACK-PARTNER-SETTLEMENT-1` |
 | Sales / marketing / churn analytics | LATRO, Mobileum | `PREDICTIVE-ANALYTICS-1` on the `ANALYTICS-CORE-1` S5 base |
-| Regulator-specific SAR / STR formats | LATRO | Report Templates on `REGULATORY-REPORTING-1` (engine shipped) |
-| 5G / IoT / cloud service assurance | LATRO, Mobileum, TEOCO | candidate industry pack, not filed |
+| Regulator-specific SAR / STR formats | LATRO | `REGULATORY-SAR-STR-TEMPLATES-1` (Report Templates on the shipped `REGULATORY-REPORTING-1` engine) |
+| 5G / IoT / cloud service assurance | LATRO, Mobileum, TEOCO | `PACK-5G-IOT-ASSURANCE-1` |
+| Bypass / SIM-box detection beyond CDRs | LATRO, Subex, Mobileum, Neural, Araxxe | `TELCO-BYPASS-SIMBOX-1` |
+| ML anomaly scoring | LATRO, Subex, Mobileum, Neural | `ANOMALY-ML-SCORING-1` |
 
 **Closed since 2026-10-07:** AML typologies and screening (S), explainable anomaly scoring (L), the regulatory
 reporting engine (T, partial), mobile-money assurance (R), the telecom fraud content gaps (H, recharge / data bypass /
