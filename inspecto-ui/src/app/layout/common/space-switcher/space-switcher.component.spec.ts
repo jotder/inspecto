@@ -53,13 +53,16 @@ describe('SpaceSwitcherComponent', () => {
 
     it('renders an accessible switcher when multiple spaces exist', async () => {
         const { fixture } = create(true);
-        expect(fixture.nativeElement.querySelector('button[aria-label="Switch space"]')).not.toBeNull();
+        const btn = fixture.nativeElement.querySelector('button[aria-label$=", switch space"]') as HTMLButtonElement;
+        // WCAG 2.5.3 label in name: the accessible name starts with the visible Space label.
+        const visible = btn.querySelector('span')!.textContent!.trim();
+        expect(btn.getAttribute('aria-label')!.startsWith(visible)).toBe(true);
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
     /** Opens the switcher menu and returns its item labels (the menu renders in the CDK overlay). */
     function openMenu(fixture: ReturnType<typeof create>['fixture']): HTMLButtonElement[] {
-        fixture.nativeElement.querySelector('button[aria-label="Switch space"]').click();
+        fixture.nativeElement.querySelector('button[aria-label$=", switch space"]').click();
         fixture.detectChanges();
         return Array.from(document.querySelectorAll<HTMLButtonElement>('.mat-mdc-menu-panel button[mat-menu-item]'));
     }

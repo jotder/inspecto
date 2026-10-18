@@ -31,6 +31,7 @@ import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { SessionService } from 'app/inspecto/auth/session.service';
+import { LinkAnalysisIdentitiesComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-identities.component';
 
 /** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
 const STANDARD_EDITION_FEATURES = {
@@ -2631,6 +2632,29 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         fixture.detectChanges();
         expect(c.mergeUnavailable()).toContain('typed entities');
         expect(merge()!.disabled).toBe(true);
+        fixture.destroy();
+    });
+
+    // LA-I2-GAPS-RESIDUALS-1 (5): the prefilled merge sits in the Investigation tab, so the action opens it.
+    it('opens the Investigation tab holding the prefilled merge', async () => {
+        const { fixture, c, select, merge } = await inInvestigation(['msisdn:+447700900123', 'imsi:234150000000001']);
+        select(2);
+        c.toolboxTab.set('analysis');
+        fixture.detectChanges();
+        expect(c.mergeUnavailable()).toBe('');
+        expect(merge()).not.toBeNull();
+        c.mergeSelected();
+        fixture.detectChanges();
+        expect(c.toolboxTab()).toBe('investigation');
+        // The Identity section rendered in that tab took the hand-off into its form (and cleared it).
+        const identities = fixture.debugElement.query(By.directive(LinkAnalysisIdentitiesComponent));
+        expect(identities.componentInstance.assertForm.getRawValue()).toMatchObject({
+            typeA: 'msisdn',
+            valueA: '+447700900123',
+            typeB: 'imsi',
+            valueB: '234150000000001',
+        });
+        expect(c.investigation.mergeDraft()).toBeNull();
         fixture.destroy();
     });
 

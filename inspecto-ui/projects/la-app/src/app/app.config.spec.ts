@@ -7,6 +7,7 @@ describe('la-app app config', () => {
     it('names the product Inspecto LA for the shared sign-in screen (ED-1)', () => {
         expect(appConfig.providers.length).toBeGreaterThan(0);
         expect(appEnvironment().productName).toBe('Inspecto LA');
+        expect(appEnvironment().signInPitch?.title).toBe('Follow every link, one case at a time.');
     });
 
     it('makes every dialog modal to assistive technology and keeps the dialog role', () => {

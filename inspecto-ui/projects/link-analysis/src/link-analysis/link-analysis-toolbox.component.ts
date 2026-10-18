@@ -1155,8 +1155,9 @@ export class LinkAnalysisToolboxComponent {
                 ? pack.stages.map((s) => ({ ...s, ...(s.threshold ? { threshold: { ...s.threshold } } : {}) }))
                 : null,
         );
-        if (!pack) return;
-        this.patternSteps.set(pack.steps.map((s) => ({ ...s })));
+        // LA-I2-GAPS-RESIDUALS-1 (9): "Custom motif" starts from the blank two-step motif. Keeping the previous
+        // pack's steps kept its temporal constraint, so Search around stayed hidden with no visible reason.
+        this.patternSteps.set(pack ? pack.steps.map((s) => ({ ...s })) : [{}, { direction: 'out' }]);
         this.patternMatches.set([]);
         this.analysisError.set('');
         this.clearServerNotices();
