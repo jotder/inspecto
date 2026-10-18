@@ -1233,6 +1233,20 @@ describe('Breaks page — server paging, type filter, export (RECON-UPLIFT-1 U1/
         expect(c.setCountText('missing_left')).toBe('3 of 3');
     });
 
+    // Found driving a real backend: at offset=16 the headings still read "16 OF 251" while the pager said "Rows 17-32".
+    it('past page 1 a set heading names its range, not the first page count', async () => {
+        const summary = { groups: 9, matchedKeys: 5, byType: { missing_right: 251, missing_left: 3, value_break: 0 } };
+        const { c } = await create({
+            sets: { missing_right: set(['A1', 'A2'], true), missing_left: set(['B1']) },
+            summary,
+            offset: '32',
+        });
+        expect(c.pageIndex()).toBeGreaterThan(0);
+        const from = c.pageIndex() * c.pageSize() + 1;
+        expect(c.setCountText('missing_right')).toBe(`${from}–${from + 1} of 251`);
+        expect(c.setCountText('value_break')).toBe('0 of 0'); // an empty set keeps the plain form
+    });
+
     it('"Show all types, first page" returns to page 1 even though the type is already All', async () => {
         const { fixture, c, breaks, navigate } = await create({ sets: { missing_right: set(['A1', 'A2'], true) } });
         breaks.mockResolvedValueOnce({});

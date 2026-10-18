@@ -206,6 +206,21 @@ open compared each side's WHOLE store (no date predicate) in ~7 scans, returned 
     The dialog applies a seeded value only to a parameter the Job Type DECLARES, so a link cannot add an arbitrary
     parameter; an edit wins over a seed. A seeded type the server does not know degrades to the existing "no descriptor"
     warning.
+* **Driven against a real backend** (`RECON-UPLIFT-1`, 2026-10-18; an Advanced demo-auth bundle built from master, the
+  `telco-ra` template ingested through its real pipelines, plus a generated Space; no mocks). Passed: the list's Schedule opens
+  the Jobs dialog on *Reconciliation Run* with the id prefilled and a clean `/jobs` URL; the Breaks page showed 16 rows per set
+  on All types ("16 OF 251 / 250 / 251", pager "More in: Only in A, Only in B, Value breaks"), 50 rows on one type, paged to
+  the last row with `?type=&offset=` surviving a reload, every call 200 in 59-629 ms; the CSV had its BOM and exported
+  `=CMD|calc` / `-NEG1` quote-prefixed, and 20,000 Breaks as 20,001 lines; the definition dialog offered both sides' columns,
+  flagged a key missing on the right, and a Test definition edited mid-request left no stale result; *Record run* recorded
+  752 Breaks and the `recon.run` Job ran to SUCCESS. **Scale:** 60k rows per side: Board 0.9 s, Breaks 0.3 s; **1,000,000 per
+  side** (1,020,000 key groups, 60,000 Breaks): Board 1.3 s, Breaks 0.8 + 1.3 s, a deep page (offset 19,950) 0.6 s, no error
+  or timeout. Found and fixed: a set heading kept reading "16 of 251" on page 2 (it now names its range, "17-32 of 251").
+  **Seen, not changed (product calls):** the `recon.run` Job reports the Breaks of EVERY pair (A-B plus A-C on a 3-way
+  Reconciliation: 5) while the Breaks page and Board default to the A-B pair (2); a Test definition of a daily Dataset against a
+  monthly one defaults to the latest left day and reads every key as missing on the right; *Open breaks by age* on a day with
+  no recorded run shows the previous recorded run's counts; for a missing Break the CSV `left`/`right` are empty, the present
+  side's figure is in `impact`; at about 1,000 px the list's Actions column is off-screen until the grid is scrolled.
 * **State retention** (`RECON-PERF-RESIDUALS-1` (7), ⛔ decision 2026-10-09): a record keeps the Breaks of the
   `ReconStateStore.RETAIN_DAYS` = **90** most recent recorded days (newest by DAY, not wall clock) and drops older days
   WHOLE, whatever their status — an open Break 91 days back is gone (setting its status later re-appends it

@@ -367,7 +367,13 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly setCountText = (type: BreakSetType): string => {
         const onPage = this.drillBreaks().filter((b) => b.type === type).length;
         const total = this.dayTotal(type);
-        if (total !== null) return `${onPage} of ${formatNumber(total)}`;
+        if (total !== null) {
+            // Past page 1 the heading names its range (17–32 of 251), so it never repeats the first page's "16 of 251".
+            const from = this.pageIndex() * this.pageSize() + 1;
+            return this.pageIndex() > 0 && onPage > 0
+                ? `${formatNumber(from)}–${formatNumber(from + onPage - 1)} of ${formatNumber(total)}`
+                : `${onPage} of ${formatNumber(total)}`;
+        }
         return this.truncatedTypes().has(type) ? `${onPage}+` : String(onPage);
     };
 
