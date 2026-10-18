@@ -3,6 +3,7 @@ title: Sample suspicious activity report
 description: "Illustrative only - the shape of a SAR / STR (header, subject, repeating incidents and evidence, narrative). It follows no real regulator's schema; a pack ships those."
 format: xml
 rootElement: suspiciousActivityReport
+schema: sample-sar.xsd
 delivery:
   kind: file-drop
   dir: regulatory-submissions/sample-sar

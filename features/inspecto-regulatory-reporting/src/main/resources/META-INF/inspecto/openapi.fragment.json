@@ -189,6 +189,28 @@
         },
         "x-generated" : true
       }
+    },
+    "/regulatory-reports/{regulatoryreportId}/verify" : {
+      "get" : {
+        "tags" : [ "regulatory-reports" ],
+        "summary" : "GET /regulatory-reports/{regulatoryreportId}/verify (generated skeleton)",
+        "operationId" : "getRegulatoryReportsByRegulatoryreportIdVerify",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "regulatoryreportId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   }
 }

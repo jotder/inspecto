@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic XSD for the built-in sample-sar Report Template. Illustrative only: it follows no real regulator's
+     schema (a real regulator XSD is pack content, supplied by the operator). It pins the element order, which
+     elements are required, and a few value shapes, so a draft that drifts from the template is refused at draft. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:simpleType name="text">
+    <xs:restriction base="xs:string"><xs:minLength value="1"/></xs:restriction>
+  </xs:simpleType>
+  <xs:element name="suspiciousActivityReport">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="schema">
+          <xs:simpleType><xs:restriction base="xs:string"><xs:enumeration value="inspecto-sample-sar/1"/></xs:restriction></xs:simpleType>
+        </xs:element>
+        <xs:element name="reportId" type="text"/>
+        <xs:element name="preparedAt" type="xs:dateTime"/>
+        <xs:element name="preparedBy" type="text"/>
+        <xs:element name="reportingEntity" type="text"/>
+        <xs:element name="subjectId" type="text"/>
+        <xs:element name="subjectType" type="text"/>
+        <xs:element name="subjectTitle" type="text"/>
+        <xs:element name="severity" type="text" minOccurs="0"/>
+        <xs:element name="amountSuspected" type="xs:decimal" minOccurs="0"/>
+        <xs:element name="currency" minOccurs="0">
+          <xs:simpleType><xs:restriction base="xs:string"><xs:pattern value="[A-Z]{3}"/></xs:restriction></xs:simpleType>
+        </xs:element>
+        <xs:element name="incident" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="id" type="text" minOccurs="0"/>
+              <xs:element name="title" type="xs:string" minOccurs="0"/>
+              <xs:element name="status" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="evidence" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="name" type="xs:string" minOccurs="0"/>
+              <xs:element name="uri" type="xs:string" minOccurs="0"/>
+              <xs:element name="contentType" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="narrative" type="text"/>
+        <xs:element name="activityPeriod" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

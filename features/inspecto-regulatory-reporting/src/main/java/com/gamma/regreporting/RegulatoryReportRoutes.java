@@ -46,6 +46,7 @@ import java.util.Set;
  *   GET  /regulatory-reports/templates                         the Space's templates, with load problems
  *   GET  /regulatory-reports[?status=&amp;template=&amp;caseId=&amp;incidentId=]   newest first (capped, truncated, true total)
  *   GET  /regulatory-reports/{id}                              one, with its content, sourceChanged and approverCheck
+ *   GET  /regulatory-reports/{id}/verify                       re-hash the delivered file and its .sha256 sidecar
  *   POST /regulatory-reports                                   draft from a Case / Incident        (canWorkIncidents)
  *   POST /regulatory-reports/{id}/request-approval             draft → pending                      (canWorkIncidents)
  *   POST /regulatory-reports/{id}/approve                      four-eyes approve → submitted|failed (canApproveChanges)
@@ -97,6 +98,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
                 (e, m) -> putTemplate(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/regulatory-reports/templates/([^/]+)", ApiContext.withCapability("canApproveChanges",
                 (e, m) -> deleteTemplate(api, e, ApiContext.name(m))));
+        api.get("/regulatory-reports/([^/]+)/verify", (e, m) -> verify(api, e, ApiContext.name(m)));
         api.post("/regulatory-reports", ApiContext.withCapability("canWorkIncidents",
                 (e, m) -> create(api, e, api.body(e))));
         api.post("/regulatory-reports/([^/]+)/request-approval", ApiContext.withCapability("canWorkIncidents",
@@ -140,6 +142,13 @@ public final class RegulatoryReportRoutes implements RouteModule {
             FileDrop.resolve(root, t.deliveryDir());
         } catch (IllegalArgumentException refused) {
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "delivery.dir is refused: " + refused.getMessage());
+        }
+        if (t.schema() != null) {
+            try {
+                SchemaCheck.load(root, t.schema());
+            } catch (IllegalArgumentException missing) {
+                throw invalid("report template '" + id + "' is invalid: " + missing.getMessage());
+            }
         }
         boolean created;
         synchronized (RegulatoryReports.lock()) {
@@ -243,6 +252,38 @@ public final class RegulatoryReportRoutes implements RouteModule {
             if (RegulatoryReports.PENDING.equals(rec.get("status"))) view.put("approverCheck", approverCheck(root, rec));
         }
         return shown(api, ex, view);
+    }
+
+    /**
+     * Re-hash a submitted report's delivered file and read its {@code .sha256} sidecar against the pinned
+     * {@code contentSha256}. Reader gate and visibility as {@link #one}; not submitted 409. {@code ok} only when the
+     * file is there, hashes to the pinned digest AND the sidecar names that digest. Never names an absolute path.
+     */
+    @SuppressWarnings("unchecked")
+    private Object verify(ApiContext api, HttpExchange ex, String id) throws IOException {
+        requireReader(ex);
+        Path root = api.writeRoot();
+        if (root == null) throw notFound(id);
+        Map<String, Object> rec;
+        synchronized (RegulatoryReports.lock()) {
+            rec = RegulatoryReports.read(root, id);   // 422 on an unsafe id
+            if (rec == null || !visible(api, ex, rec)) throw notFound(id);
+        }
+        if (!RegulatoryReports.SUBMITTED.equals(rec.get("status"))) throw wrongStatus(id, rec.get("status"), "submitted");
+        Map<String, Object> delivery = (Map<String, Object>) rec.get("delivery");
+        String fileName = String.valueOf(delivery.get("fileName"));
+        String pinned = String.valueOf(rec.get("contentSha256"));
+        FileDrop.Check c = FileDrop.check(root, String.valueOf(delivery.get("dir")), fileName, pinned);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.put("file", fileName);
+        out.put("expectedSha256", pinned);
+        out.put("actualSha256", c.actualSha256());
+        out.put("fileState", c.file());
+        out.put("sidecar", c.sidecar());
+        out.put("ok", c.ok());
+        out.put("integrity", !RegulatoryReports.invalid(rec));
+        return out;
     }
 
     /**
@@ -466,6 +507,17 @@ public final class RegulatoryReportRoutes implements RouteModule {
         } catch (ReportRenderer.Refused refused) {
             ApiException e = invalid("the report does not render: " + String.join("; ", refused.problems()));
             throw e;
+        }
+        if (t.schema() != null) {
+            List<String> violations;
+            try {
+                violations = SchemaCheck.violations(SchemaCheck.load(root, t.schema()), r.content());
+            } catch (IllegalArgumentException missing) {
+                throw invalid("template '" + templateId + "': " + missing.getMessage());
+            }
+            if (!violations.isEmpty())
+                throw invalid("the report does not validate against schema '" + t.schema() + "': "
+                        + String.join("; ", violations));
         }
         rec.put("inputs", inputs);
         rec.put("content", r.content());

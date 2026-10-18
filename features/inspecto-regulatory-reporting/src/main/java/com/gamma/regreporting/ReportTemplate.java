@@ -27,6 +27,7 @@ import java.util.stream.Stream;
  *   title: ...
  *   format: xml
  *   rootElement: suspiciousActivityReport          (xml only)
+ *   schema: sample-sar.xsd                          (xml only, optional: the XSD a draft must validate against)
  *   delivery:
  *     kind: file-drop
  *     dir: regulatory-submissions/sample-sar        (jailed like the report Job's out_dir)
@@ -40,7 +41,7 @@ import java.util.stream.Stream;
  * draft nothing.
  */
 public record ReportTemplate(String id, String title, String description, String format, String rootElement,
-                             String deliveryKind, String deliveryDir, List<Field> fields, String origin) {
+                             String schema, String deliveryKind, String deliveryDir, List<Field> fields, String origin) {
 
     /** One output field. {@code group} is the part before {@code /} (null for a plain field). */
     public record Field(String name, String group, String leaf, String source, boolean required, int maxLength) {
@@ -57,6 +58,8 @@ public record ReportTemplate(String id, String title, String description, String
     static final Pattern ELEMENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_.-]{0,63}");
     static final Pattern INPUT_KEY = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,63}");
     static final int MAX_FIELDS = 200;
+    /** An XSD file name: looked up beside the Space's templates, then beside the built-ins on the classpath. */
+    static final Pattern SCHEMA_FILE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,59}\\.xsd");
 
     /** The {@code input.*} keys this template reads — the only inputs a draft may carry. */
     public Set<String> inputKeys() {
@@ -78,6 +81,7 @@ public record ReportTemplate(String id, String title, String description, String
         m.put("description", description);
         m.put("format", format);
         m.put("rootElement", rootElement);
+        m.put("schema", schema);
         m.put("origin", origin);
         m.put("delivery", Map.of("kind", deliveryKind, "dir", deliveryDir));
         m.put("inputs", List.copyOf(inputKeys()));
@@ -127,7 +131,7 @@ public record ReportTemplate(String id, String title, String description, String
             throw new Invalid(List.of("does not parse as TOON: " + unparseable.getMessage()));
         }
         for (String k : m.keySet())
-            if (!Set.of("id", "title", "description", "format", "rootElement", "delivery", "fields").contains(k))
+            if (!Set.of("id", "title", "description", "format", "rootElement", "schema", "delivery", "fields").contains(k))
                 problems.add("unknown key '" + k + "'");
         String id = str(m.get("id"));
         if (id == null || !SAFE_ID.matcher(id).matches()) problems.add("'id' must match " + SAFE_ID.pattern());
@@ -142,6 +146,10 @@ public record ReportTemplate(String id, String title, String description, String
         String root = str(m.get("rootElement"));
         if ("xml".equals(format) && (root == null || !ELEMENT.matcher(root).matches()))
             problems.add("'rootElement' must match " + ELEMENT.pattern() + " for an xml template");
+        String schema = str(m.get("schema"));
+        if (schema != null && !"xml".equals(format)) problems.add("'schema' (an XSD) applies to an xml template only");
+        else if (schema != null && !SCHEMA_FILE.matcher(schema).matches())
+            problems.add("'schema' must be an XSD file name matching " + SCHEMA_FILE.pattern());
 
         String kind = null, dir = null;
         if (m.get("delivery") instanceof Map<?, ?> d) {
@@ -206,7 +214,7 @@ public record ReportTemplate(String id, String title, String description, String
         } else problems.add("'fields' must list at least one {name, source, required, maxLength}");
 
         if (!problems.isEmpty()) throw new Invalid(problems);
-        return new ReportTemplate(id, title, str(m.get("description")), format, root, kind, dir, List.copyOf(fields), origin);
+        return new ReportTemplate(id, title, str(m.get("description")), format, root, schema, kind, dir, List.copyOf(fields), origin);
     }
 
     private static List<String> sourceProblems(String name, String source) {
