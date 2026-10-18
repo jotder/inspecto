@@ -26,7 +26,7 @@ import {
     NodeData,
     NodeEvent,
 } from '@antv/g6';
-import { G6GraphData, nodeColor, nodeKindLabel, nodeShape } from './catalog-graph';
+import { G6GraphData, entityTypeIcon, nodeColor, nodeKindLabel, nodeShape } from './catalog-graph';
 import { toSvg } from './graph-export';
 import { NodeKind } from 'app/inspecto/api';
 import { ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
@@ -420,6 +420,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @Input() display: GraphDisplayOptions | null = null;
     /** Enable hover tooltips with short node/edge details (Link Analysis). */
     @Input() tooltips = false;
+    /**
+     * Draw an Entity Type's built-in glyph as an icon tile (Link Analysis). A per-kind shape the view overrides wins
+     * over the icon; a type with no glyph keeps its plain shape. Read at construction, like `tooltips`.
+     */
+    @Input() entityIcons = false;
     /** Appended to the figure's accessible name: where the text alternative of the canvas is (Link Analysis list view). */
     @Input() textHint = '';
     /** Graph layout; `null` = the default LR layered layout (the 4 existing hosts). */
@@ -506,7 +511,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 // A change of a few pixels (a scrollbar, a rounding) is not worth throwing the analyst's zoom away for.
                 const box = entries[entries.length - 1]?.contentRect;
                 const moved =
-                    !box || Math.abs(box.width - this.lastSize[0]) > RESIZE_REFIT_MIN_PX || Math.abs(box.height - this.lastSize[1]) > RESIZE_REFIT_MIN_PX;
+                    !box ||
+                    Math.abs(box.width - this.lastSize[0]) > RESIZE_REFIT_MIN_PX ||
+                    Math.abs(box.height - this.lastSize[1]) > RESIZE_REFIT_MIN_PX;
                 if (box) this.lastSize = [box.width, box.height];
                 if (moved && this.interaction?.fitOnResize) this.scheduleFit();
             });
@@ -550,7 +557,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             return;
         }
         // `tooltips` and `fill` are read once, at construction and on the host class binding.
-        if (changes['tooltips'] || changes['fill']) {
+        if (changes['tooltips'] || changes['fill'] || changes['entityIcons']) {
             this.create();
             return;
         }
@@ -877,7 +884,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         }
         this.refreshStyleState();
         const kindOf = (d: NodeData): NodeKind => (d.data as { kind: NodeKind }).kind;
-        const iconOf = (d: NodeData): string | undefined => (d.data as { iconSrc?: string }).iconSrc;
+        const iconOf = (d: NodeData): string | undefined => {
+            const iconSrc = (d.data as { iconSrc?: string }).iconSrc;
+            if (iconSrc || !this.entityIcons) return iconSrc;
+            const kind = kindOf(d);
+            return entityTypeIcon(kind, this.nodeColorOf(d), this.display?.nodeShapes);
+        };
         const graph = new Graph({
             container: this.hostEl.nativeElement,
             data: this.data as unknown as GraphData,
@@ -911,7 +923,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     },
                     // A high-connectivity entity (Link Analysis hub suppression) wears a wide halo in its own colour.
                     halo: (d) =>
-                        !!(d.data as { highConnectivity?: boolean }).highConnectivity || this.selSet.has(d.id as string),
+                        !!(d.data as { highConnectivity?: boolean }).highConnectivity ||
+                        this.selSet.has(d.id as string),
                     haloStroke: (d) => this.nodeColorOf(d),
                     haloLineWidth: (d) => (this.selSet.has(d.id as string) ? 16 : 10),
                     haloStrokeOpacity: (d) => (this.selSet.has(d.id as string) ? 0.6 : 0.35),

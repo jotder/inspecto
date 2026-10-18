@@ -143,7 +143,47 @@ export const GLYPH_LIBRARY: Record<string, string> = {
     bolt: '<path d="M13 3 4 14h7l-1 7 9-11h-7z"/>',
     code: '<path d="m8 7-5 5 5 5M16 7l5 5-5 5"/>',
     globe: '<path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/>',
+    // Entity glyphs: path data copied from the Heroicons outline set (MIT, (c) Refactoring UI Inc.) this app already
+    // ships as `assets/icons/heroicons-outline.svg` - the same icons, inlined so G6 can take them as a data URI.
+    person: '<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>',
+    'id-card':
+        '<path d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>',
+    chip: '<path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>',
+    phone: '<path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>',
+    cash: '<path d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>',
+    card: '<path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>',
+    building:
+        '<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>',
+    'device-mobile': '<path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>',
+    pin: '<path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>',
 };
+
+/** Glyph per Entity Type id (the 9 shipped types, `EntityTypes.DEFAULTS`). A type without one keeps its plain shape. */
+export const ENTITY_TYPE_GLYPH: Record<string, string> = {
+    subscriber: 'person',
+    imsi: 'id-card',
+    imei: 'chip',
+    msisdn: 'phone',
+    wallet: 'cash',
+    account: 'card',
+    agent: 'building',
+    handset: 'device-mobile',
+    cell: 'pin',
+};
+
+/**
+ * A data-URI icon for an Entity Type, stroked in `color`; `undefined` when the type has no glyph or the view overrides
+ * its shape (`shapeOverrides`, per kind) - an explicit shape choice wins over the icon tile.
+ */
+export function entityTypeIcon(
+    kind: string,
+    color: string,
+    shapeOverrides: Record<string, string> = {},
+): string | undefined {
+    if (shapeOverrides[kind]) return undefined;
+    const glyph = GLYPH_LIBRARY[ENTITY_TYPE_GLYPH[kind] ?? ''];
+    return glyph ? iconDataUri(glyph, color) : undefined;
+}
 
 /** Default glyph name per catalog node kind (the fallback when the icon map has no entry). */
 const KIND_GLYPH: Record<string, string> = {

@@ -73,6 +73,7 @@ class StubGraphView {
     @Input() emphasis: unknown;
     @Input() display: unknown;
     @Input() tooltips = false;
+    @Input() entityIcons = false;
     @Input() textHint = '';
     @Input() layout: unknown;
     @Input() plugins: unknown;

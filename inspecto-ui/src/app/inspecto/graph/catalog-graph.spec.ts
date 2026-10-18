@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { MetadataEdge, MetadataNode, NodeKind } from 'app/inspecto/api';
 import { NODE_KIND_FALLBACK } from 'app/inspecto/theme/chart-tokens';
-import { CATALOG_NODE_KINDS, legendFor, nodeColor, nodeKindLabel, nodeShape, toG6Data } from './catalog-graph';
+import {
+    CATALOG_NODE_KINDS,
+    ENTITY_TYPE_GLYPH,
+    GLYPH_LIBRARY,
+    entityTypeIcon,
+    legendFor,
+    nodeColor,
+    nodeKindLabel,
+    nodeShape,
+    toG6Data,
+} from './catalog-graph';
 
 /** Built-in node types registered by G6 v5 (`@antv/g6/lib/elements/nodes`). */
 const G6_NODE_TYPES = ['circle', 'rect', 'ellipse', 'diamond', 'triangle', 'hexagon', 'star', 'donut', 'image', 'html'];
@@ -139,5 +149,27 @@ describe('legendFor', () => {
         ]);
         expect(legend.map((l) => l.kind)).toEqual(['TABLE', 'COLUMN', 'STREAM']);
         expect(legend[0].fill).toBe(nodeColor('TABLE'));
+    });
+});
+
+describe('entityTypeIcon', () => {
+    // EntityTypes.DEFAULTS (platform/inspecto-entity-store) - the nine shipped Entity Types.
+    const SHIPPED = ['subscriber', 'imsi', 'imei', 'msisdn', 'wallet', 'account', 'agent', 'handset', 'cell'];
+
+    it('every shipped Entity Type has a glyph that exists in the library', () => {
+        for (const t of SHIPPED) {
+            expect(GLYPH_LIBRARY[ENTITY_TYPE_GLYPH[t]], t).toBeTruthy();
+            expect(entityTypeIcon(t, '#112233'), t).toContain('data:image/svg+xml');
+        }
+    });
+
+    it('is stroked in the given colour, and absent for a type with no glyph', () => {
+        expect(decodeURIComponent(entityTypeIcon('msisdn', '#112233')!)).toContain('stroke="#112233"');
+        expect(entityTypeIcon('custom_type', '#112233')).toBeUndefined();
+    });
+
+    it('an explicit per-kind shape override wins over the icon; other kinds keep theirs', () => {
+        expect(entityTypeIcon('wallet', '#112233', { wallet: 'diamond' })).toBeUndefined();
+        expect(entityTypeIcon('cell', '#112233', { wallet: 'diamond' })).toBeTruthy();
     });
 });
