@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **73<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 18<!--count:backlog-p2--> × P2 · 55<!--count:backlog-p3--> × P3** —
+> **74<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 18<!--count:backlog-p2--> × P2 · 56<!--count:backlog-p3--> × P3** —
 > ↔ **73 (P2 19 → 18, P3 54 → 55) on 2026-10-18**: closed P2 `REGREPORT-PERSONAL-BUILD-TEST-COUNT-1` (count test fixed to 11 routes; the ~20 downstream modules it hid ran green) and filed P3 `TEST-ENV-PG-ASN-UNRUN-1` (Postgres and `asn-*` tests cannot run on this profile).
 > ⬆ **72 → 73 (P2 18 → 19) on 2026-10-18**: filed P2 `REGREPORT-PERSONAL-BUILD-TEST-COUNT-1` (a red test on origin, found by the full-reactor verification lane) and the unverified-modules row it hides.
 > ↔ **72 (no count change) on 2026-10-18**: operator-delegated decision pass on §1 (`SCALEOUT-OBJSTORE-DATABASE-DIR-1`, `SCALEOUT-D14-D16-DECISIONS-1`, `OFFERING-DECLARATION-DRIFT-1`, `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1`; `SCREENING-1`'s stale §1 row corrected, four-eyes shipped 2026-10-14). All assistant-decided, PENDING OPERATOR CONFIRMATION; no row closed, so no count moves. D15 and keeping `output_per_member` OFF were operator-signed 2026-10-18.
@@ -268,10 +268,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 18<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 55<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 56<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 18<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 55<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 73<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 56<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 74<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
