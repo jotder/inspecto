@@ -6,7 +6,7 @@ and move open items to `docs/BACKLOG.md`.
 ## Goal
 An i2-style visual search: pick an entity type, add conditions ("follow link kind K, in direction D, to neighbour type T"),
 run across the graph, and get the matching paths highlighted/added. Vocabulary per `docs/GLOSSARY.md` (Entity, Link, Pipeline etc.; the
-UI says "link kind" and "entity type", never "Flow"/"Issue"/bare "Rule").
+UI says "link kind" and "entity type", never "Flow"/"Issue"/bare "Rule"). <!-- vocab-allow: quotes the banned terms to state the vocabulary rule -->
 
 ## Hard constraints
 - The Investigation op vocabulary is CLOSED (`seed seedBy expand exclude excludeBy keep threshold window hide annotate snapshot`, plus `resolve`

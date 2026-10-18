@@ -529,7 +529,7 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **93**<!--count:la-routes--> routes (**86**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **94**<!--count:la-routes--> routes (**87**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
