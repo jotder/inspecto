@@ -1,6 +1,7 @@
 import { ColumnMeta, compileWhere, quoteIdent } from 'app/inspecto/query';
 import { runSql, SqlRunResult } from 'app/inspecto/data-table/sql/sql-run';
-import { Aggregation, ChannelValue, QueryMeasure, QuerySpec } from './viz-types';
+import MEASURE_CONTRACT from 'app/inspecto/contracts/measure-grammar.contract.json';
+import { Aggregation, ChannelValue, QueryMeasure, QuerySpec, QueryWindow } from './viz-types';
 
 /**
  * Compile/run a {@link QuerySpec}. This is the QuerySpec→SQL boundary — the single swap seam between offline
@@ -67,6 +68,55 @@ export function buildMeasure(agg: Aggregation, field: string, label?: string): Q
     };
 }
 
+/** The id join of a ratio measure's column, `MeasureCompiler.Ratio#id` — contract-pinned. */
+const RATIO_ID_SEPARATOR: string = MEASURE_CONTRACT.ratio.idSeparator;
+
+/**
+ * `recency(field)` (C1, D-AN12): whole days from the latest `field` in the window to the window's as-of date. Offline it
+ * is the registered `RECENCY(col, 'asOf')` aggregate (`stat-aggregates.ts`); live it travels as `{agg: 'recency', field}`
+ * and the server binds the as-of. Needs a {@link QueryWindow} on the spec, which the server refuses without.
+ */
+export function recencyMeasure(field: string, asOf: string, label?: string): QueryMeasure {
+    return {
+        id: `recency_${field}`.replace(/[^A-Za-z0-9_]/g, '_'),
+        expression: `RECENCY(${quoteIdent(field)}, '${asOf}')`,
+        label: label ?? `recency(${field})`,
+        agg: 'recency',
+        field,
+    };
+}
+
+/**
+ * A ratio of two aggregates, `num / den` — NULL when the denominator is 0 or empty, as the server's
+ * `NULLIF(den, 0)`. Not an `{agg, field}` pair: it keeps the Measure grammar's shape (D10) and the Risk factors'
+ * no-free-arithmetic rule (D11) intact by being its own wire list, `ratios`.
+ */
+export function ratioMeasure(num: QueryMeasure, den: QueryMeasure, label?: string): QueryMeasure {
+    return {
+        id: `${num.id}${RATIO_ID_SEPARATOR}${den.id}`,
+        expression: `CASE WHEN (${den.expression}) IS NULL OR (${den.expression}) = 0 THEN NULL ELSE (${num.expression}) / (${den.expression}) END`,
+        label: label ?? `${num.label} / ${den.label}`,
+        ratio: { num, den },
+    };
+}
+
+/**
+ * The offline WHERE terms of a {@link QueryWindow}: ISO dates compare as text, so the column's first ten characters
+ * (`YYYY-MM-DD`) are held to `<= asOf` and `> asOf − days`. The server compares `CAST(field AS DATE)` — the same days.
+ */
+export function windowTerms(w: QueryWindow): string[] {
+    const date = `SUBSTRING(${quoteIdent(w.field)}, 1, 10)`;
+    const terms = [`${date} <= '${w.asOf}'`];
+    if (w.days != null) terms.push(`${date} > '${isoDaysBefore(w.asOf, w.days)}'`);
+    return terms;
+}
+
+/** `asOf` (YYYY-MM-DD) minus `days` whole days, as YYYY-MM-DD — calendar arithmetic in UTC, no zone or DST. */
+export function isoDaysBefore(asOf: string, days: number): string {
+    const [y, m, d] = asOf.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d - days)).toISOString().slice(0, 10);
+}
+
 /** The measure a channel value contributes: a named measure's expression verbatim, else `agg(field)`. */
 export function channelMeasure(cv: ChannelValue): QueryMeasure {
     if (cv.expression) return { id: channelMeasureId(cv), expression: cv.expression, label: cv.field };
@@ -91,8 +141,11 @@ export function compileSpec(spec: QuerySpec, cols: ColumnMeta[] = []): string {
     const from = quoteIdent(spec.sourceName);
 
     let sql = `SELECT ${select}\nFROM ${from}`;
+    const terms: string[] = [];
     const where = spec.filters ? compileWhere(spec.filters, cols) : '';
-    if (where) sql += `\nWHERE ${where}`;
+    if (where) terms.push(spec.window ? `(${where})` : where);
+    if (spec.window) terms.push(...windowTerms(spec.window));
+    if (terms.length) sql += `\nWHERE ${terms.join(' AND ')}`;
     if (spec.measures.length && spec.groupBy.length) sql += `\nGROUP BY ${dims.join(', ')}`;
     if (spec.orderBy?.length) {
         const ob = spec.orderBy.map((o) => `${quoteIdent(o.field)} ${o.dir.toUpperCase()}`).join(', ');

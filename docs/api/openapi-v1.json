@@ -3552,6 +3552,21 @@
                 "properties" : {
                   "dataset" : { "type" : "string" },
                   "measures" : { "type" : "array", "items" : { "type" : "object" } },
+                  "window" : {
+                    "type" : "object",
+                    "description" : "A trailing window as of a date: only rows whose field, read as a DATE, is in (asOf - days, asOf] feed every measure and ratio (days absent = no lower bound). asOf is always stated. Gives the recency aggregate its as-of; recency is refused without a window.",
+                    "required" : [ "field", "asOf" ],
+                    "properties" : {
+                      "field" : { "type" : "string" },
+                      "asOf" : { "type" : "string", "description" : "YYYY-MM-DD" },
+                      "days" : { "type" : "integer", "minimum" : 1, "maximum" : 3660 }
+                    }
+                  },
+                  "ratios" : {
+                    "type" : "array",
+                    "description" : "num / den of two aggregates as a DOUBLE, NULL when den is 0. The column id is <numId>_per_<denId>.",
+                    "items" : { "type" : "object", "required" : [ "num", "den" ], "properties" : { "num" : { "type" : "object" }, "den" : { "type" : "object" } } }
+                  },
                   "groupBy" : { "type" : "array", "items" : { "type" : "string" } },
                   "orderBy" : {
                     "type" : "array",

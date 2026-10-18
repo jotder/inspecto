@@ -20,6 +20,10 @@ export interface BiFilter {
 export interface BiQueryBody {
     dataset: string;
     measures?: BiMeasure[];
+    /** `num / den` of two aggregates, NULL for a zero denominator; the column id is `<numId>_per_<denId>` (C1). */
+    ratios?: { num: BiMeasure; den: BiMeasure }[];
+    /** A trailing window as of a date (C1): rows with `field` in `(asOf − days, asOf]`; gives `recency` its as-of. */
+    window?: { field: string; asOf: string; days?: number };
     groupBy?: string[];
     /** Group-by column → time bucket (`day`/`week`/`month`); the server compiles it to `DATE_TRUNC`.
      *  Every key must also appear in `groupBy` — the server 422s on one that does not. */

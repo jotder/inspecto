@@ -199,6 +199,11 @@ final class BiResultMasking {
         for (MeasureCompiler.Measure m : spec.measures())
             if (m.field() != null && revealsValues(m.agg()))
                 refuseIfMasked(m.field(), m.agg() + " over", viaText);
+        for (MeasureCompiler.Ratio r : spec.ratios())
+            for (MeasureCompiler.Measure m : List.of(r.num(), r.den()))
+                if (m.field() != null && revealsValues(m.agg()))
+                    refuseIfMasked(m.field(), "a ratio of " + m.agg() + " over", viaText);
+        if (spec.window() != null) refuseIfMasked(spec.window().field(), "windowing", viaText);
     }
 
     /**

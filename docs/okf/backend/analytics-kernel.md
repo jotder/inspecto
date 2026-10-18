@@ -3,8 +3,8 @@ type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
 description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6), and ranking, sampling and pivot (S4: the deterministic seeded sampler with DuckDB parity, Steps transform.analytics.rank, transform.sample, transform.matrix.pivot), and deterministic entity grouping (S2: blocking keys, exact match conditions, union-find, its DuckDB form and parity, Step transform.entity.link; similarity never forms a group, D-M1). Also the distribution Steps (S3: outlier flags, equal-width and quantile bins, Pearson correlation and linear regression, their edge rules and DuckDB parity).
 resource: docs/superpower/analytics-core-plan.md
-tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, modules, duckdb]
-timestamp: 2026-10-17T00:00:00Z
+tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, cohort, change-point, modules, duckdb]
+timestamp: 2026-10-18T00:00:00Z
 ---
 
 # Analytics Kernel
@@ -31,6 +31,11 @@ timestamp: 2026-10-17T00:00:00Z
 > review candidates, never a group (§ [Entity grouping](#entity-grouping)).
 > **S3, the distribution Steps, are built (2026-10-17):** `transform.stats.outlier`, `transform.data.binning` and
 > `transform.stats.correlation` on the definitions here (§ [Distribution Steps](#distribution-steps)).
+> **Could batch, lane A, built 2026-10-18 (D-AN10…D-AN13 in the plan, assistant-decided, pending operator confirmation):**
+> C5 [hour of week and seasonal profile](#hour-of-week-and-seasonal-profile), C6
+> [change-point and regime detection](#change-point-and-regime-detection), C1
+> [windowed and ratio Measures](#windowed-and-ratio-measures), C9 [cohort retention and funnel](#cohort-retention-and-funnel).
+> No caller uses the kernels yet; their Steps are open (`ANALYTICS-STEPS-TS-1`).
 
 ## The module
 
@@ -50,7 +55,9 @@ Packages:
 * `com.gamma.analytics.accuracy` — `Accuracy`, `AccuracySql`, `Backtest` (S5b, § [Accuracy and backtest](#accuracy-and-backtest)).
 * `com.gamma.analytics.split` — `HoldoutSplit` (S5d, § [Holdout split](#holdout-split)).
 * `com.gamma.analytics.sample` — `Sampler` (S4, § [Ranking, sampling and pivot](#ranking-sampling-and-pivot)).
-* `com.gamma.analytics.time` — also `SeasonalityDetector` (S5c, § [Seasonality detection](#seasonality-detection)).
+* `com.gamma.analytics.time` — also `SeasonalityDetector` (S5c, § [Seasonality detection](#seasonality-detection)),
+  `HourOfWeek` and `SeasonalProfile` (C5), `ChangePoint` (C6).
+* `com.gamma.analytics.cohort` — `Retention` and `Funnel` (C9, § [Cohort retention and funnel](#cohort-retention-and-funnel)).
 * `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
 * `com.gamma.analytics.similarity` — the similarity kit (S1): `Similarity`, `JaroWinkler`, `TextUnit`,
   `SimilaritySql` (§ [Similarity kit](#similarity-kit)).
@@ -640,6 +647,155 @@ calls the same `decide`, so the two forms share one decision.
 
 ⚠ The series must have no gaps (resample first); a gap shifts every lag. Detrending is the caller's choice (a first
 difference through `transform.timeseries.shift`); the peak rule only keeps a trend from being *chosen*.
+
+## Hour of week and seasonal profile
+
+*ANALYTICS-CORE-1 C5, built 2026-10-18.* Hour buckets were already in the M5 primitives (`TimeGrain.HOUR`, zoned,
+DST rules above) and the hourly candidates 24 and 168 already in `SeasonalityDetector`; C5 adds what was missing, the
+**calendar slot** and the **profile over it**.
+
+* `HourOfWeek` (`HOUR_OF_DAY` 24 slots, `WEEKDAY` 7, `HOUR_OF_WEEK` 168) — `slot(LocalDateTime)`, `slot(Instant, ZoneId)`,
+  `slotSql(expr)` (wall clock) and `slotSql(expr, zone)` (a `TIMESTAMPTZ` on an explicit zone's wall clock). **The clock is
+  always stated; never DuckDB's session zone.** Weekday is ISO, Monday = 0; hour of week = weekday × 24 + hour (Monday
+  00h = 0). Both occurrences of a repeated fall-back hour share a slot; a skipped hour has no observations.
+* `SeasonalProfile` — `of(kind, slots, values)` / `profileSql` (per key and slot: `n`, `mean`) and `strengthSql` (per key:
+  `n`, `strength`). **Strength** = Σ_obs (slot mean − mean)² / Σ_obs (x − mean)², population arithmetic, in [0, 1], NULL
+  for a constant series: "does a weekday×hour shape explain this series?". It complements `SeasonalityDetector`
+  (which period repeats, on an evenly spaced series); it needs no gap fill. ⚠ With 168 free means a short noise series
+  scores well above 0 (about 168/n), so read strength against the observations per slot.
+* No Step: the slot is a one-line SQL expression and the profile feeds `SeasonalBaseline` callers; a Step can follow
+  the first consumer (D-AN10).
+
+Tests: `HourOfWeekTest` (Monday/Sunday ends, zone changes the slot, labels, a pure shape explained to 1.0, constant and
+bad input), `HourOfWeekDuckDbParityTest` (slot SQL = JVM for 3 kinds × 4 zones across the New York and Berlin DST
+weeks, under two different session zones; profile and strength per key, a NULL value left out, no-key form).
+
+## Change-point and regime detection
+
+*ANALYTICS-CORE-1 C6, built 2026-10-18.* `com.gamma.analytics.time.ChangePoint` — the regime-change and drift logic of
+the Business Assurance forecast template, lifted out of its Holt-Winters recursion into a function of the **residuals**
+`e_t = actual − expected`, so any model (the S5 forecaster, a baseline, a peer median) can feed it. JVM `detect(e,
+Params)` and DuckDB `sql(relation, orderColumn, residualColumn, sigmaColumn, keys, Params)` (a recursive CTE per key),
+one rule.
+
+**Rule**, per point with `a_t = e_t − offset` and σ the caller's residual scale: *outside* = |a_t| > z·σ; *run* = consecutive
+outside points; **regime change** = run ≥ K, raised once on the K-th point then the run restarts; a two-sided **CUSUM**
+over inside points only (`S⁺ ← max(0, S⁺ + a/σ − k)`, `S⁻ ← max(0, S⁻ − a/σ − k)`; an outside point leaves the sums
+alone, so a spike or a shift never feeds them); **drift** = an inside, non-regime point with S⁺ or S⁻ > h. After a regime
+change or a drift the run and the sums restart at 0. **`outside_band`** = an outside point in a run whose longest
+`run_at` stayed below K (a run that became a regime change is that one event); it looks at the whole run, so it is
+retrospective, as the template's. Leading `warmup` points update the state but carry no flag. Defaults `Params.of(σ)`
+are the template's, tuned on its corpus: z 4, K 3, k 0.25, h 8.
+
+**`rebase`** (default off). Without it the detector assumes the model re-levels itself after a regime change (the
+template's Holt-Winters does: its forecast restarts from the actual). A model that does not keeps producing large
+residuals and the rule would raise a regime change every K points; `rebase` moves the offset by `a_t` at each regime
+change or drift so the new level reads as residual 0. Level only — a drift's slope is not estimated.
+
+**σ.** `scaleOfDifferences(x, lag)` = 1.4826 · MAD(x_t − x_{t−lag}) / √2 (a difference of two equal-variance errors has
+variance 2σ²), the template's estimate (lag 7 for a daily series with a weekly season). The SQL form reads σ from a column
+that is constant per key, so per-key σ is the caller's one-line aggregate.
+
+**Golden — the template is the reference.** `ChangePointDuckDbParityTest#theKernelReproducesTheTemplatesOwnFlagsFromItsResiduals`
+runs `ba_revenue_forecast_view.toon` as shipped and in four variants (level shift up, down, ramp up, down) and feeds the
+kernel the template's own `actual − forecast`: `outside_band`, `regime_change` and `drift_change` are equal on every one
+of its 175 days in all five corpora (rows 8..182; warm-up 21 = the template's 28 days). The template itself is **not
+rewired** to the kernel: its recursion is one state machine shared with the forecaster, and no shipped number moves.
+
+**No Step yet** (D-AN11): the template raises it in a `sql.template` Job, where the SQL form drops in; a
+`transform.timeseries.changepoint` Step needs a residual-producing Step first and is filed as `CHANGEPOINT-STEP-1`.
+
+Tests: `ChangePointTest` (spike, K-run, one short of K, persistent shift with and without `rebase`, ramp, outside points
+not feeding the CUSUM, warm-up, negative shift, σ estimate by hand, input rules); `ChangePointDuckDbParityTest` (SQL =
+JVM for 3 keys with different σ, a NULL key, a NULL residual, `rebase` × warm-up; and the template golden above).
+
+## Windowed and ratio Measures
+
+*ANALYTICS-CORE-1 C1 (`PREDICTIVE-WINDOWED-MEASURES-1`), built 2026-10-18; decision D-AN12.* Entity Measures over a
+trailing window as of a date — recency, frequency, sum — and ratios of aggregates, the shared inputs of RFM and churn.
+Three additions to `MeasureCompiler.Spec`, all optional, so no existing spec, call site or shipped number moves; the
+Java compiler, its TypeScript twin (`viz/query-spec.ts`) and the contract JSON change in one commit.
+
+* **`window: {field, asOf, days?}`** — only rows whose `field`, **read as a DATE** (a timestamp's own wall-clock date, no
+  zone involved), is in `(asOf − days, asOf]` feed *every* measure and ratio of the spec; `days` absent = no lower bound.
+  `asOf` (`YYYY-MM-DD`) is mandatory — never "now" — so a run is reproducible. `days` 1..3660. Unknown keys refused.
+  It is a **row restriction, not a Measure**: a Measure stays an `{agg, field}` pair (parked-rows D10 stands).
+* **`recency`** — the one window-relative aggregate, in its own list `AS_OF_AGGS` (not in `AGGS`): whole days from the
+  latest `field` in the window to `asOf`, `DATE_DIFF('day', CAST(MAX(f) AS DATE), asOf)`. **Refused without a
+  window** (and inside a ratio). Kept out of `AGGS` on purpose: summarize, KPI, Alert Rule and report take `agg(field)`
+  shorthand and have no as-of to give, so they keep refusing it at save time instead of failing at run time.
+  An entity with **no row in the window has no output row** — so recency is "within the window"; give the window the
+  horizon the question needs (churn: at least the inactivity limit), or leave `days` off.
+* **`ratios: [{num: {agg, field}, den: {agg, field}}]`** — `CAST(num AS DOUBLE) / NULLIF(CAST(den AS DOUBLE), 0)`:
+  **NULL for a zero or empty denominator**, never 0 or ∞. Column id `<numId>_per_<denId>` (`sum_refund_per_sum_amount`).
+  A separate list, so "Risk factors take no free arithmetic" (D11) stands: nothing parses an expression; only the fixed
+  `AGGS` may appear in `num` / `den`. Frequency is `count` (or `countDistinct` on the date field for active days) and the
+  monetary value `sum`, under the window; `recency` + those three are an RFM row.
+* **Bound, not rendered.** Both window bounds and `recency`'s as-of are `CAST(? AS DATE)` parameters (parameters are
+  collected in text order: select list, then filters, `when`, window); `render` prints `DATE '…'` for display only.
+* **The BI route is the boundary.** `POST /bi/query` accepts `window` and `ratios`; `BiResultMasking.vet` refuses a
+  ratio whose aggregate reveals values (`max`, `sum`, statistics…) over a masked column and a `window` on a masked
+  column, as it does for flat measures and filters. `BiRoutes.overBound` re-points the spec with `Spec.withDataset`, which
+  carries the window and ratios (a copy through the old constructor would have dropped them silently). The OpenAPI
+  fragment and `docs/api/openapi-v1.json` describe both keys.
+* **Not covered:** two windows in one spec (last 30 days against the 90 before — run two specs); a window on a
+  `transform.summarize` / KPI / Alert Rule measure (their shorthand has no clause for it); a window anchored on "today"
+  (state the date). A Predictive consumer reads this through `MeasureCompiler.parse` / `compile` with its own as-of.
+
+**TypeScript twin.** `QuerySpec.window`, `QueryMeasure.ratio`, `recencyMeasure(field, asOf)`, `ratioMeasure(num, den)`;
+`compileSpec` ANDs the window's date terms (`SUBSTRING(f, 1, 10)` compared as ISO text) after the filters; offline
+`RECENCY(col, 'asOf')` is registered in `stat-aggregates.ts` (it exists only offline — live, the wire carries
+`{agg: 'recency', field}`); `biQueryBody` sends `window` and moves ratio measures to `ratios`. ⚠ The offline window needs
+**ISO date strings** in the column (a `Date` object would not compare).
+
+**Contract.** `measure-grammar.contract.json` gains `asOfAggregations`, `window` (`keys`, `maxDays`), `ratio.idSeparator`
+and a golden `windowed` corpus (8 events, 4 customers, asOf 2026-06-30; the edges are in it: the as-of day itself is in,
+`asOf − 30` is out, a day after the as-of is out, an event 90 days back shows only in the open window, a zero
+denominator is NULL). Tests: `MeasureWindowTest` (compiled text and parameter order, open window, ratio SQL, every refusal,
+the seams `withLimit` / `withOrderBy` / `withDataset`, and the corpus RUN on DuckDB), `MeasureGrammarContractTest`
+(the new pins), `ControlApiBiQueryMaskingTest#aRatioOrWindowOverAMaskedColumnIsRefusedForAViewer`, and the vitest
+`windowed and ratio measures` block in `query-spec.spec.ts` (the same corpus run offline to the same figures).
+
+## Cohort retention and funnel
+
+*ANALYTICS-CORE-1 C9, built 2026-10-18; decision D-AN13.* `com.gamma.analytics.cohort` — the primitives the Sales &
+Marketing BI pack needs (acquisition cohorts, retention curves, a conversion funnel), each a JVM function and a DuckDB SQL
+builder held equal by a parity test. Built on M5 (`TimeGrain` buckets on a stated clock) and on C1's as-of discipline (the
+as-of is always stated, never "now"). Entities are compared as text; an event with a NULL entity or time is ignored.
+
+**`Retention`** — `compute(events, Params)` / `sql(relation, entityColumn, timeColumn, Params)` →
+`cohort, period, size, active, rate`. `Params(grain, zone, through, from, mode, maxPeriods)`: `grain` is HOUR or coarser;
+`zone` null = the column's own clock (DATE / zone-less TIMESTAMP), else the zone a `TIMESTAMPTZ` is bucketed in (never
+DuckDB's session zone); `through` is the as-of.
+* Events after `through`'s bucket are dropped; an entity's **cohort** is the bucket of its earliest remaining event;
+  **size** = the cohort's entities; the **period** of an event = whole buckets from its cohort's bucket (0 = the cohort's own).
+  `from` leaves older cohorts out of the *result* only — dropping old events first would make old entities look new.
+* **`EXACT`** (classic): active(c, k) = distinct entities of c with an event in period k. **`UNBOUNDED`** ("returned on or
+  after"): … in period k *or later*; never rises with k, period 0 = size.
+* A cell exists only when **observable** (bucket c + k not after `through`, and k ≤ `maxPeriods`, default 120): an observable
+  cell with nobody active is a row with `active = 0`; a cell not yet observable is **absent, never 0**.
+* Hourly periods count wall-clock hours (a repeated fall-back hour is one bucket).
+
+**`Funnel`** — `compute(events, Params)` / `sql(relation, entityColumn, stepColumn, timeColumn, Params)` →
+`step, name, entities, from_previous, from_first`. `Params(steps, within)`: 2..12 distinct step names; `within` an optional
+whole-second window from the anchor. Per entity the chain is built **earliest-first**: t₁ = the earliest step-1 event (the
+anchor); tᵢ = the earliest step-i event with time ≥ tᵢ₋₁ (the very same instant counts) and, with `within`, ≤ t₁ + within. An
+entity *reached* step i when tᵢ exists. Events between steps are ignored; steps need not be consecutive; an event outside the
+funnel's steps is ignored. ⚠ **The anchor is always the earliest step-1**: an entity whose first attempt is too old for
+`within` but whose later attempt would fit is *not* rescued ("any attempt" would need every step-1 as an anchor) — say so to
+whoever reads the funnel. `from_previous` is NULL for step 1 and where the previous step is empty; `from_first` is 1 for step 1
+and NULL when step 1 is empty. The caller bounds the time range by filtering the relation.
+
+**No Step yet** (D-AN13): a pack reaches these through Steps, and the registration seams (`ProcessorCatalog`,
+`NodeAttributes`, the two contract JSONs, `BuiltinNodeType`) were under edit by another lane the same day; filed with the
+change-point Step as `ANALYTICS-STEPS-TS-1`. The Sales & Marketing pack's plan is not in the repository, so the Step's
+shape (columns, one Step or two) is best fixed against it.
+
+Tests: `CohortTest` (hand matrices for monthly EXACT and UNBOUNDED retention, `from` and `maxPeriods`, the zone moving an
+event across a month, week and day periods; a hand funnel of 6 entities with ordering, same-instant, earliest-anchor and
+within cases; input rules), `CohortDuckDbParityTest` (retention SQL = JVM over 400 seeded entities for 4 grains × 4 zones ×
+2 modes across the Berlin and New York DST changes with a different session zone, and over a DATE column; funnel SQL = JVM
+with no window, 48 h and 30 d).
 
 ## Holdout split
 

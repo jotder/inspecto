@@ -5,7 +5,7 @@ import { BiFilter, BiQueryBody, BiQueryService } from 'app/inspecto/api/bi-query
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { ColumnMeta, Condition, ConditionGroup, columnType } from 'app/inspecto/query';
 import { SqlRunResult } from 'app/inspecto/data-table/sql/sql-run';
-import { QuerySpec } from './viz-types';
+import { QueryMeasure, QuerySpec } from './viz-types';
 
 /**
  * De-dupes/caches identical {@link QuerySpec} runs so N widgets sharing a dataset + cross-filter compute
@@ -100,15 +100,24 @@ export class DatasetResultService {
 export function biQueryBody(spec: QuerySpec, cols: ColumnMeta[] = []): BiQueryBody | null {
     if (!spec.measures.length && !spec.groupBy.length) return null; // the wire needs at least one of them
     const measures: BiQueryBody['measures'] = [];
+    const ratios: NonNullable<BiQueryBody['ratios']> = [];
+    const wire = (m: QueryMeasure) => (m.agg === 'count' ? { agg: 'count' } : { agg: m.agg as string, field: m.field ?? m.id });
     for (const m of spec.measures) {
+        if (m.ratio) {
+            if (!m.ratio.num.agg || !m.ratio.den.agg) return null; // a named-measure term inside the ratio
+            ratios.push({ num: wire(m.ratio.num), den: wire(m.ratio.den) });
+            continue;
+        }
         if (!m.agg) return null; // named-measure SQL expression — not expressible on the wire
-        measures.push(m.agg === 'count' ? { agg: 'count' } : { agg: m.agg, field: m.field ?? m.id });
+        measures.push(wire(m));
     }
     const filters = flattenFilters(spec.filters ?? null, cols);
     if (filters === null) return null;
 
     const body: BiQueryBody = { dataset: spec.datasetId };
     if (measures.length) body.measures = measures;
+    if (ratios.length) body.ratios = ratios;
+    if (spec.window) body.window = spec.window;
     if (spec.groupBy.length) body.groupBy = spec.groupBy;
     // Only grains on grouped columns cross — the server refuses the rest, and a stale grain on a channel
     // whose field has since changed would otherwise 422 the whole widget.
