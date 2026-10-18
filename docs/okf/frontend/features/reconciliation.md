@@ -433,6 +433,18 @@ back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model 
 * **Authoring is gated on `canAuthorWorkbench`** — the list's *New reconciliation* and *Duplicate* row action,
   and the Board's edit pencil (and `edit()` itself), because each writes the `reconciliation` Component whose
   PUT the server gates on that capability. *Run* stays `canOperateRuns`.
+* **Definition check in the dialog (RECON-UPLIFT-1 U2, 2026-10-18).** `reconciliation-form.dialog.ts` reads the
+  column inventory of EVERY chosen Dataset (`POST /recon/columns`, once per distinct set of sides) and offers the union
+  of their columns to the key and compare pickers; a per-side line states each side's column count. A key missing on a
+  loaded side, a compare column missing on one, or a `sum` over a column that is not numeric on one is flagged inline
+  (`role="alert"`) and disables Create/Save; `count` over a text column is allowed. ⚠ A side whose inventory could not
+  be read is reported "not checked" and never blocks, and a stored `columnMap` (columns renamed per side) skips the
+  same-name check, because it would be wrong. **Test definition** posts the unsaved definition to the existing
+  `/recon/run` with `sample: 1000, limit: 1` (no new route, nothing recorded) and shows key groups compared, matched
+  keys, elapsed time and Breaks by type, or the server's message with a fix hint; any edit clears the result.
+  Not built: **U5 Schedule**. The Jobs create dialog takes only `{existingNames}` and `/jobs?create=1` carries no
+  job type or params, so a prefilled `recon.run` Job needs a change to the Jobs feature (a `type`/`params` seed on
+  `JobFormData` and a query-param handshake), which lane C may not touch.
 
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
