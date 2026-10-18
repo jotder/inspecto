@@ -116,6 +116,7 @@ Breaking changes are free on any surface (nothing after 3.x was in production): 
 - **Operator ack / resolve routes** exist for stored Alerts; the Event bridge (`EventAlertBridge`) moved to `inspecto-engine`.
 - **Unmodelled-key policy (P4):** every writer that rebuilds a config from a typed `toMap()` keeps `x-` keys and refuses any other unmodelled key 422 `ERR_UNKNOWN_CONFIG_KEY`, so a save never silently drops config.
 - **The telecom-asn1 split packages** (`ingester`, `parse`) were first deliberate, then retired (P3g, `com.gamma.telecom.asn1`).
+- **The jlink hand list is retired** (2026-10-18, taken on the operator's behalf): `package.ps1` links the derived set alone and **fails closed** on a lock mismatch or a missing section, rather than falling back to a hand list; `tools/jlink-runtime-extra.txt` stays as the one hand-kept list, because each entry carries its WHY; every edition must have a lock section (`--check`, CI guards job). Reverse by restoring the union block in `package.ps1` (git history).
 
 ## Open rows (BACKLOG section Module architecture)
 `MODULE-REORG-1` (umbrella) - `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (no work item) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; the Workflow & SLA second source was declined 2026-10-11, see the memo above). `MODULE-REORG-P7-KERNEL` closed 2026-10-09: steps 1, 3–6 and the Escalation Rule edit UI shipped; step 7 and the five unregistered Consequences declined (BACKLOG §6).

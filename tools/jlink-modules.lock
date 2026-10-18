@@ -1,6 +1,23 @@
 # jlink runtime module set per edition = jdeps(staged jars) UNION tools/jlink-runtime-extra.txt.
 # Refresh: node tools/jlink-modules.mjs --edition <e> --staged-dir <bundle dir> --write-lock
 
+[Basic]
+java.base
+java.compiler
+java.desktop
+java.management
+java.naming
+java.net.http
+java.scripting
+java.security.jgss
+java.sql
+jdk.crypto.ec
+jdk.httpserver
+jdk.jfr
+jdk.management
+jdk.unsupported
+jdk.zipfs
+
 [Standard]
 java.base
 java.compiler
@@ -20,6 +37,24 @@ jdk.unsupported
 jdk.zipfs
 
 [Advanced]
+java.base
+java.compiler
+java.desktop
+java.management
+java.naming
+java.net.http
+java.scripting
+java.security.jgss
+java.security.sasl
+java.sql
+jdk.crypto.ec
+jdk.httpserver
+jdk.jfr
+jdk.management
+jdk.unsupported
+jdk.zipfs
+
+[Preview]
 java.base
 java.compiler
 java.desktop

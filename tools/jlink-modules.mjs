@@ -11,12 +11,12 @@
 // The result is held against tools/jlink-modules.lock (per edition) — `--write-lock` refreshes it.
 //
 // Modes
-//   --edition <e> --staged-dir <dir> [--runtime-modules a,b] [--emit]   compute, print, compare to the lock
-//   --edition <e> --staged-dir <dir> --write-lock                       rewrite that edition's lock section
-//   --check                                                             no jars needed: lock well-formed,
-//                                                                       extra.txt names are real JDK modules
-// CI (NOT wired in this step): add to the guards job in .github/workflows/ci.yml
-//   `- run: node tools/jlink-modules.mjs --check`
+//   --edition <e> --staged-dir <dir> [--emit]          compute, print, compare to the lock (exit 1 on mismatch)
+//   --edition <e> --staged-dir <dir> --write-lock      rewrite that edition's lock section
+//   --check                                            no jars needed: a well-formed section for EVERY edition,
+//                                                      extra.txt names are real JDK modules
+// package.ps1 uses this set ALONE (the hand list was retired 2026-10-18) and fails closed on a non-zero exit.
+// CI: the guards job runs `--check` (.github/workflows/ci.yml, "jlink module lock covers every edition").
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,6 +97,11 @@ export function validateLock(lock) {
     return problems;
 }
 
+/** Editions with no lock section: package.ps1 cannot build their runtime, so `--check` fails on any. */
+export function missingSections(lock) {
+    return EDITIONS.filter((e) => !lock[e]).map((e) => `no [${e}] section — package that edition and run --write-lock`);
+}
+
 /** The jar file names an edition's bundle must stage (first-party: the edition's modules + the core thin jars, P3d stage 2); PG sidecar is scanned when present. */
 export function expectedJars(edition) {
     return [...bundleModules(edition), ...coreModules()].map((m) => m.bundleFile);
@@ -147,26 +152,19 @@ export function main(argv) {
         const list = spawnSync(javaTool('java'), ['--list-modules'], { encoding: 'utf8' });
         const jdk = list.status === 0 ? parseListModules(list.stdout) : null;
         if (!jdk) console.error('WARN: java --list-modules unavailable; module names not verified against the JDK');
-        const problems = [...validateLock(lock), ...validateExtra(parseExtra(extraText), jdk)];
+        const problems = [...validateLock(lock), ...missingSections(lock), ...validateExtra(parseExtra(extraText), jdk)];
         problems.forEach((p) => console.error(`jlink-modules --check: ${p}`));
         console.log(problems.length ? `FAIL (${problems.length})` : `OK (lock sections: ${Object.keys(lock).join(', ') || 'none'})`);
         return problems.length ? 1 : 0;
     }
     const edition = arg(argv, '--edition');
     const stagedDir = arg(argv, '--staged-dir');
-    if (!EDITIONS.includes(edition) || !stagedDir) { console.error('usage: --edition <Basic|Standard|Advanced|Preview> --staged-dir <dir> [--write-lock|--runtime-modules a,b|--emit]  |  --check'); return 2; }
+    if (!EDITIONS.includes(edition) || !stagedDir) { console.error('usage: --edition <Basic|Standard|Advanced|Preview> --staged-dir <dir> [--write-lock|--emit]  |  --check'); return 2; }
     const r = computeSet({ edition, stagedDir, extraText });
     console.log(`jdeps over ${r.jars.length} jars: ${r.jdeps.join(',')}`);
     console.log(`extra (hand, with WHY): ${r.extra.join(',')}`);
     console.log(`computed set (${r.all.length}): ${r.all.join(',')}`);
     let code = 0;
-    const hand = arg(argv, '--runtime-modules');
-    if (hand) {
-        const h = hand.split(',').filter(Boolean);
-        const needed = diff(r.all, h), unexplained = diff(h, r.all);
-        console.log(`vs hand list: needed-but-missing [${needed.join(',') || '-'}]  hand-only [${unexplained.join(',') || '-'}]`);
-        if (needed.length) code = 1;
-    }
     if (argv.includes('--write-lock')) {
         lock[edition] = r.all;
         writeFileSync(LOCK_FILE, renderLock(lock));

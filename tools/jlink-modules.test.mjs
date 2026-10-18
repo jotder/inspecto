@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
     parseJdepsOutput, parseExtra, validateExtra, parseListModules, union, diff, parseLock, renderLock,
-    validateLock, expectedJars, requireJars, lockMismatch, computeSet,
+    validateLock, missingSections, expectedJars, requireJars, lockMismatch, computeSet,
 } from './jlink-modules.mjs';
+import { EDITIONS } from './bundle-modules.mjs';
 
 test('parseJdepsOutput takes the comma line and ignores warnings', () => {
     const out = 'Warning: split package\njava.base,java.sql,java.naming\n';
@@ -35,6 +36,13 @@ test('lock round trip and validation', () => {
     assert.ok(validateLock({ Standard: ['java.sql'] }).some((x) => x.includes('java.base')));
     assert.ok(validateLock({ Nope: ['java.base'] }).some((x) => x.includes('unknown edition')));
     assert.ok(validateLock({ Basic: ['java.base', 'a.b', 'a.a'] }).some((x) => x.includes('not sorted')));
+});
+
+test('every edition needs a lock section', () => {
+    const full = Object.fromEntries(EDITIONS.map((e) => [e, ['java.base']]));
+    assert.deepEqual(missingSections(full), []);
+    const { Preview, ...noPreview } = full;
+    assert.deepEqual(missingSections(noPreview), ['no [Preview] section — package that edition and run --write-lock']);
 });
 
 test('missing staged jar fails', () => {
