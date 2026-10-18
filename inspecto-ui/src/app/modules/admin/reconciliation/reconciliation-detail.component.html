@@ -252,6 +252,7 @@
                             [rows]="missingA()"
                             [columns]="missingColumns()"
                             [rowActions]="rowActions"
+                            [pinActions]="true"
                             (rowClick)="select($event)"
                         />
                     </section>
@@ -277,6 +278,7 @@
                             [rows]="missingB()"
                             [columns]="missingColumns()"
                             [rowActions]="rowActions"
+                            [pinActions]="true"
                             (rowClick)="select($event)"
                         />
                     </section>
@@ -297,6 +299,7 @@
                             [rows]="valueBreaks()"
                             [columns]="valueColumns()"
                             [rowActions]="rowActions"
+                            [pinActions]="true"
                             (rowClick)="select($event)"
                         />
                     </section>
@@ -319,6 +322,7 @@
                             [rows]="duplicates()"
                             [columns]="duplicateColumns()"
                             [rowActions]="duplicateActions"
+                            [pinActions]="true"
                             (rowClick)="select($event)"
                         />
                     </section>

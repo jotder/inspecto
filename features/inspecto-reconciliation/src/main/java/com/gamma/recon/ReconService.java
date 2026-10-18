@@ -385,8 +385,8 @@ public final class ReconService {
          * The Break sets of the anchor-relative pair {@code other} (1 = "b", 2 = "c"), each capped at {@code limit}
          * ({@code truncated} set past it) - what {@link #breaks(Spec, Map, String, int, int, int)} returns with no path, type
          * or sample. A carried impact column is validated here exactly as there ({@code IllegalArgumentException} when no
-         * side has it), though no Break set reads it: ⚠ a row's {@code impact} block is {@code {a:null, b:null}} here, unlike
-         * {@link #breaks}, because the grain does not carry the impact column ({@link ReconBreaks#compute} never reads it).
+         * side has it), but the rows carry NO {@code impact} block, unlike {@link #breaks}: the grain does not hold the impact
+         * column, and {@link ReconBreaks#compute} never reads it (RECON-UPLIFT-RESIDUALS-1 (5), 2026-10-18).
          */
         public Map<String, BreakSet> breakSets(int other, int limit) throws SQLException, IOException {
             if (other < 1 || other >= spec.sides().size())
@@ -397,13 +397,13 @@ public final class ReconService {
             if (!uniformKeys) return breaks(spec, null, null, other, limit, 0);
             if (spec.carriedImpact() != null) padAbsentImpact(conn, spec);
             Map<String, BreakSet> out = new LinkedHashMap<>();
-            out.put("missing_right", breakSet(conn, spec, grainMissingSql(spec, other, true, limit), 'a', limit, false));
-            out.put("missing_left", breakSet(conn, spec, grainMissingSql(spec, other, false, limit), 'b', limit, false));
+            out.put("missing_right", breakSet(conn, spec, grainMissingSql(spec, other, true, limit), 'a', limit, false, false));
+            out.put("missing_left", breakSet(conn, spec, grainMissingSql(spec, other, false, limit), 'b', limit, false, false));
             out.put("value_break", spec.measures().isEmpty()
                     ? new BreakSet(List.of(), 0, false)
-                    : breakSet(conn, spec, grainValueSql(spec, other, limit), 'x', limit, false));
+                    : breakSet(conn, spec, grainValueSql(spec, other, limit), 'x', limit, false, false));
             if (spec.cardinality() != Cardinality.MANY_TO_MANY)
-                out.put("cardinality_break", breakSet(conn, spec, grainCardinalitySql(spec, other, limit), 'x', limit, true));
+                out.put("cardinality_break", breakSet(conn, spec, grainCardinalitySql(spec, other, limit), 'x', limit, true, false));
             return out;
         }
 
@@ -1069,6 +1069,13 @@ public final class ReconService {
     private static BreakSet breakSet(Connection conn, Spec spec, String sql, char roles, int limit,
                                      boolean alwaysCounts)
             throws SQLException {
+        return breakSet(conn, spec, sql, roles, limit, alwaysCounts, true);
+    }
+
+    /** As above; {@code withImpact} false = no {@code impact} block (a grain query, which does not select the column). */
+    private static BreakSet breakSet(Connection conn, Spec spec, String sql, char roles, int limit,
+                                     boolean alwaysCounts, boolean withImpact)
+            throws SQLException {
         List<Map<String, Object>> raw = select(conn, sql);
         boolean truncated = raw.size() > limit;
         if (truncated) raw = raw.subList(0, limit);
@@ -1078,7 +1085,7 @@ public final class ReconService {
             row.put("key", keysOf(spec, r));
             if (roles != 'b') row.put("a", withCount(spec, measuresOf(spec, r, "sa_"), r, "sa_", alwaysCounts));
             if (roles != 'a') row.put("b", withCount(spec, measuresOf(spec, r, "sb_"), r, "sb_", alwaysCounts));
-            if (spec.carriedImpact() != null) {   // both roles always present; a side absent at the key = null
+            if (withImpact && spec.carriedImpact() != null) {   // both roles always present; a side absent at the key = null
                 Map<String, Object> impact = new LinkedHashMap<>();
                 impact.put("a", r.get("sa_mi"));
                 impact.put("b", r.get("sb_mi"));

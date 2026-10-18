@@ -45,7 +45,6 @@ import {
     ReconState,
     ReconToolbarComponent,
 } from 'app/inspecto/reconciliation';
-import { csvSafeRow } from './csv-safe';
 import { ElapsedTimer } from './recon-elapsed';
 import { ReconExecService } from './recon-exec.service';
 import { ReconAssignData, ReconAssignDialog } from './recon-assign.dialog';
@@ -624,7 +623,7 @@ export class ReconciliationDetailComponent implements OnInit {
             const sumDiff = list.reduce((s, b) => s + (typeof b.diff === 'number' ? b.diff : 0), 0);
             out.push({
                 id: `grp:${type}`,
-                label: `${breakLabel(type)} (${list.length})`,
+                label: groupLabel(breakLabel(type), list.length, this.dayTotal(type as BreakSetType)),
                 icon: 'heroicons_outline:rectangle-stack',
                 expanded: true,
                 values: { diff: sumDiff || undefined },
@@ -972,7 +971,7 @@ export class ReconciliationDetailComponent implements OnInit {
                 for (const b of this.overlay(live)) {
                     const impact = (b.type === 'cardinality_break' ? dups : impacts)[b.key];
                     rows.push(
-                        csvSafeRow({
+                        {
                             type: breakLabel(b.type),
                             key: b.key,
                             column: b.column ?? '',
@@ -983,7 +982,7 @@ export class ReconciliationDetailComponent implements OnInit {
                             status: b.status,
                             ageDays: breakAgeDays(b) ?? '',
                             assignee: b.assignee ?? '',
-                        }),
+                        },
                     );
                 }
                 if (!anyTruncated(sets)) break;
@@ -992,8 +991,7 @@ export class ReconciliationDetailComponent implements OnInit {
                     break;
                 }
             }
-            // The BOM makes Excel read the file as UTF-8 (keys carry non-ASCII such as the middle dot).
-            downloadCsv(`${r.id}-breaks-${day ?? 'latest'}`, '\ufeff' + toCsv(rows, EXPORT_COLUMNS));
+            downloadCsv(`${r.id}-breaks-${day ?? 'latest'}`, toCsv(rows, EXPORT_COLUMNS));
             if (capped)
                 this.toastr.warning(
                     `Exported the first ${formatNumber(rows.length)} Breaks — narrow the filter for the rest.`,
@@ -1170,4 +1168,9 @@ function fmtVal(v: unknown): string {
     if (v == null) return '—';
     const n = Number(v);
     return Number.isNaN(n) ? String(v) : n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/** A grouped-Breaks label: `Type (n)`, or `Type (n of total)` when only part of the day's Breaks are loaded. */
+export function groupLabel(label: string, loaded: number, dayTotal: number | null): string {
+    return dayTotal != null && dayTotal > loaded ? `${label} (${loaded} of ${dayTotal})` : `${label} (${loaded})`;
 }

@@ -3,9 +3,30 @@
  * browser Blob/anchor dance. Used by the Standard+ tiers of the data-table family.
  */
 
-/** Serialize rows × columns to a CSV string (header + body), quoting cells that need it. */
-export function toCsv(rows: readonly Record<string, unknown>[], columns: readonly string[]): string {
-    const esc = (v: unknown): string => {
+/** A plain number written as text (`-5`, `3.2`, `1e5`) — safe, and rewriting it would turn a figure into text. */
+const NUMERIC_TEXT = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+/** A cell starting with one of these runs as a formula when the file is opened in a spreadsheet. */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
+/** The cell as safe to export: a risky string gets a leading single quote; numbers and everything else pass through. */
+export function csvSafeCell(v: unknown): unknown {
+    if (typeof v !== 'string' || !FORMULA_START.test(v) || NUMERIC_TEXT.test(v)) return v;
+    return `'${v}`;
+}
+
+/**
+ * Serialize rows × columns to a CSV string (header + body), quoting cells that need it. String cells that would
+ * run as a spreadsheet formula are neutralised ({@link csvSafeCell}); a caller whose file is re-imported verbatim
+ * (the Grammar CSV) passes `{ formulaGuard: false }`.
+ */
+export function toCsv(
+    rows: readonly Record<string, unknown>[],
+    columns: readonly string[],
+    opts: { formulaGuard?: boolean } = {},
+): string {
+    const guard = opts.formulaGuard ?? true;
+    const esc = (raw: unknown): string => {
+        const v = guard ? csvSafeCell(raw) : raw;
         const s = v == null ? '' : String(v);
         return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
@@ -20,6 +41,7 @@ export function toCsv(rows: readonly Record<string, unknown>[], columns: readonl
  * Grammar CSV import shares the one parser with the editable grid and the mapping editor.
  */
 export function parseCsv(text: string): string[][] {
+    if (text.startsWith('﻿')) text = text.slice(1); // the BOM downloadCsv writes
     const rows: string[][] = [];
     let row: string[] = [];
     let cell = '';
@@ -54,9 +76,9 @@ export function parseCsv(text: string): string[][] {
     return rows.filter((r) => r.some((c) => c.trim().length));
 }
 
-/** Trigger a client-side CSV download (browser DOM, not Angular). */
+/** Trigger a client-side CSV download (browser DOM, not Angular). A UTF-8 BOM makes Excel read non-ASCII correctly. */
 export function downloadCsv(name: string, csv: string): void {
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv.startsWith('﻿') ? csv : '﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

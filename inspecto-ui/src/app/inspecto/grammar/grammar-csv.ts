@@ -89,7 +89,7 @@ export function grammarToCsv(
             rows.push({ section: 'column', key: String(c.selector), attr, value: String(v) });
         }
     });
-    return toCsv(rows, ['section', 'key', 'attr', 'value']);
+    return toCsv(rows, ['section', 'key', 'attr', 'value'], { formulaGuard: false });
 }
 
 /**

@@ -136,8 +136,27 @@ public final class ReconRunJob implements Job {
 
         return JobResult.ok("recon.run '" + reconId + "' " + scoped.day() + ": " + breaks + " break(s) ("
                 + missingLeft + " missing-left, " + missingRight + " missing-right, " + valueBreak + " value-break)"
+                + byPair(fresh, spec.sides().size())
                 + (notRecorded == null ? "" : " — run not recorded: " + notRecorded),
                 (System.nanoTime() - t0) / 1_000_000L);
+    }
+
+    /**
+     * On a 3-way Reconciliation, the counts above cover every pair while the Breaks page and Board default to A-B, so
+     * the message names each pair's share: {@code " [A-B 2, A-C 3]"} (RECON-UPLIFT-RESIDUALS-1 (2)). Empty on a 2-way
+     * run or when the Breaks could not be computed.
+     */
+    static String byPair(List<ReconBreaks.Break> fresh, int sides) {
+        if (fresh == null || sides < 3) return "";
+        StringBuilder sb = new StringBuilder(" [");
+        for (int other = 1; other < sides; other++) {
+            String pair = ReconBreaks.PAIRS.get(other - 1);
+            long n = fresh.stream().filter(b -> pair.equals(b.pair())
+                    && !"cardinality_break".equals(b.type())).count();
+            if (other > 1) sb.append(", ");
+            sb.append(pair.charAt(0)).append('-').append(pair.substring(1)).append(' ').append(n);
+        }
+        return sb.append(']').toString();
     }
 
     private static long count(List<ReconBreaks.Break> breaks, String type) {
