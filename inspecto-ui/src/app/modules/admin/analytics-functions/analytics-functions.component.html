@@ -1,0 +1,28 @@
+<div class="flex min-w-0 flex-auto flex-col">
+    <inspecto-page-header
+        title="Analytics functions"
+        subtitle="What the Analytics Kernel offers: parameters, cost hint and result kind per function"
+    >
+        <ng-container actions>
+            <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
+                <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-page-header>
+
+    <div class="flex flex-auto flex-col p-6 sm:p-10">
+        <inspecto-section-tabs [tabs]="tabs()" [selected]="kernel()" (selectedChange)="kernel.set($event)" />
+        <inspecto-data-table
+            class="mt-4 block"
+            stateKey="analytics-functions"
+            tier="standard"
+            sourceName="analytics_functions"
+            exportName="analytics-functions"
+            [rows]="rows()"
+            [columns]="columnDefs"
+            [loading]="loading()"
+            noRowsTitle="No Analytics functions"
+            noRowsHint="The catalogue is empty or could not be loaded."
+        />
+    </div>
+</div>

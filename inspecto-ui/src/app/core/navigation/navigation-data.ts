@@ -76,6 +76,13 @@ export const defaultNavigation: GammaNavigationItem[] = [
             },
             { id: 'audit', title: 'Audit log', type: 'basic', icon: 'heroicons_outline:shield-check', link: '/audit' },
             {
+                id: 'analytics-functions',
+                title: 'Analytics functions',
+                type: 'basic',
+                icon: 'heroicons_outline:calculator',
+                link: '/analytics-functions',
+            },
+            {
                 id: 'diagnoses',
                 title: 'Diagnoses',
                 type: 'basic',
