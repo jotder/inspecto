@@ -665,8 +665,8 @@ Test: `ControlApiJobAuthorityTest` (stamping at four doors, revocation, legacy r
   resolves the named Spaces only AFTER the gate, then runs via `JobService.triggerSpaceComparisonRun`
   (202 + `runId`, the `triggerMaterializeRun` idiom). ⚠ **An authored or scheduled `space.comparison` job is
   refused by design**: the registered type carries `SpaceStorageAccess.ownSpaceOnly`, and a run with no Subject
-  has nothing to authorize a cross-Space read. Scheduling one needs a persisted, attributable grant — an open
-  decision (BACKLOG §3.7). ⚠ On Personal nothing authenticates, so the capability wrapper is a no-op there, as
+  has nothing to authorize a cross-Space read. Scheduling one would need a persisted, attributable grant — declined
+  2026-10-18 with "compare every Space" and persisted rows (BACKLOG §6 *Control plane & Jobs*). ⚠ On Personal nothing authenticates, so the capability wrapper is a no-op there, as
   for every gated route (the edition model, not a hole in this one). Why a Job Type and not a 22nd
   maintenance task: every maintenance task is handed exactly one `dataDir`; the cross-Space grant does not
   belong in that switch, and `BUILT_IN_TASKS` stays unchanged. Tests: `SpaceComparisonJobTest`,
