@@ -136,6 +136,9 @@ public final class AnomalyScoreEvaluator {
     /** As above; classified evidence is masked by {@code masker} exactly as a Job run masks it. */
     static Run preview(AnomalyModel model, LocalDate asOf, Function<String, String> relationSql, String entityKey,
                        SqlSandboxPolicy policy, EvidenceMasker masker) throws SQLException, IOException {
+        if (model.forest() != null)
+            throw new IllegalArgumentException("anomaly-model '" + model.id() + "' uses method isolation_forest, which is "
+                    + "fitted over the whole population by the anomaly.score Job only - not on the request path, so it has no preview");
         if (model.peers() == null)
             return evaluate(model.forEntity(entityKey), asOf, relationSql, 1, MAX_BUCKET_ROWS, policy, NONE, null, masker,
                     entityKey, EVIDENCE_PER_ENTITY);
@@ -232,6 +235,8 @@ public final class AnomalyScoreEvaluator {
             }
             scored.add(AnomalyScorer.score(model, e.getKey(), period.toString(), inputs));
         }
+        if (model.forest() != null)   // the isolation-forest option re-scores the population (ANALYTICS-CORE-1 C4); cap already enforced
+            scored = new ArrayList<>(AnomalyForestScorer.score(model, scored, maxEntities, com.gamma.graph.RunControl.NONE));
         boolean evidenceTruncated = wantsEvidence
                 && attachEvidence(model, period, asOf, relationSql, policy, masker, previewEntity, maxEvidenceRows, scored);
         return new Run(period, List.copyOf(scored), dropped.size(), evidenceTruncated, daily);
