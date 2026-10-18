@@ -2549,6 +2549,14 @@ if (-not $SkipBootCheck) {
         } catch { Start-Sleep -Milliseconds 500 }
     }
     if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit(5000) }
+    # Kill() stops only the process Start-Process launched. When $java is 'java' from PATH that is a
+    # LAUNCHER SHIM, and the real JVM it spawned survives -- holding $port and locking the bundle's jars,
+    # one orphan per build. Find it by the smoke's unique -Dcontrol.port and stop it, on both paths.
+    if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+        Get-CimInstance Win32_Process -Filter "Name = 'java.exe'" |
+            Where-Object { $_.CommandLine -like "*-Dcontrol.port=$port *" } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    }
     if (-not $healthy) {
         Write-Host "---- boot output ----" -ForegroundColor Yellow
         foreach ($f in @($out, "$out.err")) { if (Test-Path $f) { Get-Content $f -Tail 40 | Write-Host } }
