@@ -50,8 +50,29 @@ wrong, it is **not yet in force**. See `docs/BRANCHING.md` §0-A.
 
 SemVer `vMAJOR.MINOR.PATCH`. **Conventional Commits:** `fix:`→PATCH, `feat:`→MINOR,
 `feat!:`/`BREAKING CHANGE:`→MAJOR; `chore/docs/refactor/test/build/ci/perf/style/revert`→none.
-Scope encouraged (`fix(etl):`, `feat(ui):`). One version spans all editions; artifacts differ by
-classifier (`-basic` / `-standard`).
+One version spans all editions; artifacts differ by classifier (`-basic` / `-standard`).
+
+**Scope = the Product Map Item name (operator 2026-10-19).** `feat` / `fix` / `perf` commits carry the
+item they change as scope — `feat(reconciliation): …`, `fix(case-management): …` (the `name` of
+`product-map/<kind>/<name>.toon`; the full id `module.reconciliation` also works; several items:
+`fix(ops,etl): …`). Non-item work uses a general scope: `ci`, `deps`, `docs`, `tools`, `release`,
+`build`, `guards`, `skills`, `deploy`, `package`. Release notes are generated from this — there is no
+hand-kept changelog. Advisory check (opt-in hook, never installed by the repo):
+`printf '#!/bin/sh
+node tools/check-commit-scope.mjs "$1"
+' > .git/hooks/commit-msg` — it warns, exit 0.
+
+**Release notes at release time** (before tagging `vX.Y.Z`):
+
+```bash
+node tools/release-notes.mjs v4.2.0 HEAD                 # whole product + one file per item → target/release-notes/
+node tools/release-notes.mjs v4.2.0 HEAD --item module.reconciliation --out target/rn-recon
+```
+
+Commits are attributed by scope, else by the module dirs / product hubs / product-map files they touch
+(that is how pre-2026-10-19 free-form scopes still land). Merges and pure hub regenerations are
+skipped; a file-attributed sweep over > 5 items goes under *(cross-cutting)*. Check the printed
+coverage % and the *(unattributed)* section before publishing.
 
 ## Propagation = MERGE-FORWARD (oldest → master)
 

@@ -19,6 +19,14 @@ Authoritative doc: `docs/BRANCHING.md`. Two axes, never confused:
 `feat!`/`BREAKING CHANGE:`→MAJOR; `chore/docs/refactor/test/build/ci/perf/style/revert`→none. One version
 spans all editions.
 
+**Commit scope = Product Map Item; release notes come from git (2026-10-19).** `feat` / `fix` / `perf`
+commits are scoped by the item they change (`feat(reconciliation): …`; general scopes `ci`, `deps`,
+`docs`, `tools`, `release` … for the rest). `tools/release-notes.mjs <from> [<to>] [--item <id>]` turns
+the range into whole-product notes (by item, then BREAKING / feat / fix / perf / docs) plus one file per
+item under `target/release-notes/`; commits without an item scope (all history before this rule) are
+attributed by the module directories, product hubs and product-map files they touch.
+`tools/check-commit-scope.mjs` is the advisory, opt-in commit-msg hook — see the `release-workflow` skill.
+
 **Propagation = MERGE-FORWARD (oldest → master).** A `fix:` lands on the **oldest still-supported branch it
 affects**, then merges forward up to `master` (`4.x → master`) — a fix may never silently regress in a newer
 line. `feat:` goes to `master` only (empty merge-forward set). Refuse to commit/push/tag on retired
