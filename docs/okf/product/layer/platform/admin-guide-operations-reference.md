@@ -454,7 +454,7 @@ and unversioned.
 
 ```bash
 curl -s localhost:8080/api/v1/pipelines
-curl -s -X POST localhost:8080/api/v1/pipelines/adjustment_etl/trigger   # 202 + {runId}
+curl -s -X POST localhost:8080/api/v1/runs/adjustment_etl/trigger   # 202 + {runId}
 ```
 
 **Authoring → save → register (v4.1).** With `-Dassist.write.root=<dir>` set, a validated config
@@ -518,10 +518,10 @@ identically over the file and DB backends.
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/status
-curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/pipelines/adjustment_etl/report
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/runs/adjustment_etl/report
 # just last month, with p50/p95/p99 over that window:
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "localhost:8080/api/v1/pipelines/adjustment_etl/report?from=2026-04-01&to=2026-04-30"
+  "localhost:8080/api/v1/runs/adjustment_etl/report?from=2026-04-01&to=2026-04-30"
 ```
 
 ### Enrichment run audit over the API (`EnrichmentAuditReader`)

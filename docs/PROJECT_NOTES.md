@@ -545,7 +545,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   assert every one of them against the rule** (2026-09-14).
 - 🔴 **Grep the SYMBOL, never the file list a previous pass wrote down.** `DOC-DEADTOKEN-1` named three
   files carrying a dead `-Dcontrol.token`; a sweep for the symbol found **twelve**, plus a *second* dead
-  flag (`-Dassist.read.token`) the row never mentioned, plus a live instance in a file the row recorded as
+  flag (`-Dassist.read.token`, also dead) the row never mentioned, plus a live instance in a file the row recorded as
   already fixed — one that **ships inside the bundle**. ⚠ A cleanup that states its own scope narrowly
   makes everything outside it read as though it had been checked (2026-09-14).
 - 🔴 **Before adding a call to a shared helper, grep every CONSTRUCTION site of that helper.**

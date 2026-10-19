@@ -200,6 +200,20 @@ jobs:
       - name: Guard — the route-gating evidence table matches the code
         run: node tools/route-gating-report.mjs --check
 
+      # Doc-claim guards (2026-10-19, PRODUCT-DOCS-HUB-1). The link/citation/vocabulary/count guards above
+      # prove a doc's paths, words and numbers; none saw a `-D` flag or an `/api/v1` route. Both rot
+      # silently: the JVM accepts any -D, and a dead route 404s only when an operator follows the doc.
+      # First run found 14 unmarked historical mentions of removed flags (control.token, api.legacy.*) and
+      # three curl examples on `/pipelines/{name}/trigger|report`, which never existed (`/runs/{name}/…`).
+      # Flags pass when a Java literal names them (main or test), a tracked .xml substitutes them
+      # (pom / logback), they are JVM/Maven-standard, a PowerShell switch, or the line marks them
+      # planned/absent. Routes pass against docs/api/openapi-v1.json OR the route-gating scanner, with
+      # {id}/:id/<id>/concrete-id and ControlApi's /spaces/{id} prefix normalised. Each prints its scope
+      # and per-reason counts on every run. Falsified before wiring: a fake flag and a fake route in a
+      # tracked doc each failed with file:line; reverting went green.
+      - name: Guard — every -D flag and /api/v1 route a doc names exists
+        run: node tools/check-doc-flags.mjs && node tools/check-doc-routes.mjs && node --test tools/check-doc-flags.test.mjs tools/check-doc-routes.test.mjs
+
       # NUL-byte guard (2026-09-10). Found while running scale-out spike S4: an agent reported one file
       # "drops out of a naive content grep"; measured, a recursive `rg -l --glob '*.java' 'SHARED'` over
       # the module listed three files and NOT the fourth, although that fourth declares `SHARED`. ripgrep

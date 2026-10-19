@@ -791,7 +791,7 @@ someone asks what is still gated.
   already carries **Signal**, **Consequence**, **Decision Engine** and **Result Set** as binding (the last three
   annotated "§6-proposed → binding (R5)"). Only *Query* and *Parameter* were never formally adopted; use them
   as ordinary words, not as capitalized concepts. → `okf/product/layer/platform/architecture-living-system.md` §Vocabulary
-- **`-Dassist.token` / `-Dassist.read.token` mentions in the docs — LEAVE THEM** (from `DOC-DEADTOKEN-1`,
+- **`-Dassist.token` / `-Dassist.read.token` (dead flags) mentions in the docs — LEAVE THEM** (from `DOC-DEADTOKEN-1`,
   closed 2026-09-14). Every remaining mention is a HISTORICAL record of the removal — ⛔ a symbol sweep that
   "fixes" them undoes the closure. ⚠ Do not confuse them with **`-Dassist.write.root`**, a different, shipped
   and live key; grep the symbol from the repo root. → `okf/product/layer/platform/admin-guide-operations-reference.md`
