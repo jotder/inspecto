@@ -42,7 +42,8 @@ import java.nio.file.attribute.PosixFilePermissions;
  * Investigation seed). It is resolved from {@link #BOOK}: the alias → raw pairs this server has minted for this Space,
  * kept in memory (bounded, least-recently-used out) and appended to the Space's book file in the secrets directory beside
  * the root ({@code .exploration-alias-book}, outside every exported tree; LA-EDITIONS-RESIDUALS-1 4c), so an alias
- * still resolves after a restart or an eviction: every in-memory miss scans that file. Nothing raw is ever sent to a
+ * still resolves after a restart or an eviction: an in-memory miss scans that file, unless the
+ * same alias already missed on a book of the same size ({@link #MISSES}). Nothing raw is ever sent to a
  * client. ⚠ An alias never minted, or whose book file was removed, is answered 422 {@code "alias not known"}.
  */
 final class ExplorationMasking {
@@ -54,6 +55,22 @@ final class ExplorationMasking {
             return size() > BOOK_MAX;
         }
     });
+
+    /**
+     * Aliases a scan of the book did NOT find, with the book file's size at that scan: a repeated miss on an unchanged
+     * book answers null without reading it again (an Investigation pseudonym or a stale alias misses as a normal path).
+     * A changed size (a mint appended) invalidates the entry. Bounded, least-recently-used out.
+     */
+    private static final int MISSES_MAX = 100_000;
+    private static final Map<String, Long> MISSES = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Long> eldest) {
+            return size() > MISSES_MAX;
+        }
+    });
+
+    /** Book-file scans since start (test seam). */
+    static final java.util.concurrent.atomic.AtomicInteger SCANS = new java.util.concurrent.atomic.AtomicInteger();
 
     /** Serialises appends to a book file (one lock for all Spaces: an append is one short write). */
     private static final Object FILE_LOCK = new Object();
@@ -129,9 +146,23 @@ final class ExplorationMasking {
     /** The raw id behind an alias served for this Space's exploration reads, or null. */
     static String lookup(Path writeRoot, String alias) {
         String raw = BOOK.get(writeRoot + "\u0000" + alias);
-        if (raw == null) {
-            raw = scan(writeRoot, alias);
-            if (raw != null) BOOK.put(writeRoot + "\u0000" + alias, raw);
+        if (raw != null) return raw;
+        String k = writeRoot + "\u0000" + alias;
+        Path f = bookFile(writeRoot);
+        long size;
+        try {
+            size = Files.isRegularFile(f) ? Files.size(f) : -1;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        Long missedAt = MISSES.get(k);
+        if (missedAt != null && missedAt == size) return null;
+        raw = size < 0 ? null : scan(writeRoot, alias);
+        if (raw != null) {
+            BOOK.put(k, raw);
+            MISSES.remove(k);
+        } else {
+            MISSES.put(k, size);
         }
         return raw;
     }
@@ -153,13 +184,30 @@ final class ExplorationMasking {
         String line = alias + "\t" + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8)) + "\n";
         Path f = bookFile(writeRoot);
         synchronized (FILE_LOCK) {
-            try {
-                Files.createDirectories(f.getParent());
-                if (!Files.exists(f)) createOwnerOnly(f);
-                Files.writeString(f, line, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+            appendLine(f, line);
+        }
+    }
+
+    /**
+     * Appends one line to the book with a single write on an APPEND channel, which the OS places at the end atomically
+     * even when another process appends too (the in-process lock does not reach other processes). A torn last line
+     * (no newline) is ended first, inside that same write, so it cannot swallow this one; the last-byte check is a
+     * separate read, and a race there costs at most an empty line, which a scan skips.
+     */
+    static void appendLine(Path f, String line) {
+        try {
+            Files.createDirectories(f.getParent());
+            if (!Files.exists(f)) createOwnerOnly(f);
+            try (var r = Files.newByteChannel(f, StandardOpenOption.READ)) {
+                long end = r.size();
+                java.nio.ByteBuffer last = java.nio.ByteBuffer.allocate(1);
+                if (end > 0 && r.position(end - 1).read(last) == 1 && last.get(0) != '\n') line = "\n" + line;
             }
+            try (var w = Files.newByteChannel(f, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+                w.write(java.nio.ByteBuffer.wrap(line.getBytes(StandardCharsets.UTF_8)));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -185,6 +233,7 @@ final class ExplorationMasking {
     private static String scan(Path writeRoot, String alias) {
         Path f = bookFile(writeRoot);
         if (!Files.isRegularFile(f)) return null;
+        SCANS.incrementAndGet();
         String prefix = alias + "\t";
         byte[] key = null;
         try (var lines = Files.lines(f, StandardCharsets.UTF_8)) {
@@ -212,6 +261,7 @@ final class ExplorationMasking {
     /** Test seam: drops the in-memory book, as a restart does. */
     static void forgetInMemoryForTest() {
         BOOK.clear();
+        MISSES.clear();
     }
 
     /** Test seam: drops one entry from the in-memory book, as an LRU eviction does. */

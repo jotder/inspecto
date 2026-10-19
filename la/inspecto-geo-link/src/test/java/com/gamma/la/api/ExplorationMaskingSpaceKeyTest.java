@@ -81,6 +81,69 @@ class ExplorationMaskingSpaceKeyTest {
         assertEquals("441700900101", ExplorationMasking.lookup(root, a));
     }
 
+    /** A repeated miss on an unchanged book does not read it again; a mint (the book grows) makes it read again. */
+    @Test
+    void aRepeatedMissDoesNotRescan(@TempDir Path root) {
+        ExplorationMasking.alias(root, "441700900101");
+        String unknown = "masked:0123456789abcdef";
+        assertEquals(null, ExplorationMasking.lookup(root, unknown));
+        int scans = ExplorationMasking.SCANS.get();
+        for (int i = 0; i < 50; i++) assertEquals(null, ExplorationMasking.lookup(root, unknown));
+        assertEquals(scans, ExplorationMasking.SCANS.get(), "no rescan on a repeated miss");
+        ExplorationMasking.alias(root, "441700900202");
+        assertEquals(null, ExplorationMasking.lookup(root, unknown));
+        assertEquals(scans + 1, ExplorationMasking.SCANS.get(), "a grown book is read again");
+    }
+
+    /** A line torn by a crash (no newline) does not swallow the next minted line. */
+    @Test
+    void aMintAfterATornLineResolves(@TempDir Path root) throws Exception {
+        ExplorationMasking.alias(root, "441700900101");
+        Path book = com.gamma.util.SpaceSecretKeys.keyFile(root, ".exploration-alias-book");
+        Files.writeString(book, "masked:00", java.nio.file.StandardOpenOption.APPEND);   // torn, no newline
+        String b = ExplorationMasking.alias(root, "441700900202");
+        ExplorationMasking.forgetInMemoryForTest();
+        assertEquals("441700900202", ExplorationMasking.lookup(root, b));
+    }
+
+    /** Case history tries the Investigation pseudonym first, so a pseudonym never reads the book. */
+    @Test
+    void caseHistoryRevealsBeforeTheBook(@TempDir Path root) {
+        ExplorationMasking.alias(root, "441700900101");
+        ExplorationMasking.forgetInMemoryForTest();
+        int scans = ExplorationMasking.SCANS.get();
+        String pseudonym = "masked:fedcba9876543210";
+        assertTrue(CaseHistory.nodeHolds("441700900303", pseudonym, root, t -> t.equals(pseudonym) ? "441700900303" : null));
+        assertTrue(!CaseHistory.nodeHolds("441700900999", pseudonym, root, t -> t.equals(pseudonym) ? "441700900303" : null));
+        assertEquals(scans, ExplorationMasking.SCANS.get(), "a pseudonym the Investigation knows never reads the book");
+    }
+
+    /**
+     * Two processes appending to one book share no lock: modelled by appending from many threads WITHOUT the in-process
+     * lock (each thread is a process). Every line must survive.
+     */
+    @Test
+    void appendsFromTwoProcessesLoseNoLine(@TempDir Path root) throws Exception {
+        Path book = com.gamma.util.SpaceSecretKeys.keyFile(root, ".exploration-alias-book");
+        int writers = 4, each = 250;
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(writers);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+        for (int w = 0; w < writers; w++) {
+            int id = w;
+            futures.add(pool.submit(() -> {
+                start.await();
+                for (int i = 0; i < each; i++) ExplorationMasking.appendLine(book, "p" + id + "-" + i + "\tx\n");
+                return null;
+            }));
+        }
+        start.countDown();
+        for (var f : futures) f.get();
+        pool.shutdown();
+        long lines = Files.readAllLines(book).stream().filter(l -> !l.isEmpty()).distinct().count();
+        assertEquals(writers * each, lines, "no appended line is lost");
+    }
+
     @Test
     void anotherSpaceHasAnotherKey(@TempDir Path a, @TempDir Path b) {
         assertTrue(!ExplorationMasking.alias(a, "x").equals(ExplorationMasking.alias(b, "x")), "keys are per Space");
