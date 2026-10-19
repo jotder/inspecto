@@ -300,14 +300,14 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 
 | § | Product area | Active plans (`docs/superpower/`) | §2 gates in this area |
 |---|---|---|---|
-| [3.1](#31-pipelines--authoring-editor--step-catalog) | Pipelines — authoring, editor & Step catalog | [record-transformer-replaces-map-plan.md](archived-documents/plans-archive/record-transformer-replaces-map-plan.md) · [dead-property-validation-plan.md](superpower/dead-property-validation-plan.md) | — |
+| [3.1](#31-pipelines--authoring-editor--step-catalog) | Pipelines — authoring, editor & Step catalog | [record-transformer-replaces-map-plan.md](archived-documents/plans-archive/record-transformer-replaces-map-plan.md) · [dead-property-validation-plan.md](archived-documents/plans-archive/dead-property-validation-plan.md) | — |
 | [3.2](#32-pipelines--execution-lanes--consignments) | Pipelines — execution, lanes & Consignments | — | Row 15 · X5 |
 | [3.3](#33-acquisition-collectors--parsing) | Acquisition, Collectors & Parsing | [parser-field-tiers-interview-plan.md](superpower/parser-field-tiers-interview-plan.md) | D13 |
 | [3.4](#34-catalog-onboarding-datasets--lineage) | Catalog, Onboarding, Datasets & Lineage | — | — |
 | [3.5](#35-data-quality-observability-signals--alerting) | Data quality, Observability, Signals & Alerting | [cross-space-consequence-design.md](archived-documents/plans-archive/cross-space-consequence-design.md) | OPS-5 |
 | [3.6](#36-analytics--queries-bi-studio--export) | Analytics — Queries, BI, Studio & Export | — | — |
-| [3.7](#37-control-plane-api--jobs) | Control plane, API & Jobs | [job-path-compat-survey.md](superpower/job-path-compat-survey.md) | Release notes for the next MAJOR |
-| [3.8](#38-security-policy-editions--compliance) | Security, Policy, Editions & Compliance | [route-gating-audit.md](superpower/route-gating-audit.md) · [policy-narrowing-design.md](archived-documents/plans-archive/policy-narrowing-design.md) | X-Actor · NFR-7 · SOC 2 · DATA-GOV-1 |
+| [3.7](#37-control-plane-api--jobs) | Control plane, API & Jobs | [job-path-compat-survey.md](archived-documents/plans-archive/job-path-compat-survey.md) | Release notes for the next MAJOR |
+| [3.8](#38-security-policy-editions--compliance) | Security, Policy, Editions & Compliance | [route-gating-audit.md](archived-documents/plans-archive/route-gating-audit.md) · [policy-narrowing-design.md](archived-documents/plans-archive/policy-narrowing-design.md) | X-Actor · NFR-7 · SOC 2 · DATA-GOV-1 |
 | [3.9](#39-cases-incidents--assistant) | Cases, Incidents & Assistant | [findings-spec-authoring-ui-design.md](archived-documents/plans-archive/findings-spec-authoring-ui-design.md) (archived) | AGT-6b |
 | [3.10](#310-deployment-packaging--scale-out) | Deployment, Packaging & Scale-out | [enterprise-scale-out-plan.md](superpower/enterprise-scale-out-plan.md) | Deployment topology live validation · `SPACES-FROM-PARTITION-MAP-1` · E1 |
 | [3.11](#311-web-ui--spa-wide-hygiene) | Web UI — SPA-wide hygiene | — | — |

@@ -1,6 +1,6 @@
 # Solution suite documentation — plan (`SOLUTION-SUITE-DOCS-1`)
 
-> **Status:** ✅ SHIPPED 2026-10-18 — all five waves built, L0 [`SOLUTION_OVERVIEW.md`](../okf/product/layer/product/brochure-solution-overview.md) written, review pass done (edition names conformed to Basic/Standard/Advanced, Link Analysis offering corrected). Move to `plans-archive/` once the operator accepts. Decisions taken below. Follows the rewrite of
+> **Status:** ✅ SHIPPED 2026-10-18 — all five waves built, L0 [`SOLUTION_OVERVIEW.md`](../../okf/product/layer/product/brochure-solution-overview.md) written, review pass done (edition names conformed to Basic/Standard/Advanced, Link Analysis offering corrected). Move to `plans-archive/` once the operator accepts. Decisions taken below. Follows the rewrite of
 > `docs/okf/product/layer/platform/architecture-technical.md` (level 1). Operator ask: a next-level architecture and solution
 > breakdown, down to small modules such as maker-checker, so that system users understand how things work.
 

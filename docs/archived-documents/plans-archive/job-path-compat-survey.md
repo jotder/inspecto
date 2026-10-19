@@ -376,6 +376,6 @@ It is here in `docs/superpower/` because its work is **in flight** — five foll
 open. *(`JOB-PATH-BACKUPTASK-SPLIT-1` ✅ **SHIPPED 2026-09-16** `3f384182`; its config half is the
 re-point tracked under `JOB-PATH-DEMO-CONFIG-REPOINT-1`.)* ⛔ **When those ship**, distil §1 (the four surfaces and
 their bases), §2.1 (the real key list and its three blind spots) and §4's "MEANING CHANGED is empty"
-finding into [`okf/product/module/config/spec-config-safety.md`](../okf/product/module/config/spec-config-safety.md) beside the
+finding into [`okf/product/module/config/spec-config-safety.md`](../../okf/product/module/config/spec-config-safety.md) beside the
 existing path-containment section, move anything still open to `docs/BACKLOG.md`, `git mv` this file to
 `docs/archived-documents/plans-archive/`.

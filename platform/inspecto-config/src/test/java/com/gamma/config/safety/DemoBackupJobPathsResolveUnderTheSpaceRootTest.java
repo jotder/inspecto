@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>⚠ This is deliberately NOT a sweep over every committed job config: the other 29 surveyed values
  * belong to runtimes ({@code PipelineJobRunner}, the compactors) that have <b>not</b> moved, so a
  * repo-wide assertion would be red for reasons this change does not own
- * ({@code docs/superpower/job-path-compat-survey.md}).
+ * ({@code docs/archived-documents/plans-archive/job-path-compat-survey.md}).
  */
 class DemoBackupJobPathsResolveUnderTheSpaceRootTest {
 
