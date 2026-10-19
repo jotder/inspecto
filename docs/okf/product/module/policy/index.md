@@ -27,3 +27,11 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.policy` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `BI-QUERY-MASKING-1` | P2 | defect | /bi/query and /queries/{id}/run return a classified entity key raw to any viewer (decided 2026-10-12, operator: its own gated, reviewed r… | — |

@@ -27,3 +27,13 @@ tags: [product-item, solution-pack]
 | brochure | current | [Telecom industry pack — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.industry-telecom` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | partner settlement and re-rating function pack | — |
+| `PACK-RERATING-1` | P3 | feature | re-rating / tariff validation pack | — |
+| `PACK-5G-IOT-ASSURANCE-1` | P3 | feature | 5G / IoT / cloud / digital service assurance industry pack | demand |

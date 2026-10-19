@@ -27,3 +27,11 @@ tags: [product-item, solution-pack]
 | brochure | current | [Link Analysis daily feed — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-daily-feed` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-DAILY-INGEST-1` | P2 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | — |

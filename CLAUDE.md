@@ -100,6 +100,15 @@ change that adds or retires a doc:
 3. **History → `docs/archived-documents/`** — kept for provenance, never maintained, never linked
    as current.
 
+**Open work = one board, tagged rows.** `docs/BACKLOG.md` is the only list of open work, defects
+included (a row with `kind: defect` — never "Issue", which means Incident). Every new row ends its
+first line with `[items: <product-map ids> · kind: feature|defect|chore · hold: …]`
+(`tools/check-backlog-items.mjs`); each hub's **Open work** section is generated from those tags — never
+keep a list of open work in a hub. **Feature path:** plan in `docs/superpower/` + tagged board rows →
+build, commit scope = the item name (`feat(reconciliation): …`) → on ship, update the hub's plan / spec
+/ guides, close the rows and archive the plan; then `node tools/render-product-docs.mjs` refreshes every
+generated slot and Open work section. Detail: `docs/okf/product/layer/platform/spec-work-tracking.md`.
+
 Never create a new root-level `docs/*.md` topic file — new knowledge goes into a product hub
 (or an existing canon file).
 

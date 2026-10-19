@@ -27,3 +27,17 @@ tags: [product-item, module]
 | brochure | current | [Inspecto LA (Link Analysis) — Graph Intelligence Whitepaper](brochure-whitepaper.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.la-core` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | an InvestigationStore seam so the Investigation sidecar files can live on Postgres for multi-pod deployments. | demand |
+| `LA-INVESTIGATION-OPS-DEFERRED-1` | P3 | feature | the unbuilt half of the Investigation model. | demand |
+| `LA-A11Y-AUDIT-1` | P3 | chore | what remains of the Link Analysis / Geo accessibility audit is person-only: a screen-reader reading (NVDA / JAWS / VoiceOver: the node-li… | — |
+| `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §9-§10; plan archived l… | — |
+| `LA-ENTITY-PROFILE-RESIDUALS-1` | P3 | feature | what the Entity profile pages left after P0-P3 shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §6.3, plan arc… | — |
+| `LA-I2-GAPS-RESIDUALS-1` | P3 | feature | what the i2-gap lanes left (2026-10-18). The canvas-styling, visual-query and entity-merge plans are fully shipped and archived (la-canva… | — |
+| `LA-DAILY-INGEST-1` | P2 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | — |

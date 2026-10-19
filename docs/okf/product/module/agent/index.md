@@ -27,3 +27,12 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.agent` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| — | P2 | feature | AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL | external |
+| `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |

@@ -102,6 +102,12 @@ jobs:
       - name: Guard — no BACKLOG row head is closed, struck-and-live, or ranked twice
         run: node tools/check-board-heads.mjs
 
+      # Backlog item-tag guard (2026-10-19, PRODUCT-DOCS-HUB-1). Every ranked row in BACKLOG.md §3–§5 ends with
+      # `[items: <Product Map Item ids> · kind: feature|defect|chore · hold: operator|external|demand]`; each hub's
+      # "Open work" section is generated from those tags, so an untagged row or a bad id would vanish from its hub.
+      - name: Guard — every BACKLOG row names valid Product Map Items
+        run: node tools/check-backlog-items.mjs && node --test tools/check-backlog-items.test.mjs
+
       # Family-count guard (2026-09-12). OperationalDb.Family's size is restated in NINE places outside
       # the enum — two test tripwires and seven sentences across three docs — and the hand sweep was
       # missed TWICE IN TWO SHIFTS (EVENTS took it 12->13, RUN_LEASE 13->14). The tripwires caught both,

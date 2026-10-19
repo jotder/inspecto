@@ -27,3 +27,11 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.la-storage` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-INDEX-SCALE-MEASURE-1` | P3 | chore | clauses (1) and (2) MEASURED 2026-10-05; clause (3) 10^9 still open. | — |

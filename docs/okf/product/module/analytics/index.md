@@ -27,3 +27,18 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.analytics` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `ANALYTICS-CORE-1` | P2 | feature | one home for data operations and statistics; minimise duplicate data-operations code across modules. | — |
+| `ANALYTICS-STEPS-TS-1` | P3 | feature | Steps for the Analytics Kernel time-series and cohort kernels: transform.timeseries.changepoint (ChangePoint, input a residual column + σ… | — |
+| `ANOMALY-ML-SCORING-1` | P3 | feature | ML anomaly scoring (isolation forest) beside the statistical Anomaly Detection scores | — |
+| `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
+| `PREDICTIVE-SEGMENT-RFM-1` | P3 | feature | a Segmentation Model component kind and a predict.segment Job: declared RFM bins and a label table; its Instance is a Customer Segment as… | — |
+| `PREDICTIVE-CHURN-DECLARED-1` | P3 | feature | a Churn Model kind: a declared-coefficient logistic score with contributions, insufficient when history is short, and an afterScore pendi… | — |
+| `PREDICTIVE-FORECAST-1` | P3 | feature | a Forecast Model kind: seasonal-naive and Holt-Winters with an interval and the backtest error stored. | — |
+| `PREDICTIVE-SURFACE-1` | P3 | feature | the read and preview routes (four gates), Studio panes, the entity panel and the forecast chart for the Predictive add-on. | — |

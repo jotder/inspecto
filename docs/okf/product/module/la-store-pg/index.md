@@ -27,3 +27,11 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.la-store-pg` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | an InvestigationStore seam so the Investigation sidecar files can live on Postgres for multi-pod deployments. | demand |
