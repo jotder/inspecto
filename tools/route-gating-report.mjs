@@ -15,14 +15,15 @@
 //         node tools/route-gating-report.mjs --check   # fail if the committed table differs from the code
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const REPORT = 'compliance/evidence/route-gating.md';
 const BEGIN = '<!--route-gating:begin-->';
 const END = '<!--route-gating:end-->';
 
 /** Every *Routes.java under a module's main sources. */
-function routeFiles(root = '.') {
+export function routeFiles(root = '.') {
   const out = [];
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
@@ -42,10 +43,12 @@ function routeFiles(root = '.') {
 const REGISTRATION = /api\.(post|put|patch|delete|get)\(\s*"([^"]+)"\s*,\s*(?:ApiContext\.)?withCapability\(\s*"([^"]+)"/g;
 const BARE = /api\.(post|put|patch|delete|get)\(\s*"([^"]+)"\s*,/g;
 
-function scan() {
+/** Also read by tools/render-api-routes.mjs; `file` is relative to `root`. */
+export function scan(root = '.') {
   const rows = new Map();                         // "METHOD pattern" -> {method, pattern, capability, file, line}
-  for (const file of routeFiles()) {
-    const text = readFileSync(file, 'utf8');
+  for (const abs of routeFiles(root)) {
+    const file = relative(root, abs);
+    const text = readFileSync(abs, 'utf8');
     const lineOf = (idx) => text.slice(0, idx).split('\n').length;
     for (const m of text.matchAll(REGISTRATION)) {
       const key = `${m[1].toUpperCase()} ${m[2]}`;
@@ -90,37 +93,40 @@ function table() {
   return { body: lines.join('\n'), gated, exempt, undeclared, total: rows.length };
 }
 
-const t = table();
-// ⛔ An undeclared mutating route must never reach the evidence file as a row that merely LOOKS alarming:
-// it fails here too, so the report cannot quietly document a hole.
-if (t.undeclared > 0) {
-  console.error(`✗ route-gating report: ${t.undeclared} mutating route(s) declare no posture. `
-    + 'They must be gated with ApiContext.withCapability or recorded as a CapabilityManifest exemption.');
-  process.exit(1);
-}
-
-const doc = readFileSync(REPORT, 'utf8');
-const start = doc.indexOf(BEGIN);
-const stop = doc.indexOf(END);
-if (start < 0 || stop < 0) {
-  console.error(`✗ ${REPORT} is missing the ${BEGIN} / ${END} markers — the table has nowhere to land.`);
-  process.exit(1);
-}
-
-const generated = `${BEGIN}\n\n${t.body}\n\n${END}`;
-const updated = doc.slice(0, start) + generated + doc.slice(stop + END.length);
-const check = process.argv.includes('--check');
-
-if (check) {
-  if (updated !== doc) {
-    console.error(`✗ ${REPORT} is STALE: its table differs from the code. `
-      + 'Run `node tools/route-gating-report.mjs` and commit the result. '
-      + 'The evidence document may not say something the code does not.');
+// Run only as a script, so the scanner can be imported.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const t = table();
+  // ⛔ An undeclared mutating route must never reach the evidence file as a row that merely LOOKS alarming:
+  // it fails here too, so the report cannot quietly document a hole.
+  if (t.undeclared > 0) {
+    console.error(`✗ route-gating report: ${t.undeclared} mutating route(s) declare no posture. `
+      + 'They must be gated with ApiContext.withCapability or recorded as a CapabilityManifest exemption.');
     process.exit(1);
   }
-  console.log(`✓ Route-gating evidence: ${t.total} mutating route(s) — ${t.gated} gated, ${t.exempt} exempt, `
-    + '0 undeclared; the committed table matches the code.');
-} else {
-  writeFileSync(REPORT, updated);
-  console.log(`✓ Wrote ${REPORT}: ${t.total} mutating route(s) — ${t.gated} gated, ${t.exempt} exempt.`);
+
+  const doc = readFileSync(REPORT, 'utf8');
+  const start = doc.indexOf(BEGIN);
+  const stop = doc.indexOf(END);
+  if (start < 0 || stop < 0) {
+    console.error(`✗ ${REPORT} is missing the ${BEGIN} / ${END} markers — the table has nowhere to land.`);
+    process.exit(1);
+  }
+
+  const generated = `${BEGIN}\n\n${t.body}\n\n${END}`;
+  const updated = doc.slice(0, start) + generated + doc.slice(stop + END.length);
+  const check = process.argv.includes('--check');
+
+  if (check) {
+    if (updated !== doc) {
+      console.error(`✗ ${REPORT} is STALE: its table differs from the code. `
+        + 'Run `node tools/route-gating-report.mjs` and commit the result. '
+        + 'The evidence document may not say something the code does not.');
+      process.exit(1);
+    }
+    console.log(`✓ Route-gating evidence: ${t.total} mutating route(s) — ${t.gated} gated, ${t.exempt} exempt, `
+      + '0 undeclared; the committed table matches the code.');
+  } else {
+    writeFileSync(REPORT, updated);
+    console.log(`✓ Wrote ${REPORT}: ${t.total} mutating route(s) — ${t.gated} gated, ${t.exempt} exempt.`);
+  }
 }
