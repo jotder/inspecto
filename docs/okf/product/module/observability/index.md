@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | current | [Observability & maintenance (OPS) — capability spec](plan-observability.md) |
 | spec | missing | |
 | architecture | current | [Observability and backup](architecture-observability-backup.md) |
-| features | missing | |
+| features | current | [Observability and backup — features](features-observability-backup.md) |
 | feature-db | current | [Observability (metrics endpoint + events feed API) — feature database](feature-db.md) |
-| user-guide | missing | |
+| user-guide | current | [Observability and backup — screens](user-guide-observability-backup.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Observability and backup — API](api-observability-backup.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

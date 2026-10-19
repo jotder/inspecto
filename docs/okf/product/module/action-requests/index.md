@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Action Requests — approved outbound API calls](spec.md) |
 | architecture | current | [Action Requests](architecture-overview.md) |
-| features | missing | |
+| features | current | [Action Requests — features](features-action-requests.md) |
 | feature-db | current | [Action Requests — feature database](feature-db.md) |
-| user-guide | missing | |
+| user-guide | current | [Action Requests — screens](user-guide-action-requests.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Action Requests — API](api-action-requests.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

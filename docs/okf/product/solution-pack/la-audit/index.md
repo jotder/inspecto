@@ -24,6 +24,6 @@ tags: [product-item, solution-pack]
 | admin-guide | current | [Inspecto LA (Link Analysis) showcase B: Finance and audit (runbook, synthetic data only)](admin-guide-showcase-runbook.md) |
 | api | missing | |
 | tests | missing | |
-| brochure | missing | |
+| brochure | current | [Link Analysis audit showcase — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

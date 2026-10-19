@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Embedded intelligence (AGT-5)](architecture-embedded-intelligence.md) · [AI assist](architecture-overview.md) |
-| features | missing | |
+| features | current | [AI assist — features](features-ai-assist.md) |
 | feature-db | missing | |
-| user-guide | current | [Assistant](user-guide-assist.md) · [Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)](user-guide-inline-ai-authoring.md) |
+| user-guide | current | [AI assist — screens](user-guide-ai-assist.md) · [Assistant](user-guide-assist.md) · [Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)](user-guide-inline-ai-authoring.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [AI assist — API](api-ai-assist.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

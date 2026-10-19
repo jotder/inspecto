@@ -24,6 +24,6 @@ tags: [product-item, edition]
 | admin-guide | missing | |
 | api | missing | |
 | tests | missing | |
-| brochure | missing | |
+| brochure | current | [Inspecto Preview — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

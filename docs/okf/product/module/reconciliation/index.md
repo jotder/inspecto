@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Reconciliation](architecture-overview.md) |
-| features | missing | |
+| features | current | [Reconciliation — features](features-reconciliation.md) |
 | feature-db | current | [Reconciliation — feature database](feature-db.md) |
 | user-guide | current | [Reconciliation](user-guide-reconciliation.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Reconciliation — API](api-reconciliation.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

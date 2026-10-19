@@ -44,7 +44,7 @@ Every current doc lives in **one hub per Product Map Item**: `docs/okf/product/<
 ## Which layer hub?
 
 - **`layer/platform`** — platform-wide **backend** docs: build/test, launch flags, operations,
-  troubleshooting (`architecture-troubleshooting.md`), gotchas, editions model, reactor.
+  troubleshooting (`admin-guide-troubleshooting.md`), gotchas, editions model, reactor.
 - **`layer/product`** — **UI-wide** docs and **whole-product sales** material.
 - A doc about one module or add-on goes in **that item's** hub, never a layer hub.
 

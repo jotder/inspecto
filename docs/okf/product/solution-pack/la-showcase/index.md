@@ -24,6 +24,6 @@ tags: [product-item, solution-pack]
 | admin-guide | current | [Inspecto LA (Link Analysis) showcase: Postgres store and Basic variants](admin-guide-variants-runbook.md) |
 | api | missing | |
 | tests | missing | |
-| brochure | missing | |
+| brochure | current | [Link Analysis showcase — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

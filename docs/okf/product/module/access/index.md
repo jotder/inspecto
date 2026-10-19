@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | current | [Security (SEC)](plan-security.md) |
 | spec | missing | |
 | architecture | current | [Identity and Access](architecture-overview.md) |
-| features | missing | |
+| features | current | [Identity and Access — features](features-access.md) |
 | feature-db | missing | |
-| user-guide | missing | |
+| user-guide | current | [Identity and Access — screens](user-guide-access.md) |
 | admin-guide | current | [Auth & Security](admin-guide-auth-security.md) |
-| api | missing | |
+| api | current | [Identity and Access — API](api-access.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Storage](architecture-storage.md) |
-| features | missing | |
+| features | current | [Storage — features](features-storage.md) |
 | feature-db | missing | |
-| user-guide | missing | |
+| user-guide | current | [Storage — screens](user-guide-storage.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Storage — API](api-storage.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Screening — Match Scores against Entity Lists and the review of Screening Hits](spec.md) |
 | architecture | current | [Screening](architecture-overview.md) |
-| features | missing | |
+| features | current | [Screening — features](features-screening.md) |
 | feature-db | current | [Screening — feature database](feature-db.md) |
-| user-guide | missing | |
+| user-guide | current | [Screening — screens](user-guide-screening.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Screening — API](api-screening.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

@@ -18,11 +18,11 @@ tags: [product-item, addon]
 | plan | current | [Alerts & Incidents (INC)](plan-incidents.md) |
 | spec | missing | |
 | architecture | current | [Alerts](architecture-alerts.md) · [Incidents](architecture-incidents.md) |
-| features | missing | |
+| features | current | [Alerts — features](features-alerts.md) · [Incidents — features](features-incidents.md) |
 | feature-db | current | [Incidents — feature database](feature-db.md) |
-| user-guide | current | [Alerts](user-guide-alerts.md) |
+| user-guide | current | [Alerts](user-guide-alerts.md) · [Incidents — screens](user-guide-incidents.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Alerts — API](api-alerts.md) · [Incidents — API](api-incidents.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

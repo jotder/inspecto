@@ -28,6 +28,6 @@ Code: `platform/inspecto-engine/src/main/java/com/gamma/query/ConditionTree.java
 Engine base (`inspecto-engine`) plus control-plane routes. The browser twin is
 `inspecto-ui/src/app/inspecto/query/query-eval.ts`; `ConditionTree` is a port of it, so a preview in the editor
 and a backend count agree. The `Conditions` text notation (Access Policies only) is separate; compiling it into
-the tree was declined (see [module reorganisation decisions](../../layer/platform/plan-module-reorganisation-decisions.md)).
+the tree was declined (see [module reorganisation decisions](../../layer/platform/spec-module-reorg-decisions.md)).
 
 More: [screens](user-guide-decision-kernel.md) · [API](api-decision-kernel.md) · [architecture](architecture-decision-kernel.md).

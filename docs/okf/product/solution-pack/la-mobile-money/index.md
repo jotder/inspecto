@@ -24,6 +24,6 @@ tags: [product-item, solution-pack]
 | admin-guide | current | [Inspecto LA (Link Analysis) showcase A: mobile money (runbook, synthetic data)](admin-guide-showcase-runbook.md) |
 | api | missing | |
 | tests | missing | |
-| brochure | missing | |
+| brochure | current | [Link Analysis mobile money showcase — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

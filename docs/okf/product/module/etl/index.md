@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | current | [Ingestion & parsing (ING)](plan-ingestion.md) · [Pipeline authoring (PIP) — capability spec](plan-pipeline-authoring.md) |
 | spec | current | [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
 | architecture | current | [Parsing and ingest](architecture-parsing-ingest.md) · [Pipelines and Steps](architecture-pipelines-steps.md) |
-| features | missing | |
+| features | current | [Parsing and ingest — features](features-parsing-ingest.md) · [Pipelines and Steps — features](features-pipelines-steps.md) |
 | feature-db | missing | |
-| user-guide | current | [Enrichment](user-guide-enrichment.md) · [Pipeline Editor](user-guide-pipeline-editor.md) · [Pipelines (Authoring) — MOVED](user-guide-pipelines.md) · [Schema, Mapping & Transformation Authoring](user-guide-schema-mapping.md) |
+| user-guide | current | [Enrichment](user-guide-enrichment.md) · [Parsing and ingest — screens](user-guide-parsing-ingest.md) · [Pipeline Editor](user-guide-pipeline-editor.md) · [Pipelines (Authoring) — MOVED](user-guide-pipelines.md) · [Schema, Mapping & Transformation Authoring](user-guide-schema-mapping.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Parsing and ingest — API](api-parsing-ingest.md) · [Pipelines and Steps — API](api-pipelines-steps.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

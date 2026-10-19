@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Graph library](architecture-overview.md) |
-| features | missing | |
+| features | current | [Graph library — features](features-graph.md) |
 | feature-db | missing | |
-| user-guide | missing | |
+| user-guide | current | [Graph library — screens](user-guide-graph.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Graph library — API](api-graph.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

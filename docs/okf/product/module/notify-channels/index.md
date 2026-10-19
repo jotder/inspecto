@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Notifications](architecture-overview.md) |
-| features | missing | |
+| features | current | [Notifications — features](features-notifications.md) |
 | feature-db | missing | |
-| user-guide | missing | |
+| user-guide | current | [Notifications — screens](user-guide-notifications.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Notifications — API](api-notifications.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

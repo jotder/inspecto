@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Link Analysis](architecture-overview.md) · [Link Analysis backend architecture (la/ modules, entity store, host wiring)](architecture.md) |
-| features | missing | |
+| features | current | [Link Analysis — features](features-link-analysis.md) |
 | feature-db | missing | |
 | user-guide | current | [Inspecto LA (Link Analysis) — End User Guide](user-guide-end-user.md) · [Investigation Pivot](user-guide-investigation-pivot.md) · [Link Analysis](user-guide-link-analysis.md) · [Inspecto LA (Link Analysis) — User Manual](user-guide-manual.md) |
 | admin-guide | current | [Inspecto LA (Link Analysis) demo runbook (rehearsable, stakeholder presentation)](admin-guide-demo.md) · [Inspecto LA (Link Analysis) real OIDC sign-in runbook (`la-app`, local WSO2 Identity Server)](admin-guide-real-signin.md) |
-| api | missing | |
+| api | current | [Link Analysis — API](api-link-analysis.md) |
 | tests | current | [Link Analysis analyst coverage test (UI-only, impersonated analyst)](tests-analyst-coverage.md) · [Link Analysis data trust: live drive (S10 of `LA-DATA-TRUST-1`)](tests-data-trust-live-drive.md) · [Link Analysis stakeholder Q&A (presenter prep and leave-behind)](tests-stakeholder-qa.md) · [D6 think-aloud session script — a real Case-desk lead](tests-think-aloud-script.md) |
 | brochure | current | [Inspecto LA (Link Analysis) — Graph Intelligence Whitepaper](brochure-whitepaper.md) |
 

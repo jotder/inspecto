@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Regulatory Reporting — regulator-format reports from Cases, four-eyes, file drop](spec.md) |
 | architecture | current | [Regulatory Reporting](architecture-overview.md) |
-| features | missing | |
+| features | current | [Regulatory Reporting — features](features-regulatory-reporting.md) |
 | feature-db | current | [Regulatory Reporting — feature database](feature-db.md) |
-| user-guide | missing | |
+| user-guide | current | [Regulatory Reporting — screens](user-guide-regulatory-reporting.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Regulatory Reporting — API](api-regulatory-reporting.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

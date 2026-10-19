@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts](spec.md) |
 | architecture | current | [Analytics kernel](architecture-overview.md) |
-| features | missing | |
+| features | current | [Analytics kernel — features](features-analytics.md) |
 | feature-db | missing | |
-| user-guide | current | [Analytics functions](user-guide-analytics-functions.md) · [KPI & Reports](user-guide-kpi-reports.md) |
+| user-guide | current | [Analytics functions](user-guide-analytics-functions.md) · [Analytics kernel — screens](user-guide-analytics.md) · [KPI & Reports](user-guide-kpi-reports.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Analytics kernel — API](api-analytics.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

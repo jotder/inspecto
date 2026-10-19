@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Anomaly Scores — explainable behavioural anomaly scoring per entity](spec-anomaly-scores.md) |
 | architecture | current | [Anomaly Detection](architecture-overview.md) |
-| features | missing | |
+| features | current | [Anomaly Detection — features](features-anomaly.md) |
 | feature-db | current | [Anomaly Detection — feature database](feature-db.md) |
-| user-guide | missing | |
+| user-guide | current | [Anomaly Detection — screens](user-guide-anomaly.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Anomaly Detection — API](api-anomaly.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

@@ -23,7 +23,7 @@ Routes below are in `docs/api/openapi-v1.json` or the cited hub doc; confirm the
 | Events, signals | `module/event/architecture-overview.md`, `module/event/spec-events-metrics.md`, `module/event/spec-signal-backbone.md`, `module/event/user-guide-events.md` |
 | Observability / backup | `module/observability/architecture-observability-backup.md` |
 | Runs and run detail | `module/engine/user-guide-runs.md`, `module/engine/user-guide-run-detail.md`, `module/engine/spec-step-park-drain.md` |
-| Known failure modes | `layer/platform/architecture-troubleshooting.md`, `layer/platform/architecture-gotchas.md` |
+| Known failure modes | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-gotchas.md` |
 | Operating, flags | `layer/platform/admin-guide-operations-reference.md`, `layer/platform/admin-guide-launch-flags.md` |
 
 ## Control API routes
@@ -52,10 +52,10 @@ Recovery and transition routes mutate state — confirm with the operator before
 | Symptom | Start at |
 |---|---|
 | Run FAILED / stuck / parked | `module/engine/user-guide-run-detail.md`, `module/engine/spec-step-park-drain.md` |
-| File quarantined, wrong schema, parsed=0 | `layer/platform/architecture-troubleshooting.md`, `module/etl/architecture-parsing-ingest.md` |
-| Output in `year=NULL/...` partitions | `layer/platform/architecture-troubleshooting.md` |
+| File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/etl/architecture-parsing-ingest.md` |
+| Output in `year=NULL/...` partitions | `layer/platform/admin-guide-troubleshooting.md` |
 | Collector picks nothing up / re-pick | `module/acquire/architecture-collectors.md`; troubleshooting (`.processed` markers) |
-| JVM crash / native access / out of memory | `layer/platform/architecture-troubleshooting.md`, `layer/platform/admin-guide-launch-flags.md` |
+| JVM crash / native access / out of memory | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-launch-flags.md` |
 | Config refused at save | `pipeline-author` skill, `module/config/spec-config-safety.md` |
 | Alert fired / did not fire | `addon/incidents/architecture-alerts.md` |
 | Incident transition refused | `addon/incidents/architecture-incidents.md` (workflow actions), `module/ops/user-guide-objects.md` |

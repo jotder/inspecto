@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Events & Metrics](spec-events-metrics.md) · [Signal Backbone (canonical envelope, agent context fabric, gated agentic write)](spec-signal-backbone.md) |
 | architecture | current | [Events and event log](architecture-overview.md) |
-| features | missing | |
+| features | current | [Events and event log — features](features-events.md) |
 | feature-db | missing | |
 | user-guide | current | [Events & Activity](user-guide-events.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Events and event log — API](api-events.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

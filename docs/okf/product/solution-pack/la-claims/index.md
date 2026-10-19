@@ -24,6 +24,6 @@ tags: [product-item, solution-pack]
 | admin-guide | current | [Inspecto LA (Link Analysis) claims showcase runbook (insurance, Special Investigations Unit)](admin-guide-showcase-runbook.md) |
 | api | missing | |
 | tests | missing | |
-| brochure | missing | |
+| brochure | current | [Link Analysis claims showcase — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Maker-checker (Pending Changes)](architecture-maker-checker.md) · [Workflow and SLA](architecture-workflow-sla.md) |
-| features | missing | |
+| features | current | [Maker-checker (Pending Changes) — features](features-maker-checker.md) · [Workflow and SLA — features](features-workflow-sla.md) |
 | feature-db | missing | |
-| user-guide | missing | |
+| user-guide | current | [Maker-checker (Pending Changes) — screens](user-guide-maker-checker.md) · [Workflow and SLA — screens](user-guide-workflow-sla.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Maker-checker (Pending Changes) — API](api-maker-checker.md) · [Workflow and SLA — API](api-workflow-sla.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

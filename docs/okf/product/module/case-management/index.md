@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Case Management](architecture-overview.md) |
-| features | missing | |
+| features | current | [Case Management — features](features-case-management.md) |
 | feature-db | current | [Case Management — feature database](feature-db.md) |
-| user-guide | missing | |
+| user-guide | current | [Case Management — screens](user-guide-case-management.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Case Management — API](api-case-management.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 

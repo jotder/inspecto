@@ -18,11 +18,11 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Exchange — Cross-Space Sharing](spec.md) |
 | architecture | current | [Exchange (multi-entity sharing)](architecture-overview.md) |
-| features | missing | |
+| features | current | [Exchange (multi-entity sharing) — features](features-exchange.md) |
 | feature-db | current | [Exchange (publication and ingestion contracts) — feature database](feature-db.md) |
-| user-guide | missing | |
+| user-guide | current | [Exchange (multi-entity sharing) — screens](user-guide-exchange.md) |
 | admin-guide | missing | |
-| api | missing | |
+| api | current | [Exchange (multi-entity sharing) — API](api-exchange.md) |
 | tests | missing | |
 | brochure | n/a | per edition / solution pack |
 
