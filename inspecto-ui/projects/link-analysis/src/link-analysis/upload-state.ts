@@ -49,7 +49,7 @@ export function uploadErrorMessage(err: unknown, fallback: string, action: 'uplo
         case 409:
             return action === 'delete'
                 ? 'The Collector has already picked this file up, so it cannot be withdrawn - its rows are in the Dataset.'
-                : "A file with this name is still waiting in the Collector's inbox. Wait until it is ingested, delete it below, or replace it.";
+                : "A file with this name is still waiting in the Collector's inbox. If it is your upload, delete or replace it below; otherwise rename your file.";
         case 413:
             return (
                 'That upload is over a size limit and nothing was stored. ' +

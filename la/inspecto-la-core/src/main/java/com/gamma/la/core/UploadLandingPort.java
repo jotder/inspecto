@@ -83,4 +83,17 @@ public interface UploadLandingPort {
 
     /** The ingest state of {@code file}, an upload to {@code target}. Metadata only - never a row or a header value. */
     Ingest ingest(ApiContext api, Target target, String file);
+
+    /**
+     * Outcome of {@link #withdraw}: {@code deleted}; {@code picked-up} (the Collector already took it - {@code state} says how);
+     * {@code busy} (a run of the Pipeline is in flight, so the file may be being read); {@code failed} (the filesystem refused).
+     */
+    record Withdrawal(String outcome, String state, String detail) {}
+
+    /**
+     * Delete a still-pending upload from the inbox, safely against a concurrent ingest: under the Pipeline's run claim (no
+     * cycle in flight or starting), re-check that it is still pending, claim it by an atomic rename to a name the poll never
+     * picks up, then delete it. Never throws for the act itself.
+     */
+    Withdrawal withdraw(ApiContext api, Target target, String file);
 }

@@ -34,3 +34,4 @@ processing:
 collector:
   discovery: poll
   connector: local
+  accepts_upload: true

@@ -1,6 +1,11 @@
 package com.gamma.geolink;
 
+import com.gamma.acquire.AcquisitionLedger;
+import com.gamma.acquire.AcquisitionLedgers;
+import com.gamma.acquire.LedgerEntry;
 import com.gamma.control.HostContext;
+import com.gamma.etl.unpack.LogicalNames;
+import java.nio.file.StandardCopyOption;
 import com.gamma.etl.FileNames;
 import com.gamma.etl.MarkerManager;
 import com.gamma.etl.PipelineConfig;
@@ -23,6 +28,9 @@ import java.util.stream.Stream;
  * quarantine folder) so the upload status read can say where a landed file is.
  */
 public final class HostUploadLandingPort implements UploadLandingPort {
+
+    /** At most this many quarantine entries are examined per lookup (depth 4), so a huge quarantine cannot stall a status read. */
+    static final int QUARANTINE_WALK_CAP = 20_000;
 
     @Override
     public Optional<Target> target(ApiContext api, String collector) {
@@ -69,9 +77,61 @@ public final class HostUploadLandingPort implements UploadLandingPort {
         } catch (RuntimeException unreadable) {
             // fall through: the other footprints still answer
         }
+        // Content-based duplicate mode (checksum / metadata / etag) records a fingerprint row instead of a marker, and with
+        // no backup dir the file stays in the inbox: a row processed at or after the file's last write means it was ingested.
+        if (fingerprintedSinceLanding(cfg, inFile, file)) return new Ingest("ingested", rejected, null);
         String reason = quarantineReason(cfg, file);
         if (reason != null) return new Ingest("quarantined", rejected, reason);
         return new Ingest(Files.exists(inFile) ? "pending" : "consumed", rejected, null);
+    }
+
+    private static boolean fingerprintedSinceLanding(PipelineConfig cfg, Path inFile, String file) {
+        try {
+            if (!cfg.collector().duplicate().contentBased()) return false;
+            AcquisitionLedger ledger = AcquisitionLedgers.shared();
+            String logical = FileNames.safe(cfg, LogicalNames.logicalName(file, cfg));
+            String verbatim = FileNames.safe(cfg, file);
+            Optional<LedgerEntry> prior = ledger.find(cfg.collector().id(), verbatim).or(() -> ledger.find(cfg.collector().id(), logical));
+            if (prior.isEmpty()) return false;
+            if (!Files.exists(inFile)) return true;
+            return prior.get().processedAt() >= Files.getLastModifiedTime(inFile).toMillis();
+        } catch (IOException | RuntimeException unreadable) {
+            return false;
+        }
+    }
+
+    @Override
+    public Withdrawal withdraw(ApiContext api, Target target, String file) {
+        var service = HostContext.of(api).service();
+        Path inFile = target.inbox().resolve(file).normalize();
+        if (!target.inbox().equals(inFile.getParent())) return new Withdrawal("failed", null, "the name escapes the inbox");
+        try {
+            Optional<Withdrawal> done = service.whileIdle(target.pipeline(), () -> {
+                Ingest now = ingest(api, target, file);
+                if (!"pending".equals(now.state())) return new Withdrawal("picked-up", now.state(), null);
+                // Claim the file first: a name the poll never picks up (the in-flight .tmp exclusion, and it no longer
+                // matches any .csv include), atomically, so no reader sees it half-deleted under its real name.
+                Path claimed = target.inbox().resolve("." + file + ".withdraw-" + System.nanoTime() + ".tmp");
+                try {
+                    Files.move(inFile, claimed, StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.NoSuchFileException gone) {
+                    return new Withdrawal("picked-up", "consumed", null);
+                } catch (IOException held) {
+                    return new Withdrawal("busy", "pending", "the file is open elsewhere: " + held.getClass().getSimpleName());
+                }
+                try {
+                    Files.deleteIfExists(claimed);
+                } catch (IOException stuck) {
+                    // claimed but undeletable: put it back under its name so nothing is lost silently
+                    try { Files.move(claimed, inFile, StandardCopyOption.ATOMIC_MOVE); } catch (IOException ignored) { /* left as .tmp */ }
+                    return new Withdrawal("failed", "pending", stuck.getClass().getSimpleName());
+                }
+                return new Withdrawal("deleted", "pending", null);
+            });
+            return done.orElse(new Withdrawal("busy", "pending", "a run of the Pipeline is in flight"));
+        } catch (Exception unexpected) {
+            return new Withdrawal("failed", null, unexpected.getClass().getSimpleName());
+        }
     }
 
     /** Rows in the per-file reject ledger ({@code <errors>/<stem>_errors.csv}, one header line), or null when absent. */
@@ -95,7 +155,7 @@ public final class HostUploadLandingPort implements UploadLandingPort {
             Path q = Paths.get(cfg.dirs().quarantine()).toAbsolutePath().normalize();
             if (!Files.isDirectory(q)) return null;
             try (Stream<Path> walk = Files.walk(q, 4)) {
-                return walk.filter(p -> p.getFileName().toString().equals(file) && Files.isRegularFile(p))
+                return walk.limit(QUARANTINE_WALK_CAP).filter(p -> p.getFileName().toString().equals(file) && Files.isRegularFile(p))
                         .map(p -> p.getParent().getFileName().toString()).findFirst().orElse(null);
             }
         } catch (IOException | RuntimeException unreadable) {

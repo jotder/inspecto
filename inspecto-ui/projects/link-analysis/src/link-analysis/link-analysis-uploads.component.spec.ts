@@ -171,6 +171,17 @@ describe('LinkAnalysisUploadsComponent', () => {
         expect(inv.uploadCsv).toHaveBeenLastCalledWith('up_feed', f, true);
     });
 
+    it("never offers Replace for a waiting file that is not the caller's own", async () => {
+        const { cmp, el, settle } = create({ uploadResult: http(409, 'already in the inbox') });
+        await settle();
+        cmp.file.set(csv('UPL_7.csv'));   // not in the caller's list: someone else's waiting file
+        await cmp.upload();
+        await settle();
+        expect(el.textContent).toContain('still waiting');
+        expect(el.querySelector('[data-testid="la-upload-replace"]')).toBeNull();
+        expect(cmp.canReplace()).toBe(false);
+    });
+
     it('says the limit and the next step on a 413', async () => {
         const { cmp, el, settle } = create({ uploadResult: http(413, 'over upload.max_bytes (1024 bytes)') });
         await settle();

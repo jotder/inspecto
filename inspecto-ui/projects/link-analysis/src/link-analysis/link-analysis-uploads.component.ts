@@ -269,7 +269,13 @@ export class LinkAnalysisUploadsComponent {
             this.file.set(null);
             await this.loadUploads();
         } catch (err) {
-            this.canReplace.set((err as { status?: number } | null)?.status === 409);
+            // Replace is offered only for a waiting file that is YOURS (the list holds only your own uploads; the server also
+            // refuses another analyst's replace with 403).
+            const name = this.file()?.name;
+            this.canReplace.set(
+                (err as { status?: number } | null)?.status === 409 &&
+                    (this.uploads() ?? []).some((u) => u.file === name && u.state === 'pending'),
+            );
             this.fail(err, 'The upload failed.', 'upload');
         } finally {
             this.busy.set(false);

@@ -1035,7 +1035,7 @@
         "tags" : [ "inv" ],
         "summary" : "Land an analyst CSV in an upload-enabled Collector's inbox",
         "operationId" : "postInvUploadsByCollector",
-        "description" : "LA-ANALYST-UPLOAD-1. Raw CSV body (UTF-8), `?name=<file>.csv` (bare name, must match the Collector's file pattern), optional `replace=true`. Lands bytes only; the Collector's Pipeline parses, types, masks and quarantines. Needs canUploadData. Refusals: 503 no write root, 422 bad name / not a CSV / empty / zip-XLSX / NUL / not UTF-8, 403 path-shaped name or D-U7 four-eyes row budget, 404 unknown or non-upload Collector, 413 over upload.max_bytes or upload.daily_bytes, 409 name already in the inbox, 429 rate limit.",
+        "description" : "LA-ANALYST-UPLOAD-1. Raw CSV body (UTF-8), `?name=<file>.csv` (bare name, must match the Collector's file pattern), optional `replace=true`. Lands bytes only; the Collector's Pipeline parses, types, masks and quarantines. Needs canUploadData. Refusals: 503 no write root, 422 bad name / not a CSV / empty / zip-XLSX / NUL / not UTF-8, 403 path-shaped name, D-U7 four-eyes row budget, or replace=true on another analyst's waiting upload (only the uploader or canAdminister may replace), 404 unknown or non-upload Collector, 413 over upload.max_bytes or upload.daily_bytes, 409 name already in the inbox, 429 rate limit.",
         "parameters" : [ {
           "name" : "collector",
           "in" : "path",
@@ -1125,7 +1125,7 @@
         "tags" : [ "inv" ],
         "summary" : "Withdraw an upload the Collector has not picked up yet",
         "operationId" : "deleteInvUploadsByCollectorByFile",
-        "description" : "LA-I2-GAPS-RESIDUALS-1. Deletes the landed file and its upload record. Needs canUploadData, and the caller must be the uploader or hold canAdminister (403). Refusals: 503 no write root, 404 unknown Collector or no record of that file, 409 the Collector already picked the file up (ingested, quarantined or consumed - its rows stay in the Dataset), 429 rate limit.",
+        "description" : "LA-I2-GAPS-RESIDUALS-1. Deletes the landed file and its upload record. Needs canUploadData, and the caller must be the uploader or hold canAdminister. Refusals: 503 no write root, 404 unknown Collector, no record of that file (exact name) or another analyst's upload (one answer), 409 the Collector already picked the file up (ingested, quarantined or consumed - its rows stay in the Dataset), a run of the Pipeline is in flight, or the filesystem refused.",
         "parameters" : [ {
           "name" : "collector",
           "in" : "path",

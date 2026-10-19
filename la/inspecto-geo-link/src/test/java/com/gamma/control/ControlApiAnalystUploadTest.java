@@ -94,6 +94,9 @@ class ControlApiAnalystUploadTest {
     }
 
     /** {@code store} (a name under the data root, {@code ./database}) is where UP_FEED writes; null keeps it beside the inbox. */
+    /** True: content-based (checksum) duplicate mode, no marker, no backup dir - the ingested file stays in the inbox. */
+    private boolean checksumMode;
+
     private Ctx open(Path cfg, Path writeRoot, boolean acceptsUpload, String store) throws Exception {
         Path mini = PipelineConfigBatchTest.writePipeline(cfg, "");
         Path up = cfg.resolve("up");
@@ -123,7 +126,7 @@ class ControlApiAnalystUploadTest {
                 dirs:
                   poll: %s/inbox
                   database: %s
-                  backup: %s/backup
+                  %s
                   temp: %s/temp
                   errors: %s/errors
                   quarantine: %s/quarantine
@@ -137,7 +140,7 @@ class ControlApiAnalystUploadTest {
                   threads: 1
                   file_pattern: "glob:**/*.csv"
                   duplicate_check:
-                    enabled: true
+                    enabled: %s
                     marker_extension: .processed
                   schema_file: "%s/up_schema.toon"
                   csv_settings:
@@ -150,7 +153,8 @@ class ControlApiAnalystUploadTest {
                   include[1]: "glob:**/UPL_*.csv"
                 %s
                 """.formatted(d, store == null ? d + "/db" : Path.of("database").resolve(store).toAbsolutePath().toString().replace("\\", "/"),
-                d, d, d, d, d, d, d, d, acceptsUpload ? "  accepts_upload: true" : ""));
+                checksumMode ? "" : "backup: " + d + "/backup", d, d, d, d, d, d, true, d,
+                (acceptsUpload ? "  accepts_upload: true\n" : "") + (checksumMode ? "  duplicate:\n    mode: checksum\n" : "")));
         if (writeRoot != null) System.setProperty("assist.write.root", writeRoot.toString());
         try {
             CollectorService svc = new CollectorService(List.of(mini, pipe), 3600, 1);
@@ -280,7 +284,9 @@ class ControlApiAnalystUploadTest {
             status(403, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", VIEWER), "no capability");
             status(403, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", ANALYST), "canManageIncidents is not canUploadData");
             HttpResponse<String> other = call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER2);
-            status(403, other, "another analyst without canAdminister");
+            status(404, other, "another analyst's upload answers like an unknown one (no existence oracle)");
+            assertEquals(JSON.readTree(call(c, "DELETE", "/inv/uploads/up_feed/UPL_9.csv", UPLOADER2).body()).path("error").path("message").asText(),
+                    JSON.readTree(other.body()).path("error").path("message").asText().replace("UPL_1", "UPL_9"), "same words as an unknown file");
             assertEquals(List.of("UPL_1.csv"), inboxFiles(c), "a refused delete removed nothing");
             status(404, call(c, "DELETE", "/inv/uploads/NOPE/UPL_1.csv", UPLOADER), "unknown Collector");
             status(404, call(c, "DELETE", "/inv/uploads/mini_etl/UPL_1.csv", UPLOADER), "a Collector that did not opt in");
@@ -326,6 +332,93 @@ class ControlApiAnalystUploadTest {
             assertTrue(del.body().contains("stay in the Dataset"), del.body());
             assertEquals(1, uploadsOf(c, UPLOADER).size(), "the record stays");
         } finally {
+            try (Stream<Path> w = Files.exists(Path.of("database").resolve(store)) ? Files.walk(Path.of("database").resolve(store)) : Stream.<Path>empty()) {
+                w.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
+    /** Review fix 1: replace=true is the uploader's (or an administrator's) act; it can never take over another's upload. */
+    @Test
+    void anotherAnalystCannotTakeOverAWaitingUploadWithReplace(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            byte[] mine = CSV.getBytes(StandardCharsets.UTF_8);
+            byte[] theirs = (CSV + "+447700900009,234109,2026-10-01\n").getBytes(StandardCharsets.UTF_8);
+            status(201, up(c, "UPL_1.csv", mine), "A lands");
+            HttpResponse<String> takeover = up(c, "up_feed", "?name=UPL_1.csv&replace=true", theirs, UPLOADER2);
+            status(403, takeover, "B may not replace A's waiting file");
+            assertEquals(CSV, Files.readString(c.inbox().resolve("UPL_1.csv")), "A's bytes are untouched");
+            assertEquals(1, uploadsOf(c, UPLOADER).size(), "A still owns it");
+            assertEquals(0, uploadsOf(c, UPLOADER2).size());
+            status(404, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER2), "and B still cannot delete it");
+
+            status(201, up(c, "up_feed", "?name=UPL_1.csv&replace=true", theirs, ADMIN), "an administrator may replace");
+            JsonNode row = uploadsOf(c, UPLOADER).get(0);
+            assertEquals("uploader-1", row.get("uploader").asText(), "the record keeps the ORIGINAL uploader on replace");
+            assertTrue(row.get("replaced").asBoolean());
+            status(201, up(c, "up_feed", "?name=UPL_1.csv&replace=true", mine, UPLOADER), "the owner may replace their own");
+        }
+    }
+
+    /** Review fix 3a/3b + 4: the name check is its own gate; another spelling of a stored name is not that record. */
+    @Test
+    void deleteMatchesTheStoredNameExactlyAndRefusesAnUnsafeNameAtItsOwnGate(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            status(201, up(c, "UPL_2.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            List<Event> seen = new CopyOnWriteArrayList<>();
+            Consumer<Event> sub = seen::add;
+            EventLog.current().addSubscriber(sub);
+            try {
+                status(404, call(c, "DELETE", "/inv/uploads/up_feed/upl_2.CSV", UPLOADER), "another spelling is not the record");
+                status(404, call(c, "DELETE", "/inv/uploads/up_feed/a%20b.csv", UPLOADER), "outside the name charset");
+                status(404, call(c, "DELETE", "/inv/uploads/up_feed/.UPL_2.csv", UPLOADER), "a leading dot");
+            } finally {
+                EventLog.current().removeSubscriber(sub);
+            }
+            assertEquals(List.of("UPL_2.csv"), inboxFiles(c), "nothing was deleted");
+            List<String> gates = seen.stream().filter(e -> EventType.LA_UPLOAD.equals(e.type())).map(e -> e.attributes().get("gate")).toList();
+            assertEquals(List.of("record", "name", "name"), gates, "the SAFE_NAME gate refused the last two: " + seen);
+        }
+    }
+
+    /** Review fix 2b: while a run of the Pipeline holds its claim, the file may be being read - delete refuses (409, audited). */
+    @Test
+    void deleteRefusesWhileARunOfThePipelineIsInFlight(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            status(201, up(c, "UPL_1.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            HttpResponse<String>[] during = new HttpResponse[1];
+            c.svc().whileIdle("up_feed", () -> {      // the test holds the run claim, as an in-flight ingest would
+                during[0] = call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER);
+                return Boolean.TRUE;
+            });
+            status(409, during[0], "a run is in flight");
+            assertTrue(during[0].body().contains("being ingested"), during[0].body());
+            assertEquals(List.of("UPL_1.csv"), inboxFiles(c), "nothing was deleted mid-ingest");
+            status(200, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER), "free again: withdrawn");
+            try (Stream<Path> s = Files.list(c.inbox())) {
+                assertEquals(0, s.count(), "no claimed temp file left behind");
+            }
+        }
+    }
+
+    /** Review fix 2a: a checksum-mode Collector writes no marker and (no backup dir) leaves the file in the inbox. */
+    @Test
+    void aChecksumModeCollectorsIngestedFileReadsIngestedAndCannotBeDeleted(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String store = "upl_cs_" + System.nanoTime();
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        checksumMode = true;
+        try (Ctx c = open(cfg, root, true, store)) {
+            status(201, up(c, "UPL_20261002.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            assertEquals("pending", uploadsOf(c, UPLOADER).get(0).get("state").asText());
+            c.svc().runPipeline("up_feed");
+            JsonNode row = uploadsOf(c, UPLOADER).get(0);
+            assertEquals("ingested", row.get("state").asText(), "fingerprint ledger says ingested: " + row + " inbox " + inboxFiles(c)
+                    + " ledger(test thread) " + com.gamma.acquire.AcquisitionLedgers.shared().find("up_feed", "UPL_20261002.csv")
+                    + " store " + Files.exists(Path.of("database").resolve(store)));
+            status(409, call(c, "DELETE", "/inv/uploads/up_feed/UPL_20261002.csv", UPLOADER), "picked up: refused");
+        } finally {
+            checksumMode = false;
             try (Stream<Path> w = Files.exists(Path.of("database").resolve(store)) ? Files.walk(Path.of("database").resolve(store)) : Stream.<Path>empty()) {
                 w.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
             }

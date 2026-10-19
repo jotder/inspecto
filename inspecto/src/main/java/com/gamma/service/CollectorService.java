@@ -2152,6 +2152,19 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         }
     }
 
+    /**
+     * Run {@code action} under {@code pipelineName}'s {@link #runGuard} claim, taken WITHOUT blocking, so no cycle of that
+     * pipeline is in flight or can start while it runs (LA analyst upload withdraw: a file is only deleted from the inbox when
+     * no ingest can be reading it). Empty when a cycle holds the claim. Same pattern as {@link #commitRetryAct}.
+     */
+    public <T> Optional<T> whileIdle(String pipelineName, java.util.concurrent.Callable<T> action) throws Exception {
+        RunLease.Claim claim = runGuard.tryAcquire(pipelineName);
+        if (claim == null) return Optional.empty();
+        try (claim) {
+            return Optional.ofNullable(action.call());
+        }
+    }
+
     /** {@link #triggerRunAsync(String)} with an explicit trigger label ({@code manual} | {@code notify} — ACQ-6). */
     public Optional<String> triggerRunAsync(String pipelineName, String trigger) {
         return triggerRunAsync(pipelineName, trigger, false);

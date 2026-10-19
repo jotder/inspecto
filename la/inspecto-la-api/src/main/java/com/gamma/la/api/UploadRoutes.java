@@ -118,29 +118,67 @@ public final class UploadRoutes implements RouteModule {
                 "no Collector '" + collector + "' accepts uploads"));
         boolean admin = isAdmin(ex);
         String me = ApiContext.actor(ex);
-        List<Map<String, Object>> rows = new ArrayList<>();
         Path dir = recordDir(root, target.collector());
-        if (Files.isDirectory(dir)) {
-            try (Stream<Path> s = Files.list(dir)) {
-                for (Path p : s.filter(f -> f.getFileName().toString().endsWith(".json")).toList()) {
-                    Map<String, Object> rec = readRecord(p);
-                    if (rec == null) continue;
-                    if (!admin && !String.valueOf(me).equals(rec.get("uploader"))) continue;
-                    UploadLandingPort.Ingest in = port.ingest(api, target, String.valueOf(rec.get("file")));
-                    rec.put("state", in.state());
-                    if (in.rejectedRows() != null) rec.put("rejectedRows", in.rejectedRows());
-                    if (in.reason() != null) rec.put("quarantineReason", in.reason());
-                    rows.add(rec);
-                }
-            }
-        }
+        prune(dir);
+        // Read the (small, retention-bounded) records, keep the caller's, sort, cut the page - and only THEN probe the
+        // Collector's footprint for the rows on the page.
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> rec : records(dir))
+            if (admin || String.valueOf(me).equals(rec.get("uploader"))) rows.add(rec);
         rows.sort((a, b) -> String.valueOf(b.get("landedAt")).compareTo(String.valueOf(a.get("landedAt"))));
+        int total = rows.size();
+        List<Map<String, Object>> page = total > MAX_LISTED ? new ArrayList<>(rows.subList(0, MAX_LISTED)) : rows;
+        for (Map<String, Object> rec : page) {
+            UploadLandingPort.Ingest in = port.ingest(api, target, String.valueOf(rec.get("file")));
+            rec.put("state", in.state());
+            if (in.rejectedRows() != null) rec.put("rejectedRows", in.rejectedRows());
+            if (in.reason() != null) rec.put("quarantineReason", in.reason());
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("collector", target.collector());
-        out.put("total", rows.size());
-        out.put("truncated", rows.size() > MAX_LISTED);
-        out.put("uploads", rows.size() > MAX_LISTED ? rows.subList(0, MAX_LISTED) : rows);
+        out.put("total", total);
+        out.put("truncated", total > MAX_LISTED);
+        out.put("uploads", page);
         return out;
+    }
+
+    /** Every readable record in {@code dir}. */
+    private static List<Map<String, Object>> records(Path dir) throws IOException {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (!Files.isDirectory(dir)) return out;
+        try (Stream<Path> s = Files.list(dir)) {
+            for (Path p : s.filter(f -> f.getFileName().toString().endsWith(".json")).toList()) {
+                Map<String, Object> rec = readRecord(p);
+                if (rec != null) out.add(rec);
+            }
+        }
+        return out;
+    }
+
+    /** The record of {@code file}, matched by EXACT (case-sensitive) name against the stored records - never a filesystem
+     *  lookup that a case-insensitive disk would answer for another spelling. */
+    private static Path recordOf(Path dir, String file) throws IOException {
+        if (!Files.isDirectory(dir)) return null;
+        String want = file + ".json";
+        try (Stream<Path> s = Files.list(dir)) {
+            return s.filter(p -> p.getFileName().toString().equals(want)).findFirst().orElse(null);
+        }
+    }
+
+    /** Drop records past {@link #RECORD_RETENTION_DAYS} (best effort; one directory listing). */
+    private static void prune(Path dir) {
+        if (!Files.isDirectory(dir)) return;
+        Instant cutoff = Instant.now().minus(java.time.Duration.ofDays(RECORD_RETENTION_DAYS));
+        try (Stream<Path> s = Files.list(dir)) {
+            for (Path p : s.toList())
+                if (Files.getLastModifiedTime(p).toInstant().isBefore(cutoff)) Files.deleteIfExists(p);
+        } catch (IOException | RuntimeException ignored) {
+            // retention is housekeeping; a failed prune retries on the next read or upload
+        }
+    }
+
+    private static boolean ownerOrAdmin(HttpExchange ex, Map<String, Object> rec) {
+        return isAdmin(ex) || (rec != null && String.valueOf(ApiContext.actor(ex)).equals(rec.get("uploader")));
     }
 
     /**
@@ -157,6 +195,11 @@ public final class UploadRoutes implements RouteModule {
         } catch (ApiException refused) {
             emit(ex, "la.upload.delete", collector, seen[0], -1, seen[1], "refused", GATE.get() == null ? "write-root" : GATE.get());
             throw refused;
+        } catch (IOException | RuntimeException fault) {
+            // never an unaudited 500: a filesystem fault is a refusal like any other
+            emit(ex, "la.upload.delete", collector, seen[0], -1, seen[1], "refused", "io");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the upload could not be deleted (" + fault.getClass().getSimpleName()
+                    + "); nothing was changed - try again");
         } finally {
             GATE.remove();
         }
@@ -168,22 +211,36 @@ public final class UploadRoutes implements RouteModule {
                 "no Collector '" + collector + "' accepts uploads"));
         UploadLandingPort.Target target = port.target(api, collector).orElseThrow(() -> refuse("collector", 404, ErrorCodes.NOT_FOUND,
                 "no Collector '" + collector + "' accepts uploads"));
-        if (!SAFE_NAME.matcher(file).matches())
-            throw refuse("record", 404, ErrorCodes.NOT_FOUND, "no upload '" + file + "' for Collector '" + collector + "'");
-        Path recordFile = recordDir(root, target.collector()).resolve(file + ".json");
-        Map<String, Object> rec = Files.isRegularFile(recordFile) ? readRecord(recordFile) : null;
-        if (rec == null) throw refuse("record", 404, ErrorCodes.NOT_FOUND, "no upload '" + file + "' for Collector '" + collector + "'");
+        String noSuch = "no upload '" + file + "' for Collector '" + collector + "'";
+        if (!SAFE_NAME.matcher(file).matches()) throw refuse("name", 404, ErrorCodes.NOT_FOUND, noSuch);
+        Path recordFile;
+        Map<String, Object> rec;
+        try {
+            recordFile = recordOf(recordDir(root, target.collector()), file);
+            rec = recordFile == null ? null : readRecord(recordFile);
+        } catch (IOException unreadable) {
+            throw refuse("record", 503, ErrorCodes.CONTROL_PLANE_READ_ONLY, "the upload records cannot be read right now; nothing was deleted");
+        }
+        if (rec == null) throw refuse("record", 404, ErrorCodes.NOT_FOUND, noSuch);
+        // Another analyst's upload answers exactly like an unknown one: no existence oracle.
+        if (!ownerOrAdmin(ex, rec)) throw refuse("owner", 404, ErrorCodes.NOT_FOUND, noSuch);
+        file = String.valueOf(rec.get("file"));     // the stored spelling, for the act and the audit
+        seen[0] = file;
         seen[1] = String.valueOf(rec.get("sha256"));
-        if (!isAdmin(ex) && !String.valueOf(ApiContext.actor(ex)).equals(rec.get("uploader")))
-            throw refuse("owner", 403, ErrorCodes.PERMISSION_DENIED, "only the analyst who uploaded '" + file + "' or an administrator may delete it");
-        UploadLandingPort.Ingest in = port.ingest(api, target, file);
-        Path inFile = target.inbox().resolve(file).normalize();
-        if (!"pending".equals(in.state()) || !target.inbox().equals(inFile.getParent()))
-            throw refuse("picked-up", 409, ErrorCodes.CONFLICT, "'" + file + "' is already " + in.state()
+        UploadLandingPort.Withdrawal w = port.withdraw(api, target, file);
+        switch (w.outcome()) {
+            case "deleted" -> { }
+            case "picked-up" -> throw refuse("picked-up", 409, ErrorCodes.CONFLICT, "'" + file + "' is already " + w.state()
                     + ": the Collector has picked it up, and its rows stay in the Dataset - this route only withdraws a file not yet ingested");
-        if (!Files.deleteIfExists(inFile))
-            throw refuse("picked-up", 409, ErrorCodes.CONFLICT, "'" + file + "' left the inbox while it was being deleted");
-        Files.deleteIfExists(recordFile);
+            case "busy" -> throw refuse("busy", 409, ErrorCodes.CONFLICT, "'" + file
+                    + "' may be being ingested right now (" + w.detail() + "); nothing was deleted - try again when the run finishes");
+            default -> throw refuse("io", 409, ErrorCodes.CONFLICT, "'" + file + "' could not be deleted (" + w.detail() + "); it is still in the inbox");
+        }
+        try {
+            Files.deleteIfExists(recordFile);
+        } catch (IOException stale) {
+            // the file is gone; a stale record only shows it as "picked up" until retention prunes it
+        }
         emit(ex, "la.upload.delete", collector, file, ((Number) rec.getOrDefault("bytes", -1)).longValue(), seen[1], "deleted", null);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("collector", target.collector());
@@ -216,11 +273,7 @@ public final class UploadRoutes implements RouteModule {
             rec.put("replaced", replaced);
             rec.put("landedAt", landedAt);
             AtomicFiles.write(dir.resolve(file + ".json"), JSON.writeValueAsBytes(rec), ".rec-");
-            Instant cutoff = Instant.now().minus(java.time.Duration.ofDays(RECORD_RETENTION_DAYS));
-            try (Stream<Path> s = Files.list(dir)) {
-                for (Path p : s.toList())
-                    if (Files.getLastModifiedTime(p).toInstant().isBefore(cutoff)) Files.deleteIfExists(p);
-            }
+            prune(dir);
         } catch (IOException | RuntimeException ignored) {
             // the file landed; a record that cannot be written only hides it from the status list
         }
@@ -302,6 +355,16 @@ public final class UploadRoutes implements RouteModule {
         if (existed && (!replace || !Files.isRegularFile(dest)))
             throw refuse("conflict", 409, ErrorCodes.CONFLICT, "'" + name + "' is already in the Collector's inbox"
                     + (Files.isRegularFile(dest) ? "; pass replace=true to replace it (a re-delivery keeps the SAME name)" : " and is not a file"));
+        // Replace is the uploader's (or an administrator's) act, exactly like delete; the record keeps its ORIGINAL uploader.
+        String uploader = ApiContext.actor(ex);
+        if (existed) {
+            Path recPath = recordOf(recordDir(root, target.collector()), name);
+            Map<String, Object> prior = recPath == null ? null : readRecord(recPath);
+            if (!ownerOrAdmin(ex, prior))
+                throw refuse("owner", 403, ErrorCodes.PERMISSION_DENIED, "'" + name
+                        + "' is waiting in the inbox as another analyst's upload; only they or an administrator may replace it");
+            if (prior != null && prior.get("uploader") != null) uploader = String.valueOf(prior.get("uploader"));
+        }
 
         long daily = lim.get(LaLimit.UPLOAD_DAILY_BYTES);
         synchronized (QUOTA_LOCK) {
@@ -328,7 +391,7 @@ public final class UploadRoutes implements RouteModule {
         out.put("replaced", existed);
         String landedAt = Instant.now().toString();
         out.put("landedAt", landedAt);
-        record(root, target, name, bytes.length, lines(bytes), seen[1], ApiContext.actor(ex), existed, landedAt);
+        record(root, target, name, bytes.length, lines(bytes), seen[1], uploader, existed, landedAt);
         emit(ex, collector, name, bytes.length, seen[1], existed ? "replaced" : "landed", null);
         return ApiContext.respondJson(ex, 201, out);
     }
