@@ -224,9 +224,8 @@ class ControlApiInvCaseHistoryTest {
             assertTrue(CaseTeamObjectEngine.ASKED.isEmpty());
 
             JsonNode cell = ok(c, "{\"key\":\"CELL-0042\",\"investigationId\":\"cells\"}", true);
-            assertTrue(cell.get("resolved").asBoolean(), "a raw key of an uncovered type is looked up as it is");
-            assertEquals(List.of("cell|CELL-0042|all|50"), CaseTeamObjectEngine.ASKED);
-            assertFalse(cell.at("/masking/masked").asBoolean());
+            assertFalse(cell.get("resolved").asBoolean(), "under any masking a raw key is refused, even of an uncovered type");
+            assertTrue(CaseTeamObjectEngine.ASKED.isEmpty());
 
             // msisdn IS covered under typed: the alias resolves again without an Investigation
             assertTrue(ok(c, "{\"key\":\"" + aliasA + "\"}", false).get("resolved").asBoolean());
@@ -265,6 +264,19 @@ class ControlApiInvCaseHistoryTest {
             HttpResponse<String> unknown = send(c, ROUTE, "{\"key\":\"" + aliasA + "\",\"entityType\":\"spaceship\"}");
             assertEquals(422, unknown.statusCode(), unknown.body());
             assertFalse(unknown.body().contains(A));
+        }
+    }
+
+    @Test
+    void aCellInvestigationNeverLetsARawMsisdnBypassTypedMasking(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: typed\n")) {
+            // LA-CASE-HISTORY-RAW-KEY-1: the analyst picks the header type, so "cell" must not unlock a raw msisdn
+            assertEquals(200, send(c, "/inv/investigations", "{\"id\":\"cells\",\"purpose\":\"case history\",\"dataset\":\"calls_ds\","
+                    + "\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"entityType\":\"cell\"}").statusCode());
+            JsonNode d = ok(c, "{\"key\":\"" + A + "\",\"investigationId\":\"cells\"}", false);
+            assertFalse(d.get("resolved").asBoolean(), d.toString());
+            assertEquals(0, d.get("objects").size());
+            assertTrue(CaseTeamObjectEngine.ASKED.isEmpty(), "nothing was looked up");
         }
     }
 

@@ -122,7 +122,7 @@ class ControlApiCaseFromEntitiesTest {
     @Test
     void aMaskedPseudonymIsRefusedAsAnEntityKeyForEveryone(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            for (String id : List.of("masked:0123456789abcdef", "entity:masked:0123456789abcdef", "account:masked:0123456789abcdef")) {
+            for (String id : List.of("masked:0123456789abcdef", "entity:masked:0123456789abcdef", "account:masked:0123456789abcdef", "entity:msisdn:masked:0123456789abcdef")) {
                 for (String who : List.of("manager", "revealer")) {
                     HttpResponse<String> r = post(c.port, "/cases/from-entities",
                             "{\"title\":\"T\",\"entities\":[{\"id\":\"" + id + "\",\"dataset\":\"orders\"}]}", who);
