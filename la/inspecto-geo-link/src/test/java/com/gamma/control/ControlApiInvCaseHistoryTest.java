@@ -269,6 +269,24 @@ class ControlApiInvCaseHistoryTest {
     }
 
     @Test
+    void anExplicitEntityTypeNeverLetsARawKeyBypassTheMasking(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: typed\n")) {
+            // msisdn is masked under typed: naming an unmasked type for a RAW number must not read it in the clear
+            JsonNode plain = ok(c, "{\"key\":\"" + A + "\"}", false);
+            JsonNode asCell = ok(c, "{\"key\":\"" + A + "\",\"entityType\":\"cell\"}", false);
+            assertFalse(asCell.get("resolved").asBoolean(), asCell.toString());
+            assertEquals(plain, asCell, "the explicit type is ignored for a raw key");
+            assertTrue(CaseTeamObjectEngine.ASKED.isEmpty(), "nothing was looked up");
+
+            settings(c, "masking_mode: none\n");
+            JsonNode none = ok(c, "{\"key\":\"" + A + "\",\"entityType\":\"cell\"}", true);
+            assertTrue(none.get("resolved").asBoolean(), "with no masking a raw key is looked up as before");
+            assertEquals("msisdn", none.get("entityType").asText(), "as the default type, not the one named");
+            assertEquals(List.of("msisdn|" + A + "|all|50"), CaseTeamObjectEngine.ASKED);
+        }
+    }
+
+    @Test
     void anInvestigationPseudonymResolvesForAReaderAndANonMemberGets404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
             Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {

@@ -43,7 +43,8 @@ import java.util.regex.Pattern;
  * as asked (any separators), any other token of 5+ digits by {@code [number]} and an email by {@code [email]}; rows carry
  * only an allowlist of fields.
  *
- * <p><b>Entity Type</b> — {@code entityType} when given (one of the Space's Entity Types in force, else 422), else the Investigation's endpoint type (header {@code entityType}, else {@code sourceType}, else
+ * <p><b>Entity Type</b> — for an ALIAS key, {@code entityType} when given (one of the Space's Entity Types in force, else
+ * 422; ignored for a raw key, so a caller cannot pick an unmasked type to read a masked number in the clear), else the Investigation's endpoint type (header {@code entityType}, else {@code sourceType}, else
  * {@code targetType}), else {@value #DEFAULT_TYPE} (the telecom profile's type).
  *
  * <p><b>Keys in</b> — the {@link ReferenceRows} rules: a pseudonym the named Investigation issued, else an exploration
@@ -105,18 +106,13 @@ final class CaseHistory {
             for (String h : List.of("entityType", "sourceType", "targetType"))
                 if (inv.header().get(h) instanceof String t && !t.isBlank()) { type = t; break; }
         }
-        if (asked != null) type = asked;   // the caller's explicit type wins over the Investigation's
         String mode = settings.effectiveMaskingMode();
-        String typeId = type;
-        boolean covered = switch (mode) {
-            case "none" -> false;
-            case "all" -> true;
-            // an Entity Type this Space does not know is treated as masked (fail closed), as EntityMasking does
-            default -> settings.effectiveEntityTypes().stream().filter(t -> t.id().equalsIgnoreCase(typeId)).findFirst()
-                    .map(EntityTypes.EntityType::masked).orElse(true);
-        };
-
         boolean alias = key.startsWith(MaskTokens.TOKEN_PREFIX);
+        // the caller's explicit type steers only how an ALIAS is resolved: for a raw key it would let the caller pick an
+        // unmasked type and look a masked number up in the clear, so a raw key keeps the Investigation's / default type
+        if (alias && asked != null) type = asked;
+        boolean covered = covered(settings, mode, type);
+
         String raw = null;
         if (alias) {
             // an alias resolves only for an Entity Type the masking covers: else the raw id behind it would be searched
@@ -352,6 +348,16 @@ final class CaseHistory {
         } catch (RuntimeException bad) {
             // a Case that cannot be read is not shown
         }
+    }
+
+    /** Whether the Space's masking covers {@code type}; a type this Space does not know is masked (fail closed), as EntityMasking does. */
+    private static boolean covered(LinkAnalysisSettings settings, String mode, String type) {
+        return switch (mode) {
+            case "none" -> false;
+            case "all" -> true;
+            default -> settings.effectiveEntityTypes().stream().filter(t -> t.id().equalsIgnoreCase(type)).findFirst()
+                    .map(EntityTypes.EntityType::masked).orElse(true);
+        };
     }
 
     private static int limit(Object v, int maxLimit) {
