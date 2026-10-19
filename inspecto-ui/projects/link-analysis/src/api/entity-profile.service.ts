@@ -76,14 +76,19 @@ export interface ProfileSentinel {
     share: number;
 }
 
-export interface ProfileVolume extends Assessed {
+/** A profile section the server cut at a limit says `truncated: true`. */
+export interface Truncatable {
+    truncated?: boolean;
+}
+
+export interface ProfileVolume extends Assessed, Truncatable {
     distinct: number;
     approximate: boolean;
     rows: number;
     sentinels: ProfileSentinel[];
 }
 
-export interface ProfileShapes extends Assessed {
+export interface ProfileShapes extends Assessed, Truncatable {
     length: { length: number; rows: number }[];
     prefix: { prefix: string; rows: number }[];
     /** The safe prefix the normaliser declares; 0 = no prefix histogram. */
@@ -97,7 +102,7 @@ export interface DatasetAsOf {
     dataAsOf: string | null;
 }
 
-export interface ProfileTime extends Assessed {
+export interface ProfileTime extends Assessed, Truncatable {
     earliest: string | null;
     latest: string | null;
     perDay: { day: string; rows: number; distinct: number }[];
@@ -123,7 +128,7 @@ export interface DegreeQuantiles {
     max: number;
 }
 
-export interface ProfileLinks extends Assessed {
+export interface ProfileLinks extends Assessed, Truncatable {
     /** `index` = the link index manifest; `dataset` = the fallback Dataset query. */
     from: string | null;
     kinds: { kind: string; edges: number }[];

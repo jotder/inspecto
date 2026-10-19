@@ -57,6 +57,7 @@ describe('entity-profile-view', () => {
         expect(b.map((x) => x.pct)).toEqual([100, 25]);
         expect(b[1].srText).toBe('20 rows, 25 % of the largest item');
         expect(bars([{ label: 'x', rows: 0 }])[0].pct).toBe(0);
+        expect(bars([{ label: 'one', rows: 1 }])[0].srText).toBe('1 row, 100 % of the largest item');
     });
 
     it('lays days out Monday-first by week; a missing day says missing, an unread one is not a zero', () => {
@@ -91,6 +92,7 @@ describe('entity-profile-view', () => {
         ]);
         expect(weeks[0].days[1]!.rows).toBeNull();
         expect(weeks[0].days[1]!.text).toBe('2026-10-06: not read');
+        expect(weeks[0].days[0]!.text).toBe('2026-10-05: 1 row');
     });
 
     it('lists what is not here: no time column, no as-of, unassessed and unreturned sections', () => {

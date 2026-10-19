@@ -74,9 +74,7 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
                 <inspecto-alert variant="error" data-testid="profile-error">{{ e }}</inspecto-alert>
             } @else if (profile(); as p) {
                 @if (p.truncated) {
-                    <inspecto-alert variant="warning" data-testid="truncated"
-                        >A limit was reached: some sections are partial.</inspecto-alert
-                    >
+                    <inspecto-alert variant="warning" data-testid="truncated">{{ truncatedText() }}</inspecto-alert>
                 }
                 <p class="text-secondary m-0 text-xs" data-testid="computed-at">
                     Computed {{ day(p.computedAt) || 'at an unknown time' }}{{ p.cached ? ' (cached)' : '' }}.
@@ -242,9 +240,11 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
                                     [value]="count(p.time!.missingDays.length)"
                                 ></inspecto-stat-tile>
                                 <div class="sm:col-span-2">
-                                    <h2 class="m-0 mb-1 text-sm font-semibold">Rows per day</h2>
+                                    <h2 id="type-rows-per-day" class="m-0 mb-1 text-sm font-semibold">
+                                        Rows and distinct Entities per day
+                                    </h2>
                                     <inspecto-la-day-calendar
-                                        caption="Rows and distinct Entities per day"
+                                        labelledBy="type-rows-per-day"
                                         [weeks]="weeks()"
                                     ></inspecto-la-day-calendar>
                                 </div>
@@ -387,6 +387,19 @@ export class EntityTypeComponent implements OnInit {
     readonly kindBars = computed(() =>
         bars((this.profile()?.links?.kinds ?? []).map((k) => ({ label: k.kind, rows: k.edges }))),
     );
+    /** Names each section the server marked cut by a limit; never a section it did not mark. */
+    readonly truncatedText = computed(() => {
+        const p = this.profile();
+        if (!p) return '';
+        const parts: string[] = [];
+        if (p.volume?.truncated) parts.push('Volume');
+        if (p.shapes?.truncated) parts.push('Shapes');
+        if (p.time?.truncated) parts.push(`Time (newest ${count(p.time.perDay.length)} days read)`);
+        if (p.links?.truncated) parts.push('Links');
+        return parts.length
+            ? `A limit was reached: ${parts.join(', ')} ${parts.length === 1 ? 'is' : 'are'} partial.`
+            : 'A limit was reached: this profile may not have read every Dataset bound to this type.';
+    });
     readonly weeks = computed(() => {
         const t = this.profile()?.time;
         return t ? calendar(t.perDay, t.missingDays) : [];

@@ -40,12 +40,18 @@ export class EntityBarListComponent {
     template: `
         @if (weeks().length) {
             <div class="overflow-x-auto">
-                <table class="border-separate border-spacing-0.5 text-xs" data-testid="calendar">
-                    <caption class="sr-only">
-                        {{
-                            caption()
-                        }}
-                    </caption>
+                <table
+                    class="border-separate border-spacing-0.5 text-xs"
+                    data-testid="calendar"
+                    [attr.aria-labelledby]="labelledBy()"
+                >
+                    @if (!labelledBy()) {
+                        <caption class="sr-only">
+                            {{
+                                caption()
+                            }}
+                        </caption>
+                    }
                     <thead>
                         <tr>
                             <th scope="col"><span class="sr-only">Weekday</span></th>
@@ -88,5 +94,7 @@ export class EntityBarListComponent {
 export class EntityDayCalendarComponent {
     readonly weeks = input.required<CalendarWeek[]>();
     readonly caption = input('Rows per day');
+    /** The id of a visible heading that names the calendar; it then replaces the screen-reader caption. */
+    readonly labelledBy = input<string | null>(null);
     protected readonly rows = computed(() => calendarRows(this.weeks()));
 }

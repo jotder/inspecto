@@ -197,6 +197,35 @@ describe('EntityTypeComponent (Entity Type Profile)', () => {
         expect(cal.querySelector('[data-day="2026-10-09"]')!.textContent).toContain('300 rows, 90 distinct');
     });
 
+    it('names the clipped section(s) in the limit banner, and never a section the server did not mark', () => {
+        const { el } = make({ ...PROFILE, truncated: true, time: { ...PROFILE.time!, truncated: true } });
+        const text = el.querySelector('[data-testid=truncated]')!.textContent!;
+        expect(text).toContain('Time (newest 2 days read) is partial');
+        expect(text).not.toContain('Volume');
+        expect(text).not.toContain('Shapes');
+    });
+
+    it('names Links when only the link-kind list was cut, with no Dataset sentence', () => {
+        const { el } = make({ ...PROFILE, truncated: true, links: { ...PROFILE.links!, truncated: true } });
+        const text = el.querySelector('[data-testid=truncated]')!.textContent!;
+        expect(text).toContain('Links is partial');
+        expect(text).not.toContain('Dataset');
+    });
+
+    it('says the profile may not have read every Dataset only when no section is marked', () => {
+        const { el } = make({ ...PROFILE, truncated: true });
+        expect(el.querySelector('[data-testid=truncated]')!.textContent).toContain('may not have read every Dataset');
+    });
+
+    it('labels the calendar by its one visible heading', () => {
+        const { el } = make(PROFILE);
+        const time = section(el, 'time');
+        const cal = time.querySelector('[data-testid=calendar]')!;
+        expect(cal.querySelector('caption')).toBeNull();
+        const h = time.querySelector('#' + cal.getAttribute('aria-labelledby'))!;
+        expect(h.textContent).toContain('Rows and distinct Entities per day');
+    });
+
     it('says when the normaliser declares no safe prefix', () => {
         const { el } = make({ ...PROFILE, shapes: { ...PROFILE.shapes!, prefixLength: 0, prefix: [] } });
         expect(section(el, 'shapes').querySelector('[data-testid=no-prefix]')).toBeTruthy();

@@ -104,9 +104,9 @@ type Identity = { members: string[] | null; note: string } | null;
                                 absentReason="Not assessed"
                             ></inspecto-stat-tile>
                             <div class="sm:col-span-2">
-                                <h2 class="m-0 mb-1 text-sm font-semibold">Rows per day</h2>
+                                <h2 id="entity-rows-per-day" class="m-0 mb-1 text-sm font-semibold">Rows per day</h2>
                                 <inspecto-la-day-calendar
-                                    caption="Rows per day"
+                                    labelledBy="entity-rows-per-day"
                                     [weeks]="weeks()"
                                 ></inspecto-la-day-calendar>
                             </div>
