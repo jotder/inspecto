@@ -84,7 +84,8 @@
 // ⬇ 49 → 47 on 2026-10-01: the D-4 step 6 `/inv/graph/*` routes ship with an armed-Subject test class (`ControlApiGraphRunTest`).
 // ⬇ 41 → 40 on 2026-10-08: armed tests landed with the module reorganisation (e.g. `ControlApiAlertAckTest` arms the new Alert ack/resolve routes);
 // the guard printed "improved … lower BASELINE_UNCOVERED". Operator-approved in chat.
-const BASELINE_UNCOVERED = 40;
+// ⬇ 40 → 38 on 2026-10-19: the guard printed "improved"; the analyst upload status reads and delete ship armed (`ControlApiAnalystUploadTest`).
+const BASELINE_UNCOVERED = 38;
 
 // Usage:  node tools/check-authgate-coverage.mjs           # report + exit 1 on a ratchet regression
 //         node tools/check-authgate-coverage.mjs --list    # also print every uncovered route

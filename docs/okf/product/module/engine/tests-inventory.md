@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-368 test class(es): 368 unit, 0 real-HTTP control-plane, 0 IT.
+369 test class(es): 369 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -270,6 +270,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ParserPluginTckSelfTest` | `com.gamma.parse.testkit` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/testkit/ParserPluginTckSelfTest.java` | Proves the ParserPlugin TCK can fail (MODULE-REORG-1 P5b): broken in-test parsers must go red, a sound one green. |
 | `BindKindHomeContractTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/BindKindHomeContractTest.java` | The bind-kind contract (AUTHOR-1(b) residual): the Angular editor decides whether to render a |
 | `BuiltinNodeTypeFlatHomeTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/BuiltinNodeTypeFlatHomeTest.java` | NODE-TYPE-MIRRORS-1 (2026-09-15): the flat-config home is declared on the {@link BuiltinNodeType} case, |
+| `CollectorAcceptsUploadLiftLowerTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/CollectorAcceptsUploadLiftLowerTest.java` | LA-I2-GAPS-RESIDUALS-1 (1d): the visual Pipeline editor must keep {@code collector.accepts_upload} on save. If a save dropped |
 | `ComponentRegistryTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/ComponentRegistryTest.java` | {@link ComponentRegistry} (T6): scanning {@code registry/<type>/<name>.toon} into a {@code use:}-resolvable |
 | `ComponentStoreTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/ComponentStoreTest.java` | {@link ComponentStore} (T19): create / replace / delete registry components, jailed + atomic, with the |
 | `ConfigMigratorTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/ConfigMigratorTest.java` | The ELT §6 step-1 one-shot converter behind {@code inspecto migrate-configs}. |

@@ -70,6 +70,7 @@ import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component'
 import { LinkAnalysisReferencesComponent } from './link-analysis-references.component';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
 import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
+import { LinkAnalysisUploadsComponent } from './link-analysis-uploads.component';
 import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
 import { LinkAnalysisMembersComponent } from './link-analysis-members.component';
 import { LinkAnalysisEmbedComponent } from './link-analysis-embed.component';
@@ -116,6 +117,7 @@ export const APPROVAL_POLL_MS = 15_000;
         LinkAnalysisReferencesComponent,
         LinkAnalysisEntityListsComponent,
         LinkAnalysisIdentitiesComponent,
+        LinkAnalysisUploadsComponent,
         LinkAnalysisInvestigationCaseComponent,
         LinkAnalysisMembersComponent,
         LinkAnalysisEmbedComponent,

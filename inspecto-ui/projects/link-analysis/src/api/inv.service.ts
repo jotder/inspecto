@@ -2052,6 +2052,74 @@ export class InvService {
     retractIdentity(seq: number, reason: string): Observable<IdentityRetractResult> {
         return this.http.post<IdentityRetractResult>(apiUrl(`/inv/entity-identities/${seq}/retract`), { reason });
     }
+
+    // ── Analyst CSV upload (LA-ANALYST-UPLOAD-1 + LA-I2-GAPS-RESIDUALS-1). All need `canUploadData`; off the module → 503. ──
+
+    /** The Collectors that opted in with `collector.accepts_upload`: id, Pipeline, the file patterns they pick up, the size cap. */
+    uploadTargets(): Observable<UploadTargets> {
+        return this.http.get<UploadTargets>(apiUrl('/inv/uploads'));
+    }
+
+    /** The caller's own uploads to one Collector (every upload for an administrator), newest first, with ingest state. */
+    listUploads(collector: string): Observable<UploadList> {
+        return this.http.get<UploadList>(apiUrl(`/inv/uploads/${encodeURIComponent(collector)}`));
+    }
+
+    /** → 201. The raw bytes are the body (never re-shaped). 409 = the name is still in the inbox (pass `replace`); 413 over a cap; 422 not a CSV. */
+    uploadCsv(collector: string, file: File, replace = false): Observable<UploadLanded> {
+        return this.http.post<UploadLanded>(apiUrl(`/inv/uploads/${encodeURIComponent(collector)}`), file, {
+            params: toParams({ name: file.name, replace: replace ? 'true' : undefined }),
+            headers: { 'Content-Type': 'text/csv' },
+        });
+    }
+
+    /** Withdraw an upload the Collector has not picked up yet. 409 once it has (its rows stay in the Dataset). */
+    deleteUpload(collector: string, file: string): Observable<{ collector: string; file: string; deleted: boolean }> {
+        return this.http.delete<{ collector: string; file: string; deleted: boolean }>(
+            apiUrl(`/inv/uploads/${encodeURIComponent(collector)}/${encodeURIComponent(file)}`),
+        );
+    }
+}
+
+export interface UploadTarget {
+    collector: string;
+    pipeline: string;
+    /** Include patterns exactly as configured (`glob:` / `regex:` / bare). */
+    includes: string[];
+    maxBytes: number;
+}
+export interface UploadTargets {
+    collectors: UploadTarget[];
+}
+/** `pending` = in the inbox, not yet processed · `ingested` · `quarantined` (the whole file) · `consumed` (left the inbox, no marker). */
+export type UploadState = 'pending' | 'ingested' | 'quarantined' | 'consumed';
+export interface UploadRecord {
+    collector: string;
+    file: string;
+    bytes: number;
+    lines: number;
+    sha256: string;
+    uploader: string;
+    replaced: boolean;
+    landedAt: string;
+    state: UploadState;
+    rejectedRows?: number;
+    quarantineReason?: string;
+}
+export interface UploadList {
+    collector: string;
+    total: number;
+    truncated: boolean;
+    uploads: UploadRecord[];
+}
+export interface UploadLanded {
+    collector: string;
+    pipeline: string;
+    file: string;
+    bytes: number;
+    sha256: string;
+    replaced: boolean;
+    landedAt: string;
 }
 
 function entityListPath(id: string, suffix: string): string {

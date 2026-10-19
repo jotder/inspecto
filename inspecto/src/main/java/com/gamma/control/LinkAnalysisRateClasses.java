@@ -32,6 +32,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/graph/runs"},
             {"POST", "/inv/index/builds"},
             {"POST", "/inv/uploads/([^/]+)"},   // LA-ANALYST-UPLOAD-1: buffers up to upload.max_bytes and writes disk
+            {"GET", "/inv/uploads/([^/]+)"},    // LA-I2-GAPS-RESIDUALS-1: reads up to 200 records and probes the Collector's marker / quarantine dirs for each
             {"POST", "/inv/projection"},
             {"POST", "/inv/reference-rows"},
             {"POST", "/inv/case-history"},
@@ -58,6 +59,8 @@ final class LinkAnalysisRateClasses {
             {"GET", "/inv/schema/relationships"},
             {"GET", "/inv/value-measures"},
             {"POST", "/inv/snapshots"},
+            {"GET", "/inv/uploads"},                       // LA-I2-GAPS-RESIDUALS-1: the upload-enabled Collectors, from config
+            {"DELETE", "/inv/uploads/([^/]+)/([^/]+)"},    // LA-I2-GAPS-RESIDUALS-1: removes one pending file and its record
             {"GET", "/inv/snapshots"},
             {"POST", "/inv/snapshots/attach"},
             {"GET", "/inv/investigations"},

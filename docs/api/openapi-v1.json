@@ -12710,6 +12710,23 @@
         "x-optional-module" : true
       }
     },
+    "/inv/uploads" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "List the Collectors an analyst may upload to",
+        "operationId" : "getInvUploads",
+        "description" : "LA-I2-GAPS-RESIDUALS-1. The Collectors that opted in with collector.accepts_upload (local poll Collectors): collector, pipeline, includes (the file patterns they pick up) and maxBytes (upload.max_bytes). Needs canUploadData.",
+        "responses" : {
+          "200" : {
+            "description" : "Envelope data: collectors[]."
+          },
+          "default" : {
+            "description" : "Error envelope (see #/components/schemas/Envelope)."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/uploads/{collector}" : {
       "post" : {
         "tags" : [ "inv" ],
@@ -12752,6 +12769,61 @@
         "responses" : {
           "201" : {
             "description" : "Landed. Envelope data: collector, pipeline, file, bytes, sha256, replaced, landedAt."
+          },
+          "default" : {
+            "description" : "Error envelope (see #/components/schemas/Envelope)."
+          }
+        },
+        "x-optional-module" : true
+      },
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "List the caller's uploads to a Collector with their ingest state",
+        "operationId" : "getInvUploadsByCollector",
+        "description" : "LA-I2-GAPS-RESIDUALS-1. The caller's own uploads (every upload for canAdminister), newest first, at most 200. Per upload: file, bytes, lines, sha256, uploader, replaced, landedAt, state (pending | ingested | quarantined | consumed), rejectedRows when the Pipeline wrote a reject ledger, quarantineReason when the whole file was quarantined. Metadata only - never a row or a header value. Needs canUploadData. 503 no write root, 404 unknown or non-upload Collector, 429 rate limit.",
+        "parameters" : [ {
+          "name" : "collector",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope data: collector, total, truncated, uploads[]."
+          },
+          "default" : {
+            "description" : "Error envelope (see #/components/schemas/Envelope)."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/uploads/{collector}/{file}" : {
+      "delete" : {
+        "tags" : [ "inv" ],
+        "summary" : "Withdraw an upload the Collector has not picked up yet",
+        "operationId" : "deleteInvUploadsByCollectorByFile",
+        "description" : "LA-I2-GAPS-RESIDUALS-1. Deletes the landed file and its upload record. Needs canUploadData, and the caller must be the uploader or hold canAdminister (403). Refusals: 503 no write root, 404 unknown Collector or no record of that file, 409 the Collector already picked the file up (ingested, quarantined or consumed - its rows stay in the Dataset), 429 rate limit.",
+        "parameters" : [ {
+          "name" : "collector",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "file",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Deleted. Envelope data: collector, file, deleted."
           },
           "default" : {
             "description" : "Error envelope (see #/components/schemas/Envelope)."

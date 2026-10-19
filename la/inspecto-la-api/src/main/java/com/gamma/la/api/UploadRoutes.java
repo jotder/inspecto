@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
@@ -25,11 +26,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * <b>Analyst upload</b> (LA-ANALYST-UPLOAD-1, roadmap D4, {@code docs/superpower/la-analyst-upload-plan.md}):
@@ -66,6 +70,160 @@ public final class UploadRoutes implements RouteModule {
         // ⚠ String LITERAL on purpose (CapabilityManifestTest's scanner).
         api.post("/inv/uploads/([^/]+)", ApiContext.withCapability("canUploadData",
                 (e, m) -> upload(api, e, ApiContext.name(m))));
+        // LA-I2-GAPS-RESIDUALS-1: the status reads and the uploader's own delete (same capability; own rows only unless canAdminister).
+        api.get("/inv/uploads", ApiContext.withCapability("canUploadData", (e, m) -> targets(api)));
+        api.get("/inv/uploads/([^/]+)", ApiContext.withCapability("canUploadData",
+                (e, m) -> list(api, e, ApiContext.name(m))));
+        api.delete("/inv/uploads/([^/]+)/([^/]+)", ApiContext.withCapability("canUploadData",
+                (e, m) -> delete(api, e, ApiContext.name(m), ApiContext.param(m, 2))));
+    }
+
+    /** Upload records older than this are pruned (metadata only; the landed file follows the Collector's own retention). */
+    static final int RECORD_RETENTION_DAYS = 90;
+    private static final int MAX_LISTED = 200;
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private static Path recordDir(Path root, String collector) {
+        return root.resolve("audit").resolve("la-uploads").resolve("records").resolve(collector.replaceAll("[^A-Za-z0-9._-]", "_"));
+    }
+
+    /** Whether the caller may act on every upload (Space administrator, or no Subject at all as on Personal). */
+    private static boolean isAdmin(HttpExchange ex) {
+        return ApiContext.subject(ex).map(s -> s.capabilities().contains("canAdminister")).orElse(true);
+    }
+
+    /** {@code GET /inv/uploads} - the Collectors an analyst may upload to (id, Pipeline, accepted file patterns, the size cap). */
+    private Object targets(ApiContext api) {
+        long max = api.writeRoot() == null ? LaLimit.UPLOAD_MAX_BYTES.defaultValue().longValue() : SpaceLimits.of(api.writeRoot()).get(LaLimit.UPLOAD_MAX_BYTES);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (UploadLandingPort.Target t : UploadLandingPorts.active().map(p -> p.targets(api)).orElse(List.of())) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("collector", t.collector());
+            r.put("pipeline", t.pipeline());
+            r.put("includes", t.includes());
+            r.put("maxBytes", max);
+            rows.add(r);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("collectors", rows);
+        return out;
+    }
+
+    /** {@code GET /inv/uploads/{collector}} - the caller's own uploads (every upload for canAdminister), newest first, with ingest state. */
+    private Object list(ApiContext api, HttpExchange ex, String collector) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "analyst upload status");
+        UploadLandingPort port = UploadLandingPorts.active().orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND,
+                "no Collector '" + collector + "' accepts uploads"));
+        UploadLandingPort.Target target = port.target(api, collector).orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND,
+                "no Collector '" + collector + "' accepts uploads"));
+        boolean admin = isAdmin(ex);
+        String me = ApiContext.actor(ex);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        Path dir = recordDir(root, target.collector());
+        if (Files.isDirectory(dir)) {
+            try (Stream<Path> s = Files.list(dir)) {
+                for (Path p : s.filter(f -> f.getFileName().toString().endsWith(".json")).toList()) {
+                    Map<String, Object> rec = readRecord(p);
+                    if (rec == null) continue;
+                    if (!admin && !String.valueOf(me).equals(rec.get("uploader"))) continue;
+                    UploadLandingPort.Ingest in = port.ingest(api, target, String.valueOf(rec.get("file")));
+                    rec.put("state", in.state());
+                    if (in.rejectedRows() != null) rec.put("rejectedRows", in.rejectedRows());
+                    if (in.reason() != null) rec.put("quarantineReason", in.reason());
+                    rows.add(rec);
+                }
+            }
+        }
+        rows.sort((a, b) -> String.valueOf(b.get("landedAt")).compareTo(String.valueOf(a.get("landedAt"))));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("collector", target.collector());
+        out.put("total", rows.size());
+        out.put("truncated", rows.size() > MAX_LISTED);
+        out.put("uploads", rows.size() > MAX_LISTED ? rows.subList(0, MAX_LISTED) : rows);
+        return out;
+    }
+
+    /**
+     * {@code DELETE /inv/uploads/{collector}/{file}} - withdraw an upload the Collector has not picked up yet. Gates, in order:
+     * capability 401/403 → write root 503 → Collector 404 → no record of that file 404 → not the uploader and not canAdminister
+     * 403 → the Collector already picked it up (ingested, quarantined or consumed) 409: its rows are in the Dataset and this
+     * route never removes them → delete the inbox file and the record, audit {@code deleted}.
+     */
+    private Object delete(ApiContext api, HttpExchange ex, String collector, String file) throws IOException {
+        String[] seen = new String[]{file.length() > 120 ? file.substring(0, 120) : file, null};
+        GATE.remove();
+        try {
+            return withdraw(api, ex, collector, file, seen);
+        } catch (ApiException refused) {
+            emit(ex, "la.upload.delete", collector, seen[0], -1, seen[1], "refused", GATE.get() == null ? "write-root" : GATE.get());
+            throw refused;
+        } finally {
+            GATE.remove();
+        }
+    }
+
+    private Object withdraw(ApiContext api, HttpExchange ex, String collector, String file, String[] seen) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "analyst upload delete");
+        UploadLandingPort port = UploadLandingPorts.active().orElseThrow(() -> refuse("collector", 404, ErrorCodes.NOT_FOUND,
+                "no Collector '" + collector + "' accepts uploads"));
+        UploadLandingPort.Target target = port.target(api, collector).orElseThrow(() -> refuse("collector", 404, ErrorCodes.NOT_FOUND,
+                "no Collector '" + collector + "' accepts uploads"));
+        if (!SAFE_NAME.matcher(file).matches())
+            throw refuse("record", 404, ErrorCodes.NOT_FOUND, "no upload '" + file + "' for Collector '" + collector + "'");
+        Path recordFile = recordDir(root, target.collector()).resolve(file + ".json");
+        Map<String, Object> rec = Files.isRegularFile(recordFile) ? readRecord(recordFile) : null;
+        if (rec == null) throw refuse("record", 404, ErrorCodes.NOT_FOUND, "no upload '" + file + "' for Collector '" + collector + "'");
+        seen[1] = String.valueOf(rec.get("sha256"));
+        if (!isAdmin(ex) && !String.valueOf(ApiContext.actor(ex)).equals(rec.get("uploader")))
+            throw refuse("owner", 403, ErrorCodes.PERMISSION_DENIED, "only the analyst who uploaded '" + file + "' or an administrator may delete it");
+        UploadLandingPort.Ingest in = port.ingest(api, target, file);
+        Path inFile = target.inbox().resolve(file).normalize();
+        if (!"pending".equals(in.state()) || !target.inbox().equals(inFile.getParent()))
+            throw refuse("picked-up", 409, ErrorCodes.CONFLICT, "'" + file + "' is already " + in.state()
+                    + ": the Collector has picked it up, and its rows stay in the Dataset - this route only withdraws a file not yet ingested");
+        if (!Files.deleteIfExists(inFile))
+            throw refuse("picked-up", 409, ErrorCodes.CONFLICT, "'" + file + "' left the inbox while it was being deleted");
+        Files.deleteIfExists(recordFile);
+        emit(ex, "la.upload.delete", collector, file, ((Number) rec.getOrDefault("bytes", -1)).longValue(), seen[1], "deleted", null);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("collector", target.collector());
+        out.put("file", file);
+        out.put("deleted", true);
+        return ApiContext.respondJson(ex, 200, out);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> readRecord(Path p) {
+        try {
+            return JSON.readValue(Files.readAllBytes(p), LinkedHashMap.class);
+        } catch (IOException | RuntimeException unreadable) {
+            return null;
+        }
+    }
+
+    /** Best-effort: write the record of a landed upload and prune records past {@link #RECORD_RETENTION_DAYS}. */
+    private static void record(Path root, UploadLandingPort.Target target, String file, long bytes, long lines, String sha256,
+                               String uploader, boolean replaced, String landedAt) {
+        try {
+            Path dir = recordDir(root, target.collector());
+            Map<String, Object> rec = new LinkedHashMap<>();
+            rec.put("collector", target.collector());
+            rec.put("file", file);
+            rec.put("bytes", bytes);
+            rec.put("lines", lines);
+            rec.put("sha256", sha256);
+            rec.put("uploader", uploader);
+            rec.put("replaced", replaced);
+            rec.put("landedAt", landedAt);
+            AtomicFiles.write(dir.resolve(file + ".json"), JSON.writeValueAsBytes(rec), ".rec-");
+            Instant cutoff = Instant.now().minus(java.time.Duration.ofDays(RECORD_RETENTION_DAYS));
+            try (Stream<Path> s = Files.list(dir)) {
+                for (Path p : s.toList())
+                    if (Files.getLastModifiedTime(p).toInstant().isBefore(cutoff)) Files.deleteIfExists(p);
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // the file landed; a record that cannot be written only hides it from the status list
+        }
     }
 
     private static final ThreadLocal<String> GATE = new ThreadLocal<>();
@@ -168,7 +326,9 @@ public final class UploadRoutes implements RouteModule {
         out.put("bytes", bytes.length);
         out.put("sha256", seen[1]);
         out.put("replaced", existed);
-        out.put("landedAt", Instant.now().toString());
+        String landedAt = Instant.now().toString();
+        out.put("landedAt", landedAt);
+        record(root, target, name, bytes.length, lines(bytes), seen[1], ApiContext.actor(ex), existed, landedAt);
         emit(ex, collector, name, bytes.length, seen[1], existed ? "replaced" : "landed", null);
         return ApiContext.respondJson(ex, 201, out);
     }
@@ -205,11 +365,16 @@ public final class UploadRoutes implements RouteModule {
 
     /** Best-effort audit, one per attempt. Metadata only: never a row, a header or a column name. */
     private static void emit(HttpExchange ex, String collector, String file, long bytes, String sha256, String outcome, String gate) {
+        emit(ex, "la.upload", collector, file, bytes, sha256, outcome, gate);
+    }
+
+    private static void emit(HttpExchange ex, String action, String collector, String file, long bytes, String sha256,
+                             String outcome, String gate) {
         try {
             Event.Builder b = Event.builder(EventType.LA_UPLOAD).source("inv")
-                    .message("la.upload - " + outcome + (gate == null ? "" : " at " + gate))
+                    .message(action + " - " + outcome + (gate == null ? "" : " at " + gate))
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
-                    .action("la.upload").actionCategory("analysis")
+                    .action(action).actionCategory("analysis")
                     .attr("collector", collector).attr("outcome", outcome);
             if (file != null) b.attr("file", file);
             if (bytes >= 0) b.attr("bytes", bytes);

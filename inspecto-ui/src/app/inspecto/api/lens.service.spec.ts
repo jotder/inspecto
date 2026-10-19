@@ -147,6 +147,20 @@ describe('LensService', () => {
         expect(service.canRunLinkGraphAnalysis()).toBe(true);
     });
 
+    // LA-ANALYST-UPLOAD-1 D-UP3: landing a CSV is its own grant (not implied by canManageIncidents) and an identity capability.
+    it('canUploadData is granted only to a subject holding it, and survives the business lens', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        service.selectLens('business');
+
+        session.capabilities.set(['canAdminister', 'canManageIncidents']);
+        expect(service.canUploadData()).toBe(false);
+
+        session.capabilities.set(['canUploadData']);
+        expect(service.canUploadData()).toBe(true);
+    });
+
     // Off-OIDC there is no identity to justify the exemption — granted() is true for everyone — so the
     // lens stays the only signal and the Business "View as" preview keeps hiding authoring affordances.
     it('identity capabilities are still lens-suppressed in honor-system mode', () => {

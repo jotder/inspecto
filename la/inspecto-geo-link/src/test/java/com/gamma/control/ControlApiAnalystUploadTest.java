@@ -51,6 +51,8 @@ class ControlApiAnalystUploadTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String UPLOADER = "Bearer uploader";
     private static final String ANALYST = "Bearer analyst";      // canManageIncidents but NOT canUploadData
+    private static final String UPLOADER2 = "Bearer uploader2";  // canUploadData, a different analyst
+    private static final String ADMIN = "Bearer admin";          // canUploadData + canAdminister
     private static final String VIEWER = "Bearer viewer";
     private static final String CSV = "MSISDN,IMSI,EVENT_DATE\n+447700900001,234101,2026-10-01\n+447700900002,234102,2026-10-01\n";
     private final HttpClient client = HttpClient.newHttpClient();
@@ -66,6 +68,8 @@ class ControlApiAnalystUploadTest {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case UPLOADER -> Optional.of(new Subject("uploader-1", Set.of("canUploadData", "canManageIncidents")));
             case ANALYST -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents")));
+            case UPLOADER2 -> Optional.of(new Subject("uploader-2", Set.of("canUploadData")));
+            case ADMIN -> Optional.of(new Subject("admin-1", Set.of("canUploadData", "canAdminister")));
             case VIEWER -> Optional.of(new Subject("viewer-1", Set.of()));
             default -> Optional.empty();
         });
@@ -199,6 +203,144 @@ class ControlApiAnalystUploadTest {
 
     private static String sha256(byte[] b) throws Exception {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));
+    }
+
+    private HttpResponse<String> call(Ctx c, String method, String path, String auth) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
+                .method(method, BodyPublishers.noBody());
+        if (auth != null) b.header("Authorization", auth);
+        return client.send(b.build(), BodyHandlers.ofString());
+    }
+
+    private JsonNode uploadsOf(Ctx c, String auth) throws Exception {
+        HttpResponse<String> r = call(c, "GET", "/inv/uploads/up_feed", auth);
+        status(200, r, "status read");
+        return JSON.readTree(r.body()).get("data").get("uploads");
+    }
+
+    @Test
+    void uploadEnabledCollectorsListIsGatedAndOnlyNamesOptedInCollectors(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            status(401, call(c, "GET", "/inv/uploads", null), "no credential");
+            status(403, call(c, "GET", "/inv/uploads", VIEWER), "no capability");
+            status(403, call(c, "GET", "/inv/uploads", ANALYST), "canManageIncidents is not canUploadData");
+            HttpResponse<String> r = call(c, "GET", "/inv/uploads", UPLOADER);
+            status(200, r, "armed");
+            JsonNode rows = JSON.readTree(r.body()).get("data").get("collectors");
+            assertEquals(1, rows.size(), r.body());
+            assertEquals("up_feed", rows.get(0).get("collector").asText());
+            assertTrue(rows.get(0).get("includes").toString().contains("UPL_*.csv"));
+            assertTrue(rows.get(0).get("maxBytes").asLong() > 0);
+            assertFalse(r.body().contains(c.inbox().toString().replace("\\", "\\\\")), "no filesystem path leaks");
+        }
+        try (Ctx c = open(cfg, root, false)) {
+            assertEquals(0, JSON.readTree(call(c, "GET", "/inv/uploads", UPLOADER).body()).get("data").get("collectors").size());
+        }
+    }
+
+    @Test
+    void statusReadGatesAndShowsOnlyTheCallersOwnUploadsUnlessAdministrator(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            status(401, call(c, "GET", "/inv/uploads/up_feed", null), "no credential");
+            status(403, call(c, "GET", "/inv/uploads/up_feed", VIEWER), "no capability");
+            status(403, call(c, "GET", "/inv/uploads/up_feed", ANALYST), "canManageIncidents is not canUploadData");
+            status(404, call(c, "GET", "/inv/uploads/mini_etl", UPLOADER), "a Collector that did not opt in");
+            status(404, call(c, "GET", "/inv/uploads/NOPE", UPLOADER), "unknown Collector");
+            assertEquals(0, uploadsOf(c, UPLOADER).size(), "nothing uploaded yet");
+
+            byte[] b = CSV.getBytes(StandardCharsets.UTF_8);
+            status(201, up(c, "UPL_1.csv", b), "landed");
+            JsonNode mine = uploadsOf(c, UPLOADER);
+            assertEquals(1, mine.size());
+            assertEquals("UPL_1.csv", mine.get(0).get("file").asText());
+            assertEquals("pending", mine.get(0).get("state").asText(), "not picked up yet");
+            assertEquals(b.length, mine.get(0).get("bytes").asInt());
+            assertEquals(sha256(b), mine.get(0).get("sha256").asText());
+            assertEquals(3, mine.get(0).get("lines").asInt());
+            assertEquals(0, uploadsOf(c, UPLOADER2).size(), "another analyst does not see it");
+            assertEquals(1, uploadsOf(c, ADMIN).size(), "canAdminister sees every upload");
+            assertFalse(call(c, "GET", "/inv/uploads/up_feed", UPLOADER).body().contains("7700900001"), "metadata only, never a row");
+        }
+    }
+
+    @Test
+    void statusReadIs503WithoutAWriteRoot(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null, true)) {
+            status(503, call(c, "GET", "/inv/uploads/up_feed", UPLOADER), "write root unset");
+            status(503, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER), "write root unset");
+        }
+    }
+
+    @Test
+    void deleteWithdrawsAPendingUploadForItsUploaderOrAnAdministratorAndIsAudited(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            byte[] b = CSV.getBytes(StandardCharsets.UTF_8);
+            status(201, up(c, "UPL_1.csv", b), "landed");
+            status(401, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", null), "no credential");
+            status(403, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", VIEWER), "no capability");
+            status(403, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", ANALYST), "canManageIncidents is not canUploadData");
+            HttpResponse<String> other = call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER2);
+            status(403, other, "another analyst without canAdminister");
+            assertEquals(List.of("UPL_1.csv"), inboxFiles(c), "a refused delete removed nothing");
+            status(404, call(c, "DELETE", "/inv/uploads/NOPE/UPL_1.csv", UPLOADER), "unknown Collector");
+            status(404, call(c, "DELETE", "/inv/uploads/mini_etl/UPL_1.csv", UPLOADER), "a Collector that did not opt in");
+            status(404, call(c, "DELETE", "/inv/uploads/up_feed/UPL_9.csv", UPLOADER), "no record of that file");
+            status(404, call(c, "DELETE", "/inv/uploads/up_feed/..%2FUPL_1.csv", UPLOADER), "a path-shaped name is never a record");
+
+            List<Event> seen = new CopyOnWriteArrayList<>();
+            Consumer<Event> sub = seen::add;
+            EventLog.current().addSubscriber(sub);
+            try {
+                HttpResponse<String> ok = call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER);
+                status(200, ok, "the uploader deletes their own pending file");
+                assertTrue(JSON.readTree(ok.body()).get("data").get("deleted").asBoolean());
+            } finally {
+                EventLog.current().removeSubscriber(sub);
+            }
+            assertEquals(List.of(), inboxFiles(c), "the file left the inbox");
+            assertEquals(0, uploadsOf(c, UPLOADER).size(), "and its record");
+            List<Event> mine = seen.stream().filter(e -> EventType.LA_UPLOAD.equals(e.type())).toList();
+            assertEquals(1, mine.size(), mine.toString());
+            assertTrue(mine.get(0).toString().contains("la.upload.delete"), mine.toString());
+            assertEquals("deleted", mine.get(0).attributes().get("outcome"));
+            assertEquals(sha256(b), mine.get(0).attributes().get("sha256"));
+            status(404, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER), "already gone");
+
+            status(201, up(c, "UPL_2.csv", b), "landed again");
+            status(200, call(c, "DELETE", "/inv/uploads/up_feed/UPL_2.csv", ADMIN), "canAdminister may delete another's upload");
+            assertEquals(List.of(), inboxFiles(c));
+        }
+    }
+
+    @Test
+    void anUploadTheCollectorHasIngestedIsIngestedNotPendingAndCannotBeDeleted(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String store = "upl_del_" + System.nanoTime();
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        try (Ctx c = open(cfg, root, true, store)) {
+            status(201, up(c, "UPL_20261001.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            c.svc().runPipeline("up_feed");
+            JsonNode row = uploadsOf(c, UPLOADER).get(0);
+            assertEquals("ingested", row.get("state").asText(), row.toString());
+            HttpResponse<String> del = call(c, "DELETE", "/inv/uploads/up_feed/UPL_20261001.csv", UPLOADER);
+            status(409, del, "the Collector already picked it up");
+            assertTrue(del.body().contains("stay in the Dataset"), del.body());
+            assertEquals(1, uploadsOf(c, UPLOADER).size(), "the record stays");
+        } finally {
+            try (Stream<Path> w = Files.exists(Path.of("database").resolve(store)) ? Files.walk(Path.of("database").resolve(store)) : Stream.<Path>empty()) {
+                w.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
+    @Test
+    void theStatusReadIsRateClassed429(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("control.rateLimit.linkAnalysis.capacity", "1");
+        System.setProperty("control.rateLimit.linkAnalysis.refillPerSecond", "0.001");
+        try (Ctx c = open(cfg, root, true)) {
+            assertTrue(call(c, "GET", "/inv/uploads/up_feed", UPLOADER).statusCode() != 429);
+            status(429, call(c, "GET", "/inv/uploads/up_feed", UPLOADER), "the one-token bucket is spent");
+        }
     }
 
     @Test

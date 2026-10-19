@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-87 route(s) registered; 87 in the OpenAPI contract, 0 not.
+90 route(s) registered; 90 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -99,7 +99,10 @@ tags: [api, routes, generated]
 | POST | `/inv/snapshots` | POST /inv/snapshots (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/snapshots/attach` | POST /inv/snapshots/attach (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/traversal/recursive-paths` | Simple paths from a start node, walked server-side (from the edge index when it can answer exactly) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
+| GET | `/inv/uploads` | List the Collectors an analyst may upload to | inv | `canUploadData` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/UploadRoutes.java` |
+| GET | `/inv/uploads/{collector}` | List the caller's uploads to a Collector with their ingest state | inv | `canUploadData` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/UploadRoutes.java` |
 | POST | `/inv/uploads/{collector}` | Land an analyst CSV in an upload-enabled Collector's inbox | inv | `canUploadData` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/UploadRoutes.java` |
+| DELETE | `/inv/uploads/{collector}/{file}` | Withdraw an upload the Collector has not picked up yet | inv | `canUploadData` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/UploadRoutes.java` |
 | GET | `/inv/value-measures` | GET /inv/value-measures (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/ValueMeasureRoutes.java` |
 | GET | `/public/investigations/{token}` | Read-only embedded view of one Investigation (public; the token is the credential) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PublicInvestigationRoutes.java` |
 

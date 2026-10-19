@@ -247,6 +247,12 @@ export class LensService {
      *  backend-only gate), so `allows` answers true for the node id. */
     readonly canBuildLinkIndex = computed(() => this.identityCapability('canBuildLinkIndex', 'linkgraph.build-index'));
 
+    /** May land a CSV in an upload-enabled Collector's inbox, list their own uploads and delete one not yet ingested
+     *  (`/inv/uploads*`, LA-ANALYST-UPLOAD-1 D-UP3). RBAC: Operations, Support, Power, Admin, Super (the roles holding
+     *  `canBuildLinkIndex`). {@link identityCapability}, like {@link canBuildLinkIndex}: no Access-Catalog node carries it
+     *  (a backend-only gate), so `allows` answers true for the node id. */
+    readonly canUploadData = computed(() => this.identityCapability('canUploadData', 'linkgraph.upload-data'));
+
     /** May approve / deny a held sensitive Investigation expand (D-U7, `POST /inv/investigations/{id}/pending/{rid}/
      *  approve | deny`). {@link identityCapability}, as {@link canRunLinkGraphAnalysis} is. The server adds
      *  four-eyes (the requester cannot decide their own request) — this only decides whether the buttons show. No Access-Catalog action node carries it yet

@@ -2231,6 +2231,18 @@ The SPA half of the inbound deep link; the wire contract and the server rules ar
 
 The decisions behind these (D-M1 stands; D-UP1…D-UP8 with the `canUploadData` capability; heroicons glyphs with no pack field; *Search around* inside the toolbox Pattern section) were **decided under operator delegation, recorded 2026-10-18** (`LA-I2-GAPS-RESIDUALS-1` tracks what is left). The canvas-styling, visual-query and entity-merge plans are archived in `docs/archived-documents/plans-archive/`; what they deferred is retired to `BACKLOG.md` §6 with a reopen trigger. The analyst-upload plan stays active (`docs/superpower/la-analyst-upload-plan.md`).
 
+### Upload a CSV (analyst upload pane, as built 2026-10-19)
+
+The Investigation tab has an **Upload a CSV** section under *Identity resolution*, shown only to a user with the upload capability (`canUploadData`: operations, support, power, admin) on a build that includes the link-analysis module.
+
+1. Choose a **Collector**. Only a local Collector whose Pipeline says *Accepts analyst upload* (`collector.accepts_upload: true`) is listed; a single one is preselected. The section shows the file-name patterns it picks up and the size limit. With none enabled it says so and what to ask a Space administrator for.
+2. **Choose a CSV file** and press **Upload**. The browser checks the three things it can see (a `.csv` extension, a plain file name, the size cap) and says why in words; a workbook (`.xlsx`) is refused with "export the sheet as CSV (UTF-8)". The server checks the rest (pattern, content, daily quota, the four-eyes row budget).
+3. The file only **lands**: the Collector's own Pipeline ingests it on its next poll, so the Dataset it fills appears afterwards (then use it for identity import or the index as before).
+4. **Your uploads** lists what you uploaded to that Collector, newest first, with its ingest state: *Waiting for the Collector*, *Ingested* (with "N rows rejected" when the Pipeline wrote a reject ledger), *Quarantined (reason)*, or *Picked up*. A Space administrator sees every analyst's uploads. Press the refresh icon to re-read.
+5. **Delete** is offered while a file is still waiting; once the Collector has picked it up the rows are in the Dataset and the route refuses (409). Uploading a name that is still waiting answers "still waiting in the inbox" and offers **Replace the waiting file**; it is never the default.
+
+Refusals read as a cause plus a next step (DR-D6 conventions): 413 names the limit and says to split the file or ask an administrator, 429 says to wait a few seconds, 403 on a delete says you can only delete your own. Retention: the landed file follows the Collector's own post-ingest retention; the upload records behind the list are kept 90 days. Components: `LinkAnalysisUploadsComponent` (`link-analysis-uploads.component.ts`), words and checks in `upload-state.ts`, the four calls in `InvService`. The visual Pipeline editor keeps `collector.accepts_upload` when it saves (pinned by `CollectorAcceptsUploadLiftLowerTest`). Not yet driven live over HTTP in a browser: that is `LA-I2-GAPS-RESIDUALS-1` item 2.
+
 ### Industry-pack relabels on the legend and pattern picker
 
 - The canvas legend (`inspecto-link-analysis-legend` in `link-analysis-overlays.component.ts`, used by the studio and the saved-view widget) draws the active pack's `link_kind.<kind>` on link-kind chips and `entity_type.<kind>` on node rows; the pattern picker (`link-analysis-toolbox.component`: `packOptions()`, `packDescription()`) draws `pattern.<pack id>` as the option label, and the term's `definition`, when stated, replaces the pack description.
