@@ -49,7 +49,7 @@ import java.util.regex.Pattern;
  *
  * <p><b>Keys in</b> — the {@link ReferenceRows} rules: a pseudonym the named Investigation issued, else an exploration
  * alias, and only when the masking covers the Entity Type (mode {@code all}, or {@code typed} with a masked type); a raw
- * key only when that masking does NOT cover it and the Investigation does not hide it.
+ * key only under masking mode {@code none} and when the Investigation does not hide it.
  *
  * <p><b>Gates, fail closed in order:</b> write root unset 503 · Case management not installed 503 · malformed body 422 ·
  * {@code investigationId} given: the Investigation read gate (404 absent or not a reader, 403 a member refused) · an
@@ -121,7 +121,9 @@ final class CaseHistory {
                 if (invMask != null) raw = invMask.reveal(key);
                 if (raw == null) raw = ExplorationMasking.lookup(writeRoot, key);
             }
-        } else if (!covered && !(invMask != null && invMask.hidesRaw(key))) {
+        } else if ("none".equals(mode) && !(invMask != null && invMask.hidesRaw(key))) {
+            // any masking at all refuses a raw key: an Investigation's header type is the caller's to choose, so an
+            // "uncovered" type would read a masked number in the clear (LA-CASE-HISTORY-RAW-KEY-1)
             raw = key;
         }
 
