@@ -36,8 +36,8 @@ test('a leaf change tests only the leaf, with an upstream install first', () => 
     const p = run(['features/ops/src/main/java/A.java']);
     assert.equal(p.mode, 'affected');
     assert.deepEqual(p.testModules, ['ops']);
-    assert.match(p.commands[0], /-DskipTests .*-pl :ops -am$/);
-    assert.match(p.commands[1], /test .*-pl :ops$/);
+    assert.match(p.commands[0], /-DskipTests .*-pl :ops -am && /);
+    assert.match(p.commands[0], /&& mvn -B test .*-pl :ops$/);
 });
 
 test('a shared-module change tests every dependent (never only -am)', () => {

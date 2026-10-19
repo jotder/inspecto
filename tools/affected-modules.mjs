@@ -122,7 +122,9 @@ export function decide({ mods, changed, consumers, forceFull = false, pomChanged
     const commands = mode === 'full'
         ? ['mvn -B install -Pedition-advanced']
         : mode === 'affected'
-            ? [`mvn -B install -DskipTests -Pedition-advanced -pl ${pl} -am`, `mvn -B test -Pedition-advanced -pl ${pl}`]
+            // ONE chained command: if the upstream install fails, the test step must NOT run — it would resolve
+            // stale sibling jars from ~/.m2 and report false failures (or false passes). Observed 2026-10-19.
+            ? [`mvn -B install -DskipTests -Pedition-advanced -pl ${pl} -am && mvn -B test -Pedition-advanced -pl ${pl}`]
             : [];
     return { mode, reasons, changedModules: [...start].sort(), testModules: mode === 'full' ? real.map((m) => m.artifactId).sort() : [...closure].sort(),
         reactorSize: real.length, ui, package: pkg, notes: [...notes].sort(), commands };

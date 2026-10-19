@@ -38,7 +38,7 @@ It prints a **mode** and the exact commands:
 | Mode | When | What runs |
 |---|---|---|
 | `none` | only docs, product map, offerings, `.claude/`, node tools, Space content no test reads | the node guards (`ci.yml` `guards` job, or locally) |
-| `affected` | module sources changed | **1)** `mvn install -DskipTests -Pedition-advanced -pl <set> -am` (upstream compiled + installed, no tests; test-jars still built) **2)** `mvn test -Pedition-advanced -pl <set>` |
+| `affected` | module sources changed | `mvn install -DskipTests -Pedition-advanced -pl <set> -am && mvn test -Pedition-advanced -pl <set>` — upstream compiled + installed without tests (test-jars still built), then the set tested; ⛔ chained: if the install fails the tests must not run (they would resolve stale sibling jars from ~/.m2) |
 | `full` | root/aggregator/module `pom.xml` or `.mvn/` changed beyond comments · an unclassified path (fail-safe) · the set is >70% of the reactor · `--full` | `mvn install -Pedition-advanced` (+ `-Pcoverage` in CI) |
 
 **The test set** = changed modules **+ every module that depends on them, transitively** (read from the poms,
