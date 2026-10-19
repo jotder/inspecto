@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Events & Activity](user-guide-events.md) |
 | admin-guide | missing | |
 | api | current | [Events and event log — API](api-events.md) |
-| tests | missing | |
+| tests | current | [Event model and log — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

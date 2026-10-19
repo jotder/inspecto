@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-47 test file(s). Run one, or all:
+48 test file(s). Run one, or all:
 
 ```bash
 node --test tools/check-bundle-spaces.test.mjs
@@ -55,6 +55,7 @@ node --test tools/
 | `tools/offering-classpath.test.mjs` | Fixture test for tools/offering-classpath.mjs. Run: node --test tools/offering-classpath.test.mjs |
 | `tools/product-map-import.test.mjs` | Fixture test for tools/product-map-import.mjs. Run: node --test tools/product-map-import.test.mjs |
 | `tools/regroup-modules.test.mjs` | Fixture-based tests for tools/regroup-modules.mjs: a tiny synthetic git repo in a temp dir, never the real tree. |
+| `tools/render-api-routes.test.mjs` |  |
 | `tools/render-feature-db.test.mjs` | Fixture test for tools/render-feature-db.mjs. Run: node --test tools/render-feature-db.test.mjs |
 | `tools/render-offerings-matrix.test.mjs` | Fixture test for tools/render-offerings-matrix.mjs. Run: node --test tools/render-offerings-matrix.test.mjs |
 | `tools/render-product-map.test.mjs` | Fixture test for tools/render-product-map.mjs. Run: node --test tools/render-product-map.test.mjs |

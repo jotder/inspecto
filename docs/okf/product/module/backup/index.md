@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Backup and restore — features](features.md) |
 | feature-db | missing | |
 | user-guide | missing | |
 | admin-guide | current | [Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)](admin-guide-backup-restore.md) |
 | api | missing | |
-| tests | missing | |
+| tests | current | [Backup and restore — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

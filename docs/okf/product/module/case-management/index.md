@@ -22,8 +22,8 @@ tags: [product-item, module]
 | feature-db | current | [Case Management — feature database](feature-db.md) |
 | user-guide | current | [Case Management — screens](user-guide-case-management.md) |
 | admin-guide | missing | |
-| api | current | [Case Management — API](api-case-management.md) |
-| tests | missing | |
+| api | current | [Case Management — API](api-case-management.md) · [HTTP routes — module.case-management](api-routes.md) |
+| tests | current | [Case Management — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

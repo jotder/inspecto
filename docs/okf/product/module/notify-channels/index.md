@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Notifications — screens](user-guide-notifications.md) |
 | admin-guide | missing | |
 | api | current | [Notifications — API](api-notifications.md) |
-| tests | missing | |
+| tests | current | [Notification channels — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

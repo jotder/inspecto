@@ -18,7 +18,7 @@ tags: [product-item, module]
 | plan | current | [API stability policy](plan-api-stability.md) |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Public API annotations — features](features.md) |
 | feature-db | missing | |
 | user-guide | missing | |
 | admin-guide | missing | |

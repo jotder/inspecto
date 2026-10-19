@@ -18,7 +18,7 @@ tags: [product-item, addon]
 | plan | missing | |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Case Management — features](features.md) |
 | feature-db | current | [Case Management — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |

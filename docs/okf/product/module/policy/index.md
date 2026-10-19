@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Attribute-based access policy — features](features.md) |
 | feature-db | missing | |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |
-| tests | missing | |
+| tests | current | [Attribute-based access policy — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | current | [Inspecto as the feeder — warehouse and lake targets](plan-warehouse-targets.md) |
 | spec | current | [Collector Connectors](spec-connectors.md) |
 | architecture | current | [Connectors Module (providers/inspecto-connectors/)](architecture.md) |
-| features | missing | |
+| features | current | [Collector and export connectors — features](features.md) |
 | feature-db | missing | |
 | user-guide | current | [Connections](user-guide-connections.md) |
 | admin-guide | current | [Remote connectors — operator runbook](admin-guide-connectors-runbook.md) |
 | api | missing | |
-| tests | missing | |
+| tests | current | [Collector and export connectors — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

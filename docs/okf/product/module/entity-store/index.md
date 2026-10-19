@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Storage — screens](user-guide-storage.md) |
 | admin-guide | missing | |
 | api | current | [Storage — API](api-storage.md) |
-| tests | missing | |
+| tests | current | [Entity store — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

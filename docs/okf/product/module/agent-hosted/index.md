@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Hosted Model Providers](spec.md) |
 | architecture | current | [Agent Hosted Module (providers/inspecto-agent-hosted/)](architecture.md) |
-| features | missing | |
+| features | current | [Hosted model providers for the assistant — features](features.md) |
 | feature-db | missing | |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |
-| tests | missing | |
+| tests | current | [Hosted model providers for the assistant — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

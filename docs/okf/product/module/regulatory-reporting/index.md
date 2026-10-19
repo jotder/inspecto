@@ -22,8 +22,8 @@ tags: [product-item, module]
 | feature-db | current | [Regulatory Reporting — feature database](feature-db.md) |
 | user-guide | current | [Regulatory Reporting — screens](user-guide-regulatory-reporting.md) |
 | admin-guide | missing | |
-| api | current | [Regulatory Reporting — API](api-regulatory-reporting.md) |
-| tests | missing | |
+| api | current | [Regulatory Reporting — API](api-regulatory-reporting.md) · [HTTP routes — module.regulatory-reporting](api-routes.md) |
+| tests | current | [Regulatory Reporting — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

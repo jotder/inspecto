@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Collector configuration (the one surface)](user-guide-collector-config.md) · [Collectors](user-guide-collectors.md) |
 | admin-guide | missing | |
 | api | current | [Collectors — API](api-collectors.md) |
-| tests | missing | |
+| tests | current | [Acquisition and collectors — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | current | [Entity Lists — assurance entries (ranges, CIDR, expiry, sidecar, four-eyes)](spec.md) |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Entity lists — features](features.md) |
 | feature-db | current | [Entity lists — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
-| api | missing | |
-| tests | missing | |
+| api | current | [HTTP routes — module.entity-list](api-routes.md) |
+| tests | current | [Entity lists — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

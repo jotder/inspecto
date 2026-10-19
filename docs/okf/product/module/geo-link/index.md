@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Geo and link adapters over platform data — features](features.md) |
 | feature-db | current | [Geo and link adapters over platform data — feature database](feature-db.md) |
 | user-guide | current | [Geo Map Analysis](user-guide-geo-map.md) |
 | admin-guide | missing | |
-| api | missing | |
-| tests | missing | |
+| api | current | [HTTP routes — module.geo-link](api-routes.md) |
+| tests | current | [Geo and link adapters over platform data — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | current | [Security module (inspecto-oidc, with inspecto-secrets and inspecto-geo-country split out by D-MR6)](architecture.md) |
-| features | missing | |
+| features | current | [OIDC authenticator and token relay — features](features.md) |
 | feature-db | missing | |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |
-| tests | missing | |
+| tests | current | [OIDC authenticator and token relay — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

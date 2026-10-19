@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Analytics functions](user-guide-analytics-functions.md) · [Analytics kernel — screens](user-guide-analytics.md) · [KPI & Reports](user-guide-kpi-reports.md) |
 | admin-guide | missing | |
 | api | current | [Analytics kernel — API](api-analytics.md) |
-| tests | missing | |
+| tests | current | [Analytics Kernel (canonical statistics and baselines) — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

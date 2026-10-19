@@ -22,8 +22,8 @@ tags: [product-item, module]
 | feature-db | current | [Reconciliation — feature database](feature-db.md) |
 | user-guide | current | [Reconciliation](user-guide-reconciliation.md) |
 | admin-guide | missing | |
-| api | current | [Reconciliation — API](api-reconciliation.md) |
-| tests | missing | |
+| api | current | [Reconciliation — API](api-reconciliation.md) · [HTTP routes — module.reconciliation](api-routes.md) |
+| tests | current | [Reconciliation — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Maker-checker (Pending Changes) — screens](user-guide-maker-checker.md) · [Workflow and SLA — screens](user-guide-workflow-sla.md) |
 | admin-guide | missing | |
 | api | current | [Maker-checker (Pending Changes) — API](api-maker-checker.md) · [Workflow and SLA — API](api-workflow-sla.md) |
-| tests | missing | |
+| tests | current | [Workflow and SLA models — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

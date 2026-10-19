@@ -18,7 +18,7 @@ tags: [product-item, addon]
 | plan | missing | |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Action Requests — features](features.md) |
 | feature-db | current | [Action Requests — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |

@@ -22,8 +22,8 @@ tags: [product-item, module]
 | feature-db | current | [Anomaly Detection — feature database](feature-db.md) |
 | user-guide | current | [Anomaly Detection — screens](user-guide-anomaly.md) |
 | admin-guide | missing | |
-| api | current | [Anomaly Detection — API](api-anomaly.md) |
-| tests | missing | |
+| api | current | [Anomaly Detection — API](api-anomaly.md) · [HTTP routes — module.anomaly](api-routes.md) |
+| tests | current | [Anomaly Detection — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

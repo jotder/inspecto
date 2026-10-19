@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [AI assist — screens](user-guide-ai-assist.md) · [Assistant](user-guide-assist.md) · [Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)](user-guide-inline-ai-authoring.md) |
 | admin-guide | missing | |
 | api | current | [AI assist — API](api-ai-assist.md) |
-| tests | missing | |
+| tests | current | [AI assist and intelligence — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | missing | |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Case management and objects — features](features.md) |
 | feature-db | current | [Case management and objects — feature database](feature-db.md) |
 | user-guide | current | [Incidents & Cases (Objects)](user-guide-objects.md) |
 | admin-guide | missing | |
-| api | missing | |
-| tests | missing | |
+| api | current | [HTTP routes — module.ops](api-routes.md) |
+| tests | current | [Case management and objects — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

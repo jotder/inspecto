@@ -22,8 +22,8 @@ tags: [product-item, module]
 | feature-db | current | [Scoring — feature database](feature-db.md) |
 | user-guide | current | [Decision Kernel (Decision Rules and the Condition Language) — screens](user-guide-decision-kernel.md) · [Risk Scores and Entity Lists — screens](user-guide-scoring-entity-lists.md) |
 | admin-guide | missing | |
-| api | current | [Decision Kernel (Decision Rules and the Condition Language) — API](api-decision-kernel.md) · [Risk Scores and Entity Lists — API](api-scoring-entity-lists.md) |
-| tests | missing | |
+| api | current | [Decision Kernel (Decision Rules and the Condition Language) — API](api-decision-kernel.md) · [HTTP routes — module.scoring](api-routes.md) · [Risk Scores and Entity Lists — API](api-scoring-entity-lists.md) |
+| tests | current | [Scoring — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Graph library — screens](user-guide-graph.md) |
 | admin-guide | missing | |
 | api | current | [Graph library — API](api-graph.md) |
-| tests | missing | |
+| tests | current | [Graph algorithms — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

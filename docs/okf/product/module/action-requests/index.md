@@ -22,8 +22,8 @@ tags: [product-item, module]
 | feature-db | current | [Action Requests — feature database](feature-db.md) |
 | user-guide | current | [Action Requests — screens](user-guide-action-requests.md) |
 | admin-guide | missing | |
-| api | current | [Action Requests — API](api-action-requests.md) |
-| tests | missing | |
+| api | current | [Action Requests — API](api-action-requests.md) · [HTTP routes — module.action-requests](api-routes.md) |
+| tests | current | [Action Requests — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

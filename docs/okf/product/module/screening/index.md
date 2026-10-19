@@ -22,8 +22,8 @@ tags: [product-item, module]
 | feature-db | current | [Screening — feature database](feature-db.md) |
 | user-guide | current | [Screening — screens](user-guide-screening.md) |
 | admin-guide | missing | |
-| api | current | [Screening — API](api-screening.md) |
-| tests | missing | |
+| api | current | [HTTP routes — module.screening](api-routes.md) · [Screening — API](api-screening.md) |
+| tests | current | [Screening — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

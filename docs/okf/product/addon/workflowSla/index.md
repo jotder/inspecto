@@ -18,7 +18,7 @@ tags: [product-item, addon]
 | plan | missing | |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Workflow & SLA — features](features.md) |
 | feature-db | current | [Workflow & SLA — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |

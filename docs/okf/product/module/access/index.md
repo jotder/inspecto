@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Identity and Access — screens](user-guide-access.md) |
 | admin-guide | current | [Auth & Security](admin-guide-auth-security.md) |
 | api | current | [Identity and Access — API](api-access.md) |
-| tests | missing | |
+| tests | current | [Access policy (roles, grants, row scope, audit trail) — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -18,7 +18,7 @@ tags: [product-item, addon]
 | plan | missing | |
 | spec | missing | |
 | architecture | missing | |
-| features | missing | |
+| features | current | [Scoring & Lists — features](features.md) |
 | feature-db | current | [Scoring & Lists — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |

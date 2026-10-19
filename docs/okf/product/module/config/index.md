@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Config](user-guide-config.md) · [Grammar configuration (the one surface)](user-guide-grammar-config.md) · [Spaces — screens](user-guide-spaces.md) |
 | admin-guide | current | [Configuration reference](admin-guide-configuration-reference.md) |
 | api | current | [Spaces — API](api-spaces.md) |
-| tests | missing | |
+| tests | current | [Config model and codecs — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

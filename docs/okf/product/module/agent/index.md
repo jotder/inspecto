@@ -18,12 +18,12 @@ tags: [product-item, module]
 | plan | current | [Assistant (AGT + EOI) — capability spec](plan-assistant.md) |
 | spec | current | [eoiagent ADR log](spec-adr-log.md) · [Assist Agent](spec-assist-agent.md) · [eoiagent governance & safety](spec-governance.md) |
 | architecture | current | [Inspecto ↔ eoiagent integration](architecture-integration.md) · [Agent Module (features/inspecto-agent/)](architecture-module.md) · [eoiagent overview](architecture-overview.md) · [eoiagent architecture](architecture.md) |
-| features | missing | |
+| features | current | [Assistant agent — features](features.md) |
 | feature-db | missing | |
 | user-guide | current | [Model Settings](user-guide-model-settings.md) |
 | admin-guide | missing | |
 | api | missing | |
-| tests | missing | |
+| tests | current | [Assistant agent — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.

@@ -22,8 +22,8 @@ tags: [product-item, module]
 | feature-db | current | [Observability (metrics endpoint + events feed API) — feature database](feature-db.md) |
 | user-guide | current | [Observability and backup — screens](user-guide-observability-backup.md) |
 | admin-guide | missing | |
-| api | current | [Observability and backup — API](api-observability-backup.md) |
-| tests | missing | |
+| api | current | [Observability and backup — API](api-observability-backup.md) · [HTTP routes — module.observability](api-routes.md) |
+| tests | current | [Observability (metrics endpoint + events feed API) — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
