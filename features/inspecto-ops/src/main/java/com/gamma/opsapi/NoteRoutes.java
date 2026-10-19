@@ -75,7 +75,7 @@ public final class NoteRoutes implements RouteModule {
 
     /**
      * {@code POST /notes/{targetKind}/{targetId}/comments} — body {@code {body, author?}}. The author is the
-     * signed-in Subject when there is one; the body's {@code author} counts only without one (Personal) —
+     * signed-in Subject when there is one; the body's {@code author} counts only without one (Basic) —
      * operator 2026-09-26.
      */
     private Object addComment(ApiContext api, HttpExchange ex, String targetKind, String targetId,

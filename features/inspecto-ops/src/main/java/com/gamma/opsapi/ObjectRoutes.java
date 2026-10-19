@@ -181,7 +181,7 @@ public final class ObjectRoutes implements RouteModule {
     public static final String ATTR_CASE_TYPE = "caseType";
 
     /**
-     * Whether the caller may see {@code o}: an unscoped caller (Personal — no Subject; or a role with
+     * Whether the caller may see {@code o}: an unscoped caller (Basic — no Subject; or a role with
      * {@code dataScopes = null}) sees everything; a scoped caller sees untyped objects plus those whose
      * {@code caseType} is in their scopes. Fail-closed: an empty scope set reveals only untyped objects.
      * ABAC A3: the edition's policy engine ({@link RowScope}) can additionally hide a row — a policy
@@ -560,7 +560,7 @@ public final class ObjectRoutes implements RouteModule {
 
     /**
      * {@code POST /objects/{id}/comments} (Phase 4) — add a comment; body {@code {body, author?}}. The author is
-     * the signed-in Subject when there is one; the body's {@code author} counts only without one (Personal) —
+     * the signed-in Subject when there is one; the body's {@code author} counts only without one (Basic) —
      * operator 2026-09-26, as {@link #actorOf} does for a lifecycle move.
      */
     private Object addComment(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
@@ -650,7 +650,7 @@ public final class ObjectRoutes implements RouteModule {
     /**
      * The actor an object's own history records for a lifecycle move: the authenticated {@link Subject} when
      * the request has one — a body field must not re-attribute a Subject's act, now that analysts hold
-     * {@code canWorkIncidents} (operator, 2026-09-26) — else the body's {@code actor}, the Personal edition's
+     * {@code canWorkIncidents} (operator, 2026-09-26) — else the body's {@code actor}, the Basic edition's
      * honour-system value, unchanged.
      */
     private static String actorOf(HttpExchange ex, Map<String, Object> body) {

@@ -89,7 +89,7 @@ public final class AnnotationTargets {
      *
      * <p>⛔ Absent the module the kind is not addressable at all, so an {@code object} target is refused —
      * {@code AnnotationKinds.OBJECT} deliberately stays in the static vocabulary on every edition
-     * (a role file authored on Standard must still validate on Personal), so the vocabulary listing it is
+     * (a role file authored on Standard must still validate on Basic), so the vocabulary listing it is
      * not a promise that a route is behind it.
      */
     private static String visibleObjectCorrelationId(ApiContext api, HttpExchange ex, String id) {

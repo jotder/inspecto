@@ -13,7 +13,7 @@ import java.util.function.Function;
  *
  * <p>The edition model this expresses:
  * <ul>
- *   <li><b>Personal</b> — embedded DuckDB for everything. No server to run, no driver to ship.</li>
+ *   <li><b>Basic</b> — embedded DuckDB for everything. No server to run, no driver to ship.</li>
  *   <li><b>Standard</b> — PostgreSQL for the operational stores; DuckDB stays as the query engine
  *       over Parquet.</li>
  * </ul>
@@ -30,9 +30,9 @@ import java.util.function.Function;
  * Postgres came up "healthy" with job reporting, provenance and Objects silently switched OFF rather
  * than moved. The shipped {@code inspecto.jar} carries no JDBC driver by design (see
  * {@code platform/inspecto-engine/pom.xml}: "runtime stays JDBC-driver-free"); the driver rides the
- * <b>Standard/Enterprise bundle as the {@code postgresql.jar} sidecar</b> (PG-1, decided 2026-08-14),
+ * <b>Standard/Advanced bundle as the {@code postgresql.jar} sidecar</b> (PG-1, decided 2026-08-14),
  * which {@code serve.sh}/{@code serve.bat} auto-detect and add to the classpath — the same mechanism
- * as {@code inspecto-oidc.jar}, so the fat JAR and its SBOM stay driver-free. On a Personal
+ * as {@code inspecto-oidc.jar}, so the fat JAR and its SBOM stay driver-free. On a Basic
  * bundle this is the expected failure and the message says what to drop in rather than leaving an
  * operator to infer it.
  *
@@ -55,7 +55,7 @@ public final class OperationalDb {
     /** The one toggle the four operational-object families share: {@code db} | {@code postgres} | {@code memory}. */
     public static final String OBJECTS_BACKEND = "objects.backend";
 
-    /** The object families' {@code postgres} value: durable, and PostgreSQL is mandatory (the Enterprise launcher). */
+    /** The object families' {@code postgres} value: durable, and PostgreSQL is mandatory (the Advanced launcher). */
     public static final String OBJECTS_POSTGRES = "postgres";
 
     /** The object families' default {@code objects.backend}: the Space's own {@code duckdb/} files. */
@@ -91,15 +91,15 @@ public final class OperationalDb {
                 "jobs.db.url", null, null, SpaceRoot::jobRunDbUrl),
         // D6 (enterprise scale-out §9). ⛔ Default "memory", NOT "duckdb" — and the asymmetry with
         // DEDUP_LEDGER/CONSIGNMENT_OUTPUTS below is deliberate. `events.backend` predates this family with
-        // a memory|parquet contract that Personal relies on (zero files, zero configuration); defaulting to
-        // a database here would create one in the working directory for every Personal install under
-        // SpaceRoot.legacy(). The Standard/Enterprise launchers opt in explicitly — parquet today
+        // a memory|parquet contract that Basic relies on (zero files, zero configuration); defaulting to
+        // a database here would create one in the working directory for every Basic install under
+        // SpaceRoot.legacy(). The Standard/Advanced launchers opt in explicitly — parquet today
         // (EVENTS-DURABLE-1), db once a deployment has shared state to point it at.
         EVENTS("Operational events", "events.backend", "memory", Mode.URL_OR_ENGINE,
                 "events.db.url", null, null, SpaceRoot::eventsDbUrl),
         // Phase B. ⛔ Default "heap", never a database: a lease is exclusion ACROSS processes, and on one
         // node the in-heap guard is both correct and free. Defaulting to a DB would create a file for
-        // every Personal install to coordinate a fleet of one.
+        // every Basic install to coordinate a fleet of one.
         RUN_LEASE("Run lease", "run.lease.backend", "heap", Mode.URL_OR_ENGINE,
                 "run.lease.db.url", "run.lease.db.user", "run.lease.db.password", SpaceRoot::runLeaseDbUrl),
         PROVENANCE("Provenance", "provenance.backend", "none", Mode.URL_OR_ENGINE,
@@ -112,7 +112,7 @@ public final class OperationalDb {
         // deliberately: an absent receipt store is not degraded correctness, it is the shipped behaviour
         // (receipts stay in InMemoryDeliveryReceiptStore, bounded and prunable, exactly as before). Making
         // it default-ON would create a DB file in the working directory under SpaceRoot.legacy() for every
-        // Personal install — and CP-15 is a "not for Personal" cell, so Personal must not gain a database
+        // Basic install — and CP-15 is a "not for Basic" cell, so Basic must not gain a database
         // it was never meant to have.
         DELIVERY_RECEIPTS("Delivery receipts", "delivery.receipts.backend", "none", Mode.URL_OR_ENGINE,
                 "delivery.receipts.db.url", null, null, SpaceRoot::deliveryReceiptsDbUrl),
@@ -140,7 +140,7 @@ public final class OperationalDb {
         // as "ops:<id>" with kind "operational", and its file lives in the space's duckdb/ dir, not data/.
         //
         // ✅ DEFAULT FLIPPED to "db" 2026-08-31 by operator decision, once the gate above was met. Every
-        // deployment now serves status/batches/lineage from the projection (DuckDB on Personal; PostgreSQL
+        // deployment now serves status/batches/lineage from the projection (DuckDB on Basic; PostgreSQL
         // where the bundle carries the driver AND a URL is configured). ⚠ The CSVs remain the durable
         // write-ahead and the on-disk audit stays the source of truth — this changes the READ surface only.
         // ⚠ openStatusStore degrades to FileStatusStore with a loud warning rather than failing boot on
@@ -158,7 +158,7 @@ public final class OperationalDb {
         // a URL pointing at shared Postgres makes the finding possible at all.
         INBOX_REGISTRY("Inbox registry", "inbox.registry.backend", "none", Mode.URL_OR_ENGINE,
                 "inbox.registry.db.url", null, null, SpaceRoot::inboxRegistryDbUrl),
-        // MODULE-REORG-P7-INCIDENTS slice 2 (operator decision 2026-10-07): Personal MUST keep Alert history and
+        // MODULE-REORG-P7-INCIDENTS slice 2 (operator decision 2026-10-07): Basic MUST keep Alert history and
         // restart-safe de-duplication, so the Alert records are durable on EVERY edition - default "db", the same
         // call as OBJECTS above and for the same reason (an Alert that vanishes on restart is not a default any
         // edition keeps). "memory" survives only as an explicit opt-in (-Dalerts.backend=memory; the test reactor
@@ -316,7 +316,7 @@ public final class OperationalDb {
     }
 
     /**
-     * The shared connection URL, or {@code null} when this is a DuckDB (Personal) deployment or no
+     * The shared connection URL, or {@code null} when this is a DuckDB (Basic) deployment or no
      * shared URL was given — callers then fall back to their per-space DuckDB file as before.
      */
     public static String url() {
@@ -369,16 +369,16 @@ public final class OperationalDb {
         return System.getProperty(OBJECTS_BACKEND, OBJECTS_BACKEND_DEFAULT).trim().toLowerCase();
     }
 
-    /** True when {@code -Dobjects.backend=postgres} — the Enterprise launcher's setting. */
+    /** True when {@code -Dobjects.backend=postgres} — the Advanced launcher's setting. */
     public static boolean objectsPostgresRequired() {
         return OBJECTS_POSTGRES.equals(objectsBackend());
     }
 
     /**
      * {@code OBJECTS-BACKEND-DEFAULT-MEMORY-1}: fail closed at boot when the object families' backend cannot be
-     * honoured — an unknown value (a typo used to mean "memory", silently), or {@code postgres} (Enterprise)
+     * honoured — an unknown value (a typo used to mean "memory", silently), or {@code postgres} (Advanced)
      * without a PostgreSQL URL for every one of the four families, or without the driver. ⛔ Never a fallback
-     * to DuckDB or memory: an Enterprise deployment that quietly kept its Cases in a local file, or in the
+     * to DuckDB or memory: an Advanced deployment that quietly kept its Cases in a local file, or in the
      * heap, would look healthy until the first restart or the second node.
      *
      * <p>⚠ The {@code -DemoAuth} demo build is not an exception carved in here: its {@code serve-demo.*}

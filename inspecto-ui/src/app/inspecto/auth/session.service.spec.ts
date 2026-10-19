@@ -61,7 +61,7 @@ describe('SessionService (W6d edition switch)', () => {
         await done;
         expect(svc.authMode()).toBe('none');
         expect(svc.loginRequired()).toBe(false);
-        httpMock.expectNone(`${base}/auth/refresh`); // never attempts a session under Personal
+        httpMock.expectNone(`${base}/auth/refresh`); // never attempts a session under Basic
     });
 
     it('a browser with no resumable session ⇒ no /auth/refresh on load (no expected-401 console error)', async () => {

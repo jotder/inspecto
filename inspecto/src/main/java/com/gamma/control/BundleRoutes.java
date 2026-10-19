@@ -77,7 +77,7 @@ import com.gamma.access.WriteGates;
  * {@code POST /bundle/preview} (read; New/Exists/drift fit-check + {@code requires} classification,
  * no writes), {@code POST /bundle/import} (write; sequential upsert in dependency order, reporting
  * per-item without aborting the rest). Import is gated on {@code canAuthorWorkbench} (a no-op on
- * Personal) then the write-root 503 gate — matching {@link ComponentRoutes}.
+ * Basic) then the write-root 503 gate — matching {@link ComponentRoutes}.
  *
  * <p><b>A Live Working Set Widget leaves Frozen</b> (LA-21, D-E6): export rewrites its {@code workingSet.mode} to
  * {@code frozen} at its own pin and lists it under {@code converted} — see {@link WorkingSetWidgets}.
@@ -145,7 +145,7 @@ final class BundleRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.post("/bundle/export", (e, m) -> exportBundle(api, api.body(e)));
         api.post("/bundle/preview", (e, m) -> previewBundle(api, api.body(e)));
-        // Import writes real components → Builder capability (W6; no-op on Personal) then the write-root gate.
+        // Import writes real components → Builder capability (W6; no-op on Basic) then the write-root gate.
         api.post("/bundle/import", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> importBundle(api, e, api.body(e))));
     }

@@ -46,7 +46,7 @@ final class AssistRoutes implements RouteModule {
         // 2026-09-15). The settings are SERVER-WIDE — one AssistModelSettings file, no per-caller scope — and
         // /test performs a REAL outbound call to whatever baseUrl/provider was last saved. Ungated, that pair
         // let any authenticated caller point the server at an arbitrary URL and then make it call out:
-        // request-forgery-shaped, and live in every Standard/Enterprise bundle because inspecto-agent IS
+        // request-forgery-shaped, and live in every Standard/Advanced bundle because inspecto-agent IS
         // staged (unlike /agent/*, whose gate is correct-but-unreached). Gating only /test would leave the
         // write route as the injection point; gating only the write would leave the trigger open. The
         // agent's own javadoc already named `scope: assist.write` here — documented, and until now

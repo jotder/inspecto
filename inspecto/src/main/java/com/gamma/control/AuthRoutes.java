@@ -20,7 +20,7 @@ import com.gamma.access.AuditTrail;
  * PKCE in the browser, then hands the one-time {@code code} here — the backend redeems it via the
  * edition's {@link TokenRelay} and keeps the <b>refresh token in an {@code httpOnly} cookie</b> the
  * page's JavaScript can never read; only the short-lived access token is returned in the body. On
- * Personal (no relay on the classpath) every route answers {@code 503 CAPABILITY_UNAVAILABLE} — the
+ * Basic (no relay on the classpath) every route answers {@code 503 CAPABILITY_UNAVAILABLE} — the
  * auth-free core needs no session.
  *
  * <p><b>CSRF posture</b> (decision 2026-07-06): the cookie is {@code SameSite=Strict} (a browser
@@ -52,7 +52,7 @@ final class AuthRoutes implements RouteModule {
     }
 
     private Object exchange(HttpExchange ex, Map<String, Object> body) {
-        TokenRelay relay = relay();   // capability check first: on Personal this is 503 regardless of body
+        TokenRelay relay = relay();   // capability check first: on Basic this is 503 regardless of body
         requireSameOrigin(ex);
         String code = ApiContext.str(body, "code");
         String verifier = ApiContext.str(body, "codeVerifier");
@@ -69,7 +69,7 @@ final class AuthRoutes implements RouteModule {
     }
 
     private Object refresh(HttpExchange ex) {
-        TokenRelay relay = relay();   // capability check first: on Personal this is 503, never a cookie-derived 401
+        TokenRelay relay = relay();   // capability check first: on Basic this is 503, never a cookie-derived 401
         requireSameOrigin(ex);
         String rt = cookie(ex, COOKIE);
         if (rt == null) throw new ApiException(401, ErrorCodes.UNAUTHENTICATED, "no session");
@@ -83,7 +83,7 @@ final class AuthRoutes implements RouteModule {
     }
 
     private Object logout(HttpExchange ex, Map<String, Object> body) {
-        TokenRelay relay = relay();   // capability check first: on Personal this is 503, not a no-op 200
+        TokenRelay relay = relay();   // capability check first: on Basic this is 503, not a no-op 200
         requireSameOrigin(ex);
         String rt = cookie(ex, COOKIE);
         String idToken = cookie(ex, ID_COOKIE);

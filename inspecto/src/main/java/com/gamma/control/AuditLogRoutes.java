@@ -20,10 +20,10 @@ import com.gamma.access.WriteGates;
  * The <b>audit</b> read, kept in core when the {@code /events*} feed left for the optional
  * {@code inspecto-observability} module (EDG-01 cell 6, 2026-09-08).
  *
- * <p>🔴 <b>Why this route exists at all.</b> Cell 6 gates CP-13's feed out of Personal — but
- * {@code EDITIONS.md} §Audit promises Personal "local append-only logs", and the Audit-log screen read that
+ * <p>🔴 <b>Why this route exists at all.</b> Cell 6 gates CP-13's feed out of Basic — but
+ * {@code EDITIONS.md} §Audit promises Basic "local append-only logs", and the Audit-log screen read that
  * trail through {@code GET /events/search?type=AUDIT}. Gating the feed alone would therefore have taken away
- * Personal's ability to READ ITS OWN AUDIT TRAIL while a matrix row still promised it — a compliance
+ * Basic's ability to READ ITS OWN AUDIT TRAIL while a matrix row still promised it — a compliance
  * regression dressed as a packaging change. Operator decision (2026-09-08): gate the browsing feed, keep the
  * audit projection in core. So CP-13 is precisely "feed gated, audit read retained", and the matrix says so.
  *

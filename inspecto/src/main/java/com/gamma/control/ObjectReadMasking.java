@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
  * Dataset classifies sensitive ({@link EvidenceMasker#sensitiveColumns}) becomes the Space's {@code masked:<16 hex>} token,
  * and the raw value is replaced by that token wherever it stands in the title, description, correlation id and the other
  * attributes. Stored rows stay RAW (the dedupe key is raw); only the read view is masked. Fail closed: untraceable lineage
- * masks every {@code key.*} value. A request with no Subject (Personal) is unrestricted.
+ * masks every {@code key.*} value. A request with no Subject (Basic) is unrestricted.
  */
 public final class ObjectReadMasking {
 

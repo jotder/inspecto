@@ -44,9 +44,9 @@ import java.util.zip.ZipOutputStream;
  * {@code maintenance} Job Type — mirrors the core's {@code MaterializeTask} one-class-per-complex-task shape.
  *
  * <p>⚠ <b>Relocated from {@code com.gamma.job} in {@code inspecto-engine} on 2026-09-07 (EDG-01 cell 2).</b>
- * EDITIONS {@code OPS-06} is "not for Personal", and this class shipped in every bundle because the engine is
+ * EDITIONS {@code OPS-06} is "not for Basic", and this class shipped in every bundle because the engine is
  * an unconditional dependency. It now reaches {@code MaintenanceJob} only through the
- * {@link com.gamma.job.MaintenanceTaskProvider} seam ({@link BackupTaskProvider}), from a module the Personal
+ * {@link com.gamma.job.MaintenanceTaskProvider} seam ({@link BackupTaskProvider}), from a module the Basic
  * build does not include. The package moved with it: leaving it in {@code com.gamma.job} would split that
  * package across two jars. Nothing in the three methods changed.
  *

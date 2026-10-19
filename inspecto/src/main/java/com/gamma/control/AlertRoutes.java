@@ -35,7 +35,7 @@ import com.gamma.access.WriteGates;
  * running {@link AlertService} so {@code GET /alerts/rules} and evaluation reflect it immediately —
  * the in-memory list stays the evaluation-time source of truth (cheap per-batch reads), the
  * ComponentStore is what a restart re-arms from. CRUD requires {@code canAuthorAlertRules} (a no-op
- * on Personal).
+ * on Basic).
  */
 final class AlertRoutes implements RouteModule {
 
@@ -98,7 +98,7 @@ final class AlertRoutes implements RouteModule {
         }
     }
 
-    /** The authenticated Subject, else the body's {@code actor} (Personal's honour-system value), else {@code operator}. */
+    /** The authenticated Subject, else the body's {@code actor} (Basic's honour-system value), else {@code operator}. */
     private static String actorOf(HttpExchange e, Map<String, Object> body) {
         return ApiContext.subject(e).map(Subject::id)
                 .orElseGet(() -> ApiContext.str(body, "actor") == null ? "operator" : ApiContext.str(body, "actor"));
@@ -217,7 +217,7 @@ final class AlertRoutes implements RouteModule {
     }
 
     /**
-     * Alert Rules are Professional+ ({@code SP-CTL-07}; `PROCESSOR-RELEASE-READINESS-1` G9): on a Personal build
+     * Alert Rules are Standard+ ({@code SP-CTL-07}; `PROCESSOR-RELEASE-READINESS-1` G9): on a Basic build
      * this answers the request itself - 422, the save gate's body shape, one {@code ERR_EDITION_FEATURE}
      * finding - and returns {@code true}. Used by create, update and {@code /components/alert-rule}; a Decision
      * Rule's {@code create-alert} is refused inside {@link #parse}, where the consequence records the message.

@@ -50,7 +50,7 @@ final class RunRoutes implements RouteModule {
         api.get("/runs", (e, m) -> ApiContext.paged(HostContext.of(api).service().pipelines(), e));
         // Register a new pipeline from a config on disk under the write root (control scope).
         // Registration is a workbench-authoring action (W6: canAuthorWorkbench); trigger/pause/resume/
-        // reprocess below are operational (canOperateRuns) — both a no-op on Personal (rbac-groundwork.md §2).
+        // reprocess below are operational (canOperateRuns) — both a no-op on Basic (rbac-groundwork.md §2).
         api.post("/runs", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createPipeline(api, e, api.body(e))));
         api.post("/runs/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) ->
                 triggerPipeline(api, e, ApiContext.name(m))));

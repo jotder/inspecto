@@ -76,7 +76,7 @@ final class HealthDetails {
         // had no way to find out from the product. A family that was ASKED for a durable backend and could not
         // open one reports DOWN, which is what VER-3 asserts ("every intended subsystem UP — not silently
         // NOT_CONFIGURED or an in-memory fallback"). A family that was never asked for stays NOT_CONFIGURED and
-        // is not a failure, so Personal, which configures none of them, is unaffected.
+        // is not a failure, so Basic, which configures none of them, is unaffected.
         StoreHealth.of(HostContext.of(api).service().spaceId()).forEach((family, r) -> {
             String status = switch (r.status()) {
                 case UP -> "UP";

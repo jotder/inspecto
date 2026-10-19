@@ -96,7 +96,7 @@ final class SaveGate {
         f.addAll(ConfigRoutes.stepColumnMetadataFindings(type, draft));   // AUTHORING-REDESIGN-1 (e)
         f.addAll(ConfigRoutes.collectorFindings(type, draft));   // post_action MOVE target; inert remote keys
         f.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
-        f.addAll(editionFindings(type, draft));   // G9: Professional+ features on a Personal build
+        f.addAll(editionFindings(type, draft));   // G9: Standard+ features on a Basic build
         // Referential: a collector bound to a Connection this Space does not have throws once per poll.
         if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
         f.addAll(webhookFindings(type, draft, api, referents));
@@ -144,7 +144,7 @@ final class SaveGate {
     }
 
     /**
-     * The Professional+ features a Personal build refuses ({@link EditionFeatures}, `PROCESSOR-RELEASE-READINESS-1`
+     * The Standard+ features a Basic build refuses ({@link EditionFeatures}, `PROCESSOR-RELEASE-READINESS-1`
      * G9): a pipeline's {@code post_action: MOVE} archive and its DuckLake registration, and a legacy
      * {@code alert} config. ERROR regardless of {@code active} — activation does not change the edition.
      * Alert Rule components are refused on their own routes ({@code AlertRoutes}, {@code ComponentRoutes}).

@@ -38,7 +38,7 @@ final class AgentRoutes implements RouteModule {
     /**
      * Session id -> the Subject id that opened it (2026-09-29, round-2 verification). Every per-session route
      * answers 404 to any other caller, exactly as it answers an unknown session, so a session id someone else
-     * learned is useless. Only sessions opened with a Subject are recorded; Personal has no Subject and checks
+     * learned is useless. Only sessions opened with a Subject are recorded; Basic has no Subject and checks
      * nothing. The issuer is implicit: the installed Authenticator accepts exactly one issuer, so a Subject id
      * is unique within an installation. In memory, like the sessions themselves.
      */
@@ -53,7 +53,7 @@ final class AgentRoutes implements RouteModule {
             String goalKind = ApiContext.str(body, "goalKind");
             try {
                 // The caller's capabilities ride with the session, so a tool the model calls meets the same gate as
-                // POST /agent/tools/{name}. null (no Subject, Personal) checks nothing, like every gate.
+                // POST /agent/tools/{name}. null (no Subject, Basic) checks nothing, like every gate.
                 java.util.Set<String> capabilities = ApiContext.subject(e).map(Subject::capabilities).orElse(null);
                 AgentSessionResult opened = agentOr503(api).openSession(
                         new AgentSessionRequest(role, mapField(page), goalKind, capabilities));
@@ -255,7 +255,7 @@ final class AgentRoutes implements RouteModule {
      * the word, and the deliberative loop would plan with ADMIN grants (the mutating gate is separate and
      * held, but the role also shapes what the model is told it may reason about). When a {@link Subject} is
      * attached, the role is now DERIVED from the capabilities the IdP actually granted, and the body's
-     * value is ignored; with no Subject (Personal edition, nothing authenticates) the body still decides,
+     * value is ignored; with no Subject (Basic edition, nothing authenticates) the body still decides,
      * because there is no identity to derive from.
      */
     static String sessionRole(HttpExchange e, String requestedRole) {
@@ -356,13 +356,13 @@ final class AgentRoutes implements RouteModule {
 
     /**
      * The per-tool gate for {@code /agent/tools/{name}} and {@code /derive}: 403 unless the caller holds the
-     * capability the named tool declares. A no-op without a Subject (Personal), like every capability gate.
+     * capability the named tool declares. A no-op without a Subject (Basic), like every capability gate.
      */
     private static void requireToolCapability(IntelligenceAgent agent, String tool, HttpExchange e) {
         agent.toolCapability(tool).ifPresent(capability -> ApiContext.requireCapability(e, capability));
     }
 
-    /** 404 unless the caller opened {@code sessionId} (a no-op without a Subject, i.e. Personal). */
+    /** 404 unless the caller opened {@code sessionId} (a no-op without a Subject, i.e. Basic). */
     private void requireSessionOwner(HttpExchange e, String sessionId) {
         ApiContext.subject(e).ifPresent(caller -> {
             if (!caller.id().equals(sessionOwners.get(sessionId)))

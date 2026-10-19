@@ -8,9 +8,9 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { APP_ENVIRONMENT } from '../api/app-environment';
 
 /**
- * Professional-edition sign-in screen (W6d). A single "Sign in with SSO" action that kicks off the
+ * Standard-edition sign-in screen (W6d). A single "Sign in with SSO" action that kicks off the
  * Authorization-Code + PKCE redirect to the IAM (Keycloak/WSO2) via {@link SessionService.beginLogin}.
- * Never reached on Personal / offline: {@link authGuard} only routes here when OIDC is on and there is
+ * Never reached on Basic / offline: {@link authGuard} only routes here when OIDC is on and there is
  * no live session, and this component itself bounces back to the app if a session already exists (e.g.
  * a returning user whose refresh cookie was resumed at startup).
  */
@@ -206,7 +206,7 @@ export class SignInComponent implements OnInit {
     readonly configured = computed(() => this.session.oidcConfigured());
 
     ngOnInit(): void {
-        // Already signed in (or Personal/offline where login is never required) → straight into the app.
+        // Already signed in (or Basic/offline where login is never required) → straight into the app.
         if (!this.session.loginRequired()) {
             this.router.navigate(['/']);
             return;

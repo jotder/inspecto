@@ -9,12 +9,12 @@ import { SessionService } from './session.service';
 const SESSION_PATHS = ['/auth/exchange', '/auth/refresh', '/auth/logout'];
 
 /**
- * Professional-edition bearer attachment + silent refresh (W6d). Attaches `Authorization: Bearer <token>`
+ * Standard-edition bearer attachment + silent refresh (W6d). Attaches `Authorization: Bearer <token>`
  * to control-plane calls when a session is live, and on a 401 tries one silent refresh (from the
  * httpOnly cookie) then retries the original request; a failed refresh drops the session and routes to
  * sign-in.
  *
- * <p><b>No-op on Personal.</b> When {@link SessionService.authMode} isn't `'oidc'` this passes every
+ * <p><b>No-op on Basic.</b> When {@link SessionService.authMode} isn't `'oidc'` this passes every
  * request straight through — the auth-free core stays byte-for-byte unchanged. Only attaches to same-origin ControlApi calls (`/api…`), never to static assets.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {

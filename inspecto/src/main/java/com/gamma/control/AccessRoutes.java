@@ -70,7 +70,7 @@ final class AccessRoutes implements RouteModule {
         // "Why denied?" dry-run for the caller's own session (BACKLOG §5). A GET (read action) on
         // purpose: it changes nothing, and a POST would be a 'write' the very policy under test could
         // deny at the route PEP — locking the denied subject out of the tool that explains their denial.
-        // Ungated like the /access reads above; on Personal/Standard (no engine) it returns {enabled:false}.
+        // Ungated like the /access reads above; on Basic/Standard (no engine) it returns {enabled:false}.
         api.get("/access/explain", (e, m) -> explain(e));
         api.get("/access/catalog", (e, m) -> ETags.respond(e, catalog(api)));
         api.put("/access/catalog", ApiContext.withCapability("canConfigureAccess",
@@ -131,13 +131,13 @@ final class AccessRoutes implements RouteModule {
     }
 
     // ── access policies (ABAC A2 — authorable allow/deny over attributes; evaluation is
-    //    the Enterprise policy engine's job, A3) ─────────────────────────────────────
+    //    the Advanced policy engine's job, A3) ─────────────────────────────────────
 
     /** The effective policies: authored rows ({@code source: authored}) plus the engine-resident seed
      *  policies in force but never written to the doc ({@code source: seed} — e.g. the A4 space-isolation
      *  denies), so an operator sees the built-in denies too (BACKLOG §5). A seed whose name an authored
      *  policy overrides is shadowed (shown once, as authored). An unreadable doc is surfaced — the engine
-     *  denies, fail-closed. Seeds appear only on the Enterprise edition (the engine supplies them). */
+     *  denies, fail-closed. Seeds appear only on the Advanced edition (the engine supplies them). */
     private Object policies(ApiContext api, HttpExchange ex) {
         AccessPolicies.Doc doc = AccessPolicyStore.load(api.writeRoot());
         Map<String, Object> out = new LinkedHashMap<>();
@@ -182,7 +182,7 @@ final class AccessRoutes implements RouteModule {
      *  {@code ?route=<path>&method=<GET|PUT|…>&resourceKind=<kind>} ({@code route} required,
      *  {@code method} defaults GET, {@code resourceKind} optional for a row-level probe). Returns the
      *  engine's decision + matched policy + a per-policy trace, enforcing/auditing nothing.
-     *  {@code {enabled:false}} when there is no policy engine (Personal/Standard) or no authenticated
+     *  {@code {enabled:false}} when there is no policy engine (Basic/Standard) or no authenticated
      *  subject on the request. Testing arbitrary resource attributes is the deferred "arbitrary subject"
      *  feature — here {@code resource.space} defaults to the bound space, which the A4 seeds condition on. */
     private Object explain(HttpExchange ex) {

@@ -102,7 +102,7 @@ final class ComponentRoutes implements RouteModule {
         api.delete("/components/escalation-rule/([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> deleteComponent(api, e, ESCALATION_RULE, ApiContext.name(m))));
         api.post("/components/escalation-rule/([^/]+)/versions/([^/]+)/restore", ApiContext.withCapability("canAdminister",
                 (e, m) -> restoreVersion(api, e, ESCALATION_RULE, ApiContext.name(m), ApiContext.param(m, 2))));
-        // Writes require canAuthorWorkbench (W6; a no-op on Personal — no Subject is ever attached there).
+        // Writes require canAuthorWorkbench (W6; a no-op on Basic — no Subject is ever attached there).
         api.post("/components/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createComponent(api, e, genericKind(e, m), api.body(e))));
         api.put("/components/([^/]+)/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> updateComponent(api, e, genericKind(e, m), ApiContext.param(m, 2), api.body(e))));
         api.delete("/components/([^/]+)/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteComponent(api, e, genericKind(e, m), ApiContext.param(m, 2))));
