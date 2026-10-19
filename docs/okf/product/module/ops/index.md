@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | missing | |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Case management and objects — feature database](feature-db.md) |
 | user-guide | current | [Incidents & Cases (Objects)](user-guide-objects.md) |
 | admin-guide | missing | |
 | api | missing | |

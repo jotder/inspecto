@@ -19,7 +19,7 @@ tags: [product-item, addon]
 | spec | missing | |
 | architecture | current | [Alerts](architecture-alerts.md) · [Incidents](architecture-incidents.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Incidents — feature database](feature-db.md) |
 | user-guide | current | [Alerts](user-guide-alerts.md) |
 | admin-guide | missing | |
 | api | missing | |

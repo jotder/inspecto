@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Entity Lists — assurance entries (ranges, CIDR, expiry, sidecar, four-eyes)](spec.md) |
 | architecture | missing | |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Entity lists — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Action Requests — approved outbound API calls](spec.md) |
 | architecture | current | [Action Requests](architecture-overview.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Action Requests — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |

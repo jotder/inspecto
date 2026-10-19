@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Exchange — Cross-Space Sharing](spec.md) |
 | architecture | current | [Exchange (multi-entity sharing)](architecture-overview.md) |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | current | [Exchange (publication and ingestion contracts) — feature database](feature-db.md) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |
