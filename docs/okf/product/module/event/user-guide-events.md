@@ -15,3 +15,12 @@ query; a **live-tail** toggle polls via `visibleInterval` while the tab is visib
 persists filter sets; matching rows export to CSV. The grid is a **pro** [data-table](../../layer/product/spec-ds-data-table.md)
 with `[searchable]="false"` `[exportable]="false"` (backend search/export are kept) and an Actions column
 (row detail → correlation/type drill-down). Backed by `EventsService`.
+
+## Screens
+
+Screens for Events and event log. Design and internals: [Events and event log architecture](architecture-overview.md).
+
+- **Events** (route `events`, `inspecto-ui/src/app/modules/admin/events/events.component.ts`) - filterable
+  event grid; `event-detail.dialog.ts` shows one event's attributes.
+- **Audit log** (route `audit`, `inspecto-ui/src/app/modules/admin/audit-logs/audit-logs.component.ts`) -
+  read-only; flattens `AUDIT` / `ACCESS_DENIED` attributes (actor, action, target, ip) into columns.

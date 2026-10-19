@@ -82,14 +82,11 @@ entity cap `-D` property that `EntityCap` parses (malformed or ≤ 0 keeps the d
 
 ## 6. Screens
 
-None. Its output appears in the Step previews, Expectation baselines, Anomaly and Risk Score
-screens, Screening hits and the Link Analysis profile panes.
+Moved to [Analytics kernel — screens](user-guide-analytics.md).
 
 ## 7. API
 
-No HTTP routes. The programmatic surface for Jobs and packs is the Platform Service `analytics`:
-`requires: [analytics]`, then `ctx.services().get(AnalyticsAccess.class)`. `AnalyticsAccess` lives in
-the engine (`com.gamma.query`) and only delegates here ([platform-services](../../layer/platform/architecture-platform-services.md)).
+Moved to [Analytics kernel — API](api-analytics.md).
 
 ## 8. Interactions
 

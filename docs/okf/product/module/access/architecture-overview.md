@@ -96,25 +96,11 @@ Per-Space documents: `roles.toon` (`Roles.FILE`), `access-policies.toon` (`Acces
 
 ## 6. Screens
 
-- **Sign-in** — `inspecto-ui/src/app/inspecto/auth/sign-in.component.ts`: SSO button, or the Demo User picker
-  with a "not secured" warning in a demo build.
-- **Admin → Access** — `inspecto-ui/src/app/modules/admin/access/access.component.ts`, with the role table
-  (`access-roles.component.ts`) and Access Policies (`access-policies.component.ts`, `policy-form.dialog.ts`).
-- Capability-driven visibility in the SPA comes from `LensService`; see [Security §3.14](plan-security.md).
+Moved to [Identity and Access — screens](user-guide-access.md).
 
 ## 7. API
 
-| Route | Gate | Purpose |
-|---|---|---|
-| `POST /auth/exchange`, `POST /auth/refresh`, `POST /auth/logout` | public; `503` without a `TokenRelay` | BFF session (`AuthRoutes`) |
-| `GET` / `PUT /access/roles` | PUT: `canConfigureAccess` | Effective role table / author it |
-| `GET` / `PUT /access/policies` | PUT: `canConfigureAccess` | Access Policies |
-| `POST /access/policies/preview` | `canConfigureAccess` | Impact matrix for an unsaved draft |
-| `GET /access/explain` | ungated | "Why denied?" for the caller; `{enabled:false}` without the engine |
-| `GET` / `PUT /access/catalog` | PUT: `canConfigureAccess` | Access Catalog |
-| `GET /access/profiles`, `PUT` / `DELETE /access/profiles/{id}` | writes: `canConfigureAccess` | Access Profiles (`role-…` / `lens-…`) |
-
-All in `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` and `AuthRoutes.java`.
+Moved to [Identity and Access — API](api-access.md).
 
 ## 8. Interactions
 

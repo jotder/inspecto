@@ -59,3 +59,14 @@ flips at once and rolls back on failure. Outcomes go to ONE polite live region a
 (`"<title> acknowledged"`; 403/404/422 as plain-language lines) which also **takes focus** after an action,
 because the clicked button may have just left the row. A 403 drops the pane to read-only for the session; a
 subject without the capability sees a permission note instead of the buttons.
+
+## Screens
+
+Screens for Alerts. Design and internals: [Alerts architecture](architecture-alerts.md).
+
+The **Alerts** page (route `alerts`, `inspecto-ui/src/app/modules/admin/alerts/alerts.component.ts`) shows
+the fired Alerts grid (Acknowledge on OPEN, Resolve on OPEN or ACKNOWLEDGED, applied optimistically and
+offered only with `canWorkIncidents`; a 403 drops the page to read-only), an *Open Investigation* action for
+an Investigation rule's Alert, the armed Alert Rules (`GET /alerts/rules`) plus pending ones, and a manual
+**Evaluate** sweep. Create / edit / delete appear only with `canAuthorAlertRules`; `alert-rule-form.dialog.ts`
+is the form.

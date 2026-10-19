@@ -87,27 +87,11 @@ requires one or more comma-separated email addresses as `target`.
 
 ## 6. Screens
 
-- Bell menu in the shell: `inspecto-ui/src/app/layout/common/notifications/notifications.component.ts`.
-- Notification center (channels, rules, deliveries):
-  `inspecto-ui/src/app/modules/admin/notification-center/notification-center.component.ts`; the old
-  `notification-center` path redirects to `settings/notifications`.
-- Preferences grid: `inspecto-ui/src/app/modules/admin/notification-preferences/notification-preferences.component.ts`.
-- Client: `inspecto-ui/src/app/inspecto/api/notifications.service.ts`.
+Moved to [Notifications — screens](user-guide-notifications.md).
 
 ## 7. API
 
-All in `NotificationRoutes`; gates per `platform/inspecto-access/src/main/java/com/gamma/access/CapabilityManifest.java`.
-
-| Route | Gate |
-|---|---|
-| `GET /notifications`, `GET /notifications/unread-count`, `GET /notifications/stream` (SSE) | authenticated |
-| `POST /notifications/read-all`, `POST /notifications/{id}/read`, `POST /notifications/{id}/unread` | self-service |
-| `GET` / `PUT /notifications/preferences` | self-service (caller's own override) |
-| `GET` / `PUT /notifications/preferences/default` | PUT `canAdminister` |
-| `GET` / `POST /notifications/channels`, `PUT` / `DELETE /notifications/channels/{id}` | writes `canAuthorWorkbench` |
-| `GET` / `POST /notifications/rules`, `PUT` / `DELETE /notifications/rules/{id}` | writes `canAuthorWorkbench` |
-| `GET /notifications/deliveries`, `GET` / `DELETE /notifications/suppressions` | `canAuthorWorkbench` |
-| `DELETE /notifications/{id}` (archive, shared per Space) | `canAdminister` |
+Moved to [Notifications — API](api-notifications.md).
 
 ## 8. Interactions
 

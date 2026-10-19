@@ -562,3 +562,16 @@ back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model 
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
 review sheet: [`reviews/reconciliation.md`](../../../../archived-documents/superpower-reviews/reconciliation.md).
+
+## Screens
+
+Screens for Reconciliation. Design and internals: [Reconciliation architecture](architecture-overview.md).
+
+Route `/reconciliation` (`inspecto-ui/src/app/modules/admin/reconciliation/reconciliation.routes.ts`):
+
+- `/reconciliation` — list (`reconciliations.component.ts`), authoring via `reconciliation-form.dialog.ts`;
+- `/reconciliation/:id` — the Board (`recon-board.component.ts`): grain rows, totals, Break summary, filters;
+- `/reconciliation/:id/breaks` — Breaks page (`reconciliation-detail.component.ts`), assignment via
+  `recon-assign.dialog.ts`.
+
+Shared logic sits in `inspecto-ui/src/app/inspecto/reconciliation/` (`recon-board.ts`, `reconciliation-types.ts`).

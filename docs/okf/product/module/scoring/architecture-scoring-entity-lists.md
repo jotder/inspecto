@@ -77,27 +77,11 @@ For Incidents, declare the `_latest` Dataset and a per-entity Alert Rule with `b
 
 ## 6. Screens
 
-- `/risk-scores` — `inspecto-ui/src/app/modules/admin/risk-scores/risk-scores.component.ts`, with
-  `risk-score-form.dialog.ts`, `risk-score-factors.component.ts`, `risk-score-actions.component.ts`.
-- Risk Score panel on the Incident page: `inspecto-ui/src/app/inspecto/components/risk-score-panel.component.ts`.
-- Entity Lists in the Link Analysis app: `inspecto-ui/projects/la-app/src/app/entity-lists.page.ts` and the
-  Investigation section `inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-entity-lists.component.ts`
-  (entry editing parsed by `entity-list-entries.ts`).
+Moved to [Risk Scores and Entity Lists — screens](user-guide-scoring-entity-lists.md).
 
 ## 7. API
 
-| Route | Gate | Handler |
-|---|---|---|
-| `GET /risk-scores/{model}/{entityKey}` | `canWorkIncidents`; existence-hiding 404 | `features/inspecto-scoring/src/main/java/com/gamma/risk/RiskScoreRoutes.java` |
-| `POST /risk-scores/preview` | `canWorkIncidents` (+ `canAuthorWorkbench` for unsaved content) | same |
-| `GET /entity-lists`, `GET /entity-lists/{id}` | Space access | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
-| `POST /entity-lists` | `canManageIncidents` | same |
-| `POST /entity-lists/{id}/members` | `canManageIncidents` (may be held) | same |
-| `POST /entity-lists/{id}/retire` | `canManageIncidents` (may be held) | same |
-| `POST /entity-lists/{id}/match` | Space access (read-shaped POST, 1..5 000 values) | same |
-| `POST /entity-lists/{id}/register-dataset` | `canAuthorWorkbench` | same |
-
-Models are authored through `/components/risk-score/{id}`.
+Moved to [Risk Scores and Entity Lists — API](api-scoring-entity-lists.md).
 
 ## 8. Interactions
 

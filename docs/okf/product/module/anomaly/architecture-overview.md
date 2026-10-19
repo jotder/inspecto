@@ -79,22 +79,11 @@ Rule declaring `afterScore: {kind: anomaly-model, model: <id>}` over the `_lates
 
 ## 6. Screens
 
-- `/anomaly-models` — Studio pane (`inspecto-ui/src/app/modules/admin/anomaly-models/anomaly-models.component.ts`)
-  with `anomaly-model-form.dialog.ts`, `anomaly-model-features.component.ts` and `anomaly-model-preview.component.ts`.
-- Entity anomaly panel `inspecto-ui/src/app/inspecto/components/anomaly-panel.component.ts` (data via
-  `inspecto-ui/src/app/inspecto/api/anomaly-scores.service.ts`): band badge, top Features, day series. Hosted on the
-  Incident page, the Risk Score entity view and Link Analysis.
+Moved to [Anomaly Detection — screens](user-guide-anomaly.md).
 
 ## 7. API
 
-Handler: `features/inspecto-anomaly/src/main/java/com/gamma/anomaly/AnomalyScoreRoutes.java`.
-
-| Route | Gate | Purpose |
-|---|---|---|
-| `GET /anomaly-scores/{model}/{entityKey}` | `canWorkIncidents` | latest score with Feature explanation; existence-hiding 404 |
-| `POST /anomaly-scores/preview` | `canWorkIncidents` (+ `canAuthorWorkbench` for unsaved content) | score one entity now, write nothing |
-
-Authoring uses the generic `/components/anomaly-model/{id}` routes.
+Moved to [Anomaly Detection — API](api-anomaly.md).
 
 ## 8. Interactions
 

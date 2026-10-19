@@ -71,26 +71,11 @@ against the Dataset's Schema. Templates may seed a deferred rule over a score ou
 
 ## 6. Screens
 
-The **Alerts** page (route `alerts`, `inspecto-ui/src/app/modules/admin/alerts/alerts.component.ts`) shows
-the fired Alerts grid (Acknowledge on OPEN, Resolve on OPEN or ACKNOWLEDGED, applied optimistically and
-offered only with `canWorkIncidents`; a 403 drops the page to read-only), an *Open Investigation* action for
-an Investigation rule's Alert, the armed Alert Rules (`GET /alerts/rules`) plus pending ones, and a manual
-**Evaluate** sweep. Create / edit / delete appear only with `canAuthorAlertRules`; `alert-rule-form.dialog.ts`
-is the form.
+Moved to [the user guide](user-guide-alerts.md#screens).
 
 ## 7. API
 
-All in `AlertRoutes.java`:
-
-| Route | Gate |
-|---|---|
-| `GET /alerts` | none - no `withCapability` and no `CapabilityManifest` entry; any caller past the AuthN gate (everyone on Basic) |
-| `GET /alerts/rules`, `GET /alerts/rules/pending` | none (as above) |
-| `POST /alerts/evaluate` | `canOperateRuns` |
-| `POST /alerts/{id}/ack`, `POST /alerts/{id}/resolve` | `canWorkIncidents` |
-| `POST /alerts/rules`, `PUT /alerts/rules/{name}`, `DELETE /alerts/rules/{name}` | `canAuthorAlertRules` |
-
-Investigation rules are authored only through `POST /inv/investigations/{id}/alert-rules`; the generic routes refuse that shape.
+Moved to [Alerts — API](api-alerts.md).
 
 ## 8. Interactions
 

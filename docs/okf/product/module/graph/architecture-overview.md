@@ -72,12 +72,11 @@ None. Limits (node ceilings, cost classes, budgets) are set by the caller; for L
 
 ## 6. Screens
 
-None of its own. Results appear in the Link Analysis algorithm toolbox and pattern search.
+Moved to [Graph library — screens](user-guide-graph.md).
 
 ## 7. API
 
-No HTTP routes. Link Analysis exposes the algorithms through its own routes (for example the
-pattern route behind `/inv/pattern/branching`).
+Moved to [Graph library — API](api-graph.md).
 
 ## 8. Interactions
 

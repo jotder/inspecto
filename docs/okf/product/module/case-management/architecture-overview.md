@@ -80,31 +80,11 @@ parameter `rule` ([jobs](../processor/spec-jobs.md)).
 
 ## 6. Screens
 
-Route `/cases` (`inspecto-ui/src/app/modules/admin/objects/cases.routes.ts`):
-
-- `/cases` — "Case Manager" inbox (`object-mail.component.ts`, type `CASE`), rules via `case-rules.dialog.ts`,
-  analytics via `case-analytics.dialog.ts`;
-- `/cases/:id` — detail (`object-detail.component.ts`) with `case-contents.component.ts`,
-  `merge-cases.dialog.ts`, `split-case.dialog.ts`, `add-member.dialog.ts`.
-
-Front-end notes: [objects](../ops/user-guide-objects.md).
+Moved to [Case Management — screens](user-guide-case-management.md).
 
 ## 7. API
 
-Handler: `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java`.
-
-| Route | Gate |
-|---|---|
-| `GET /cases/rules` | — |
-| `POST /cases/rules`, `DELETE /cases/rules/{name}` | `canAuthorWorkbench` |
-| `POST /cases/rules/{name}/evaluate` | `canAdminister` |
-| `POST /cases/from-entities` | `canManageIncidents` |
-| `POST /objects/{id}/merge` (`sources`) | `canAdminister` + data-scope guard |
-| `POST /objects/{id}/split` (`title`, `members`) | `canAdminister` + data-scope guard |
-
-State changes, comments, links and findings use the shared object routes in
-`features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` (`POST /objects/{id}/transition`,
-`/resolve`, `/assign`, all `canWorkIncidents`).
+Moved to [Case Management — API](api-case-management.md).
 
 ## 8. Interactions
 

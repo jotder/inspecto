@@ -72,31 +72,11 @@ An authored workflow is validated at save and load (reachable states, a way out 
 
 ## 6. Screens
 
-Route `/incidents` (`inspecto-ui/src/app/modules/admin/objects/incidents.routes.ts`):
-
-- `/incidents` — inbox (`object-mail.component.ts`, data type `INCIDENT`), create via `object-create.dialog.ts`;
-- `/incidents/:id` — detail (`object-detail.component.ts`) with `resolve.dialog.ts`, `categorize.dialog.ts`,
-  `impact-panel.component.ts`, `postmortem-panel.component.ts`, `object-link.dialog.ts` and
-  `action-requests-panel.component.ts`.
-
-Front-end notes: [objects](../../module/ops/user-guide-objects.md).
+Moved to [Incidents — screens](user-guide-incidents.md).
 
 ## 7. API
 
-Handler: `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java`.
-
-| Route | Gate |
-|---|---|
-| `GET /objects`, `GET /objects/analytics`, `GET /objects/by-entity` | read, post-filtered by scope |
-| `POST /objects` | `canManageIncidents` |
-| `POST /objects/{id}/ack`, `/resolve`, `/transition`, `/assign` | `canWorkIncidents` |
-| `PUT /objects/{id}/postmortem`, `/category`, `/impact` | `canWorkIncidents` |
-| `GET` / `POST` / `DELETE /objects/{id}/links`, `GET /objects/{id}/graph` | scope guard |
-| `/objects/{id}/comments`, `/attachments`, `POST /objects/{id}/rca`, `PUT /objects/{id}/findings` | scope guard |
-| `PATCH /objects/{id}` | `canAdminister` |
-| `GET /objects/{id}` | scope guard |
-
-The capability gate runs before the scope guard: no capability → 403, out-of-scope object → 404.
+Moved to [Incidents — API](api-incidents.md).
 
 ## 8. Interactions
 

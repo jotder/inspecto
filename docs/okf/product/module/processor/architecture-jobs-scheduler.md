@@ -90,25 +90,11 @@ only if its SHA-256 is listed).
 
 ## 6. Screens
 
-- **Jobs** (`inspecto-ui/src/app/modules/admin/jobs/jobs.component.ts`): schedules mode (list,
-  trigger, enable, reschedule, edit, delete) and reporting mode (`/jobs/metrics`, `/jobs/runs`,
-  `/jobs/failures`). The authoring form is generated from `GET /jobs/types/{id}`. Run detail is
-  `job-run-detail.dialog.ts`.
-- **Scheduler settings** (`inspecto-ui/src/app/modules/admin/settings/scheduler.component.ts`):
-  concurrency and DuckDB memory limit, each with its provenance.
+Moved to [the user guide](user-guide-jobs.md#screens).
 
 ## 7. API
 
-| Route | Purpose |
-|---|---|
-| `GET /jobs`, `POST /jobs`, `GET` / `PUT` / `DELETE /jobs/{name}` | CRUD |
-| `POST /jobs/{name}/trigger[?dryRun=true]`, `/enable`, `/disable`, `/reschedule` | control |
-| `GET /jobs/types`, `/jobs/types/{id}`, `/jobs/expressions`, `/jobs/processors` | descriptors |
-| `GET /jobs/{name}/runs`, `/jobs/runs/{runId}`, `…/runs/{runId}/log`, `…/artifacts`, `…/diff/{other}` | Run history |
-| `POST /jobs/runs/{runId}/replay` | replay a live Run |
-| `GET /jobs/metrics`, `/jobs/runs`, `/jobs/failures` | reporting (needs `-Djobs.backend`) |
-| `GET /jobs/packs`, `POST /jobs/packs/rescan` | Job Packs |
-| `GET` / `PUT /system/scheduler` | concurrency settings |
+Moved to [Jobs and scheduler — API](api-jobs-scheduler.md).
 
 ## 8. Interactions
 
