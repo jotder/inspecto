@@ -18,9 +18,9 @@ tags: [product-item, solution-pack]
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Link Analysis](architecture.md) |
-| features | missing | |
+| features | current | [Link Analysis showcase — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
+| user-guide | current | [Link Analysis showcase — user guide](user-guide.md) |
 | admin-guide | current | [Inspecto LA (Link Analysis) showcase: Postgres store and Basic variants](admin-guide-variants-runbook.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |

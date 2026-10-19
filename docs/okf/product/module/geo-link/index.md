@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Geo and link adapters — plan of record](plan.md) |
+| spec | current | [Geo and link adapters — implementation spec](spec.md) |
+| architecture | current | [Geo and link adapters — architecture](architecture.md) |
 | features | current | [Geo and link adapters over platform data — features](features.md) |
 | feature-db | current | [Geo and link adapters over platform data — feature database](feature-db.md) |
 | user-guide | current | [Geo Map Analysis](user-guide-geo-map.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Geo and link adapters — admin guide](admin-guide.md) |
 | api | current | [HTTP routes — module.geo-link](api-routes.md) |
 | tests | current | [Geo and link adapters over platform data — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

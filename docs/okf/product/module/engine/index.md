@@ -21,8 +21,8 @@ tags: [product-item, module]
 | features | current | [Execution engine — features](features.md) |
 | feature-db | current | [Execution engine — feature database](feature-db.md) |
 | user-guide | current | [Run Detail](user-guide-run-detail.md) · [Runs (Operations)](user-guide-runs.md) |
-| admin-guide | missing | |
-| api | missing | |
+| admin-guide | current | [Execution engine — admin guide](admin-guide.md) |
+| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/etl api-parsing-ingest |
 | tests | current | [Execution engine — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

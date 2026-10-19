@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
+| plan | current | [Graph algorithms — plan](plan.md) |
+| spec | current | [Graph algorithms — spec](spec.md) |
 | architecture | current | [Graph library](architecture-overview.md) |
 | features | current | [Graph library — features](features-graph.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Graph library — screens](user-guide-graph.md) |
-| admin-guide | missing | |
+| admin-guide | n/a | a pure algorithm library with no config keys, -D flags, files or services of its own; every limit is set by the caller (Link Analysis limits, see the la-core hub) |
 | api | current | [Graph library — API](api-graph.md) |
 | tests | current | [Graph algorithms — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

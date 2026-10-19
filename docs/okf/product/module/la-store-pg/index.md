@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Link analysis PostgreSQL store - plan of record](plan.md) |
+| spec | current | [Link analysis PostgreSQL store - spec](spec.md) |
+| architecture | current | [Link analysis PostgreSQL store - architecture](architecture.md) |
 | features | current | [Link analysis PostgreSQL store — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | no screens - a storage backend chosen by JVM properties, invisible to end users |
+| admin-guide | current | [Link analysis PostgreSQL store - admin guide](admin-guide.md) |
+| api | n/a | implements la-core's InvestigationStoreProvider SPI and adds no contract of its own; the SPI is specified in la-core/spec.md |
 | tests | current | [Link analysis PostgreSQL store — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

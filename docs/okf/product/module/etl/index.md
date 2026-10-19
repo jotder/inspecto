@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | current | [Parsing and ingest — features](features-parsing-ingest.md) · [Pipelines and Steps — features](features-pipelines-steps.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Enrichment](user-guide-enrichment.md) · [Parsing and ingest — screens](user-guide-parsing-ingest.md) · [Pipeline Editor](user-guide-pipeline-editor.md) · [Pipelines (Authoring) — MOVED](user-guide-pipelines.md) · [Schema, Mapping & Transformation Authoring](user-guide-schema-mapping.md) |
-| admin-guide | missing | |
+| admin-guide | current | [ETL model and step registry — admin guide](admin-guide.md) |
 | api | current | [Parsing and ingest — API](api-parsing-ingest.md) · [Pipelines and Steps — API](api-pipelines-steps.md) |
 | tests | current | [ETL model and step registry — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

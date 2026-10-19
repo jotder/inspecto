@@ -17,7 +17,7 @@ tags: [product-item, layer]
 |---|---|---|
 | plan | n/a | a layer groups modules — see the hubs of the modules it holds |
 | spec | n/a | a layer groups modules — see the hubs of the modules it holds |
-| architecture | missing | |
+| architecture | current | [Providers layer — architecture](architecture.md) |
 | features | current | [Providers — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a layer groups modules — see the hubs of the modules it holds |

@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Backup and restore — plan](plan.md) |
+| spec | current | [Backup and restore — spec](spec.md) |
+| architecture | current | [Backup and restore — architecture](architecture.md) |
 | features | current | [Backup and restore — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
+| user-guide | n/a | no screen or end-user configuration of its own; the tasks are maintenance Jobs authored by administrators, covered by admin-guide-backup-restore |
 | admin-guide | current | [Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)](admin-guide-backup-restore.md) |
-| api | missing | |
+| api | n/a | no HTTP routes of its own; the tasks run through the generic Jobs routes (POST /jobs, POST /jobs/{name}/trigger) |
 | tests | current | [Backup and restore — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

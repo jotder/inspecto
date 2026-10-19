@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
+| plan | current | [Regulatory Reporting — requirement of record](plan.md) |
 | spec | current | [Regulatory Reporting — regulator-format reports from Cases, four-eyes, file drop](spec.md) |
 | architecture | current | [Regulatory Reporting](architecture-overview.md) |
 | features | current | [Regulatory Reporting — features](features-regulatory-reporting.md) |
 | feature-db | current | [Regulatory Reporting — feature database](feature-db.md) |
 | user-guide | current | [Regulatory Reporting — screens](user-guide-regulatory-reporting.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Regulatory Reporting — admin guide](admin-guide.md) |
 | api | current | [Regulatory Reporting — API](api-regulatory-reporting.md) · [HTTP routes — module.regulatory-reporting](api-routes.md) |
 | tests | current | [Regulatory Reporting — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -17,10 +17,10 @@ tags: [product-item, solution-pack]
 |---|---|---|
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | missing | |
-| features | missing | |
+| architecture | current | [Link Analysis mobile money — architecture](architecture.md) |
+| features | current | [Link Analysis mobile money — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
+| user-guide | current | [Link Analysis mobile money — user guide](user-guide.md) |
 | admin-guide | current | [Inspecto LA (Link Analysis) showcase A: mobile money (runbook, synthetic data)](admin-guide-showcase-runbook.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |

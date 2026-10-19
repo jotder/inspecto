@@ -18,7 +18,7 @@ tags: [product-item, edition]
 | plan | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
 | spec | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
 | architecture | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
-| features | missing | |
+| features | current | [Standard Edition — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
 | admin-guide | n/a | an Edition is a build flavor — see the hubs of the modules it holds |

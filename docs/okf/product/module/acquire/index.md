@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | current | [Collectors — features](features-collectors.md) |
 | feature-db | current | [Acquisition and collectors — feature database](feature-db.md) |
 | user-guide | current | [Collector configuration (the one surface)](user-guide-collector-config.md) · [Collectors](user-guide-collectors.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Acquisition and collectors — admin guide](admin-guide.md) |
 | api | current | [Collectors — API](api-collectors.md) |
 | tests | current | [Acquisition and collectors — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Link analysis and geo routes - plan of record](plan.md) |
+| spec | current | [Link analysis and geo routes - spec](spec.md) |
+| architecture | current | [Link analysis and geo routes - architecture](architecture.md) |
 | features | current | [Link analysis and geo routes — features](features.md) |
 | feature-db | current | [Link analysis and geo routes — feature database](feature-db.md) |
-| user-guide | missing | |
-| admin-guide | missing | |
+| user-guide | n/a | no screens of its own - the Link Analysis screens these routes serve are documented in the la-core hub (la-core/user-guide-link-analysis.md) |
+| admin-guide | current | [Link analysis and geo routes - admin guide](admin-guide.md) |
 | api | current | [HTTP routes — module.la-api](api-routes.md) |
 | tests | current | [Link analysis and geo routes — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

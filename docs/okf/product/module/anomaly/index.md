@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
+| plan | current | [Anomaly Detection — plan](plan.md) |
 | spec | current | [Anomaly Scores — explainable behavioural anomaly scoring per entity](spec-anomaly-scores.md) |
 | architecture | current | [Anomaly Detection](architecture-overview.md) |
 | features | current | [Anomaly Detection — features](features-anomaly.md) |
 | feature-db | current | [Anomaly Detection — feature database](feature-db.md) |
 | user-guide | current | [Anomaly Detection — screens](user-guide-anomaly.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Anomaly Detection — admin guide](admin-guide.md) |
 | api | current | [Anomaly Detection — API](api-anomaly.md) · [HTTP routes — module.anomaly](api-routes.md) |
 | tests | current | [Anomaly Detection — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

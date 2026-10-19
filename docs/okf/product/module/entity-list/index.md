@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
+| plan | current | [Entity Lists — plan of record](plan.md) |
 | spec | current | [Entity Lists — assurance entries (ranges, CIDR, expiry, sidecar, four-eyes)](spec.md) |
-| architecture | missing | |
+| architecture | current | [Entity Lists — architecture](architecture.md) |
 | features | current | [Entity lists — features](features.md) |
 | feature-db | current | [Entity lists — feature database](feature-db.md) |
-| user-guide | missing | |
-| admin-guide | missing | |
+| user-guide | current | [Entity Lists — user guide](user-guide.md) |
+| admin-guide | current | [Entity Lists — admin guide](admin-guide.md) |
 | api | current | [HTTP routes — module.entity-list](api-routes.md) |
 | tests | current | [Entity lists — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

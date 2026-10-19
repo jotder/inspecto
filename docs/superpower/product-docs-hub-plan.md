@@ -5,6 +5,9 @@
 > `stakeholders/`, `ops/`, `ui/`, `roadmap/`, `wiki/` moved into hubs (plus 43 diagrams → `okf/product/assets/`), 24 index
 > pages dropped (snapshot: `archived-documents/doc-indexes-before-product-hubs-2026-10-19/`), every reference rewritten.
 > Open: waves 3, 5, 6 and slot-splitting of large docs.
+> **Gaps closed 2026-10-19:** slot applicability decided per kind (generator) and per hub (`slots-na.toon`, reasoned);
+> four writing lanes filled every remaining gap — 0 `missing` across 87 hubs (plan 47 · spec 46 · architecture 69 ·
+> features 87 · user-guide 49 · admin-guide 58 · api 37 · tests 47 current).
 
 ## 1. Problem
 

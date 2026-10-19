@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Security (SEC)](plan-security.md) |
-| spec | missing | |
+| spec | current | [Access policy — spec](spec.md) |
 | architecture | current | [Identity and Access](architecture-overview.md) |
 | features | current | [Identity and Access — features](features-access.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |

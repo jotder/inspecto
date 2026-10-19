@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
+| plan | current | [Workflow and SLA models — plan](plan.md) |
+| spec | current | [Workflow and SLA models — spec](spec.md) |
 | architecture | current | [Maker-checker (Pending Changes)](architecture-maker-checker.md) · [Workflow and SLA](architecture-workflow-sla.md) |
 | features | current | [Maker-checker (Pending Changes) — features](features-maker-checker.md) · [Workflow and SLA — features](features-workflow-sla.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Maker-checker (Pending Changes) — screens](user-guide-maker-checker.md) · [Workflow and SLA — screens](user-guide-workflow-sla.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Workflow and SLA models — admin guide](admin-guide.md) |
 | api | current | [Maker-checker (Pending Changes) — API](api-maker-checker.md) · [Workflow and SLA — API](api-workflow-sla.md) |
 | tests | current | [Workflow and SLA models — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

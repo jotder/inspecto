@@ -21,7 +21,7 @@ tags: [product-item, layer]
 | features | current | [Inspecto — Product Capabilities](features-product-capabilities.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Catalog](user-guide-catalog.md) · [Dashboard](user-guide-dashboard.md) · [Icon Settings](user-guide-icon-settings.md) · [Journey: from an alert to a closed Case](user-guide-journey-alert-to-case.md) · [Journey: from a file to a dashboard](user-guide-journey-file-to-dashboard.md) · [Journey: a safe config change](user-guide-journey-safe-config-change.md) · [Stream & Reference Onboarding](user-guide-onboarding.md) · [Spaces](user-guide-spaces.md) · [Studio](user-guide-studio.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Product — admin guide](admin-guide.md) |
 | api | current | [API Services Catalog](api-services.md) |
 | tests | current | [Accessibility audit — `inspecto-ui` (WCAG 2.2 Level AA)](tests-accessibility-audit.md) · [Testing, Build & Definition of Done](tests-testing-build.md) |
 | brochure | current | [Inspecto — Competitive Landscape](brochure-competitive-landscape.md) · [Inspecto — Competitive Capability Matrix](brochure-competitive-matrix.md) · [Inspecto — Enterprise Product & Solutions Whitepaper](brochure-enterprise-whitepaper.md) · [Inspecto — Executive Brief](brochure-executive-brief.md) · [Inspecto — Solution Overview](brochure-solution-overview.md) · [Inspecto — Platform Overview & Strategy](brochure-stakeholder-overview.md) |

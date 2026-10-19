@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
+| plan | current | [Scoring — plan](plan.md) |
 | spec | current | [Risk Scores — weighted-factor scoring per entity](spec-risk-scores.md) |
 | architecture | current | [Decision Kernel (Decision Rules and the Condition Language)](architecture-decision-kernel.md) · [Risk Scores and Entity Lists](architecture-scoring-entity-lists.md) |
 | features | current | [Decision Kernel (Decision Rules and the Condition Language) — features](features-decision-kernel.md) · [Risk Scores and Entity Lists — features](features-scoring-entity-lists.md) |
 | feature-db | current | [Scoring — feature database](feature-db.md) |
 | user-guide | current | [Decision Kernel (Decision Rules and the Condition Language) — screens](user-guide-decision-kernel.md) · [Risk Scores and Entity Lists — screens](user-guide-scoring-entity-lists.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Scoring — admin guide](admin-guide.md) |
 | api | current | [Decision Kernel (Decision Rules and the Condition Language) — API](api-decision-kernel.md) · [HTTP routes — module.scoring](api-routes.md) · [Risk Scores and Entity Lists — API](api-scoring-entity-lists.md) |
 | tests | current | [Scoring — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

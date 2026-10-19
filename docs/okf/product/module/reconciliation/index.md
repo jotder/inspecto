@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
+| plan | current | [Reconciliation — requirement of record](plan.md) |
+| spec | current | [Reconciliation — implementation spec](spec.md) |
 | architecture | current | [Reconciliation](architecture-overview.md) |
 | features | current | [Reconciliation — features](features-reconciliation.md) |
 | feature-db | current | [Reconciliation — feature database](feature-db.md) |
 | user-guide | current | [Reconciliation](user-guide-reconciliation.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Reconciliation — admin guide](admin-guide.md) |
 | api | current | [Reconciliation — API](api-reconciliation.md) · [HTTP routes — module.reconciliation](api-routes.md) |
 | tests | current | [Reconciliation — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

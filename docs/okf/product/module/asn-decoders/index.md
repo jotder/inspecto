@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [ASN.1 decoders — plan of record](plan.md) |
+| spec | current | [ASN.1 decoders — implementation spec](spec.md) |
+| architecture | current | [ASN.1 decoders — architecture](architecture.md) |
 | features | current | [ASN.1 decoders — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | a decoding library with no screens; the ASN.1 grammar fields an end user sees belong to the telecom-asn1 hub |
+| admin-guide | n/a | a library jar with nothing to install or configure on its own; it is staged and configured through telecom-asn1 |
+| api | current | [ASN.1 decoders — Java API](api.md) |
 | tests | current | [ASN.1 decoders — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

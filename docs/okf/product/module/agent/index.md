@@ -21,8 +21,8 @@ tags: [product-item, module]
 | features | current | [Assistant agent — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Model Settings](user-guide-model-settings.md) |
-| admin-guide | missing | |
-| api | missing | |
+| admin-guide | current | [Assistant agent — admin guide](admin-guide.md) |
+| api | current | [Assistant agent — API](api.md) |
 | tests | current | [Assistant agent — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

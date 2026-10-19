@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
+| plan | current | [Action Requests — requirement of record](plan.md) |
 | spec | current | [Action Requests — approved outbound API calls](spec.md) |
 | architecture | current | [Action Requests](architecture-overview.md) |
 | features | current | [Action Requests — features](features-action-requests.md) |
 | feature-db | current | [Action Requests — feature database](feature-db.md) |
 | user-guide | current | [Action Requests — screens](user-guide-action-requests.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Action Requests — admin guide](admin-guide.md) |
 | api | current | [Action Requests — API](api-action-requests.md) · [HTTP routes — module.action-requests](api-routes.md) |
 | tests | current | [Action Requests — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

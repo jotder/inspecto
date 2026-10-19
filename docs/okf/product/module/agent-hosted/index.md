@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
+| plan | current | [Hosted model providers — plan](plan.md) |
 | spec | current | [Hosted Model Providers](spec.md) |
 | architecture | current | [Agent Hosted Module (providers/inspecto-agent-hosted/)](architecture.md) |
 | features | current | [Hosted model providers for the assistant — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | no screens of its own - the provider is chosen on the Model Settings screen documented in the agent hub (agent/user-guide-model-settings.md) |
+| admin-guide | current | [Hosted model providers — admin guide](admin-guide.md) |
+| api | current | [HostedProviderPlugin SPI](api.md) |
 | tests | current | [Hosted model providers for the assistant — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [MaxMind geo-country resolver — plan](plan.md) |
+| spec | current | [MaxMind geo-country resolver — spec](spec.md) |
+| architecture | current | [MaxMind geo-country resolver — architecture](architecture.md) |
 | features | current | [MaxMind geo-country resolver — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | no screens - the resolver only adds geo_country and geo_db_build to audit rows; operators configure it per the admin guide |
+| admin-guide | current | [MaxMind geo-country resolver — admin guide](admin-guide.md) |
+| api | current | [GeoCountryResolver SPI](api.md) |
 | tests | current | [MaxMind geo-country resolver — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

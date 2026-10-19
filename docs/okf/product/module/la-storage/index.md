@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Link analysis storage - plan of record](plan.md) |
+| spec | current | [Link analysis storage - spec](spec.md) |
+| architecture | current | [Link analysis storage - architecture](architecture.md) |
 | features | current | [Link analysis storage — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | no screens of its own - the index tool and staleness badges are documented in the la-core user guide (la-core/user-guide-link-analysis.md) |
+| admin-guide | current | [Link analysis storage - admin guide](admin-guide.md) |
+| api | n/a | no HTTP routes and no SPI - an internal library called only by la-api, whose index routes are in la-api/api-routes.md |
 | tests | current | [Link Analysis edge index — 10^9 scale run plan (clause 3 of `LA-INDEX-SCALE-MEASURE-1`)](tests-index-scale-run.md) · [Link analysis storage — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

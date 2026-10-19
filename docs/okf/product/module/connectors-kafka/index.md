@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Kafka stream connector — plan](plan.md) |
+| spec | current | [Kafka stream connector — spec](spec.md) |
+| architecture | current | [Kafka stream connector — architecture](architecture.md) |
 | features | current | [Kafka stream connector — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | no screens of its own - a kafka Connection is created in the shared Connections screen (connectors/user-guide-connections.md) |
+| admin-guide | current | [Kafka stream connector — admin guide](admin-guide.md) |
+| api | n/a | no HTTP routes; the Java contract it implements is the Collector connector SPI in the connectors hub (connectors/api.md) |
 | tests | current | [Kafka stream connector — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

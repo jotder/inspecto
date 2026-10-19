@@ -16,12 +16,12 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Observability & maintenance (OPS) — capability spec](plan-observability.md) |
-| spec | missing | |
+| spec | current | [Observability — spec](spec.md) |
 | architecture | current | [Observability and backup](architecture-observability-backup.md) |
 | features | current | [Observability and backup — features](features-observability-backup.md) |
 | feature-db | current | [Observability (metrics endpoint + events feed API) — feature database](feature-db.md) |
 | user-guide | current | [Observability and backup — screens](user-guide-observability-backup.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Observability — admin guide](admin-guide.md) |
 | api | current | [Observability and backup — API](api-observability-backup.md) · [HTTP routes — module.observability](api-routes.md) |
 | tests | current | [Observability (metrics endpoint + events feed API) — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

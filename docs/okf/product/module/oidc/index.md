@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
+| plan | current | [OIDC authenticator and token relay — plan of record](plan.md) |
+| spec | current | [OIDC authenticator and token relay — implementation spec](spec.md) |
 | architecture | current | [Security module (inspecto-oidc, with inspecto-secrets and inspecto-geo-country split out by D-MR6)](architecture.md) |
 | features | current | [OIDC authenticator and token relay — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | end users only see the sign-in button, documented with the other access screens in module.access user-guide-access.md |
+| admin-guide | current | [OIDC authenticator and token relay — admin guide](admin-guide.md) |
+| api | n/a | implements the Authenticator and TokenRelay contracts owned by module.auth-spi; the /auth/* routes live in the core and are documented in module.access api-access.md |
 | tests | current | [OIDC authenticator and token relay — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

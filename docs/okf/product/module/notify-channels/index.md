@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
+| plan | current | [Notifications — requirement of record](plan.md) |
+| spec | current | [Notifications — specification](spec.md) |
 | architecture | current | [Notifications](architecture-overview.md) |
 | features | current | [Notifications — features](features-notifications.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Notifications — screens](user-guide-notifications.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Notifications — admin guide](admin-guide.md) |
 | api | current | [Notifications — API](api-notifications.md) |
 | tests | current | [Notification channels — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

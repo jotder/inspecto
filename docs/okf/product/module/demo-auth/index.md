@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Demo authenticator — plan of record](plan.md) |
+| spec | current | [Demo authenticator — implementation spec](spec.md) |
+| architecture | current | [Demo authenticator — architecture](architecture.md) |
 | features | current | [Demo authenticator — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | current | [Demo authenticator — user guide](user-guide.md) |
+| admin-guide | current | [Demo authenticator — admin guide](admin-guide.md) |
+| api | n/a | implements the Authenticator and TokenRelay contracts owned by module.auth-spi and adds no route; the /auth/* routes are core routes documented in module.access api-access.md |
 | tests | current | [Demo authenticator — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

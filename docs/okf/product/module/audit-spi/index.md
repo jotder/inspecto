@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | n/a | a contract module carved out by MODULE-REORG-1; its requirement of record is decision D-MR1 in docs/okf/product/layer/platform/spec-module-reorg-decisions.md, and audit behaviour is planned in the event and access hubs |
+| spec | n/a | the contract's invariants are stated per type in api.md and the design in architecture.md; the implementation lives in the event module hub |
+| architecture | current | [Audit contract — architecture](architecture.md) |
 | features | current | [Audit contract — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | a pure Java contract with no screens; the audit trail screens are documented in the event hub user guide |
+| admin-guide | n/a | nothing to install or configure in this jar; event storage and retention settings belong to the event module |
+| api | current | [Audit contract — Java API](api.md) |
 | tests | current | [Audit contract — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Utilities, DuckDB access, TOON helpers, module manifests — plan](plan.md) |
+| spec | current | [Utilities, DuckDB access, TOON helpers, module manifests — spec](spec.md) |
+| architecture | current | [Utilities, DuckDB access, TOON helpers, module manifests — architecture](architecture.md) |
 | features | current | [Utilities, DuckDB access, TOON helpers, module manifests — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | a backend library with no screen and no user-authored configuration |
+| admin-guide | current | [Utilities, DuckDB access, TOON helpers, module manifests — admin guide](admin-guide.md) |
+| api | n/a | exposes no HTTP routes; it is a Java library every other module links against |
 | tests | current | [Utilities, DuckDB access, TOON helpers, module manifests — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

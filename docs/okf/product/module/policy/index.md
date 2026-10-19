@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [Attribute-based access policy — plan of record](plan.md) |
+| spec | current | [Attribute-based access policy — implementation spec](spec.md) |
+| architecture | current | [Attribute-based access policy — architecture](architecture.md) |
 | features | current | [Attribute-based access policy — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | current | [Attribute-based access policy — user guide](user-guide.md) |
+| admin-guide | current | [Attribute-based access policy — admin guide](admin-guide.md) |
+| api | n/a | implements the AccessDecider and EditionFeatureProvider contracts owned by module.auth-spi and the core; the /access/policies routes are core routes documented in module.access api-access.md |
 | tests | current | [Attribute-based access policy — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

@@ -22,7 +22,7 @@ tags: [product-item, module]
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Connections](user-guide-connections.md) |
 | admin-guide | current | [Remote connectors — operator runbook](admin-guide-connectors-runbook.md) |
-| api | missing | |
+| api | current | [Collector connector SPI](api.md) |
 | tests | current | [Collector and export connectors — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

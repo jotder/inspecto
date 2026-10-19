@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | current | [File-keystore secrets provider — plan of record](plan.md) |
+| spec | current | [File-keystore secrets provider — implementation spec](spec.md) |
+| architecture | current | [File-keystore secrets provider — architecture](architecture.md) |
 | features | current | [File-keystore secrets provider — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
+| user-guide | n/a | no screens; references are typed into connection profiles, covered by the admin guide and the connectors hub |
+| admin-guide | current | [File-keystore secrets provider — admin guide](admin-guide.md) |
+| api | n/a | implements the SecretsProvider contract owned by module.auth-spi; no types or routes of its own |
 | tests | current | [File-keystore secrets provider — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

@@ -17,10 +17,10 @@ tags: [product-item, solution-pack]
 |---|---|---|
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | missing | |
-| features | missing | |
+| architecture | current | [Link Analysis audit showcase — architecture](architecture.md) |
+| features | current | [Link Analysis audit showcase — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
+| user-guide | current | [Link Analysis audit showcase — user guide](user-guide.md) |
 | admin-guide | current | [Inspecto LA (Link Analysis) showcase B: Finance and audit (runbook, synthetic data only)](admin-guide-showcase-runbook.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |

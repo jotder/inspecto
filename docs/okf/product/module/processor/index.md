@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | current | [Jobs and scheduler — features](features-jobs-scheduler.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Diagnoses](user-guide-diagnoses.md) · [Jobs](user-guide-jobs.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Control plane and processor host — admin guide](admin-guide.md) |
 | api | current | [HTTP Control API](api-control-api.md) · [Jobs and scheduler — API](api-jobs-scheduler.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair)](api-onboarding-authoring.md) · [HTTP routes — module.processor](api-routes.md) · [Versioned API (/api/v1)](api-v1.md) |
 | tests | current | [Control plane and processor host — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

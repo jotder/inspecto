@@ -17,11 +17,11 @@ tags: [product-item, solution-pack]
 |---|---|---|
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | missing | |
-| features | missing | |
+| architecture | current | [Link Analysis showcase (feature off) — architecture](architecture.md) |
+| features | current | [Link Analysis showcase (feature off) — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
+| user-guide | current | [Link Analysis showcase (feature off) — user guide](user-guide.md) |
+| admin-guide | current | [Link Analysis showcase (feature off) — admin guide](admin-guide.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | brochure | current | [Link Analysis showcase (feature off) — brochure](brochure.md) |

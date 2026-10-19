@@ -18,10 +18,10 @@ tags: [product-item, solution-pack]
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Revenue assurance (telecom)](architecture-revenue-assurance.md) · [Business assurance](architecture.md) |
-| features | missing | |
+| features | current | [Business assurance — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
+| user-guide | current | [Business assurance — user guide](user-guide.md) |
+| admin-guide | current | [Business assurance — admin guide](admin-guide.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | brochure | current | [Business assurance — brochure](brochure.md) |

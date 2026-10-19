@@ -15,13 +15,13 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
+| plan | current | [Case Management — requirement of record](plan.md) |
+| spec | current | [Case Management — specification](spec.md) |
 | architecture | current | [Case Management](architecture-overview.md) |
 | features | current | [Case Management — features](features-case-management.md) |
 | feature-db | current | [Case Management — feature database](feature-db.md) |
 | user-guide | current | [Case Management — screens](user-guide-case-management.md) |
-| admin-guide | missing | |
+| admin-guide | current | [Case Management — admin guide](admin-guide.md) |
 | api | current | [Case Management — API](api-case-management.md) · [HTTP routes — module.case-management](api-routes.md) |
 | tests | current | [Case Management — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

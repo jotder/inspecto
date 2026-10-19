@@ -17,7 +17,7 @@ tags: [product-item, layer]
 |---|---|---|
 | plan | n/a | a layer groups modules — see the hubs of the modules it holds |
 | spec | n/a | a layer groups modules — see the hubs of the modules it holds |
-| architecture | missing | |
+| architecture | current | [Service contracts (SPI) — architecture](architecture.md) |
 | features | current | [Service contracts (SPI) — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a layer groups modules — see the hubs of the modules it holds |
