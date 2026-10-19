@@ -391,15 +391,14 @@ export class EntityTypeComponent implements OnInit {
     readonly truncatedText = computed(() => {
         const p = this.profile();
         if (!p) return '';
-        const cut = (s: unknown): boolean => (s as { truncated?: boolean } | undefined)?.truncated === true;
         const parts: string[] = [];
-        if (cut(p.volume)) parts.push('Volume');
-        if (cut(p.shapes)) parts.push('Shapes');
-        if (p.time && cut(p.time)) parts.push(`Time (newest ${count(p.time.perDay.length)} days read)`);
-        if ((p.relationships ?? []).some(cut)) parts.push('Relationships');
+        if (p.volume?.truncated) parts.push('Volume');
+        if (p.shapes?.truncated) parts.push('Shapes');
+        if (p.time?.truncated) parts.push(`Time (newest ${count(p.time.perDay.length)} days read)`);
+        if (p.links?.truncated) parts.push('Links');
         return parts.length
             ? `A limit was reached: ${parts.join(', ')} ${parts.length === 1 ? 'is' : 'are'} partial.`
-            : 'A limit was reached: not every Dataset bound to this type was read.';
+            : 'A limit was reached: this profile may not have read every Dataset bound to this type.';
     });
     readonly weeks = computed(() => {
         const t = this.profile()?.time;

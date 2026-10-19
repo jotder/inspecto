@@ -198,16 +198,23 @@ describe('EntityTypeComponent (Entity Type Profile)', () => {
     });
 
     it('names the clipped section(s) in the limit banner, and never a section the server did not mark', () => {
-        const { el } = make({ ...PROFILE, truncated: true, time: { ...PROFILE.time!, truncated: true } as never });
+        const { el } = make({ ...PROFILE, truncated: true, time: { ...PROFILE.time!, truncated: true } });
         const text = el.querySelector('[data-testid=truncated]')!.textContent!;
         expect(text).toContain('Time (newest 2 days read) is partial');
         expect(text).not.toContain('Volume');
         expect(text).not.toContain('Shapes');
     });
 
-    it('says the Dataset list was capped when no section is marked', () => {
+    it('names Links when only the link-kind list was cut, with no Dataset sentence', () => {
+        const { el } = make({ ...PROFILE, truncated: true, links: { ...PROFILE.links!, truncated: true } });
+        const text = el.querySelector('[data-testid=truncated]')!.textContent!;
+        expect(text).toContain('Links is partial');
+        expect(text).not.toContain('Dataset');
+    });
+
+    it('says the profile may not have read every Dataset only when no section is marked', () => {
         const { el } = make({ ...PROFILE, truncated: true });
-        expect(el.querySelector('[data-testid=truncated]')!.textContent).toContain('not every Dataset');
+        expect(el.querySelector('[data-testid=truncated]')!.textContent).toContain('may not have read every Dataset');
     });
 
     it('labels the calendar by its one visible heading', () => {
