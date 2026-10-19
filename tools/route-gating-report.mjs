@@ -25,11 +25,21 @@ const END = '<!--route-gating:end-->';
 /** Every *Routes.java under a module's main sources. */
 export function routeFiles(root = '.') {
   const out = [];
+  // An unreadable directory OUTSIDE module sources (an untracked local bundle, a locked runtime folder) cannot hold
+  // a *Routes.java: skip it with a warning. Inside a src/ tree it could, so there the error still throws — a
+  // silently skipped routes file would turn the gating evidence into a false green.
+  const unreadable = (p, e) => {
+    if (!['EPERM', 'EACCES'].includes(e.code) || relative(root, p).split(/[\\/]/).includes('src')) throw e;
+    console.warn(`route scan: skipped unreadable ${relative(root, p)} (${e.code})`);
+  };
   const walk = (dir) => {
-    for (const name of readdirSync(dir)) {
+    let names;
+    try { names = readdirSync(dir); } catch (e) { unreadable(dir, e); return; }
+    for (const name of names) {
       if (name === 'target' || name === 'node_modules' || name === '.git' || name === '.claude') continue;
       const p = join(dir, name);
-      const st = statSync(p);
+      let st;
+      try { st = statSync(p); } catch (e) { unreadable(p, e); continue; }
       if (st.isDirectory()) walk(p);
       else if (name.endsWith('.java') && p.includes(join('src', 'main', 'java'))) out.push(p);
     }

@@ -95,7 +95,7 @@ export function decide({ mods, changed, consumers, forceFull = false, pomChanged
     for (const p of changed) {
         // readers first: a test that READS this file sees even a comment edit
         let consumed = false;
-        for (const [prefix, ds] of consumers) if (p === prefix || p.startsWith(prefix + '/')) { consumed = true; for (const d of ds) { readers.add(mods[d].artifactId); notes.add(`${p} → read by ${d} tests`); } }
+        for (const [prefix, ds] of consumers) if (p === prefix || p.startsWith(prefix + '/')) { consumed = true; for (const d of ds) { readers.add(mods[d].artifactId); notes.add(`${p} → used by ${d} (its tests or build)`); } }
         if ((p.endsWith('pom.xml') || p.endsWith('.java')) && !pomChanged(p)) { notes.add(`${p}: comments/whitespace only — not compiled differently`); continue; }
         if (p === 'pom.xml' || p.startsWith('.mvn/')) { full = true; reasons.push(`${p}: reactor-wide build config`); continue; }
         const dir = owner(mods, p);
@@ -158,6 +158,17 @@ function main() {
     // an untracked file counts only as NEW SOURCE inside a module; scratch, target/ output and runtime state are not changes
     for (const p of untracked) if (owner(mods, p) && /\/src\//.test(p)) changed.add(p);
     const consumers = discoverConsumers(mods, tracked.filter((f) => /\/src\/test\/.*\.java$/.test(f)), read, (p) => trackedSet.has(p) || dirs.has(p));
+    // a BUILD that runs a repo file (exec-maven-plugin: ${project.basedir}/../tools/KnownModules.java) makes that
+    // module a consumer too — its build output depends on the file
+    for (const [dir, m] of Object.entries(mods)) {
+        if (dir === '.' || m.aggregator) continue;
+        for (const x of read(`${dir}/pom.xml`).matchAll(/\$\{project\.basedir\}\/((?:\.\.\/)+[\w./-]+\.\w+)/g)) {
+            const p = posix.normalize(posix.join(dir, x[1]));
+            if (!trackedSet.has(p)) continue;
+            if (!consumers.has(p)) consumers.set(p, new Set());
+            consumers.get(p).add(dir);
+        }
+    }
     const plan = decide({ mods, changed: [...changed], consumers, forceFull, pomChanged });
     plan.base = base; plan.head = head ?? 'WORKTREE'; plan.changedFiles = changed.size;
     if (json) { console.log(JSON.stringify(plan, null, 2)); return; }

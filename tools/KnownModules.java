@@ -30,6 +30,14 @@ public class KnownModules {
             @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes a) {
                 return !dir.equals(root) && SKIP.contains(dir.getFileName().toString()) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
             }
+            // An unreadable entry OUTSIDE module sources (an untracked local bundle, a locked runtime folder) cannot
+            // hold a manifest: skip it with a warning instead of failing the build. Inside a src/ tree it could, so
+            // there it still fails — a silently skipped manifest would ship a wrong known-modules index.
+            @Override public FileVisitResult visitFileFailed(Path f, IOException e) throws IOException {
+                if (root.relativize(f).toString().replace('\\', '/').contains("/src/")) throw e;
+                System.err.println("known-modules: skipped unreadable " + root.relativize(f) + " (" + e.getClass().getSimpleName() + ")");
+                return FileVisitResult.CONTINUE;
+            }
             @Override public FileVisitResult visitFile(Path f, BasicFileAttributes a) throws IOException {
                 if (!f.toString().replace('\\', '/').endsWith(TAIL)) return FileVisitResult.CONTINUE;
                 Matcher m = ID.matcher(Files.readString(f, StandardCharsets.UTF_8));
