@@ -30,7 +30,7 @@ directory (`MaskTokens.spaceKey`).
 
 - `LA-CONFIG-LIMITS-RESIDUALS-1` (P3): what the limits work left; as-built in [la-core architecture](../la-core/architecture.md) §9-§10.
 - `LA-EDITIONS-RESIDUALS-1` (P3): pack and edition residuals.
-- `ASSURE-ENTITY-LISTS-RESIDUALS-1` (P3): Entity List residuals after WS-12 shipped.
+- `ASSURE-ENTITY-LISTS-RESIDUALS-1` is closed: its demand-gated rest (range / CIDR entries in `excludeBy` / `seedBy`) was retired to BACKLOG §6 on 2026-10-18.
 
 ## Refused
 

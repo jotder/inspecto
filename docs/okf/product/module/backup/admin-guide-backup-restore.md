@@ -19,7 +19,7 @@ on Personal; see EDITIONS `OPS-06`.
 Every path field on a maintenance job (`dir`, `backup_dir`, `archive_dir`, `archive`, `target_dir`,
 and `out_dir` on reports) must resolve under an **allowed root** — as must a pipeline's
 `schema_file` / `grammar` / `mapping_file`, which are now enforced when the config loads. The roots come from
-`-Dassist.safety.roots` (a `;`-separated list) plus every hosted Space base — the
+`-Dassist.safety.roots` (a `;`-separated list) plus the calling Space's own base only (`CROSS-SPACE-JAIL-1`) — the
 same list the control plane's 422 write gate enforces, so a value refused at authoring is refused at
 run time for the same reason.
 

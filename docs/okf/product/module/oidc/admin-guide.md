@@ -21,12 +21,12 @@ refuses to start rather than serve unauthenticated. Wider security posture: [adm
 | `auth.oidc.discoveryUrl` | no | none | `<issuer>/.well-known/openid-configuration`; fills every endpoint below that is not set explicitly. https only (http allowed for localhost). |
 | `auth.oidc.issuer` | yes* | from discovery | Exact `iss` the tokens must carry. |
 | `auth.oidc.jwksUri` | yes* | from discovery / keycloak preset | Signing keys (RS256). |
-| `auth.oidc.tokenEndpoint` | yes* | from discovery / keycloak preset | Server-side code and refresh exchange. Never derived for `generic` or `wso2`. |
+| `auth.oidc.tokenEndpoint` | yes* | from discovery / keycloak preset | Server-side code and refresh exchange. No path preset for `generic` or `wso2`: set it or use discovery. |
 | `auth.oidc.audience` | no (warned) | none | Expected `aud`. Unset logs "OIDC audience validation is OFF" at boot. |
 | `auth.oidc.clientId` | no | `inspecto-spa` | The SPA's client id. |
 | `auth.oidc.clientSecret` | no | none | Confidential client only; pass a reference such as `${ENV:AUTH_OIDC_CLIENT_SECRET}`, never the value. |
 | `auth.oidc.rolesClaim` | no | `roles` | Claim holding role names (WSO2: `groups`). Setting it switches the Keycloak union off. |
-| `auth.oidc.authorizeUrl`, `auth.oidc.endSessionUrl`, `auth.oidc.scopes` | no | from discovery / preset | Published to the SPA by `GET /bootstrap`; no `authorizeUrl` means the SPA gets no OIDC config from the server. |
+| `auth.oidc.authorizeUrl`, `auth.oidc.endSessionUrl`, `auth.oidc.scopes` | no | URLs from discovery / keycloak preset; `scopes` none (explicit only) | Published to the SPA by `GET /bootstrap`; no `authorizeUrl` means the SPA gets no OIDC config from the server. |
 | `auth.oidc.gateway.issuer`, `.jwksUri`, `.audience`, `.header` | no | header `X-JWT-Assertion` | Gateway trust mode: accept a gateway-signed JWT when no valid Bearer token is present. Setting `.issuer` makes `.jwksUri` required. |
 
 \* Required after precedence: explicit flag, then discovery, then the `keycloak` preset

@@ -28,7 +28,7 @@ Standard, Advanced and Preview bundle OIDC sign-in and a Postgres sidecar.
 | `-Ui gamma\|la-app` | Which SPA goes into `ui/` — the Inspecto console (default) or the Link Analysis app. Not an edition. |
 | `-NoUi` / `-NoRuntime` | Skip the UI build / the embedded trimmed Java runtime (the host must then supply Java). |
 | `-SkipBootCheck` | Skip the post-package boot smoke against `/health` (local use only, never for a release). |
-| `-DemoAuth` | Offline demo build (requires `-Edition Advanced`); binds to `127.0.0.1`. Never an edition. |
+| `-DemoAuth` | Offline demo build (requires `-Edition Advanced` or `-Edition Preview`); binds to `127.0.0.1`. Never an edition. |
 | `-Sign` | Also write a GPG detached signature per artifact; SHA-256 checksums are always written. |
 
 Build recipes and Maven profiles: [build & test](../platform/spec-build-test.md).

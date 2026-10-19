@@ -25,7 +25,7 @@ Copy each sample feed from `data/samples/<feed>` into `data/inbox/<feed>` (`swit
 
 ## Enable optional parts
 
-The completeness tile needs `ra_switch_kpi_completeness_job` (`kpi.completeness`), which ships `enabled: false`.
+The completeness tile needs the `ra_switch_kpi_completeness` Job (`config/jobs/ra_switch_kpi_completeness_job.toon`, type `kpi.completeness`), which ships `enabled: false`.
 
 ## Tune
 

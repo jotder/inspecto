@@ -28,7 +28,7 @@ per-Feature explanation that can be recomputed; authored as an **Anomaly Model**
 - `ANOMALY-DETECTION-RESIDUALS-1` (closed 2026-10-18): evidence rows, preview day series, NULL cohort values,
   unsaved-content preview, the telco-fraud dashboard tile.
 - `ANOMALY-PEER-GROUPING-1` (closed 2026-10-11): grouped peer side, 200k entities in about 1–1.6 s (D-AD9).
-- `ANOMALY-UI-FINDINGS-1` items (a)–(j) shipped 2026-10-14.
+- `ANOMALY-UI-FINDINGS-1` items (a)–(j) shipped 2026-10-14 to 2026-10-17 ((g) only partly).
 - `ANOMALY-ML-SCORING-1`: `method: isolation_forest` on the model, built 2026-10-18 (see
   [analytics spec](../analytics/spec.md)).
 

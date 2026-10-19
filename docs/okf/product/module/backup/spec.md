@@ -33,7 +33,7 @@ ServiceLoader registrations: `META-INF/services/com.gamma.job.MaintenanceTaskPro
 | `restore` | `archive`, `target_dir` | `overwrite` (`"true"`; default `false`) |
 
 Every path except `backup_verify`'s `archive` goes through `PathJail.requireJobPathUnderAny` against
-`PathJail.allowedRoots()` (from `-Dassist.safety.roots` plus every hosted Space base), with the Space config
+`PathJail.allowedRoots()` (`SafetyPolicy.defaultPolicy()`: `-Dassist.safety.roots` plus the calling Space's own base only, never another Space's — `CROSS-SPACE-JAIL-1`), with the Space config
 root (`SpaceConfigRoot.current()`) as the base for relative values. `backup_verify`'s `archive` is jailed
 against the resolved `backup_dir`.
 
@@ -56,6 +56,6 @@ against the resolved `backup_dir`.
 |---|---|---|
 | `maintenance.backup.completed` | INFO | archive written (`archive`, `archiveSha256`, `fileCount`, `totalBytes`) |
 | `maintenance.backup.verify_failed` | CRITICAL | any finding (`backupDir`, `count`, `findings`) |
-| `maintenance.restore.completed` | | restore finished |
+| `maintenance.restore.completed` | INFO | restore finished |
 
 Tests: [tests-inventory](tests-inventory.md).
