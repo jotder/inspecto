@@ -328,8 +328,9 @@ and any column whose registry/lineage class is claimed by a masked Entity Type o
 `{entityType, resolved, reason?, objects, total, truncated, masking{mode, masked}}`. The node dialog's Case history for a
 key it holds only as an alias (`GET /objects/by-entity` needs the raw id). The key resolves with the reference-rows rules:
 an Investigation pseudonym (readable Investigation only), else an exploration alias, and only when the masking covers the
-Entity Type (`all`, or `typed` with a masked type); under that masking a raw key names nothing (`resolved:false`, the
-same answer as an unknown alias — no oracle). Entity Type = the Investigation header's `entityType`/`sourceType`/`targetType`,
+Entity Type (`all`, or `typed` with a masked type). A raw key resolves only under mode `none`; under any other mode it
+names nothing, whatever the header type (`resolved:false`, the same answer as an unknown alias — no oracle;
+`LA-CASE-HISTORY-RAW-KEY-1`, 2026-10-19). So under `typed`, an uncovered type (e.g. `cell`) has no case history here. Entity Type = the Investigation header's `entityType`/`sourceType`/`targetType`,
 else `msisdn`. The read is the ops module's own (`ObjectAccess.byEntity` → `EntityHistory.query`, reached through
 `CasePort.history` / `HostCasePort`): same matching, SEC-7d / ABAC post-filter and `truncated`. No key is echoed; under
 masking titles are scrubbed fail-closed: the raw id in any spelling (spaces, dashes, dots, parentheses, `+`) becomes the
