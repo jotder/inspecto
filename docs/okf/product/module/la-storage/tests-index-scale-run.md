@@ -210,4 +210,4 @@ passes first.
 1. **Peak RSS and spill-peak recording** in the bench: a sampler thread printing `SCALE resources rssMB=... spillGB=... freeGB=...` every 60 s would give the figures section 4 asks for without an outside watcher (about 20 lines in `IndexScaleBench`; not done here because the plan was docs-only).
 2. **Resumable series** (`-Dinspecto.bench.only=compact|latency` and a guard that a rerun does not re-append deltas): a 10^9 FULL build is hours, and today a crash after it, or a wish to add COMPACT later, means a rebuild.
 3. A corpus-complete marker (`data-N/_done`) so an interrupted generation is not silently reused.
-4. A `-Dinspecto.bench.freeFloorGB=` that aborts the build before the disk fills.
+4. A `-Dinspecto.bench.freeFloorGB=` (planned, not built) that aborts the build before the disk fills.

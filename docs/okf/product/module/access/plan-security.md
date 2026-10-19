@@ -635,7 +635,7 @@ the logs were deleted 2026-07-26 before export).
 
 | Superseded | By | Where recorded |
 |---|---|---|
-| The pre-2026-06-16 bearer plane (`Scope`, `-Dcontrol.token`, the token screen) | the SPI posture (§3.1) | `auth-security.md` |
+| The pre-2026-06-16 bearer plane (`Scope`, `-Dcontrol.token`, the token screen — removed) | the SPI posture (§3.1) | `auth-security.md` |
 | A hand-rolled JOSE library for the authenticator (`rbac-abac-plan` R0 draft) | **MOOT** — Nimbus was already the signed-off, module-confined dependency; R0 was drafted from a stale premise | `rbac-abac-plan.md` §R0 (archive) |
 | A separate authorize middleware for Access Profiles (R2 sketch) | enforcement at authentication (§3.7) | §4 |
 | Seeding `access-policies.toon` at Space creation | engine-resident `PolicyEngine.SEED` overlaid by name | §3.10 |

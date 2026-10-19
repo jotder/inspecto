@@ -152,7 +152,7 @@ context on `/`. The pipeline is a composed middleware `Chain`, outermost first:
 that stay unversioned is `isInfraRoute` (`:1119-1122`): `/health`, `/ready`, `/metrics`,
 `/metrics/acquisition` — they have no v1 semantics. A bare `GET /objects` is a **SPA deep link** and gets
 `index.html`; a bare `POST /objects` gets a JSON 404. The whole sunset apparatus — `Deprecation` / `Sunset`
-headers, `-Dapi.legacy.routes`, `inspecto_legacy_api_requests_total`, the 30-day-at-zero soak — is
+headers, `-Dapi.legacy.routes` (removed), `inspecto_legacy_api_requests_total`, the 30-day-at-zero soak — is
 **deleted**, not disabled. `ControlApi.LOCAL_BASE_URL_PROP` stays a **root** URL with no version: the
 version belongs to the client, exactly as the SPA composes `apiBaseUrl + /v1 + path`.
 
@@ -654,7 +654,7 @@ Renaming would break every stored client link; migrating an offset pager with no
 | The design's full `metadata.etag` / `links` / `permissions` envelope with per-resource ∩ state permissions | session-wide `permissions[]`, refined by SEC-7b `resourcePermissions` | `api-v1.md` |
 | `docs/api/openapi-v1.json` per context | `openapi-v1.json` with tags | `docs/api/README.md` |
 | `KeycloakTokenRelay`, the issuer-derived token endpoint | `OidcTokenRelay`, mandatory `-Dauth.oidc.tokenEndpoint` (D15) | `SEC` §4 |
-| Scoped token auth in the core (`-Dcontrol.token`, `/connect`) | the auth-free core + SPIs (2026-06-16) | `SEC` §3.1 |
+| Scoped token auth in the core (`-Dcontrol.token`, `/connect` — removed) | the auth-free core + SPIs (2026-06-16) | `SEC` §3.1 |
 | `/flows`, `/sources`, `/issues`; the ingest-ops `/pipelines` | `/pipelines`, `/collectors`, `/incidents`; `/runs` | `GLOSSARY.md` §13 |
 | "Job survives as internal scheduling vocabulary only" (2026-08-05) | Jobs un-banned, routes canonical (2026-08-06) | `GLOSSARY.md` §13 |
 | Constructor injection of engine facilities into built-in Jobs; a setter for the service registry | Platform Services; a constructor parameter | `platform-services.md` |

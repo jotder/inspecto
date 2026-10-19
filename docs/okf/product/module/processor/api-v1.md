@@ -27,7 +27,7 @@ guidelines, §4 the decisions); provenance:
   **`/health`, `/ready`, `/metrics`, `/metrics/acquisition`** — they have no v1 semantics.
   `isInfraRoute` is therefore the allow-list, no longer a metric exemption.
   The whole sunset apparatus is **gone**: `legacyRoutesOff`, `legacySunset`, `recordLegacyUsage`,
-  `markDeprecated`, `sunsetHeader`, the `-Dapi.legacy.routes` / `-Dapi.legacy.sunset` flags, and the
+  `markDeprecated`, `sunsetHeader`, the `-Dapi.legacy.routes` / `-Dapi.legacy.sunset` flags (all removed), and the
   `inspecto_legacy_api_requests_total` metric. (The 30-day-at-zero soak criterion was deliberately
   overridden: there is no live deployment and every in-repo caller was migrated in the same change.)
   Contract for callers: responses are envelope-wrapped and errors are

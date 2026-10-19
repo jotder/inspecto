@@ -295,7 +295,7 @@ are exactly the pair the pipeline does not produce.
 ## Status — core is auth-free (2026-06-16)
 
 The hand-rolled bearer-token control plane that earlier versions baked into `ControlApi`
-(per-route `Scope` + `Tokens` + `requireAuth`, `-Dcontrol.token` / `-Dassist.*.token`, the
+(per-route `Scope` + `Tokens` + `requireAuth`, `-Dcontrol.token` / `-Dassist.*.token` (removed), the
 Angular token-paste `/connect` screen + `authInterceptor` + route guard) has been **removed
 from the common core / `master`**. The Basic edition is now genuinely auth-free: every
 ControlApi route is open and the SPA boots straight to the dashboard with no login.

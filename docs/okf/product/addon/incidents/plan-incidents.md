@@ -1019,7 +1019,7 @@ and a default purge deletes business records.
 | MNT-14 plan §3 G1 / G4 framing | marked wrong in the plan's own header; `jobs.md` is the account | archived `mnt-14-incident-retention-plan.md` |
 | D6's two premises ("reuse the C6 workflow/TOON pattern", "the `attribute-spec` renderer" = `ConfigSpecs`) | the `findings-spec` kind and the frontend `AttributeSpec` vocabulary | `objects.md` |
 | `DecisionConsequence` | `Consequence` (aliased for back-compat) | archived `decision-network-plan.md` |
-| The operations reference's curl walkthrough (`type=ISSUE`, `assign` → `start`, `-Dcontrol.token`) | rewritten with this spec: `INCIDENT`, `accept` → `resolve`, no token plane | `operations-reference.md` |
+| The operations reference's curl walkthrough (`type=ISSUE`, `assign` → `start`, `-Dcontrol.token`, now removed) | rewritten with this spec: `INCIDENT`, `accept` → `resolve`, no token plane | `operations-reference.md` |
 | `USER_GUIDE.md`'s "open → in-progress → resolved" and "list-and-detail" | corrected with this spec | `USER_GUIDE.md` |
 | `STAKEHOLDER_OVERVIEW.md`'s "Issue & case management … open → assigned → in-progress → resolved → closed", "(cases/issues)", unconditional Personal availability | plan §8 cluster — reconciled at step 6, not here | — |
 
