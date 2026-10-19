@@ -80,8 +80,15 @@ path mention to them (used for wave 4; reuse it for any later move).
    rows would be the union of everything; read the CSV. A generated `feature-db.md` the tool no longer writes is
    deleted on the next run. Gotcha: most FEATURE_INVENTORY rows cite no hub, so they are not in the feature-db.
 4. ✅ **Move content in** (whole files). Still open: split big multi-audience docs (L3 pages hold screens/API
-   sections → `user-guide` / `api`), slice OpenAPI by tag into `api`, write `tests` inventories, fill
+   sections → `user-guide` / `api`), slice OpenAPI by tag into `api`, fill
    `features` for every item.
+   ✅ **`tests` slot generated** (2026-10-19) — `tools/render-tests-inventory.mjs` (test
+   `render-tests-inventory.test.mjs`; CI runs `--check` in the Product Map guard step) writes `tests-inventory.md` into
+   every `module.*` hub whose Maven module has tests (45 hubs, 1561 classes on 2026-10-19), plus
+   `layer/platform/tests-tools-inventory.md` for `tools/*.test.mjs`. Module dir = the dir holding the manifest whose
+   `id` matches the item's `module:`; tests = git-tracked `src/test/**/*Test.java` / `*IT.java`. Kind is inferred
+   (`*IT` → IT; `ControlApi*` or `HttpClient`+`ControlApi` → real-HTTP control-plane; else unit); summary = first
+   Javadoc line. UI specs are deliberately not mapped (no reliable item link). Orphaned generated files are deleted.
 5. **Brochures** — per edition and solution pack, assembled from `features` slots.
 6. ✅ **Agent skills** (2026-10-19) — four repo skills read hubs by item id + slot:
    `.claude/skills/docs-lookup` (item id + slot → hub `index.md` → slot file), `pipeline-author`
