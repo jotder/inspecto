@@ -8,11 +8,17 @@ import com.gamma.spi.auth.ErrorCodes;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.attribute.PosixFilePermissions;
 
 /**
  * Entity masking for the STATELESS exploration reads — {@code /inv/projection}, {@code /neighbors}, {@code /multi},
@@ -34,8 +40,10 @@ import java.util.Map;
  *
  * <p><b>Resolution</b> — a client hands an alias back (an expand's {@code value}, a traversal's {@code startNode}, an
  * Investigation seed). It is resolved from {@link #BOOK}: the alias → raw pairs this server has minted for this Space,
- * kept in memory only (bounded, least-recently-used out). Nothing raw is ever sent to a client. ⚠ A restart, or an alias
- * evicted from the book, is answered 422 {@code "alias not known"} — re-run the query to mint it again.
+ * kept in memory (bounded, least-recently-used out) and appended to the Space's book file in the secrets directory beside
+ * the root ({@code .exploration-alias-book}, outside every exported tree; LA-EDITIONS-RESIDUALS-1 4c), so an alias
+ * still resolves after a restart or an eviction: every in-memory miss scans that file. Nothing raw is ever sent to a
+ * client. ⚠ An alias never minted, or whose book file was removed, is answered 422 {@code "alias not known"}.
  */
 final class ExplorationMasking {
 
@@ -46,6 +54,9 @@ final class ExplorationMasking {
             return size() > BOOK_MAX;
         }
     });
+
+    /** Serialises appends to a book file (one lock for all Spaces: an append is one short write). */
+    private static final Object FILE_LOCK = new Object();
 
     private final Path root;
     private final String mode;
@@ -96,7 +107,7 @@ final class ExplorationMasking {
     String out(String raw) {
         if (!active || raw == null) return raw;
         String alias = MaskTokens.token(key(), raw);
-        BOOK.put(root + "\u0000" + alias, raw);
+        remember(root, alias, raw);
         return alias;
     }
 
@@ -111,13 +122,18 @@ final class ExplorationMasking {
         String raw = lookup(root, id);
         if (raw == null)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "alias '" + id + "' is not known to this server "
-                    + "(it restarted, or the alias aged out) - run the query again to mint it, then pick the node");
+                    + "(it was never minted here, or its book was removed) - run the query again to mint it, then pick the node");
         return raw;
     }
 
     /** The raw id behind an alias served for this Space's exploration reads, or null. */
     static String lookup(Path writeRoot, String alias) {
-        return BOOK.get(writeRoot + "\u0000" + alias);
+        String raw = BOOK.get(writeRoot + "\u0000" + alias);
+        if (raw == null) {
+            raw = scan(writeRoot, alias);
+            if (raw != null) BOOK.put(writeRoot + "\u0000" + alias, raw);
+        }
+        return raw;
     }
 
     /**
@@ -127,8 +143,80 @@ final class ExplorationMasking {
      */
     static String alias(Path writeRoot, String raw) {
         String alias = MaskTokens.token(spaceKey(writeRoot), raw);
-        BOOK.put(writeRoot + "\u0000" + alias, raw);
+        remember(writeRoot, alias, raw);
         return alias;
+    }
+
+    /** Puts the pair in the book; a pair this process did not hold yet is appended to the Space's book file. */
+    private static void remember(Path writeRoot, String alias, String raw) {
+        if (BOOK.put(writeRoot + "\u0000" + alias, raw) != null) return;
+        String line = alias + "\t" + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8)) + "\n";
+        Path f = bookFile(writeRoot);
+        synchronized (FILE_LOCK) {
+            try {
+                Files.createDirectories(f.getParent());
+                if (!Files.exists(f)) createOwnerOnly(f);
+                Files.writeString(f, line, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    private static void createOwnerOnly(Path f) throws IOException {
+        boolean posix = f.getFileSystem().supportedFileAttributeViews().contains("posix");
+        try {
+            if (posix) Files.createFile(f, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+            else {
+                Files.createFile(f);
+                com.gamma.util.SpaceSecretKeys.ownerOnlyAcl(f);
+            }
+        } catch (FileAlreadyExistsException raced) {
+            // another process created it first
+        }
+    }
+
+    /**
+     * The raw id behind {@code alias} in the Space's book file, or null. Read on every in-memory miss, so an alias evicted
+     * from {@link #BOOK} resolves again and concurrent first lookups after a restart each find it. A line is believed only
+     * when the alias really is the token of its raw value, so a line torn by a crash mid-append (whose truncated base64
+     * may still decode, to a shorter raw) is skipped.
+     */
+    private static String scan(Path writeRoot, String alias) {
+        Path f = bookFile(writeRoot);
+        if (!Files.isRegularFile(f)) return null;
+        String prefix = alias + "\t";
+        byte[] key = null;
+        try (var lines = Files.lines(f, StandardCharsets.UTF_8)) {
+            for (String line : (Iterable<String>) lines::iterator) {
+                if (!line.startsWith(prefix)) continue;
+                String raw;
+                try {
+                    raw = new String(Base64.getDecoder().decode(line.substring(prefix.length())), StandardCharsets.UTF_8);
+                } catch (IllegalArgumentException torn) {
+                    continue;
+                }
+                if (key == null) key = spaceKey(writeRoot);
+                if (MaskTokens.token(key, raw).equals(alias)) return raw;
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return null;
+    }
+
+    private static Path bookFile(Path writeRoot) {
+        return com.gamma.util.SpaceSecretKeys.keyFile(writeRoot, ".exploration-alias-book");
+    }
+
+    /** Test seam: drops the in-memory book, as a restart does. */
+    static void forgetInMemoryForTest() {
+        BOOK.clear();
+    }
+
+    /** Test seam: drops one entry from the in-memory book, as an LRU eviction does. */
+    static void evictForTest(Path writeRoot, String alias) {
+        BOOK.remove(writeRoot + "\u0000" + alias);
     }
 
     private static byte[] spaceKey(Path writeRoot) {

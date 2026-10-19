@@ -594,7 +594,7 @@ Masked values appear as stable tokens you can still group and count by.
 The same rule applies on the query graph, the node list, paths, patterns and Value Measures as in the Working Set: a *Masking: typed|all|none*
 badge in the query panel says which applies, and stays visible after the panel collapses to its summary. A masked entity shows as an alias (`masked:...`); pick, seed and expand it as you
 would a name. The Investigation gives the seeded entity its own alias, so the Working Set row differs from the query graph's;
-the Selected line keeps them one entity and marks it *(masked)*. After a server restart an old alias is refused: run the query again.
+the Selected line keeps them one entity and marks it *(masked)*. An alias keeps working after a server restart.
 
 **Settings → Link Analysis** sets per-Space limits: the four-eyes thresholds (large expands wait for a second
 person), the merged-traversal cap and the `seedBy` cap. It also shows and, with the authoring capability, changes the
