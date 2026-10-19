@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | current | [Notifications](architecture-overview.md) |
 | features | current | [Notifications — features](features-notifications.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Notifications — screens](user-guide-notifications.md) |
 | admin-guide | missing | |
 | api | current | [Notifications — API](api-notifications.md) |
 | tests | current | [Notification channels — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

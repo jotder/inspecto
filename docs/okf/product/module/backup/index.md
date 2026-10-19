@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | missing | |
 | features | current | [Backup and restore — features](features.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | missing | |
 | admin-guide | current | [Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)](admin-guide-backup-restore.md) |
 | api | missing | |
 | tests | current | [Backup and restore — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

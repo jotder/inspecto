@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | current | [Hosted Model Providers](spec.md) |
 | architecture | current | [Agent Hosted Module (providers/inspecto-agent-hosted/)](architecture.md) |
 | features | current | [Hosted model providers for the assistant — features](features.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | missing | |
 | admin-guide | missing | |
 | api | missing | |
 | tests | current | [Hosted model providers for the assistant — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

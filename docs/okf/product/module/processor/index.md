@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | current | [Component Registry](spec-component-registry.md) · [Decision Rules & the Condition-Tree Evaluator](spec-decision-rules.md) · [Jobs & Scheduling](spec-jobs.md) · [Metadata Bundle & Transportability](spec-metadata-bundle.md) · [Pipeline closure — what belongs to a pipeline](spec-pipeline-closure.md) · [Pipeline identity — rename & save-as-template](spec-pipeline-identity.md) · [Platform Services — the plugin envelope](spec-platform-services.md) · [Query catalog & execution](spec-queries.md) · [Tags — the cross-entity label graph](spec-tags.md) |
 | architecture | current | [Job vs Pipeline Step — capability boundary](architecture-job-vs-step.md) · [Jobs and scheduler](architecture-jobs-scheduler.md) · [Multi-Space Hosting](architecture-multi-space.md) |
 | features | current | [Jobs and scheduler — features](features-jobs-scheduler.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Diagnoses](user-guide-diagnoses.md) · [Jobs](user-guide-jobs.md) |
 | admin-guide | missing | |
 | api | current | [HTTP Control API](api-control-api.md) · [Jobs and scheduler — API](api-jobs-scheduler.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair)](api-onboarding-authoring.md) · [HTTP routes — module.processor](api-routes.md) · [Versioned API (/api/v1)](api-v1.md) |
 | tests | current | [Control plane and processor host — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

@@ -15,15 +15,15 @@ tags: [product-item, layer]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
+| plan | n/a | a layer groups modules — see the hubs of the modules it holds |
+| spec | n/a | a layer groups modules — see the hubs of the modules it holds |
 | architecture | missing | |
 | features | current | [Link Analysis modules — features](features.md) |
-| feature-db | missing | |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
-| tests | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
+| user-guide | n/a | a layer groups modules — see the hubs of the modules it holds |
+| admin-guide | n/a | a layer groups modules — see the hubs of the modules it holds |
+| api | n/a | a layer groups modules — see the hubs of the modules it holds |
+| tests | n/a | a layer groups modules — see the hubs of the modules it holds |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

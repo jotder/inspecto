@@ -15,15 +15,15 @@ tags: [product-item, addon]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
+| spec | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
+| architecture | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | features | current | [Scoring & Lists — features](features.md) |
 | feature-db | current | [Scoring & Lists — feature database](feature-db.md) |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
-| tests | missing | |
+| user-guide | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
+| admin-guide | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
+| api | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
+| tests | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

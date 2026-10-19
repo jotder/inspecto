@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | current | [Collector Connectors](spec-connectors.md) |
 | architecture | current | [Connectors Module (providers/inspecto-connectors/)](architecture.md) |
 | features | current | [Collector and export connectors — features](features.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Connections](user-guide-connections.md) |
 | admin-guide | current | [Remote connectors — operator runbook](admin-guide-connectors-runbook.md) |
 | api | missing | |
 | tests | current | [Collector and export connectors — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

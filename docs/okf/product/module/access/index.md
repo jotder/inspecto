@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | current | [Identity and Access](architecture-overview.md) |
 | features | current | [Identity and Access — features](features-access.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Identity and Access — screens](user-guide-access.md) |
 | admin-guide | current | [Auth & Security](admin-guide-auth-security.md) |
 | api | current | [Identity and Access — API](api-access.md) |
 | tests | current | [Access policy (roles, grants, row scope, audit trail) — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

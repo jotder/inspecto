@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | current | [Maker-checker (Pending Changes)](architecture-maker-checker.md) · [Workflow and SLA](architecture-workflow-sla.md) |
 | features | current | [Maker-checker (Pending Changes) — features](features-maker-checker.md) · [Workflow and SLA — features](features-workflow-sla.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Maker-checker (Pending Changes) — screens](user-guide-maker-checker.md) · [Workflow and SLA — screens](user-guide-workflow-sla.md) |
 | admin-guide | missing | |
 | api | current | [Maker-checker (Pending Changes) — API](api-maker-checker.md) · [Workflow and SLA — API](api-workflow-sla.md) |
 | tests | current | [Workflow and SLA models — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

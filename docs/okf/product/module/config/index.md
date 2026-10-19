@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | current | [Config Safety Validator](spec-config-safety.md) · [Pipeline config keys — the single block census](spec-pipeline-config-keys.md) · [TOON Configuration](spec-toon-config.md) |
 | architecture | current | [Spaces](architecture-spaces.md) |
 | features | current | [Spaces — features](features-spaces.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Config](user-guide-config.md) · [Grammar configuration (the one surface)](user-guide-grammar-config.md) · [Spaces — screens](user-guide-spaces.md) |
 | admin-guide | current | [Configuration reference](admin-guide-configuration-reference.md) |
 | api | current | [Spaces — API](api-spaces.md) |
 | tests | current | [Config model and codecs — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

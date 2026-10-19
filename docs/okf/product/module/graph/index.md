@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | current | [Graph library](architecture-overview.md) |
 | features | current | [Graph library — features](features-graph.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Graph library — screens](user-guide-graph.md) |
 | admin-guide | missing | |
 | api | current | [Graph library — API](api-graph.md) |
 | tests | current | [Graph algorithms — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

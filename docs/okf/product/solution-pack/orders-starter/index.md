@@ -15,15 +15,15 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
+| plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
+| spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | missing | |
 | features | missing | |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | missing | |
 | admin-guide | missing | |
-| api | missing | |
-| tests | missing | |
+| api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
+| tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | brochure | current | [Orders starter — brochure](brochure.md) |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

@@ -16,6 +16,14 @@ const check = process.argv.includes('--check');
 const KIND_ORDER = ['edition', 'solution-pack', 'layer', 'addon', 'module', 'functionality'];
 const KIND_TITLE = { edition: 'Editions', 'solution-pack': 'Solution packs', layer: 'Layers', addon: 'Add-ons', module: 'Modules', functionality: 'Functionalities' };
 let stale = 0;
+// Slots that do not apply to a KIND of item (a file in the hub still wins). Per-hub exceptions: `slots-na.toon` in the hub.
+const MODULES = 'see the hubs of the modules it holds';
+const KIND_NA = {
+    edition: Object.fromEntries(['plan', 'spec', 'architecture', 'user-guide', 'admin-guide', 'api', 'tests'].map((s) => [s, `an Edition is a build flavor — ${MODULES}`])),
+    addon: Object.fromEntries(['plan', 'spec', 'architecture', 'user-guide', 'admin-guide', 'api', 'tests'].map((s) => [s, `an Add-on licenses modules — ${MODULES}`])),
+    'solution-pack': Object.fromEntries(['plan', 'spec', 'api', 'tests'].map((s) => [s, `a Solution pack configures modules — ${MODULES}`])),
+};
+const LAYER_NA = Object.fromEntries(['plan', 'spec', 'user-guide', 'admin-guide', 'api', 'tests'].map((s) => [s, `a layer groups modules — ${MODULES}`]));
 
 const titleOf = (text, fallback) => /^title:\s*(.+)$/m.exec(text)?.[1].trim().replace(/^["']|["']$/g, '')
     ?? /^#\s+(.+)$/m.exec(text)?.[1].trim() ?? fallback;
@@ -37,10 +45,18 @@ for (const kind of KIND_ORDER) {
         const title = /^title:\s*(.+)$/m.exec(toon)?.[1].trim() ?? id;
         const dir = join(HUBS, kind, name), hubRel = `docs/okf/product/${kind}/${name}/index.md`;
         const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'index.md').sort() : [];
+        const naFile = join(dir, 'slots-na.toon');
+        // per-hub decisions: `<slot>: <why this slot does not apply>` — one line each
+        const naOverride = existsSync(naFile) ? Object.fromEntries(readFileSync(naFile, 'utf8').split(/\r?\n/)
+            .map((l) => /^([a-z-]+):\s*(.+)$/.exec(l.trim())).filter(Boolean).map((m) => [m[1], m[2].replace(/^"|"$/g, '')])) : {};
         const rows = SLOTS.map((slot) => {
             const mine = files.filter((f) => f === `${slot}.md` || f.startsWith(`${slot}-`));
             if (mine.length) return `| ${slot} | current | ${mine.map((f) => `[${titleOf(readFileSync(join(dir, f), 'utf8'), f)}](${f})`).join(' · ')} |`;
+            if (naOverride[slot]) return `| ${slot} | n/a | ${naOverride[slot]} |`;
             if (slot === 'brochure' && kind !== 'edition' && kind !== 'solution-pack') return `| ${slot} | n/a | per edition / solution pack |`;
+            if (slot === 'feature-db') return `| ${slot} | n/a | no feature rows derive to this item (\`tools/render-feature-db.mjs\`) |`;
+            const na = KIND_NA[kind]?.[slot] ?? (kind === 'layer' && !['platform', 'product'].includes(name) ? LAYER_NA[slot] : undefined);
+            if (na) return `| ${slot} | n/a | ${na} |`;
             return `| ${slot} | missing | |`;
         });
         const orphans = files.filter((f) => !SLOTS.some((s) => f === `${s}.md` || f.startsWith(`${s}-`)));
@@ -64,7 +80,7 @@ tags: [product-item, ${kind}]
 |---|---|---|
 ${rows.join('\n')}
 
-Status: \`current\` (in this folder) · \`stub\` · \`missing\` · \`n/a\`.
+Status: \`current\` (in this folder) · \`missing\` (a real gap) · \`n/a\` (decided: the reason says why; per-hub decisions in \`slots-na.toon\`).
 `);
         const docsLine = `docs: ${hubRel}`;
         const next = /^docs:.*$/m.test(toon) ? toon.replace(/^docs:.*$/m, docsLine) : toon.replace(/\n?$/, `\n${docsLine}\n`);

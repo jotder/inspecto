@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | missing | |
 | architecture | current | [Embedded intelligence (AGT-5)](architecture-embedded-intelligence.md) · [AI assist](architecture-overview.md) |
 | features | current | [AI assist — features](features-ai-assist.md) |
-| feature-db | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [AI assist — screens](user-guide-ai-assist.md) · [Assistant](user-guide-assist.md) · [Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)](user-guide-inline-ai-authoring.md) |
 | admin-guide | missing | |
 | api | current | [AI assist — API](api-ai-assist.md) |
 | tests | current | [AI assist and intelligence — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

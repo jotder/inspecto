@@ -15,15 +15,15 @@ tags: [product-item, edition]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | missing | |
-| spec | missing | |
-| architecture | missing | |
+| plan | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
+| spec | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
+| architecture | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
 | features | missing | |
-| feature-db | missing | |
-| user-guide | missing | |
-| admin-guide | missing | |
-| api | missing | |
-| tests | missing | |
+| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
+| user-guide | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
+| admin-guide | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
+| api | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
+| tests | n/a | an Edition is a build flavor — see the hubs of the modules it holds |
 | brochure | current | [Inspecto Advanced — brochure](brochure.md) |
 
-Status: `current` (in this folder) · `stub` · `missing` · `n/a`.
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
