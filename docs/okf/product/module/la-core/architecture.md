@@ -297,8 +297,10 @@ masks every id; `typed` masks every id when a bound endpoint column's classifica
 expand's `value`, a traversal's `startNode`, an Investigation seed's `ids`) is resolved from an in-memory alias-to-raw
 book of what this server minted for this Space (bounded LRU; nothing raw is ever sent). The book is also appended, one
 `alias<TAB>base64(raw)` line per newly minted alias, to `<root>.secrets/.exploration-alias-book` beside the Space key
-(outside every exported tree), and a miss reads that file once per Space per process, so an alias survives a restart
-or an eviction (LA-EDITIONS-RESIDUALS-1 4c, 2026-10-19; `ExplorationMaskingSpaceKeyTest.anAliasSurvivesARestart`). The
+(owner-only, outside every exported tree), and every in-memory miss scans that file, so an alias survives a restart
+or an eviction; a line is believed only when its alias is the token of its raw value, so a torn line is skipped
+(LA-EDITIONS-RESIDUALS-1 4c, 2026-10-19; `ExplorationMaskingSpaceKeyTest`). ⚠ A miss costs one file read, so an
+alias never minted reads the whole file each time. The
 file is not compacted: it grows by one line per distinct alias minted (plus one if an evicted alias is minted again).
 An alias never minted (or whose book was removed) is 422 *alias not known* and the query is re-run. ⚠ An Investigation keeps its own key, so a seeded entity has a second alias
 there: Working Set answers (`/working-set`, `/replay`, op answers) carry `exploreAliases` (Investigation alias to
