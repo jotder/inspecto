@@ -253,6 +253,25 @@ describe('ReconBoardComponent', () => {
         ]);
     });
 
+    it('ages the SELECTED day only: another day is left out, an undated Break still counts (RECON-UPLIFT-RESIDUALS-1 4a)', async () => {
+        const old = new Date(Date.now() - 100 * DAY).toISOString();
+        const recent = new Date(Date.now() - 10 * DAY).toISOString();
+        const perDay: ReconState = {
+            ...RECORDED,
+            breaks: [
+                { pair: 'AB', key: 'k1', type: 'missing_right', status: 'open', firstSeenAt: old, day: '2026-09-25' },
+                { pair: 'AB', key: 'k2', type: 'missing_right', status: 'open', firstSeenAt: recent, day: '2026-09-24' },
+                { pair: 'AB', key: 'k3', type: 'missing_right', status: 'open', firstSeenAt: recent },
+            ],
+        };
+        const { c } = await create({ params: { day: '2026-09-25' }, state: () => of(perDay) });
+        await vi.waitFor(() => expect(c.state()).toEqual(perDay));
+        expect(c.ageBuckets()).toEqual([
+            { bucket: '0-30', count: 1 },
+            { bucket: '90+', count: 1 },
+        ]);
+    });
+
     /** ASSURE-BREAK-LIFECYCLE-1: the server's age wins, assigned Breaks still age, and the strip counts them. */
     it('ages assigned Breaks by the server age and shows the assigned and recurring counts', async () => {
         const lifecycle: ReconState = {

@@ -197,14 +197,23 @@ export class ReconBoardComponent implements OnInit {
     });
 
     /**
-     * Open breaks by age across the WHOLE reconciliation (`BREAK-AGING-1`) — the Board is the landing
-     * page, so "how long has this been broken" belongs here as well as on the Breaks page. Same shared
-     * rollup as the Breaks page, so the two can never disagree.
+     * The recorded Breaks of the selected day, plus the undated ones recorded before per-day lifecycle (they belong
+     * to no known day, and dropping them would hide real backlog). With no day known yet (still loading), all of them.
      */
-    readonly ageBuckets = computed(() => openAgeBuckets(this.state()?.breaks ?? []));
+    private readonly dayBreaks = computed(() => {
+        const day = this.query().day ?? this.result()?.day;
+        const all = this.state()?.breaks ?? [];
+        return day ? all.filter((b) => !b.day || b.day === day) : all;
+    });
+
+    /**
+     * Open breaks by age for the SELECTED day (`BREAK-AGING-1`; per-day since RECON-UPLIFT-RESIDUALS-1 4a — every
+     * recorded Break carries its `day`). Same shared rollup as the Breaks page, so the two can never disagree.
+     */
+    readonly ageBuckets = computed(() => openAgeBuckets(this.dayBreaks()));
     readonly ageLabel = ageBucketLabel;
     /** Unresolved Breaks someone owns, and those that came back after auto-closing (ASSURE-BREAK-LIFECYCLE-1). */
-    readonly lifecycle = computed(() => lifecycleCounts(this.state()?.breaks ?? []));
+    readonly lifecycle = computed(() => lifecycleCounts(this.dayBreaks()));
 
     /** "Comparing HLR, CRM and CBS for 2026-09-26…" — what the spinner says while the backend works. */
     readonly comparing = computed(() => {

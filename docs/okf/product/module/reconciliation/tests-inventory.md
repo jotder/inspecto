@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.reconciliation`](../../../../../product-map/module/reconciliation.toon).
 
-20 test class(es): 15 unit, 5 real-HTTP control-plane, 0 IT.
+21 test class(es): 16 unit, 5 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -37,6 +37,7 @@ mvn -o test -pl features/inspecto-reconciliation -Dtest=ControlApiReconDayTest,C
 | `ReconConfigLoaderTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconConfigLoaderTest.java` | {@link ReconConfigLoader#buildSpec} — the shared {@code reconciliation} config → {@link ReconService.Spec} |
 | `ReconDayCacheTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconDayCacheTest.java` | The result tier of {@link ReconDay.Cache} is bounded by estimated bytes as well as by count (RECON-UPLIFT-1 P4). |
 | `ReconDayPruneTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconDayPruneTest.java` | RECON-PERF-RESIDUALS-1 (1): a day reads only the files whose Parquet statistics can hold it |
+| `ReconDayWeighMeasureTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconDayWeighMeasureTest.java` | Measurement, not a gate (RECON-UPLIFT-RESIDUALS-1 5a): {@link ReconDay.Cache#weigh} against the real retained heap of |
 | `ReconJobTypeManifestTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconJobTypeManifestTest.java` | {@code provides.jobTypes} of this module's manifest equals the Job Types its providers register (P4e). |
 | `ReconPerfTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconPerfTest.java` | Timing harness, not a gate (RECON-PERF-1, operator 2026-10-09): 30 days x 4,000 msisdns x 3 sides (HLR / CRM / |
 | `ReconRoutesContractTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconRoutesContractTest.java` | {@link ReconRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-1 P5a): no host, no processor boot. |

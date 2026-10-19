@@ -34,5 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `RECON-UPLIFT-RESIDUALS-1` | P3 | defect | what RECON-UPLIFT-1 (shipped 2026-10-18, plan in archived-documents/plans-archive/reconciliation-uplift-plan.md) found and deliberately l… | — |
 | `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | partner settlement and re-rating function pack | — |

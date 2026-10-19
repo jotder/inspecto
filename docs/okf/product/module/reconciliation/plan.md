@@ -36,12 +36,14 @@ scheduling, and promotion of a Break to an Incident
 
 ## Left
 
-P3 `RECON-UPLIFT-RESIDUALS-1` ([BACKLOG](../../../../BACKLOG.md)), each pickable alone:
+`RECON-UPLIFT-RESIDUALS-1` closed 2026-10-19:
 
 - (3) *Test definition* sends no day, so the server reads the latest day on any side; a daily side against a
   monthly side then reads every key missing. Kept: the day policy is deliberate (decided 2026-10-18).
-- (4a) *Open breaks by age* reads the last recorded run, not the selected day; needs per-day recorded state.
-- (5a) `ReconDay.Cache.weigh` is an estimate; measure it against a heap histogram on a 200k-row 3-way day.
+- (4a) Built: the Board's *Open breaks by age* strip and its Assigned / Recurring chips count the selected day's
+  recorded Breaks plus undated legacy ones (`recon-board.component.ts` `dayBreaks`); per-day state already existed.
+- (5a) Measured: `ReconDay.Cache.weigh` read 1.45x the retained heap on a 200k-key 3-way day; corrected (map keys not
+  counted, boxed numbers 16, map 136 + 40 per entry) to 1.17x, still an over-estimate on purpose.
 
 `RECON-CARDINALITY-1` tier 2 (true one-to-many matching) stays demand-gated
 ([recon-cardinality-plan](../../../../archived-documents/plans-archive/recon-cardinality-plan.md)).

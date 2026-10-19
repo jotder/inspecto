@@ -374,17 +374,21 @@ public final class ReconDay {
         }
 
         /**
-         * A rough heap estimate: strings 40 + 2 per char, numbers 24, a map 48 + its entries, a list of N elements as
-         * N x the first element (rows of one result are alike, so the first stands for all). Deliberately an estimate,
-         * not a measurement: it only has to keep the retained size in the right order of magnitude.
+         * A heap estimate: strings 40 + 1 per char (Latin-1, the usual case for keys and codes), boxed numbers 16, a map
+         * 136 + 40 per entry (LinkedHashMap shell, default table, entry) with its KEYS not counted (they are shared
+         * literals / spec names, never per-row copies), a list of N elements as N x the first element (rows of one
+         * result are alike, so the first stands for all). Measured 2026-10-19 on a 200k-key 3-way day
+         * (ReconDayWeighMeasureTest): 1.17x the retained heap after GC and the class histogram; the earlier 48 + 32 and 2-per-char version
+         * read 1.45x. It stays an over-estimate on purpose (cached small Longs and Booleans cost nothing), so the
+         * budget errs toward evicting early, never toward an OOM.
          */
         static long weigh(Object o) {
             if (o == null) return 0;
-            if (o instanceof CharSequence c) return 40L + 2L * c.length();
-            if (o instanceof Number || o instanceof Boolean || o instanceof Character) return 24;
+            if (o instanceof CharSequence c) return 40L + c.length();
+            if (o instanceof Number || o instanceof Boolean || o instanceof Character) return 16;
             if (o instanceof Map<?, ?> m) {
-                long n = 48;
-                for (Map.Entry<?, ?> e : m.entrySet()) n += 32 + weigh(e.getKey()) + weigh(e.getValue());
+                long n = 136;
+                for (Map.Entry<?, ?> e : m.entrySet()) n += 40 + weigh(e.getValue());
                 return n;
             }
             if (o instanceof List<?> l) return l.isEmpty() ? 24 : 24L + (long) l.size() * (8 + weigh(l.get(0)));

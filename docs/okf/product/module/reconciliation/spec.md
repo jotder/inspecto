@@ -51,7 +51,7 @@ routes are in [api-routes](api-routes.md). This page maps the code.
 (`-Drecon.cache.max_bytes`; default max heap / 8 clamped to 64 MiB..1 GiB), plus a separate LRU of 512 small
 entries (scope, days, prune, stats). Keys carry the input fingerprint (spec plus every side's file stamps), so a
 changed file or config is a new key. No fingerprint (view-backed or virtual Dataset, or more than 50 000 input files
-per side) = not cached. `weigh` is an estimate (`RECON-UPLIFT-RESIDUALS-1` (5a)).
+per side) = not cached. `weigh` is an estimate, measured 1.17x the retained heap on a 200k-key 3-way day (`ReconDayWeighMeasureTest`, `RECON_PERF=1`).
 
 ## Limits
 
