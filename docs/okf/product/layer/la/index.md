@@ -27,3 +27,11 @@ tags: [product-item, layer]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `layer.la` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-EDITIONS-RESIDUALS-1` | P3 | feature | what LA-EDITIONS-1 left after it shipped (2026-10-17; plan archived inspecto-la-editions-plan §7). | — |

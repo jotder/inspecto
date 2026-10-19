@@ -27,3 +27,12 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.case-management` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `D6-REAL-USER-SESSION-1` | P3 | chore | the D10 think-aloud with a REAL Case-desk lead is still unrun. | external |
+| `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Incidents / Case Management split — one item left (everything else shipped 2026-10-06..09; item 2 declined 2026-10-11). | — |

@@ -27,3 +27,11 @@ tags: [product-item, edition]
 | brochure | current | [Inspecto Standard — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `edition.standard` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `OFFERING-DECLARATION-DRIFT-1` | P3 | defect | NARROWED 2026-10-18 to two operator decisions | operator |

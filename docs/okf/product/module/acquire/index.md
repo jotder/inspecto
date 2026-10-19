@@ -27,3 +27,12 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.acquire` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| — | P3 | feature | Unpack (11) absent codecs | demand |
+| `SCALEOUT-U1-REMOTE-ACQUIRE-1` | P3 | feature | Remote acquisition (U1) is not distributed: two pods would both fetch the same remote file. | — |

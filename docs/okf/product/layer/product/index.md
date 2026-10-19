@@ -27,3 +27,14 @@ tags: [product-item, layer]
 | brochure | current | [Inspecto — Competitive Landscape](brochure-competitive-landscape.md) · [Inspecto — Competitive Capability Matrix](brochure-competitive-matrix.md) · [Inspecto — Enterprise Product & Solutions Whitepaper](brochure-enterprise-whitepaper.md) · [Inspecto — Executive Brief](brochure-executive-brief.md) · [Inspecto — Solution Overview](brochure-solution-overview.md) · [Inspecto — Platform Overview & Strategy](brochure-stakeholder-overview.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `layer.product` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
+| `OFFERING-DECLARATION-DRIFT-1` | P3 | defect | NARROWED 2026-10-18 to two operator decisions | operator |
+| `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
+| `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |

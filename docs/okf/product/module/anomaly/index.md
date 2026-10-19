@@ -27,3 +27,12 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.anomaly` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `ANOMALY-UI-FINDINGS-1` | P3 | defect | small defects and rough edges found driving the Anomaly Detection UI in a running demo build (2026-10-13; live-verification lane over the… | — |
+| `ANOMALY-ML-SCORING-1` | P3 | feature | ML anomaly scoring (isolation forest) beside the statistical Anomaly Detection scores | — |

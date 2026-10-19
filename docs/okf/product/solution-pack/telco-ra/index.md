@@ -27,3 +27,9 @@ tags: [product-item, solution-pack]
 | brochure | current | [Telecom revenue assurance — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.telco-ra` — the board is the only list; change the row there.
+
+_No open rows._

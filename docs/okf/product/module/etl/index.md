@@ -27,3 +27,15 @@ tags: [product-item, module]
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.etl` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
+| — | P3 | feature | P4 Test mapping on a generic parser node | — |
+| — | P3 | feature | Step Processor catalog | — |
+| — | P3 | feature | D-11 hand-authored relations component | demand |
+| `ANALYTICS-STEPS-TS-1` | P3 | feature | Steps for the Analytics Kernel time-series and cohort kernels: transform.timeseries.changepoint (ChangePoint, input a residual column + σ… | — |
