@@ -1,0 +1,2 @@
+user-guide: a decoding library with no screens; the ASN.1 grammar fields an end user sees belong to the telecom-asn1 hub
+admin-guide: a library jar with nothing to install or configure on its own; it is staged and configured through telecom-asn1

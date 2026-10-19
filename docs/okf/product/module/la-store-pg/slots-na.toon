@@ -1,0 +1,2 @@
+user-guide: no screens - a storage backend chosen by JVM properties, invisible to end users
+api: implements la-core's InvestigationStoreProvider SPI and adds no contract of its own; the SPI is specified in la-core/spec.md

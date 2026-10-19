@@ -1,0 +1,2 @@
+user-guide: end users only see the sign-in button, documented with the other access screens in module.access user-guide-access.md
+api: implements the Authenticator and TokenRelay contracts owned by module.auth-spi; the /auth/* routes live in the core and are documented in module.access api-access.md

@@ -1,0 +1,1 @@
+api: implements the ParserPlugin contract owned by the engine (documented in module.engine spec-parser-plugins.md); the preview route POST /parsers/{id}/preview is an engine route, and the library API is in module.asn-decoders api.md

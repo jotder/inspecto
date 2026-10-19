@@ -1,0 +1,4 @@
+plan: a contract module carved out by MODULE-REORG-1; its requirement of record is decision D-MR1 in docs/okf/product/layer/platform/spec-module-reorg-decisions.md, and audit behaviour is planned in the event and access hubs
+spec: the contract's invariants are stated per type in api.md and the design in architecture.md; the implementation lives in the event module hub
+user-guide: a pure Java contract with no screens; the audit trail screens are documented in the event hub user guide
+admin-guide: nothing to install or configure in this jar; event storage and retention settings belong to the event module

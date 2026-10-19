@@ -1,0 +1,1 @@
+api: implements the AccessDecider and EditionFeatureProvider contracts owned by module.auth-spi and the core; the /access/policies routes are core routes documented in module.access api-access.md

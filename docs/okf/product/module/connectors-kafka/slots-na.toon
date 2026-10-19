@@ -1,0 +1,2 @@
+user-guide: no screens of its own - a kafka Connection is created in the shared Connections screen (connectors/user-guide-connections.md)
+api: no HTTP routes; the Java contract it implements is the Collector connector SPI in the connectors hub (connectors/api.md)
