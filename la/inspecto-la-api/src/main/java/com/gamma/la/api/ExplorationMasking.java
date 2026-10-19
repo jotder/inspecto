@@ -184,19 +184,30 @@ final class ExplorationMasking {
         String line = alias + "\t" + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8)) + "\n";
         Path f = bookFile(writeRoot);
         synchronized (FILE_LOCK) {
-            try {
-                Files.createDirectories(f.getParent());
-                if (!Files.exists(f)) createOwnerOnly(f);
-                try (var ch = Files.newByteChannel(f, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
-                    long end = ch.size();
-                    java.nio.ByteBuffer last = java.nio.ByteBuffer.allocate(1);
-                    // a line torn by a crash has no newline: end it first so it cannot swallow this one
-                    if (end > 0 && ch.position(end - 1).read(last) == 1 && last.get(0) != '\n') line = "\n" + line;
-                    ch.position(end).write(java.nio.ByteBuffer.wrap(line.getBytes(StandardCharsets.UTF_8)));
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+            appendLine(f, line);
+        }
+    }
+
+    /**
+     * Appends one line to the book with a single write on an APPEND channel, which the OS places at the end atomically
+     * even when another process appends too (the in-process lock does not reach other processes). A torn last line
+     * (no newline) is ended first, inside that same write, so it cannot swallow this one; the last-byte check is a
+     * separate read, and a race there costs at most an empty line, which a scan skips.
+     */
+    static void appendLine(Path f, String line) {
+        try {
+            Files.createDirectories(f.getParent());
+            if (!Files.exists(f)) createOwnerOnly(f);
+            try (var r = Files.newByteChannel(f, StandardOpenOption.READ)) {
+                long end = r.size();
+                java.nio.ByteBuffer last = java.nio.ByteBuffer.allocate(1);
+                if (end > 0 && r.position(end - 1).read(last) == 1 && last.get(0) != '\n') line = "\n" + line;
             }
+            try (var w = Files.newByteChannel(f, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+                w.write(java.nio.ByteBuffer.wrap(line.getBytes(StandardCharsets.UTF_8)));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

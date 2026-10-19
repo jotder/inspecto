@@ -118,6 +118,32 @@ class ExplorationMaskingSpaceKeyTest {
         assertEquals(scans, ExplorationMasking.SCANS.get(), "a pseudonym the Investigation knows never reads the book");
     }
 
+    /**
+     * Two processes appending to one book share no lock: modelled by appending from many threads WITHOUT the in-process
+     * lock (each thread is a process). Every line must survive.
+     */
+    @Test
+    void appendsFromTwoProcessesLoseNoLine(@TempDir Path root) throws Exception {
+        Path book = com.gamma.util.SpaceSecretKeys.keyFile(root, ".exploration-alias-book");
+        int writers = 4, each = 250;
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(writers);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+        for (int w = 0; w < writers; w++) {
+            int id = w;
+            futures.add(pool.submit(() -> {
+                start.await();
+                for (int i = 0; i < each; i++) ExplorationMasking.appendLine(book, "p" + id + "-" + i + "\tx\n");
+                return null;
+            }));
+        }
+        start.countDown();
+        for (var f : futures) f.get();
+        pool.shutdown();
+        long lines = Files.readAllLines(book).stream().filter(l -> !l.isEmpty()).distinct().count();
+        assertEquals(writers * each, lines, "no appended line is lost");
+    }
+
     @Test
     void anotherSpaceHasAnotherKey(@TempDir Path a, @TempDir Path b) {
         assertTrue(!ExplorationMasking.alias(a, "x").equals(ExplorationMasking.alias(b, "x")), "keys are per Space");
