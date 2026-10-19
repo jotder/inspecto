@@ -333,6 +333,15 @@ jobs:
       - name: Guard — Product Map items link to real modules and Offerings, and hold no prices
         run: node tools/check-product-map.mjs && node tools/render-feature-db.mjs --check && node tools/render-tests-inventory.mjs --check && node tools/render-api-routes.mjs --check && node tools/render-product-docs.mjs --check && node tools/check-product-docs.mjs && node --test tools/render-feature-db.test.mjs tools/render-tests-inventory.test.mjs tools/render-api-routes.test.mjs tools/check-product-docs.test.mjs tools/check-product-map.test.mjs tools/render-product-map.test.mjs tools/product-map-import.test.mjs tools/customer-build.test.mjs
 
+      # Docs-touched check (PRODUCT-DOCS-HUB-1, ADVISORY — always exits 0): a Product Map Item whose module main code changed in
+      # the range but whose hub docs/okf/product/<kind>/<name>/ did not gets a ::warning naming the likely slots. The guards
+      # checkout is shallow, so deepen it first; the range is the PR base on a PR, else origin/master~20..HEAD.
+      - name: Advisory — code changes whose product hub docs were not touched
+        run: |
+          git fetch --no-tags --depth=60 origin "${GITHUB_BASE_REF:-master}" || true
+          git fetch --no-tags --deepen=60 || true
+          node tools/check-docs-touched.mjs && node --test tools/check-docs-touched.test.mjs
+
       # jlink lock guard (MODULE-REORG-P3-THIN-JARS): the derived runtime module set is the ONLY source package.ps1
       # uses, so every edition must have a well-formed lock section. No build; the JDK-name check is skipped without a JDK.
       - name: Guard — jlink module lock covers every edition
