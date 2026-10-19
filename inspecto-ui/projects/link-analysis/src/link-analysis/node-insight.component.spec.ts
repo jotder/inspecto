@@ -466,12 +466,24 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
         await settle(fixture);
         expect(byEntity).not.toHaveBeenCalled();
-        expect(byMaskedKey).toHaveBeenCalledWith('masked:0123456789abcdef', 'inv-1', 'all');
+        expect(byMaskedKey).toHaveBeenCalledWith('masked:0123456789abcdef', 'inv-1', 'all', undefined);
         expect(el.querySelector('[data-testid=history-unavailable]')).toBeNull();
         expect(el.querySelector('[data-testid=history-list]')!.textContent).toContain(
             'calls spike masked:0123456789abcdef',
         );
         await expectNoA11yViolations(el);
+    });
+
+    it("passes a masked Entity's own type to the server lookup", async () => {
+        const { fixture, el, byMaskedKey } = make({
+            key: 'masked:ecc5b07e74c1c0e8',
+            label: 'masked:ecc5…',
+            entityType: 'account',
+            investigationId: null,
+        });
+        el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
+        await settle(fixture);
+        expect(byMaskedKey).toHaveBeenCalledWith('masked:ecc5b07e74c1c0e8', null, 'all', 'account');
     });
 
     it('states an unresolved masked key in words', async () => {

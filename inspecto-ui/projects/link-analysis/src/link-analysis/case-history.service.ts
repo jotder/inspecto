@@ -52,14 +52,20 @@ export class CaseHistoryService {
 
     /**
      * The history of a MASKED key (an alias or Investigation pseudonym): `POST /inv/case-history` resolves it on the
-     * server, picks the Entity Type (the Investigation's endpoint type, else msisdn) and answers titles re-masked, so no
-     * raw number reaches the browser. A key the server cannot resolve (it restarted, or the masking hides a raw id) is
-     * reported as an `error` in words, never as an empty history.
+     * server under the Entity Type given (else the Investigation's endpoint type, else msisdn) and answers titles
+     * re-masked, so no raw number reaches the browser. A key the server cannot resolve (it restarted, or the masking
+     * hides a raw id) is reported as an `error` in words, never as an empty history.
      */
-    async byMaskedKey(key: string, investigationId: string | null, status: EntityHistoryStatus): Promise<EntityHistory> {
+    async byMaskedKey(
+        key: string,
+        investigationId: string | null,
+        status: EntityHistoryStatus,
+        entityType?: string | null,
+    ): Promise<EntityHistory> {
         try {
             const body: Record<string, unknown> = { key, status };
             if (investigationId) body['investigationId'] = investigationId;
+            if (entityType) body['entityType'] = entityType;
             const r = await firstValueFrom(this.http.post<CaseHistoryResult>(apiUrl('/inv/case-history'), body));
             if (!r.resolved)
                 return {

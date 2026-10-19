@@ -1377,7 +1377,14 @@ public final class ControlApi implements AutoCloseable, HostContext {
         Path target;
         try {
             target = uiDir.resolve(rel).normalize();
-        } catch (InvalidPathException e) {      // e.g. a ':' on Windows - not a servable file, so a 404
+        } catch (InvalidPathException e) {      // e.g. a ':' on Windows (a masked key in an Entity deep link)
+            // not a file, but an extensionless path (API routes matched before this) is an SPA route: answer the root
+            // index, never anything else
+            Path index = uiDir.resolve("index.html");
+            if (!hasExtension(rel) && !path.startsWith("/embed/") && Files.isRegularFile(index)) {
+                writeFile(ex, index);
+                return true;
+            }
             logStaticMiss(ex, "not a valid file path");
             return false;
         }

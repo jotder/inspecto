@@ -478,7 +478,7 @@ export class NodeInsightComponent implements OnInit {
         this.history.set(null);
         const status = this.historyStatus();
         const h = this.historyMasked()
-            ? await this.historySvc.byMaskedKey(c.key, c.investigationId, status)
+            ? await this.historySvc.byMaskedKey(c.key, c.investigationId, status, c.entityType)
             : await this.historySvc.byEntity(c.entityType!, c.key, status);
         if (status === this.historyStatus()) this.history.set(h);
     }

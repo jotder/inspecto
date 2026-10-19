@@ -142,6 +142,24 @@ class ControlApiStaticAndCorsTest {
     }
 
     @Test
+    void anSpaRouteWithAColonServesIndexWhileTraversalIsStillRefused(@TempDir Path dir) throws Exception {
+        // a masked key in an Entity deep link: on Windows ':' cannot be resolved as a file, yet it is an SPA route
+        try (Ctx c = open(spaDir(dir).toString(), null)) {
+            HttpResponse<String> r = send(c.port, "GET", "/entities/msisdn/masked:2910537b29699a31");
+            assertEquals(200, r.statusCode());
+            assertTrue(ctype(r).startsWith("text/html"));
+            assertTrue(r.body().contains("Inspecto UI"));
+            Files.writeString(dir.resolve("secret.txt"), "top secret");
+            HttpResponse<String> up = send(c.port, "GET", "/..%2Fsecret.txt");
+            assertNotEquals(200, up.statusCode(), "traversal outside the ui root is refused");
+            assertFalse(up.body().contains("top secret"));
+            HttpResponse<String> upColon = send(c.port, "GET", "/..%2Fa:b%2Fsecret.txt");
+            assertFalse(upColon.body().contains("top secret"));
+            assertEquals(404, upColon.statusCode());
+        }
+    }
+
+    @Test
     void extensionlessDeepLinkFallsBackToIndex(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
             HttpResponse<String> deep = send(c.port, "GET", "/dashboard/runs");
