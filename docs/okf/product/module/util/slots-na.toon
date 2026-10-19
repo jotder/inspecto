@@ -1,0 +1,2 @@
+user-guide: a backend library with no screen and no user-authored configuration
+api: exposes no HTTP routes; it is a Java library every other module links against

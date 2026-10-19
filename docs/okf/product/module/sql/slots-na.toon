@@ -1,0 +1,2 @@
+user-guide: a backend library with no screen and no user-authored configuration; users meet it only as a refusal message on query screens documented in their own hubs
+api: exposes no HTTP routes; it is a Java library called by the engine, BI and Link Analysis modules
