@@ -13,7 +13,7 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.workflowSla`](../../../../../product-map/addon/workflowSla.toon).
 
-55 row(s).
+56 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -23,6 +23,7 @@ tags: [feature-db, addon]
 | workflow | config kind | ops | standard;advanced;preview | incidents;workflowSla | ga | `workflow` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | create-incident | consequence | ops | standard;advanced;preview | incidents;workflowSla | ga | `create-incident` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | ops | feature | ops | standard;advanced;preview | incidents;workflowSla | ga | `ops` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
+| RCA templates (`*_rca.toon`) | inventory | ops | standard;advanced;preview | incidents;workflowSla | ga | consumed by `GET /rca/templates`; **no example file/shape in the tree yet** | `docs/FEATURE_INVENTORY.md §1J` |
 | objects.analytics | job type | ops | standard;advanced;preview | incidents;workflowSla | ga | `objects.analytics` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | incident_purge | maintenance task | ops | standard;advanced;preview | incidents;workflowSla | ga | `incident_purge` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | "DELETE /objects/([^/]+)/links" | route | ops | standard;advanced;preview | incidents;workflowSla | ga | `"DELETE /objects/([^/]+)/links"` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |

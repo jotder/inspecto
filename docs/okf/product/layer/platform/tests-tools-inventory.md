@@ -11,18 +11,22 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-48 test file(s). Run one, or all:
+53 test file(s). Run one, or all:
 
 ```bash
-node --test tools/check-bundle-spaces.test.mjs
+node --test tools/check-backlog-items.test.mjs
 node --test tools/
 ```
 
 | test file | summary |
 |---|---|
+| `tools/check-backlog-items.test.mjs` | Fixture test for tools/check-backlog-items.mjs. Run: node --test tools/check-backlog-items.test.mjs |
 | `tools/check-bundle-spaces.test.mjs` | node --test tools/check-bundle-spaces.test.mjs |
 | `tools/check-data-ops-duplication.test.mjs` | Fixture tests for tools/check-data-ops-duplication.mjs. Run: node --test tools/check-data-ops-duplication.test.mjs |
 | `tools/check-demo-auth-isolation.test.mjs` | Fixture test for tools/check-demo-auth-isolation.mjs — each planted violation must turn the guard RED. |
+| `tools/check-doc-flags.test.mjs` |  |
+| `tools/check-doc-routes.test.mjs` |  |
+| `tools/check-docs-touched.test.mjs` | Fixture test for tools/check-docs-touched.mjs. Run: node --test tools/check-docs-touched.test.mjs |
 | `tools/check-engine-names-no-la.test.mjs` | Fixture test for tools/check-engine-names-no-la.mjs. Run: node --test tools/check-engine-names-no-la.test.mjs |
 | `tools/check-family-count.test.mjs` | Negative fixtures for tools/check-family-count.mjs. Run: node --test tools/check-family-count.test.mjs |
 | `tools/check-jar-signatures.test.mjs` | Fixtures for tools/check-jar-signatures.mjs (P3h per-jar signing). Run: node --test tools/check-jar-signatures.test.mjs |
@@ -55,6 +59,7 @@ node --test tools/
 | `tools/offering-classpath.test.mjs` | Fixture test for tools/offering-classpath.mjs. Run: node --test tools/offering-classpath.test.mjs |
 | `tools/product-map-import.test.mjs` | Fixture test for tools/product-map-import.mjs. Run: node --test tools/product-map-import.test.mjs |
 | `tools/regroup-modules.test.mjs` | Fixture-based tests for tools/regroup-modules.mjs: a tiny synthetic git repo in a temp dir, never the real tree. |
+| `tools/release-notes.test.mjs` | Fixture test for tools/release-notes.mjs. Run: node --test tools/release-notes.test.mjs |
 | `tools/render-api-routes.test.mjs` |  |
 | `tools/render-feature-db.test.mjs` | Fixture test for tools/render-feature-db.mjs. Run: node --test tools/render-feature-db.test.mjs |
 | `tools/render-offerings-matrix.test.mjs` | Fixture test for tools/render-offerings-matrix.mjs. Run: node --test tools/render-offerings-matrix.test.mjs |
