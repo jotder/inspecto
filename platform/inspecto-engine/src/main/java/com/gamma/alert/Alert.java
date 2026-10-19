@@ -129,6 +129,11 @@ public record Alert(String rule, String severity, String pipeline, String metric
      * rule's {@link AlertRule#description} when it has one, else a sentence built from what it watches
      * (e.g. {@code Sum of exposure_sar on fraud_cases_open is above 298,668}).
      */
+    /** An Incident's title for one breaching key: the description and the key only (the Dataset is its own field), else as {@link #title}. */
+    static String keyTitle(AlertRule r, String scope, String keyLabel) {
+        return r.description() != null ? r.description() + " — " + keyLabel : title(r, scope + " for " + keyLabel);
+    }
+
     static String title(AlertRule r, String scope) {
         if (r.description() != null) return r.description() + " — " + scope;
         if (r.isFreshnessRule()) return r.indexLag()

@@ -43,7 +43,7 @@ Thresholds are in the Job files under `config/jobs/`; the Case Rule window and g
 
 - `cdr`, `subscriber_events` and `payments` fill after ingest.
 - The `fraud_<typology>` Datasets fill after the detection Jobs; Alerts appear after `fraud_alert_evaluate_job`.
-- `exports/fraud_offender_export` holds the nightly CSV.
+- `data/exports/fraud_offender_export` (the Space data tree) holds the nightly CSV.
 - The `telco_fraud_overview` dashboard shows the exposure tiles.
 
 ## References

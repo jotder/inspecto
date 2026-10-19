@@ -7,6 +7,6 @@ job:
   measures: "sum(irsf_seconds),sum(irsf_calls)"
   group_by: msisdn
   format: csv
-  out_dir: exports/fraud_offender_export
+  out_dir: ../data/exports/fraud_offender_export
   cron: "0 3 * * *"
   enabled: true

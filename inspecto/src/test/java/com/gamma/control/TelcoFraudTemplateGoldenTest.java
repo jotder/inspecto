@@ -182,6 +182,8 @@ class TelcoFraudTemplateGoldenTest {
                 ToonHelper.load(config.resolve("jobs").resolve("fraud_offender_export_job.toon").toString()), "job")));
         assertEquals("report", export.type());
         assertEquals("0 3 * * *", export.cron());
+        assertEquals("../data/exports/fraud_offender_export", export.opt("out_dir", null),
+                "the export lands in the Space data tree, not inside the config tree");
         JobConfig quality = JobConfig.fromMap(Map.of("job", ToonHelper.requireSection(
                 ToonHelper.load(config.resolve("jobs").resolve("fraud_expectation_evaluate_job.toon").toString()), "job")));
         assertEquals("expectation.evaluate", quality.type());

@@ -18,7 +18,7 @@ Three Pipelines ingest the feeds into Datasets of the same name: `cdr`, `subscri
 
 - The fourteen detection Jobs (`fraud_<typology>_job`) run over the previous day and write one row per offender to `fraud_<typology>` Datasets (for example `fraud_irsf`, `fraud_simbox`, `fraud_sim_swap`).
 - `fraud_alert_evaluate_job` evaluates the fourteen Alert Rules, one Alert per offender per typology.
-- `fraud_offender_export` writes a CSV of IRSF offenders (summed `irsf_seconds` and `irsf_calls` by `msisdn`) to `exports/fraud_offender_export`.
+- `fraud_offender_export` writes a CSV of IRSF offenders (summed `irsf_seconds` and `irsf_calls` by `msisdn`) to `data/exports/fraud_offender_export` (the Space data tree).
 - `tf_anomaly_score_job` scores the `tf_subscriber_usage` Anomaly Model.
 
 ## Incidents and Cases

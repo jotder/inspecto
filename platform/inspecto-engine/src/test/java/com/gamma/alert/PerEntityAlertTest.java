@@ -131,7 +131,7 @@ class PerEntityAlertTest {
 
         FakeObjectAccess.Opened m7 = incidents.stream()
                 .filter(o -> "m7".equals(o.attributes().get("key.msisdn"))).findFirst().orElseThrow();
-        assertEquals("High spend — usage for msisdn=m7, region=EU", m7.title(), "the title names the key");
+        assertEquals("High spend — msisdn=m7, region=EU", m7.title(), "the title names the key, not the Dataset (its own field)");
         assertEquals("EU", m7.attributes().get("key.region"), "every key column is an attribute");
         assertEquals("1000.0", m7.attributes().get("value"), "the Measure value rides along");
         assertEquals("high-spend|msisdn=m7,region=EU", m7.attributes().get(AlertService.ALERT_KEY));

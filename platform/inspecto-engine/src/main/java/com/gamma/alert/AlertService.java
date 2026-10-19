@@ -1264,7 +1264,7 @@ public final class AlertService {
             keyValues.forEach((column, v) -> attrs.put("key." + column, v == null ? "NULL" : String.valueOf(v)));
             records.findAlert(ruleAlertId).map(r -> r.attributes().get("causedByEvent"))
                     .ifPresent(e -> attrs.put("causedByEvent", e));
-            linkIncident(rule, alertKey, ruleAlertId, index, incidents.openIncident(Alert.title(rule, label),
+            linkIncident(rule, alertKey, ruleAlertId, index, incidents.openIncident(Alert.keyTitle(rule, textScope(rule, scope), keyLabel(keyValues)),
                     text.message(), rule.severity(), rule.dataset(), new LinkedHashMap<>(attrs), ALERT_KEY));
         } catch (RuntimeException e) {
             log.warn("could not open the Incident of rule {} key {}: {}", rule.name(), keyId, e.getMessage());
