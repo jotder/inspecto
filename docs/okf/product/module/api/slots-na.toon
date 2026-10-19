@@ -1,0 +1,4 @@
+user-guide: a single compile-time annotation with no screens and no user configuration
+admin-guide: nothing to install, configure or operate; no flags, files or runtime state
+api: no HTTP routes; the module is one Java annotation
+tests: the module has no behaviour to test and no test sources

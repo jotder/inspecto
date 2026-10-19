@@ -1,0 +1,1 @@
+admin-guide: a pure algorithm library with no config keys, -D flags, files or services of its own; every limit is set by the caller (Link Analysis limits, see the la-core hub)

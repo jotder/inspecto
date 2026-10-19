@@ -1,0 +1,2 @@
+user-guide: no screen or end-user configuration of its own; the tasks are maintenance Jobs authored by administrators, covered by admin-guide-backup-restore
+api: no HTTP routes of its own; the tasks run through the generic Jobs routes (POST /jobs, POST /jobs/{name}/trigger)
