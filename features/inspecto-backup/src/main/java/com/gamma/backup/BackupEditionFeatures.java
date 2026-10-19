@@ -7,10 +7,10 @@ import java.util.Set;
 
 /**
  * Declares the compliance archive ({@code sink.archive}: {@code collector.post_action.on_success: MOVE}) and
- * DuckLake registration ({@code sink.ducklake}) present wherever this module ships — Professional and
- * Enterprise (`PROCESSOR-RELEASE-READINESS-1` G9). The archive's other half is this module's {@code backup}
- * task; DuckLake has no module of its own and rides with this storage module, which every Professional
- * bundle carries. A Personal build refuses both at save and at run.
+ * DuckLake registration ({@code sink.ducklake}) present wherever this module ships — Standard and
+ * Advanced (`PROCESSOR-RELEASE-READINESS-1` G9). The archive's other half is this module's {@code backup}
+ * task; DuckLake has no module of its own and rides with this storage module, which every Standard
+ * bundle carries. A Basic build refuses both at save and at run.
  */
 public final class BackupEditionFeatures implements EditionFeatureProvider {
 

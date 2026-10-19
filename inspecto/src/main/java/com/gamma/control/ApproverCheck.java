@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  *   <li>{@code none-eligible}: no role in the Space's table grants the capability (deny grants applied - every
  *       edition), or the Authenticator enumerates its principals (Demo) and every holder is a maker; and with no
- *       Authenticator (Personal): no Subject exists, so no one can decide.</li>
+ *       Authenticator (Basic): no Subject exists, so no one can decide.</li>
  *   <li>{@code ok}: an enumerated non-maker holds it - or, when the Authenticator cannot enumerate (OIDC), the Space's
  *       {@link ApproverRoster} names a group or a non-maker user.</li>
  *   <li>{@code unknown}: enumerating failed, or every enumerated non-maker holder is data-scoped (deciding also needs
@@ -60,7 +60,7 @@ public final class ApproverCheck {
      *  {@code needsVisible}: deciding also needs the linked object visible to the approver (an Action Request does;
      *  a Pending Change's approve gate is the capability alone). */
     private static String compute(Path root, Set<Object> makers, String capability, boolean needsVisible) {
-        // No Authenticator (Personal) => no Subject is ever attached => deciding is always 403.
+        // No Authenticator (Basic) => no Subject is ever attached => deciding is always 403.
         Authenticator auth = Authenticators.active().orElse(null);
         if (auth == null) return NONE_ELIGIBLE;
         boolean anyRole = Roles.effective(root).keySet().stream()

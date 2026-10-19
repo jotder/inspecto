@@ -42,7 +42,7 @@ final class ConnectionRoutes implements RouteModule {
         // Writes require canOnboardConnections — its own Admin-only grant (rbac-groundwork §3/§4.1 Q1,
         // product sign-off 2026-07-22), NOT canAuthorWorkbench: Connections are the credential/egress
         // surface, so onboarding them is distinct from authoring pipelines/components. A no-op on
-        // Personal — no Subject is ever attached there.
+        // Basic — no Subject is ever attached there.
         api.post("/connections", ApiContext.withCapability("canOnboardConnections", (e, m) -> createConnection(api, api.body(e))));
         // Gated 2026-09-17 (test/probe, saved and unsaved): a test dials the profile's host:port from the
         // server's network position and a probe reads through the SAVED credential — the same credential

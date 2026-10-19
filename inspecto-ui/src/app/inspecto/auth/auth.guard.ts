@@ -4,8 +4,8 @@ import { recordReturnUrl } from './return-url';
 import { SessionService } from './session.service';
 
 /**
- * Professional-edition route guard (W6d): redirect to the sign-in screen when OIDC is on and there is no
- * live session yet. A pure pass-through on Personal / offline (`authMode !== 'oidc'`) — the auth-free
+ * Standard-edition route guard (W6d): redirect to the sign-in screen when OIDC is on and there is no
+ * live session yet. A pure pass-through on Basic / offline (`authMode !== 'oidc'`) — the auth-free
  * core keeps booting straight to the app with no guard effect. Session state is already resolved by
  * {@link SessionService.init} (an app initializer that runs before routing), so this reads signals only.
  */

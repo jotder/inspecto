@@ -30,7 +30,7 @@ import java.util.Map;
  * This module's {@link ObjectEngineProvider} — the construction that used to live in mandatory core
  * (EDG-01 cell 7, 2026-09-08).
  *
- * <p>Discovered through {@code ServiceLoader}, so a Personal bundle that omits this jar simply has no
+ * <p>Discovered through {@code ServiceLoader}, so a Basic bundle that omits this jar simply has no
  * provider: {@code CollectorService} then holds no engine and every operational-object surface answers 503.
  *
  * <p><b>What moved in here, and the two behaviours that had to move intact:</b>
@@ -92,16 +92,16 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
 
     /**
      * Durable JDBC unless {@code -Dobjects.backend=memory} was asked for explicitly
-     * ({@code OBJECTS-BACKEND-DEFAULT-MEMORY-1}: {@code db} is the default, {@code postgres} the Enterprise one).
+     * ({@code OBJECTS-BACKEND-DEFAULT-MEMORY-1}: {@code db} is the default, {@code postgres} the Advanced one).
      */
     private static boolean durable() {
         return !"memory".equals(OperationalDb.objectsBackend());
     }
 
     /**
-     * {@code -Dobjects.backend=postgres} (Enterprise) never degrades to in-memory: a store that will not open
+     * {@code -Dobjects.backend=postgres} (Advanced) never degrades to in-memory: a store that will not open
      * stops this Space booting instead. The {@code db} default keeps its degrade — the Alert Center must not
-     * block a Personal/Professional boot — but Enterprise asked for PostgreSQL, and serving the heap would hide it.
+     * block a Basic/Standard boot — but Advanced asked for PostgreSQL, and serving the heap would hide it.
      */
     private static IllegalStateException refuseFallback(String what, String url, Exception cause) {
         return new IllegalStateException("-Dobjects.backend=postgres: could not open the " + what + " store at " + url

@@ -56,9 +56,9 @@ import com.gamma.access.AuditTrail;
  * {@link com.gamma.etl.StatusStore}, reprocess a batch, and validate a config.
  *
  * <h3>Authentication (W6)</h3>
- * The core (Personal edition) is <b>auth-free</b> — every route is open, exactly as before. Authentication
+ * The core (Basic edition) is <b>auth-free</b> — every route is open, exactly as before. Authentication
  * and authorization are an <em>edition</em> concern: {@link #dispatch} looks up an {@link Authenticator}
- * via {@link Authenticators} (a {@code ServiceLoader} seam); when the Professional edition's
+ * via {@link Authenticators} (a {@code ServiceLoader} seam); when the Standard edition's
  * {@code inspecto-oidc} module is absent, the lookup is empty and nothing is enforced. When it is
  * present, every route outside the health/bootstrap probe surface requires a valid credential
  * ({@code 401 UNAUTHENTICATED} on failure); write routes additionally declare a required capability via
@@ -93,9 +93,9 @@ import com.gamma.access.AuditTrail;
  *   GET  /health                              liveness (open)
  *   GET  /ready                               readiness (open)
  *   GET  /bootstrap                           platform bootstrap: edition/features/config-specs/enums/spaces/session (ETag'd) [v4.8.0]
- *   POST /auth/exchange                       redeem an OIDC code (PKCE) → access token + httpOnly refresh cookie [v4.8.0, 503 on Personal]
- *   POST /auth/refresh                        mint a fresh access token from the refresh cookie      [v4.8.0, 503 on Personal]
- *   POST /auth/logout                         revoke (best-effort) + clear the session cookie        [v4.8.0, 503 on Personal]
+ *   POST /auth/exchange                       redeem an OIDC code (PKCE) → access token + httpOnly refresh cookie [v4.8.0, 503 on Basic]
+ *   POST /auth/refresh                        mint a fresh access token from the refresh cookie      [v4.8.0, 503 on Basic]
+ *   POST /auth/logout                         revoke (best-effort) + clear the session cookie        [v4.8.0, 503 on Basic]
  *   GET  /spaces                              list hosted spaces (manifests)               [v4.7.0]
  *   POST /spaces                              body {id,display_name?,description?} — create + boot a space [v4.7.0]
  *   PUT  /spaces/{id}                         body {display_name?,description?} — rename/re-describe (not 'default') [v4.10.0]
@@ -189,7 +189,7 @@ import com.gamma.access.AuditTrail;
  *       to {@code index.html}. API paths that match a route keep returning JSON (incl. JSON 404s).</li>
  *   <li><b>HTTPS (W6)</b> — set {@code -Dhttps.keystore=<PKCS12 path>} (+
  *       {@code -Dhttps.keystore.password=<pw>}) to serve over TLS 1.3 instead of plain HTTP. Unset
- *       (the default) ⇒ plain HTTP, byte-for-byte unchanged (Personal edition).</li>
+ *       (the default) ⇒ plain HTTP, byte-for-byte unchanged (Basic edition).</li>
  * </ul>
  */
 @PublicApi(since = "2.4.0")
@@ -206,7 +206,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
      */
     private static final Pattern SPACE_PREFIX = Pattern.compile("^/spaces/([a-z0-9][a-z0-9-]{0,62})(/.*)$");
 
-    /** Routes that stay open even when the Professional edition's security module is active (W6): liveness/
+    /** Routes that stay open even when the Standard edition's security module is active (W6): liveness/
      *  readiness/metrics probes carry no credentials; {@code /bootstrap} is how the SPA discovers it
      *  needs to start the OIDC redirect in the first place (its own {@code session.authenticated} reports
      *  {@code false} rather than 401); and the {@code /auth/*} session routes (W6d) run <em>before</em> a
@@ -312,7 +312,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         this.http.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         // ⚠ SharedRefResolver.install(new ExchangeRefResolver(spaces)) used to sit here. It moved into
         // inspecto-exchange's ExchangeRoutes.register (EDG-01 cell 4): the resolver is the exchange
-        // module's, so installing it from core would teach every Personal bundle to resolve shared refs
+        // module's, so installing it from core would teach every Basic bundle to resolve shared refs
         // for a feature it does not have. Absent module ⇒ SharedRefResolver stays NONE ⇒ every
         // shared/<owner>/<item> ref fails to resolve, which is the fail-closed answer.
         registerRoutes();
@@ -326,7 +326,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // Fail-closed at the edge (W6): resolve the edition's Authenticator now, not on the first
         // request, so a misconfigured Standard deployment (e.g. missing -Dauth.oidc.jwksUri, which the
         // security module's no-arg constructor rejects) fails to boot instead of silently accepting
-        // traffic. A no-op on Personal — the lookup just resolves empty.
+        // traffic. A no-op on Basic — the lookup just resolves empty.
         Authenticators.active();
         // MAINT-TASK-AUTHORITY-1: the runner re-checks an administrator-only Job's last editor against the role
         // table the request gate resolves (this server's bound Space); inert while no Authenticator is active.
@@ -360,12 +360,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *
      * <p>⚠ <b>The default is the wildcard address, and that is a deliberate call (2026-08-29), not an
      * oversight.</b> Narrowing it to loopback would silently make every already-deployed Standard and
-     * Enterprise install unreachable on upgrade, so the flag exists to let a deployment restrict itself
+     * Advanced install unreachable on upgrade, so the flag exists to let a deployment restrict itself
      * rather than to change what an existing one does.
      *
      * <p>🔴 <b>Consequently, exposure is an operator responsibility, and it matters most exactly where
-     * there is no authentication.</b> Personal ships no {@code Authenticator} at all
-     * ({@code docs/EDITIONS.md}), so a Personal install left on the default binds an unauthenticated
+     * there is no authentication.</b> Basic ships no {@code Authenticator} at all
+     * ({@code docs/EDITIONS.md}), so a Basic install left on the default binds an unauthenticated
      * control plane to every interface. Set {@code -Dcontrol.bind=127.0.0.1} (or firewall the port) for
      * any single-user install. {@code docs/EDITIONS.md} previously asserted loopback as if the code
      * enforced it; it never did.
@@ -400,8 +400,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
     }
 
     /**
-     * Plain HTTP by default (Personal edition, unchanged). Set {@code -Dhttps.keystore=<PKCS12 path>}
-     * (+ {@code -Dhttps.keystore.password=<pw>}) to serve over TLS 1.3 instead (Professional edition,
+     * Plain HTTP by default (Basic edition, unchanged). Set {@code -Dhttps.keystore=<PKCS12 path>}
+     * (+ {@code -Dhttps.keystore.password=<pw>}) to serve over TLS 1.3 instead (Standard edition,
      * docs/EDITIONS.md); pure JDK ({@link HttpsServer} + {@code javax.net.ssl}), no new dependency.
      *
      * <p>Both transports bind through {@link #bindAddress(int)} — a TLS listener that ignored
@@ -1158,9 +1158,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
         }
     }
 
-    /** AuthN gate (W6): a no-op when no {@link Authenticator} is on the classpath (Personal edition —
-     *  {@link Authenticators#active()} is empty), so Personal behaviour is byte-for-byte unchanged. When
-     *  the Professional edition's security module is present, a {@link #PUBLIC_PATHS} route (bootstrap/health)
+    /** AuthN gate (W6): a no-op when no {@link Authenticator} is on the classpath (Basic edition —
+     *  {@link Authenticators#active()} is empty), so Basic behaviour is byte-for-byte unchanged. When
+     *  the Standard edition's security module is present, a {@link #PUBLIC_PATHS} route (bootstrap/health)
      *  authenticates <em>optionally</em> — a Subject is attached when credentials resolve one (so
      *  {@code /bootstrap} reports the real session for an already-logged-in caller), but missing/invalid
      *  credentials there is not an error. Every other route requires a valid credential; a miss is
@@ -1197,7 +1197,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             java.nio.file.Path rolesRoot = spaces.size() == 0 ? null : writeRoot();
             if (rolesRoot != null) Roles.configRoot(ex, rolesRoot);
             // SEC-7(a): on Standard the acting identity is authoritative from the authenticated Subject; a
-            // client-supplied X-Actor header is an attempted actor spoof and is rejected outright. (Personal
+            // client-supplied X-Actor header is an attempted actor spoof and is rejected outright. (Basic
             // has no Authenticator, so this branch never runs there and X-Actor stays the historic actor.)
             String spoof = ex.getRequestHeaders().getFirst("X-Actor");
             if (spoof != null && !spoof.isBlank())
@@ -1210,7 +1210,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
     }
 
     /** Route-level PEP (ABAC A3): consult the edition's {@link AccessDecider} — a no-op when none is
-     *  on the classpath (Personal/Standard byte-identical) or no {@link Subject} is attached (the
+     *  on the classpath (Basic/Standard byte-identical) or no {@link Subject} is attached (the
      *  public probe surface). Only an explicit {@code DENY} acts (403); {@code ALLOW}/{@code ABSTAIN}
      *  fall through to the existing capability gates — a policy allow never bypasses them. The action
      *  vocabulary is {@code read} (GET/HEAD) / {@code operate} (a state change gated
@@ -1636,8 +1636,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
         return (dir == null || dir.isBlank()) ? null : Path.of(dir);
     }
 
-    // Route registration. The core (Personal edition) is auth-free — every route is open.
-    // Standard/Enterprise editions re-introduce authorization out-of-band via the security module.
+    // Route registration. The core (Basic edition) is auth-free — every route is open.
+    // Standard/Advanced editions re-introduce authorization out-of-band via the security module.
     @Override public void get   (String pattern, Handler h) { register("GET",    pattern, h); }
     @Override public void post  (String pattern, Handler h) { register("POST",   pattern, h); }
     @Override public void put   (String pattern, Handler h) { register("PUT",    pattern, h); }

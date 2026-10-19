@@ -43,7 +43,7 @@ final class ConfigWriteRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        // Requires canAuthorWorkbench (W6; a no-op on Personal — no Subject is ever attached there).
+        // Requires canAuthorWorkbench (W6; a no-op on Basic — no Subject is ever attached there).
         api.post("/config/write", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> writeConfig(api, e, api.body(e))));
         // Block-level save (collector-config unification, 2026-08-04): deep-merge a patch over the
         // file's CURRENT content server-side, so a stage pane can never clobber blocks it didn't

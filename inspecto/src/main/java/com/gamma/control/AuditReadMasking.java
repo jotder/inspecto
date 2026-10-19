@@ -35,7 +35,7 @@ import java.util.function.UnaryOperator;
  *
  * <p>⛔ Stored rows stay RAW: the hash chain is over raw content, so {@code /audit/verify} and the anchors are
  * untouched. Reads of the audit trail are NOT themselves audited (deferred by D-P8). Other event types pass through.
- * A request with no Subject (Personal, or no auth module) is unrestricted, as every {@code withCapability} gate is.
+ * A request with no Subject (Basic, or no auth module) is unrestricted, as every {@code withCapability} gate is.
  */
 public final class AuditReadMasking {
 

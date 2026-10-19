@@ -39,7 +39,7 @@ import java.util.stream.Stream;
  * </ol>
  * Every step runs on every create, the zero-Space recovery create included ({@code TEMPLATE-RECOVERY-IMPORT-GATE-1},
  * operator 2026-10-03: that create is Space governance and needs {@code canAdminister} like the rest, so there is
- * no capability-less applier left to exempt). With no Subject (Personal) every capability check is a no-op.
+ * no capability-less applier left to exempt). With no Subject (Basic) every capability check is a no-op.
  * Pipelines and Jobs are additionally run through {@link SaveGate} with referents deferred
  * ({@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1}), and every Connection file through
  * {@link ConnectionRoutes#validateProfile} (its connector checks and the https egress host check),

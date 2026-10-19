@@ -64,7 +64,7 @@ final class JobRoutes implements RouteModule {
                     HostContext.of(api).service().jobService().map(JobService::jobs).orElseGet(java.util.List::of);
             return ApiContext.v1(e) ? jobsPage(all, e) : ApiContext.paged(all, e);
         });
-        // Job CRUD (Scheduler write actions). Requires canAuthorWorkbench (W6; a no-op on Personal).
+        // Job CRUD (Scheduler write actions). Requires canAuthorWorkbench (W6; a no-op on Basic).
         // Persisted as <write-root>/jobs/<name>_job.toon; the write also hot-registers the job on the
         // live JobService (JobService.upsertJob/removeJob) so it takes effect without a restart.
         api.post("/jobs", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createJob(api, e, api.body(e))));
@@ -142,7 +142,7 @@ final class JobRoutes implements RouteModule {
         // Ends in a fixed /content segment so it never collides with the metadata read above.
         api.get("/jobs/([^/]+)/runs/([^/]+)/artifacts/([^/]+)/content",
                 (e, m) -> downloadArtifact(api, e, ApiContext.param(m, 2), ApiContext.param(m, 3)));
-        // Requires canOperateRuns (W6; a no-op on Personal — no Subject is ever attached there).
+        // Requires canOperateRuns (W6; a no-op on Basic — no Subject is ever attached there).
         api.post("/jobs/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> triggerJob(api, e, ApiContext.name(m))));
 
         // ── data-plane provenance (T22, §11): per-(node, relationship) record counts of a past pipeline run,
@@ -442,7 +442,7 @@ final class JobRoutes implements RouteModule {
      * ASSURE-AUDIT-CHAIN-1: an {@code event_prune} job decides which audit rows may lawfully vanish (its chained
      * prune record is what {@code /audit/verify} accepts for anchored rows being gone), so authoring or editing
      * one needs {@code canAdminister} on top of the route's {@code canAuthorWorkbench}. A no-op without a Subject
-     * (Personal), like every capability check.
+     * (Basic), like every capability check.
      */
     static void requireAdministerForEventPrune(HttpExchange ex, JobConfig c) {
         if (requiresAdminister(c, Roles.configRoot(ex))) ApiContext.requireCapability(ex, "canAdminister");

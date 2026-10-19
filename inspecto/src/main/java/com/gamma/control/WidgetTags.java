@@ -66,7 +66,7 @@ public final class WidgetTags {
                         boolean create, Consumer<String> ensureTag) {
         if (!KIND.equals(type)) return;
         // ⚠ Through the seam since EDG-01 cell 7, and absent on a bundle without inspecto-ops. Tag
-        // assignments are operational-object domain, so on Personal a widget simply carries no managed
+        // assignments are operational-object domain, so on Basic a widget simply carries no managed
         // tags — the persisted TOON keeps whatever it was authored with rather than being rewritten.
         com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null) return;

@@ -28,7 +28,7 @@ import com.gamma.access.WriteGates;
  *
  * <p>Fail-closed: write root unset → 503; a bad expectation body / target / column → 422; a duplicate
  * create → 409; an unknown expectation → 404. CRUD writes require {@code canAuthorWorkbench} (a no-op on
- * Personal); evaluation persists {@code lastResult}, so it also needs the write root.
+ * Basic); evaluation persists {@code lastResult}, so it also needs the write root.
  *
  * <p>The {@code baseline} kind (DUCKLE-C8) additionally records a profile per evaluation in
  * {@link BaselineProfileStore} and is accepted only when the whole run passed; its audited

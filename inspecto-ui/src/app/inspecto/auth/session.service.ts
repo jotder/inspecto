@@ -8,7 +8,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
 import { apiErrorMessage, apiUrl } from '../api/api-base';
 
 /**
- * OIDC endpoint configuration for the Professional-edition login redirect. Comes from `bootstrap.auth`
+ * OIDC endpoint configuration for the Standard-edition login redirect. Comes from `bootstrap.auth`
  * when the backend supplies it (the mock does, with `mock:true`); otherwise falls back to
  * `environment.oidc` (a real deployment bakes its non-secret authorize URL + public client id there,
  * the conventional SPA pattern). Never carries a client secret — the SPA is a public PKCE client.
@@ -84,10 +84,10 @@ export const RESUMABLE_KEY = 'inspecto.session.resumable';
  * (in memory only — the refresh token lives in the backend's httpOnly cookie, never here) plus the
  * resolved capability grants.
  *
- * <p><b>Offline / Personal is byte-for-byte unchanged.</b> When `authMode !== 'oidc'` (Personal, or the
+ * <p><b>Offline / Basic is byte-for-byte unchanged.</b> When `authMode !== 'oidc'` (Basic, or the
  * mock backend answering offline) this service does nothing beyond the one bootstrap read: no login, no
  * token, no redirect — {@link loginRequired} is always false and {@link authGuard} is a pass-through.
- * The Professional flow (redirect → callback → {@link completeLogin}) engages only when the backend reports
+ * The Standard flow (redirect → callback → {@link completeLogin}) engages only when the backend reports
  * OIDC on `GET /bootstrap`. ⚠ There is NO client-side dev switch (a `mockAuthMode: 'oidc'` one was named
  * here for weeks and never existed — SIGNIN-PREVIEW-1). To preview the guest routes locally, run the core
  * with `tools/run-backend.ps1 -AuthMode oidc`: the core echoes `auth.mode` on `/bootstrap` without
@@ -114,7 +114,7 @@ export class SessionService {
         });
     }
 
-    /** 'none' (Personal / offline) or 'oidc' (Professional). Drives {@link loginRequired} + {@link authGuard}. */
+    /** 'none' (Basic / offline) or 'oidc' (Standard). Drives {@link loginRequired} + {@link authGuard}. */
     readonly authMode = signal<'none' | 'oidc'>('none');
     readonly edition = signal<string>('basic');
     /** The running product's version as `GET /bootstrap` reported it; null until the bootstrap read lands. */
@@ -122,7 +122,7 @@ export class SessionService {
     readonly authenticated = signal(false);
     /**
      * `bootstrap.session.actor` for an AUTHENTICATED subject — the `Subject.id()` the security module
-     * resolved off the bearer — else null. Personal never sets it: there the server reports the
+     * resolved off the bearer — else null. Basic never sets it: there the server reports the
      * honour-system `appUser` placeholder, which is not a principal anyone should be shown as.
      */
     readonly actor = signal<string | null>(null);
@@ -146,7 +146,7 @@ export class SessionService {
     readonly exchangeEnabled = signal(false);
     /**
      * `bootstrap.features.geoLink` — the geo map + link analysis routes are REGISTERED in this bundle
-     * (EDITIONS CP-09: an optional module Professional and Enterprise carry and Personal does not). The
+     * (EDITIONS CP-09: an optional module Standard and Advanced carry and Basic does not). The
      * backend derives it from what actually registered, so this is never a guess about the edition.
      * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
      */
@@ -161,7 +161,7 @@ export class SessionService {
     readonly investigationsEnabled = signal(false);
     /**
      * `bootstrap.features.events` — the operational events FEED is registered in this bundle (EDITIONS
-     * CP-13: the optional `inspecto-events` module, Professional and above; EDG-01 cell 6).
+     * CP-13: the optional `inspecto-events` module, Standard and above; EDG-01 cell 6).
      *
      * ⛔ This is NOT "auditing is off". The audit trail is still RECORDED in every edition and still
      * READABLE through the core `/audit/*` routes, which is why the Audit log screen does not gate on this
@@ -234,7 +234,7 @@ export class SessionService {
     /**
      * LIVEFIX2 #3: the server ANSWERED `GET /bootstrap` with an error (a 4xx/5xx — e.g. a Demo User conflict), so the
      * edition, the session and the capabilities are unknown. Not set for an unreachable backend (status 0): the
-     * connectivity banner owns that, and the shell still degrades to Personal. The sign-in page shows this text.
+     * connectivity banner owns that, and the shell still degrades to Basic. The sign-in page shows this text.
      */
     readonly bootstrapError = signal<string | null>(null);
 
@@ -244,7 +244,7 @@ export class SessionService {
         () => this.bootstrapError() !== null || (this.authMode() === 'oidc' && !this.authenticated()),
     );
 
-    /** The current access token for the auth interceptor to attach, or null (Personal / signed-out). */
+    /** The current access token for the auth interceptor to attach, or null (Basic / signed-out). */
     token(): string | null {
         return this.accessToken();
     }
@@ -252,7 +252,7 @@ export class SessionService {
     /**
      * App-initializer entry point: read bootstrap, set the edition switch, and — under OIDC — try to
      * resume an existing session from the refresh cookie. Never rejects: a bootstrap failure degrades to
-     * Personal (auth-free) so the app still loads rather than white-screening on a login it can't reach.
+     * Basic (auth-free) so the app still loads rather than white-screening on a login it can't reach.
      */
     async init(): Promise<void> {
         const boot = await firstValueFrom(
@@ -283,7 +283,7 @@ export class SessionService {
         this.opsEnabled.set(boot.features?.ops === true);
         this.loopbackOnly.set(boot.features?.loopbackOnly === true);
 
-        if (mode !== 'oidc') return; // Personal / offline — done, no login path.
+        if (mode !== 'oidc') return; // Basic / offline — done, no login path.
 
         this.oidc = {
             authorizeUrl: boot.auth?.authorizeUrl ?? this.environment.oidc?.authorizeUrl ?? '',
@@ -437,7 +437,7 @@ export class SessionService {
      * `ca3680df` and 2026-07-26.
      *
      * Falls back to the in-app route when no `endSessionUrl` is configured (or in offline mock mode,
-     * where there is no provider to redirect to), so Personal and the dev mock are unaffected.
+     * where there is no provider to redirect to), so Basic and the dev mock are unaffected.
      */
     logout(): void {
         this.http

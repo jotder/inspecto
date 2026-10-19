@@ -16,7 +16,7 @@ import java.util.function.Function;
  * ({@code objects.db.user}/{@code .password}) but each has its own URL property ("URL grain != credential grain").
  * Default {@code db}, never {@code memory} (OBJECTS-BACKEND-DEFAULT-MEMORY-1, operator 2026-09-25): Incidents,
  * Cases, notes, links and tags vanishing on restart is not a default any edition keeps. {@code postgres} is what
- * the Enterprise launcher sets - PostgreSQL mandatory, refused at boot by {@code OperationalDb.verifyObjectsBackend()}
+ * the Advanced launcher sets - PostgreSQL mandatory, refused at boot by {@code OperationalDb.verifyObjectsBackend()}
  * when it cannot be honoured; {@code memory} survives only as an explicit opt-in.
  */
 public enum OpsStoreFamily implements StoreFamily {

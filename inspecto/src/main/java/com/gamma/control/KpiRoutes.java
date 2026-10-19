@@ -238,7 +238,7 @@ final class KpiRoutes implements RouteModule {
             try {
                 // The authoring door answers an unreadable Dataset exactly as an absent one (no existence leak).
                 // A template's Datasets are the server's own shipped content, so here the refusal says which it is.
-                // With no Subject (Personal) ComponentAccess is fail-open.
+                // With no Subject (Basic) ComponentAccess is fail-open.
                 String ds = KpiDefinition.fromMap(k.name(), k.content()).dataset();
                 ComponentStore seeded = new ComponentStore(config.resolve("registry"));
                 if (readableDataset(ex, seeded, ds) == null && seeded.exists("dataset", ds))

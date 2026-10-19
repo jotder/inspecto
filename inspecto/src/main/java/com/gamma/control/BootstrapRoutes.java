@@ -32,7 +32,7 @@ import java.util.Map;
  * them (that would invent a sync problem); the UI merges them client-side. Session
  * {@code capabilities} come from the authenticated {@link Subject}'s resolved grants (W6); the
  * auth-free core has no {@code Subject} (no {@link Authenticator} is ever present there), so
- * {@code authenticated} stays {@code false} and {@code capabilities} empty — Personal edition,
+ * {@code authenticated} stays {@code false} and {@code capabilities} empty — Basic edition,
  * unchanged. {@code /bootstrap} itself stays public even on Standard (it is how the SPA discovers it
  * needs to start the OIDC redirect). The response is space-agnostic; a per-space bootstrap (dataset
  * descriptors, lookup values, per-Lens navigation) is a follow-on once those become backend-owned.
@@ -66,7 +66,7 @@ final class BootstrapRoutes implements RouteModule {
         data.put("topology", com.gamma.util.Topology.mode().name().toLowerCase());
         data.put("features", features(api));
         // DEMO-AUTH-1: the session broker's pre-sign-in context (the demo relay's Demo User picker). Omitted when
-        // no relay is installed or it publishes nothing — the OIDC relay, and Personal, are unchanged.
+        // no relay is installed or it publishes nothing — the OIDC relay, and Basic, are unchanged.
         TokenRelays.active().map(TokenRelay::bootstrapAuth).filter(a -> !a.isEmpty()).ifPresent(a -> data.put("auth", a));
         // Landing-page plan D2 (2026-09-15): the deployment's own branding is PRE-SIGN-IN CONTEXT, not
         // inventory, so it is served to an anonymous caller too — it is what makes the sign-in page belong
@@ -74,10 +74,10 @@ final class BootstrapRoutes implements RouteModule {
         // it the usual way there: `GET /settings/branding` sits behind the auth gate, so a sign-in page
         // calling `BrandingService` would 401 on exactly the screen that needs it.
         data.put("branding", branding(api));
-        // Landing-page plan D2 (2026-09-15): before sign-in a Standard/Enterprise deployment tells an
+        // Landing-page plan D2 (2026-09-15): before sign-in a Standard/Advanced deployment tells an
         // unauthenticated caller only what the SPA needs to START the OIDC redirect — edition, topology,
         // feature flags and the anonymous session. The Space roster and the spec catalogue are
-        // deployment inventory and wait for a bearer. Personal registers no Authenticator, so it is
+        // deployment inventory and wait for a bearer. Basic registers no Authenticator, so it is
         // unchanged: there is no "before sign-in" to protect. Derived from the SPI slot, not the edition.
         if (!(Authenticators.active().isPresent() && ApiContext.subject(ex).isEmpty())) {
             data.put("configSpecs", configSpecs());
@@ -107,7 +107,7 @@ final class BootstrapRoutes implements RouteModule {
         f.put("multiSpace", HostContext.of(api).spaces().supportsCrud());
         // EDITIONS SEC-10 (EDG-01 cell 4): BOTH conditions. The multi-space runtime is necessary
         // (-Dspaces.root) but not sufficient — the optional inspecto-exchange module must also have
-        // registered. ⚠ Until 2026-09-07 this was the containerRoot check alone, so a Personal install with
+        // registered. ⚠ Until 2026-09-07 this was the containerRoot check alone, so a Basic install with
         // -Dspaces.root reported exchange:true and the SPA's Share buttons 404'd on click. Derived from what
         // registered, never guessed; the stub does not count (ApiContext.hasRoute excludes stubs).
         java.util.Set<String> on = new java.util.HashSet<>(api.registeredFeatures());
@@ -218,7 +218,7 @@ final class BootstrapRoutes implements RouteModule {
     }
 
     /** {@code authenticated}/{@code capabilities} reflect the {@link Subject} the security module resolved
-     *  for this request (W6); absent on Personal edition, where this is still the honor-system stub. */
+     *  for this request (W6); absent on Basic edition, where this is still the honor-system stub. */
     private static Map<String, Object> session(HttpExchange ex) {
         Map<String, Object> s = new LinkedHashMap<>();
         var subject = ApiContext.subject(ex);

@@ -58,7 +58,7 @@ final class NotificationRoutes implements RouteModule {
         // Preferences are two layers (ses-sns-adapter-design §7, fixes SEC review F2): the deployment DEFAULT
         // grid, and a sparse per-Subject override on top. PUT /notifications/preferences writes the CALLER's
         // override only, so it is self-service; the default changes every user's delivery, so its write is
-        // admin-gated. On Personal (no Subject) there is one user, and PUT keeps writing the single grid.
+        // admin-gated. On Basic (no Subject) there is one user, and PUT keeps writing the single grid.
         api.get("/notifications/preferences", (e, m) -> myPreferences(api, e));
         api.put("/notifications/preferences", (e, m) -> saveMyPreferences(api, e, api.body(e)));
         api.get("/notifications/preferences/default", (e, m) -> HostContext.of(api).service().notificationPreferences().grid());
@@ -99,7 +99,7 @@ final class NotificationRoutes implements RouteModule {
     }
 
     /**
-     * {@code PUT /notifications/preferences/default} (and, on Personal, {@code PUT /notifications/preferences})
+     * {@code PUT /notifications/preferences/default} (and, on Basic, {@code PUT /notifications/preferences})
      * — apply the edited deployment-default grid. Body: {@code {"preferences":[{category, channels:{inApp,email}},
      * …]}}. Critical/unknown categories are ignored by the store (locked); the full refreshed grid is returned.
      */
@@ -115,7 +115,7 @@ final class NotificationRoutes implements RouteModule {
 
     /**
      * {@code GET /notifications/preferences} — the caller's EFFECTIVE grid: each cell its override, else the
-     * default, marked {@code source: inherited | overridden}. No Subject (Personal) ⇒ the single grid.
+     * default, marked {@code source: inherited | overridden}. No Subject (Basic) ⇒ the single grid.
      */
     private static Object myPreferences(ApiContext api, HttpExchange ex) {
         Subject s = ApiContext.subject(ex).orElse(null);
@@ -132,7 +132,7 @@ final class NotificationRoutes implements RouteModule {
      * {@code PUT /notifications/preferences} — self-service: writes ONLY the calling Subject's override, keyed
      * by its stable id. A cell set to {@code null} resets it to the default. ⛔ The email destination is the
      * Subject's verified email claim; nothing in the body can name an address (no field is read for one), and a
-     * Subject without a claim cannot turn email on. Personal (no Subject): writes the single grid, as before.
+     * Subject without a claim cannot turn email on. Basic (no Subject): writes the single grid, as before.
      */
     private static Object saveMyPreferences(ApiContext api, HttpExchange ex, Map<String, Object> body)
             throws IOException {
@@ -169,12 +169,12 @@ final class NotificationRoutes implements RouteModule {
     /**
      * Whether {@code reader}'s feed shows {@code n}: with a Subject, only categories whose EFFECTIVE in-app
      * preference is on (critical always) — the feed is shared, so the per-Subject in-app choice is applied
-     * at read time. Without one (Personal) everything stored is shown, as before, and so is a category the
+     * at read time. Without one (Basic) everything stored is shown, as before, and so is a category the
      * grid has no row for (an authored rule's own category) — there is no preference to have opted out of.
      *
      * <p>An <b>addressed</b> notification (an owned Alert Rule's, DUCKLE-C1 residual 2) is in its recipient's
      * feed only — for every Subject, {@code canAdminister} included: the feed is a personal inbox, and the
-     * oversight view of every fired alert is {@code GET /alerts} and the Incidents it opens. Personal has no
+     * oversight view of every fired alert is {@code GET /alerts} and the Incidents it opens. Basic has no
      * Subject and so no owner could have been stamped; there, as before, everything stored is shown.
      */
     /** {@link #existing}, but a notification the caller may not see (a {@code security} one for a non-admin)

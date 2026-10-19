@@ -26,7 +26,7 @@ import com.gamma.access.WriteGates;
  * components under {@code <write-root>/registry}.
  *
  * <p>SEC-7(c): the triage + deliver transitions are gated <b>server-side</b> on {@code canTriageRequirements}
- * (a no-op on Personal — no Subject is attached); submission and listing are open. The prior mock routed
+ * (a no-op on Basic — no Subject is attached); submission and listing are open. The prior mock routed
  * every write through the generic {@code canAuthorWorkbench} component CRUD, which would have both blocked
  * Business submission and left triage unenforced on the backend.
  *

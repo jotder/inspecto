@@ -32,7 +32,7 @@ import com.gamma.access.CapabilityManifest;
  *       ({@link JobRoutes#isAdministerOnlyMaintenance}).</li>
  * </ul>
  * Every door calls {@link #checkItems} or {@link #checkFiles} BEFORE its first write: the first missing capability
- * refuses the whole import (403, naming the kind and the capability). A no-op without a Subject (Personal), like
+ * refuses the whole import (403, naming the kind and the capability). A no-op without a Subject (Basic), like
  * every capability check. The access config, the role table and the settings documents are not here: no import
  * writes them at all ({@code ReservedConfigPaths}).
  *

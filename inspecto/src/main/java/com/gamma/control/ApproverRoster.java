@@ -35,7 +35,7 @@ import java.util.Set;
  *
  * <p><b>When it applies.</b> Only under an Authenticator that does not enumerate principals ({@link
  * Authenticator#principals} empty — OIDC). Demo sign-in enumerates its users and keeps deciding on roles alone;
- * Personal has no Subject, so deciding is already 403.
+ * Basic has no Subject, so deciding is already 403.
  */
 public final class ApproverRoster {
 

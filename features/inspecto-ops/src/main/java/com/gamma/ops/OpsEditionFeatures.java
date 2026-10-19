@@ -6,8 +6,8 @@ import com.gamma.etl.EditionFeatures;
 import java.util.Set;
 
 /**
- * Declares Alert Rules ({@code SP-CTL-07}) present wherever this module ships — Professional and Enterprise
- * (`PROCESSOR-RELEASE-READINESS-1` G9). A fired rule opens an ALERT object in this module's store; a Personal
+ * Declares Alert Rules ({@code SP-CTL-07}) present wherever this module ships — Standard and Advanced
+ * (`PROCESSOR-RELEASE-READINESS-1` G9). A fired rule opens an ALERT object in this module's store; a Basic
  * build, which never bundles it, refuses Alert Rules at every authoring door and at boot.
  *
  * <p>Also declares the Link Analysis Investigation surface ({@link EditionFeatures#INVESTIGATIONS}, {@code LA-EDITIONS-1}

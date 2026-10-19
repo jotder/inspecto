@@ -50,7 +50,7 @@ import java.util.regex.Pattern;
  * Link Analysis exploration and Entity Lists use, so one id has one alias. Applied AFTER execution: grouping and
  * {@code countDistinct} ran over the raw values.
  *
- * <p><b>Caller</b> - raw only for a holder of {@link #REVEAL}; a request with no Subject (Personal, no auth module) is
+ * <p><b>Caller</b> - raw only for a holder of {@link #REVEAL}; a request with no Subject (Basic, no auth module) is
  * unrestricted like every capability gate, EXCEPT the public share route, which passes {@code reveal=false} always.
  *
  * <p><b>Inference channels refused (422) for a caller who cannot reveal:</b> a filter, a {@code when} condition or an
@@ -96,7 +96,7 @@ final class BiResultMasking {
         return refs;
     }
 
-    /** True when the caller may see raw keys: holds {@link #REVEAL}, or no Subject is attached (Personal edition). */
+    /** True when the caller may see raw keys: holds {@link #REVEAL}, or no Subject is attached (Basic edition). */
     static boolean mayReveal(HttpExchange ex) {
         return ApiContext.subject(ex).map(s -> s.capabilities().contains(REVEAL)).orElse(true);
     }

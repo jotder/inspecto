@@ -39,7 +39,7 @@ import com.gamma.access.ComponentAccess;
  *   <li><b>Every Job carries an author.</b> Each server write door ({@code POST}/{@code PUT /jobs},
  *       {@code /config/write} + {@code /config/patch} type {@code job}, every import door) calls {@link #stamp}:
  *       {@link JobConfig#AUTHOR_KEYS} are SERVER-STAMPED from the authenticated {@link Subject} — any value the
- *       client sent is discarded. Without a Subject (no Authenticator: Personal / an open dev server) nothing is
+ *       client sent is discarded. Without a Subject (no Authenticator: Basic / an open dev server) nothing is
  *       stamped and any carried value is still stripped.</li>
  *   <li><b>The runner re-checks.</b> {@link #runAuthority} is installed into {@link JobService}: a Job that
  *       {@link JobRoutes#requiresAdminister needs canAdminister} runs only if its last editor's recorded roles,
