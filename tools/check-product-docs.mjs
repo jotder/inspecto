@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-product-docs — holds the documentation hubs docs/okf/product/<kind>/<name>/index.md
-// (docs/superpower/product-docs-hub-plan.md, PRODUCT-DOCS-HUB-1) against product-map/<kind>/<name>.toon.
+// (docs/archived-documents/plans-archive/product-docs-hub-plan.md, PRODUCT-DOCS-HUB-1) against product-map/<kind>/<name>.toon.
 //
 //   node tools/check-product-docs.mjs [--root .]      exit 1 on any finding; prints slot coverage
 //

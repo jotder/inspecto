@@ -25,7 +25,7 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **63<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 50<!--count:backlog-p3--> × P3** —
+> **66<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 53<!--count:backlog-p3--> × P3** —
 > ⬇ **76 → 63 (P2 18 → 13, P3 58 → 50) on 2026-10-18, net of the seven residual lanes R1-R7 merged together** (each lane's own line below counts from 76; decisions taken under operator delegation and recorded on each row).
 > ↔ **76 (no count change) on 2026-10-18**: closed P3 `PREDICTIVE-WINDOWED-MEASURES-1` (built as `ANALYTICS-CORE-1` C1: `MeasureCompiler` window, `recency`, ratios, with the TS twin and contract JSON) and filed P3 `ANALYTICS-STEPS-TS-1` (the Steps for change-point detection and cohort / funnel).
 > ⬇ **76 → 74 (P2 18 → 15, P3 58 → 59) on 2026-10-18**: closed P3 `PARSING-CHILD-DERIVE-CORPUS-1` (stale — the `repeated_child_nested` corpus case shipped `7f9be5884`; `Asn1RecordIngesterChildTest` 7/7, and `asn-golden` `SyntheticCorpusTest` now runs 4/4, confirming the once hand-written `repeated_child/expected.jsonl`) and P3 `Parsing (Stage-1) — residuals` (its deferrals are one §6 line); re-ranked P2 → P3 and kept, demand-gated: `Branch-aware executor residuals`, `Platform Services Stage 2 / 3`, `Consignment addressing` (its stale "temporalColumn has no caller" claim corrected).
@@ -291,10 +291,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 50<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 53<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 50<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 63<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 53<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 66<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -631,7 +631,9 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 ## 5. Docs & board hygiene
 
-_No open rows (last closed: `BOARD-STALE-HEADS-1`, 2026-10-04)._
+- **P3** · **DOCS-AGENT-WRITTEN-REVIEW-1** — ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1). A claim audit of 30 of them found 7 of 580 checkable claims wrong (1.2%, all fixed; `okf/product/layer/platform/tests-doc-claim-audit-2026-10-19.md`) and the `check-doc-flags` / `check-doc-routes` guards now hold `-D` flags and routes, but behaviour prose in the unsampled ~170 is unreviewed — review `admin-guide*` and `plan*` first, a module at a time when it is next touched. [items: layer.platform, layer.product · kind: chore]
+- **P3** · **DOCS-SKILLS-ALERTS-AGENTIC-1** — hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (`.claude/skills/`); still missing: alert authoring and agentic operation skills, written the same way (route through the hubs, every route grounded). [items: addon.incidents, module.agent · kind: feature · hold: demand]
+- **P3** · **DOCS-FUNCTIONALITY-HUBS-1** — decide whether `functionality/` Product Map Items get their own hubs or stay sections of their module's `features` slot (none exist yet, so nothing is blocked). [items: layer.product · kind: chore · hold: operator]
 
 
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)

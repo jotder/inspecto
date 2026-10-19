@@ -1,13 +1,11 @@
 # Product documentation hubs — plan (`PRODUCT-DOCS-HUB-1`)
 
-> **Status:** 🟡 IN FLIGHT — design agreed with the operator 2026-10-19. Pilot ✅ (`96b37369f`).
-> **Waves 2 + 4 ✅ 2026-10-19:** all 87 hubs generated; all 244 current docs of `okf/backend|frontend|capabilities|agentic`,
-> `stakeholders/`, `ops/`, `ui/`, `roadmap/`, `wiki/` moved into hubs (plus 43 diagrams → `okf/product/assets/`), 24 index
-> pages dropped (snapshot: `archived-documents/doc-indexes-before-product-hubs-2026-10-19/`), every reference rewritten.
-> Open: waves 3, 5, 6 and slot-splitting of large docs.
-> **Gaps closed 2026-10-19:** slot applicability decided per kind (generator) and per hub (`slots-na.toon`, reasoned);
-> four writing lanes filled every remaining gap — 0 `missing` across 87 hubs (plan 47 · spec 46 · architecture 69 ·
-> features 87 · user-guide 49 · admin-guide 58 · api 37 · tests 47 current).
+> **Status:** ✅ SHIPPED 2026-10-19 and archived. All 87 hubs exist with 0 `missing` slots; generators
+> (`render-product-docs`, `render-feature-db`, `render-tests-inventory`, `render-api-routes`) and guards
+> (`check-product-docs`, `check-doc-flags`, `check-doc-routes`, `check-backlog-items`) run in CI and the pre-commit hook.
+> As-built home: `CLAUDE.md` doc lifecycle + `okf/product/index.md` + `okf/product/layer/platform/spec-work-tracking.md`.
+> Open follow-ups moved to `docs/BACKLOG.md` §5: `DOCS-AGENT-WRITTEN-REVIEW-1`, `DOCS-SKILLS-ALERTS-AGENTIC-1`,
+> `DOCS-FUNCTIONALITY-HUBS-1`.
 
 ## 1. Problem
 

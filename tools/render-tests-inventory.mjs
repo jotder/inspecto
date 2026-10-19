@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// render-tests-inventory — the `tests` slot of the documentation hubs (PRODUCT-DOCS-HUB-1, docs/superpower/product-docs-hub-plan.md
+// render-tests-inventory — the `tests` slot of the documentation hubs (PRODUCT-DOCS-HUB-1, docs/archived-documents/plans-archive/product-docs-hub-plan.md
 // wave 4): a GENERATED list of test classes per Product Map Item, for QA/QC readers.
 //
 //   node tools/render-tests-inventory.mjs [--root .] [--check]      --check: exit 1 if any written file would change

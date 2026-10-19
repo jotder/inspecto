@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // docs-relocate — moves docs by a mapping and rewrites every reference to them (PRODUCT-DOCS-HUB-1 wave 4,
-// docs/superpower/product-docs-hub-plan.md).
+// docs/archived-documents/plans-archive/product-docs-hub-plan.md).
 //
 //   node tools/docs-relocate.mjs <mapping.csv> [--write]      dry run without --write
 //

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// render-feature-db — the `feature-db` slot of the documentation hubs (PRODUCT-DOCS-HUB-1, docs/superpower/product-docs-hub-plan.md
+// render-feature-db — the `feature-db` slot of the documentation hubs (PRODUCT-DOCS-HUB-1, docs/archived-documents/plans-archive/product-docs-hub-plan.md
 // wave 3): a GENERATED, sortable feature list per Product Map Item, for build and release engineers.
 //
 //   node tools/render-feature-db.mjs [--root .] [--check]      --check: exit 1 if any written file would change
