@@ -42,7 +42,8 @@ import java.nio.file.attribute.PosixFilePermissions;
  * Investigation seed). It is resolved from {@link #BOOK}: the alias → raw pairs this server has minted for this Space,
  * kept in memory (bounded, least-recently-used out) and appended to the Space's book file in the secrets directory beside
  * the root ({@code .exploration-alias-book}, outside every exported tree; LA-EDITIONS-RESIDUALS-1 4c), so an alias
- * still resolves after a restart or an eviction: every in-memory miss scans that file. Nothing raw is ever sent to a
+ * still resolves after a restart or an eviction: an in-memory miss scans that file, unless the
+ * same alias already missed on a book of the same size ({@link #MISSES}). Nothing raw is ever sent to a
  * client. ⚠ An alias never minted, or whose book file was removed, is answered 422 {@code "alias not known"}.
  */
 final class ExplorationMasking {
@@ -54,6 +55,22 @@ final class ExplorationMasking {
             return size() > BOOK_MAX;
         }
     });
+
+    /**
+     * Aliases a scan of the book did NOT find, with the book file's size at that scan: a repeated miss on an unchanged
+     * book answers null without reading it again (an Investigation pseudonym or a stale alias misses as a normal path).
+     * A changed size (a mint appended) invalidates the entry. Bounded, least-recently-used out.
+     */
+    private static final int MISSES_MAX = 100_000;
+    private static final Map<String, Long> MISSES = Collections.synchronizedMap(new LinkedHashMap<>(1024, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Long> eldest) {
+            return size() > MISSES_MAX;
+        }
+    });
+
+    /** Book-file scans since start (test seam). */
+    static final java.util.concurrent.atomic.AtomicInteger SCANS = new java.util.concurrent.atomic.AtomicInteger();
 
     /** Serialises appends to a book file (one lock for all Spaces: an append is one short write). */
     private static final Object FILE_LOCK = new Object();
@@ -129,9 +146,23 @@ final class ExplorationMasking {
     /** The raw id behind an alias served for this Space's exploration reads, or null. */
     static String lookup(Path writeRoot, String alias) {
         String raw = BOOK.get(writeRoot + "\u0000" + alias);
-        if (raw == null) {
-            raw = scan(writeRoot, alias);
-            if (raw != null) BOOK.put(writeRoot + "\u0000" + alias, raw);
+        if (raw != null) return raw;
+        String k = writeRoot + "\u0000" + alias;
+        Path f = bookFile(writeRoot);
+        long size;
+        try {
+            size = Files.isRegularFile(f) ? Files.size(f) : -1;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        Long missedAt = MISSES.get(k);
+        if (missedAt != null && missedAt == size) return null;
+        raw = size < 0 ? null : scan(writeRoot, alias);
+        if (raw != null) {
+            BOOK.put(k, raw);
+            MISSES.remove(k);
+        } else {
+            MISSES.put(k, size);
         }
         return raw;
     }
@@ -156,7 +187,13 @@ final class ExplorationMasking {
             try {
                 Files.createDirectories(f.getParent());
                 if (!Files.exists(f)) createOwnerOnly(f);
-                Files.writeString(f, line, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+                try (var ch = Files.newByteChannel(f, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+                    long end = ch.size();
+                    java.nio.ByteBuffer last = java.nio.ByteBuffer.allocate(1);
+                    // a line torn by a crash has no newline: end it first so it cannot swallow this one
+                    if (end > 0 && ch.position(end - 1).read(last) == 1 && last.get(0) != '\n') line = "\n" + line;
+                    ch.position(end).write(java.nio.ByteBuffer.wrap(line.getBytes(StandardCharsets.UTF_8)));
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -185,6 +222,7 @@ final class ExplorationMasking {
     private static String scan(Path writeRoot, String alias) {
         Path f = bookFile(writeRoot);
         if (!Files.isRegularFile(f)) return null;
+        SCANS.incrementAndGet();
         String prefix = alias + "\t";
         byte[] key = null;
         try (var lines = Files.lines(f, StandardCharsets.UTF_8)) {
@@ -212,6 +250,7 @@ final class ExplorationMasking {
     /** Test seam: drops the in-memory book, as a restart does. */
     static void forgetInMemoryForTest() {
         BOOK.clear();
+        MISSES.clear();
     }
 
     /** Test seam: drops one entry from the in-memory book, as an LRU eviction does. */

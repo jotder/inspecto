@@ -316,20 +316,37 @@ final class CaseHistory {
             InvestigationRoutes.Inv inv = readable(api, ex, invId, readable);
             if (inv == null) return null;
             if (!(snap.get("nodes") instanceof List<?> nodes)) return false;
-            EntityMasking mask = null;
+            EntityMasking[] mask = {null};
+            java.util.function.UnaryOperator<String> reveal = t -> {
+                if (mask[0] == null) {
+                    try {
+                        mask[0] = EntityMasking.of(inv, List.of());
+                    } catch (IOException e) {
+                        throw new java.io.UncheckedIOException(e);   // caught below as before: the snapshot is hidden
+                    }
+                }
+                return mask[0].reveal(t);
+            };
             for (Object n : nodes) {
                 if (!(n instanceof Map<?, ?> m) || !(m.get("id") instanceof String nid)) continue;
-                if (raw.equals(nid)) return true;
-                if (nid.startsWith(MaskTokens.TOKEN_PREFIX)) {
-                    if (raw.equals(ExplorationMasking.lookup(writeRoot, nid))) return true;
-                    if (mask == null) mask = EntityMasking.of(inv, List.of());
-                    if (raw.equals(mask.reveal(nid))) return true;
-                }
+                if (nodeHolds(raw, nid, writeRoot, reveal)) return true;
             }
             return false;
         } catch (IOException | RuntimeException bad) {
             return null;
         }
+    }
+
+    /**
+     * Whether snapshot node {@code nid} is {@code raw}. A masked node is tried as the Investigation's own pseudonym FIRST
+     * (an in-memory map), and only when that does not know it as an exploration alias, whose miss may read the book file.
+     */
+    static boolean nodeHolds(String raw, String nid, Path writeRoot, java.util.function.UnaryOperator<String> reveal) {
+        if (raw.equals(nid)) return true;
+        if (!nid.startsWith(MaskTokens.TOKEN_PREFIX)) return false;
+        String pseudonymOf = reveal.apply(nid);
+        if (pseudonymOf != null) return raw.equals(pseudonymOf);
+        return raw.equals(ExplorationMasking.lookup(writeRoot, nid));
     }
 
     /** One allowlisted row for Case {@code ref} when it exists, is a Case, the caller may see it and it passes {@code status}. */

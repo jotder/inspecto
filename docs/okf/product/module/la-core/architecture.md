@@ -299,8 +299,11 @@ book of what this server minted for this Space (bounded LRU; nothing raw is ever
 `alias<TAB>base64(raw)` line per newly minted alias, to `<root>.secrets/.exploration-alias-book` beside the Space key
 (owner-only, outside every exported tree), and every in-memory miss scans that file, so an alias survives a restart
 or an eviction; a line is believed only when its alias is the token of its raw value, so a torn line is skipped
-(LA-EDITIONS-RESIDUALS-1 4c, 2026-10-19; `ExplorationMaskingSpaceKeyTest`). ⚠ A miss costs one file read, so an
-alias never minted reads the whole file each time. The
+(LA-EDITIONS-RESIDUALS-1 4c, 2026-10-19; `ExplorationMaskingSpaceKeyTest`). ⚠ The first miss of an alias reads the whole
+file (about 64 ms at 500k lines / 20 MB); a repeated miss on a book of unchanged size answers from a bounded negative
+cache without reading it (any mint grows the book and re-opens the question). Case history tries the Investigation's own
+pseudonym before the book, so Investigation-alias nodes never read it. An append first ends a torn last line with a
+newline, so a crash mid-append cannot swallow the next line. The
 file is not compacted: it grows by one line per distinct alias minted (plus one if an evicted alias is minted again).
 An alias never minted (or whose book was removed) is 422 *alias not known* and the query is re-run. ⚠ An Investigation keeps its own key, so a seeded entity has a second alias
 there: Working Set answers (`/working-set`, `/replay`, op answers) carry `exploreAliases` (Investigation alias to
