@@ -961,6 +961,11 @@ lane record: [`archived plan`](../../../../archived-documents/plans-archive/la-c
   (`bucket_sizing_changed`; append refused 409).
 * **Suspicion score has ONE cap** for browser and server: `suspicion_node_cap` (default 1,000) drives the browser
   refusal, the server's inline-or-job decision and the ceiling echoed by `GET /inv/graph/algorithms`.
+* **SPA loading.** `LaLimitsService` (root) reads the GET once per Space and publishes into the `la-limits` store the
+  pure modules read. A host that projects once, up front, awaits `whenLoaded()` first — the dashboard Link analysis
+  widget does, so every tile shares one GET and a failed read leaves the shipped fallbacks (built 2026-10-19). The Geo
+  map widget loads none: its sources leave `limit` unset, so `GeoRoutes` applies the Space's `display.geo_point_cap`.
+  Both widgets show the studio's *Truncated* wording when a cap cut the answer.
 * **Parity.** `LaLimitCatalogueParityTest` parses the SPA's `LA_LIMIT_FALLBACKS` (`la-limits.ts`) and fails on a key
   the catalogue lacks or a default that differs; it also pins that no wired site still holds its old constant.
 

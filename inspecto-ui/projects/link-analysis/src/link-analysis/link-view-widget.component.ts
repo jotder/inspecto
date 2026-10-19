@@ -7,6 +7,8 @@ import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-sta
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
 import { GraphSourcesService } from './graph-sources';
+import type { ProjectedGraph } from './entity-projection';
+import { LaLimitsService } from './la-limits.service';
 import {
     hideLinkKinds,
     legendEdgeKindsFor,
@@ -47,6 +49,11 @@ import {
             @if (error(); as message) {
                 <inspecto-alert class="block" variant="warning">{{ message }}</inspecto-alert>
             } @else if (data(); as d) {
+                @if (truncated()) {
+                    <inspecto-alert class="mb-2 block shrink-0" variant="warning" title="Truncated">
+                        The projection hit the node cap — narrow the dataset or filter to see everything.
+                    </inspecto-alert>
+                }
                 <div class="relative flex min-h-0 flex-auto flex-col">
                     <inspecto-graph-view
                         class="min-h-0 flex-auto"
@@ -85,6 +92,8 @@ export class LinkViewWidgetComponent {
     readonly savedViewNotice = SAVED_VIEW_NOT_EVIDENCE;
     private linkAnalysisApi = inject(LinkAnalysisService);
     private graphSources = inject(GraphSourcesService);
+    /** The Space's Link Analysis limits (`projection_node_cap`, …), loaded before the projection runs; one GET per Space. */
+    private laLimits = inject(LaLimitsService);
     protected readonly headerComponent = inject(LA_DASHBOARD_HEADER);
 
     /** The saved `link-analysis-view` id this widget renders (the widget's binding). */
@@ -104,6 +113,8 @@ export class LinkViewWidgetComponent {
     /** Link kinds the legend's chips hide (client-side, this tile only). */
     readonly hiddenLinkKinds = signal<string[]>([]);
     readonly drawn = computed(() => hideLinkKinds(this.data(), this.hiddenLinkKinds()));
+    /** The node cap cut the projection short — said in the Link Analysis page's own words. */
+    readonly truncated = computed(() => !!(this.data() as ProjectedGraph | null)?.truncated);
     protected readonly toggleHiddenKind = toggleHiddenKind;
     readonly header = computed(() => ({ description: this.view()?.description }));
 
@@ -129,8 +140,10 @@ export class LinkViewWidgetComponent {
                         this.error.set(`Unknown graph source “${view.sourceId}”.`);
                         return;
                     }
-                    source
-                        .query(view.query)
+                    // the projection reads the Space's limits at call time, so they load first (fallbacks if that fails)
+                    this.laLimits
+                        .whenLoaded()
+                        .then(() => source.query(view.query))
                         .then((d) => this.data.set(d))
                         .catch((e: unknown) =>
                             this.error.set(e instanceof Error ? e.message : 'The view’s query failed.'),

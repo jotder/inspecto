@@ -48,10 +48,16 @@ export class LaLimitsService {
         () => `${PERSONAL_PREFIX}.${this.spaces.currentSpaceId() ?? 'default'}.${this.session.actor() ?? 'local'}`,
     );
 
+    /** The Space the last GET was for, and that GET settling (answered or failed): one read per Space, shared. */
+    private loadedFor: string | null | undefined = undefined;
+    private settled: Promise<void> | null = null;
+
     constructor() {
         effect(() => {
-            this.spaces.currentSpaceId(); // track: the limits are per Space
-            untracked(() => this.reload());
+            const id = this.spaces.currentSpaceId(); // track: the limits are per Space
+            untracked(() => {
+                if (this.settled === null || this.loadedFor !== id) this.reload();
+            });
         });
         effect(() => {
             const key = this.storageKey(); // track: per Space and per user
@@ -64,20 +70,37 @@ export class LaLimitsService {
 
     /** Re-read the active Space's limits (after a settings save elsewhere changed one). */
     reload(): void {
+        this.loadedFor = this.spaces.currentSpaceId();
         this.items.set([]);
         this.publish();
         this.loading.set(true);
-        this.http.get<LaLimitsResponse>(apiUrl('/settings/link-analysis/limits')).subscribe({
-            next: (r) => {
-                this.loading.set(false);
-                this.loadError.set(null);
-                this.apply(r);
-            },
-            error: (err) => {
-                this.loading.set(false);
-                this.loadError.set(apiErrorMessage(err, 'The Link Analysis limits did not load; the shipped defaults apply.'));
-            },
-        });
+        this.settled = new Promise<void>((resolve) =>
+            this.http.get<LaLimitsResponse>(apiUrl('/settings/link-analysis/limits')).subscribe({
+                next: (r) => {
+                    this.loading.set(false);
+                    this.loadError.set(null);
+                    this.apply(r);
+                    resolve();
+                },
+                error: (err) => {
+                    this.loading.set(false);
+                    this.loadError.set(
+                        apiErrorMessage(err, 'The Link Analysis limits did not load; the shipped defaults apply.'),
+                    );
+                    resolve();
+                },
+            }),
+        );
+    }
+
+    /**
+     * Resolves once the active Space's limits have answered — or failed, leaving the shipped fallbacks in force. For a
+     * host that reads limits once, up front (a dashboard Widget projecting a saved view), rather than reactively. Every
+     * caller shares the Space's one GET: it starts one only when none was made for the active Space.
+     */
+    whenLoaded(): Promise<void> {
+        if (this.settled === null || this.loadedFor !== this.spaces.currentSpaceId()) this.reload();
+        return this.settled as Promise<void>;
     }
 
     /** The item the server published under `key`, if any. */
