@@ -83,7 +83,13 @@ path mention to them (used for wave 4; reuse it for any later move).
    sections → `user-guide` / `api`), slice OpenAPI by tag into `api`, write `tests` inventories, fill
    `features` for every item.
 5. **Brochures** — per edition and solution pack, assembled from `features` slots.
-6. **Agent skills** — investigation / pipeline-authoring / incident skills read hubs by item id + slot.
+6. ✅ **Agent skills** (2026-10-19) — four repo skills read hubs by item id + slot:
+   `.claude/skills/docs-lookup` (item id + slot → hub `index.md` → slot file), `pipeline-author`
+   (etl/engine/config/acquire hubs, SaveGate rules, validate → dry-run routes, tests),
+   `incident-investigate` (incidents/ops/event/observability/engine hubs + platform troubleshooting,
+   routes, symptom → hub table), `case-analysis` (case-management, la-core, scoring, screening,
+   entity-list). Every route is in `docs/api/openapi-v1.json` or the cited hub doc. Still open: skills
+   for alert authoring and agentic operation once those hubs have `features` / `api` slots.
 
 ## 4. Open
 
