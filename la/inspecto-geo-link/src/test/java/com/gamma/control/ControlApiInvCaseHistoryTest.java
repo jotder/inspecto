@@ -239,6 +239,36 @@ class ControlApiInvCaseHistoryTest {
     }
 
     @Test
+    void anExplicitEntityTypeWinsAndAnAliasStillResolvesOnlyWhenThatTypeIsCovered(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            String aliasA = aliasOfA(c);
+            settings(c, "masking_mode: typed\n");
+            // account is a masked type: the Entity page of a masked account looks its alias up AS an account, not an msisdn
+            JsonNode acct = ok(c, "{\"key\":\"" + aliasA + "\",\"entityType\":\"ACCOUNT\"}", false);
+            assertTrue(acct.get("resolved").asBoolean(), acct.toString());
+            assertEquals("account", acct.get("entityType").asText(), "the canonical id of the type asked");
+            assertEquals(List.of("account|" + A + "|all|50"), CaseTeamObjectEngine.ASKED);
+            CaseTeamObjectEngine.ASKED.clear();
+
+            // cell is not masked: an alias asked as a cell never resolves (no oracle), even with no Investigation
+            JsonNode cell = ok(c, "{\"key\":\"" + aliasA + "\",\"entityType\":\"cell\"}", false);
+            assertFalse(cell.get("resolved").asBoolean());
+            assertTrue(CaseTeamObjectEngine.ASKED.isEmpty());
+
+            // the explicit type beats the Investigation's header type
+            assertEquals(200, send(c, "/inv/investigations", "{\"id\":\"cells\",\"purpose\":\"case history\",\"dataset\":\"calls_ds\","
+                    + "\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"entityType\":\"cell\"}").statusCode());
+            JsonNode over = ok(c, "{\"key\":\"" + aliasA + "\",\"investigationId\":\"cells\",\"entityType\":\"account\"}", false);
+            assertTrue(over.get("resolved").asBoolean(), over.toString());
+            assertEquals("account", over.get("entityType").asText());
+
+            HttpResponse<String> unknown = send(c, ROUTE, "{\"key\":\"" + aliasA + "\",\"entityType\":\"spaceship\"}");
+            assertEquals(422, unknown.statusCode(), unknown.body());
+            assertFalse(unknown.body().contains(A));
+        }
+    }
+
+    @Test
     void anInvestigationPseudonymResolvesForAReaderAndANonMemberGets404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
             Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {

@@ -67,6 +67,14 @@ describe('CaseHistoryService', () => {
         req2.flush({ entityType: 'msisdn', resolved: false, objects: [], total: 0, truncated: false });
         expect((await gone).error).toContain('no longer knows this masked number');
 
+        // the Entity's own type travels with the key, so a masked account is not looked up as an msisdn
+        const typed = svc.byMaskedKey('masked:ecc5', null, 'all', 'account');
+        await flushNext();
+        const req3 = http.expectOne((r) => r.url.endsWith('/inv/case-history'));
+        expect(req3.request.body).toEqual({ key: 'masked:ecc5', status: 'all', entityType: 'account' });
+        req3.flush({ entityType: 'account', resolved: true, objects: [], total: 0, truncated: false });
+        expect((await typed).error).toBeUndefined();
+
         const absent = svc.byMaskedKey('masked:00ff', null, 'all');
         await flushNext();
         http.expectOne((r) => r.url.endsWith('/inv/case-history')).flush(

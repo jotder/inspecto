@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
  * route resolves the alias server-side and asks the same read through the {@link CasePort} ({@code ObjectAccess.byEntity}
  * on the host: identical matching, SEC-7d / ABAC post-filter and truncation).
  *
- * <p><b>Body</b> {@code {key, investigationId?, status?: open|closed|all, limit?: 1..200}}. <b>Response</b>
+ * <p><b>Body</b> {@code {key, entityType?, investigationId?, status?: open|closed|all, limit?: 1..200}}. <b>Response</b>
  * {@code {entityType, resolved, objects, total, truncated, masking: {mode, masked}}}. {@code resolved=false} (with
  * {@code reason}) when the key names nothing this route may look up: an alias the server does not know, an alias for an
  * Entity Type the masking does not cover, or a RAW key the masking hides — answered alike, so the route is no oracle for
@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  * as asked (any separators), any other token of 5+ digits by {@code [number]} and an email by {@code [email]}; rows carry
  * only an allowlist of fields.
  *
- * <p><b>Entity Type</b> — the Investigation's endpoint type (header {@code entityType}, else {@code sourceType}, else
+ * <p><b>Entity Type</b> — {@code entityType} when given (one of the Space's Entity Types in force, else 422), else the Investigation's endpoint type (header {@code entityType}, else {@code sourceType}, else
  * {@code targetType}), else {@value #DEFAULT_TYPE} (the telecom profile's type).
  *
  * <p><b>Keys in</b> — the {@link ReferenceRows} rules: a pseudonym the named Investigation issued, else an exploration
@@ -86,6 +86,16 @@ final class CaseHistory {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "status must be one of open, closed, all");
         int limit = limit(body.get("limit"), SpaceLimits.get(lim, LaLimit.CASE_HISTORY_PAGE_MAX));
         String invId = ApiContext.str(body, "investigationId");
+        LinkAnalysisSettings settings = LinkAnalysisSettings.forRoot(writeRoot);
+        String asked = ApiContext.str(body, "entityType");
+        if (asked != null) {
+            String a = asked.trim();
+            // an Entity Type this Space has in force, by its canonical id; anything else is refused before any lookup
+            asked = settings.effectiveEntityTypes().stream().map(EntityTypes.EntityType::id)
+                    .filter(id -> id.equalsIgnoreCase(a)).findFirst()
+                    .orElseThrow(() -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                            "entityType must be one of this Space's Entity Types"));
+        }
 
         EntityMasking invMask = null;
         String type = DEFAULT_TYPE;
@@ -95,8 +105,7 @@ final class CaseHistory {
             for (String h : List.of("entityType", "sourceType", "targetType"))
                 if (inv.header().get(h) instanceof String t && !t.isBlank()) { type = t; break; }
         }
-
-        LinkAnalysisSettings settings = LinkAnalysisSettings.forRoot(writeRoot);
+        if (asked != null) type = asked;   // the caller's explicit type wins over the Investigation's
         String mode = settings.effectiveMaskingMode();
         String typeId = type;
         boolean covered = switch (mode) {
