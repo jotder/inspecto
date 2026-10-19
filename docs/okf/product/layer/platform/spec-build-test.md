@@ -23,6 +23,48 @@ Adoptium had published no 27 build as of 2026-09-17. ⚠ The GraalVM cache still
 25.1.3 (Linux); the Linux entry is the jmods source for the cross-built runtime and is NOT the toolchain.
 See the `build-verify` skill for exact local paths.)
 
+## Affected-module protocol — build/test only what a change reaches (`AFFECTED-BUILD-1`, 2026-10-19)
+
+The reactor is ~54 modules and a full `install` is the slowest thing the repo does. **Default: verify the
+affected set; run the full reactor only when it is unavoidable.** One tool decides, locally and in CI:
+
+```bash
+node tools/affected-modules.mjs                  # your working tree vs merge-base with origin/master
+node tools/affected-modules.mjs <base> <head>    # a commit range;  --json for machines;  --full to force
+```
+
+It prints a **mode** and the exact commands:
+
+| Mode | When | What runs |
+|---|---|---|
+| `none` | only docs, product map, offerings, `.claude/`, node tools, Space content no test reads | the node guards (`ci.yml` `guards` job, or locally) |
+| `affected` | module sources changed | **1)** `mvn install -DskipTests -Pedition-advanced -pl <set> -am` (upstream compiled + installed, no tests; test-jars still built) **2)** `mvn test -Pedition-advanced -pl <set>` |
+| `full` | root/aggregator/module `pom.xml` or `.mvn/` changed beyond comments · an unclassified path (fail-safe) · the set is >70% of the reactor · `--full` | `mvn install -Pedition-advanced` (+ `-Pcoverage` in CI) |
+
+**The test set** = changed modules **+ every module that depends on them, transitively** (read from the poms,
+test-jar dependencies included) **+ modules whose tests READ a changed file**. The last group is discovered, not
+listed: string literals in `src/test/**` that name a tracked repo path (e.g. `docs/api/openapi-v1.json`,
+`docs/GLOSSARY.md`, `spaces/…`). Such a reader runs its own tests only — its dependents do not read the file.
+
+Rules it encodes (each one a past false green or wasted hour):
+- ⛔ **Never `-pl X -am` alone to decide a change is safe** — `-am` builds UPSTREAM only; dependents stay untested.
+- **Comment/whitespace-only edits to `.java` or `pom.xml` are not build changes** (a doc-path rewrite touched 40
+  Java files' comments and would otherwise have forced 34 modules).
+- **A real pom change always plans FULL**: it may move the resolved dependency graph, and the lockfile, SBOM and
+  lean-core guards resolve the whole reactor.
+- **Untracked files count only as new source inside a module** (`*/src/**`); `target/`, scratch and runtime state do not.
+- `inspecto-ui/` changes flag the UI lane (`ui.yml` already runs only on `inspecto-ui/**`); `package.ps1`,
+  `deploy/`, `scripts/` flag a packaging smoke instead of tests.
+
+**CI** (`ci.yml` `test` job): a pull request runs the AFFECTED plan against its base; the nightly schedule, a `v*`
+tag and a manual run (default `scope: full`) run FULL; a manual run with `scope: affected` (+ optional `base`)
+runs the plan on demand. Repo-wide coverage floors, the lean-core guard and the dependency-lock guard run on full
+runs only (they need every module). The reactor-verdict guard judges whichever log was produced.
+**Locally**: per change, run the tool and its commands (narrow further with `-Dtest=A,B` while iterating); the
+full gate (GAUNTLET) is for the operator asking, a pom change, or a release.
+Measured on the last 60 Java-touching commits (2026-10-19): 7 needed FULL; the rest tested a median of ~30 of 54
+modules, and leaf-module fixes tested 1–9.
+
 ## When GitHub CI runs (operator, 2026-10-09)
 - **A branch push runs only `branch-policy.yml`** (~10 s: commit-subject lint, retired-line refusal). The no-build
   guards were taken off push too (operator, same day): run them locally before pushing.

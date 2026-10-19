@@ -21,8 +21,11 @@ Inspecto — Java 27 build (`release=27`), Maven reactor `inspecto-parent`. UI i
 ## Verify (authoritative — the source of truth)
 
 > ⛔ **Cadence (operator, 2026-09-17): do NOT run the full reactor gate for each change.** Per change,
-> run the affected test classes (`mvn -o -B test -pl <module> -Dtest=A,B` — commas, never `+`; confirm
-> the surefire reports are fresh) and go forward. The full gate below is for: the operator asking
+> run **`node tools/affected-modules.mjs`** (`AFFECTED-BUILD-1`) and the two commands it prints — upstream
+> `install -DskipTests -am`, then `test -pl <changed + every dependent + test readers>` (add `-o` offline) — narrowing
+> to classes with `-Dtest=A,B` (commas, never `+`) while iterating; confirm the surefire reports are fresh. If it says
+> `full` (a pom/.mvn change, an unclassified path, or >70% of the reactor), that IS the unavoidable full gate.
+> Protocol: `docs/okf/product/layer/platform/spec-build-test.md` "Affected-module protocol". The full gate below is for: the operator asking
 > (GAUNTLET), the push that closes a batch touching shared seams, or handoff.
 
 ```powershell

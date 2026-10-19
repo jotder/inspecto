@@ -147,10 +147,12 @@ shift gets the identical environment.
 - Big specs/docs go into `docs/` files and are referenced by path — never pasted inline into prompts.
 - **Verification gate:** non-trivial changes (3+ file edits, backend/API or infra changes) get a
   `verification` subagent PASS before reporting done — own checks and self-reports don't substitute.
-- **Test at the UNIT level per change (operator, 2026-09-17).** Run the affected test classes
-  (`-pl <module> -Dtest=A,B` — commas, never `+`) and move on. The FULL reactor gate
-  (`mvn -o clean test -Pedition-advanced`, ~10 min) runs only when the operator asks for it
-  (GAUNTLET), before a push that touched shared seams, or at handoff — never once per edit.
+- **Test only what a change reaches (operator, 2026-09-17; protocol `AFFECTED-BUILD-1` 2026-10-19).** Run
+  `node tools/affected-modules.mjs` — it prints mode `none | affected | full` and the exact Maven commands
+  (changed modules + every dependent + modules whose tests read a changed file). While iterating, narrow with
+  `-Dtest=A,B` (commas, never `+`). The FULL reactor gate (`mvn -o clean test -Pedition-advanced`, ~10 min) runs
+  only when the tool says `full`, the operator asks (GAUNTLET), or at release — never once per edit. ⛔ Never
+  `-pl X -am` alone as proof: it skips every dependent. Protocol: `docs/okf/product/layer/platform/spec-build-test.md`.
 
 ## CodeGraph (code knowledge graph)
 

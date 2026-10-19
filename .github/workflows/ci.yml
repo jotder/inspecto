@@ -16,6 +16,16 @@ on:
   schedule:
     - cron: '30 1 * * *'   # 01:30 UTC nightly (nightly-perf runs at 02:17)
   workflow_dispatch:
+    inputs:
+      scope:
+        description: 'full = whole reactor; affected = only the modules a change reaches (AFFECTED-BUILD-1)'
+        type: choice
+        options: [full, affected]
+        default: full
+      base:
+        description: 'affected scope only: the ref to diff against (default origin/master~1)'
+        required: false
+        default: ''
 
 # Default GITHUB_TOKEN perms, narrowed to just reading this repo — eoiagent is built from source
 # below, so no GitHub Packages auth is needed here.
@@ -351,7 +361,7 @@ jobs:
       # and Industry packs, covers every one of them, holds no price (prices live only in the gitignored product-map/private/) and no
       # copied technical fact, and claims only an enforcement the build can honour. Reads files only; no build.
       - name: Guard — Product Map items link to real modules and Offerings, and hold no prices
-        run: node tools/check-product-map.mjs && node tools/render-feature-db.mjs --check && node tools/render-tests-inventory.mjs --check && node tools/render-api-routes.mjs --check && node tools/render-product-docs.mjs --check && node tools/check-product-docs.mjs && node --test tools/render-feature-db.test.mjs tools/render-tests-inventory.test.mjs tools/render-api-routes.test.mjs tools/check-product-docs.test.mjs tools/check-product-map.test.mjs tools/render-product-map.test.mjs tools/product-map-import.test.mjs tools/customer-build.test.mjs
+        run: node tools/check-product-map.mjs && node tools/render-feature-db.mjs --check && node tools/render-tests-inventory.mjs --check && node tools/render-api-routes.mjs --check && node tools/render-product-docs.mjs --check && node tools/check-product-docs.mjs && node --test tools/affected-modules.test.mjs tools/render-feature-db.test.mjs tools/render-tests-inventory.test.mjs tools/render-api-routes.test.mjs tools/check-product-docs.test.mjs tools/check-product-map.test.mjs tools/render-product-map.test.mjs tools/product-map-import.test.mjs tools/customer-build.test.mjs
 
       # Docs-touched check (PRODUCT-DOCS-HUB-1, ADVISORY — always exits 0): a Product Map Item whose module main code changed in
       # the range but whose hub docs/okf/product/<kind>/<name>/ did not gets a ::warning naming the likely slots. The guards
@@ -418,7 +428,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # the affected-contracts report diffs against HEAD^1 (the PR merge commit's base)
+          # full history: the affected-module plan (AFFECTED-BUILD-1) diffs against an arbitrary base on a manual run,
+          # and the affected-contracts report diffs against HEAD^1 (the PR merge commit's base)
+          fetch-depth: 0
 
       - name: Set up JDK 27
         uses: actions/setup-java@v4
@@ -502,16 +514,47 @@ jobs:
       - name: Fetch the linux_amd64 excel extension for the xlsx export test
         run: node tools/fetch-duckdb-extensions.mjs --only excel --platform linux_amd64 --out "$RUNNER_TEMP/duckdb-extensions"
 
+      # AFFECTED-BUILD-1 (2026-10-19): build/test only what a change reaches. tools/affected-modules.mjs reads the poms,
+      # diffs the change, and returns mode none | affected | full (protocol: okf/product/layer/platform/spec-build-test.md).
+      # FULL is unavoidable on: the nightly schedule, a tag, a manual run with scope=full (the default), a pom/.mvn
+      # change, an unclassified path, or a change whose dependents are >70% of the reactor. A pull request runs the
+      # AFFECTED plan: the changed modules' upstream are installed WITHOUT tests, then the changed modules AND every
+      # module depending on them are tested (never `-pl X -am` alone — that is a false green downstream).
+      - name: Plan — which Maven modules this change reaches
+        id: plan
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node tools/affected-modules.mjs HEAD^1 HEAD --json > "$RUNNER_TEMP/plan.json"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "affected" ]; then
+            node tools/affected-modules.mjs "${{ inputs.base || 'origin/master~1' }}" HEAD --json > "$RUNNER_TEMP/plan.json"
+          else
+            node tools/affected-modules.mjs HEAD HEAD --full --json > "$RUNNER_TEMP/plan.json"
+          fi
+          node -e "const p=require(process.argv[1]);const pl=p.testModules.map(a=>':'+a).join(',');
+            require('fs').appendFileSync(process.env.GITHUB_OUTPUT,'mode='+p.mode+'\npl='+pl+'\n');
+            console.log('mode '+p.mode+' — '+p.testModules.length+'/'+p.reactorSize+' modules'); for (const r of p.reasons) console.log('  why full: '+r)" "$RUNNER_TEMP/plan.json"
+
       - name: Run tests (all editions) with coverage, and install so the dependency guard can resolve the reactor
         id: reactor
+        if: steps.plan.outputs.mode != 'none'
         shell: bash
         env:
           DUCKDB_EXTENSION_CACHE: ${{ runner.temp }}/duckdb-extensions
+          PG: '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'
         run: |
           set -o pipefail
-          mvn --batch-mode --no-transfer-progress install -Pedition-advanced -Pcoverage \
-            '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres' \
-            2>&1 | tee "$RUNNER_TEMP/reactor.log"
+          if [ "${{ steps.plan.outputs.mode }}" = "full" ]; then
+            mvn --batch-mode --no-transfer-progress install -Pedition-advanced -Pcoverage "$PG" \
+              2>&1 | tee "$RUNNER_TEMP/reactor.log"
+          else
+            # upstream of the test set, compiled and installed WITHOUT tests (test-jars still built)
+            mvn --batch-mode --no-transfer-progress install -DskipTests -Pedition-advanced \
+              -pl "${{ steps.plan.outputs.pl }}" -am
+            # the test set: changed modules + every dependent + modules whose tests read a changed file
+            mvn --batch-mode --no-transfer-progress install -Pedition-advanced "$PG" \
+              -pl "${{ steps.plan.outputs.pl }}" 2>&1 | tee "$RUNNER_TEMP/reactor.log"
+          fi
 
       # REACTOR-HALT-IS-A-SILENT-PASS-1 → REACTOR-VERDICT-CI-1 (operator 2026-09-25: CI, NOT pre-push). The exit
       # code alone cannot prove every module RAN: a SKIPPED module is unverified, and surefire reports older than
@@ -522,13 +565,13 @@ jobs:
       # its own parse against Maven's Reactor Build Order, so a hard-coded number would only add drift.
       # Node 22+ is required (the guard uses `fs.globSync`); the runner's preinstalled Node is not pinned.
       - name: Set up Node 22 for the reactor-verdict guard
-        if: always() && steps.reactor.outcome != 'skipped'
+        if: always() && steps.reactor.outcome != 'skipped' && steps.plan.outputs.mode != 'none'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Guard — the reactor log proves every module ran (reactor verdict)
-        if: always() && steps.reactor.outcome != 'skipped'
+        if: always() && steps.reactor.outcome != 'skipped' && steps.plan.outputs.mode != 'none'
         run: node tools/check-reactor-verdict.mjs "$RUNNER_TEMP/reactor.log" --root .
 
       # DUCKLE-C7-AFFECTED-CONTRACTS-1 (2026-09-24): which Pipelines, non-Pipeline dependents and contracts a
@@ -544,7 +587,8 @@ jobs:
       # `AFFECTED_CONTRACTS_FLAGS` (e.g. `--fail-on-breaking`, or `--fail-on-affected`) to make it gate; then a
       # non-zero exit from any root fails the step. See okf/product/module/processor/spec-pipeline-closure.md.
       - name: Report — Pipelines, dependents and contracts this PR's config change reaches
-        if: github.event_name == 'pull_request'
+        # needs the processor fat JAR: built on a full run, or when the affected set includes it
+        if: github.event_name == 'pull_request' && hashFiles('inspecto/target/inspecto-processor-*.jar') != ''
         env:
           FLAGS: ${{ vars.AFFECTED_CONTRACTS_FLAGS }}
         run: |
@@ -571,7 +615,7 @@ jobs:
       # Keep the reports so a trend is visible run-to-run — without this the number exists only in the
       # log and nobody can say whether it moved.
       - name: Upload coverage reports
-        if: always()
+        if: always() && steps.plan.outputs.mode == 'full'
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-coverage
@@ -585,6 +629,8 @@ jobs:
       # sits well above the floor. Summing is the only way to enforce ONE number.
       # ⚠ Absent reports FAIL rather than pass, so a build that lost `-Pcoverage` cannot slip through.
       - name: Coverage floors
+        # repo-WIDE floors are a sum over every module: only meaningful on a full run
+        if: steps.plan.outputs.mode == 'full'
         run: node tools/check-coverage.mjs --backend
 
       # Boundary law (U1): the lean ETL core never gains a kernel dependency. Kernel types live
@@ -592,6 +638,8 @@ jobs:
       # makes that enforceable, not aspirational — it fails the build if a com.gamma.agentkernel
       # reference ever leaks into the lean core's sources or its resolved dependency tree.
       - name: Guard — lean core stays kernel-free
+        # resolves inspecto's dependency tree: needs the full reactor installed (a pom change always plans full)
+        if: steps.plan.outputs.mode == 'full'
         run: |
           if grep -rEl "com\.gamma\.agentkernel" inspecto/src; then
             echo "::error::lean core (inspecto) must not reference com.gamma.agentkernel"; exit 1
@@ -610,6 +658,8 @@ jobs:
       # it to an auditor as vulnerability management. Runs AFTER the eoiagent install, because the
       # graph it resolves includes com.eoiagent:*.
       - name: Guard — dependency review (lockfile diff)
+        # resolves the whole reactor's graph; the graph can only move through a pom, and any pom change plans full
+        if: steps.plan.outputs.mode == 'full'
         run: node tools/check-dependencies.mjs
 
       # Offline vulnerability scan (ASSURE-OPERABILITY-1, D-P3). tools/vuln-scan.mjs matches every coordinate
