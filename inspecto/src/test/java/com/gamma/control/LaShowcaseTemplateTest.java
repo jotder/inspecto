@@ -36,6 +36,15 @@ class LaShowcaseTemplateTest {
         assertEquals(10, s.drafts().maxOpen());
     }
 
+    /** Operator 2026-10-19: the showcase's crm_kyc Collector takes analyst uploads (LA-ANALYST-UPLOAD-1); it parses as one. */
+    @Test
+    void theCrmKycCollectorAcceptsAnalystUploads() throws Exception {
+        Path pipe = CFG.resolve("telecom").resolve("crm_kyc_pipeline.toon");
+        com.gamma.etl.PipelineConfig cfg = com.gamma.etl.PipelineConfig.loadForValidation(pipe.toString());
+        assertTrue(cfg.collector().acceptsUpload(), "crm_kyc must keep collector.accepts_upload: true");
+        assertEquals("local", cfg.collector().connector());
+    }
+
     @Test
     void theIndexBuildJobFiresOnAPipelineCommitOfTheMuleFeedOnly() throws Exception {
         JobConfig c = JobConfig.load(CFG.resolve("jobs").resolve("la_index_build_job.toon").toString());

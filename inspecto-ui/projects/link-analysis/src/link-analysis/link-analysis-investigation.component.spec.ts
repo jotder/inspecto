@@ -198,7 +198,7 @@ function create(
                 : []),
             {
                 provide: LensService,
-                useValue: { canManageIncidents: signal(opts.canManage ?? true), canShareInvestigation: signal(false) },
+                useValue: { canManageIncidents: signal(opts.canManage ?? true), canShareInvestigation: signal(false), canUploadData: signal(false) },
             },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does

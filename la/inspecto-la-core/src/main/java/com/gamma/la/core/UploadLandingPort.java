@@ -66,4 +66,34 @@ public interface UploadLandingPort {
     /** The Collector {@code collector} (by Collector id, else Pipeline name) as an upload target, or empty when it is unknown,
      *  does not accept uploads, is not a local poll Collector, or is Dataset-fed - the caller cannot tell which. */
     Optional<Target> target(ApiContext api, String collector);
+
+    /** Every Collector that accepts uploads (what {@link #target} would answer for), by Collector id. */
+    List<Target> targets(ApiContext api);
+
+    /**
+     * Where a landed file is in the Collector's own ingest, as far as the filesystem says (LA-I2-GAPS-RESIDUALS-1).
+     *
+     * @param state        {@code pending} (still in the inbox, not yet processed) | {@code ingested} (the Collector's
+     *                     duplicate-check marker exists) | {@code quarantined} (the whole file was moved to quarantine) |
+     *                     {@code consumed} (left the inbox, no marker or quarantine record - duplicate check is off)
+     * @param rejectedRows rows the Pipeline refused into the per-file reject ledger, or {@code null} when there is none
+     * @param reason       the quarantine reason folder for {@code quarantined}, else {@code null}
+     */
+    record Ingest(String state, Long rejectedRows, String reason) {}
+
+    /** The ingest state of {@code file}, an upload to {@code target}. Metadata only - never a row or a header value. */
+    Ingest ingest(ApiContext api, Target target, String file);
+
+    /**
+     * Outcome of {@link #withdraw}: {@code deleted}; {@code picked-up} (the Collector already took it - {@code state} says how);
+     * {@code busy} (a run of the Pipeline is in flight, so the file may be being read); {@code failed} (the filesystem refused).
+     */
+    record Withdrawal(String outcome, String state, String detail) {}
+
+    /**
+     * Delete a still-pending upload from the inbox, safely against a concurrent ingest: under the Pipeline's run claim (no
+     * cycle in flight or starting), re-check that it is still pending, claim it by an atomic rename to a name the poll never
+     * picks up, then delete it. Never throws for the act itself.
+     */
+    Withdrawal withdraw(ApiContext api, Target target, String file);
 }
