@@ -41,7 +41,7 @@ the shape once):
 | `feature-db` | build / release engineer | sortable feature rows — **generated, never prose** (wave 3) |
 | `user-guide` | end user | screens and configuration |
 | `admin-guide` | system administrator, team manager | install, permissions, operations |
-| `api` | API integrator | the module's slice of `/api/v1` |
+| `api` | API integrator | the module's slice of `/api/v1` — `api-routes.md` is **generated** by `tools/render-api-routes.mjs` (route → registering Maven module, joined with `openapi-v1.json`, drift listed); hand-written `api-*.md` pages sit beside it |
 | `tests` | QA / QC | test cases and where their tests live |
 | `brochure` | customer, sales | **`n/a` on modules** — brochures are per edition / solution pack |
 
@@ -80,7 +80,7 @@ path mention to them (used for wave 4; reuse it for any later move).
    rows would be the union of everything; read the CSV. A generated `feature-db.md` the tool no longer writes is
    deleted on the next run. Gotcha: most FEATURE_INVENTORY rows cite no hub, so they are not in the feature-db.
 4. ✅ **Move content in** (whole files). Still open: split big multi-audience docs (L3 pages hold screens/API
-   sections → `user-guide` / `api`), slice OpenAPI by tag into `api`, fill
+   sections → `user-guide` / `api`), ✅ `api` route slices generated per module (`render-api-routes.mjs`, CI-checked), fill
    `features` for every item.
    ✅ **`tests` slot generated** (2026-10-19) — `tools/render-tests-inventory.mjs` (test
    `render-tests-inventory.test.mjs`; CI runs `--check` in the Product Map guard step) writes `tests-inventory.md` into
