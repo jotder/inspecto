@@ -184,7 +184,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 | DB-backed objects | `-Dobjects.backend=db` | `ADVANCED_GUIDE §9` |
 | DB-backed job runs | `-Djobs.backend=duckdb` | `ADVANCED_GUIDE §9` |
 | Provenance data plane | `-Dprovenance.backend=duckdb` | `ADVANCED_GUIDE §5.3` |
-| RCA templates (`*_rca.toon`) | consumed by `GET /rca/templates`; **no example file/shape in the tree yet** | `ADVANCED_GUIDE §10` (gap) |
+| RCA templates (`*_rca.toon`) | consumed by `GET /rca/templates`; **no example file/shape in the tree yet** | `okf/product/module/ops/api-routes.md` (gap) |
 
 ### K — Views, measures, events (serve mode) [`DAT` · `OPS`]
 

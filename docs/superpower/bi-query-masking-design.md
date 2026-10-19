@@ -3,7 +3,7 @@
 > **Status: DESIGN + first slice + gap-closure slice built 2026-10-12 (lane), awaiting operator security review before any push.**
 > Gap closure (section 11): `/db` routes, Report exports, KPI values, Rule Template simulate, numeric key derivations and the
 > `$parameter` oracle are covered; Exchange snapshots stay open on decision D-M6 (section 11.6).
-> Decision D7 of [`parked-rows-scoping-2026-10-12.md`](parked-rows-scoping-2026-10-12.md): classified entity keys in BI
+> Decision D7 of [`parked-rows-scoping-2026-10-12.md`](../archived-documents/plans-archive/parked-rows-scoping-2026-10-12.md): classified entity keys in BI
 > result rows are MASKED unless the caller holds the reveal capability. This is a security change that alters what
 > every dashboard, report and share viewer sees; it is written to be reviewed line by line.
 

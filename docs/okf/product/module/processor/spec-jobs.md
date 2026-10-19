@@ -878,7 +878,7 @@ builders, or `Batch`/`PipelineNode`. Each omission is a decision, not an oversig
 ## Open rows this concept owns — the job-path semantics change (2026-09-16)
 
 `JOB-DIR-CWD-CONTAINMENT-1` made `PathJail.resolveJobPath` the single rule for a job's relative paths.
-The survey that followed ([`superpower/job-path-compat-survey.md`](../../../../superpower/job-path-compat-survey.md))
+The survey that followed ([`archived-documents/plans-archive/job-path-compat-survey.md`](../../../../archived-documents/plans-archive/job-path-compat-survey.md))
 found the change reaches further than the decision that authorised it. ⛔ **`JOB_PATH_KEYS` is SIX keys,
 not the five the decision names** — the extra one is `pipeline_config`, the most common path key in
 committed configs.

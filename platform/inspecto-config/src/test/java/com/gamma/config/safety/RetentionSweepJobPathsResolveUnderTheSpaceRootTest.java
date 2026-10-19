@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>⚠ Deliberately NOT a sweep over every committed job config: the remaining 25 surveyed values
  * belong to {@code PipelineJobRunner} (19) and the compactors (3, incl. {@code store}), which have
  * <b>not</b> moved — a repo-wide assertion would be red for reasons this change does not own
- * ({@code docs/superpower/job-path-compat-survey.md}).
+ * ({@code docs/archived-documents/plans-archive/job-path-compat-survey.md}).
  */
 class RetentionSweepJobPathsResolveUnderTheSpaceRootTest {
 

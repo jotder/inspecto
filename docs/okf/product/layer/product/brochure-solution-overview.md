@@ -1,6 +1,6 @@
 # Inspecto — Solution Overview
 
-> **Level 0 of the solution suite** (`SOLUTION-SUITE-DOCS-1`, plan: [`solution-suite-docs-plan.md`](../../../../superpower/solution-suite-docs-plan.md)).
+> **Level 0 of the solution suite** (`SOLUTION-SUITE-DOCS-1`, plan: [`solution-suite-docs-plan.md`](../../../../archived-documents/plans-archive/solution-suite-docs-plan.md)).
 > Audience: buyers, sponsors, new users. Checked against `offerings/*.toon` and `spaces/_templates/` on 2026-10-18.
 > Vocabulary per [`../../../../GLOSSARY.md`](../../../../GLOSSARY.md). The market framing is in the
 > [Executive Brief](brochure-executive-brief.md); this page is the map into the technical suite.

@@ -432,111 +432,12 @@ negotiated ≥ 1 KiB. Every request gets a `Correlation-ID` (caller-supplied or 
 response header and inherited by events logged during the request. The only unversioned routes are the
 infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 
-- **Health/metrics:** `GET /health`, `GET /ready`, `GET /metrics` (Prometheus), `GET /metrics/acquisition` (JSON).
-- **Bootstrap (v4.8.0):** `GET /bootstrap` — one ETag'd call: edition + feature flags, all config specs, platform
-  enumerations, space list, session stub (backend-owned metadata only; the SPA merges its own kind/viz/param
-  registries). Folds the per-type `/config/spec/{type}` calls together.
-- **Config:** `POST /validate`, `GET /config/spec/{type}`, `POST /config/write` *(503)*.
-- **Query (v4.8.0):** `POST /queries/{id}/run` *(503 if no write root; 404 unknown query/dataset; 422 non-sql /
-  SqlGuard violation / DuckDB error)* — runs a persisted `query` component against its dataset in a DuckDB
-  sandbox with server-side `$`-parameter resolution + caller overrides, returning the Result Set contract
-  (typed columns + roles + cardinality, rows, statistics, candidate renderings, export options). Query/dataset
-  authoring reuses `/components/{query|dataset}/{id}`. Read-path only (not Matrices materialization).
-- **Pipelines (ingest runs):** `GET /runs`, `POST /runs` *(503)*, `POST /runs/{n}/trigger`
-  *(async: **202 + {runId} + Location**)*,
-  `GET /runs/runs/{runId}` *(poll a run — RUNNING then terminal; 404 once evicted)*,
-  `POST /runs/{n}/pause|resume|reprocess`,
-  `POST /runs/{n}/drain` *(complete a Consignment PARKED at a disabled route branch — body `{batchId}`;
-  409 with the reason when it is not parked, the step is still in `processing.disabled_steps`, or a park
-  table is gone)*,
-  `GET /runs/{n}/commits|batches|files|lineage|quarantine|pending|report`, `POST /trigger` (all).
-- **Status/report:** `GET /status`, `GET /report`.
-- **Jobs:** `GET /jobs`, `GET /jobs/metrics|runs|failures`, `GET /jobs/{n}/runs`, `POST /jobs/{n}/trigger`
-  *(async: **202 + {runId} + Location**)*, `GET /jobs/runs/{runId}`
-  *(poll a run — RUNNING then terminal; 404 once evicted)*.
-- **Idempotency (v4.8.0):** any `POST/PUT/DELETE` may carry an `Idempotency-Key` header; a retry with the same
-  key replays the first response (`Idempotency-Replayed: true`) instead of re-running (per-instance, ~10 min TTL).
-- **Enrichment:** `GET /enrichment`, `GET /enrichment/{job}/runs|lineage|report`.
-- **Collectors:** `GET /collectors` (incl. current DB watermark).
-- **Connections:** `GET /connections`, `GET /connections/{id}`, `POST /connections/{id}/test`,
-  `POST /connections` *(503)*, `PUT/DELETE /connections/{id}` *(503; DELETE 409 if in use)*.
-- **Audit (core, every edition):** `GET /audit/search`, `/audit/export[?format=csv]` — `type` is required
-  and must be `AUDIT` or `ACCESS_DENIED` (fail-closed; anything else is a 400). This is the audit read on
-  every edition, Personal included.
-- **Events** (⚠ the optional `inspecto-observability` module — Standard edition and above; **503 on Personal**,
-  where events are still recorded but the feed is not served): `GET /events`, `/events/search`,
-  `/events/{id}`, `/events/export`, `GET/POST /events/views`,
-  `POST /events/views/{name}/delete`.
-- **Alerts:** `GET /alerts`, `/alerts/rules`, `POST /alerts/evaluate` (503 if no rules).
-- **Objects:** `GET/POST /objects`, `GET /objects/{id}`, `POST /objects/{id}/ack|resolve|transition|links|comments|attachments|rca`,
-  `GET /objects/{id}/links|graph|comments|attachments`, `GET /rca/templates`.
-- **Pipelines** (each line names its OKF owner; re-verified against `Pipeline*Routes` 2026-09-01):
-  - `GET /pipelines`, `/pipelines/node-types`, `/pipelines/combined` — list + palette catalog → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md).
-  - `GET /pipelines/{n}/graph` — lifted read-only graph projection → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md).
-  - `GET /pipelines/{n}/graph/raw` — lossless editable graph for the editor → [`editable-round-trip.md`](okf/product/module/engine/spec-editable-round-trip.md).
-  - `PUT /pipelines/{n}/graph` *(canAuthorWorkbench)* — save the graph over the canonical `*_pipeline.toon` (THE authoring write) → [`editable-round-trip.md`](okf/product/module/engine/spec-editable-round-trip.md).
-  - `GET /pipelines/{n}/document` — read-only Markdown projection for sign-off (`X-Config-Fingerprint`) → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md).
-  - `GET|POST /pipelines/{n}/settings` — pipeline settings read/write → [`pipeline-identity.md`](okf/product/module/processor/spec-pipeline-identity.md).
-  - `POST /pipelines/{n}/label` — display label → [`pipeline-identity.md`](okf/product/module/processor/spec-pipeline-identity.md).
-  - `POST /pipelines/{n}/save-as-template` — clone into a template → [`pipeline-identity.md`](okf/product/module/processor/spec-pipeline-identity.md).
-  - `GET /pipelines/{n}/bundle` — selective export zip (pipeline + dependency closure + secret-free requirements) → [`editable-round-trip.md` §21](okf/product/module/engine/spec-editable-round-trip.md).
-  - `POST /pipelines/import?name=&conflict=refuse|overwrite|rename` *(canAuthorWorkbench, raw zip body)* — import a bundle as an inactive retargeted draft → same owner.
-  - `POST /pipelines/{n}/rename`, `POST /pipelines/rename/resume` — two-phase rename + crash resume → [`pipeline-identity.md`](okf/product/module/processor/spec-pipeline-identity.md).
-  - `GET /pipelines/{n}/related` — cross-entity neighbourhood → [`pipeline-related.md`](okf/product/module/processor/spec-pipeline-closure.md).
-  - `POST /pipelines/authored/{n}/run?to={nodeId}` *(canAuthorWorkbench)* — scratch-only run-to-here over real inbox files; never a production run → [`pipeline-test-run.md`](okf/product/module/engine/spec-pipeline-test-run.md).
-  - `POST /pipelines/authored/{n}/trigger` *(canOperateRuns)* — fire a real run (mirrors `POST /jobs/{n}/trigger`) → [`live-execution.md`](okf/product/module/engine/spec-live-execution.md).
-  - `POST /pipelines/authored/{n}/dry-run` — bounded sample on a throwaway DuckDB → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md).
-  - `GET /pipelines/authored[/{n}[/raw]]`, `DELETE /pipelines/authored/{n}` — read/delete of authored entries incl. grandfathered flows (the `*_flow.toon` CRUD surface is retired — no POST/PUT here) → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md) §16.
-  - `POST /runs/{n}/drain` *(canOperateRuns)* — complete a PARKED Consignment (also listed under ingest runs above) → [`step-park-drain.md`](okf/product/module/engine/spec-step-park-drain.md).
-  - `POST /jobs/runs/{runId}/replay` *(canOperateRuns)* — re-fire a finished/failed at-rest job run (configured defaults; `replay:<runId>` linkage in the new run's trigger; 409 while running) → [`execution-lanes.md`](okf/product/module/engine/spec-execution-lanes.md).
-- **Components:** `GET /components/{type}[/{id}]` *(single-GET carries a strong `ETag`=content hash; `If-None-Match`→304)*,
-  `POST/PUT/DELETE` *(503; PUT honours `If-Match`→409 `CONFLICT_STALE_VERSION`; DELETE 409 if referenced)*,
-  `POST /components/{transform|grammar|schema|sink}/{id}/test` *(503)*,
-  `POST /components/{transform|grammar|sink}/preview` *(the same previews over a config in the request `config`
-  body key instead of a registered id — needs no write root and reads nothing)*. Writable types (v4.8.0):
-  grammar, schema, transform, sink, **dataset, widget, dashboard**.
-- **Catalog:** `GET /catalog`, `/catalog/kpis`, `/catalog/graph`, `/catalog/tables/{id}`.
-- **Assist:** `GET /assist/diagnoses|settings|metrics`, `POST /assist/settings|settings/test|{intent}` (503 if absent).
-
-**Added since W7 (post-2026-07-08 shipped features — regen 2026-07-20):**
-
-- **Nav / menus:** `GET/PUT /nav/menus` — per-space `NavMenus` tree; PUT *(canAuthorWorkbench; 422 bad version)*.
-- **Signals:** `GET /signals`, `GET /signals/stream` (SSE) — Signal Backbone read surface.
-- **Auth / session (Standard):** `POST /auth/exchange|refresh|logout` — public paths, httpOnly refresh cookie *(503 on Personal)*.
-- **Decision rules:** `GET/POST /decision-rules`, `PUT/DELETE /decision-rules/{id}` *(canAuthorWorkbench)*,
-  `POST /decision-rules/{id}/simulate` (dry-run over sample rows), `POST /decision-rules/{id}/apply` *(canOperateRuns)*.
-- **Expectations:** `GET/POST /expectations`, `PUT/DELETE /expectations/{id}` *(canAuthorWorkbench)*,
-  `POST /expectations/evaluate` / `/{id}/evaluate`.
-- **Views:** `GET /views`, `GET /views/{id}`, `GET /views/{id}/data?limit=` — `sink.view` materialized-data preview.
-- **Notifications (beyond alerts):** `GET /notifications`, `/notifications/stream` (SSE), `/notifications/unread-count`,
-  `POST /notifications/read-all`, `POST /notifications/{id}/read`, `POST /notifications/{id}/unread`,
-  `DELETE /notifications/{id}`, `GET/PUT /notifications/preferences`, `GET/PUT /notifications/preferences/default`,
-  `GET/POST /notifications/channels`, `PUT/DELETE /notifications/channels/{id}` *(read/unread/read-all and the
-  preference PUT: any signed-in user, and only their own read state / their own preference override — the feed
-  reports `read` per caller; channel writes: canAuthorWorkbench; delete + the `/default` preference PUT:
-  canAdminister — the feed archive and the deployment-default grid are shared, not per user)*.
-- **Workflows:** `GET /workflows/{type}` — authored `*_workflow.toon` override if registered, else the default state machine.
-- **Investigation / link analysis (INV-1):** `POST /inv/projection` (entity-projection fold; *503 no write root, 404 unknown
-  dataset, 422 bad column*), `POST /inv/projection/neighbors` (one-hop expand; same gates). Multi-root/export/undo are
-  client-side only, no additional routes.
-- **Enrichment preview:** `POST /enrichment/preview` — dry-run a draft enrichment spec over inline sample rows, persists nothing.
-- **DB / table browser:** `GET /db/catalog`, `GET /db/table` *(403 path-jail, 404 unknown store/format)*,
-  `POST /db/query` *(422 bad SQL, 503 sandbox unavailable)*.
-- **Reconciliation:** `POST /recon/columns`, `POST /recon/run`, `POST /recon/breaks` — plus the scheduled `recon.run` Job type.
-- **Connection workbench:** `POST /connections/{id}/probe`, `GET /connections/{id}/explore?path=`,
-  `GET /connections/{id}/sample`, `POST /connections/test?target=` (test an unsaved profile; `target=proxy` probes the proxy hop).
-- **Bundle / Exchange:** `POST /bundle/export|preview|import` *(import: canAuthorWorkbench)*; `GET/POST /exchange/offers`,
-  `POST /exchange/refresh`, `POST /exchange/requests`, `GET /exchange/grants`,
-  `POST /exchange/grants/{id}/approve|deny|revoke|pin|expiry`, `GET /exchange/datasets|widgets/{owner}/{item}`
-  *(403 no active grant)* — capabilities `canOfferDatasets`/`canRequestShares`/`canApproveShares`.
-- **Agent:** `POST /agent/sessions`, `POST /agent/sessions/{id}/ask[/stream]` (SSE), `GET /agent/triage-runs[/{id}]`.
-- **Cursor pagination adopters** (opaque keyset via `metadata.pagination`, v1-only): `GET /jobs/runs`, `GET /objects`,
-  `GET /jobs`, `GET /events`.
-
-_Not yet re-verified against code in this pass (surfaced by a route scan, worth a follow-up spot-check before relying on
-exact gating): `/bi/*`, `/access/*`, `/datasources*`, `/export`/`/import*`, `/lineage`, `/requirements*`,
-`/settings/branding|geo`, `/dashboards/{id}/share` + `/public/dashboards/*`, `/spaces*`, `/tags*`, `/cases/rules*`,
-`/provenance*`._
+**The route list is generated, not kept here** (2026-10-19 — the hand-kept list that stood here was last
+re-verified 2026-09-01 and still named the retired Personal edition). Every `/api/v1` route a module registers,
+joined with the contract, is in that module's hub: `docs/okf/product/<kind>/<name>/api-routes.md` (generated by
+`tools/render-api-routes.mjs`; find the hub through [`okf/product/index.md`](okf/product/index.md)). The contract
+itself is [`api/openapi-v1.json`](api/openapi-v1.json), enforced against the live server by `ApiContractTest`.
+The superseded list is kept in git history (`git log -p -- docs/ADVANCED_GUIDE.md`).
 
 ---
 
