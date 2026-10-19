@@ -1,0 +1,4 @@
+plan: a contract module carved out by MODULE-REORG-1; its requirement of record is decision D-MR1 in layer/platform spec-module-reorg-decisions.md, and security requirements are planned in module.access plan-security.md
+spec: the contract's invariants are stated per interface in api.md and the discovery design in architecture.md; implementations are specified in their provider hubs
+user-guide: a pure Java contract with no screens; sign-in and access screens are documented in module.access user-guide-access.md
+admin-guide: nothing to configure in this jar; the providers' keys and flags are in module.access admin-guide-auth-security.md and each provider hub

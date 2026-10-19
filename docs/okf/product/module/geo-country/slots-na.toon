@@ -1,0 +1,1 @@
+user-guide: no screens - the resolver only adds geo_country and geo_db_build to audit rows; operators configure it per the admin guide

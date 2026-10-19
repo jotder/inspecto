@@ -1,0 +1,1 @@
+api: implements the Authenticator and TokenRelay contracts owned by module.auth-spi and adds no route; the /auth/* routes are core routes documented in module.access api-access.md

@@ -1,0 +1,5 @@
+plan: a contract module carved out by MODULE-REORG-1 and opened by EDG-01; its requirement of record is decision D-MR1 in layer/platform spec-module-reorg-decisions.md
+spec: the contract's invariants are stated per interface in api.md and the boot and discovery design in architecture.md; the host implementation is ControlApi in the core
+user-guide: a pure Java contract with no screens; each route module's screens are documented in its own hub
+admin-guide: nothing to install or configure in this jar; which route modules a bundle carries is an edition choice documented in layer/platform architecture-editions-model.md
+tests: the module has no test classes of its own; its test tree is the platform test kit (FakeApiContext, RouteModuleContract, ModuleRoutesParity) shipped as a test-jar and exercised by every feature module's RouteModuleContract subclass
