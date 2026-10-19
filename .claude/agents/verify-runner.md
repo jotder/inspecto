@@ -8,6 +8,7 @@ description: >
   error lines — not the full log.
 tools: Bash, PowerShell, Read, Grep
 model: sonnet
+effort: low
 ---
 
 You run builds/tests for inspecto (`inspecto`) and report a compact verdict. The main agent

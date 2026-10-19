@@ -105,11 +105,20 @@ const TEST_SEGMENT = join('src', 'test', 'java');
  */
 function javaFiles(segment) {
   const out = [];
+  // Same rule as route-gating-report.mjs: an unreadable directory outside module sources (a locked local bundle)
+  // is skipped with a warning; inside a src/ tree it still throws, or uncovered routes would hide behind it.
+  const unreadable = (p, e) => {
+    if (!['EPERM', 'EACCES'].includes(e.code) || p.split(/[\\/]/).includes('src')) throw e;
+    console.warn(`authgate scan: skipped unreadable ${p} (${e.code})`);
+  };
   const walk = (dir) => {
-    for (const name of readdirSync(dir)) {
+    let names;
+    try { names = readdirSync(dir); } catch (e) { unreadable(dir, e); return; }
+    for (const name of names) {
       if (name === 'target' || name === 'node_modules' || name === '.git' || name === '.claude') continue;
       const p = join(dir, name);
-      const st = statSync(p);
+      let st;
+      try { st = statSync(p); } catch (e) { unreadable(p, e); continue; }
       if (st.isDirectory()) walk(p);
       else if (name.endsWith('.java') && p.includes(segment)) out.push(p);
     }

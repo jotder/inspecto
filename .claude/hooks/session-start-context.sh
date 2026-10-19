@@ -31,6 +31,15 @@ ctx += (
     "(COMMON_MISTAKES, QUICK_START, ARCHITECTURE_MAP) are on-demand, not auto-loaded. "
     "At shift end run /handoff and END the session — session-per-shift, no mid-task compaction."
 )
+# Team memory: engineering lessons committed in the repo, so EVERY user of this sandbox gets them (a user's own
+# Claude memory lives in their profile and would reach only them). Index only; the notes are opened on demand.
+mem = ".claude/memory/INDEX.md"
+if os.path.isfile(mem):
+    try:
+        with open(mem, encoding="utf-8", errors="replace") as f:
+            ctx += "\n\nTeam memory (.claude/memory/ — open a note before working in its area):\n" + f.read()[:4000]
+    except OSError:
+        pass
 snap = ".claude/sessions/snapshot.md"
 if os.path.isfile(snap):
     try:

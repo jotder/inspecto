@@ -1,0 +1,15 @@
+---
+name: push-and-branch-policy
+description: "master is the only line (4.x deleted, nothing in production after 3.x): no merge-forward set to confirm; push when asked; the auto-mode push denial is per-attempt, not a verdict"
+metadata:
+  type: project
+---
+
+- **4.x was deleted 2026-08-17**; `v4.0.0*` tags are ancestors of master. Operator restated 2026-09-20: "after 3.x
+  we practically don't have any release, just carry on master." The merge-forward set is permanently empty —
+  do NOT ask the operator to confirm it; `.githooks/pre-push` prints that. If an instruction seems to change the
+  branch model, ask for the reason before acting (it flip-flopped once).
+- **Push cadence:** local commits, push batches; see [[ci-gates-beyond-the-reactor]].
+- **Classifier push denials are per-attempt** and not a hook/policy failure: retry on the next push; if denied
+  again, say it needs the operator's hands for now. Never work around it (`permissions.allow` is the wrong lever).
+  History rewrite is also refused — squash-merge an integrated tree instead.

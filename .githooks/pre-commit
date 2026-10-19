@@ -1,0 +1,10 @@
+#!/bin/sh
+# .githooks/pre-commit — runs the deterministic repo checks the STAGED files can affect (tools/precommit.mjs),
+# so they run on every commit without anyone remembering them. Fast node checks only; Java changes print the
+# affected-module test plan instead of running Maven.
+#
+# Activate once per clone:   git config core.hooksPath .githooks
+# Humans may bypass in an emergency with `git commit --no-verify` — say so in the commit body. Agents never bypass.
+
+command -v node >/dev/null 2>&1 || { echo "pre-commit: node not on PATH — repo checks skipped (CI still runs them)"; exit 0; }
+exec node tools/precommit.mjs

@@ -263,3 +263,26 @@ tell for "is this actually a real deployment or did Path A's demo jar end up on 
 | Safe to expose beyond localhost? | **Never** (refuses to load unless bound to loopback) | Yes, per the edition's transport/TLS story |
 | Classpath includes `inspecto-oidc.jar`? | No (deliberately) | Yes |
 | Boot log tell | `...DemoAuthenticator` | `...OidcAuthenticator` |
+
+## New laptop / environment
+
+Run the read-only check first and after every step: `node tools/dev-doctor.mjs` (`--json` for machine
+output). It prints ✓ / ⚠ / ✗ per item with the exact fix command, changes nothing, and exits 1 on any ✗.
+
+Install steps:
+
+1. JDK 27 first on `PATH` **and** `JAVA_HOME` pointing at the same JDK 27 (a `JAVA_HOME` left on 26 makes
+   Maven fail with "release version 27 not supported"); Apache Maven 3.9+.
+2. Build `jotder/inspect-agent` from source into `~/.m2` (`mvn -DskipTests install` in its clone), then
+   `mvn -DskipTests install` here once so `~/.m2` holds a previous Inspecto install.
+3. Node.js 22+ with npm; `npm ci` in `inspecto-ui`.
+4. The codegraph CLI, then `codegraph index` in the checkout.
+5. `git config core.hooksPath .githooks`, set `user.name` / `user.email`, `gh auth login`.
+6. Optional: Docker with postgres, WSO2 IS (`wso2/wso2is`, port 9443) and MinIO (port 9000) containers.
+7. `node tools/fetch-duckdb-extensions.mjs` to fill `.duckdb-extension-cache/`.
+
+Copy by hand from the previous machine (never in git; the doctor only reports presence):
+`product-map/private/`, `SESSION_STATUS.local.md`,
+`.claude/sessions/snapshot.md` (gitignored: it does not exist in a fresh clone),
+`docs/superpower/rfp-mvno-assurance/`, `docs/superpower/group-regulator-assurance/`, the Claude memory
+directory for this checkout path (under `~/.claude/projects/`), and any signing keys.

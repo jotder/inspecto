@@ -302,7 +302,7 @@ jobs:
       # compile that went green without recompiling the dependants). The fixture tests plant each blind spot and
       # were confirmed RED against the old behaviour. Pure Node, ~instant.
       - name: Tools — java-closure and compile-clean fixture tests
-        run: node --test tools/java-closure.test.mjs tools/compile-clean.test.mjs tools/check-native-licences.test.mjs tools/unreadable-dirs.test.mjs
+        run: node --test tools/java-closure.test.mjs tools/compile-clean.test.mjs tools/check-native-licences.test.mjs tools/unreadable-dirs.test.mjs tools/precommit.test.mjs tools/dev-doctor.test.mjs
 
       # Extracted-module dependency guard (LA separation D-1, Decision 5). The SPI modules and inspecto-graph exist so
       # Link Analysis can stand on a thin platform layer without the core; one convenient <dependency> on

@@ -158,6 +158,8 @@ const DOC_TREES_LABEL = `{all tracked *.md minus ${DOC_SKIP.join(', ')}}`;
 // Anything else is a stale doc and must be FIXED — that is how this pass found the `sources.md`/
 // "Source Connectors" residue of the shipped Source→Collector rename.
 const DOC_ALLOW = {
+    '.claude/memory/doc-guard-traps.md::source-acquisition-entity':
+        'Subject is the banned term itself: the team lesson that a citation heading named with it trips this guard.',
     'docs/okf/product/module/engine/spec-db-layer.md::data-store':
         'Sanctioned sense: "Business-data stores" read via a DuckDB sandbox is the physical backend, not a Dataset.',
     // The vocabulary-and-config-contract plan's two entries were RETIRED 2026-08-04 when the plan shipped

@@ -9,6 +9,7 @@ description: >
   conventions when reporting on code that will change.
 tools: Bash, Glob, Grep, Read
 model: sonnet
+effort: low
 ---
 
 You are a fast, read-only frontend code explorer for the `inspecto-ui` Angular SPA.

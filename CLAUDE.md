@@ -121,6 +121,9 @@ produced for this project — must live **under the repo**, so they are IDE-read
   `~/.claude/plans/` or anywhere under the user profile. When a plan is approved, persist it in-repo.
 - **Live working state / hand-off** → `SESSION_STATUS.local.md` (gitignored but in-repo).
 - The user's auto-memory index is a thin pointer only; durable project knowledge belongs in the repo.
+- **Team memory = `.claude/memory/`** (one lesson per file + `INDEX.md`, loaded at every session start for
+  whoever works in this sandbox). A new engineering lesson goes there, not into a personal profile; personal or
+  client-specific notes stay in the user's own memory and are never committed.
 
 ## Shared team sandbox — shifts & handover
 
@@ -136,6 +139,17 @@ shift gets the identical environment.
   per-user branches or PRs.
 
 ## Model & effort routing (token economy)
+
+- **Effort follows the task, automatically (operator, 2026-10-19).** The session default is `high`
+  (`.claude/settings.json`). Effort is fixed per agent, so route work to the agent whose effort fits — this rule
+  is the standing instruction to pass `effort` when spawning:
+  - **design, architecture, protocol, review, root-cause of a defect** → stay in the main thread at high, or
+    spawn with `effort: "xhigh"`; the `verification` agent (Opus, high) gives the independent verdict.
+  - **writing docs from known facts, implementing a decided change** → `effort: "high"` (the default).
+  - **locating, bulk mechanical edits, running builds** → `backend-explorer` / `frontend-explorer` /
+    `verify-runner` (`effort: low` in their definitions), or `effort: "low"` on a general agent.
+  - If the session itself was started at low effort and the next task is design or review, ask the operator
+    once to raise it (app effort picker) rather than proceeding at low.
 
 - **Delegate, don't read raw:** broad code searches → `Explore` (pass `model: "haiku"` for pure
   locating) or `backend-explorer` / `frontend-explorer`; builds/tests → `verify-runner`. Never parse
@@ -153,6 +167,23 @@ shift gets the identical environment.
   `-Dtest=A,B` (commas, never `+`). The FULL reactor gate (`mvn -o clean test -Pedition-advanced`, ~10 min) runs
   only when the tool says `full`, the operator asks (GAUNTLET), or at release — never once per edit. ⛔ Never
   `-pl X -am` alone as proof: it skips every dependent. Protocol: `docs/okf/product/layer/platform/spec-build-test.md`.
+
+## Deterministic checks run themselves — don't spend turns on them
+
+- **`.githooks/pre-commit` runs `tools/precommit.mjs`** on every commit: EVERY no-build step of the CI `guards`
+  job (read from `ci.yml` at commit time, so it cannot drift), read-only guards 6 in parallel then test steps one at a time (~30–40 s), plus the affected-module
+  test plan when Java changed. Stage everything, commit, and fix what it reports — never re-run those guards by
+  hand "to be sure", and never `--no-verify`. It warns when tracked files have unstaged edits: the guards read
+  the working tree, so those were judged too.
+- **New laptop / broken build → `node tools/dev-doctor.mjs`** first: it names environment traps (JAVA_HOME ≠
+  JDK 27, missing eoiagent in `~/.m2`, hooks path unset, unreadable folders) before they masquerade as code failures.
+
+## Editing on this Windows box (Git Bash)
+
+- **Never put regexes or backslashes in inline `python -c`, `node -e`, `sed` or heredoc scripts** — Git Bash
+  collapses `\\` and mangles `/c/...` paths (four failed patches in one session, 2026-10-19). Use the Edit tool
+  for exact replacements; for anything scripted, Write the script to a file and run the file.
+- Docker paths in Git Bash need `MSYS_NO_PATHCONV=1`, or `/w` becomes `W:/`.
 
 ## CodeGraph (code knowledge graph)
 

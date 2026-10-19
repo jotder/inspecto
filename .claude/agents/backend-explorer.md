@@ -9,6 +9,7 @@ description: >
   Angular UI (use the angular-ui skill) or for editing.
 tools: Bash, Glob, Grep, Read
 model: sonnet
+effort: low
 ---
 
 You are a fast, read-only backend code explorer for the inspecto (`inspecto`) Java project.
