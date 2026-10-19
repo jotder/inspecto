@@ -139,6 +139,28 @@ describe('Link Analysis legend - link-kind chips', () => {
     });
 });
 
+describe('Link Analysis legend - Entity Type rows (ONB-LA-ENDPOINT-TYPE-1)', () => {
+    it('shows the type glyph and the registry label; an untyped kind keeps its swatch', async () => {
+        TestBed.configureTestingModule({
+            imports: [LinkAnalysisLegendComponent],
+            providers: [provideNoopAnimations()],
+        });
+        const fixture = TestBed.createComponent(LinkAnalysisLegendComponent);
+        fixture.componentRef.setInput('items', [
+            { kind: 'msisdn', color: 'var(--gamma-primary)', count: 2 },
+            { kind: 'entity', color: 'var(--gamma-primary)', count: 1 },
+        ]);
+        fixture.componentRef.setInput('typeLabels', { msisdn: 'Phone number' });
+        fixture.detectChanges();
+        const rows = [...(fixture.nativeElement as HTMLElement).querySelectorAll('ul[aria-label="Node kinds"] li')];
+        expect(rows[0].querySelector('[data-testid="legend-glyph"]')).not.toBeNull();
+        expect(rows[0].textContent).toContain('Phone number');
+        expect(rows[1].querySelector('[data-testid="legend-glyph"]')).toBeNull();
+        expect(rows[1].textContent).toContain('entity');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
 describe('Link Analysis legend - unexpanded row (LA-UNEXPANDED-MARKER-1)', () => {
     it('shows the dotted-outline row with its count only when something is unexpanded', async () => {
         TestBed.configureTestingModule({

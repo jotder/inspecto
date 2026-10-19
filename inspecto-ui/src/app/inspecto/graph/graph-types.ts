@@ -28,6 +28,9 @@ export interface G6Node {
         /** The Incident/Case this node represents, when the source could resolve one — lights the
          *  detail dialog's "Open record" pivot (ui-design-review R8). Structurally = `ElementObjectRef`. */
         objectRef?: { id: string; type: 'INCIDENT' | 'CASE' };
+        /** Link Analysis: the Entity Type of an Investigation's typed entity node, whose `kind` is then that type (not
+         *  'entity'). Marks the node as an Entity for every "is this an entity" check; absent on every other node. */
+        entityType?: string;
         /**
          * LA-06: the real node ids this one STANDS IN FOR. Present only on a synthetic super-node
          * ({@link SUPER_NODE_KIND}) produced by `aggregateSuperNodes`; absent on every real node.

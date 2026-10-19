@@ -26,6 +26,7 @@ import {
     calendar,
     count,
     day,
+    dayStart,
     entitiesBase,
     notAssessedText,
     notHere,
@@ -225,11 +226,11 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <inspecto-stat-tile
                                     label="Earliest event"
-                                    [value]="day(p.time!.earliest)"
+                                    [value]="dayStart(p.time!.earliest)"
                                 ></inspecto-stat-tile>
                                 <inspecto-stat-tile
                                     label="Latest event"
-                                    [value]="day(p.time!.latest)"
+                                    [value]="dayStart(p.time!.latest)"
                                 ></inspecto-stat-tile>
                                 <inspecto-stat-tile
                                     label="Days read"
@@ -364,6 +365,7 @@ export class EntityTypeComponent implements OnInit {
 
     protected readonly count = count;
     protected readonly day = day;
+    protected readonly dayStart = dayStart;
     protected na(s: { assessed: boolean; reason: string | null } | undefined): string {
         return notAssessedText(s ?? NOT_RETURNED);
     }

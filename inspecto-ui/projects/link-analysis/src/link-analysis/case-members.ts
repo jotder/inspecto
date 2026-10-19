@@ -32,7 +32,7 @@ export function caseMemberCandidates(graph: G6GraphData, originDataset: string |
     const out: CaseMemberCandidate[] = [];
     for (const n of graph.nodes) {
         const d = n.data;
-        if (d.missing || d.superMembers?.length || d.kind !== 'entity') continue;
+        if (d.missing || d.superMembers?.length || !isEntityNode(n)) continue;
         if (d.objectRef) {
             if (d.objectRef.type === 'INCIDENT')
                 out.push({
@@ -62,7 +62,7 @@ export function caseMemberCandidates(graph: G6GraphData, originDataset: string |
  * looking in the wrong place.
  */
 export function noCaseMemberReason(graph: G6GraphData): string {
-    const masked = graph.nodes.some((n) => n.data.kind === 'entity' && MASKED_NODE_ID.test(n.id));
+    const masked = graph.nodes.some((n) => isEntityNode(n) && MASKED_NODE_ID.test(n.id));
     return masked
         ? 'No node on this graph can become a Case member: its entities are masked, and a masked pseudonym is refused as a Case key. Ask for Reveal rights, or link an Investigation to a Case instead.'
         : 'No node on this graph can become a Case member: each must be an Entity with a known source Dataset.';
@@ -71,8 +71,16 @@ export function noCaseMemberReason(graph: G6GraphData): string {
 /** An Entity node id: untyped `entity:<key>` or typed `<type>:<key>` (D-M6) — the server's `EntityMember` rule. */
 const ENTITY_NODE_ID = /^[a-z][a-z0-9_]{0,31}:./;
 
-/** A masked pseudonym (`masked:<hex>`, bare or after a type): the server refuses it as a Case key (422), so it is never offered. */
-const MASKED_NODE_ID = /^([a-z][a-z0-9_]{0,31}:)?masked:/;
+/**
+ * A masked pseudonym (`masked:<hex>`, bare, after a type, or after `entity:<type>:` as a typed Investigation node mints
+ * it): the server refuses it as a Case key (422), so it is never offered.
+ */
+const MASKED_NODE_ID = /^([a-z][a-z0-9_]{0,31}:){0,2}masked:/;
+
+/** An Entity node: an untyped one (`kind` 'entity') or an Investigation's typed one (`kind` = its Entity Type). */
+export function isEntityNode(n: G6Node): boolean {
+    return n.data.kind === 'entity' || !!n.data.entityType;
+}
 
 function datasetOf(n: G6Node, originDataset: string | undefined): string | undefined {
     const p = n.data.provenance?.filter((x) => !!x) ?? [];

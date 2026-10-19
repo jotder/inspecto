@@ -28,6 +28,7 @@ import {
     calendar,
     count,
     day,
+    dayStart,
     entitiesBase,
     freshness,
     linkAnalysisFrom,
@@ -96,8 +97,8 @@ type Identity = { members: string[] | null; note: string } | null;
                     <mat-expansion-panel [expanded]="true" data-section="seen">
                         <mat-expansion-panel-header><mat-panel-title>Seen</mat-panel-title></mat-expansion-panel-header>
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <inspecto-stat-tile label="First seen" [value]="day(p.firstSeen)"></inspecto-stat-tile>
-                            <inspecto-stat-tile label="Last seen" [value]="day(p.lastSeen)"></inspecto-stat-tile>
+                            <inspecto-stat-tile label="First seen" [value]="dayStart(p.firstSeen)"></inspecto-stat-tile>
+                            <inspecto-stat-tile label="Last seen" [value]="dayStart(p.lastSeen)"></inspecto-stat-tile>
                             <inspecto-stat-tile
                                 label="Active days"
                                 [value]="activeText()"
@@ -276,6 +277,7 @@ export class EntityComponent implements OnInit {
 
     protected readonly count = count;
     protected readonly day = day;
+    protected readonly dayStart = dayStart;
     protected na(s: { assessed: boolean; reason: string | null }): string {
         return notAssessedText(s);
     }

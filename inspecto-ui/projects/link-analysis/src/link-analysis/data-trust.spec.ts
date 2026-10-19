@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DatasetFilesPage } from '@inspecto/link-analysis/api/inv.service';
-import { buildStrip, dayCells, daysWindow, formatDay, formatInstant, outcomeTone, splitMissing } from './data-trust';
+import { buildStrip, dayCells, daysWindow, formatDay, formatDayStart, formatInstant, outcomeTone, splitMissing } from './data-trust';
 
 const files = (over: Partial<NonNullable<DatasetFilesPage['summary']>> = {}): DatasetFilesPage =>
     ({
@@ -165,6 +165,16 @@ describe('helpers', () => {
         expect(formatDay('2026-10-01T00:00:00.000Z')).toBe('30 Sep 2026');
         expect(formatDay(null)).toBe('');
         expect(formatDay('nope')).toBe('');
+    });
+
+    it('formats a day-bucket start as the day itself, never shifted (first/last seen)', () => {
+        expect(formatDayStart('2026-08-18T00:00:00Z')).toBe('18 Aug 2026');
+        expect(formatDayStart('2026-08-18T00:00:00.000Z')).toBe('18 Aug 2026');
+        expect(formatDayStart('2026-08-18T13:05:00Z')).toBe('18 Aug 2026');
+        expect(formatDayStart(null)).toBe('');
+        expect(formatDayStart('nope')).toBe('');
+        // the freshness reading is unchanged: the same midnight read end-exclusive is the day before
+        expect(formatDay('2026-08-18T00:00:00Z')).toBe('17 Aug 2026');
     });
 
     it('maps outcomes to a badge tone', () => {

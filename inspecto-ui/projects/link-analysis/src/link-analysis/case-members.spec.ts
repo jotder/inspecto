@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { G6GraphData } from '@inspecto/core/graph';
-import { caseMemberCandidates, noCaseMemberReason } from './case-members';
+import { EntityProjection, G6GraphData } from '@inspecto/core/graph';
+import { WorkingSet } from '@inspecto/link-analysis/api/inv.service';
+import { caseMemberCandidates, isEntityNode, noCaseMemberReason } from './case-members';
+import { workingSetToGraph } from './investigation-state';
 
 const G: G6GraphData = {
     nodes: [
@@ -14,6 +16,43 @@ const G: G6GraphData = {
     ],
     edges: [],
 };
+
+describe('caseMemberCandidates - typed Investigation nodes (ONB-LA-ENDPOINT-TYPE-1)', () => {
+    // Attach to Case and Create Case (link-analysis-evidence.dialogs.ts) both list exactly these candidates.
+    const ws = (entities: { id: string; type: string | null }[]): WorkingSet => ({
+        entities: entities.map((e) => ({ ...e, hop: 0, seed: e.id, admittedBy: 1, hidden: false, kept: false })),
+        links: [],
+        excluded: [],
+        hash: 'h',
+    });
+    const P: EntityProjection = { datasetId: 'calls', sourceCol: 'A', targetCol: 'B' };
+
+    it('offers a typed Working Set entity (kind = its Entity Type) as a member', () => {
+        const g = workingSetToGraph(ws([{ id: '99979100001', type: 'msisdn' }, { id: 'x', type: null }]), P);
+        expect(g.nodes.find((n) => n.data.label === '99979100001')!.data.kind).toBe('msisdn');
+        const c = caseMemberCandidates(g, 'calls');
+        expect(c.map((m) => m.label).sort()).toEqual(['99979100001', 'x']);
+    });
+
+    it('never offers a typed masked alias, and says masking is why', () => {
+        const g: G6GraphData = {
+            nodes: [
+                {
+                    id: 'entity:msisdn:masked:0123456789abcdef',
+                    data: { label: 'masked:0123456789abcdef', kind: 'msisdn', entityType: 'msisdn' },
+                },
+            ],
+            edges: [],
+        };
+        expect(caseMemberCandidates(g, 'calls')).toEqual([]);
+        expect(noCaseMemberReason(g)).toContain('masked');
+    });
+
+    it('still excludes non-Entity kinds', () => {
+        expect(isEntityNode({ id: 'pipeline:p', data: { label: 'p', kind: 'pipeline' } })).toBe(false);
+        expect(isEntityNode({ id: 'msisdn:1', data: { label: '1', kind: 'msisdn', entityType: 'msisdn' } })).toBe(true);
+    });
+});
 
 describe('caseMemberCandidates', () => {
     it('mints real Entities, joins a referenced Incident as itself, and excludes everything that is not one Entity', () => {

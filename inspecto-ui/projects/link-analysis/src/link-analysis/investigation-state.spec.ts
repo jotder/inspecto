@@ -7,6 +7,7 @@ import {
     effectiveOpSteps,
     idsInWorkingSet,
     investigationErrorMessage,
+    mergePairOf,
     moveStep,
     rawIdsOf,
     truncatedSteps,
@@ -23,6 +24,38 @@ function entity(id: string, extra: Partial<WorkingSet['entities'][number]> = {})
 function entry(step: number, extra: Partial<InvestigationLogEntry> = {}): InvestigationLogEntry {
     return { step, kind: 'op', author: null, at: '', undoneBy: null, workingSetHash: '', text: `${step}.`, ...extra };
 }
+
+describe('Working Set entity types on the canvas (ONB-LA-ENDPOINT-TYPE-1)', () => {
+    const ws = (entities: WorkingSet['entities']): WorkingSet => ({ entities, links: [], excluded: [], hash: 'h' });
+
+    it('draws a typed entity with its Entity Type as the node kind, an untyped one as entity', () => {
+        const g = workingSetToGraph(
+            ws([entity('99979100001', { type: 'msisdn' }), entity('SHELL-A', { type: 'account' }), entity('x')]),
+            P,
+        );
+        const kindOf = (raw: string) => g.nodes.find((n) => rawIdsOf(n).includes(raw))!.data.kind;
+        expect(kindOf('99979100001')).toBe('msisdn');
+        expect(kindOf('SHELL-A')).toBe('account');
+        expect(kindOf('x')).toBe('entity');
+    });
+
+    it('keeps a masked id masked while typing its node', () => {
+        const g = workingSetToGraph(ws([entity('masked:0123456789abcdef', { type: 'msisdn' })]), P);
+        expect(g.nodes[0].data.kind).toBe('msisdn');
+        expect(g.nodes[0].data.label).toBe('masked:0123456789abcdef');
+    });
+
+    it('builds the merge pair from the Working Set types for bare ids', () => {
+        const set = ws([entity('99979100001', { type: 'msisdn' }), entity('SHELL-A', { type: 'account' }), entity('plain')]);
+        expect(mergePairOf(['99979100001', 'SHELL-A'], set)).toEqual({
+            pair: { a: { type: 'msisdn', value: '99979100001' }, b: { type: 'account', value: 'SHELL-A' } },
+            reason: '',
+        });
+        expect(mergePairOf(['99979100001', 'plain'], set).reason).toContain('typed entities');
+        const masked = ws([entity('masked:0123456789abcdef', { type: 'msisdn' }), entity('1', { type: 'imsi' })]);
+        expect(mergePairOf(['masked:0123456789abcdef', '1'], masked).reason).toContain('masked entity cannot be merged');
+    });
+});
 
 describe('LA-10 investigation-state', () => {
     it('draws typed Working Set ids that agree with the typed query graph (LA-17 D-M6)', () => {
