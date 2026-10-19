@@ -36,16 +36,22 @@
                 </mat-menu>
 
                 <!-- node-type filter -->
-                <button
-                    mat-icon-button
-                    [matMenuTriggerFor]="kindMenu"
-                    [color]="kindFilter().length ? 'primary' : undefined"
-                    [disabled]="workingSetCanvas()"
-                    [matTooltip]="workingSetCanvas() ? queryGraphOnlyReason : 'Filter node types'"
-                    [attr.aria-label]="'Filter node types' + (kindFilter().length ? ' (filter active)' : '')"
-                >
-                    <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
-                </button>
+                <!-- disabled-with-reason: the tooltip sits on a wrapper (a disabled button fires no hover) and the label carries the reason -->
+                <span class="inline-flex" [matTooltip]="workingSetCanvas() ? queryGraphOnlyReason : 'Filter node types'">
+                    <button
+                        mat-icon-button
+                        [matMenuTriggerFor]="kindMenu"
+                        [color]="kindFilter().length ? 'primary' : undefined"
+                        [disabled]="workingSetCanvas()"
+                        [attr.aria-label]="
+                            workingSetCanvas()
+                                ? 'Filter node types — ' + queryGraphOnlyReason
+                                : 'Filter node types' + (kindFilter().length ? ' (filter active)' : '')
+                        "
+                    >
+                        <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
+                    </button>
+                </span>
                 <mat-menu #kindMenu="matMenu">
                     @for (k of nodeKinds(); track k) {
                         <!-- menuitemcheckbox: a role="menu" panel may hold only menu items (axe aria-required-children);
@@ -94,16 +100,21 @@
 
                 <!-- timeline: filter edges by a temporal `attrs` column cut off at a point in time -->
                 @if (attrColumns().length) {
-                    <button
-                        mat-icon-button
-                        [matMenuTriggerFor]="timelineMenu" laFormMenu
-                        [color]="timeColumn() ? 'primary' : undefined"
-                        [disabled]="workingSetCanvas()"
-                        [matTooltip]="workingSetCanvas() ? queryGraphOnlyReason : 'Timeline'"
-                        [attr.aria-label]="'Filter edges by time' + (timeColumn() ? ' (filter active)' : '')"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
-                    </button>
+                    <span class="inline-flex" [matTooltip]="workingSetCanvas() ? queryGraphOnlyReason : 'Timeline'">
+                        <button
+                            mat-icon-button
+                            [matMenuTriggerFor]="timelineMenu" laFormMenu
+                            [color]="timeColumn() ? 'primary' : undefined"
+                            [disabled]="workingSetCanvas()"
+                            [attr.aria-label]="
+                                workingSetCanvas()
+                                    ? 'Filter edges by time — ' + queryGraphOnlyReason
+                                    : 'Filter edges by time' + (timeColumn() ? ' (filter active)' : '')
+                            "
+                        >
+                            <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
+                        </button>
+                    </span>
                     <mat-menu #timelineMenu="matMenu">
                         <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                         <div
@@ -870,22 +881,32 @@
                                         mat-icon-button
                                         (click)="mergeSelected()"
                                         [disabled]="!!mergeUnavailable()"
+                                        [disabledInteractive]="true"
+                                        [attr.aria-describedby]="mergeUnavailable() ? 'la-merge-reason' : null"
                                         [matTooltip]="mergeUnavailable() || 'Merge with... assert that the two selected nodes are one entity'"
                                         aria-label="Merge the two selected nodes into one identity"
                                         data-testid="la-selection-merge"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:arrows-pointing-in"></mat-icon>
                                     </button>
+                                    <!-- disabled-with-reason: disabledInteractive renders aria-disabled and keeps the button focusable, so the
+                                         tooltip and this described reason reach everyone; mergeSelected() guards the click -->
+
+                                    <span id="la-merge-reason" class="sr-only">{{ mergeUnavailable() }}</span>
                                 }
                                 <button
                                     mat-icon-button
                                     (click)="openAttachToCase()"
                                     [disabled]="!!attachUnavailable()"
+                                    [disabledInteractive]="true"
+                                    [attr.aria-describedby]="attachUnavailable() ? 'la-selection-attach-reason' : null"
                                     [matTooltip]="attachUnavailable() || 'Attach the selected nodes to a Case'"
                                     [attr.aria-label]="'Attach the ' + selectedOnCanvas().length + ' selected nodes to a Case'"
+                                    data-testid="la-selection-attach"
                                 >
                                     <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
                                 </button>
+                                <span id="la-selection-attach-reason" class="sr-only">{{ attachUnavailable() }}</span>
                                 <button
                                     mat-icon-button
                                     (click)="clearSelection()"
@@ -901,6 +922,7 @@
                             class="absolute left-2 top-2 z-10"
                             [attr.inert]="listMode() ? '' : null"
                             [items]="legendItems()"
+                            [typeLabels]="entityTypeLabels()"
                             [edgeKinds]="legendLinkKinds()"
                             [hiddenEdgeKinds]="hiddenLinkKinds()"
                             [edgeColors]="edgeColors()"

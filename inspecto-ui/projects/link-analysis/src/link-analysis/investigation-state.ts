@@ -87,6 +87,16 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
             node.data.spellings = [...(node.data.spellings ?? []), e.id];
         }
     }
+    // ONB-LA-ENDPOINT-TYPE-1: a node takes its Working Set entity's Entity Type as its kind, so the canvas draws that
+    // type's icon and colour and the legend names it; an untyped entity keeps 'entity'. The id (masked or not) is untouched.
+    const typeOf = new Map(ws.entities.filter((e) => e.type).map((e) => [e.id, e.type as string]));
+    if (typeOf.size)
+        for (const n of g.nodes) {
+            const type = rawIdsOf(n)
+                .map((raw) => typeOf.get(raw))
+                .find((t) => !!t);
+            if (type) n.data.kind = type;
+        }
     // Supernode suppression: a node any of whose Working Set ids is flagged is drawn ringed (legend: High connectivity).
     // The flagged entity's own sealed `contacts` rides along for the hover text (null/absent → no count).
     const flagged = new Map(ws.entities.filter((e) => e.highConnectivity).map((e) => [e.id, e.contacts ?? null]));
@@ -269,12 +279,22 @@ export function identityErrorMessage(err: unknown, fallback: string): string {
  * refuses an alias as an identity key (LA-19), and a masked caller cannot read the real value.
  */
 export type MergePair = { a: { type: string; value: string }; b: { type: string; value: string } };
-export function mergePairOf(ids: string[]): { pair: MergePair; reason: '' } | { pair: null; reason: string } {
+/**
+ * The identity pair "Merge with..." pre-fills. Working Set ids are bare raw values (`99979100001`), so `ws` supplies
+ * each entity's Entity Type (`msisdn:99979100001`); a `type:value` id is still read as such.
+ */
+export function mergePairOf(
+    ids: string[],
+    ws?: WorkingSet | null,
+): { pair: MergePair; reason: '' } | { pair: null; reason: string } {
     if (ids.length !== 2) return { pair: null, reason: 'Select exactly two entities to merge them.' };
     // A bare pseudonym `masked:<hex>` would split into type "masked" and slip past the value check below.
     if (ids.some((id) => id.startsWith(MASKED_PREFIX)))
         return { pair: null, reason: 'A masked entity cannot be merged: only its alias is visible, and an identity needs the real value.' };
+    const types = new Map((ws?.entities ?? []).filter((e) => e.type).map((e) => [e.id, e.type as string]));
     const split = ids.map((id) => {
+        const type = types.get(id);
+        if (type) return { type, value: id };
         const i = id.indexOf(':');
         return i > 0 ? { type: id.slice(0, i), value: id.slice(i + 1) } : null;
     });

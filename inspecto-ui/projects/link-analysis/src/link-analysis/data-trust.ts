@@ -44,6 +44,18 @@ export function formatDay(iso: string | null | undefined): string {
     return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+/**
+ * A day-bucket START (`2026-08-18T00:00:00Z` = the events of 18 Aug) -> `18 Aug 2026`, UTC, never shifted: a profile's
+ * first/last seen and an Entity Type's earliest/latest event name the day itself. Use {@link formatDay} only for an
+ * end-exclusive "covered through" instant. Blank when unreadable.
+ */
+export function formatDayStart(iso: string | null | undefined): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+    if (!m) return '';
+    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 /** `2026-09-05T10:03:20Z` -> `5 Sep 2026 10:03 UTC`: the one reading of an instant in the strip (UTC for every analyst). Blank when unreadable. */
 export function formatInstant(iso: string | null | undefined): string {
     const d = new Date(iso ?? '');

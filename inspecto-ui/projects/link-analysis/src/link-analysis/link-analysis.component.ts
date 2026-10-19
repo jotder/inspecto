@@ -4,6 +4,7 @@ import {
     Component,
     DestroyRef,
     ElementRef,
+    Injector,
     OnInit,
     ViewChild,
     afterNextRender,
@@ -23,6 +24,7 @@ import {
     ValidatorFn,
 } from '@angular/forms';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -382,6 +384,7 @@ export class LinkAnalysisComponent implements OnInit {
     private router = inject(Router);
     private route = inject(ActivatedRoute);
     private destroyRef = inject(DestroyRef);
+    private readonly injector = inject(Injector);
     private datasetRows = inject(DatasetRowsService);
     /**
      * The Case this analysis was opened from (`/studio/link-analysis?case=<id>`, the link on a Case page),
@@ -1106,6 +1109,26 @@ export class LinkAnalysisComponent implements OnInit {
 
     // ── canvas overlays: legend (kind → colour → count) and the working set tiles ──
     readonly legendItems = computed<LegendItem[]>(() => legendItemsFor(this.displayed(), this.nodeColors()));
+    /** Entity Type id → its registry label, for the legend rows; empty until (and unless) the registry answers. */
+    readonly entityTypeLabels = signal<Record<string, string>>({});
+    private entityTypeLabelsAsked = false;
+    /** Read the Entity Types registry once, the first time an Investigation canvas draws typed nodes. */
+    private readonly loadEntityTypeLabels = effect(() => {
+        if (this.entityTypeLabelsAsked || !this.investigation.canvas()?.nodes.some((n) => n.data.kind !== 'entity')) return;
+        this.entityTypeLabelsAsked = true;
+        try {
+            this.injector
+                .get(EntityProfileService)
+                .entityTypes()
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe({
+                    next: (l) => this.entityTypeLabels.set(Object.fromEntries((l?.items ?? []).map((t) => [t.id, t.label]))),
+                    error: () => undefined, // the legend falls back to the pack's term, else the id
+                });
+        } catch {
+            // no registry in this host: the legend keeps the pack's term, else the id
+        }
+    });
     /** Drawn Working Set entities flagged high connectivity — the legend's ringed-node row. */
     readonly hubsDrawn = computed(
         () => this.investigation.canvas()?.nodes.filter((n) => n.data.highConnectivity).length ?? 0,
@@ -1755,7 +1778,7 @@ export class LinkAnalysisComponent implements OnInit {
             const node = (this.canvasData()?.nodes ?? []).find((n) => n.id === id);
             return node ? idsInWorkingSet(node, ws) : [];
         });
-        return mergePairOf(ids).reason;
+        return mergePairOf(ids, ws).reason;
     });
 
     /** Hands the two selected entities to the Identity section (Investigation tab); nothing is written until it is confirmed there. */
@@ -1763,7 +1786,7 @@ export class LinkAnalysisComponent implements OnInit {
         if (this.mergeUnavailable()) return;
         const ws = this.investigation.workingSet();
         const ids = this.selectedNodes().flatMap((n) => idsInWorkingSet(n, ws));
-        const { pair } = mergePairOf(ids);
+        const { pair } = mergePairOf(ids, ws);
         if (!pair) return;
         this.investigation.mergeDraft.set(pair);
         // LA-I2-GAPS-RESIDUALS-1 (5): open the tab that holds the prefilled merge, so the next step is on screen.

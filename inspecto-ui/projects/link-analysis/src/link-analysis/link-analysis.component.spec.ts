@@ -2588,7 +2588,7 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         select(2);
         expect(c.selectedOnCanvas()).toHaveLength(2);
         expect(c.mergeUnavailable()).toBe('');
-        expect(merge()!.disabled).toBe(false);
+        expect(merge()!.getAttribute('aria-disabled')).toBeNull();
         fixture.destroy();
     });
 
@@ -2614,11 +2614,11 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         session.capabilities.set([]);
         fixture.detectChanges();
         expect(c.mergeUnavailable()).toContain('needs the Incident management capability');
-        expect(merge()!.disabled).toBe(true);
+        expect(merge()!.getAttribute('aria-disabled')).toBe('true');
         session.capabilities.set(['canManageIncidents']);
         fixture.detectChanges();
         expect(c.mergeUnavailable()).toBe('');
-        expect(merge()!.disabled).toBe(false);
+        expect(merge()!.getAttribute('aria-disabled')).toBeNull();
         fixture.destroy();
     });
 
@@ -2626,14 +2626,14 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         const { fixture, c, select, merge } = await inInvestigation(['msisdn:+44', 'imsi:1', 'plain']);
         select(1);
         expect(c.mergeUnavailable()).toContain('exactly two');
-        expect(merge()!.disabled).toBe(true);
+        expect(merge()!.getAttribute('aria-disabled')).toBe('true');
         select(3);
         expect(c.mergeUnavailable()).toContain('exactly two');
-        expect(merge()!.disabled).toBe(true);
+        expect(merge()!.getAttribute('aria-disabled')).toBe('true');
         c.onSelectionChange((c.canvasData()?.nodes ?? []).slice(1, 3).map((n) => n.id)); // imsi:1 + the untyped one
         fixture.detectChanges();
         expect(c.mergeUnavailable()).toContain('typed entities');
-        expect(merge()!.disabled).toBe(true);
+        expect(merge()!.getAttribute('aria-disabled')).toBe('true');
         fixture.destroy();
     });
 
@@ -2665,7 +2665,56 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         select(2);
         expect(c.selectedOnCanvas()).toHaveLength(2);
         expect(c.mergeUnavailable()).toContain('masked entity cannot be merged');
-        expect(merge()!.disabled).toBe(true);
+        expect(merge()!.getAttribute('aria-disabled')).toBe('true');
+        fixture.destroy();
+    });
+
+    it('builds the pair from the Working Set types when the ids are bare raw values (ONB-LA-ENDPOINT-TYPE-1)', async () => {
+        const made = create();
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        const c = made.fixture.componentInstance;
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [
+                { id: '99979100001', type: 'msisdn' },
+                { id: 'SHELL-A', type: 'account' },
+            ],
+            links: [],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        made.fixture.detectChanges();
+        c.onSelectionChange((c.canvasData()?.nodes ?? []).map((n) => n.id));
+        made.fixture.detectChanges();
+        expect(c.canvasData()?.nodes.map((n) => n.data.kind).sort()).toEqual(['account', 'msisdn']);
+        expect(c.mergeUnavailable()).toBe('');
+        c.mergeSelected();
+        made.fixture.detectChanges();
+        // the Identity section (Investigation tab) took the hand-off: what reached its form is the typed pair
+        const identities = made.fixture.debugElement.query(By.directive(LinkAnalysisIdentitiesComponent));
+        expect(identities.componentInstance.assertForm.getRawValue()).toMatchObject({
+            typeA: 'msisdn',
+            valueA: '99979100001',
+            typeB: 'account',
+            valueB: 'SHELL-A',
+        });
+        made.fixture.destroy();
+    });
+
+    it('keeps a disabled Merge focusable and states why (aria-disabled + described reason, axe clean)', async () => {
+        const { fixture, c, el, select, merge } = await inInvestigation(['msisdn:+44', 'imsi:1', 'plain']);
+        select(1);
+        const btn = merge()!;
+        expect(btn.disabled).toBe(false); // focusable: a disabled button fires no tooltip and is skipped by Tab
+        expect(btn.getAttribute('aria-disabled')).toBe('true');
+        const reason = el.querySelector('#' + btn.getAttribute('aria-describedby'))!;
+        expect(reason.textContent).toContain('exactly two');
+        const draft = c.investigation.mergeDraft();
+        btn.click(); // the click guard: nothing is prefilled
+        expect(c.investigation.mergeDraft()).toBe(draft);
+        await expectNoA11yViolations(el.querySelector('[data-testid="la-selection-bar"]') as HTMLElement);
         fixture.destroy();
     });
 });

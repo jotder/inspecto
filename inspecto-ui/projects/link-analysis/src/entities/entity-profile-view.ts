@@ -2,7 +2,7 @@ import type { ActivatedRoute } from '@angular/router';
 import { formatNumber } from '@inspecto/core/viz/number-format';
 import { rampColor, sequentialLevel } from '@inspecto/core/viz/heatmap';
 import type { Assessed } from '@inspecto/link-analysis/api/entity-profile.service';
-import { formatDay } from '@inspecto/link-analysis/link-analysis/data-trust';
+import { formatDay, formatDayStart } from '@inspecto/link-analysis/link-analysis/data-trust';
 
 /**
  * The framework-free half of the Entities pages: the honest wording (an unassessed section says "not assessed" with
@@ -46,9 +46,14 @@ export function freshness(dataAsOf: string | null | undefined, assessed: boolean
     return ageDays <= STALE_AFTER_DAYS ? { value: 'OK', label: 'Fresh' } : { value: 'STALE', label: 'Stale' };
 }
 
-/** "5 Sep 2026", or blank. */
+/** "5 Sep 2026", or blank — for an end-exclusive "as of" instant (a UTC midnight names the day before). */
 export function day(iso: string | null | undefined): string {
     return formatDay(iso);
+}
+
+/** "18 Aug 2026", or blank — for a day-bucket START (first/last seen, earliest/latest event): the day itself. */
+export function dayStart(iso: string | null | undefined): string {
+    return formatDayStart(iso);
 }
 
 /** One bar of a relative bar list: the bar is a share of the LARGEST item, and its text says so. */

@@ -7,7 +7,7 @@ import { G6GraphData } from '@inspecto/core/graph';
 import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
 import { activeDomainProfileId, domainProfile, termLabel } from '@inspecto/link-analysis/graph/domain-profile';
 import { WorkingSetStat } from '@inspecto/link-analysis/graph/working-set-stats';
-import { nodeColor } from '@inspecto/core/graph/catalog-graph';
+import { entityTypeIcon, nodeColor } from '@inspecto/core/graph/catalog-graph';
 import { baseEdgeKind } from '@inspecto/core/graph/graph-view.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 
@@ -105,11 +105,15 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
                 <ul class="mt-1 flex flex-col gap-0.5" aria-label="Node kinds">
                     @for (i of items(); track i.kind) {
                         <li class="flex items-center gap-2">
-                            <span
-                                class="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                                [style.background]="i.color"
-                                aria-hidden="true"
-                            ></span>
+                            @if (glyphOf(i); as glyph) {
+                                <img class="h-3.5 w-3.5 shrink-0" [src]="glyph" alt="" data-testid="legend-glyph" />
+                            } @else {
+                                <span
+                                    class="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                                    [style.background]="i.color"
+                                    aria-hidden="true"
+                                ></span>
+                            }
                             <span>{{ nodeLabel(i.kind) }}</span>
                             <span class="text-secondary ml-auto tabular-nums">{{ i.count }}</span>
                         </li>
@@ -219,10 +223,19 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
     `,
 })
 export class LinkAnalysisLegendComponent {
-    /** What the active Industry pack calls a node kind (`entity_type.<kind>`), else the kind itself. Display only. */
+    /**
+     * The Entity Types registry's label for a node kind, else what the active Industry pack calls it
+     * (`entity_type.<kind>`), else the kind itself. Display only.
+     */
     protected nodeLabel(kind: string): string {
-        return termLabel(domainProfile(activeDomainProfileId()), `entity_type.${kind}`, kind);
+        return this.typeLabels()[kind] || termLabel(domainProfile(activeDomainProfileId()), `entity_type.${kind}`, kind);
     }
+    /** The Entity Type's canvas glyph in the kind's colour (the icon the node is drawn with); undefined = a plain swatch. */
+    protected glyphOf(i: LegendItem): string | undefined {
+        return entityTypeIcon(i.kind, i.color);
+    }
+    /** Entity Type id → registry label (`GET /inv/entity-types`); absent = not loaded. */
+    readonly typeLabels = input<Record<string, string>>({});
     /** What the active Industry pack calls a link kind (`link_kind.<kind>`), else the kind (or "unlabelled"). Display only. */
     protected linkLabel(kind: string): string {
         return termLabel(domainProfile(activeDomainProfileId()), `link_kind.${kind}`, kind || 'unlabelled');
