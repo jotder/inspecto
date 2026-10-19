@@ -25,7 +25,7 @@ Config files live under a space's `config/<adapter>/` directory (e.g. `spaces/<i
 ## Spaces (multi-project layout)
 
 One server can host **many isolated spaces** (projects) at once. A space is a self-contained directory under a
-container root — launch with `-Dspaces.root=<dir>` (default `./spaces`):
+container root — launch with `-Dspaces.root=<dir>` (no code default: unset means single-tenant mode; `serve.sh`/`serve.bat` default `SPACES_ROOT=spaces`):
 
 ```
 spaces/
@@ -35,7 +35,7 @@ spaces/
     data/  ( data/events/ ) # partition output  ( + rolling Parquet events )
     audit/                  # run journal, watermarks, commit logs
     duckdb/                 # this space's *.duckdb / *.db stores
-    flows/                  # authored flows
+    pipelines/              # authored pipelines (`flows/` is read only as a legacy fallback)
 ```
 
 Each space is fully isolated: its own service, scheduler, event log, stores, connection registry and metric
@@ -729,7 +729,7 @@ percentile per dialect — DuckDB `quantile_cont(col, p)` vs PostgreSQL `percent
 ---
 
 
-### `CONFIG-MIGRATOR-LOSES-MAPPINGS-1` — the migrator loses what its javadoc promises to refuse (open, P1)
+### `CONFIG-MIGRATOR-LOSES-MAPPINGS-1` — the migrator loses what its javadoc promises to refuse (FIXED 2026-09-17 — the section below is the historical defect record; `writeSchema` now keeps `mapping.fields[]` and `MainApp` strips `--apply`)
 
 Found 2026-09-17 by **driving** `migrate-configs` on a copy of `spaces/demo`, not by reading it.
 

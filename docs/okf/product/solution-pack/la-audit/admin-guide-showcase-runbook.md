@@ -1,6 +1,6 @@
 # Inspecto LA (Link Analysis) showcase B: Finance and audit (runbook, synthetic data only)
 
-**Status: BUILT and LIVE-REHEARSED 2026-10-16 on a booted Space (Enterprise Demo Auth bundle, port 8141): smoke 30/30, the HTTP routes and the headline browser scenes driven; what was not driven is listed in section 6.** Vertical B of the
+**Status: BUILT and LIVE-REHEARSED 2026-10-16 on a booted Space (Advanced Demo Auth bundle, port 8141): smoke 30/30, the HTTP routes and the headline browser scenes driven; what was not driven is listed in section 6.** Vertical B of the
 [multi-vertical showcase plan](../../../../superpower/la-multi-vertical-showcase-plan.md): "procure-to-pay and the journal". The analyst's questions: is this vendor real, who approved,
 is the control chain sound? The headline is the **Dossier as an audit workpaper**: seal it, verify it, change one byte, watch Verify fail.
 Everything is invented (names, bank accounts, addresses, ids). The plants are labelled as planted; nothing here is a detection-rate claim.
@@ -10,7 +10,7 @@ The stakeholder-facing sibling script is the [demo runbook](../../module/la-core
 
 | # | Step | Command / expectation |
 |---|---|---|
-| 1 | Bundle: the Demo Auth build with the la-app UI | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` (`-DemoAuth` refuses every edition but Enterprise, Preview included); unzip it inside the checkout, not under `%TEMP%` |
+| 1 | Bundle: the Demo Auth build with the la-app UI | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` (`-DemoAuth` accepts Advanced or Preview only); unzip it inside the checkout, not under `%TEMP%` |
 | 2 | Lay the Space down (offline, before the server starts) | `node tools/seed-la-audit.mjs --scaffold <spacesRoot>` creates `la-audit` and the template gallery |
 | 3 | Start the server with `-Dla.embed.enabled=true` (only for the Embed scene) | without it the mint answers 503 |
 | 4 | Wait for the Jobs: `ap_links` runs on a 10-minute cron; its three derived Jobs and `la_index_build` follow it by signal | or press Run on each as `audit.manager` |
@@ -27,7 +27,7 @@ Ids are `audit.*` on purpose: the demo-auth roster refuses one id defined differ
 
 | Demo User | Role | Can | Cannot |
 |---|---|---|---|
-| `audit.lead` | audit-lead (Lead auditor) | work Investigations, run Graph Runs, build the index, author Alert Rules; a lead member | approve her own expand; Reveal |
+| `audit.lead` | audit-lead (Lead auditor) | work Investigations, run Graph Runs, build the index, author Alert Rules; a lead member | approve her own expand |
 | `audit.manager` | audit-manager (second approver) | approve held expands, operate Jobs | Reveal; author |
 | `audit.committee` | audit-committee (read-only) | read the Investigation (a reviewer member) | write anything |
 | `audit.outsider` | audit-committee | nothing: not a member (404) | |
@@ -78,7 +78,7 @@ with a single approver is a pendant. Three vendors carry the placeholder account
 1. On `ap_vendor_identity` seed V-117, expand: **E-31** appears joined by both `shares_account` (BA-9031) and `shares_address` (AD-9031). Say: two independent attributes, one person.
 2. Seed E-31 and V-117 and run **Connect seeds**: the shortest route is one hop. Switch to `ap_approval_graph`, seed V-117: its only approver is E-15, E-31's own manager (hop 2 from E-31 through the org chart in `ap_org_links_dataset`).
 3. Open the **Entity profile** of V-117 (node panel): reference rows from `vendor_master_dataset` (bank account, address key, onboarding date) and 14 invoice links, the payment account, and the shared links.
-* **Beat check:** the committee sees the same profile with masked ids, and Reveal is `audit.admin` only.
+* **Beat check:** the committee sees the same profile with masked ids, and Reveal is held by `audit.admin` and `audit.lead` only (not manager or committee).
 
 ### C. Algorithms (3.5 min). Each: client run first (instant, small), then **Run on server** for the Job-class ones, progress and result parity
 Plan section 3.1 assigns eight algorithms to this vertical. Always seed first; an all-nodes canvas is a dust cloud.
@@ -118,7 +118,7 @@ Mint an embed link on the Investigation (`POST .../embeds` or the Share panel; n
 python -m http.server 8100 --bind 127.0.0.1 --directory spaces/_templates/la-audit/portal
 # open http://127.0.0.1:8100/committee-portal.html and paste the viewer link http://<host>/embed/inv/<grantId>.<secret>
 ```
-`link-analysis.toon` allows `http://127.0.0.1:8100` and `http://localhost:8100` as frame ancestors (`embed.frame_ancestors`); a page opened from disk presents the `null` origin and is refused, and the viewer answers `frame-ancestors 'none'` to any other page. **Expect:** the committee sees the read-only masked Investigation (aliases, graph, step 6) inside their own page. Revoke it (`POST .../embeds/<grantId>/revoke`): the public read answers a uniform 404 and the frame stays blank. A mangled token answers 404 too.
+`link-analysis.toon` allows `http://127.0.0.1:8100` and `http://localhost:8100` as frame ancestors (`embed.frame_ancestors`); a page opened from disk presents the `null` origin and is refused, and the viewer's `frame-ancestors` lists only those origins (`'none'` when the list is empty), so the browser refuses any other page. **Expect:** the committee sees the read-only masked Investigation (aliases, graph, step 6) inside their own page. Revoke it (`POST .../embeds/<grantId>/revoke`): the public read answers a uniform 404 and the frame stays blank. A mangled token answers 404 too.
 
 ### S9. Intercompany round trip (extra 1.5 min)
 Open `gl_intercompany` (journal flows; `LEGAL_ENTITY` ids are not masked). **Find cycles** (server run): exactly one cycle LE-05, LE-06, LE-07, LE-08. **Maximum flow** LE-05 to LE-07: **7 200 000** (three quarter ends of 2 400 000). Hover a link: `via` names the journal and GL account (`JNL-RT-.../1900-IC-RECEIVABLE`).
@@ -138,7 +138,7 @@ Open `gl_intercompany` (journal flows; `LEGAL_ENTITY` ids are not masked). **Fin
 
 ## 6. What was verified live, what was not
 
-Rehearsal 2026-10-16 on an Enterprise Demo Auth bundle built from this branch (port 8141, `-Dla.embed.enabled=true`), Space created with `seed-la-audit.mjs --scaffold`, all five feeds ingested on boot (1 804 invoices and approvals, 150, 60 and 72 rows, no rejects).
+Rehearsal 2026-10-16 on an Advanced Demo Auth bundle built from this branch (port 8141, `-Dla.embed.enabled=true`), Space created with `seed-la-audit.mjs --scaffold`, all five feeds ingested on boot (1 804 invoices and approvals, 150, 60 and 72 rows, no rejects).
 
 **Verified:**
 * `la-audit-smoke.mjs`: **30/30** (Job outputs carry every plant; the Dossier verifies and one altered hash fails; committee read-only 403 and 200; outsider 404; pending request in the manager's inbox; a server Graph Run is accepted).
@@ -155,9 +155,9 @@ Rehearsal 2026-10-16 on an Enterprise Demo Auth bundle built from this branch (p
 4. V-041 had two E-07 invoices, so the app (one link per invoice) found no bridge; it now has one, and the golden test builds the graph the way the app draws it.
 5. The committee portal could not frame the viewer: the template now allows the `:8100` origin and the page is served from `portal/`.
 
-**Observations, not fixed (outside this lane):** the Domain profile "Financial crime" labels the Working Set tiles Accounts, Transfers and Transactions for an approvals graph, and the placeholders in the expand settings are telecom values (call, sms); an Investigation title carries the id it was made for (V-117), which is masked inside it, so the title reads "Vendor masked:... workpaper"; the Centrality picker is labelled Metric (the glossary says Measure).
+**Observations, not fixed (outside this lane):** the neutral `generic` Domain profile labels the Working Set tiles generically for an approvals graph; an Investigation title carries the id it was made for (V-117), which is masked inside it, so the title reads "Vendor masked:... workpaper"; the Centrality picker is labelled Metric (the glossary says Measure).
 
 **Known limits:**
 * The Alert and Case beats are secondary here (plan matrix, "o"): the seed binds an Alert Rule `ap-split-invoices` (the closed value-Measure set has `structuring`, window 2026-03-02 to 2026-04-02) and opens a Case for V-117; the primary Alert scene is vertical A.
-* The `la-showcase-off` template's `roles.toon` differs from `la-showcase`'s (Reveal on the analyst), so `LaShowcaseTemplateTest` fails on master as of this build: a pre-existing defect of the sibling template, not touched here.
+* The `la-showcase-off` template's `roles.toon` once differed from `la-showcase`'s (Reveal on the analyst) and failed `LaShowcaseTemplateTest`; fixed in `f1b64ce03` (2026-10-17), the two files are now identical.
 * Recorded precision claims: none. The plants are planted, the counts are the corpus, and no detection rate is implied.

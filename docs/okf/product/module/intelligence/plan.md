@@ -42,8 +42,7 @@ Rows as stated in [plan-assistant §2](../agent/plan-assistant.md#2-requirements
   `AgentApprovals` stays the previewer.
 - **`AGT-6b`** — holds while the upstream approval gate is synchronous per call (nested gates deadlock).
 - **`AGT-SEGMENT-1`** — P3, the tier packaging is an unvalidated product read.
-- **`NATIVE-LICENCE-SHADE-MERGE-1`** — the shaded sidecar's `META-INF/LICENSE*` merge.
-- `AGT-6a`: the `kpi_report_builder` host; "every screen" remains an ambition.
+- `AGT-6a`: the `kpi_report_builder` host shipped 2026-07-28; "every screen" remains an ambition.
 - Untracked gaps: [plan-assistant §5.2](../agent/plan-assistant.md).
 
 ## Refused / parked

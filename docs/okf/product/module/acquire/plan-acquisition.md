@@ -442,7 +442,7 @@ optional `inspecto-connectors` jar:
 - **`ConnectionWorkbench`** — the graded probe / explore / sample SPI; an implementation holds one session
   per instance, like a connector.
 
-Eight schemes are registered by `inspecto-connectors`
+Seven schemes are registered by `inspecto-connectors`
 (`providers/inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory`):
 
 | Class | Scheme | Library |

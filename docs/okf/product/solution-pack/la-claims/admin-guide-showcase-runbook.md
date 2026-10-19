@@ -1,6 +1,6 @@
 # Inspecto LA (Link Analysis) claims showcase runbook (insurance, Special Investigations Unit)
 
-*Status: written 2026-10-16 with the build of the `la-claims` Space Template and **rehearsed live the same day** on an Enterprise Demo Auth bundle
+*Status: written 2026-10-16 with the build of the `la-claims` Space Template and **rehearsed live the same day** on an Advanced Demo Auth bundle
 (port 8142, `-Dla.embed.enabled=true`): `tools/la-claims-smoke.mjs --embed` passed 29 of 29 and the scenes marked **verified** below were driven in the
 browser pane or against the live API as the real Demo Users (section 6). Data and graph promises are pinned by tests (section 5).*
 
@@ -75,7 +75,7 @@ Start as `siu.analyst`. Always **seed first**: an all-nodes canvas is a dust clo
 # mint (admin token in $ADMIN); the response carries grantId, the token (shown ONCE) and the url
 curl -s -X POST -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" -d '{"ttl_hours":4,"label":"partner"}' http://127.0.0.1:8096/api/v1/spaces/la-claims/inv/investigations/ring-case/embeds
 # serve the static portal from the origin the Space allows (link-analysis.toon embed.frame_ancestors = http://127.0.0.1:8099 and http://localhost:8099)
-python -m http.server 8099 --directory tools
+python -m http.server 8099 --directory spaces/_templates/la-claims/portal
 # then open (the link is the token before the url's last slash)
 http://127.0.0.1:8099/partner-portal.html?host=http://127.0.0.1:8096&link=<grantId>.<secret>
 # revoke
@@ -115,7 +115,7 @@ presenter shows that **centrality alone is not guilt** and the ring is found by 
 5. **The index build is signal-driven** (`job.dataset.produced` for `claims_links`), because the link Dataset is produced by a Job rather than committed by a Pipeline.
 6. **Staged next-period files** (plan section 5) are not built; the corpus is one extract per feed. The "new data lands" beat is the mule one in the demo runbook.
 7. **Police-report PDFs are not shipped.** The ring has none by design. The seed attaches three external references with invented URLs on the reserved `records.example` domain (never fetched).
-8. **Pre-existing defect, not touched:** `LaShowcaseTemplateTest` (`theCompanionSwitchesTheFeatureOffAndSharesThePersonas`, `personasHoldExactlyTheirCapabilities`) fails on master since `91a03666c` gave the la-showcase analyst `canRevealLinkEntities`; the test still expects the old role text. Unrelated to this lane.
+8. **Fixed 2026-10-17 (`f1b64ce03`):** `LaShowcaseTemplateTest` had failed since `91a03666c` gave the la-showcase analyst `canRevealLinkEntities`; the `la-showcase-off` roles and the test now carry the analyst Reveal.
 9. **Claims we do not make:** no precision or detection-rate claim from synthetic data; the plants are planted and labelled so. The ring is found because it is built to be found.
 
 ## 5. Evidence
@@ -130,7 +130,7 @@ presenter shows that **centrality alone is not guilt** and the ring is found by 
 | Seed requests and scaffold | `node --test tools/seed-la-claims.test.mjs` |
 | Smoke verdicts and dry run | `node --test tools/la-claims-smoke.test.mjs` |
 
-## 6. Rehearsal record, 2026-10-16 (Enterprise Demo Auth bundle, port 8142)
+## 6. Rehearsal record, 2026-10-16 (Advanced Demo Auth bundle, port 8142)
 
 **Verified.** `tools/seed-la-claims.mjs --apply` (Investigation `ring-case`, 7 ops, 3 members, 3 police-report-request references, 2 Entity Lists, the identity, a Case assigned to
 `siu.manager` and linked, an Investigation Template, one pending four-eyes expand, one open Draft); `tools/la-claims-smoke.mjs --embed` **29 of 29**: five sign-ins, outsider 404, partner reviewer

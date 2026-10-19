@@ -19,7 +19,7 @@ timestamp: 2026-10-19T00:00:00Z
 ## Switch on per Space
 
 The module's feature is `geoLink`. Turn modules on or off for a Space with `PUT /settings/modules`
-(`inspecto/src/main/java/com/gamma/control/ModulesRoutes.java`); the embed sweep and the routes act only for
+(`inspecto/src/main/java/com/gamma/control/ModuleSettingsRoutes.java`); the embed sweep and the routes act only for
 Spaces where it is on. In Basic the Investigation surface stays off because the `investigations` edition
 feature is declared only by `inspecto-ops` (Standard and up).
 

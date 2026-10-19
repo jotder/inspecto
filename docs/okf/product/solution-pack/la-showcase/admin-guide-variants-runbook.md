@@ -21,7 +21,7 @@ It carries the Investigation, members, Drafts, Entity Lists, identity assertion,
 
 What it is: the optional module `la/inspecto-la-store-pg` keeps the sealed Investigation log, Working Set sets,
 members and Drafts in PostgreSQL, one `space_<id>` schema per Space
-(`docs/okf/product/module/la-core/architecture.md` section 4, `docs/okf/product/module/config/admin-guide-configuration-reference.md` row "Link Analysis Investigations").
+(`docs/okf/product/module/la-core/architecture.md` section 3.2, `docs/okf/product/module/config/admin-guide-configuration-reference.md` row "Link Analysis Investigations").
 
 Prerequisites (verified):
 
@@ -41,10 +41,11 @@ Steps:
 1. Build and launch the Advanced bundle as for the default variant, with the properties above in `INSPECTO_JAVA_OPTS`.
 2. Create the Space (scaffold or `POST /spaces {"id":"la-showcase","template":"la-showcase"}`), then
    `node tools/seed-la-showcase.mjs --base <url> --apply`.
-   The seed also pre-stages three demo scenes, each idempotent, soft-failing (a warning, exit code unchanged) and skipped
+   The seed also pre-stages four demo scenes, each idempotent, soft-failing (a warning, exit code unchanged) and skipped
    by its flag: `--no-pending` (one pending four-eyes expand on `mule-hub-case`, left undecided for `fm.manager`),
-   `--no-alert` (one `la_detect` run until the `mule-pass-through` Alert exists) and `--no-draft` (one open Draft with
-   one step, left unpromoted). It ends with a line naming the pending request, the Alert and the Draft.
+   `--no-alert` (one `la_detect` run until the `mule-pass-through` Alert exists), `--no-coverage` (a second
+   Investigation, `delivery-gap-case`, whose window reaches past the landed files) and `--no-draft` (one open Draft with
+   one step, left unpromoted). It ends with a line naming the pending request, the Alert, the coverage case and the Draft.
 3. Confirm: `GET /settings/link-analysis` echoes `investigationStoreInForce: "db"`
    (`inspecto/src/main/java/com/gamma/control/SettingsRoutes.java`), and `/health/details` shows
    `live.investigations` UP for the Space.

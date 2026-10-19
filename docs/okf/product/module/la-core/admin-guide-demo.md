@@ -17,7 +17,7 @@ store) are in the [showcase variants runbook](../../solution-pack/la-showcase/ad
 
 | # | Step | Command / action | Expect |
 |---|---|---|---|
-| 1 | Build the bundle | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app` | A demo bundle folder with `serve-demo.bat` / `serve-demo.sh` and `modules.list` naming `inspecto-demo-auth.jar` (not `inspecto-oidc.jar`). `-DemoAuth` refuses any edition but Enterprise. |
+| 1 | Build the bundle | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app` | A demo bundle folder with `serve-demo.bat` / `serve-demo.sh` and `modules.list` naming `inspecto-demo-auth.jar` (not `inspecto-oidc.jar`). `-DemoAuth` accepts only Advanced or Preview. |
 | 2 | Attach the Spaces | From a repo checkout: `node tools/seed-la-showcase.mjs --scaffold <bundle>\spaces` | `scaffolded: _templates, la-showcase, la-showcase-off`. **Bundles ship NO Spaces**; this lays down `la-showcase` (the demo) and `la-showcase-off` (LA switched off, used by the smoke runner's `MODULE_DISABLED` probe). To also show the tracked `demo` Space, copy `spaces\demo` beside them. Do it BEFORE the server starts. |
 | 3 | Start | `serve-demo.bat` (Windows) or `./serve-demo.sh`; port is 8080, override with the `PORT` env var (`set PORT=8096`). Optional extra JVM flags: `INSPECTO_JAVA_OPTS`. | Banner `[serve-demo] DEMO BUILD on http://127.0.0.1:<PORT>`. Bound to 127.0.0.1 only. |
 | 4 | Wait for the first ingest | The Space ingests `TRANSFERS_20260901..03.csv` from its inbox on boot. | The seed in step 5 retries a 422 "cannot read the columns" up to 30 times (2 s apart) until `mule_transfers_dataset` has rows. |
@@ -82,7 +82,7 @@ ingested until you copy them into the inbox (used live only if you choose the dr
 | Sign-in page error "The server could not start a session" | The server's `/bootstrap` answered an error, so no sign-in can work. Read the server log. A frequent cause is the next row. Fix, then press "Try again". |
 | Server log/boot error "Demo User '<id>' is defined differently in Spaces '<a>' and '<b>'" | Two Spaces under `spaces\` define the same Demo User with different rosters (the picker keeps one id = one person). Remove the Space with the other roster, or align the `demo-users.toon` files. |
 | Screens say the Dataset "has no data yet" | The seed/ingest did not run: the first ingest of `mule_transfers_dataset` has not landed, or the Space was copied after the server started. Restart after copying the Space, wait for ingest, re-run the seed. |
-| Link Analysis missing from the menu / "not installed" | Not an Enterprise bundle, or the Space has the module switched off (`la-showcase-off` by design). |
+| Link Analysis missing from the menu / "not installed" | Not an Advanced or Preview bundle, or the Space has the module switched off (`la-showcase-off` by design). |
 
 ---
 

@@ -15,9 +15,9 @@ and [ADVANCED_GUIDE](../../../../ADVANCED_GUIDE.md). The flags below are read by
 
 | Flag | Default | Effect |
 |---|---|---|
-| `-Dprocessing.duckdb.memory_limit` | unset | Caps every scratch DuckDB connection whose config sets no limit |
+| `-Dprocessing.duckdb.memory_limit` | unset | Bootstrap default for connections whose config and the installed server value set no limit; with none of the three, a derived cap applies (`max(1 GiB, 0.40*RAM/4)`) |
 | `-Dprocessing.duckdb.threads` | unset | Same, for DuckDB `threads` |
-| `-Dprocessing.duckdb.temp_directory` | `<java.io.tmpdir>/.duckdb_tmp` | Spill directory |
+| `-Dprocessing.duckdb.temp_directory` | unset (no SET issued; the in-memory scratch default is `<java.io.tmpdir>/.duckdb_tmp`) | Spill directory |
 | `-Dprocessing.duckdb.max_temp_directory_size` | unset | Spill size cap |
 | `-Ddb.pool.process.size` | `20` | Connections in the shared PostgreSQL pool per process per server |
 | `-Ddb.pool.size` | `10` | Per-store-family cap on concurrent borrows |

@@ -33,7 +33,7 @@ A model's `dataScope` is stricter than for objects: an unscoped model is readabl
 
 - Model keys: the `risk-score` component kind in the [spec](spec-risk-scores.md).
 - Job Type `risk.score`, param `model`; trigger on `cron` or `on_pipeline:`.
-- `-Drisk.score.maxEntities` (default 200 000): the system entity cap when the model sets no `maxEntities`
+- `-Drisk.score.maxEntities` (default 200 000, any positive int): the system entity cap when the model sets no `maxEntities` (the model's own range is 1..2 000 000)
   (1..2 000 000). A malformed value keeps 200 000; the cap cannot be disabled. Past it the Run fails.
   Other launch flags: [launch flags](../../layer/platform/admin-guide-launch-flags.md).
 

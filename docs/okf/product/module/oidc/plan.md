@@ -32,7 +32,7 @@ Proven live against WSO2 Identity Server 7.3.0 and Keycloak
 
 ## Decided
 
-* **No IdP of record** (BACKLOG D15): the module stays vendor-neutral; the provider is configuration.
+* **No IdP of record** (`access/admin-guide-auth-security.md`; not BACKLOG D15, which is the scale-out ZK call): the module stays vendor-neutral; the provider is configuration.
 * **Audience is warn-only**, not mandatory, so existing deployments keep booting (`warnIfNoAudience`).
 * **Fail closed at boot** when issuer or JWKS URI is missing, the provider value is unknown, or discovery fails.
 

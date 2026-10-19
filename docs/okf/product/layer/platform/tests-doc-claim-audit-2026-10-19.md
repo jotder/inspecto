@@ -115,3 +115,66 @@ unverifiable. Admin guides carry the most risk, because they hold the most defau
 error was **drift**: the code changed after the source text was written (LA-EDITIONS-1, CROSS-SPACE-JAIL-1,
 BACKLOG closures on 2026-10-18). None was a fabrication. Docs therefore need a drift check when such
 changes land, more than a check for invented content.
+
+## Second pass — the unsampled admin-guide and plan docs (2026-10-19)
+
+`DOCS-AGENT-WRITTEN-REVIEW-1` asked for the unsampled `admin-guide*` and `plan*` docs to be reviewed first.
+102 docs were split into six batches and audited by read-only agents with the same method as above. The
+coordinator re-checked a sample of each batch's reports against the code before editing. Counts are the agents'
+own tallies and approximate.
+
+| Batch | Docs | Wrong claims reported |
+|---|---|---|
+| 0 (layer/platform: incidents, ops guides, plans) | 16 | ~110 |
+| 1 (access, acquire, agent, api, config) | 18 | ~65 |
+| 2 (config, connectors, engine, etl, entity, event) | 17 | ~57 |
+| 3 (exchange, geo, intelligence, la, observability) | 18 | ~31 |
+| 4 (ops, processor, scoring, util, …) | 20 | ~26 |
+| 5 (solution packs, workflow) | 13 | ~21 |
+
+**The error rate is far above the first sample's 1.2 %.** The first sample was a seeded shuffle with one doc per
+hub per slot; the long plan docs (`plan-control-api`, `plan-security`, `plan-editions`, `plan-observability`,
+`admin-guide-operations-reference`) carry most of the wrong claims, because they were written in 2026-09 and
+describe a state that has since shipped.
+
+### Fixed in this pass (verified, then edited)
+
+`module/workflow/plan`, `solution-pack/aml/admin-guide`, `la-audit` · `la-claims` · `la-showcase` runbooks,
+`module/ops/plan`, `processor/admin-guide`, `scoring/admin-guide`, `util/admin-guide`,
+`processor/plan-control-api` (counts), `geo-link/admin-guide`, `oidc/plan`, `intelligence/plan`,
+`la-core/admin-guide-demo` · `-real-signin`, `observability/plan-observability` (one claim),
+`config/admin-guide-configuration-reference`, `acquire/plan-acquisition` (one claim), `access/plan-security` (two).
+
+### Verified stale and NOT yet fixed — work list
+
+1. **"Not built / not shipped" claims that have since shipped** (highest value):
+   `agent/plan-assistant` (bundles do ship `inspecto-agent` / `inspecto-intelligence`; `AgentAskResult.artifact`
+   has a producer; `component_draft` has hosts); `plan-observability` (audit hash chain, `/audit/verify`,
+   sign-in audit events, the `/signals/stream` EventSource consumer); `access/plan-security` and
+   `admin-guide-auth-security` (HTTPS test, policy-editor browser pass, maker-checker, OIDC discovery, the
+   `id_token_hint` cookie, the `auth` block in `/bootstrap`); `plan-data-plane` and `plan-studio` (the SPA does
+   call `POST /queries/{id}/run`; Materialize button and job exist); `plan-incidents`, `admin-guide-operations-reference`
+   (escalation rules mutate an Incident and emit `OBJECT_ESCALATED`).
+2. **Routes that no longer exist**: `admin-guide-operations-reference` documents `/pipelines/{name}/…` (now
+   `/runs/{id}/…`), an `ALERT` object type, an `ISSUE` lifecycle and `ingest` Job kind; a `batch_id` column in
+   the status CSV (now `consignment_id`).
+3. **Edition model**: `/bootstrap` reports `basic | standard | advanced`; the retired names Personal /
+   Professional / Enterprise survive in most plans; `plan-editions` module and jar counts, Java floor (compile
+   target is 27), profile count, example count.
+4. **Counts that drifted**: `plan-control-api` (OpenAPI 466 paths / 556 operations; WriteGates 241 calls in 69
+   files; PublicApi `since` values; ETag call sites); `plan-tooling` (40 `check-*.mjs`, 3 CI jobs, 12 skills,
+   49 `.claude` files); `plan-surfaces` (21 capabilities, 14 feature flags, 17 Settings sections, 51 route
+   files); `plan-compliance` (9 evidence files, 60 files import `WriteGates`, 89 artifacts).
+5. **Stale `file:line` citations**, everywhere. Cite the symbol, not the line; drop the numbers on the next touch.
+6. **Dangling BACKLOG pointers**: `CLIENT-HALVES-1`, `SPEC-STALEREF-1`, `SPEC-NOPROOF-1`, `OPENAPI-GEN-1`,
+   `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (wrong row), `SEC-INCIDENT-1`.
+7. **Batch 2 (config, connectors, engine, etl)**: `plan-metamodel` (30 writable kinds not 24; delete protection also owner-only, stranded-objects and runbook-link 409s; schemas already use `mapping.fields[]`; the Components pane does send `If-Match`; `transform.mask` enforces classification; `findings-spec` editor and Entity Projection are built); `plan-spaces` (13 templates not 2 or 5; telco-fraud is `minEdition: standard`; test counts; zero Spaces is a clean state); `plan-pipeline-execution` (23 built-in maintenance tasks + 5 contributed; six trigger kinds; DuckDB memory default exists; `JobDeadline`, replay-rejects, retry block, scaffold-step and Platform Services stages 2/3 all shipped; parity gate met); `plan-pipeline-authoring` (SQL is guarded on save; 46 node types; Step-kind registry seam is live); `plan-warehouse-targets` (`sinks:` fan-out, `objectstore.export` and `publish.postgres` are built); `plan-ingestion` (Expectations UI exists; 144 example `.toon`); `connectors` runbook (seven schemes, secrets from `inspecto-secrets`); `entity-store/admin-guide` (`masking_mode`); `entity-list/plan` (`LA17-NORMALISER-CHANGE-1` closed).
+8. **Minor**: `admin-guide-gotchas` (JToon tabular round-trip, `dirs.*` jail, `source:` vs `collector:`),
+   `admin-guide-local-testing` (demo-users template, Postgres default on Advanced, edition detection),
+   `acquire/plan-acquisition` (about a dozen), `la-core/admin-guide-demo` (Alerts page and embed SPA exist,
+   `fm.analyst` can Reveal, smoke count), `case-management/plan` (resolution gate), `api/plan-api-stability`.
+
+### Verified correct — do not "fix"
+
+`OperationalDb.Family` "sixteen" (12 core + 4 from `inspecto-ops`); the guarded counts 21 modules / 28 jars /
+89 locked dependencies; the `v3.11.0` merged tag.

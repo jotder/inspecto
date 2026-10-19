@@ -165,7 +165,7 @@ success  {data, metadata:{timestamp, durationMs, apiVersion:"v1", pagination?}, 
 error    {error:{errorCode, message, recoverable, correlationId, details?}}
 ```
 
-`ErrorCodes` (`ErrorCodes.java`) is the whole catalog — seventeen codes, pinned in both directions
+`ErrorCodes` (`ErrorCodes.java`) is the whole catalog — nineteen codes, pinned in both directions
 against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` · `NOT_FOUND` ·
 `METHOD_NOT_ALLOWED` · `PATH_JAIL_VIOLATION` · `CONFLICT` · `CONFLICT_STALE_VERSION` ·
 `CONFIG_VALIDATION_FAILED` · `INTERNAL` · `CONTROL_PLANE_READ_ONLY` · `CAPABILITY_UNAVAILABLE` ·
@@ -240,7 +240,7 @@ intelligence module's `ControlPlaneClient`; the SPA's `v1Interceptor` unwraps at
 
 `ApiContext` (`@PublicApi`, 413 lines) is what a route module sees: `get/post/put/patch/delete`, `hasRoute`,
 `stub`, `withCapability` (wraps a handler in `requireCapability` → `403 PERMISSION_DENIED`),
-`resourcePermissions`, `pagination`, `respondJson`. Routes are registered by **40 built-in `RouteModule`s**
+`resourcePermissions`, `pagination`, `respondJson`. Routes are registered by **61 built-in `RouteModule`s**
 (~332 registrations, "0 duplicates" per the census at `:1086`), then by **`ServiceLoader`-discovered
 modules**, appended strictly after the built-ins (`:458-461`), then by the five **absent-module stub
 groups** (`:466-470`) that answer `503` for a family the bundle lacks. `RouteModule` became a **public SPI
@@ -394,7 +394,7 @@ correlation id, idempotency, pagination, `ATTR_HELD_ROLES`, `ATTR_MATCHED_POLICY
 `HttpExchange.set/getAttribute`: on any pre-JDK-26 runtime — the bundle embeds GraalVM 25 — that map is the
 *shared* `HttpContext` map, one for every in-flight request; the route-matching path once rode it and
 concurrent bursts crossed requests (53 of 1200 served another request's file; BUNDLE-1, `fb1511c0`). The
-reactor gate runs on JDK 26, where the map is per-exchange, so **it structurally cannot catch a regression**;
+reactor gate runs on JDK 27, where the map is per-exchange, so **it structurally cannot catch a regression**;
 the pins are `ExchangeAttributeScopeTest`, `ApiContextV1DerivationTest` (v1-ness derived per request, never
 cached), and a concurrent probe against the *shipped* runtime.
 
@@ -478,7 +478,7 @@ it does it is the dependency-injection framework this codebase deliberately does
 fallback. `Correlation-ID` is **read** from `diagnostics` and shown on the Events, Notification and
 Incident-detail screens; it is never sent. DTOs are hand-written per service — **no OpenAPI-generated
 client and no drift check** between `openapi-v1.json` and TypeScript; wire vocabularies are pinned instead by
-eight `*.contract.json` files each compared by a Java `*ContractTest` and a TS `.spec.ts` (§8.4). ⚠ Two
+ten `*.contract.json` files each compared by a Java `*ContractTest` and a TS `.spec.ts` (§8.4). ⚠ Two
 contract features still have **zero client consumers**: `metadata.pagination` (never read — the data
 table's "Load more" is not cursor-driven) and `Idempotency-Key` (never sent). `If-None-Match` is also
 never sent. ⚠ **`If-Match` no longer belongs on this list** — as of 2026-09-11 two panes send it
@@ -622,7 +622,7 @@ switch leaves the code in the bundle; an absent family is a module that did not 
 
 Shared across requests on the shipped runtime; 53 crossed responses in 1200. `ApiContext.REQUEST_SCOPES`,
 keyed by exchange identity, is the only home, and the reactor gate cannot catch a regression because it runs
-on JDK 26.
+on JDK 27.
 
 ### 6.7 Generalising `SpiSlot<T>`; a `PlatformServices` that grows scopes — REFUSED (2026-08-27 / 2026-08-10)
 
@@ -710,7 +710,7 @@ Renaming would break every stored client link; migrating an offset pager with no
 | `ControlApiMetadataV1Test` | envelope metadata shapes |
 | `ControlApiJobsPageTest` · `ControlApiEventsPageTest` | keyset paging incl. a shared-timestamp id-tiebreak resume |
 | `ControlApiAuthV1Test` · `ControlApiAuthSessionV1Test` | the gate order's first two stages (`SEC` §8.1) |
-| ~90 further `ControlApi*Test` classes | one real-HTTP class per route family — the `endpoint` skill's mandatory test |
+| ~188 further `ControlApi*Test` classes (this directory alone) | one real-HTTP class per route family — the `endpoint` skill's mandatory test |
 
 ### 8.2 The SPA client — vitest
 
@@ -728,7 +728,7 @@ mutation paths.
 
 ### 8.4 Cross-language wire vocabularies — `inspecto-ui/src/app/inspecto/contracts/`
 
-Eight committed JSON contracts, each compared by a Java `*ContractTest` and a TypeScript spec so neither
+Ten committed JSON contracts, each compared by a Java `*ContractTest` and a TypeScript spec so neither
 side moves alone: `attribute-spec` (`FindingsSpecContractTest`), `bind-kinds` (`BindKindHomeContractTest`),
 `processor-catalog` (`ProcessorCatalogContractTest`), `sql-functions` (`RecordTransformContractTest` — both
 sides compile SQL independently), `node-attributes`, `expression-guard`, `measure-grammar` (`step-types` was retired 2026-09-24).

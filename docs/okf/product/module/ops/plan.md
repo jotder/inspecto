@@ -41,8 +41,8 @@ Open items are tracked in [BACKLOG](../../../../BACKLOG.md); the INC open list i
 
 ## Refused / decided against
 
-- `*_escalation.toon` mutating an Incident on SLA breach — retired (`RETIRE-HALVES-1`, 2026-09-14): a breach emits
-  `OBJECT_SLA_BREACH` and notifies only.
+- The `*_escalation.toon` loader — retired (`RETIRE-HALVES-1`, 2026-09-14). Escalation itself came back as the
+  `escalation-rules` component kind (Built, above): on breach it can raise priority or reassign and emits `OBJECT_ESCALATED`.
 - A shipped default schedule for `incident_purge` — nothing deletes business records unless an operator stands up
   the Job.
 - Purging the audit trail with an Incident — the event ledger is append-only (MNT-14 G3).

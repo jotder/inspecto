@@ -13,7 +13,7 @@ capabilities, refresh/resume, sign-out, expired token, a user with no mapped gro
 * Docker with the `wso2/wso2is` container up on `https://localhost:9443` (self-signed certificate). The console login is the
   local throwaway superadmin (the image default; never commit it, never paste it into a doc).
 * A **worktree** (never the main checkout), JDK 27 (`JAVA_HOME=C:\sandbox\.graalvm-cache\jdk-27-win`), `pwsh` 7.
-* Do **not** pass `-DemoAuth`: the build must be a plain Professional (or Enterprise) bundle.
+* Do **not** pass `-DemoAuth`: the build must be a plain Standard (or Advanced) bundle.
 
 ## 2. WSO2 side (once; through the console, or `/api/server/v1` and `/scim2`)
 

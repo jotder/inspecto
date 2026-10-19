@@ -27,7 +27,8 @@ calendar, escalation on breach or age, and a second-person approval for config c
 
 ## Left
 
-`ASSURE-WORKFLOW-SLA-RESIDUALS-1`: item (b) is on demand (operator, 2026-10-06). Item (a), re-checking a
+`ASSURE-WORKFLOW-SLA-RESIDUALS-1` (closed 2026-10-18): item (b), the graphical state-diagram editor, shipped
+2026-10-11 (`workflow-state-editor.component.ts`). Item (a), re-checking a
 deleted assignee at sweep time, was retired 2026-10-18 because no principal directory exists to ask. The
 recorded policy for when it is built: skip the reassign, still notify and raise priority, one WARN per breach.
 
