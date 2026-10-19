@@ -169,7 +169,8 @@ interface Membership {
             @if (mapping()?.enrichment; as e) {
                 @if (enrichment()?.truncated) {
                     <inspecto-alert variant="warning" data-testid="enrich-truncated"
-                        >{{ e.dataset }} matched more rows than one read returns: this row may be missing.</inspecto-alert
+                        >{{ e.dataset }} matched more rows than one read returns: this row may be
+                        missing.</inspecto-alert
                     >
                 }
                 @if (enrichment()?.masked) {
@@ -251,7 +252,9 @@ interface Membership {
                         </label>
                         @if (history(); as h) {
                             @if (h.error) {
-                                <inspecto-alert variant="warning" data-testid="history-error">{{ h.error }}</inspecto-alert>
+                                <inspecto-alert variant="warning" data-testid="history-error">{{
+                                    h.error
+                                }}</inspecto-alert>
                             } @else {
                                 @if (h.truncated) {
                                     <inspecto-alert variant="warning" data-testid="history-truncated">
@@ -280,7 +283,9 @@ interface Membership {
                                                 @if (o.severity) {
                                                     <span class="text-secondary">{{ o.severity }}</span>
                                                 }
-                                                <span class="text-secondary text-xs">{{ o.createdAt | date: 'medium' }}</span>
+                                                <span class="text-secondary text-xs">{{
+                                                    o.createdAt | date: 'medium'
+                                                }}</span>
                                                 @if (o.matchedOn === 'investigation') {
                                                     <span class="text-secondary text-xs" data-testid="history-via"
                                                         >via Investigation {{ o.via }}</span
@@ -291,7 +296,10 @@ interface Membership {
                                                     >
                                                 } @else if (o.via) {
                                                     <span class="text-secondary text-xs" data-testid="history-via"
-                                                        >via <a [routerLink]="['/incidents', o.via]">Incident {{ o.via }}</a></span
+                                                        >via
+                                                        <a [routerLink]="['/incidents', o.via]"
+                                                            >Incident {{ o.via }}</a
+                                                        ></span
                                                     >
                                                 }
                                             </li>
@@ -312,36 +320,38 @@ interface Membership {
             }
         </section>
 
-        <section class="mt-4" aria-labelledby="ni-actions">
-            <h3 id="ni-actions" class="text-base font-semibold">Actions</h3>
-            <div class="mt-1 flex flex-wrap items-center gap-2">
-                @for (l of addTargets(); track l.id) {
-                    <button
-                        mat-stroked-button
-                        [attr.data-testid]="'add-' + l.purpose + '-' + l.id"
-                        [disabled]="!ctx().canManageLists || busy()"
-                        (click)="addTo(l)"
-                    >
-                        Add to {{ l.purpose }} list: {{ l.title }}
-                    </button>
+        @if (hasActions()) {
+            <section class="mt-4" aria-labelledby="ni-actions" data-testid="ni-actions">
+                <h3 id="ni-actions" class="text-base font-semibold">Actions</h3>
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                    @for (l of addTargets(); track l.id) {
+                        <button
+                            mat-stroked-button
+                            [attr.data-testid]="'add-' + l.purpose + '-' + l.id"
+                            [disabled]="!ctx().canManageLists || busy()"
+                            (click)="addTo(l)"
+                        >
+                            Add to {{ l.purpose }} list: {{ l.title }}
+                        </button>
+                    }
+                    @if (ctx().canHide) {
+                        <button mat-stroked-button data-testid="hide-node" (click)="hide()">Hide on canvas</button>
+                    }
+                </div>
+                @if (!ctx().canManageLists && addTargets().length) {
+                    <p class="text-secondary mt-1 text-xs" data-testid="lists-forbidden">
+                        Adding to a list needs the Manage incidents capability.
+                    </p>
+                } @else if (memberships() && !eligibleLists().length) {
+                    <p class="text-secondary mt-1 text-xs" data-testid="lists-none">
+                        No watch or block list can take this entity - create one in Entity Lists.
+                    </p>
                 }
-                @if (ctx().canHide) {
-                    <button mat-stroked-button data-testid="hide-node" (click)="hide()">Hide on canvas</button>
+                @if (actionNote(); as n) {
+                    <inspecto-alert [variant]="n.variant">{{ n.text }}</inspecto-alert>
                 }
-            </div>
-            @if (!ctx().canManageLists && addTargets().length) {
-                <p class="text-secondary mt-1 text-xs" data-testid="lists-forbidden">
-                    Adding to a list needs the Manage incidents capability.
-                </p>
-            } @else if (memberships() && !eligibleLists().length) {
-                <p class="text-secondary mt-1 text-xs" data-testid="lists-none">
-                    No watch or block list can take this entity - create one in Entity Lists.
-                </p>
-            }
-            @if (actionNote(); as n) {
-                <inspecto-alert [variant]="n.variant">{{ n.text }}</inspecto-alert>
-            }
-        </section>
+            </section>
+        }
     `,
 })
 export class NodeInsightComponent implements OnInit {
@@ -414,7 +424,19 @@ export class NodeInsightComponent implements OnInit {
     readonly eligibleLists = computed(() =>
         (this.memberships() ?? []).filter((m) => m.list.purpose === 'watch' || m.list.purpose === 'block'),
     );
-    readonly addTargets = computed(() => this.eligibleLists().filter((m) => !m.matched).map((m) => m.list));
+    readonly addTargets = computed(() =>
+        this.eligibleLists()
+            .filter((m) => !m.matched)
+            .map((m) => m.list),
+    );
+    /** The Actions section renders only when it has a button or a note to show — never an empty heading. */
+    readonly hasActions = computed(
+        () =>
+            this.addTargets().length > 0 ||
+            this.ctx().canHide ||
+            (!!this.memberships() && !this.eligibleLists().length) ||
+            !!this.actionNote(),
+    );
     /** Lists this dialog added the entity to: kept as members even if the re-check lags behind the write. */
     private readonly addedHere = new Set<string>();
 
@@ -487,7 +509,9 @@ export class NodeInsightComponent implements OnInit {
                 return;
             }
             if (table.truncated) {
-                this.riskError.set('The indicators were only partly read: an incomplete score map would understate risk.');
+                this.riskError.set(
+                    'The indicators were only partly read: an incomplete score map would understate risk.',
+                );
                 return;
             }
             const { scores } = nodeScoresFor(c.serverNodeIds, table.byKey, m.indicators.scoreCol);

@@ -178,7 +178,16 @@ function make(
     const fixture = TestBed.createComponent(NodeInsightComponent);
     fixture.componentRef.setInput('ctx', { ...CTX, ...ctx });
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, svc, dialog, close, byEntity, byMaskedKey };
+    return {
+        fixture,
+        c: fixture.componentInstance,
+        el: fixture.nativeElement as HTMLElement,
+        svc,
+        dialog,
+        close,
+        byEntity,
+        byMaskedKey,
+    };
 }
 
 const settle = async (f: { detectChanges(): void; whenStable(): Promise<unknown> }) => {
@@ -205,8 +214,16 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         await settle(fixture);
         // seeded with every drawn node's positive indicator score; 222 has none
         // the cache key carries the weights in force, so a weights change never reads a stale answer
-        expect(svc.lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'telecom_msisdn_indicators_dataset' }), ['999'], 'inv');
-        expect(svc.lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'crm_kyc_dataset' }), ['999'], 'inv');
+        expect(svc.lookup).toHaveBeenCalledWith(
+            expect.objectContaining({ dataset: 'telecom_msisdn_indicators_dataset' }),
+            ['999'],
+            'inv',
+        );
+        expect(svc.lookup).toHaveBeenCalledWith(
+            expect.objectContaining({ dataset: 'crm_kyc_dataset' }),
+            ['999'],
+            'inv',
+        );
         expect(svc.lookup).toHaveBeenCalledWith(
             expect.objectContaining({ dataset: 'telecom_msisdn_indicators_dataset' }),
             ['999', '111', '222'],
@@ -254,6 +271,14 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(el.querySelector('[data-testid=lists]')!.textContent).toContain('block: BL');
         expect(el.querySelector('[data-testid=lists-none]')).toBeNull();
     });
+
+    it('renders no Actions section when there is nothing to show (no list to add to, no Hide)', async () => {
+        const { fixture, el } = make({ canHide: false }, { matched: ['wl', 'bl'] });
+        await settle(fixture);
+        expect(el.querySelector('[data-testid=ni-actions]')).toBeNull();
+        expect(el.querySelector('#ni-actions')).toBeNull();
+        await expectNoA11yViolations(el);
+    }, 30_000);
 
     it('says no list can take the entity only when none of its type is a watch / block list', async () => {
         const { fixture, el, svc } = make();
@@ -321,7 +346,14 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
                         truncated: true,
                         items: [
                             item({ id: 'i1', severity: 'HIGH' }),
-                            item({ kind: 'case', id: 'c9', title: 'Ring 7', createdAt: '2026-10-05T10:00:00Z', via: 'i1', matchedOn: 'member' }),
+                            item({
+                                kind: 'case',
+                                id: 'c9',
+                                title: 'Ring 7',
+                                createdAt: '2026-10-05T10:00:00Z',
+                                via: 'i1',
+                                matchedOn: 'member',
+                            }),
                         ],
                     }),
             },
@@ -332,11 +364,16 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         await settle(fixture);
         expect(byEntity).toHaveBeenCalledWith('msisdn', '999', 'all');
         const rows = Array.from(el.querySelectorAll('[data-testid=history-list] li'));
-        expect(rows.map((r) => r.textContent)).toEqual([expect.stringContaining('Ring 7'), expect.stringContaining('Wangiri')]);
+        expect(rows.map((r) => r.textContent)).toEqual([
+            expect.stringContaining('Ring 7'),
+            expect.stringContaining('Wangiri'),
+        ]);
         expect(rows[0].textContent).toContain('Case');
         expect(rows[0].textContent).toContain('via Incident i1');
         expect(rows[1].textContent).toContain('HIGH');
-        const hrefs = Array.from(el.querySelectorAll('[data-testid=history-list] a')).map((a) => a.getAttribute('href'));
+        const hrefs = Array.from(el.querySelectorAll('[data-testid=history-list] a')).map((a) =>
+            a.getAttribute('href'),
+        );
         expect(hrefs).toEqual(['/cases/c9', '/incidents/i1', '/incidents/i1']);
         expect(el.querySelector('[data-testid=history-truncated]')).not.toBeNull();
         await expectNoA11yViolations(el);
@@ -367,7 +404,9 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();
         await settle(fixture);
         const via = Array.from(el.querySelectorAll('[data-testid=history-via]')).map((v) => v.textContent!.trim());
-        expect(via).toEqual(expect.arrayContaining(['via Investigation inv-7', 'via sealed snapshot', 'via Incident i1']));
+        expect(via).toEqual(
+            expect.arrayContaining(['via Investigation inv-7', 'via sealed snapshot', 'via Incident i1']),
+        );
         expect(via.join(' ')).not.toContain('Incident inv-7');
     });
 
@@ -398,7 +437,9 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         c.historyStatus.set('open');
         c.toggleHistory();
         await settle(fixture);
-        expect(el.querySelector('[data-testid=history-empty]')!.textContent).toContain('No open Incident or Case references 999');
+        expect(el.querySelector('[data-testid=history-empty]')!.textContent).toContain(
+            'No open Incident or Case references 999',
+        );
         await expectNoA11yViolations(el);
     });
 
@@ -427,7 +468,9 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(byEntity).not.toHaveBeenCalled();
         expect(byMaskedKey).toHaveBeenCalledWith('masked:0123456789abcdef', 'inv-1', 'all');
         expect(el.querySelector('[data-testid=history-unavailable]')).toBeNull();
-        expect(el.querySelector('[data-testid=history-list]')!.textContent).toContain('calls spike masked:0123456789abcdef');
+        expect(el.querySelector('[data-testid=history-list]')!.textContent).toContain(
+            'calls spike masked:0123456789abcdef',
+        );
         await expectNoA11yViolations(el);
     });
 
@@ -436,7 +479,11 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
             { key: 'masked:0123456789abcdef', label: 'masked:0123…' },
             {
                 maskedHistory: () =>
-                    Promise.resolve({ items: [], truncated: false, error: 'The server no longer knows this masked number.' }),
+                    Promise.resolve({
+                        items: [],
+                        truncated: false,
+                        error: 'The server no longer knows this masked number.',
+                    }),
             },
         );
         el.querySelector<HTMLButtonElement>('[data-testid=history-toggle]')!.click();

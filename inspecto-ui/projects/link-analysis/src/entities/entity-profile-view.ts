@@ -21,6 +21,11 @@ export function count(n: number | null | undefined): string {
     return n == null || !Number.isFinite(n) ? '—' : formatNumber(n);
 }
 
+/** A row count with its noun in the right number: "1 row", "2 rows". */
+export function rowsText(n: number): string {
+    return `${count(n)} ${n === 1 ? 'row' : 'rows'}`;
+}
+
 /** A 0..1 share as a percent with one decimal ("99.9 %"); an em dash when absent. */
 export function percent(share: number | null | undefined): string {
     if (share == null || !Number.isFinite(share)) return '—';
@@ -64,7 +69,7 @@ export function bars(items: { label: string; rows: number }[]): Bar[] {
     const max = Math.max(0, ...items.map((i) => i.rows));
     return items.map((i) => {
         const pct = max > 0 ? Math.round((i.rows / max) * 100) : 0;
-        return { label: i.label, rows: i.rows, pct, srText: `${count(i.rows)} rows, ${pct} % of the largest item` };
+        return { label: i.label, rows: i.rows, pct, srText: `${rowsText(i.rows)}, ${pct} % of the largest item` };
     });
 }
 
@@ -128,7 +133,7 @@ export function calendar(
                 ? `${date}: missing`
                 : rows == null
                   ? `${date}: not read`
-                  : `${date}: ${count(rows)} rows${distinct != null ? `, ${count(distinct)} distinct` : ''}`;
+                  : `${date}: ${rowsText(rows)}${distinct != null ? `, ${count(distinct)} distinct` : ''}`;
             week.days.push({
                 date,
                 rows,

@@ -174,6 +174,17 @@ describe('EntityComponent (Entity Profile)', () => {
         });
     });
 
+    it('names the per-day calendar by its one visible heading, not a second caption', () => {
+        const { el } = make(MASKED);
+        const headings = Array.from(el.querySelectorAll('h2')).filter((h) => h.textContent!.trim() === 'Rows per day');
+        expect(headings).toHaveLength(1);
+        const cal = el.querySelector('[data-testid=calendar]');
+        if (cal) {
+            expect(cal.querySelector('caption')).toBeNull();
+            expect(cal.getAttribute('aria-labelledby')).toBe(headings[0].id);
+        }
+    });
+
     it('has no axe violations and one h1', async () => {
         const { el, fixture } = make(MASKED);
         await fixture.whenStable();
