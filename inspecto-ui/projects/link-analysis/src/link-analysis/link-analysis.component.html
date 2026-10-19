@@ -882,7 +882,6 @@
                                         (click)="mergeSelected()"
                                         [disabled]="!!mergeUnavailable()"
                                         [disabledInteractive]="true"
-                                        [attr.aria-describedby]="mergeUnavailable() ? 'la-merge-reason' : null"
                                         [matTooltip]="mergeUnavailable() || 'Merge with... assert that the two selected nodes are one entity'"
                                         aria-label="Merge the two selected nodes into one identity"
                                         data-testid="la-selection-merge"
@@ -890,23 +889,19 @@
                                         <mat-icon svgIcon="heroicons_outline:arrows-pointing-in"></mat-icon>
                                     </button>
                                     <!-- disabled-with-reason: disabledInteractive renders aria-disabled and keeps the button focusable, so the
-                                         tooltip and this described reason reach everyone; mergeSelected() guards the click -->
-
-                                    <span id="la-merge-reason" class="sr-only">{{ mergeUnavailable() }}</span>
+                                         tooltip (also its aria-describedby, the one source of the reason) reaches everyone; mergeSelected() guards the click -->
                                 }
                                 <button
                                     mat-icon-button
                                     (click)="openAttachToCase()"
                                     [disabled]="!!attachUnavailable()"
                                     [disabledInteractive]="true"
-                                    [attr.aria-describedby]="attachUnavailable() ? 'la-selection-attach-reason' : null"
                                     [matTooltip]="attachUnavailable() || 'Attach the selected nodes to a Case'"
                                     [attr.aria-label]="'Attach the ' + selectedOnCanvas().length + ' selected nodes to a Case'"
                                     data-testid="la-selection-attach"
                                 >
                                     <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
                                 </button>
-                                <span id="la-selection-attach-reason" class="sr-only">{{ attachUnavailable() }}</span>
                                 <button
                                     mat-icon-button
                                     (click)="clearSelection()"

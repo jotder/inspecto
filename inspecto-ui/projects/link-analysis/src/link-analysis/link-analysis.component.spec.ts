@@ -5,6 +5,7 @@ import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { MatTooltip } from '@angular/material/tooltip';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
@@ -2709,8 +2710,10 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         const btn = merge()!;
         expect(btn.disabled).toBe(false); // focusable: a disabled button fires no tooltip and is skipped by Tab
         expect(btn.getAttribute('aria-disabled')).toBe('true');
-        const reason = el.querySelector('#' + btn.getAttribute('aria-describedby'))!;
-        expect(reason.textContent).toContain('exactly two');
+        // the reason has ONE source: the tooltip (which Material also exposes as the button's description)
+        const tip = fixture.debugElement.query(By.css('[data-testid="la-selection-merge"]')).injector.get(MatTooltip);
+        expect(tip.message).toContain('exactly two');
+        expect(el.querySelector('#la-merge-reason')).toBeNull();
         const draft = c.investigation.mergeDraft();
         btn.click(); // the click guard: nothing is prefilled
         expect(c.investigation.mergeDraft()).toBe(draft);

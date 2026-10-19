@@ -1114,7 +1114,7 @@ export class LinkAnalysisComponent implements OnInit {
     private entityTypeLabelsAsked = false;
     /** Read the Entity Types registry once, the first time an Investigation canvas draws typed nodes. */
     private readonly loadEntityTypeLabels = effect(() => {
-        if (this.entityTypeLabelsAsked || !this.investigation.canvas()?.nodes.some((n) => n.data.kind !== 'entity')) return;
+        if (this.entityTypeLabelsAsked || !this.investigation.canvas()?.nodes.some((n) => !!n.data.entityType)) return;
         this.entityTypeLabelsAsked = true;
         try {
             this.injector

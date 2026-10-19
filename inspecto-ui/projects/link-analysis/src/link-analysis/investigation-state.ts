@@ -95,7 +95,10 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
             const type = rawIdsOf(n)
                 .map((raw) => typeOf.get(raw))
                 .find((t) => !!t);
-            if (type) n.data.kind = type;
+            if (type) {
+                n.data.kind = type;
+                n.data.entityType = type; // still an Entity: see isEntityNode
+            }
         }
     // Supernode suppression: a node any of whose Working Set ids is flagged is drawn ringed (legend: High connectivity).
     // The flagged entity's own sealed `contacts` rides along for the hover text (null/absent → no count).
