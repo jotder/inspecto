@@ -161,6 +161,33 @@ describe('LaLimitsService', () => {
         expect(laLimit('connect.max_seeds')).toBe(30);
     });
 
+    it('whenLoaded shares the Space GET: one request however many callers, settled once it answers', async () => {
+        const first = svc.whenLoaded();
+        const second = svc.whenLoaded();
+        TestBed.tick(); // the Space effect sees a read already made for this Space and makes none
+        http.expectOne(GET).flush({ items: ITEMS });
+        await Promise.all([first, second]);
+        expect(laLimit('projection_node_cap')).toBe(900);
+        await svc.whenLoaded(); // already settled for this Space: no new request (verify() in afterEach)
+    });
+
+    it('whenLoaded settles on a failed GET with the fallbacks in force', async () => {
+        const done = svc.whenLoaded();
+        http.expectOne(GET).flush({ error: { message: 'nope' } }, { status: 500, statusText: 'Server Error' });
+        await done;
+        expect(laLimit('projection_node_cap')).toBe(LA_LIMIT_FALLBACKS.projection_node_cap);
+    });
+
+    it('whenLoaded reads again for another Space', async () => {
+        load();
+        space.set('s2');
+        const done = svc.whenLoaded();
+        TestBed.tick();
+        http.expectOne(GET).flush({ items: [item({ key: 'projection_node_cap', inForce: 700 })] });
+        await done;
+        expect(laLimit('projection_node_cap')).toBe(700);
+    });
+
     it('saveInstall PUTs to the system route', () => {
         load();
         svc.saveInstall({ 'graph_run.ceiling_nodes': 600_000 }).subscribe();

@@ -12,6 +12,10 @@ import { GeoSourcesService } from './geo-projection';
  * captured display mode + camera. Loaded lazily through the viz component-loader registry (`widget.kind`),
  * so MapLibre never joins the eager dashboard bundle. Investigation notes/overlays stay studio-only — the
  * widget is a viewer; editing happens at `/studio/geo-map`.
+ *
+ * The point cap is the server's: both geo sources leave `limit` unset, so `POST /geo/projection` / `/geo/routes` apply
+ * the Space's `display.geo_point_cap`, and nothing here reads an SPA limit — so, unlike the link widget, this one
+ * does not load the Link Analysis limits. A capped answer is said in the Geo page's own words.
  */
 @Component({
     selector: 'app-geo-view-widget',
@@ -23,6 +27,11 @@ import { GeoSourcesService } from './geo-projection';
             @if (error(); as message) {
                 <inspecto-alert class="block" variant="warning">{{ message }}</inspecto-alert>
             } @else if (data(); as d) {
+                @if (d.truncated) {
+                    <inspecto-alert class="mb-2 block shrink-0" variant="warning" title="Truncated">
+                        The projection hit the point cap — narrow the dataset to see everything.
+                    </inspecto-alert>
+                }
                 <inspecto-map-view
                     class="min-h-0 flex-auto"
                     [data]="d"
