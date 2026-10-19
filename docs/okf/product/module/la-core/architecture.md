@@ -295,8 +295,12 @@ masks every id; `typed` masks every id when a bound endpoint column's classifica
 (`EntityMasking.maskedColumns`, the rule an Investigation applies); `none` shows raw. Each answer carries
 `masking {mode, masked, basis}`, which the SPA shows as a *Masking: mode* badge in the query panel. An alias handed back (an
 expand's `value`, a traversal's `startNode`, an Investigation seed's `ids`) is resolved from an in-memory alias-to-raw
-book of what this server minted for this Space (bounded LRU; nothing raw is ever sent); after a restart or eviction it is
-422 *alias not known* and the query is re-run. ⚠ An Investigation keeps its own key, so a seeded entity has a second alias
+book of what this server minted for this Space (bounded LRU; nothing raw is ever sent). The book is also appended, one
+`alias<TAB>base64(raw)` line per newly minted alias, to `<root>.secrets/.exploration-alias-book` beside the Space key
+(outside every exported tree), and a miss reads that file once per Space per process, so an alias survives a restart
+or an eviction (LA-EDITIONS-RESIDUALS-1 4c, 2026-10-19; `ExplorationMaskingSpaceKeyTest.anAliasSurvivesARestart`). The
+file is not compacted: it grows by one line per distinct alias minted (plus one if an evicted alias is minted again).
+An alias never minted (or whose book was removed) is 422 *alias not known* and the query is re-run. ⚠ An Investigation keeps its own key, so a seeded entity has a second alias
 there: Working Set answers (`/working-set`, `/replay`, op answers) carry `exploreAliases` (Investigation alias to
 exploration alias, aliases only) and the SPA matches a selected node to its Working Set entity through it. Sealed logs still
 bind raw ids. Known gap: an Investigation also masks a seed's explicit `entityType`, which a stateless read does not
@@ -724,8 +728,8 @@ surface). Outbound (case hand-off, webhooks, client-credentials trust) is a sepa
   a raw value is refused 422 and never repeated. The page posts the parameters to `/inv/deep-links/resolve`, which answers
   `{entity?: {type, key, masked}, investigation?: {id, title}, window?}`; an Investigation the caller cannot read is the 404 of absence.
   `reveal:true` returns a masked entity's raw value only to a holder of `canRevealLinkEntities` (403 otherwise), audited as
-  `LINK_ENTITY_REVEALED` with `via: deep-link` naming the alias. ⚠ Aliases live in the in-memory book (§3.4): after a restart an old
-  alias answers 422 until it is minted again.
+  `LINK_ENTITY_REVEALED` with `via: deep-link` naming the alias. Aliases are resolved from the Space's alias book (§3.4), which is
+  persisted beside the Space key, so a deep link still works after a restart (2026-10-19).
 * **Tests:** `ControlApiInvestigationInboundTest` (geo-link, armed Authenticator: seeding and window, idempotency incl. other system /
   id, invalid entity / reference / window / binding 422 with nothing written, 403 / 401 / 409, 503, the deep-link masking and reveal
   rules, Investigation 404), `InvestigationInboundRoutesContractTest` (TCK). SPA: `open-link.spec.ts`, `open-in-la.component.spec.ts` (axe).

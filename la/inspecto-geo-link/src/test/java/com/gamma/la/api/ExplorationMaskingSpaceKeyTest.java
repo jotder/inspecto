@@ -26,6 +26,17 @@ class ExplorationMaskingSpaceKeyTest {
                 "the Space key lives in the secrets directory beside the root, outside every exported tree");
     }
 
+    /** LA-EDITIONS-RESIDUALS-1 4c: an alias minted before a restart still resolves after it, from the Space's book file. */
+    @Test
+    void anAliasSurvivesARestart(@TempDir Path root, @TempDir Path other) {
+        String alias = ExplorationMasking.alias(root, "441700900101");
+        ExplorationMasking.forgetInMemoryForTest();
+        assertEquals("441700900101", ExplorationMasking.lookup(root, alias));
+        assertEquals(null, ExplorationMasking.lookup(other, alias), "the book is per Space");
+        assertTrue(Files.isRegularFile(com.gamma.util.SpaceSecretKeys.keyFile(root, ".exploration-alias-book")),
+                "the book lives in the secrets directory beside the root, outside every exported tree");
+    }
+
     @Test
     void anotherSpaceHasAnotherKey(@TempDir Path a, @TempDir Path b) {
         assertTrue(!ExplorationMasking.alias(a, "x").equals(ExplorationMasking.alias(b, "x")), "keys are per Space");

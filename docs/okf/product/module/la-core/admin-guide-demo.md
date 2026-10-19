@@ -117,8 +117,8 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
   `admin` > *Settings* (left rail) > Link Analysis > masking mode `all`, save, then reload the Investigation.
 * **Expect:** under `typed` only values of Entity Types marked masked appear as `masked:...` aliases; under `all` every identifying value does
   (the badge reads `Masking: all (ids shown as aliases)`); aliases are stable, so you can still group and count by them. Under masking the
-  Selected line keeps the query-graph node and its Working Set alias as one entity and marks it *(masked)* (manual §11). After a server restart
-  an old alias is refused: re-run the query.
+  Selected line keeps the query-graph node and its Working Set alias as one entity and marks it *(masked)* (manual §11). An alias keeps
+  working after a server restart.
 * **Proves:** tokens out, raw stays inside; `typed` default (arch §3.4, invariant 1).
 * **Which ids are masked under `typed` on la-showcase is not pinned by a test I could find: UNVERIFIED (rehearse first)** which of
   `MULE-HUB-01` / `ACC-*` show as aliases. **Put the mode back to `typed` after the scene.**
