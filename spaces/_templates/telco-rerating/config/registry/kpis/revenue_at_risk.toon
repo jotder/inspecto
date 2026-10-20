@@ -1,0 +1,8 @@
+name: revenue_at_risk
+title: Revenue at risk (USD)
+dataset: rerating_findings
+measure: sum(LEAKAGE_LOW)
+timeField: EVENT_DATE
+grain: month
+comparison: previous
+direction: down
