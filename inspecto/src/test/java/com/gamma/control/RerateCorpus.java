@@ -53,7 +53,7 @@ final class RerateCorpus {
     /** One tariff row; {@code rate} null = blank, {@code to} null = open, {@code priority} null = blank. */
     record Tariff(String id, String plan, String service, String rate, LocalDateTime from, LocalDateTime to, Integer priority) {
         String csv(boolean withPriority) {
-            String base = String.join(",", id, plan, service, rate == null ? "" : rate, TS.format(from), to == null ? "" : TS.format(to));
+            String base = String.join(",", id, plan, service, rate == null ? "" : rate, (from == null ? "" : TS.format(from)), to == null ? "" : TS.format(to));
             return withPriority ? base + "," + (priority == null ? "" : priority.toString()) : base;
         }
     }
@@ -109,7 +109,7 @@ final class RerateCorpus {
     private static LocalDateTime at(String s) { return LocalDateTime.parse(s.replace(' ', 'T')); }
 
     private void rate(String id, String plan, String service, String rate, String from, String to, Integer priority) {
-        tariffs.add(new Tariff(id, plan, service, rate, at(from), to == null ? null : at(to), priority));
+        tariffs.add(new Tariff(id, plan, service, rate, from == null ? null : at(from), to == null ? null : at(to), priority));
     }
 
     private void tariffs0() {
@@ -169,6 +169,8 @@ final class RerateCorpus {
         rate("R-V-1", "PLAN_R", "VOICE", "0.0020", "2026-01-01 00:00:00", "2026-02-01 00:00:00", null);
         rate("R-V-2", "PLAN_R", "VOICE", "0.0020", "2026-02-01 00:00:00", "2026-03-01 00:00:00", null);
         rate("R-V-3", "PLAN_R", "VOICE", "0.0020", "2026-05-01 00:00:00", null, null);
+        // PLAN_T: a row with no start (never in force, reported on its own)
+        rate("T-V-1", "PLAN_T", "VOICE", "0.0020", null, null, null);
         // PLAN_J: a single clean row for the tolerance boundary; PLAN_K: a row with no rate; PLAN_Z has no row at all
         rate("J-V-1", "PLAN_J", "VOICE", "0.0020", "2026-01-01 00:00:00", null, null);
         rate("K-V-1", "PLAN_K", "VOICE", null, "2026-01-01 00:00:00", null, null);
@@ -256,6 +258,8 @@ final class RerateCorpus {
         for (int i = 1; i <= 3; i++) call("Z_NO_TARIFF", String.valueOf(i), "2026-07-01 11:" + String.format(Locale.ROOT, "%02d", i) + ":00", "PLAN_Z", "VOICE", 100, "0.2000", NOTARIFF, false);
         call("K_NO_RATE", "1", "2026-07-01 11:10:00", "PLAN_K", "VOICE", 100, "0.2000", NOTARIFF, false);
 
+        call("T_NO_START", "1", "2026-07-01 11:11:00", "PLAN_T", "VOICE", 100, "0.2000", NOTARIFF, false);
+
         // H: a zero rate charged zero is right; I: the inverted row is never in force
         for (int i = 1; i <= 3; i++) call("H_ZERO", String.valueOf(i), "2026-07-01 13:" + String.format(Locale.ROOT, "%02d", i) + ":00", "PLAN_H", "DATA", 100, "0.0000", null, true);
         for (int i = 1; i <= 4; i++) call("I_INVERTED", String.valueOf(i), "2026-07-01 14:" + String.format(Locale.ROOT, "%02d", i) + ":00", "PLAN_I", "VOICE", 500, "1.0000", null, true);
@@ -282,6 +286,7 @@ final class RerateCorpus {
         plantedTariff.add("gap|PLAN_F|SMS|F-S-2|F-S-1");
         plantedTariff.add("negative_rate|PLAN_G|DATA|G-D-1|");
         plantedTariff.add("missing_rate|PLAN_K|VOICE|K-V-1|");
+        plantedTariff.add("missing_start|PLAN_T|VOICE|T-V-1|");
         plantedTariff.add("overlap_same_rate|PLAN_L|VOICE|L-V-1|L-V-2");
         plantedTariff.add("overlap_different_rate|PLAN_M|VOICE|M-V-1|M-V-2");
         plantedTariff.add("overlap_same_rate|PLAN_N|VOICE|N-V-1|N-V-2");

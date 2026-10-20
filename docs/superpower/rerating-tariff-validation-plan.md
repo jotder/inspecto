@@ -380,7 +380,7 @@ cap (3,246 MiB), no spill, and the stateful allowance stage inside the same enve
 |---|---|
 | G-K(a) allowance stage cannot meet the budget on the synthetic volume | **Not tripped.** 5M rows: `rr_rerate` 25.4 s and 1.78 GiB, allowance 2.8 s; at 10M rows both stages are cap-bound and spill (52.5 s, 3.17 GiB), which the runbook turns into advice (raise `processing.duckdb.memory_limit` above roughly 8M rows a day). The allowance stage measured is a cut: no cycle roll-over, bundle priority or overage plan, which R5 would add. |
 | G-K(b) a tariff structure outside S3 named by a prospect | **Not tripped.** No prospect has named one. |
-| G-K(c) a stage's SQL cannot be unit-tested in isolation | **Not tripped for R1.** Both statements are pinned by a golden with an independent oracle and a 71-mutant clause pass (section 13). Re-check at R4, where a stage per feature is added. |
+| G-K(c) a stage's SQL cannot be unit-tested in isolation | **Not tripped for R1.** Both statements are pinned by a golden with an independent oracle and a 73-mutant clause pass (section 13). Re-check at R4, where a stage per feature is added. |
 | G-K(d) gap Q needs the same arithmetic | **Open by design.** The `rerated_usage` contract is published; Q's plan has not yet asked for a different re-rating. |
 
 Not measured: a real operator's volume or tariff, the cycle logic of allowances, the statement under a 10M+ row day with the cap raised, and
@@ -394,7 +394,7 @@ R0 is section 12. Nothing else of R0 is in the repository.
 **Delivered (R1).** The `telco-rerating` Space Template: two Pipelines (`rated_usage`, the canonical Schema of `telco-ra`, and
 `tariff_version`), their Datasets and zero-row seeds, two chained `sql.template` Jobs, a runbook skeleton and the inert SLA examples every
 template carries. `rr_tariff_hygiene` (04:30 daily) judges the whole tariff table into `rerating_tariff_findings`: `overlap_same_rate`,
-`overlap_different_rate` (with `PRIORITY_ORDERED`), `gap`, `negative_rate`, `missing_rate`, `inverted_interval`. `rr_rerate` (on the
+`overlap_different_rate` (with `PRIORITY_ORDERED`), `gap`, `negative_rate`, `missing_rate`, `missing_start`, `inverted_interval`. `rr_rerate` (on the
 signal `job.run.completed` of `rr_tariff_hygiene`; window `$yesterday`, `incremental` by `window_date`, `retain: 31`) writes the
 `rerated_usage` contract, 21 columns, one row per call: `CANDIDATES`, `RESOLUTION` (`single`, `agree`, `precedence`, `disagree`, `none`),
 `TARIFF_VERSION_ID`, `CANDIDATE_VERSIONS`, `EXPECTED_CHARGE`, `EXPECTED_LOW`, `EXPECTED_HIGH`, `UNDERCHARGED_AMOUNT`,
@@ -403,12 +403,12 @@ signal `job.run.completed` of `rr_tariff_hygiene`; window `$yesterday`, `increme
 preview`: **D-RR10 stays the operator's**), the hub's five slot documents. No new Step Processor, Job Type, route, edition entry other
 than the content-pack list, or write to `telco-ra` (its counts are untouched).
 
-**What the golden pins.** Test side, in module `inspecto` beside `BypassFeatureGoldenTest`: `RerateCorpus` (seed 20261021, 532 usage rows,
-45 tariff rows, every plan, subscriber and rate fictional), `RerateCorpusTest` (5 tests) and `TelcoRerateGoldenTest` (15 tests).
-(1) Every one of the 21 columns of every one of the 530 in-window calls, and all 13 columns of all 18 tariff findings, equal an
+**What the golden pins.** Test side, in module `inspecto` beside `BypassFeatureGoldenTest`: `RerateCorpus` (seed 20261021, 533 usage rows,
+46 tariff rows, every plan, subscriber and rate fictional), `RerateCorpusTest` (5 tests) and `TelcoRerateGoldenTest` (15 tests).
+(1) Every one of the 21 columns of every one of the 531 in-window calls, and all 13 columns of all 19 tariff findings, equal an
 independent plain-Java oracle (`BigDecimal`, no SQL). (2) The findings are exactly the planted ones: 14 leakage (a stale version and its
 instant-of-change boundary, a wrong charge inside a same-rate duplicate, charges below an overlap's range and at the tolerance edge), 6
-over-billed, 7 inside an ambiguous range (data quality), 8 with no usable tariff (a gap, a plan with no row, a row with no rate); and
+over-billed, 7 inside an ambiguous range (data quality), 9 with no usable tariff (a gap, a plan with no row, a row with no rate, a row with no start); and
 every look-alike is silent (a call that starts before a change and runs past it, `FROM` inclusive and `TO` exclusive, one cent either
 way and AT the 0.02 tolerance, a zero rate, an inverted row, two versions that meet exactly, an open row that outlives a closed one, a
 reversal). (3) The plan's headline: the 12 calls on a duplicate same-rate tariff row, which the starter control reports as 12
@@ -422,15 +422,9 @@ duplicates nothing, the next window keeps the earlier day, the hygiene snapshot 
 `rr_rerate` after `rr_tariff_hygiene`. (12) The seeds: the feed seeds equal what the Pipelines write, the two Job-written seeds equal the
 Jobs' own `DESCRIBE`.
 
-**Mutation pass.** The golden carries it: 46 `rr_rerate` and 25 `rr_tariff_hygiene` mutants, each a one-clause string change of the Job's
-own statement (every join key and boundary comparison, every `CASE` branch and ordering, the window edges, the rounding, the tolerance in both
-directions and its bound, the priority, tie and winner logic, each hygiene label, period and window frame). The unmutated statement is first run through
-the same harness and must equal the Job's own rows; a mutant that survives, or that fails to find its text, fails the test. Working out the mutants
-found three **equivalent** clauses, which were then removed from the statements instead of left unpinned: a validity filter on the tariff in
-`rr_rerate` (an inverted interval is never in force, so it changes no row), the first bound of the overlap test (given the pair order it is always
-true) and a `PREV_N > 0` test in the gap sweep (an empty frame already yields NULL). It also found two clauses the first corpus did not exercise, and the
-corpus gained a call for each: a rounding that only matters for a precedence winner (1,234 units at 0.0020), a precedence winner that is the dearer row, and a reversal, which is what
-pins "least of the two extreme rates' amounts" in the range.
+**Mutation pass.** The golden carries it: 46 `rr_rerate` and 27 `rr_tariff_hygiene` mutants, each a one-clause string change of the Job's own statement (join keys and boundary comparisons, `CASE` branches, the window edges, rounding, the tolerance in both directions, priority and tie logic, hygiene labels, periods and window frame). The unmutated statement is first run through the same harness and must equal the Job's own rows; a mutant that survives, or whose text is not found, fails the test. **This is a broad pass, not every clause.** Independent verification found hygiene mutants that still survive the corpus: dropping `EFFECTIVE_FROM` from the `row_number()` order, `AND a.USABLE AND b.USABLE` reduced to `AND b.USABLE`, the `TARIFF_VERSION_ID DESC` tie order (the corpus has no overlap with tied `EFFECTIVE_FROM`), `PREV_ID` taken by greatest `EFFECTIVE_FROM`, and moving the precedence test ahead of the agree test; those clauses are unpinned (R2 should add corpus rows for them). Three equivalent clauses found by that review were removed from `rr_rerate` (`TOP2[1] IS NOT NULL AND`, and `CANDIDATES > 0 AND` in the under and over tests); earlier the validity filter on the tariff, the first overlap bound and `PREV_N > 0` were removed the same way. Corpus calls were added for a rounding that matters only for a precedence winner, a precedence winner that is the dearer row, and a reversal.
+
+**Known limits (verification findings, recorded not fixed).** (a) `PRIORITY_ORDERED` is judged per pair, `rr_rerate` per call: with two rows tied at the top priority and a blank third at another rate, hygiene marks both mixed pairs ordered while the call is a `disagree`. (b) A null `CHARGE` or null `USAGE_UNITS` on a call gives no finding (no `data_quality` row for an unratable call); R2 decides. (c) `agree` ranks above `precedence`: with zero units, rows at different priorities agree and the lower-priority row is named. (d) The gap row's `OTHER_TARIFF_VERSION_ID` is `arg_max` by `EFFECTIVE_TO`; two rows ending together make it unspecified, so `FINDING_KEY` may not be stable for that shape. (e) A row with a blank start is reported (`missing_start`) and excluded from both statements; before this review it was silent.
 
 **Deviations from the plan, and traps found.**
 

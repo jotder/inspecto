@@ -25,7 +25,7 @@ Run `rr_rerate` for another day with `POST /api/v1/jobs/rr_rerate/trigger`, pass
 
 ## Reading the tariff findings first
 
-A defect in the table explains many call findings, so read `rerating_tariff_findings` before `rerated_usage`. `REASON` is `overlap_same_rate` (two rows in force at once, the same rate), `overlap_different_rate` (the same, different rates), `gap` (no row in force between `PERIOD_FROM` and `PERIOD_TO`), `negative_rate`, `missing_rate` or `inverted_interval`. `PRIORITY_ORDERED` is true when an explicit `PRIORITY` already decides an overlap.
+A defect in the table explains many call findings, so read `rerating_tariff_findings` before `rerated_usage`. `REASON` is `overlap_same_rate` (two rows in force at once, the same rate), `overlap_different_rate` (the same, different rates), `gap` (no row in force between `PERIOD_FROM` and `PERIOD_TO`), `negative_rate`, `missing_rate`, `missing_start` (no start date) or `inverted_interval`. `PRIORITY_ORDERED` is true when an explicit `PRIORITY` already decides an overlap.
 
 ## Reading a re-rated call
 

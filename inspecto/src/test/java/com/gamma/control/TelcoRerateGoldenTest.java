@@ -243,7 +243,7 @@ class TelcoRerateGoldenTest {
         assertEquals(corpus.planted, got, "the findings: exactly the planted set");
         Map<String, Long> byClass = new TreeMap<>();
         for (String v : got.values()) byClass.merge(v.substring(0, v.lastIndexOf('|')), 1L, Long::sum);
-        assertEquals(Map.of("rate_mismatch|leakage", 14L, "rate_mismatch|overbilled", 6L, "ambiguous_tariff|data_quality", 7L, "no_tariff|data_quality", 8L), byClass);
+        assertEquals(Map.of("rate_mismatch|leakage", 14L, "rate_mismatch|overbilled", 6L, "ambiguous_tariff|data_quality", 7L, "no_tariff|data_quality", 9L), byClass);
         for (String id : corpus.benign) {
             assertNotNull(r.calls.get(id), id + " is in the window");
             assertNull(r.calls.get(id).get("FINDING"), id + " is a look-alike and must stay silent");
@@ -369,7 +369,7 @@ class TelcoRerateGoldenTest {
                     + (t.get("OTHER_TARIFF_VERSION_ID") == null ? "" : t.get("OTHER_TARIFF_VERSION_ID")));
         }
         assertEquals(corpus.plantedTariff, got);
-        assertEquals(18, got.size());
+        assertEquals(19, got.size());
         // look-alikes, named: versions that meet exactly (A, R's first two), a zero rate, an open row that outlives a closed one (no gap)
         for (String silent : List.of("PLAN_A|VOICE", "PLAN_H|DATA", "PLAN_J|VOICE", "PLAN_I|VOICE"))
             for (String f : got) assertFalse(f.contains("|" + silent + "|") && !f.startsWith("inverted_interval|PLAN_I"), silent + " must have no finding but " + f);
@@ -564,12 +564,14 @@ class TelcoRerateGoldenTest {
                 assertNotEquals(baseCalls, mutantSignature(st, substitute(mutated, pm), "ITEM_KEY"), "rr_rerate mutant survived: " + m[0]);
             }
             List<String[]> hyMutants = List.of(
+                    new String[]{"missing start label", "CASE WHEN EFFECTIVE_FROM IS NULL THEN 'missing_start'", "CASE WHEN FALSE THEN 'missing_start'"},
+                    new String[]{"missing start is a defect", "WHERE EFFECTIVE_FROM IS NULL OR NOT VALID_INTERVAL", "WHERE NOT VALID_INTERVAL"},
                     new String[]{"pair order", "a.RN < b.RN", "a.RN <> b.RN"},
                     new String[]{"overlap meets", "b.EFFECTIVE_FROM < coalesce(a.EFFECTIVE_TO,", "b.EFFECTIVE_FROM <= coalesce(a.EFFECTIVE_TO,"},
                     new String[]{"same plan", "a.PLAN = b.PLAN AND a.SERVICE = b.SERVICE", "a.SERVICE = b.SERVICE"},
                     new String[]{"same service", "a.PLAN = b.PLAN AND a.SERVICE = b.SERVICE", "a.PLAN = b.PLAN"},
                     new String[]{"usable pair", "AND a.USABLE AND b.USABLE", "AND a.USABLE"},
-                    new String[]{"usable interval", "(RATE_PER_UNIT IS NOT NULL AND (EFFECTIVE_TO IS NULL OR EFFECTIVE_TO > EFFECTIVE_FROM)) AS USABLE", "(RATE_PER_UNIT IS NOT NULL) AS USABLE"},
+                    new String[]{"usable interval", "RATE_PER_UNIT IS NOT NULL AND EFFECTIVE_FROM IS NOT NULL AND (EFFECTIVE_TO IS NULL OR EFFECTIVE_TO > EFFECTIVE_FROM)) AS USABLE", "RATE_PER_UNIT IS NOT NULL AND EFFECTIVE_FROM IS NOT NULL) AS USABLE"},
                     new String[]{"valid interval strict", "(EFFECTIVE_TO IS NULL OR EFFECTIVE_TO > EFFECTIVE_FROM) AS VALID_INTERVAL", "(EFFECTIVE_TO IS NULL OR EFFECTIVE_TO >= EFFECTIVE_FROM) AS VALID_INTERVAL"},
                     new String[]{"same rate label", "WHEN a.RATE_PER_UNIT = b.RATE_PER_UNIT THEN 'overlap_same_rate'", "WHEN a.RATE_PER_UNIT <> b.RATE_PER_UNIT THEN 'overlap_same_rate'"},
                     new String[]{"overlap start", "greatest(a.EFFECTIVE_FROM, b.EFFECTIVE_FROM)", "least(a.EFFECTIVE_FROM, b.EFFECTIVE_FROM)"},
@@ -627,7 +629,7 @@ class TelcoRerateGoldenTest {
 
     private static BigDecimal rateOf(RerateCorpus.Tariff t) { return new BigDecimal(t.rate()); }
 
-    private static boolean usable(RerateCorpus.Tariff t) { return t.rate() != null && (t.to() == null || t.to().isAfter(t.from())); }
+    private static boolean usable(RerateCorpus.Tariff t) { return t.rate() != null && t.from() != null && (t.to() == null || t.to().isAfter(t.from())); }
 
     /** Independent re-rating of every call in the window, per the plan's definitions, with plain loops and BigDecimal. */
     private static Map<String, Map<String, Object>> oracleCalls(RerateCorpus corpus, BigDecimal tolerance) {
@@ -637,7 +639,7 @@ class TelcoRerateGoldenTest {
             if (u.ts().isBefore(from) || !u.ts().isBefore(to)) continue;
             List<RerateCorpus.Tariff> cands = new ArrayList<>();
             for (RerateCorpus.Tariff t : corpus.tariffs())
-                if (t.rate() != null && t.plan().equals(u.plan()) && t.service().equals(u.service()) && !t.from().isAfter(u.ts())
+                if (t.rate() != null && t.from() != null && t.plan().equals(u.plan()) && t.service().equals(u.service()) && !t.from().isAfter(u.ts())
                         && (t.to() == null || u.ts().isBefore(t.to()))) cands.add(t);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("ITEM_KEY", u.id());
@@ -702,11 +704,11 @@ class TelcoRerateGoldenTest {
     private static Map<String, Map<String, Object>> oracleTariff(RerateCorpus corpus) {
         List<RerateCorpus.Tariff> sorted = new ArrayList<>(corpus.tariffs());
         sorted.sort(Comparator.comparing(RerateCorpus.Tariff::plan).thenComparing(RerateCorpus.Tariff::service)
-                .thenComparing(RerateCorpus.Tariff::from).thenComparing(RerateCorpus.Tariff::id));
+                .thenComparing(RerateCorpus.Tariff::from, Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(RerateCorpus.Tariff::id));
         Map<String, Map<String, Object>> out = new TreeMap<>();
         for (RerateCorpus.Tariff t : sorted) {
-            boolean valid = t.to() == null || t.to().isAfter(t.from());
-            String reason = !valid ? "inverted_interval" : t.rate() == null ? "missing_rate" : rateOf(t).signum() < 0 ? "negative_rate" : null;
+            boolean valid = t.from() != null && (t.to() == null || t.to().isAfter(t.from()));
+            String reason = t.from() == null ? "missing_start" : !valid ? "inverted_interval" : t.rate() == null ? "missing_rate" : rateOf(t).signum() < 0 ? "negative_rate" : null;
             if (reason != null) put(out, reason, t, null, t.from(), t.to(), null);
         }
         for (int i = 0; i < sorted.size(); i++)
@@ -753,7 +755,7 @@ class TelcoRerateGoldenTest {
         row.put("OTHER_TARIFF_VERSION_ID", b == null ? null : b.id());
         row.put("RATE_PER_UNIT", a.rate() == null ? null : rateOf(a));
         row.put("OTHER_RATE_PER_UNIT", b == null || reason.equals("gap") || b.rate() == null ? null : rateOf(b));
-        row.put("PERIOD_FROM", TS.format(from));
+        row.put("PERIOD_FROM", from == null ? null : TS.format(from));
         row.put("PERIOD_TO", to == null ? null : TS.format(to));
         row.put("PRIORITY_ORDERED", ordered);
         row.put("CONTROL", "rr_tariff_hygiene");

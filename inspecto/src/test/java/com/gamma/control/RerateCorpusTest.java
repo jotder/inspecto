@@ -42,8 +42,8 @@ class RerateCorpusTest {
         RerateCorpus c = new RerateCorpus().generate();
         Map<String, Long> byClass = new java.util.TreeMap<>();
         for (String v : c.planted.values()) byClass.merge(v.substring(0, v.lastIndexOf('|')), 1L, Long::sum);
-        assertEquals(Map.of("rate_mismatch|leakage", 14L, "rate_mismatch|overbilled", 6L, "ambiguous_tariff|data_quality", 7L, "no_tariff|data_quality", 8L), byClass);
-        assertEquals(18, c.plantedTariff.size());
+        assertEquals(Map.of("rate_mismatch|leakage", 14L, "rate_mismatch|overbilled", 6L, "ambiguous_tariff|data_quality", 7L, "no_tariff|data_quality", 9L), byClass);
+        assertEquals(19, c.plantedTariff.size());
         assertEquals(2, c.outsideWindow.size());
     }
 

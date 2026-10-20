@@ -34,7 +34,7 @@ zero-row schema seed under `spaces/_templates/telco-rerating/data/`, so both Job
 Two `sql.template` Jobs, chained on a signal:
 
 1. `rr_tariff_hygiene` (04:30 daily) judges the whole table and replaces the Dataset `rerating_tariff_findings`: `overlap_same_rate`,
-   `overlap_different_rate` (with `PRIORITY_ORDERED`), `gap`, `negative_rate`, `missing_rate`, `inverted_interval`. A zero rate is a
+   `overlap_different_rate` (with `PRIORITY_ORDERED`), `gap`, `negative_rate`, `missing_rate`, `missing_start`, `inverted_interval`. A zero rate is a
    free plan, not a defect.
 2. `rr_rerate` (`on_signal: job.run.completed` when `rr_tariff_hygiene` succeeded; window `$yesterday`, `incremental` by
    `window_date`, `lookback: 1`, `retain: 31`) writes the Dataset `rerated_usage`, one row per call: the contract other packs read.
@@ -77,7 +77,7 @@ columns and are never netted (D-RR4).
 seeded synthetic `RerateCorpus` through the template's own Pipelines, runs both Jobs as authored and holds every contract column of
 every call and every tariff finding to an independent plain-Java oracle; the findings to the exact planted set with every look-alike
 silent; the degradation (no `PRIORITY` column), the tolerance parameter, zone independence, idempotent re-runs and the signal chain; and
-every clause of both statements to a mutant that must change the oracle's rows.
+a broad pass of clause mutants (73) that must each change the oracle's rows; the known unpinned clauses and limits are in the plan section 13.
 
 ## Related
 

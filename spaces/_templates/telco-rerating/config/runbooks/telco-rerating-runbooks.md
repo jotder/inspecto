@@ -27,7 +27,7 @@ Two chained `sql.template` Jobs:
 | `overlap_same_rate` | Two rows are in force at once with the same rate. Harmless to a charge, but it is a defect in the table. One row here, not one per call. |
 | `overlap_different_rate` | Two rows are in force at once with different rates. A call in the overlap has no single expected charge unless `PRIORITY_ORDERED` is true. |
 | `gap` | No row is in force between `PERIOD_FROM` and `PERIOD_TO`. Calls starting then have no tariff. |
-| `negative_rate`, `missing_rate` | A rate below zero, or no rate. A zero rate is a free plan and is not reported. |
+| `negative_rate`, `missing_rate`, `missing_start` | A rate below zero, no rate, or no start date (never in force). A zero rate is a free plan and is not reported. |
 | `inverted_interval` | `EFFECTIVE_TO` is not after `EFFECTIVE_FROM`. The row is never in force. |
 
 `PRIORITY_ORDERED` is true on a conflict when an explicit `PRIORITY` separates the two rows, so the overlap is resolved by
