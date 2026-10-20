@@ -679,4 +679,122 @@ class ControlApiAnalystUploadTest {
             if (!hadDatabase) Path.of("database").toFile().delete();
         }
     }
+
+    private static void wipe(String store, boolean hadDatabase) throws Exception {
+        try (Stream<Path> w = Files.exists(Path.of("database").resolve(store)) ? Files.walk(Path.of("database").resolve(store)) : Stream.<Path>empty()) {
+            w.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+        }
+        if (!hadDatabase) Path.of("database").toFile().delete();
+    }
+
+    /** LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1 (2): a picked-up file answers 409 picked-up from the filesystem alone, never taking (or being refused) the run claim. */
+    @Test
+    void deletingAPickedUpUploadNeverNeedsTheRunClaim(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String store = "upl_pk_" + System.nanoTime();
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        try (Ctx c = open(cfg, root, true, store)) {
+            status(201, up(c, "UPL_20261003.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            c.svc().runPipeline("up_feed");
+            HttpResponse<String>[] during = new HttpResponse[1];
+            c.svc().whileIdle("up_feed", () -> {
+                during[0] = call(c, "DELETE", "/inv/uploads/up_feed/UPL_20261003.csv", UPLOADER);
+                return Boolean.TRUE;
+            });
+            status(409, during[0], "picked up");
+            assertTrue(during[0].body().contains("stay in the Dataset"), "answered as picked-up, not busy: " + during[0].body());
+        } finally {
+            wipe(store, hadDatabase);
+        }
+    }
+
+    /** (3): the picked-up state compares the ledger's recorded file mtime, so a host clock behind the file's mtime does not read pending. */
+    @Test
+    void aChecksumIngestedFileWhoseMtimeIsAheadOfTheWallClockStillReadsIngested(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String store = "upl_ck_" + System.nanoTime();
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        checksumMode = true;
+        try (Ctx c = open(cfg, root, true, store)) {
+            status(201, up(c, "UPL_20261004.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            Files.setLastModifiedTime(c.inbox().resolve("UPL_20261004.csv"),
+                    java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(3600)));
+            c.svc().runPipeline("up_feed");
+            JsonNode row = uploadsOf(c, UPLOADER).get(0);
+            assertEquals("ingested", row.get("state").asText(), row + " inbox " + inboxFiles(c));
+            status(409, call(c, "DELETE", "/inv/uploads/up_feed/UPL_20261004.csv", UPLOADER), "picked up: refused");
+        } finally {
+            checksumMode = false;
+            wipe(store, hadDatabase);
+        }
+    }
+
+    /** (4): a stranded .withdraw-*.tmp is swept at the next withdraw; only that name shape, never a folder or a link's target. */
+    @Test
+    void aWithdrawSweepsStrandedClaimFilesButNothingElse(@TempDir Path cfg, @TempDir Path root, @TempDir Path outside) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            status(201, up(c, "UPL_1.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            Path stranded = c.inbox().resolve(".UPL_0.csv.withdraw-123456.tmp");
+            Files.writeString(stranded, "x");
+            Path unrelated = c.inbox().resolve(".keep.tmp");
+            Files.writeString(unrelated, "x");
+            Path folder = c.inbox().resolve(".dir.csv.withdraw-5.tmp");
+            Files.createDirectories(folder);
+            Files.writeString(folder.resolve("inner.txt"), "x");
+            Files.writeString(outside.resolve("precious.txt"), "x");
+            Path link = c.inbox().resolve(".lnk.csv.withdraw-6.tmp");
+            boolean linked = false;
+            try {
+                Files.createSymbolicLink(link, outside);
+                linked = true;
+            } catch (Exception | Error noSymlink) {
+                Process p = new ProcessBuilder("cmd", "/c", "mklink", "/J", link.toString(), outside.toString()).redirectErrorStream(true).start();
+                p.getInputStream().readAllBytes();
+                linked = p.waitFor() == 0;
+            }
+            status(200, call(c, "DELETE", "/inv/uploads/up_feed/UPL_1.csv", UPLOADER), "withdrawn");
+            assertFalse(Files.exists(stranded), "the stranded claim file is swept");
+            assertTrue(Files.exists(unrelated), "other names are left alone");
+            assertTrue(Files.exists(folder.resolve("inner.txt")), "a folder of that name is not swept into");
+            assertTrue(Files.exists(outside.resolve("precious.txt")), "a link is never followed out of the inbox");
+            assertTrue(linked, "the link fixture was created");
+        }
+    }
+
+    /** (5): the reject ledger is read up to a bound; past it the count is the bound and the read says so. */
+    @Test
+    void aHugeRejectLedgerIsCountedUpToABoundAndFlaggedCapped(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            status(201, up(c, "UPL_1.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            Path errors = c.inbox().getParent().resolve("errors");
+            Files.createDirectories(errors);
+            int cap = com.gamma.geolink.HostUploadLandingPort.REJECT_COUNT_CAP;
+            StringBuilder sb = new StringBuilder("line,reason\n");
+            for (int i = 0; i < cap + 50; i++) sb.append(i).append(",bad\n");
+            Files.writeString(errors.resolve("UPL_1_errors.csv"), sb.toString());
+            JsonNode row = uploadsOf(c, UPLOADER).get(0);
+            assertEquals(cap, row.get("rejectedRows").asLong(), row.toString());
+            assertTrue(row.get("rejectedRowsCapped").asBoolean(), row.toString());
+            Files.writeString(errors.resolve("UPL_1_errors.csv"), "line,reason\n1,bad\n2,bad\n");
+            row = uploadsOf(c, UPLOADER).get(0);
+            assertEquals(2, row.get("rejectedRows").asLong());
+            assertFalse(row.has("rejectedRowsCapped"), "an exact count carries no flag");
+        }
+    }
+
+    /** (6): replace=true is a write into the inbox, so it takes the run claim like delete: 409 while a run holds it. */
+    @Test
+    void replaceTrueRefusesWhileARunOfThePipelineIsInFlight(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            byte[] b = CSV.getBytes(StandardCharsets.UTF_8);
+            byte[] b2 = (CSV + "+447700900009,234109,2026-10-01\n").getBytes(StandardCharsets.UTF_8);
+            status(201, up(c, "UPL_1.csv", b), "landed");
+            HttpResponse<String>[] during = new HttpResponse[1];
+            c.svc().whileIdle("up_feed", () -> {
+                during[0] = up(c, "up_feed", "?name=UPL_1.csv&replace=true", b2, UPLOADER);
+                return Boolean.TRUE;
+            });
+            status(409, during[0], "a run is in flight");
+            assertEquals(CSV, Files.readString(c.inbox().resolve("UPL_1.csv")), "the file was not replaced mid-ingest");
+            status(201, up(c, "up_feed", "?name=UPL_1.csv&replace=true", b2, UPLOADER), "free again: replaced");
+        }
+    }
 }

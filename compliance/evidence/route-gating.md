@@ -255,8 +255,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/snapshots` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:111` |
 | POST | `/inv/snapshots/attach` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:114` |
 | POST | `/inv/traversal/recursive-paths` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:99` |
-| POST | `/inv/uploads/([^/]+)` | gated | `canUploadData` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/UploadRoutes.java:71` |
-| DELETE | `/inv/uploads/([^/]+)/([^/]+)` | gated | `canUploadData` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/UploadRoutes.java:77` |
+| POST | `/inv/uploads/([^/]+)` | gated | `canUploadData` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/UploadRoutes.java:72` |
+| DELETE | `/inv/uploads/([^/]+)/([^/]+)` | gated | `canUploadData` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/UploadRoutes.java:78` |
 | POST | `/jobs` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:70` |
 | DELETE | `/jobs/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:73` |
 | PUT | `/jobs/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:71` |

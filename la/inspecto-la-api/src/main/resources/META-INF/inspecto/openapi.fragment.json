@@ -1035,7 +1035,7 @@
         "tags" : [ "inv" ],
         "summary" : "Land an analyst CSV in an upload-enabled Collector's inbox",
         "operationId" : "postInvUploadsByCollector",
-        "description" : "LA-ANALYST-UPLOAD-1. Raw CSV body (UTF-8), `?name=<file>.csv` (bare name, must match the Collector's file pattern), optional `replace=true`. Lands bytes only; the Collector's Pipeline parses, types, masks and quarantines. Needs canUploadData. Refusals: 503 no write root, 422 bad name / not a CSV / empty / zip-XLSX / NUL / not UTF-8, 403 path-shaped name, D-U7 four-eyes row budget, or replace=true on another analyst's waiting upload (only the uploader or canAdminister may replace), 404 unknown or non-upload Collector, 413 over upload.max_bytes or upload.daily_bytes, 409 name already in the inbox, 429 rate limit.",
+        "description" : "LA-ANALYST-UPLOAD-1. Raw CSV body (UTF-8), `?name=<file>.csv` (bare name, must match the Collector's file pattern), optional `replace=true`. Lands bytes only; the Collector's Pipeline parses, types, masks and quarantines. Needs canUploadData. Refusals: 503 no write root, 422 bad name / not a CSV / empty / zip-XLSX / NUL / not UTF-8, 403 path-shaped name, D-U7 four-eyes row budget, or replace=true on another analyst's waiting upload (only the uploader or canAdminister may replace), 404 unknown or non-upload Collector, 413 over upload.max_bytes or upload.daily_bytes, 409 name already in the inbox, or replace=true while a run of the Pipeline is in flight (a replace takes the run claim like delete), 429 rate limit.",
         "parameters" : [ {
           "name" : "collector",
           "in" : "path",
@@ -1083,7 +1083,7 @@
         "tags" : [ "inv" ],
         "summary" : "List the caller's uploads to a Collector with their ingest state",
         "operationId" : "getInvUploadsByCollector",
-        "description" : "LA-I2-GAPS-RESIDUALS-1. The caller's own uploads (every upload for canAdminister), newest first, at most 200. Per upload: file, bytes, lines, sha256, uploader, replaced, landedAt, state (pending | ingested | quarantined | consumed), rejectedRows when the Pipeline wrote a reject ledger, quarantineReason when the whole file was quarantined. Metadata only - never a row or a header value. Needs canUploadData. 503 no write root, 404 unknown or non-upload Collector, 429 rate limit.",
+        "description" : "LA-I2-GAPS-RESIDUALS-1. The caller's own uploads (every upload for canAdminister), newest first, at most 200. Per upload: file, bytes, lines, sha256, uploader, replaced, landedAt, state (pending | ingested | quarantined | consumed), rejectedRows when the Pipeline wrote a reject ledger (counted up to 10000 rows; rejectedRowsCapped: true when it held more), quarantineReason when the whole file was quarantined. Metadata only - never a row or a header value. Needs canUploadData. 503 no write root, 404 unknown or non-upload Collector, 429 rate limit.",
         "parameters" : [ {
           "name" : "collector",
           "in" : "path",
