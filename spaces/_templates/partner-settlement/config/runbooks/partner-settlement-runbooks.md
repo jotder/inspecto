@@ -35,7 +35,7 @@ compared only once its statement is received or its `statement_due` is before `a
 | `cutoff_difference` | The day's variance is cancelled by an opposite variance on the next or previous day: the partner's day boundary is not ours. Reported on both days. | Ask the partner for its cut-off time and zone; do not dispute the amount. |
 | `fx_difference` | The partner billed in the settlement currency but converted our priced amount at its own rate (`fx_rate_applied`), and that explains the variance. | Compare the partner's rate with `fx_rate` on the matching `settlement_expected` row (rate type and date come from the agreement). |
 | `missing_statement` | Our priced usage exists for a cycle whose `statement_due` has passed and no statement lines arrived. One finding per cycle. Before the due date it is silent (an accrual in a later slice). | Chase the partner. |
-| `unrated_usage` | The re-rater could not price the day (`no_rate_found`, `ambiguous_rate`, `unknown_agreement`). Never counted as a partner variance. | Fix the rate card in the re-rating pack. |
+| `unrated_usage` | The re-rater could not price the day (`no_rate_found`, `ambiguous_rate`, `unknown_agreement`). Only the latest rating run counts. Never counted as a partner variance. | Fix the rate card in the re-rating pack. |
 | `fx_rate_missing` | A converted amount has no `fx_rate` row on or before its date for the agreement's rate type. No amount is invented; the day is left out of the compare. | Add the rate to the `fx_rate` feed. |
 
 Statement findings: `control_total_mismatch` (the lines do not add up to the header totals the partner stated; data quality, the

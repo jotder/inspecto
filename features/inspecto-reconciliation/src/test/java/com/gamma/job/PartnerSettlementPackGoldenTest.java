@@ -382,11 +382,17 @@ class PartnerSettlementPackGoldenTest {
 
         final List<PartnerSettlementCorpus.Line> current = new ArrayList<>();
 
+        private boolean validStatement(PartnerSettlementCorpus.Line l) {
+            boolean partner = c.partners.stream().anyMatch(p -> p.startsWith(l.partner() + ","));
+            return partner && c.agreements.stream().anyMatch(a -> a.id().equals(l.agreement()) && a.partner().equals(l.partner()));
+        }
+
         private void buildStatements() {
             Map<String, PartnerSettlementCorpus.Line> dedup = new LinkedHashMap<>();
             for (List<PartnerSettlementCorpus.Line> lines : c.statements.values())
                 for (PartnerSettlementCorpus.Line l : lines) dedup.putIfAbsent(l.stmt() + "|" + l.version() + "|" + l.lineNo(), l);
             Map<String, Integer> top = new HashMap<>();
+            dedup.values().removeIf(l -> !validStatement(l));
             for (PartnerSettlementCorpus.Line l : dedup.values()) top.merge(l.agreement() + "|" + l.pStart() + "|" + l.pEnd(), l.version(), Math::max);
             for (PartnerSettlementCorpus.Line l : dedup.values())
                 if (l.version() == top.get(l.agreement() + "|" + l.pStart() + "|" + l.pEnd())) {
@@ -410,8 +416,8 @@ class PartnerSettlementPackGoldenTest {
             Map<String, PartnerSettlementCorpus.Rerated> any = new HashMap<>();
             for (PartnerSettlementCorpus.Rerated r : c.rerated) {
                 String key = r.agreement() + "|" + r.direction() + "|" + r.service() + "|" + r.dest() + "|" + r.day();
-                if (r.reason() != null) unratedKeys.add(key);
                 String period = period(r.agreement(), r.day());
+                if (r.reason() != null && period != null && pick.get(r.agreement() + "|" + period)[1].equals(r.runId())) unratedKeys.add(key);
                 if (period == null || !pick.get(r.agreement() + "|" + period)[1].equals(r.runId()) || r.amount() == null || r.reason() != null) continue;
                 String[] pe = period.split("\\|");
                 LocalDate due = LocalDate.parse(calendar.get(r.agreement() + "|" + period).split("\\|")[0]);

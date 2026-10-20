@@ -187,7 +187,9 @@ final class PartnerSettlementCorpus {
                     continue;
                 }
                 if (d.getMonthValue() == 5) {   // May was re-rated: the first run is stale and wrong (90 percent), the second is right
-                    rate(a, dir, "VOICE", dest, d, rateId, "RR-A1-2026-05-1", RUN1_AT, e.multiply(bd("0.9")).setScale(4, RoundingMode.HALF_UP), "USD", bd("20"));
+                    if (d.equals(LocalDate.of(2026, 5, 25)) && dest.equals("MOBILE"))   // the stale run could not price this day; the latest run did
+                        rerated.add(new Rerated(a, dir, "VOICE", dest, d, rateId, "RR-A1-2026-05-1", RUN1_AT, bd("1"), null, "USD", 3, "no_rate_found"));
+                    else rate(a, dir, "VOICE", dest, d, rateId, "RR-A1-2026-05-1", RUN1_AT, e.multiply(bd("0.9")).setScale(4, RoundingMode.HALF_UP), "USD", bd("20"));
                     rate(a, dir, "VOICE", dest, d, rateId, "RR-A1-2026-05-2", RUN2_AT, e, "USD", bd("20"));
                 } else {
                     rate(a, dir, "VOICE", dest, d, rateId, "RR-A1-" + d.toString().substring(0, 7), LocalDateTime.of(d.getYear(), d.getMonthValue(), 1, 8, 0).plusMonths(1).plusDays(1), e, "USD", bd("20"));
@@ -204,6 +206,7 @@ final class PartnerSettlementCorpus {
         billed.put("2026-06-20|MOBILE", bd("210"));         // +10 ...
         billed.put("2026-06-21|MOBILE", bd("206"));         // ... -4: does NOT net to tolerance, so two amount_mismatch
         billed.put("2026-06-25|MOBILE", bd("190"));         // billed, but our side is unrated: unrated_usage, no variance
+        billed.put("2026-06-26|MOBILE", bd("20"));          // -190 beside the unrated day: an unrated neighbour never makes a cut-off pair, so amount_mismatch
         billed.put("2026-07-15|FIXED", bd("116.725"));      // +1.5 percent of 115 under the 1 percent version: amount_mismatch
         billed.put("2026-07-16|FIXED", bd("101.5"));        // +1.5 percent of 100 under the 2 percent version: silent
         for (int m = 5; m <= 7; m++) {
@@ -235,6 +238,7 @@ final class PartnerSettlementCorpus {
         key("amount_mismatch", a, dir, "VOICE", "MOBILE", "2026-06-20");
         key("amount_mismatch", a, dir, "VOICE", "MOBILE", "2026-06-21");
         key("amount_mismatch", a, dir, "VOICE", "FIXED", "2026-07-15");
+        key("amount_mismatch", a, dir, "VOICE", "MOBILE", "2026-06-26");
         key("cutoff_difference", a, dir, "VOICE", "MOBILE", "2026-06-14");
         key("cutoff_difference", a, dir, "VOICE", "MOBILE", "2026-06-15");
         key("unrated_usage", a, dir, "VOICE", "MOBILE", "2026-06-25");
@@ -326,6 +330,9 @@ final class PartnerSettlementCorpus {
                 new Usage(LocalDate.of(2026, 6, 3), "NATIONAL", bd("100"), bd("41"), null));
         statement("X9-2026-06.csv", "STM-X9-2026-06", 1, "P99", "AG-VOICE-X9", s, e, "we_pay", "VOICE", "USD", LocalDateTime.of(2026, 7, 9, 9, 0), lines, null, null, null);
         statement("NONE-2026-06.csv", "STM-NONE-2026-06", 1, "P2", "AG-VOICE-NONE", s, e, "we_pay", "VOICE", "USD", LocalDateTime.of(2026, 7, 9, 9, 0), lines, null, null, null);
+        // another partner's statement naming the first partner's agreement, as a HIGHER version: it must neither add to nor replace the real one
+        statement("P2-A1-2026-06.csv", "STM-P2A1-2026-06", 2, "P2", "AG-VOICE-A1", s, e, "we_pay", "VOICE", "USD", LocalDateTime.of(2026, 7, 9, 9, 0), lines, null, null, null);
+        plantedStatementFindings.computeIfAbsent("unknown_agreement", k -> new TreeSet<>()).add("STM-P2A1-2026-06|2");
         plantedStatementFindings.computeIfAbsent("unknown_partner", k -> new TreeSet<>()).add("STM-X9-2026-06|1");
         plantedStatementFindings.computeIfAbsent("unknown_agreement", k -> new TreeSet<>()).add("STM-NONE-2026-06|1");
     }

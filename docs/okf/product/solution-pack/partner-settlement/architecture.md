@@ -64,13 +64,16 @@ Six chained `sql.template` Jobs (the first daily at 01:00, each next one on the 
   `fx_rate_type`; a missing rate is a named `fx_rate_missing` finding and the day is left out, never an invented amount.
 - **Overdue, not absent.** `ps_expected` includes a cycle only when its statement is received or `statement_due` is before the
   as-of day (`as_of`, default today), so a statement not yet due is silent and a statement past due is one `missing_statement`
-  finding per cycle, not one Break per day.
+  finding per cycle. (The Reconciliation still Breaks on each day of that cycle, ours-only; the finding is the cycle-level reading of those Breaks.)
 - **Classification.** A variance beyond tolerance is `cutoff_difference` when the neighbouring day (either side) carries an opposite
   variance beyond tolerance that nets to within tolerance; else `fx_difference` when the partner billed in the settlement currency at
   its own `fx_rate_applied` and that rate explains the variance; else `amount_mismatch`. A cut-off pair is two findings, one per
   day.
 - **Unrated usage is data quality.** A re-rating row with a blank amount and a reason becomes `unrated_usage` and the day is kept
-  out of every variance (plan R7).
+  out of every variance finding (plan R7). Only the latest rating run counts: a day unrated in a superseded run and priced in the latest is not unrated. The Reconciliation does not know the reason and still Breaks on that day (statement-only).
+- **Statements that name an unknown partner or agreement are not compared.** `ps_statement_current` drops lines whose partner or
+  partner-and-agreement pair is not in the References before it picks the highest version, so a stray statement can neither add to nor
+  supersede a real one; `ps_statement_findings` reports it.
 - **Statement shape, as built.** The plan sketched a header row; the canonical feed is flat: each line carries the statement's
   control totals, and the integrity control reads them back. A real partner file with a separate header is flattened by the Pipeline
   mapping. Non-usage lines (tax, fee, credit, adjustment) count toward the control totals and are not compared in this slice.

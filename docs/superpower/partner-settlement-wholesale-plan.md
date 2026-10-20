@@ -343,7 +343,7 @@ engine's behaviour if reversed.
 
 ## 16. S0 to S3 as built (2026-10-20)
 
-Branch `lane/ps-s0s3`; commit hashes are in the BACKLOG row. Hub: [`okf/product/solution-pack/partner-settlement/`](../okf/product/solution-pack/partner-settlement/index.md).
+Branch `lane/ps-s0s3`; the commit is named in the hand-back of the lane. Hub: [`okf/product/solution-pack/partner-settlement/`](../okf/product/solution-pack/partner-settlement/index.md).
 The slices follow the order of §10; the smallest useful cut (S0 + S1 + S2 + S3) is built, S4 to S8 and W1 to W3 are not.
 
 **S0: contract and decisions.** PS-D1 to PS-D10 are answered (§11). The §5 contract with the re-rating plan is **not signed**: the
@@ -418,12 +418,12 @@ agreements untouched).
   template applies; the seed test regenerates them with `PARTNER_SETTLEMENT_REGENERATE=true`.
 - The Reconciliation Break key joins the key columns with a middle dot; `ReconStateStore` keeps a Break per day, so a catch-up runs
   the `recon.run` Job once per day (`day` parameter).
+- An independent review found three SQL defects the first corpus could not see, now fixed and pinned by corpus cases: the unrated check read every rating run (a day unrated only in a superseded run hid a real variance); statements naming an unknown partner or agreement still fed the compare and could supersede a real version; an unrated day could be the partner of a cut-off pair.
 - The oracle shares the **business rules** with the SQL (tolerance inclusive, latest run, highest version, neighbour-day cut-off
   test); it is independent of the implementation, not of the rules. The rules are pinned by the planted corpus and the mutation pass.
 
 **Not built, and open.** S4 (netting, positions, roll-forward), S5 (disputes), S6 (aging, accruals, dashboard), S7 (evidence pack),
 S8 (the glossary entries of §13, the matrix row Q refresh, the `okf` plan-spaces entry, the solution page); W1 to W3. Open for the
-operator or the sibling plan: (1) sign the §5 table, in particular R6 (the completeness Signal); (2) PS-D0, split the BACKLOG row once
-the re-rating plan lands; (3) the real statement layout (flat or header plus lines) once a real file is seen; (4) whether the
+operator or the sibling plan: (1) sign the §5 table, in particular R6 (the completeness Signal); (2) PS-D0 (`PACK-RERATING-1` already exists as its own row; the open part is moving the matrix wording and the shared row text); (3) the real statement layout (flat or header plus lines) once a real file is seen; (4) whether the
 dispute workflow of S5 is applied by an administrator step or a governance seed; (5) the class of `restated_statement` (`info`,
 neither variance nor data quality).

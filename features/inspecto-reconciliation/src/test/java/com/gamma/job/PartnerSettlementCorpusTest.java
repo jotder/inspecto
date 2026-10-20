@@ -25,7 +25,7 @@ class PartnerSettlementCorpusTest {
         // one key carries one reason: a planted key is never planted twice
         int total = c.plantedFindings.values().stream().mapToInt(Set::size).sum();
         assertEquals(total, planted.size());
-        assertEquals(13, total, "8 amount_mismatch, 2 cutoff_difference, 1 fx_difference, 1 missing_statement, 1 unrated_usage");
+        assertEquals(14, total, "9 amount_mismatch, 2 cutoff_difference, 1 fx_difference, 1 missing_statement, 1 unrated_usage");
     }
 
     @Test
