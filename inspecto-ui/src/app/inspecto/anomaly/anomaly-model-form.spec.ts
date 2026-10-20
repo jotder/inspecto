@@ -46,6 +46,46 @@ describe('anomaly-model-form', () => {
         expect(out).toEqual(STORED);
     });
 
+    it('carries method and forest through load, edit and save verbatim', () => {
+        const stored = { ...STORED, method: 'isolation_forest', forest: { trees: 200, sampleSize: 512, seed: 7 } };
+        const top = anomalyModelInitial(stored);
+        expect(top['method']).toBe('isolation_forest');
+        expect(top['forestTrees']).toBe(200);
+        const out = toAnomalyModelContent('usage', top, featureDrafts(stored), stored);
+        expect(out['method']).toBe('isolation_forest');
+        expect(out['forest']).toEqual({ trees: 200, sampleSize: 512, seed: 7 });
+        expect(out).toEqual(stored);
+        // a partial forest stays partial; defaults are never invented
+        const partial = { ...STORED, method: 'isolation_forest', forest: { seed: 3 } };
+        expect(toAnomalyModelContent('usage', anomalyModelInitial(partial), featureDrafts(partial), partial)).toEqual(
+            partial,
+        );
+        // method only: no forest key appears
+        const bare = { ...STORED, method: 'isolation_forest' };
+        expect(toAnomalyModelContent('usage', anomalyModelInitial(bare), featureDrafts(bare), bare)).toEqual(bare);
+    });
+
+    it('drops forest when the method goes back to robust, keeps an explicit robust_z, and places forest refusals', () => {
+        const stored = { ...STORED, method: 'isolation_forest', forest: { trees: 200 } };
+        const back = { ...anomalyModelInitial(stored), method: 'robust_z' };
+        const out = toAnomalyModelContent('usage', back, featureDrafts(stored), stored);
+        expect('method' in out).toBe(false);
+        expect('forest' in out).toBe(false);
+        const explicit = { ...STORED, method: 'robust_z' };
+        expect(
+            toAnomalyModelContent('usage', anomalyModelInitial(explicit), featureDrafts(explicit), explicit),
+        ).toEqual(explicit);
+        expect(mapAnomalyRefusal('anomaly-model.forest.trees must be within 1..1000, got 0')).toEqual({
+            field: 'forestTrees',
+        });
+        expect(mapAnomalyRefusal('anomaly-model.forest.seed must be a whole number, got 1.5')).toEqual({
+            field: 'forestSeed',
+        });
+        expect(mapAnomalyRefusal("anomaly-model.method must be robust_z or isolation_forest, got 'x'")).toEqual({
+            field: 'method',
+        });
+    });
+
     it('leaves blank optionals out instead of writing nulls', () => {
         const out = toAnomalyModelContent(
             'm',

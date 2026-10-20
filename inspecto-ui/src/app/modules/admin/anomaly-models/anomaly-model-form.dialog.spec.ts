@@ -304,6 +304,36 @@ describe('AnomalyModelFormDialog', () => {
         await expectNoA11yViolations(el);
     });
 
+    const FOREST: ComponentDef = {
+        ...EXISTING,
+        content: { ...EXISTING.content, method: 'isolation_forest', forest: { trees: 150, sampleSize: 512, seed: 9 } },
+    };
+
+    it('saves a stored isolation-forest model untouched, method and forest verbatim', async () => {
+        const { fixture, cmp, update } = setup(FOREST);
+        await flush();
+        fixture.detectChanges();
+        cmp.save();
+        const body = (update.mock.calls as unknown[][])[0][1] as Record<string, unknown>;
+        expect(body['method']).toBe('isolation_forest');
+        expect(body['forest']).toEqual({ trees: 150, sampleSize: 512, seed: 9 });
+        expect(body).toEqual({ ...FOREST.content, features: expect.any(Array) });
+    });
+
+    it('says plainly the isolation forest has no preview, and does not score with the robust method', async () => {
+        const { fixture, previewContent, preview } = setup(FOREST, undefined, { work: true });
+        await flush();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        submitPreview(el, '966501234567');
+        fixture.detectChanges();
+        expect(previewContent).not.toHaveBeenCalled();
+        expect(preview).not.toHaveBeenCalled();
+        expect(el.querySelector('app-anomaly-model-preview [role="alert"]')?.textContent).toContain(
+            'No preview for the isolation forest',
+        );
+    });
+
     it('does not preview an invalid draft and says why', async () => {
         const { fixture, cmp, previewContent } = setup(EXISTING, undefined, { work: true });
         await flush();

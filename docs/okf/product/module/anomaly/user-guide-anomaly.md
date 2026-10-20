@@ -15,3 +15,10 @@ Screens for Anomaly Detection. Design and internals: [Anomaly Detection architec
 - Entity anomaly panel `inspecto-ui/src/app/inspecto/components/anomaly-panel.component.ts` (data via
   `inspecto-ui/src/app/inspecto/api/anomaly-scores.service.ts`): band badge, top Features, day series. Hosted on the
   Incident page, the Risk Score entity view and Link Analysis.
+
+## Scoring method
+
+An Anomaly Model scores with the robust statistical baseline by default. Choose **Isolation forest** under
+Scoring method to score the whole population with an isolation forest instead; its options (trees, sample size,
+seed) appear only then and each has a default. The per-Feature explanation is kept. The forest is fitted by the
+anomaly.score Job, so the draft preview shows "No preview for the isolation forest" instead of a score.

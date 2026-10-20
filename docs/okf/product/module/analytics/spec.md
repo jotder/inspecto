@@ -1112,7 +1112,10 @@ every `FeatureResult` field; `contribution = share·raw` sums to `raw`, features
 the top one), and `AnomalyForestScorer.recompute` rebuilds `{raw, score}` from the stored explanation alone. Output goes
 through the M7 score-output contract unchanged (`period_start, score, band, raw, features, insufficient_count`). The entity cap
 (`maxEntities`) fails the run before the forest is fitted. **No preview** (D-AN28: fitting on the request path). Fewer than 2
-entities score 0. ⚠ Not authorable in the UI model form yet (D-AN29): write `method` / `forest` as TOON.
+entities score 0. The UI model form authors `method` and, for the forest, `trees` / `sampleSize` / `seed` (D-AN29, 2026-10-20); the draft
+preview box says "no preview for the isolation forest" rather than scoring with the robust method. The shipped AML pack
+model uses the forest (`PackFraudAmlAnomalyPropertyTest`: planted account elevated, clear margin over the look-alike,
+explained by its isolation shares).
 
 ### Tests
 

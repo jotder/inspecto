@@ -126,4 +126,24 @@ class PackFraudAmlAnomalyPropertyTest {
     void amlLookAlikeAndOthersStayNormal() throws Exception {
         assertOthersNormal(aml);
     }
+
+    /**
+     * ANOMALY-ML-SCORING-1 (3): the SHIPPED AML model scores with the isolation forest (ANALYTICS-CORE-1 C4) - the
+     * corpus has two Features that both jump for the planted account, which the forest isolates in a few cuts. The
+     * planted account is elevated, outranks the look-alike by a clear margin, and is explained by its Features'
+     * isolation shares (the per-Feature explanation is kept under the forest).
+     */
+    @Test
+    void amlShippedModelUsesTheForestAndStillRanksAndExplainsThePlantedAccount() throws Exception {
+        assertNotNull(aml.model().forest(), "the shipped AML model must say method: isolation_forest");
+        Map<String, AnomalyScorer.Scored> s = aml.scoreFor("2026-10-01");
+        AnomalyScorer.Scored spike = s.get("spike");
+        AnomalyScorer.Scored steady = s.get("steady");
+        assertTrue(spike.score() >= aml.model().elevatedThreshold(), "elevated: " + spike.score());
+        assertTrue(spike.score() > steady.score() + 20, "clear margin over the look-alike: " + spike.score() + " vs " + steady.score());
+        assertEquals("normal", steady.band());
+        assertEquals(2, spike.features().size());
+        assertTrue(spike.features().get(0).reason().contains("isolation share"), spike.features().get(0).reason());
+        assertTrue(spike.features().stream().anyMatch(f -> f.feature().equals("out_count") && f.contribution() > 0));
+    }
 }
