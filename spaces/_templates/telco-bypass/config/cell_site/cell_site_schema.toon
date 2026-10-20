@@ -1,0 +1,24 @@
+raw:
+  name: CELL_SITE
+  format: CSV
+  fields[4]{name,selector,type,description,unit,classification}:
+    cell_id,"0",VARCHAR,"Cell identifier, the key of voice_cdr.cell_id","","CONFIDENTIAL"
+    site_id,"1",VARCHAR,"Site the cell belongs to","","CONFIDENTIAL"
+    lat,"2",DOUBLE,"Latitude in decimal degrees","deg","CONFIDENTIAL"
+    lon,"3",DOUBLE,"Longitude in decimal degrees","deg","CONFIDENTIAL"
+mapping:
+  canonicalName: cell_site
+  rawName: CELL_SITE
+  fields[4]:
+    - name: cell_id
+      from: cell_id
+      fn: keep
+    - name: site_id
+      from: site_id
+      fn: keep
+    - name: lat
+      from: lat
+      fn: keep
+    - name: lon
+      from: lon
+      fn: keep

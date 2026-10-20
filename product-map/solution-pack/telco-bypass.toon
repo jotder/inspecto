@@ -1,0 +1,7 @@
+id: solution-pack.telco-bypass
+kind: solution-pack
+title: Telecom bypass (SIM-box)
+template: telco-bypass
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/telco-bypass/index.md

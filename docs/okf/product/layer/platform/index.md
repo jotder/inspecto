@@ -42,7 +42,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Decisioning add-on | — |
 | `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | The only Helm chart is a replicas-1 StatefulSet; there is no N-pod topology, no ingress template, no per-pod Space assignment. | operator |
-| `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | Three operator decisions are unsigned and block the rest of phase C. | operator |
+| `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | D14 and D16 SIGNED yes 2026-10-20 (operator, accepted the recommended answer); D15 stays open (operator-signed 2026-10-18 per the index,… | operator |
 | `SCALEOUT-LIVE-HALVES-1` | P3 | chore | The live halves of spike S5 (pg_duckdb view queried from psql) and of an end-to-end S1 run across N processes are still owed; D13 has no… | — |
 | `MODULE-REORG-P4-3` | P3 | feature | a disabled module's in-flight work and long-lived subscriptions (the only P4 residue). | — |
 | `MODULE-REORG-P3-THIN-JARS` | P3 | feature | thin per-module jars + Offering-driven launcher classpath. | — |

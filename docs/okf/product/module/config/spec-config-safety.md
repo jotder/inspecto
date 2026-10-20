@@ -193,7 +193,7 @@ local `s3:` directory — see `PathJail.isUri`), so an object-store location has
   gate still cannot COPY outside an allowed prefix.
 * ⚠ **Accepted at the gate is not yet written by a run:** `ConsignmentIngestStrategy.configure` refuses a URI
   `dirs.database` by name — the ingest lane has no credentials route and its sealed connection has external
-  access off. That wiring is the rest of the row. Call (BACKLOG §1; **ASSISTANT-DECIDED under operator delegation 2026-10-18 — PENDING OPERATOR CONFIRMATION.** server list only, no per-Space key): whether a Space may narrow the
+  access off. That wiring is the rest of the row. Call (BACKLOG §1; **ASSISTANT-DECIDED under operator delegation 2026-10-18; CONFIRMED 2026-10-20 (operator, accepted the recommended answer).** server list only, no per-Space key): whether a Space may narrow the
   server list to its own prefix.
 
 Pinned by `PathJailObjectStoreTest`, `ConfigSafetyValidatorTest.anAllowListedObjectStoreDatabaseDirIsAcceptedAndNothingElseIs`

@@ -88,6 +88,18 @@ class AnomalyKindValidatorTest {
     }
 
     /** The peer corpus with its Datasets re-declared to carry {@code columns[].classification}. */
+    @Test
+    void aDatasetReadingTheModelsOwnOutputStoreIsAcceptedButOneWithAPathOverrideIsRefused(@TempDir Path dir) throws Exception {
+        Path cfg = dir.resolve("config"), data = dir.resolve("data");
+        AnomalyCorpus.plant(cfg, data);
+        ComponentStore store = new ComponentStore(cfg.resolve("registry"));
+        store.write("dataset", "usage_view", Map.of("physicalRef", "anomaly_scores_usage_latest"));
+        v.validateInSpace(cfg, () -> data, "usage", AnomalyCorpus.model());   // a read view of our own store
+        store.write("dataset", "usage_view", Map.of("physicalRef", "anomaly_scores_usage_latest", "path", "elsewhere"));
+        refused(() -> v.validateInSpace(cfg, () -> data, "usage", AnomalyCorpus.model()),
+                "already reads as its store");
+    }
+
     private static Path peerSpace(Path dir, Map<String, Object> subscribers) throws Exception {
         Path cfg = dir.resolve("config"), data = dir.resolve("data");
         AnomalyPeerCorpus.plant(cfg, data);

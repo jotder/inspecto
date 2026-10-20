@@ -276,6 +276,11 @@ so it cannot collide with the re-rating, settlement, SIM-box or IRSF lanes; the 
 | **D-5G9** | Classification of `ICCID`, `IMSI`, `MSISDN`, `EID`, and masking in dashboards (the `telco-fraud` masked-dashboard work set the precedent). | PII for all four; masked unless the viewer can reveal. |
 | **D-5G10** | Commercial: `billable`, `orderCode` for each solution pack; matrix cell U after U7 (**N** to **P** or **Y**)? | The operator's call; the matrix changes only when a slice ships. |
 
+**ANSWERED 2026-10-20 (operator, accepted the recommended answer): D-5G1…D-5G10.** D-5G1 hold U2…U6, do U0 now, U1 only with
+the RFP bid decision; D-5G3 one owner (cross-lane: `WS-15` / `WS-16` own it if the RFP proceeds); D-5G2, D-5G4…D-5G10 as
+recommended (D-5G6 is still decided at U6 and D-5G10 stays the operator's call at ship time, as the column says). The row stays
+`hold: demand`.
+
 ## 11. Risks
 
 1. **No evidence of the operator's fields.** Canonical Schemas are invented by this plan; a real CHF or IoT-platform export

@@ -3,8 +3,8 @@
 > 🟡 **PLAN 2026-10-18: design only, nothing built.** Closes competitive gap **Q** (partner / settlement / wholesale) in
 > [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md). Gap **C** (re-rating) has
 > its own plan, written in parallel by a sibling session; this plan states only the **contract it needs from it** (§5) and
-> does not design re-rating. Decisions below are marked **PS-D1…PS-D10**: each is a recommendation awaiting the operator
-> (§11), with how to reverse it. **What is NOT known:** no real partner statement, TAP file or MVNO wholesale invoice has been
+> does not design re-rating. Decisions below are marked **PS-D1…PS-D10**: each was a recommendation, accepted by the operator
+> 2026-10-20 (§11), with how to reverse it. **What is NOT known:** no real partner statement, TAP file or MVNO wholesale invoice has been
 > seen in this repository; every format below is synthetic or from public sources, and the vendor claims are published
 > claims, not verified behaviour (matrix §2).
 
@@ -283,6 +283,13 @@ finance-team depth.
 | PS-D8 | Evidence pack through Regulatory Reporting | reuse | a PDF letter engine, demand-gated |
 | PS-D9 | Does the Impact ledger stay manual for settlement | yes, as for `telco-ra` (2026-10-04) | n/a |
 | PS-D10 | Wholesale/MVNO (W1) before or after roaming (W3) | W1, because R7 already has the controls and it reuses S3 | order only |
+
+**ANSWERED 2026-10-20 (operator, accepted the recommended answer): PS-D1…PS-D10, all as recommended** (the Recommendation
+column above). PS-D1 separate `partner-settlement` pack; PS-D2 leave `ra_settlement`, `ic_statement`, `ic_rates` in `telco-ra`;
+PS-D3 SQL normalisation; PS-D4 operator-fed FX Reference; PS-D5 ship the authored CASE workflow; PS-D6 Impact mapping as written
+(§8); PS-D7 accrual provision shipped as a **configurable default (100 %) and stated as a finance policy**, not an engineering
+call; PS-D8 reuse Regulatory Reporting for the evidence pack; PS-D9 Impact ledger stays manual; PS-D10 W1 before W3. Slices
+S0…S3 (the smallest cut) are now startable.
 
 Everything above is "recommended" because it is the smaller, reversible change; none is security-loosening and none needs
 sign-off beyond preference. PS-D3 and PS-D5 are the two the operator should look at, because each touches an existing

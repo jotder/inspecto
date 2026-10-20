@@ -77,6 +77,20 @@ modules, and leaf-module fixes tested 1–9.
   and the nightly run is the backstop. ⚠ A broken push is therefore found by the next nightly or an ad-hoc run, not at
   push time: run the full local gate before every push, and trigger CI by hand after a push that touched shared seams.
 
+## Nightly Postgres-gated tests (`nightly-postgres.yml`, ASSURE-OPERABILITY-1 D2, 2026-10-20)
+- **What:** 16 Postgres-gated classes run against a `postgres:18` service container, with `INSPECTO_TEST_PG_URL` set
+  (`-Pedition-advanced`, modules `inspecto-processor`, `inspecto-ops`, `inspecto-case-management`, `inspecto-engine`,
+  `inspecto-la-store-pg` plus `-am`). They assume-skip without a server, so a green local run says nothing about them;
+  this is what covers the pgjdbc bump every night. `ci.yml` already runs most of them once per full run on a
+  `postgres:16` service via the `-Dinspecto.test.pg.url` property, but the `inspecto-la-store-pg` classes read only the
+  env var and so skipped there.
+- **Skip safeguard:** the last step reads every `TEST-<class>.xml` under `target/surefire-reports` and FAILS when a
+  named class has no report or any skipped test (the one allowed skip is the TLS test in `PostgresPublishPgTest`,
+  which needs a locally pulled TLS Postgres image). Surefire counts a skip as green; this step is what makes it red.
+- **Trigger:** nightly 02:47 UTC, or `gh workflow run "Nightly postgres tests" --ref master`. Reports upload as
+  `nightly-postgres-reports` on failure. Not run on GitHub yet: the first scheduled or dispatched run is the proof.
+- Not in the list: `PostgresPublishJobTest` (DuckDB stand-in) and `ConnectionSourceTest` (no env var read).
+
 ## Mandatory DuckDB native-access flag
 
 Every JVM launch (engine, tests, serve scripts) **must** pass:
