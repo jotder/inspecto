@@ -38,3 +38,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 | `TELCO-FRAUD-STORY-GAPS-1` | P3 | feature | the telco-fraud story has beats the template cannot run, plus small UI rough edges. | — |
 | `PACK-IRSF-WANGIRI-1` | P3 | feature | interconnect / wholesale fraud from CDRs: IRSF, Wangiri, flash-call / CLI patterns | operator |
 | `TELCO-BYPASS-SIMBOX-1` | P3 | feature | bypass / SIM-box detection from CDRs | — |
+| `ANOMALY-TF-STORE-CLASH-1` | P3 | defect | defect: AnomalyTemplateModelsTest.thePackModelIsStorableAndWired[1] (telco-fraud / tf_subscriber_usage) ERRORS on clean master | — |

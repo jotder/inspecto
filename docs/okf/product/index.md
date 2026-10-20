@@ -37,7 +37,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (66 open rows
 * [Mobile money](solution-pack/mobile-money/index.md) - `solution-pack.mobile-money` · 5 doc(s) · 0 open row(s)
 * [Orders starter](solution-pack/orders-starter/index.md) - `solution-pack.orders-starter` · 5 doc(s) · 0 open row(s)
 * [Payment fraud starter](solution-pack/payment-fraud/index.md) - `solution-pack.payment-fraud` · 5 doc(s) · 0 open row(s)
-* [Telecom fraud](solution-pack/telco-fraud/index.md) - `solution-pack.telco-fraud` · 5 doc(s) · 4 open row(s)
+* [Telecom fraud](solution-pack/telco-fraud/index.md) - `solution-pack.telco-fraud` · 5 doc(s) · 5 open row(s)
 * [Telecom revenue assurance](solution-pack/telco-ra/index.md) - `solution-pack.telco-ra` · 5 doc(s) · 0 open row(s)
 
 # Layers
@@ -74,7 +74,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (66 open rows
 * [Action Requests](module/action-requests/index.md) - `module.action-requests` · 10 doc(s) · 0 open row(s)
 * [Hosted model providers for the assistant](module/agent-hosted/index.md) - `module.agent-hosted` · 7 doc(s) · 0 open row(s)
 * [Assistant agent](module/agent/index.md) - `module.agent` · 13 doc(s) · 3 open row(s)
-* [Analytics Kernel (canonical statistics and baselines)](module/analytics/index.md) - `module.analytics` · 10 doc(s) · 8 open row(s)
+* [Analytics Kernel (canonical statistics and baselines)](module/analytics/index.md) - `module.analytics` · 10 doc(s) · 7 open row(s)
 * [Anomaly Detection](module/anomaly/index.md) - `module.anomaly` · 10 doc(s) · 2 open row(s)
 * [Public API annotations](module/api/index.md) - `module.api` · 4 doc(s) · 0 open row(s)
 * [ASN.1 decoders](module/asn-decoders/index.md) - `module.asn-decoders` · 6 doc(s) · 1 open row(s)
