@@ -3,7 +3,7 @@ type: Feature
 title: "Telecom re-rating (tariff validation) — admin guide"
 description: "Install, size and verify the Telecom re-rating pack."
 tags: [telco-rerating, admin-guide]
-timestamp: 2026-10-20T00:00:00Z
+timestamp: 2026-10-21T00:00:00Z
 ---
 
 # Telecom re-rating (tariff validation) — admin guide
@@ -24,11 +24,11 @@ timestamp: 2026-10-20T00:00:00Z
    ```
 
    The first refusal creates no Space (`docs/api/openapi-v1.json`, `postSpaces`).
-3. Point the operator's rating output at `data/inbox/rated_usage` (one file per day, `RATED_USAGE_<yyyyMMdd>.csv`) and deliver the whole tariff table, one row per version, to `data/inbox/tariff_version` whenever it changes. No sample files ship: use the contracts in `config/rated_usage/rated_usage_schema.toon` and `config/tariff_version/tariff_version_schema.toon`.
+3. Point the operator's rating output at `data/inbox/rated_usage` (one file per day, `RATED_USAGE_<yyyyMMdd>.csv`) deliver the whole tariff table, one row per version, to `data/inbox/tariff_version` whenever it changes, and the whole subscription history to `data/inbox/subscription_history`. No sample files ship: use the contracts in `config/rated_usage/rated_usage_schema.toon`, `config/tariff_version/tariff_version_schema.toon` and `config/subscription_history/subscription_history_schema.toon`.
 
 ## The feed contracts
 
-`rated_usage`: `XDR_ID, EVENT_TS, EVENT_DATE, SUBSCRIBER_ID, PLAN, SERVICE, USAGE_UNITS, CHARGE`. `EVENT_TS` is the call start, naive, in one agreed zone, and must be the zone of the tariff's effective dates. `tariff_version`: `TARIFF_VERSION_ID, PLAN, SERVICE, RATE_PER_UNIT, EFFECTIVE_FROM, EFFECTIVE_TO` (blank = open) and the optional `PRIORITY` (the higher number wins; a blank counts as lowest); leave `PRIORITY` blank, or end the file after `EFFECTIVE_TO`. The tariff Pipeline sets `csv_settings.null_padding: true` for that. The tariff is **one row per version**, not a current snapshot: past versions must stay in the file so a late-arriving call is rated at the rate in force when it started.
+`rated_usage`: `XDR_ID, EVENT_TS, EVENT_DATE, SUBSCRIBER_ID, PLAN, SERVICE, USAGE_UNITS, CHARGE`. `EVENT_TS` is the call start, naive, in one agreed zone, and must be the zone of the tariff's effective dates. `tariff_version`: `TARIFF_VERSION_ID, PLAN, SERVICE, RATE_PER_UNIT, EFFECTIVE_FROM, EFFECTIVE_TO` (blank = open) and the optional `PRIORITY` (the higher number wins; a blank counts as lowest); leave `PRIORITY` blank, or end the file after `EFFECTIVE_TO`. The tariff Pipeline sets `csv_settings.null_padding: true` for that. `subscription_history`: `SUBSCRIBER_ID, PLAN, FROM_TS` (inclusive), `TO_TS` (exclusive, blank = open): one row per period, the whole history in every file. It is an ordinary feed and not an `scd2` Reference, because the periods are in the past (plan section 15). `SUBSCRIBER_ID` is `INTERNAL`: deliver masked or synthetic ids. The tariff is **one row per version**, not a current snapshot: past versions must stay in the file so a late-arriving call is rated at the rate in force when it started.
 
 ## Sizing
 
@@ -44,7 +44,7 @@ Peak DuckDB memory of the re-rating statement by rated-usage rows in one day, 4 
 
 ## Explanation and root causes
 
-`rr_explain` and `rr_root_cause` read only the findings and the tariff table: their cost follows the number of findings, not of calls, and the root-cause Job reads the whole retained `rerating_findings` (31 days). Measured on the 560-call synthetic day: 0.14 to 0.7 s and 0.06 to 0.2 s across runs on a loaded box. **They were not measured at volume**; the sizing figures above are for `rr_rerate` only. Keep `tolerance` equal in `rr_rerate` and `rr_explain`. A root cause keeps its id from day to day, so an Alert Rule by `ROOT_CAUSE_ID` (a later slice) opens one Incident per cause; size `stormCap` for the number of distinct causes (plan section 12.1).
+`rr_root_cause` reads the whole retained `rerating_findings` (31 days). Since slice R3 `rr_explain` also reads the day's calls of the subscribers that have a finding (plan inference) and the subscription history, so its cost follows the calls of those subscribers. Measured over in-memory tables (not through the Job and Parquet): 0.28 s before and 0.47 s after at 5 million calls with 3,800 findings on 300 subscribers, 0.60 s and 0.9 s at 10 million, about 15 MiB more peak memory (plan section 15). Not measured: findings spread over many thousands of subscribers, the Parquet scan, a real history of millions of rows. The sizing figures above are for `rr_rerate`. Keep `tolerance` equal in `rr_rerate` and `rr_explain`. A root cause keeps its id from day to day, so an Alert Rule by `ROOT_CAUSE_ID` (a later slice) opens one Incident per cause; size `stormCap` for the number of distinct causes (plan section 12.1).
 
 ## Safety
 

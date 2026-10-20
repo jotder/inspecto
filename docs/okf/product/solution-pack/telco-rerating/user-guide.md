@@ -3,16 +3,16 @@ type: Feature
 title: "Telecom re-rating (tariff validation) — user guide"
 description: "How an analyst reads the tariff-hygiene findings and the re-rated usage in the Telecom re-rating pack."
 tags: [telco-rerating, user-guide]
-timestamp: 2026-10-20T00:00:00Z
+timestamp: 2026-10-21T00:00:00Z
 ---
 
 # Telecom re-rating (tariff validation) — user guide
 
-What a Space created from the `telco-rerating` template gives an analyst in slices R0 to R2. Design detail is in [architecture](architecture.md); the reading guide is `config/runbooks/telco-rerating-runbooks.md` in the Space.
+What a Space created from the `telco-rerating` template gives an analyst in slices R0 to R3. Design detail is in [architecture](architecture.md); the reading guide is `config/runbooks/telco-rerating-runbooks.md` in the Space.
 
 ## Data arriving
 
-Copy the day's rated usage file (`RATED_USAGE_<yyyyMMdd>.csv`) into `data/inbox/rated_usage`. Copy the **whole** tariff table, one row per version, into `data/inbox/tariff_version` whenever it changes (`TARIFF_VERSION_<yyyyMMdd>.csv`).
+Copy the day's rated usage file (`RATED_USAGE_<yyyyMMdd>.csv`) into `data/inbox/rated_usage`. Copy the **whole** tariff table, one row per version, into `data/inbox/tariff_version` whenever it changes (`TARIFF_VERSION_<yyyyMMdd>.csv`), and the **whole** subscription history, one row per plan period (`SUBSCRIBER_ID, PLAN, FROM_TS, TO_TS`), into `data/inbox/subscription_history` (`SUBSCRIPTION_HISTORY_<yyyyMMdd>.csv`). Without a history no wrong plan is claimed.
 
 ## The daily cycle
 
@@ -37,11 +37,11 @@ Each row carries what was charged (`ACTUAL_CHARGE`), what the tariff says (`EXPE
 
 Open `rerating_root_causes` first when you want to fix things: one row per cause, not per call. `ROOT_CAUSE_ID` names the cause, the plan and service, the tariff versions in force and the version the cause points at; it holds no date, so the same cause keeps its id tomorrow. `CALLS`, `FIRST_DAY`, `LAST_DAY` and `RUN_RATE_PER_DAY` say how big and how long; `LEAKAGE_LOW` is the revenue at risk and `OVERBILLED_AMOUNT` the customer exposure, never added together.
 
-`rerating_findings` has the call behind each row. `CAUSE` is what a counterfactual re-rating is **consistent with**: `stale_version` (the charge equals the version that ended most recently), `lower_priority_rate` (a row that lost on `PRIORITY`) or `early_version` (the next version, billed early). `CAUSE_CONFIDENCE` is exactness times support; `CAUSE_ALTERNATIVE` lists every other cause that fits. `unexplained` (confidence 0) means nothing fits, or not enough of the same plan's findings agree. `LEAKAGE_HIGH` is the shortfall against the dearest candidate: for an ambiguous tariff it is exposure the tariff might justify, not a claim. The KPIs `revenue_at_risk` and `overbilled_amount` sum the two amounts over this Dataset.
+`rerating_findings` has the call behind each row. `CAUSE` is what a counterfactual re-rating is **consistent with**: `stale_version` (the charge equals the version that ended most recently), `lower_priority_rate` (a row that lost on `PRIORITY`), `early_version` (the next version, billed early) or `wrong_plan` (the charge is another plan's rate, the one the subscriber's calls of the day are billed at, while the history assigns a different plan at that call's start; `CAUSE_TARIFF_VERSION_ID` is the other plan's version and the confidence is exactness times the share of the subscriber's calls that plan explains). A subscriber whose history shows a plan change, with calls on both sides of it, is **not** a wrong plan when the plan inferred is the one assigned at the call. `CAUSE_CONFIDENCE` is exactness times support; `CAUSE_ALTERNATIVE` lists every other cause that fits. `unexplained` (confidence 0) means nothing fits, or not enough of the same plan's findings agree. `LEAKAGE_HIGH` is the shortfall against the dearest candidate: for an ambiguous tariff it is exposure the tariff might justify, not a claim. The KPIs `revenue_at_risk` and `overbilled_amount` sum the two amounts over this Dataset.
 
 ## What it will not tell you
 
-A mismatch shows a charge differs from the tariff **as written**; a cause is a hypothesis the numbers are consistent with, and nothing says the table is right. The wrong plan, the rate-structure causes, the Alert Rule and the comparison with the invoice come in later slices. Billing increments, minimum charges, zones, time bands, tax and allowances are not modelled yet: a plan that uses them will show differences that are not defects.
+A mismatch shows a charge differs from the tariff **as written**; a cause is a hypothesis the numbers are consistent with, and nothing says the table is right. The rate-structure causes, the Alert Rule and the comparison with the invoice come in later slices. Billing increments, minimum charges, zones, time bands, tax and allowances are not modelled yet: a plan that uses them will show differences that are not defects.
 
 ## Verify
 
@@ -50,4 +50,4 @@ A mismatch shows a charge differs from the tariff **as written**; a cause is a h
 
 ## Tuning
 
-`tolerance` (absolute, default 0.02) is a parameter of `rr_rerate` and of `rr_explain`; keep the two equal. `within_tolerance_confidence` (0.9) and `confidence_floor` (0.5) are parameters of `rr_explain` in `config/jobs/rr_explain_job.toon`. The shipped values are illustrative until set from your own rounding behaviour and your own tolerance for a weakly supported cause.
+`tolerance` (absolute, default 0.02) is a parameter of `rr_rerate` and of `rr_explain`; keep the two equal. `within_tolerance_confidence` (0.9), `confidence_floor` (0.5), `plan_share` (0.6) and `plan_min_rows` (3) are parameters of `rr_explain` in `config/jobs/rr_explain_job.toon`. The shipped values are illustrative until set from your own rounding behaviour and your own tolerance for a weakly supported cause.
