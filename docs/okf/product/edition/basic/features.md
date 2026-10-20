@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: "Basic Edition — features"
-description: "Basic is the entry Edition: core connectors, Entity Lists, the Link Analysis studio and three content packs."
+description: "Basic is the entry Edition: core connectors, Entity Lists, the Link Analysis studio and two content packs."
 tags: [basic, edition, features, presales]
 timestamp: 2026-10-19T00:00:00Z
 ---
@@ -12,7 +12,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 ## What it is
 
-Basic is the entry Edition: core connectors, Entity Lists, the Link Analysis studio and three content packs. For the sales story see [brochure](brochure.md).
+Basic is the entry Edition: core connectors, Entity Lists, the Link Analysis studio and two content packs. For the sales story see [brochure](brochure.md).
 
 ## Includes
 
@@ -42,7 +42,6 @@ Basic is the entry Edition: core connectors, Entity Lists, the Link Analysis stu
 
 ## Content packs added
 
-- [business-assurance](../../solution-pack/business-assurance/index.md)
 - [la-daily-feed](../../solution-pack/la-daily-feed/index.md)
 - [orders-starter](../../solution-pack/orders-starter/index.md)
 

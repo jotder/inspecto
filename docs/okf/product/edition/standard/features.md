@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: "Standard Edition — features"
-description: "Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus five content packs."
+description: "Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus six content packs."
 tags: [standard, edition, features, presales]
 timestamp: 2026-10-19T00:00:00Z
 ---
@@ -12,7 +12,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 ## What it is
 
-Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus five content packs. For the sales story see [brochure](brochure.md).
+Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus six content packs. For the sales story see [brochure](brochure.md).
 
 ## Includes
 
@@ -67,6 +67,7 @@ Standard includes Basic and adds sign-in, operations, case, assurance and detect
 
 ## Content packs added over Basic
 
+- [business-assurance](../../solution-pack/business-assurance/index.md)
 - [mobile-money](../../solution-pack/mobile-money/index.md)
 - [aml](../../solution-pack/aml/index.md)
 - [payment-fraud](../../solution-pack/payment-fraud/index.md)
