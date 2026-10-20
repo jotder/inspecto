@@ -33,7 +33,7 @@ class RerateCorpusTest {
         // each defect plan is owned by one archetype family: a planted call never sits on a plan another family uses for a different defect
         assertEquals(12, c.archetypes.get("B_AGREE").size(), "the twelve calls the starter control flags for ONE duplicate row");
         assertEquals(5, c.archetypes.get("A_STALE").size());
-        assertEquals(8, c.archetypes.get("C_RANGE").size());
+        assertEquals(9, c.archetypes.get("C_RANGE").size());
         assertEquals(8, c.archetypes.get("J_TOLERANCE").size());
     }
 
@@ -42,13 +42,14 @@ class RerateCorpusTest {
         RerateCorpus c = new RerateCorpus().generate();
         Map<String, Long> byClass = new java.util.TreeMap<>();
         for (String v : c.planted.values()) byClass.merge(v.substring(0, v.lastIndexOf('|')), 1L, Long::sum);
-        assertEquals(Map.of("rate_mismatch|leakage", 14L, "rate_mismatch|overbilled", 6L, "ambiguous_tariff|data_quality", 7L, "no_tariff|data_quality", 9L), byClass);
-        assertEquals(19, c.plantedTariff.size());
-        assertEquals(2, c.outsideWindow.size());
+        assertEquals(Map.of("rate_mismatch|leakage", 33L, "rate_mismatch|overbilled", 8L, "ambiguous_tariff|data_quality", 9L, "no_tariff|data_quality", 11L,
+                "unratable_call|data_quality", 2L), byClass);
+        assertEquals(37, c.plantedTariff.size());
+        assertEquals(3, c.outsideWindow.size(), "one second before the day, midnight after it, and day 2's stale-version call");
     }
 
     @Test
-    void everyCallIsInsideTheDayExceptTheTwoDeliberateOnes() {
+    void everyCallIsInsideTheDayExceptTheThreeDeliberateOnes() {
         RerateCorpus c = new RerateCorpus().generate();
         Set<String> outside = new HashSet<>();
         for (RerateCorpus.Usage u : c.usage()) {
@@ -64,7 +65,7 @@ class RerateCorpusTest {
         for (RerateCorpus.Usage u : c.usage()) {
             assertTrue(u.plan().startsWith("PLAN_"), u.plan());
             assertTrue(u.subscriber().matches("SUB[0-9]{4}"), u.subscriber());
-            assertTrue(u.charge().scale() <= 4, u.id());
+            assertTrue(u.charge() == null || u.charge().scale() <= 4, u.id());
         }
         for (RerateCorpus.Tariff t : c.tariffs()) {
             assertTrue(t.plan().startsWith("PLAN_"), t.plan());

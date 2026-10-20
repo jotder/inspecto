@@ -1,0 +1,8 @@
+name: overbilled_amount
+title: Over-billed amount (USD)
+dataset: rerating_findings
+measure: sum(OVERBILLED_AMOUNT)
+timeField: EVENT_DATE
+grain: month
+comparison: previous
+direction: down

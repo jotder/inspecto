@@ -1,9 +1,9 @@
 # Telecom re-rating (tariff validation) runbooks
 
-> **Skeleton (slices R0 and R1).** This Space Template judges the tariff table and re-rates one day of rated usage at a time.
-> It explains no cause yet, groups no root cause, compares nothing with the invoice and raises no Alert, so there is no Incident to
-> work from this file: the reading guide below is for the analyst who opens the `rerating_tariff_findings` and `rerated_usage`
-> Datasets. The root-cause and Incident runbooks arrive with the Alert Rules in the next slices
+> **Skeleton (slices R0 to R2).** This Space Template judges the tariff table, re-rates one day of rated usage at a time, explains each
+> finding and groups the findings into root causes. It compares nothing with the invoice and raises no Alert, so there is no Incident to
+> work from this file: the reading guide below is for the analyst who opens the `rerating_tariff_findings`, `rerated_usage`,
+> `rerating_findings` and `rerating_root_causes` Datasets. The root-cause and Incident runbooks arrive with the Alert Rules in the next slices
 > (`docs/superpower/rerating-tariff-validation-plan.md`).
 
 **This pack is an unbilled preview.** It re-rates usage for validation only: it is independent of the billing system, it never
@@ -12,13 +12,17 @@ as written, never proof that the table is right.
 
 ## What runs
 
-Two chained `sql.template` Jobs:
+Four chained `sql.template` Jobs:
 
 1. `rr_tariff_hygiene` (daily at 04:30) judges the whole `tariff_version` Dataset and replaces the `rerating_tariff_findings`
    snapshot: one row per defect in the table itself, before any usage is judged.
 2. `rr_rerate` runs when `rr_tariff_hygiene` has succeeded. It re-rates the day before (`window_start` to `window_end`, the
    `day` parameter names the partition) and writes one row per call to `rerated_usage` (31 days kept). Run it for another day
    by passing `window_start`, `window_end` and `day` on the run.
+3. `rr_explain` runs when `rr_rerate` has succeeded, for the same day, and writes one row per finding to `rerating_findings`
+   (31 days kept): the cause, its confidence and the revenue-at-risk columns.
+4. `rr_root_cause` runs when `rr_explain` has succeeded and replaces the snapshot `rerating_root_causes`: one row per root cause over
+   every retained day.
 
 ## Reading `rerating_tariff_findings`
 
@@ -51,11 +55,42 @@ however far the call runs past a change.
 | `leakage` | `rate_mismatch` | Charged less than expected by more than the tolerance. `UNDERCHARGED_AMOUNT` is the shortfall against the nearest bound. |
 | `overbilled` | `rate_mismatch` | Charged more than expected by more than the tolerance. `OVERBILLED_AMOUNT` is the excess. A customer and regulatory exposure, **not** recovered revenue. |
 | `data_quality` | `ambiguous_tariff` | The charge lies inside the range an ambiguous tariff allows: explained, not leakage. |
-| `data_quality` | `no_tariff` | The call has no usable tariff row. |
+| `data_quality` | `no_tariff` | The call has no usable tariff row (none in force, no rate, or only a row with a negative rate, which is never rated against). |
+| `data_quality` | `unratable_call` | The call has a tariff but no charge or no units, so it cannot be judged. |
 
 The two amounts are separate columns and never net: sum `UNDERCHARGED_AMOUNT` for what may be uncharged revenue and
 `OVERBILLED_AMOUNT` for the customer exposure. A call within `tolerance` of the expected charge (default 0.02, absolute,
 strict) is silent.
+
+## Reading `rerating_findings`
+
+One row per finding. `CAUSE` is what a counterfactual re-rating is **consistent with**, never proof that it is the only cause.
+
+| `CAUSE` | Reads as |
+|---|---|
+| `stale_version` | The charge equals the amount of the version of that plan and service that ended most recently (`CAUSE_TARIFF_VERSION_ID`): an old rate is still in use. |
+| `lower_priority_rate` | The call has a winner by `PRIORITY`, and the charge equals the amount of a row in force that lost (`CAUSE_TARIFF_VERSION_ID`). |
+| `early_version` | The charge equals the amount of the next version, billed before it starts. |
+| `unexplained` | No hypothesis fits, or none is supported well enough (confidence below `confidence_floor`). Confidence is 0. |
+| `no_tariff`, `ambiguous_tariff`, `unratable_call` | A data-quality finding is its own cause (confidence 1): no usable tariff row; a charge inside the range an ambiguous tariff allows; no charge or no units on the call. |
+
+`CAUSE_CONFIDENCE` is exactness (1 when the counterfactual reproduces the charge exactly, `within_tolerance_confidence` when only within the
+tolerance) times support (the share of the same plan, service, candidate versions and finding that the same cause also explains). Every other
+fitting cause is listed in `CAUSE_ALTERNATIVE`.
+
+| Column | Reads as |
+|---|---|
+| `LEAKAGE_LOW` | The shortfall against the nearest bound of the expected range: the **revenue at risk**. Never includes over-billing. |
+| `LEAKAGE_HIGH` | The shortfall against the dearest candidate. For an ambiguous tariff the gap between the two is exposure that the tariff might justify; it is not claimed. |
+| `OVERBILLED_AMOUNT` | The excess over the expected charge: a customer and regulatory exposure, kept apart from the revenue at risk. |
+| `LEAKAGE_AMOUNT` | A copy of `LEAKAGE_LOW`, for readers that expect the starter control's column list. |
+
+## Reading `rerating_root_causes`
+
+One row per `ROOT_CAUSE_ID` (cause, finding class, plan, service, the tariff versions in force and the version the cause points at; no date, so
+a cause keeps its id from day to day). `CALLS`, `FIRST_DAY` and `LAST_DAY`, the sums of the three amounts, `RUN_RATE_PER_DAY` (`LEAKAGE_LOW`
+over the calendar days from first to last), the weakest confidence in the group and up to three example `ITEM_KEY`s. Fix the tariff or the
+rater once per root cause, not once per call. The KPIs `revenue_at_risk` (sum of `LEAKAGE_LOW`) and `overbilled_amount` are over `rerating_findings`.
 
 ## Feed contract
 

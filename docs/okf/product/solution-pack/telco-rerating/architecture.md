@@ -1,8 +1,8 @@
 # Telecom re-rating (tariff validation)
 
 > **Level 2 solution page.** Content pack: Space Template `telco-rerating`
-> (`spaces/_templates/telco-rerating/template.toon`). **Slices R0 and R1 of `PACK-RERATING-1` are built: tariff versioning,
-> tariff-table hygiene and ambiguity verdicts.** Causes, root-cause grouping, revenue at risk, Alert Rules and the
+> (`spaces/_templates/telco-rerating/template.toon`). **Slices R0 to R2 of `PACK-RERATING-1` are built: tariff versioning,
+> tariff-table hygiene, ambiguity verdicts, causes with confidence, root-cause grouping and revenue at risk.** Plan inference, rate structure, Alert Rules and the
 > re-rated-versus-billed Reconciliation are later slices ([plan](../../../../superpower/rerating-tariff-validation-plan.md)).
 > Checked against the template on 2026-10-20. This pack is an unbilled preview: commercial terms are not set (D-RR10).
 
@@ -31,13 +31,22 @@ zero-row schema seed under `spaces/_templates/telco-rerating/data/`, so both Job
 
 ## What the pack sets up
 
-Two `sql.template` Jobs, chained on a signal:
+Four `sql.template` Jobs, chained on a signal:
 
 1. `rr_tariff_hygiene` (04:30 daily) judges the whole table and replaces the Dataset `rerating_tariff_findings`: `overlap_same_rate`,
    `overlap_different_rate` (with `PRIORITY_ORDERED`), `gap`, `negative_rate`, `missing_rate`, `missing_start`, `inverted_interval`. A zero rate is a
    free plan, not a defect.
 2. `rr_rerate` (`on_signal: job.run.completed` when `rr_tariff_hygiene` succeeded; window `$yesterday`, `incremental` by
    `window_date`, `lookback: 1`, `retain: 31`) writes the Dataset `rerated_usage`, one row per call: the contract other packs read.
+
+3. `rr_explain` (`on_signal` when `rr_rerate` succeeded; the same window and `incremental` settings) writes the Dataset `rerating_findings`: one row per finding of the day, 23 columns. A leakage or over-billing is tested against
+   three counterfactual re-ratings, each a one-parameter change that must reproduce the charge within `tolerance`: `stale_version` (the most recently ended version), `lower_priority_rate` (a row in force that lost on
+   `PRIORITY`) and `early_version` (the next version). `CAUSE_CONFIDENCE` is exactness (1, or `within_tolerance_confidence`) times support (the share of the same plan, service, candidate versions and finding that the same cause
+   also explains); below `confidence_floor`, or with no fit, `unexplained` with confidence 0; other fitting causes stay in `CAUSE_ALTERNATIVE`. `LEAKAGE_LOW` (revenue at risk), `LEAKAGE_HIGH` and `OVERBILLED_AMOUNT` are separate columns.
+4. `rr_root_cause` (`on_signal` when `rr_explain` succeeded) replaces the snapshot `rerating_root_causes`: one row per `ROOT_CAUSE_ID` (`CAUSE|FINDING|PLAN|SERVICE|CANDIDATE_VERSIONS|CAUSE_TARIFF_VERSION_ID`, no date)
+   over every retained day, with calls, first and last day, the sums, `RUN_RATE_PER_DAY`, the weakest confidence and example keys.
+
+Two KPIs, `revenue_at_risk` (`sum(LEAKAGE_LOW)`) and `overbilled_amount` (`sum(OVERBILLED_AMOUNT)`), read `rerating_findings`.
 
 `rr_rerate` first cuts each plan and service into **segments** between consecutive tariff boundaries, so the candidate rows are
 decided once per segment (a few hundred) and not once per call; each call then joins the one segment in force at its start.
@@ -48,11 +57,11 @@ decided once per segment (a few hundred) and not once per call; each call then j
 | `agree` | several rows, the rounded amounts are equal | that amount |
 | `precedence` | several amounts, exactly one row holds the highest non-blank `PRIORITY` | that row's amount |
 | `disagree` | several amounts and no winner (a tie, or no `PRIORITY`) | none: the range `EXPECTED_LOW` to `EXPECTED_HIGH` |
-| `none` | no usable row in force | none |
+| `none` | no usable row in force (a negative-rate row is never rated against) | none |
 
 A charge more than `tolerance` (absolute, strict, default 0.02) below `EXPECTED_LOW` is `leakage` by the shortfall; above
 `EXPECTED_HIGH` it is `overbilled` by the excess; inside the range of a `disagree` call it is `data_quality` (`ambiguous_tariff`),
-explained and never leakage. `no_tariff` is `data_quality`. `UNDERCHARGED_AMOUNT` and `OVERBILLED_AMOUNT` are separate non-negative
+explained and never leakage. `no_tariff` is `data_quality`; so is `unratable_call` (a call with a tariff but no charge or no units). `UNDERCHARGED_AMOUNT` and `OVERBILLED_AMOUNT` are separate non-negative
 columns and are never netted (D-RR4).
 
 ## Decisions and seams worth knowing
@@ -68,16 +77,18 @@ columns and are never netted (D-RR4).
   overlap or gap, and is reported on its own.
 - **No zone arithmetic.** Both Jobs compare naive timestamps only, so the result does not depend on the host's session zone; the
   golden runs both statements under two zones.
-- **Not built in R1:** orphan-plan detection (needs the plan Reference), the stage columns of R4 (increments, minimum charge,
-  rounding scope, zone, time band, tax) and everything from R2 on.
+- **Decided in R2:** a call on a negative-rate row has no usable tariff; a call with no charge or no units is `unratable_call`; `agree` outranks `precedence` (zero units); `PRIORITY_ORDERED` is a fact about one pair while `RESOLUTION` is the verdict
+  for a call; the gap names the version that ends last, ties to the greater id (the tariff file's order changes nothing). Details and the equivalent clauses no mutant can claim: plan section 14.
+- **Not built:** orphan-plan detection (needs the plan Reference), plan inference and `wrong_plan` (R3), the stage columns of R4 (increments, minimum charge, rounding scope, zone, time band, tax) and their causes, allowances (R5), the Reconciliation, the
+  Alert Rule by `ROOT_CAUSE_ID` and the dashboard (R6). `rr_explain` is unmeasured at volume.
 
 ## Verification
 
 `TelcoRerateGoldenTest` (module `inspecto`, beside `BypassFeatureGoldenTest`) boots the template through `POST /spaces`, ingests the
-seeded synthetic `RerateCorpus` through the template's own Pipelines, runs both Jobs as authored and holds every contract column of
-every call and every tariff finding to an independent plain-Java oracle; the findings to the exact planted set with every look-alike
+seeded synthetic `RerateCorpus` through the template's own Pipelines, runs all four Jobs as authored and holds every contract column of
+every call, every tariff finding, every finding of `rr_explain` and every root cause to an independent plain-Java oracle (and the planted causes to hand-declared ones); the findings to the exact planted set with every look-alike
 silent; the degradation (no `PRIORITY` column), the tolerance parameter, zone independence, idempotent re-runs and the signal chain; and
-a broad pass of clause mutants (73) that must each change the oracle's rows; the known unpinned clauses and limits are in the plan section 13.
+a pass of 132 clause mutants that must each change the oracle's rows (32 must change a named row); the known unpinned clauses and limits are in the plan sections 13 and 14.
 
 ## Related
 

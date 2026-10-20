@@ -1,0 +1,10 @@
+job:
+  name: rr_root_cause
+  type: sql.template
+  description: "Groups the explained findings into root causes, one row per ROOT_CAUSE_ID over every retained day: the cause, the finding class, the plan and service, the tariff versions in force and the version the cause points at, the number of calls, the first and last day, the totals (LEAKAGE_LOW is the revenue at risk and never includes over-billing, OVERBILLED_AMOUNT is the customer exposure), RUN_RATE_PER_DAY (LEAKAGE_LOW over the calendar days from the first to the last), the weakest confidence in the group and up to three example ITEM_KEYs. The id holds no date, so a cause that persists keeps its id from day to day. The whole snapshot is replaced on every run."
+  sql: "SELECT concat_ws('|', CAUSE, FINDING, PLAN, SERVICE, CANDIDATE_VERSIONS, CAUSE_TARIFF_VERSION_ID) AS ROOT_CAUSE_ID, CAUSE, FINDING, PLAN, SERVICE, CANDIDATE_VERSIONS, CAUSE_TARIFF_VERSION_ID, count(*) AS CALLS, min(EVENT_DATE) AS FIRST_DAY, max(EVENT_DATE) AS LAST_DAY, sum(LEAKAGE_LOW) AS LEAKAGE_LOW, sum(LEAKAGE_HIGH) AS LEAKAGE_HIGH, sum(OVERBILLED_AMOUNT) AS OVERBILLED_AMOUNT, CAST(ROUND(sum(LEAKAGE_LOW) / (date_diff('day', min(EVENT_DATE), max(EVENT_DATE)) + 1), 2) AS DECIMAL(18,2)) AS RUN_RATE_PER_DAY, min(CAUSE_CONFIDENCE) AS CAUSE_CONFIDENCE, array_to_string(list(ITEM_KEY ORDER BY ITEM_KEY)[1:3], ',') AS EXAMPLE_ITEM_KEYS, 'rr_root_cause' AS CONTROL FROM rerating_findings GROUP BY CAUSE, FINDING, PLAN, SERVICE, CANDIDATE_VERSIONS, CAUSE_TARIFF_VERSION_ID"
+  sources: "rerating_findings"
+  sink_dataset: rerating_root_causes
+  on_signal: job.run.completed
+  when: "$signal.job == rr_explain && $signal.outcome == SUCCESS"
+  enabled: true

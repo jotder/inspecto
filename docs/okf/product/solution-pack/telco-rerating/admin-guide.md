@@ -38,9 +38,13 @@ Peak DuckDB memory of the re-rating statement by rated-usage rows in one day, 4 
 
 ## Verify
 
-- `GET /api/v1/jobs` lists `rr_tariff_hygiene` and `rr_rerate`.
-- After the first run, `rerating_tariff_findings` has one row per tariff defect and `rerated_usage` one row per call of the day; every call with no usable tariff row says `no_tariff`.
+- `GET /api/v1/jobs` lists `rr_tariff_hygiene`, `rr_rerate`, `rr_explain` and `rr_root_cause`.
+- After the first run, `rerating_tariff_findings` has one row per tariff defect, `rerated_usage` one row per call of the day, `rerating_findings` one row per finding and `rerating_root_causes` one row per root cause; every call with no usable tariff row says `no_tariff`.
 - The golden test is `TelcoRerateGoldenTest` in module `inspecto`.
+
+## Explanation and root causes
+
+`rr_explain` and `rr_root_cause` read only the findings and the tariff table: their cost follows the number of findings, not of calls, and the root-cause Job reads the whole retained `rerating_findings` (31 days). Measured on the 560-call synthetic day: 0.14 to 0.7 s and 0.06 to 0.2 s across runs on a loaded box. **They were not measured at volume**; the sizing figures above are for `rr_rerate` only. Keep `tolerance` equal in `rr_rerate` and `rr_explain`. A root cause keeps its id from day to day, so an Alert Rule by `ROOT_CAUSE_ID` (a later slice) opens one Incident per cause; size `stormCap` for the number of distinct causes (plan section 12.1).
 
 ## Safety
 

@@ -58,10 +58,11 @@ final class RerateCorpus {
         }
     }
 
-    record Usage(String id, LocalDateTime ts, String subscriber, String plan, String service, long units, BigDecimal charge) {
+    /** One call; {@code units} or {@code charge} null = blank in the feed. */
+    record Usage(String id, LocalDateTime ts, String subscriber, String plan, String service, Long units, BigDecimal charge) {
         String csv() {
             return String.join(",", id, TS.format(ts), ts.toLocalDate().toString(), subscriber, plan, service,
-                    String.valueOf(units), charge.setScale(4, RoundingMode.UNNECESSARY).toPlainString());
+                    units == null ? "" : String.valueOf(units), charge == null ? "" : charge.setScale(4, RoundingMode.UNNECESSARY).toPlainString());
         }
     }
 
@@ -85,9 +86,14 @@ final class RerateCorpus {
     List<Usage> usage() { return usage; }
 
     /** The two feed files; {@code withPriority} false drops the optional PRIORITY column (a feed that does not carry it). */
-    Map<String, String> files(boolean withPriority) {
+    Map<String, String> files(boolean withPriority) { return files(withPriority, false); }
+
+    /** {@code reverseTariff} writes the tariff rows in the opposite order: no verdict may depend on the order of the file. */
+    Map<String, String> files(boolean withPriority, boolean reverseTariff) {
         StringBuilder t = new StringBuilder(withPriority ? TARIFF_HEADER : TARIFF_HEADER.substring(0, TARIFF_HEADER.lastIndexOf(','))).append(NL);
-        for (Tariff x : tariffs) t.append(x.csv(withPriority)).append(NL);
+        List<Tariff> rows = new ArrayList<>(tariffs);
+        if (reverseTariff) java.util.Collections.reverse(rows);
+        for (Tariff x : rows) t.append(x.csv(withPriority)).append(NL);
         StringBuilder u = new StringBuilder(USAGE_HEADER).append(NL);
         for (Usage x : usage) u.append(x.csv()).append(NL);
         Map<String, String> files = new LinkedHashMap<>();
@@ -171,6 +177,51 @@ final class RerateCorpus {
         rate("R-V-3", "PLAN_R", "VOICE", "0.0020", "2026-05-01 00:00:00", null, null);
         // PLAN_T: a row with no start (never in force, reported on its own)
         rate("T-V-1", "PLAN_T", "VOICE", "0.0020", null, null, null);
+        // PLAN_U: the pair is named in the order of EFFECTIVE_FROM, not of the id (the earlier row has the greater id)
+        rate("U-V-2", "PLAN_U", "VOICE", "0.0020", "2026-01-01 00:00:00", null, null);
+        rate("U-V-1", "PLAN_U", "VOICE", "0.0030", "2026-06-20 00:00:00", null, null);
+        // PLAN_UT: two rows that start together: the pair is named in the order of the id
+        rate("UT-V-1", "PLAN_UT", "VOICE", "0.0020", "2026-01-01 00:00:00", null, null);
+        rate("UT-V-2", "PLAN_UT", "VOICE", "0.0030", "2026-01-01 00:00:00", null, null);
+        // PLAN_KB: a row with no rate beside a good one that starts later: only the first is reported, they are not a pair
+        rate("KB-V-1", "PLAN_KB", "VOICE", null, "2026-01-01 00:00:00", null, null);
+        rate("KB-V-2", "PLAN_KB", "VOICE", "0.0020", "2026-03-01 00:00:00", null, null);
+        // PLAN_W: the gap names the row that ENDS last (06-01), not the row that STARTS last (02-01)
+        rate("W-V-1", "PLAN_W", "VOICE", "0.0020", "2026-01-01 00:00:00", "2026-06-01 00:00:00", null);
+        rate("W-V-2", "PLAN_W", "VOICE", "0.0020", "2026-02-01 00:00:00", "2026-03-01 00:00:00", null);
+        rate("W-V-3", "PLAN_W", "VOICE", "0.0020", "2026-08-01 00:00:00", null, null);
+        // PLAN_V: two rows END together (03-01): the gap names the greater id, whatever order the file lists them in
+        rate("V-V-1", "PLAN_V", "VOICE", "0.0020", "2026-01-01 00:00:00", "2026-03-01 00:00:00", null);
+        rate("V-V-2", "PLAN_V", "VOICE", "0.0020", "2026-01-15 00:00:00", "2026-03-01 00:00:00", null);
+        rate("V-V-3", "PLAN_V", "VOICE", "0.0020", "2026-05-01 00:00:00", null, null);
+        // PLAN_X: two rows tied at the TOP priority and a blank third: the call is a disagreement, although each tied row is "ordered" against the blank one
+        rate("X-S-1", "PLAN_X", "SMS", "0.0500", "2026-01-01 00:00:00", null, 3);
+        rate("X-S-2", "PLAN_X", "SMS", "0.0400", "2026-01-01 00:00:00", null, 3);
+        rate("X-S-3", "PLAN_X", "SMS", "0.0300", "2026-01-01 00:00:00", null, null);
+        // PLAN_Y: one row alone at the top and two tied BELOW it: the call has a winner, although the tied pair is not "ordered"
+        rate("Y-S-1", "PLAN_Y", "SMS", "0.0500", "2026-01-01 00:00:00", null, 5);
+        rate("Y-S-2", "PLAN_Y", "SMS", "0.0400", "2026-01-01 00:00:00", null, 3);
+        rate("Y-S-3", "PLAN_Y", "SMS", "0.0300", "2026-01-01 00:00:00", null, 3);
+        // PLAN_ST / PLAN_WK: the rate rose at noon on the day (the old version ends, the new one starts)
+        rate("ST-V-1", "PLAN_ST", "VOICE", "0.0020", "2026-01-01 00:00:00", "2026-07-01 12:00:00", null);
+        rate("ST-V-2", "PLAN_ST", "VOICE", "0.0030", "2026-07-01 12:00:00", null, null);
+        rate("WK-V-1", "PLAN_WK", "VOICE", "0.0020", "2026-01-01 00:00:00", "2026-07-01 12:00:00", null);
+        rate("WK-V-2", "PLAN_WK", "VOICE", "0.0030", "2026-07-01 12:00:00", null, null);
+        // PLAN_BF: after noon two rows are in force (priority 5 wins at 0.0030, priority 1 charges 0.0020) and the ended version also charged 0.0020
+        rate("BF-V-1", "PLAN_BF", "VOICE", "0.0020", "2026-01-01 00:00:00", "2026-07-01 12:00:00", null);
+        rate("BF-V-3", "PLAN_BF", "VOICE", "0.0020", "2026-06-01 00:00:00", null, 1);
+        rate("BF-V-2", "PLAN_BF", "VOICE", "0.0030", "2026-07-01 12:00:00", null, 5);
+        // PLAN_BC: as BF, but the losing priority-1 row charges 0.0021: a charge of 0.21 for 100 units fits it EXACTLY and the ended version (0.20) only within the tolerance
+        rate("BC-V-1", "PLAN_BC", "VOICE", "0.0020", "2026-01-01 00:00:00", "2026-07-01 12:00:00", null);
+        rate("BC-V-3", "PLAN_BC", "VOICE", "0.0021", "2026-06-01 00:00:00", null, 1);
+        rate("BC-V-2", "PLAN_BC", "VOICE", "0.0030", "2026-07-01 12:00:00", null, 5);
+        // PLAN_SV: three versions; the stale charge is the MIDDLE one (the latest that ended), not the first
+        rate("SV-V-1", "PLAN_SV", "VOICE", "0.0020", "2026-01-01 00:00:00", "2026-06-01 00:00:00", null);
+        rate("SV-V-2", "PLAN_SV", "VOICE", "0.0025", "2026-06-01 00:00:00", "2026-07-01 12:00:00", null);
+        rate("SV-V-3", "PLAN_SV", "VOICE", "0.0030", "2026-07-01 12:00:00", null, null);
+        // PLAN_NG: the version that ended at noon had a NEGATIVE rate (a defect the hygiene Job reports); it explains nothing
+        rate("NG-V-1", "PLAN_NG", "VOICE", "-0.0020", "2026-01-01 00:00:00", "2026-07-01 12:00:00", null);
+        rate("NG-V-2", "PLAN_NG", "VOICE", "0.0030", "2026-07-01 12:00:00", null, null);
         // PLAN_J: a single clean row for the tolerance boundary; PLAN_K: a row with no rate; PLAN_Z has no row at all
         rate("J-V-1", "PLAN_J", "VOICE", "0.0020", "2026-01-01 00:00:00", null, null);
         rate("K-V-1", "PLAN_K", "VOICE", null, "2026-01-01 00:00:00", null, null);
@@ -189,8 +240,13 @@ final class RerateCorpus {
 
     /** Add one call; {@code outcome} is {@code REASON|FINDING|AMOUNT} for a planted defect, null for a silent one. */
     private String call(String archetype, String idSuffix, String ts, String plan, String service, long units, String charge, String outcome, boolean look) {
+        return callRaw(archetype, idSuffix, ts, plan, service, units, charge, outcome, look);
+    }
+
+    /** As {@link #call}, but {@code units} or {@code charge} may be null (blank in the feed). */
+    private String callRaw(String archetype, String idSuffix, String ts, String plan, String service, Long units, String charge, String outcome, boolean look) {
         String id = "X" + archetype + "-" + idSuffix;
-        usage.add(new Usage(id, at(ts), String.format(Locale.ROOT, "SUB%04d", 1 + (seq++ * 7) % 40), plan, service, units, money(charge)));
+        usage.add(new Usage(id, at(ts), String.format(Locale.ROOT, "SUB%04d", 1 + (seq++ * 7) % 40), plan, service, units, charge == null ? null : money(charge)));
         archetypes.computeIfAbsent(archetype, k -> new TreeSet<>()).add(id);
         if (outcome != null) planted.put(id, outcome);
         if (look) benign.add(id);
@@ -201,6 +257,7 @@ final class RerateCorpus {
     private static final String OVER = "rate_mismatch|overbilled|";
     private static final String RANGE = "ambiguous_tariff|data_quality|";
     private static final String NOTARIFF = "no_tariff|data_quality|";
+    private static final String UNRATABLE = "unratable_call|data_quality|";
 
     private void defects() {
         // A: the tariff change inside the day
@@ -223,7 +280,7 @@ final class RerateCorpus {
 
         // C: two rows with DIFFERENT rates and no priority: the expected charge is the range [2.00, 3.00]
         String[][] c = {{"1", "2.0000", RANGE}, {"2", "3.0000", RANGE}, {"3", "2.5000", RANGE}, {"4", "1.9800", RANGE},
-                {"5", "1.9700", UNDER + "0.03"}, {"6", "3.0200", RANGE}, {"7", "3.0300", OVER + "0.03"}, {"8", "0.5000", UNDER + "1.50"}};
+                {"5", "1.9700", UNDER + "0.03"}, {"6", "3.0200", RANGE}, {"7", "3.0300", OVER + "0.03"}, {"8", "0.5000", UNDER + "1.50"}, {"9", "2.9800", RANGE}};
         for (String[] r : c) call("C_RANGE", r[0], "2026-07-01 09:" + String.format(Locale.ROOT, "%02d", Integer.parseInt(r[0]) * 5) + ":00", "PLAN_C", "VOICE", 1000, r[1], r[2], false);
 
         // C again: a REVERSAL (negative units, negative charge) is re-rated like any call: the range is [-3.00, -2.00]
@@ -245,6 +302,8 @@ final class RerateCorpus {
         call("E_BLANK_PRIORITY", "1", "2026-07-01 10:20:00", "PLAN_E", "VOICE", 1000, "2.0000", null, true);
         call("E_BLANK_PRIORITY", "2", "2026-07-01 10:21:00", "PLAN_E", "VOICE", 1000, "3.0000", OVER + "1.00", false);
         call("E_BLANK_PRIORITY", "3", "2026-07-01 10:22:00", "PLAN_E", "VOICE", 1234, "2.4700", null, true);          // 1234 x 0.0020 = 2.468: rounded to two decimals, 2.47
+
+        call("E_BLANK_PRIORITY", "4", "2026-07-01 10:23:00", "PLAN_E", "VOICE", 1000, "5.0000", OVER + "3.00", false);          // fits no row: the cohort of over-billed calls on this plan is 2, one fits (support 0.5, AT the floor)
 
         // F: the gap, 06:00 (first second without a row) to 18:00 (first second with the next row)
         call("F_GAP", "1", "2026-07-01 06:00:00", "PLAN_F", "SMS", 10, "0.5000", NOTARIFF, false);
@@ -269,12 +328,56 @@ final class RerateCorpus {
                 {"5", "1.9700", UNDER + "0.03"}, {"6", "2.0300", OVER + "0.03"}, {"7", "4.0000", OVER + "2.00"}, {"8", "0.0000", UNDER + "2.00"}};
         for (String[] r : j) call("J_TOLERANCE", r[0], "2026-07-01 15:0" + r[0] + ":00", "PLAN_J", "VOICE", 1000, r[1], r[2], r[2] == null);
 
+        // J again: a call with no charge, and one with no units, cannot be judged (data quality, never silent)
+        callRaw("J_NULL_CHARGE", "1", "2026-07-01 15:30:00", "PLAN_J", "VOICE", 1000L, null, UNRATABLE, false);
+        callRaw("J_NULL_UNITS", "1", "2026-07-01 15:31:00", "PLAN_J", "VOICE", null, "2.0000", UNRATABLE, false);
+        // D again: zero units make every candidate amount equal, so the call AGREES (the first version in id order) although priorities differ
+        call("D_ZERO_UNITS", "1", "2026-07-01 10:05:00", "PLAN_D", "SMS", 0, "0.0000", null, true);
+        // G: the only row has a negative rate: it is never rated against (the tariff finding reports it), so its calls have no tariff
+        call("G_NEGATIVE", "1", "2026-07-01 12:30:00", "PLAN_G", "DATA", 100, "1.0000", NOTARIFF, false);
+        call("G_NEGATIVE", "2", "2026-07-01 12:31:00", "PLAN_G", "DATA", 100, "-1.0000", NOTARIFF, false);
+        // I again: billed at the inverted row's rate. The inverted row is never in force and explains nothing
+        call("I_INVERTED_OVER", "1", "2026-07-01 14:10:00", "PLAN_I", "VOICE", 500, "4.5000", OVER + "3.50", false);
+        // X: tied at the top plus a blank third: a disagreement (range 3.00 to 5.00)
+        call("X_TIE_BLANK", "1", "2026-07-01 10:50:00", "PLAN_X", "SMS", 100, "4.0000", RANGE, false);
+        // Y: a lone winner (5.00) above a tied pair: the winner's charge is right; the others are billed at a LOSING row's rate
+        call("Y_PRECEDENCE", "1", "2026-07-01 10:40:00", "PLAN_Y", "SMS", 100, "5.0000", null, true);
+        call("Y_PRECEDENCE", "2", "2026-07-01 10:41:00", "PLAN_Y", "SMS", 100, "4.0000", UNDER + "1.00", false);
+        call("Y_PRECEDENCE", "3", "2026-07-01 10:42:00", "PLAN_Y", "SMS", 100, "3.0000", UNDER + "2.00", false);
+        // ST: three calls billed at the version that ended at noon (exactly, a cent over, a cent under): ONE root cause, confidence 1.0 / 0.9 / 0.9
+        call("ST_STALE", "1", "2026-07-01 13:00:00", "PLAN_ST", "VOICE", 1000, "2.0000", UNDER + "1.00", false);
+        call("ST_STALE", "2", "2026-07-01 13:01:00", "PLAN_ST", "VOICE", 1000, "2.0100", UNDER + "0.99", false);
+        call("ST_STALE", "3", "2026-07-01 13:02:00", "PLAN_ST", "VOICE", 1000, "1.9900", UNDER + "1.01", false);
+        call("ST_STALE", "4", "2026-07-01 13:03:00", "PLAN_ST", "VOICE", 1000, "2.0200", UNDER + "0.98", false);        // AT the tolerance, over
+        call("ST_STALE", "5", "2026-07-01 13:04:00", "PLAN_ST", "VOICE", 1000, "1.9800", UNDER + "1.02", false);        // AT the tolerance, under
+        call("ST_STALE", "6", "2026-07-01 13:05:00", "PLAN_ST", "VOICE", 1000, "1.0000", UNDER + "2.00", false);        // fits nothing: the cohort's support is 5 of 6
+        // ST again, before the change: a short charge on the OLD version is a different cohort (and nothing explains it)
+        call("ST_EARLY_LEAK", "1", "2026-07-01 11:00:00", "PLAN_ST", "VOICE", 1000, "1.0000", UNDER + "1.00", false);
+        // SV: billed at the middle version's rate (2.50): the latest version that ENDED
+        call("SV_STALE", "1", "2026-07-01 13:30:00", "PLAN_SV", "VOICE", 1000, "2.5000", UNDER + "0.50", false);
+        // BC: the same, with an exact fit to the losing row and only a within-tolerance fit to the ended version
+        call("BC_DIFFERENT", "1", "2026-07-01 14:20:00", "PLAN_BC", "VOICE", 100, "0.2100", UNDER + "0.09", false);
+        // NG: billed at the negative rate's amount (-2.00): the negative row is not a hypothesis
+        call("NG_NEGATIVE_STALE", "1", "2026-07-01 13:40:00", "PLAN_NG", "VOICE", 1000, "-2.0000", UNDER + "5.00", false);
+        // WK: five leakages on one plan, only two near the ended version's amount (2.00): support 2/5, below the floor of 0.5
+        call("WK_WEAK", "1", "2026-07-01 13:10:00", "PLAN_WK", "VOICE", 1000, "2.0000", UNDER + "1.00", false);
+        call("WK_WEAK", "2", "2026-07-01 13:11:00", "PLAN_WK", "VOICE", 1000, "1.0000", UNDER + "2.00", false);
+        call("WK_WEAK", "3", "2026-07-01 13:12:00", "PLAN_WK", "VOICE", 1000, "1.5000", UNDER + "1.50", false);
+        call("WK_WEAK", "4", "2026-07-01 13:13:00", "PLAN_WK", "VOICE", 1000, "0.5000", UNDER + "2.50", false);
+        call("WK_WEAK", "5", "2026-07-01 13:14:00", "PLAN_WK", "VOICE", 1000, "2.0100", UNDER + "0.99", false);
+        // BF: billed at 2.00, which BOTH the ended version and the losing priority-1 row would charge: two causes fit, both are kept
+        call("BF_BOTH", "1", "2026-07-01 14:00:00", "PLAN_BF", "VOICE", 1000, "2.0000", UNDER + "1.00", false);
+        call("BF_BOTH", "2", "2026-07-01 14:01:00", "PLAN_BF", "VOICE", 1000, "2.0000", UNDER + "1.00", false);
+
         // the window's own edges: the first second and the last second of the day belong to it
         call("EDGE_START", "1", "2026-07-01 00:00:00", "PLAN_A", "SMS", 10, "0.5000", null, true);
         call("EDGE_END", "1", "2026-07-01 23:59:59", "PLAN_A", "SMS", 10, "0.5000", null, true);
         // the window: one second before the day and midnight after it are not this window's calls
         outsideWindow.add(call("OUT", "BEFORE", "2026-06-30 23:59:59", "PLAN_A", "SMS", 10, "0.5000", null, false));
         outsideWindow.add(call("OUT", "AFTER", "2026-07-02 00:00:00", "PLAN_A", "SMS", 10, "0.1000", null, false));      // would be a leak: it is not in the window
+
+        // the next day: the same stale-version cause again (its root cause keeps its id), in the window of day 2 only
+        outsideWindow.add(call("ST_DAY2", "1", "2026-07-02 10:00:00", "PLAN_ST", "VOICE", 1000, "2.0000", null, false));
 
         // the tariff table's own defects
         plantedTariff.add("overlap_same_rate|PLAN_B|DATA|B-D-1|B-D-1B");
@@ -296,6 +399,24 @@ final class RerateCorpus {
         plantedTariff.add("inverted_interval|PLAN_Q|VOICE|Q-V-1|");
         plantedTariff.add("gap|PLAN_R|VOICE|R-V-3|R-V-2");
         plantedTariff.add("inverted_interval|PLAN_I|VOICE|I-V-X|");
+        plantedTariff.add("overlap_different_rate|PLAN_U|VOICE|U-V-2|U-V-1");
+        plantedTariff.add("overlap_different_rate|PLAN_UT|VOICE|UT-V-1|UT-V-2");
+        plantedTariff.add("missing_rate|PLAN_KB|VOICE|KB-V-1|");
+        plantedTariff.add("overlap_same_rate|PLAN_W|VOICE|W-V-1|W-V-2");
+        plantedTariff.add("gap|PLAN_W|VOICE|W-V-3|W-V-1");
+        plantedTariff.add("overlap_same_rate|PLAN_V|VOICE|V-V-1|V-V-2");
+        plantedTariff.add("gap|PLAN_V|VOICE|V-V-3|V-V-2");
+        plantedTariff.add("overlap_different_rate|PLAN_X|SMS|X-S-1|X-S-2");
+        plantedTariff.add("overlap_different_rate|PLAN_X|SMS|X-S-1|X-S-3");
+        plantedTariff.add("overlap_different_rate|PLAN_X|SMS|X-S-2|X-S-3");
+        plantedTariff.add("overlap_different_rate|PLAN_Y|SMS|Y-S-1|Y-S-2");
+        plantedTariff.add("overlap_different_rate|PLAN_Y|SMS|Y-S-1|Y-S-3");
+        plantedTariff.add("overlap_different_rate|PLAN_Y|SMS|Y-S-2|Y-S-3");
+        plantedTariff.add("overlap_different_rate|PLAN_BC|VOICE|BC-V-1|BC-V-3");
+        plantedTariff.add("overlap_different_rate|PLAN_BC|VOICE|BC-V-3|BC-V-2");
+        plantedTariff.add("negative_rate|PLAN_NG|VOICE|NG-V-1|");
+        plantedTariff.add("overlap_same_rate|PLAN_BF|VOICE|BF-V-1|BF-V-3");
+        plantedTariff.add("overlap_different_rate|PLAN_BF|VOICE|BF-V-3|BF-V-2");
     }
 
     // ------------------------------------------------------------------------------------------- background
