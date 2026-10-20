@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-350 test class(es): 129 unit, 221 real-HTTP control-plane, 0 IT.
+352 test class(es): 130 unit, 222 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -45,6 +45,8 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `AuditVerifierTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AuditVerifierTest.java` | ASSURE-AUDIT-CHAIN-1: {@code /audit/verify}'s walk ({@link AuditVerifier}) and the signed anchors |
 | `BiResultMaskingSharedRefTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/BiResultMaskingSharedRefTest.java` | BI-QUERY-MASKING-1 (D-M6): a Dataset over another Space's shared snapshot is masked from the classification the snapshot |
 | `BootstrapEditionTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/BootstrapEditionTest.java` | {@code /bootstrap}'s edition: Personal without auth, Enterprise when a policy decider is installed. |
+| `BypassCorpusTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/BypassCorpusTest.java` | {@link BypassCorpus}: deterministic, planted and benign sets disjoint, synthetic ids only. |
+| `BypassFeatureGoldenTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/BypassFeatureGoldenTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B1 golden test. Boots the shipped {@code spaces/_templates/telco-bypass} Space |
 | `CapabilitiesNowUnknownRoleTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/CapabilitiesNowUnknownRoleTest.java` | A role name the table does not define must not lift an Access Profile deny: {@code AccessGrants} treats any |
 | `CapabilityManifestTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/CapabilityManifestTest.java` | RBAC R4: {@link CapabilityManifest} must match the actual {@code ApiContext.withCapability} |
 | `CollectorSaveFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/CollectorSaveFindingsTest.java` | {@link ConfigRoutes#collectorFindings} — the save-time half of the Collector's remote-only keys |
