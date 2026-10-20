@@ -1,5 +1,8 @@
 # Link Analysis edition placement changes and Basic-edition ingestion limits: a plan for operator review
 
+> 🟢 **UPDATE 2026-10-20: D-LAE1, D-LAE2, D-LAE5 and D-LAE12 are ANSWERED (§10) and are being built (lane A);
+> the rest below stays a draft.** The "nothing built" wording that follows describes the draft as written.
+>
 > 🟡 **DRAFT 2026-10-20 for operator review. Design only, nothing built, nothing decided.** This plan collects the
 > operator's requested changes to the Link Analysis (LA) edition table and to what the Basic edition may ingest, and
 > grounds each one in how editions gate features today. [`EDITIONS.md`](../EDITIONS.md) (the placement decided
@@ -221,18 +224,21 @@ Nothing here starts before the operator answers §10. Each lane is verified by a
 
 | ID | Decision | Recommendation | Operator answer |
 |---|---|---|---|
-| D-LAE1 | Case history Standard and up, with an explicit gate | Yes | |
-| D-LAE2 | Link Analysis dashboard widgets Standard and up (UI flag; routes stay open) | Yes | |
+| D-LAE1 | Case history Standard and up, with an explicit gate | Yes | **ANSWERED 2026-10-20 (operator): YES.** Case history becomes Standard-and-up with an EXPLICIT gate (the `investigations` feature), not the accident of there being no Case module to read. ⚠ Overrides the archived LA-EDITIONS-1 plan's "stays explorer" note for Case history. |
+| D-LAE2 | Link Analysis dashboard widgets Standard and up (UI flag; routes stay open) | Yes | **ANSWERED 2026-10-20 (operator): YES**, as a UI flag only. It is cosmetic by decision: the projection routes the widgets call stay open on Basic, and the docs say so. |
 | D-LAE3 | Masking on Basic | (a) fix mode to `none`, hide the setting | |
 | D-LAE4 | Entity profile pages Standard and up | Yes, after the dependency check in §4 | |
-| D-LAE5 | Geo map, routes, co-location Standard and up | Yes, own feature id, never via `geoLink` | |
+| D-LAE5 | Geo map, routes, co-location Standard and up | Yes, own feature id, never via `geoLink` | **ANSWERED 2026-10-20 (operator): YES.** Its OWN feature id on `GeoRoutes`, never through `geoLink` (gating via `geoLink` drops all 19 Link Analysis modules), plus its own nav flag (nav is keyed on `geoLink` today). |
 | D-LAE6 | Patterns and packs on Basic | P-A (browser-side stays, server-run and packs move) | |
 | D-LAE7 | Gate continuous ingestion by trigger mode (manual stays Basic) | Yes | |
 | D-LAE8 | Which step families stay on Basic (for example parse and schema landing only, or also filter) | parse, schema and a minimal filter; transform, enrich, SQL, route to Standard | |
 | D-LAE9 | Does Basic keep the Postgres (`db`) Collector for one-off manual pulls | Yes, manual only | |
 | D-LAE10 | Do scheduled Jobs and `EVENT` triggers count as continuous | Scheduled Jobs yes; `EVENT` yes (it is driven by a continuous upstream) | |
 | D-LAE11 | `la-daily-feed` and `orders-starter` packs on Basic | move `la-daily-feed` to Standard; trim `orders-starter` to what Basic allows | |
-| D-LAE12 | No migration shim for existing Basic installs | Confirm (standing preference) | |
+| D-LAE12 | No migration shim for existing Basic installs | Confirm (standing preference) | **ANSWERED 2026-10-20 (operator): CONFIRMED.** No migration shim for existing Basic installs; a release note is needed (an existing Basic install loses Case history, the Geo map and the Link Analysis dashboard widgets on upgrade). |
+
+Operator answer of 2026-10-20 ("go with your recommendations") covers only D-LAE1, D-LAE2, D-LAE5 and D-LAE12 for now. **Still
+open, not built:** D-LAE3, D-LAE4, D-LAE6 (each blocked on a check) and the chain D-LAE7, D-LAE10, D-LAE9, D-LAE11, D-LAE8.
 
 ## 11. Not confirmed by the survey
 
