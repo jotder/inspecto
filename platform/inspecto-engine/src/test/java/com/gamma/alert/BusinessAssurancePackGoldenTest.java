@@ -219,7 +219,7 @@ class BusinessAssurancePackGoldenTest {
         // Only the CRITICAL forecast breach opens an Incident; the WARNING erosion stays an Alert.
         assertEquals(1, s.incidents().size(), s.incidents().toString());
         assertEquals("2026-06-04", s.incidents().get(0).attributes().get("key.ds"));
-        assertTrue(s.incidents().get(0).title().contains("Daily revenue forecast and band (ba_revenue_forecast Job)"),
+        assertTrue(s.incidents().get(0).description().contains("Daily revenue forecast and band (ba_revenue_forecast Job)"),
                 "the forecast Alert names its Dataset by description, as the erosion one does: " + s.incidents());
     }
 
