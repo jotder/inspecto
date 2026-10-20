@@ -79,6 +79,7 @@ type State = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 
                                     mat-stroked-button
                                     data-testid="open-entity"
                                     [routerLink]="[...base(), 'entities', e.type, e.key]"
+                                    [queryParams]="r.window ? { from: r.window.from, to: r.window.to } : null"
                                     >Open the Entity</a
                                 >
                                 @if (e.masked && !revealed() && lens.canRevealLinkEntities()) {

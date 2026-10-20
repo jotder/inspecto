@@ -246,20 +246,24 @@ public final class InvestigationInboundRoutes implements RouteModule {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'binding': unknown key '" + k + "' (allowed: " + BINDING_KEYS + ")");
             create.putAll((Map<String, Object>) b);
         } else {
-            String typeId = entities.get(0).type().id();
+            List<String> named = entities.stream().map(t -> t.type().id()).distinct().toList();
+            String typeId = named.get(0);
             List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
             EntityTypeBindings.Resolved resolved = EntityTypeBindings.resolve(ex, writeRoot, types);
             EntityTypeBindings.LinkMapping chosen = null;
             for (EntityTypeBindings.LinkMapping m : resolved.mappings()) {
                 EntityTypes.EntityType src = resolved.typeOf(m.dataset(), m.source()), tgt = resolved.typeOf(m.dataset(), m.target());
-                if (src != null && src.id().equals(typeId) || tgt != null && tgt.id().equals(typeId)) {
-                    chosen = m;
+                if (named.stream().allMatch(n -> src != null && src.id().equals(n) || tgt != null && tgt.id().equals(n))) {
+                    chosen = m;   // one mapping binds EVERY type the call names
                     break;
                 }
             }
             if (chosen == null)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "no Link Analysis view or index of this Space links a column "
-                        + "of Entity Type '" + typeId + "' - send 'binding': {dataset, sourceCol, targetCol}");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, named.size() == 1
+                        ? "no Link Analysis view or index of this Space links a column of Entity Type '" + typeId
+                                + "' - send 'binding': {dataset, sourceCol, targetCol}"
+                        : "no single Link Analysis view or index of this Space links a column of EACH Entity Type the call names " + named
+                                + " (an Investigation has one link mapping) - name one type per call, or send 'binding': {dataset, sourceCol, targetCol}");
             create.put("dataset", chosen.dataset());
             create.put("sourceCol", chosen.source());
             create.put("targetCol", chosen.target());

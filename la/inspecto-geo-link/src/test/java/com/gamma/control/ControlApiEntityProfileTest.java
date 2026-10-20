@@ -86,6 +86,29 @@ class ControlApiEntityProfileTest {
         }
     }
 
+    /** LA-EDITIONS-RESIDUALS-1 (4a): a deep link's window scopes the Entity page's rows, days and span, and the answer echoes it. */
+    @Test
+    void aWindowScopesTheEntityProfileAndIsEchoed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            String p = profileOf("msisdn", keyOfA(c));
+            JsonNode w = noRaw(get(c, p + "?from=" + enc("2026-10-02T00:00:00Z") + "&to=" + enc("2026-10-04T00:00:00Z"), OWNER));
+            assertEquals("2026-10-02T00:00:00Z", w.at("/window/from").asText());
+            assertEquals("2026-10-04T00:00:00Z", w.at("/window/to").asText());
+            assertEquals("[{\"day\":\"2026-10-03\",\"rows\":2}]", w.get("perDay").toString());
+            assertEquals("2026-10-03T09:00:00Z", w.get("firstSeen").asText());
+            assertEquals(1, w.get("activeDays").asInt());
+            assertEquals(1, w.get("coveredDays").asInt(), "the days covered inside the window");
+            assertEquals(1, w.at("/where/0/rows").asLong());
+            JsonNode open = noRaw(get(c, p + "?from=" + enc("2026-10-03T10:00:00Z"), OWNER));
+            assertTrue(open.at("/window/to").isNull());
+            assertEquals("2026-10-03T11:00:00Z", open.get("firstSeen").asText());
+            assertFalse(noRaw(get(c, p, OWNER)).has("window"), "no window, no echo");
+            assertEquals(422, get(c, p + "?from=yesterday", OWNER).statusCode());
+            assertEquals(422, get(c, p + "?from=" + enc("2026-10-04T00:00:00Z") + "&to=" + enc("2026-10-01T00:00:00Z"), OWNER).statusCode());
+        }
+    }
+
     @Test
     void resolveGivesTheExplorationAliasForAnySpellingAndForTheAliasItself(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();

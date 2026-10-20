@@ -78,7 +78,12 @@ const TYPE = (over: Partial<EntityTypeSummary> = {}): EntityTypeSummary => ({
     ...over,
 });
 
-function make(profile: EntityProfile, type: EntityTypeSummary = TYPE(), key = profile.entity.key) {
+function make(
+    profile: EntityProfile,
+    type: EntityTypeSummary = TYPE(),
+    key = profile.entity.key,
+    query: Record<string, string> = {},
+) {
     const identityGroup = vi.fn(() =>
         of({
             group: { id: 'g1', members: ['msisdn:+249911', 'msisdn:+249922'], assertions: [] },
@@ -103,6 +108,7 @@ function make(profile: EntityProfile, type: EntityTypeSummary = TYPE(), key = pr
                 provide: ActivatedRoute,
                 useValue: {
                     paramMap: of(convertToParamMap({ type: profile.entity.type, key })),
+                    queryParamMap: of(convertToParamMap(query)),
                     snapshot: {
                         pathFromRoot: [
                             { url: [] },
@@ -163,6 +169,18 @@ describe('EntityComponent (Entity Profile)', () => {
             'Not assessed: no fresh index',
         );
         expect(section(el, 'links').querySelector('inspecto-stat-tile')).toBeNull();
+    });
+
+    it("opens scoped to a deep link's window, shows it, and offers the whole history", () => {
+        const win = { from: '2026-10-07T00:00:00Z', to: '2026-10-08T00:00:00Z' };
+        const { el, entityProfile } = make(MASKED, TYPE(), MASKED.entity.key, win);
+        expect(entityProfile).toHaveBeenCalledWith('msisdn', 'masked:f01a9b8ca40c4eb1', win);
+        const chip = el.querySelector('[data-testid=window]') as HTMLElement;
+        expect(chip.textContent).toContain('2026-10-07T00:00:00Z');
+        expect(chip.textContent).toContain('2026-10-08T00:00:00Z');
+        expect(el.querySelector('[data-testid=window-clear]')!.getAttribute('href')).toBe(
+            '/studio/entities/msisdn/masked:f01a9b8ca40c4eb1',
+        );
     });
 
     it('Investigate seeds an Investigation through the starter deep link, beside the Entities pages', () => {

@@ -90,6 +90,27 @@ public final class EntityProfileRoutes implements RouteModule {
      * value is refused 422 BEFORE anything is read, pointing at {@code POST /inv/entities/{type}/resolve}, so a raw identifier
      * is never looked up through a URL (operator 2026-10-15: never in a URL or a log). The refusal never repeats the key.
      */
+    /**
+     * The optional {@code from} / {@code to} of a deep link (ISO-8601 instants with a zone, half-open [from, to)) as
+     * {@code {from, to}} (either may be null), or null for no window; 422 for a malformed instant or a window that ends before it starts.
+     */
+    static String[] window(String from, String to) {
+        if ((from == null || from.isBlank()) && (to == null || to.isBlank())) return null;
+        java.time.Instant f = instant(from, "from"), t = instant(to, "to");
+        if (f != null && t != null && !f.isBefore(t))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'from' must be before 'to'");
+        return new String[] {f == null ? null : f.toString(), t == null ? null : t.toString()};
+    }
+
+    private static java.time.Instant instant(String v, String name) {
+        if (v == null || v.isBlank()) return null;
+        try {
+            return java.time.OffsetDateTime.parse(v.trim()).toInstant();
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' must be an ISO-8601 instant with a zone, e.g. 2026-10-01T00:00:00Z");
+        }
+    }
+
     private static Object entityProfile(ApiContext api, HttpExchange ex, String type, String urlKey) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity profile");
         EntityTypes.EntityType t = type(writeRoot, type);
@@ -100,8 +121,9 @@ public final class EntityProfileRoutes implements RouteModule {
                     + "takes the alias (masked:<16 hex>), never a raw value in a URL - POST /inv/entities/" + type
                     + "/resolve with {\"key\": ...} first");
         Resolved r = resolveKey(writeRoot, t, mode, urlKey);
+        String[] window = window(ApiContext.query(ex, "from"), ApiContext.query(ex, "to"));
         EntityProfiles.Frame f = frame(api, ex, writeRoot, type);
-        Map<String, Object> out = EntityProfiles.entityProfile(f, r.key(), r.shown());
+        Map<String, Object> out = EntityProfiles.entityProfile(f, r.key(), r.shown(), window);
         boolean found = out.get("where") instanceof List<?> w && !w.isEmpty();
         audit(ex, LinkEventTypes.LINK_ENTITY_PROFILED, "link.entity.profiled",
                 "link.entity.profiled " + type + (found ? "" : " (not seen)"),

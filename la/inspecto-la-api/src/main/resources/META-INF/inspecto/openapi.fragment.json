@@ -1406,6 +1406,18 @@
           "required" : true,
           "description" : "The exploration alias for a masked type; the value (URL-encoded) for an unmasked one.",
           "schema" : { "type" : "string" }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "description" : "Window start (ISO-8601 instant with a zone, inclusive), from an Open in Inspecto LA deep link. With 'to', scopes where, firstSeen, lastSeen, activeDays, coveredDays and perDay to the window (UTC, [from, to)) and echoes {window: {from, to}}; links and related stay whole-history. 422 for a malformed instant or from >= to.",
+          "schema" : { "type" : "string", "format" : "date-time" }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "description" : "Window end (ISO-8601 instant with a zone, exclusive); see 'from'.",
+          "schema" : { "type" : "string", "format" : "date-time" }
         } ],
         "responses" : {
           "200" : {
