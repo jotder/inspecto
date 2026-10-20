@@ -1,6 +1,6 @@
 # Partner / settlement / wholesale: plan (`PACK-PARTNER-SETTLEMENT-1`, settlement half)
 
-> 🟡 **PLAN 2026-10-18: design only, nothing built.** Closes competitive gap **Q** (partner / settlement / wholesale) in
+> 🟡 **PLAN 2026-10-18; S0 to S3 (the smallest cut) BUILT 2026-10-20, see §16; S4 to S8 and W1 to W3 not built.** Closes competitive gap **Q** (partner / settlement / wholesale) in
 > [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md). Gap **C** (re-rating) has
 > its own plan, written in parallel by a sibling session; this plan states only the **contract it needs from it** (§5) and
 > does not design re-rating. Decisions below are marked **PS-D1…PS-D10**: each was a recommendation, accepted by the operator
@@ -340,3 +340,90 @@ engine's behaviour if reversed.
 - [`okf/product/module/workflow/architecture-workflow-sla.md`](../okf/product/module/workflow/architecture-workflow-sla.md), [`okf/product/module/case-management/architecture-overview.md`](../okf/product/module/case-management/architecture-overview.md).
 - [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5 (`telco-ra`, `mobile-money`, `aml` pack precedents).
 - [`GLOSSARY.md`](../GLOSSARY.md): binding vocabulary.
+
+## 16. S0 to S3 as built (2026-10-20)
+
+Branch `lane/ps-s0s3`; commit hashes are in the BACKLOG row. Hub: [`okf/product/solution-pack/partner-settlement/`](../okf/product/solution-pack/partner-settlement/index.md).
+The slices follow the order of §10; the smallest useful cut (S0 + S1 + S2 + S3) is built, S4 to S8 and W1 to W3 are not.
+
+**S0: contract and decisions.** PS-D1 to PS-D10 are answered (§11). The §5 contract with the re-rating plan is **not signed**: the
+sibling plan's owner has not confirmed R1 to R8, so S3 runs on the planned fallback, a stand-in `rerated_usage` feed that implements
+R1 to R8 as written (grain, `units`, `amount_expected`, `currency`, `record_count`, `rate_id`, `rating_run_id`, `rated_at`, blank
+amount plus `reason` for R7). R6 (the completeness Signal) is not implemented: the chain starts on the calendar's daily run, not on a
+re-rating Signal, so a half-written period is not protected against. The golden is in module `inspecto-reconciliation`, whose test
+classpath carries `ControlApi`, the Collector and the Reconciliation engine; it does **not** need Workflow or Regulatory Reporting
+until S5 and S7 (the §10 check is deferred to S5).
+
+*Corpus spec (the part of S0 the plan named §14).* `PartnerSettlementCorpus`, hand-built and deterministic (no random draw), four
+fictional partners (`P1` to `P4`, made-up country codes `XA` and `XB`, holidays `2026-06-10` and `2026-07-13` for XA, `2026-06-15` and
+`2026-08-25` for XB), five agreement versions, three monthly cycles of usage (2026-05-01 to 2026-07-31), judged as of 2026-08-20:
+
+| Agreement | Terms | Planted |
+|---|---|---|
+| `AG-VOICE-A1` (P1, we pay, USD) | percent tolerance 1.0, then 2.0 from 2026-07-16; monthly, due 10 days | stale May re-rating run; May statement re-sent; July statement v1 with a bad line and a control total one unit off, restated as v2; mismatches on `05-10` (+3 %), `05-20` (+1.01 %), `06-20` and `06-21` (+10 and -4, not offsetting), `07-15` (+1.5 % under the 1 % version); cut-off pair `06-14` and `06-15` (-60 and +60); unrated day `06-25`. Look-alikes: `05-12` exactly +1 %, `07-16` +1.5 % under the 2 % version, `07-20` (v1 billed 999, v2 correct) |
+| `AG-SMS-C1` (P3, they pay, rated USD, invoiced EUR) | absolute tolerance 5.0; semi-monthly, due 5 days; contract USD to EUR with decoy spot rows | FX difference `06-18` (partner at 0.93, ours 0.91), mismatch `06-22` (+50, not FX) and `07-02` (+5.0001). Look-alikes: `06-19` (partner at our rate), `06-20` (exactly +5.0000), `06-21` (partner rate, +2), a balanced credit line |
+| `AG-VOICE-D1` (P2, we pay, USD) | absolute tolerance 0.5; monthly | no July statement and it is overdue (`missing_statement`); mismatch `06-04` (+0.5001); look-alike `06-03` (exactly +0.5000) |
+| `AG-VOICE-E1` (P4, they pay, USD) | percent 1.0; monthly, due 25 days | no July statement, not due until 2026-08-26: silent |
+
+Two statements name an unknown partner (`P99`) and an unknown agreement for a known partner.
+
+**S1: References.** Four References (`partner`, `settlement_agreement`, `fx_rate`, `holiday`), each a Pipeline, a Schema, a Dataset
+and a zero-row seed, and the calendar Job `ps_calendar`. A mid-cycle change is two effective-dated rows, and a lookup on each side
+of the boundary returns the right one (`PartnerSettlementReferenceTest`); the calendar equals a `java.time` oracle for every
+agreement version and the hand-worked dates for a holiday plus weekend roll.
+
+**S2: statement ingestion.** The `settlement_statement` Pipeline and Schema, `ps_statement_current` (re-sends once, highest version)
+and `ps_statement_findings` (`control_total_mismatch`, `duplicate_statement`, `restated_statement`, `unknown_partner`,
+`unknown_agreement`). The golden asserts the exact finding set, that a re-sent statement raises one finding and counts once, that the
+restated version supersedes and the older one stays in the feed, and that a mismatch is `data_quality`.
+
+**S3: compare.** `ps_expected`, `ps_billed`, `ps_findings`, two Reconciliations (`ps_voice`, `ps_sms`) and the Alert Rule
+`ps_findings_found` (one Alert per agreement). The golden holds the findings to the exact planted set (8 `amount_mismatch`, 2
+`cutoff_difference`, 1 `fx_difference`, 1 `missing_statement`, 1 `unrated_usage`; every look-alike silent), every expected and
+billed amount to an independent plain-Java oracle, the Reconciliation Breaks to the oracle's key set, and a second run to the same
+row counts. Tests (module `inspecto-reconciliation`): `PartnerSettlementCorpusTest` (4), `PartnerSettlementReferenceTest` (4),
+`PartnerSettlementSeedTest` (1), `PartnerSettlementPackGoldenTest` (12); the seed gate `ControlApiSpaceTemplateSeedGateTest` now
+also applies the template and checks its runbook.
+
+**Mutation pass (recorded, as S3 required).** Each mutation of the shipped SQL or data below is a real test that turns a named key
+red: the tolerance one step tighter (`D1` `06-03` becomes `amount_mismatch`); the snap comparator `<=` to `<` (`06-03` becomes a
+Break); the finding comparator `>` to `>=` (the at-tolerance days of A1, C1 and D1 appear); `rn = 1` to `rn >= 1` (the May statement
+doubles to 126 lines and an ordinary day turns red); the oldest rating run (an ordinary May day turns red); the superseded statement
+version (`07-20` turns red); the cut-off neighbour test inverted (the offsetting pair turns into mismatches and the non-offsetting
+pair into cut-off differences); a feed with no FX rate (`fx_rate_missing`, no invented amount, no partner variance, same-currency
+agreements untouched).
+
+**Deviations from the plan, and traps found.**
+
+- **PS-D3 as built differs in form, not in kind.** §6 sketched a `variance_beyond_tolerance` Measure (0 inside, the excess outside).
+  As built `ps_billed.amount` is the billed amount snapped to the expected amount when the variance is inside the tolerance
+  (inclusive), else the true billed amount; the Reconciliation compares `amount` at absolute tolerance 0. A Break then shows the
+  real expected and billed amounts, so risk R2 ("a Break whose Measure is the excess reads oddly") does not arise, and no add-on
+  change is needed. `amount_billed`, `amount_expected` and `variance` ride on the billed row.
+- **The statement feed is flat**, not header plus lines: each line repeats the statement's `control_total_amount` and
+  `control_total_lines` and adds `line_no`, the key the re-send and control-total checks need. A real file with a header is flattened
+  in the Pipeline mapping.
+- **Non-usage lines (tax, fee, credit, adjustment) count toward the control totals and are not compared** in S3 (they have no
+  expected counterpart); S4 positions will take them.
+- **A variance FX explains is named `fx_difference`, even right at one step beyond the tolerance.** Under the finding-comparator
+  mutation the C1 `06-20` at-tolerance day reads `fx_difference`, not `amount_mismatch`: the partner's own rate explains the whole
+  variance.
+- **`fx_rate` lookup is "latest row on or before the date"**, not an exact date match, so a weekend needs no row; a lookup with no
+  earlier row is `fx_rate_missing`.
+- **A Space Template carries no Workflow, SLA Policy or Escalation Rule** (the inert examples every template ships say so:
+  governance is written only through its `canAdminister` routes). S5's authored CASE workflow (PS-D5) therefore cannot ship as
+  template config; it needs a documented apply step or a decision on a governance seed. Raise this before S5.
+- ⚠ `HUGEINT` (a `sum()` of an integer column) is written as `DOUBLE` by Parquet, so the schema-seed check fails; cast to `BIGINT`.
+- ⚠ The template gate reads the Schema of every Dataset an Alert Rule counts, so the Job-written Datasets need seeds **before** the
+  template applies; the seed test regenerates them with `PARTNER_SETTLEMENT_REGENERATE=true`.
+- The Reconciliation Break key joins the key columns with a middle dot; `ReconStateStore` keeps a Break per day, so a catch-up runs
+  the `recon.run` Job once per day (`day` parameter).
+- The oracle shares the **business rules** with the SQL (tolerance inclusive, latest run, highest version, neighbour-day cut-off
+  test); it is independent of the implementation, not of the rules. The rules are pinned by the planted corpus and the mutation pass.
+
+**Not built, and open.** S4 (netting, positions, roll-forward), S5 (disputes), S6 (aging, accruals, dashboard), S7 (evidence pack),
+S8 (the glossary entries of §13, the matrix row Q refresh, the `okf` plan-spaces entry, the solution page); W1 to W3. Open for the
+operator or the sibling plan: (1) sign the §5 table, in particular R6 (the completeness Signal); (2) PS-D0, split the BACKLOG row once
+the re-rating plan lands; (3) the real statement layout (flat or header plus lines) once a real file is seen; (4) whether the
+dispute workflow of S5 is applied by an administrator step or a governance seed; (5) the class of `restated_statement` (`info`,
+neither variance nor data quality).

@@ -1,0 +1,84 @@
+raw:
+  name: SETTLEMENT_STATEMENT
+  format: CSV
+  fields[19]{name,selector,type,description,unit,classification}:
+    statement_id,"0",VARCHAR,"Statement identifier given by the partner","","INTERNAL"
+    statement_version,"1",INTEGER,"Version of the statement; a higher version supersedes the earlier one for the same agreement and period","","INTERNAL"
+    line_no,"2",INTEGER,"Line number inside the statement version; a re-sent line repeats it","","INTERNAL"
+    partner_id,"3",VARCHAR,"Partner that issued the statement","","INTERNAL"
+    agreement_id,"4",VARCHAR,"Agreement the line is billed under (the Pipeline mapping resolves a partner-side code to it)","","INTERNAL"
+    period_start,"5",DATE,"First day of the settlement cycle the statement covers","","INTERNAL"
+    period_end,"6",DATE,"Last day of the settlement cycle the statement covers","","INTERNAL"
+    usage_date,"7",DATE,"Day of the usage the line bills; blank for tax, fee and credit lines","","INTERNAL"
+    direction,"8",VARCHAR,"we_pay or they_pay","","INTERNAL"
+    service,"9",VARCHAR,"VOICE, SMS or DATA","","INTERNAL"
+    destination_class,"10",VARCHAR,"Destination class the partner prices the line at","","INTERNAL"
+    units,"11","DECIMAL(18,4)","Billed units (minutes, messages, megabytes)","","INTERNAL"
+    amount,"12","DECIMAL(18,4)","Billed amount in the line currency; negative for a credit","","CONFIDENTIAL"
+    currency,"13",VARCHAR,"Line currency (ISO 4217)","","INTERNAL"
+    fx_rate_applied,"14","DECIMAL(18,8)","OPTIONAL. Rate the partner converted at; used only to name an fx_difference","","INTERNAL"
+    line_kind,"15",VARCHAR,"usage, adjustment, tax, credit or fee","","INTERNAL"
+    control_total_amount,"16","DECIMAL(18,4)","Header control total: the amount the partner says the statement version adds up to","","CONFIDENTIAL"
+    control_total_lines,"17",INTEGER,"Header control total: the line count the partner says the statement version has","","INTERNAL"
+    received_at,"18",TIMESTAMP,"When the statement was received","","INTERNAL"
+mapping:
+  canonicalName: settlement_statement
+  rawName: SETTLEMENT_STATEMENT
+  fields[19]:
+    - name: statement_id
+      from: statement_id
+      fn: keep
+    - name: statement_version
+      from: statement_version
+      fn: keep
+    - name: line_no
+      from: line_no
+      fn: keep
+    - name: partner_id
+      from: partner_id
+      fn: keep
+    - name: agreement_id
+      from: agreement_id
+      fn: keep
+    - name: period_start
+      from: period_start
+      fn: keep
+    - name: period_end
+      from: period_end
+      fn: keep
+    - name: usage_date
+      from: usage_date
+      fn: keep
+    - name: direction
+      from: direction
+      fn: keep
+    - name: service
+      from: service
+      fn: keep
+    - name: destination_class
+      from: destination_class
+      fn: keep
+    - name: units
+      from: units
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: currency
+      from: currency
+      fn: keep
+    - name: fx_rate_applied
+      from: fx_rate_applied
+      fn: keep
+    - name: line_kind
+      from: line_kind
+      fn: keep
+    - name: control_total_amount
+      from: control_total_amount
+      fn: keep
+    - name: control_total_lines
+      from: control_total_lines
+      fn: keep
+    - name: received_at
+      from: received_at
+      fn: keep

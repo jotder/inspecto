@@ -1,0 +1,20 @@
+raw:
+  name: HOLIDAY
+  format: CSV
+  fields[3]{name,selector,type,description,unit,classification}:
+    country,"0",VARCHAR,"Country code, matched to partner.country","","INTERNAL"
+    holiday_date,"1",DATE,"A non-business day","","INTERNAL"
+    name,"2",VARCHAR,"Holiday name","","INTERNAL"
+mapping:
+  canonicalName: holiday
+  rawName: HOLIDAY
+  fields[3]:
+    - name: country
+      from: country
+      fn: keep
+    - name: holiday_date
+      from: holiday_date
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
