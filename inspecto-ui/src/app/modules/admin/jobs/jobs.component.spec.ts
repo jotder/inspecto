@@ -6,6 +6,7 @@ import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { JobFailureDay, JobMetrics, JobRunRow, JobView, JobsService, LensService } from 'app/inspecto/api';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { JobsComponent, fmtDuration } from './jobs.component';
@@ -112,14 +113,45 @@ describe('JobsComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    it('hides reschedule/edit/delete row actions in the Business (read-only) lens; keeps run/toggle', () => {
+    it('hides reschedule/edit/delete and the run/toggle row actions in the Business (read-only) lens', () => {
         const fixture = create('ok');
         const c = fixture.componentInstance;
         TestBed.inject(LensService).selectLens('business');
-        const hints = c.scheduleActions.map((a) =>
-            typeof a.hint === 'function' ? a.hint({ enabled: true } as JobView) : a.hint,
-        );
-        expect(hints).toEqual(['Run now', 'Run with parameters…', 'Disable']);
+        const job = { enabled: true } as JobView;
+        const hints = c.scheduleActions
+            .filter((a) => !a.visible || a.visible(job))
+            .map((a) => (typeof a.hint === 'function' ? a.hint(job) : a.hint));
+        expect(hints).toEqual([]);
+    });
+
+    describe('run actions follow canOperateRuns (same gate as the Job panel)', () => {
+        const job = { name: 'rollup', type: 'enrich', enabled: true } as JobView;
+        const shown = (c: JobsComponent) =>
+            c.scheduleActions
+                .filter((a) => !a.visible || a.visible(job))
+                .map((a) => (typeof a.hint === 'function' ? a.hint(job) : a.hint));
+        const oidc = (caps: string[]) => {
+            const session = TestBed.inject(SessionService);
+            session.authMode.set('oidc');
+            session.capabilities.set(caps);
+        };
+
+        it('a subject without canOperateRuns sees neither Run now nor Run with parameters', () => {
+            const c = create('ok').componentInstance;
+            oidc([]);
+            expect(shown(c)).toEqual([]);
+        });
+
+        it('a subject with canOperateRuns sees both', () => {
+            const c = create('ok').componentInstance;
+            oidc(['canOperateRuns']);
+            expect(shown(c)).toEqual(['Run now', 'Run with parameters…', 'Disable']);
+        });
+
+        it('open mode (no auth) still shows them', () => {
+            const c = create('ok').componentInstance;
+            expect(shown(c)).toEqual(['Run now', 'Run with parameters…', 'Disable', 'Reschedule', 'Edit', 'Delete']);
+        });
     });
 
     it('badges a system job "System" in the name cell and offers it only the Run verbs (backend 409s the rest)', () => {

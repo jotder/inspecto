@@ -220,25 +220,29 @@ export class JobsComponent implements OnInit, OnDestroy {
         },
     ];
 
-    /** Run/toggle are operational, not authoring — available in every lens. Reschedule/edit/delete open
-     *  the config-authoring dialog or destroy the job, so they're hidden in the Business (read-only) lens.
+    /** Run now / Run with parameters / Enable-Disable are operational, not authoring, but the backend gates them on
+     *  `canOperateRuns` (403 otherwise) — so they carry the same `LensService.canOperateRuns()` check as the Job
+     *  panel (hidden, not disabled). Open mode (no auth) grants it. Reschedule/edit/delete open the
+     *  config-authoring dialog or destroy the job, so they're hidden in the Business (read-only) lens.
      *  A system job shows only Run now: the backend 409s every other verb on one (DUCKLE-C1). */
     get scheduleActions(): InspectoRowAction<JobView>[] {
         const ops: InspectoRowAction<JobView>[] = [
             {
                 icon: 'heroicons_outline:play',
                 hint: 'Run now',
+                visible: () => this.lens.canOperateRuns(),
                 onClick: (j) => this.trigger(j),
             },
             {
                 icon: 'heroicons_outline:adjustments-horizontal',
                 hint: 'Run with parameters…',
+                visible: () => this.lens.canOperateRuns(),
                 onClick: (j) => this.triggerWithParams(j),
             },
             {
                 icon: (j) => (j.enabled ? 'heroicons_outline:pause-circle' : 'heroicons_outline:play-circle'),
                 hint: (j) => (j.enabled ? 'Disable' : 'Enable'),
-                visible: (j) => !j.system,
+                visible: (j) => !j.system && this.lens.canOperateRuns(),
                 onClick: (j) => this.toggleEnabled(j),
             },
         ];

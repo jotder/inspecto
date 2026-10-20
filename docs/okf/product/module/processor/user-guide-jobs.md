@@ -31,13 +31,13 @@ full-page header, which no route reaches. A future full-page detail needs the fl
 
 Row action and detail-pane button **Run with parameters…** (2026-10-17: the embedded side panel's compact header now
 carries it beside the close X, gated on `LensService.canOperateRuns()`; the full-page header keeps its button under the
-same gate. The panel has no Run-now button, so this is its only run verb. ⚠ the list row action is still ungated by
-lens, so a Business-lens subject sees it on the row but not in the panel) open `JobRunParamsDialog`
+same gate. The panel has no Run-now button, so this is its only run verb. 2026-10-20: the list row actions **Run now**, **Run with parameters…** and Enable/Disable carry the same
+`canOperateRuns()` gate, hidden not disabled, so list and panel agree; open mode with no auth still shows them) open `JobRunParamsDialog`
 (`job-run-params.dialog.ts`). It reads the type's declarations (`GET /jobs/types/{id}`) plus the Job's configured
 values (`GET /jobs/{name}`), renders them through the same `paramDeclsToSpecs` → `<inspecto-schema-form>` path as
 the authoring form, and posts `POST /jobs/{name}/trigger {"params":{…}}` with **only the dirty fields** (a `multi`
 value is joined to CSV, the resolver's wire form). A refusal (422) shows inline and the dialog stays open; **The trigger route never 422s on a bad typed value** (as built: `JobRoutes.triggerJob` only parses `params` to strings; `ParameterResolver` type/required/expression failures are raised inside the async Run and recorded as a `REJECTED` run with the reason, after the 202 — so a bad `as_of` shows in the run history, not inline). The inline 422 is therefore reachable only for other refusals (module disabled, malformed body); the dialog spec pins the inline display with a field-naming message. success
-reuses the Run-now toast + reload. Same gate as Run now (the route's `canOperateRuns`; the UI adds none).
+reuses the Run-now toast + reload. Same gate as Run now (the route's `canOperateRuns`, mirrored in the UI by `LensService.canOperateRuns()`).
 Deliberately **no free-form key=value rows**: a Job's contract is its declaration, and a type with none shows
 "declares no runtime parameters".
 
