@@ -7,3 +7,4 @@ posture:
   objectsBackend: default
   postgresSidecar: bundled
 includes[1]: advanced
+contentPacks[4]: la-showcase,la-audit,la-claims,la-mobile-money
