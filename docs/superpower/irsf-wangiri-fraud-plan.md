@@ -6,7 +6,7 @@
 > destination** level, where wholesale fraud is actually priced. This plan is **CDR-based only**: no signalling, no test calls,
 > no inline blocking (those are matrix rows F, G and I). It is written to be **RFP-compatible** (§12): every slice maps to the
 > MVNO RFP compliance-matrix lines, gap IDs and workstreams it satisfies or moves, and the RFP lines CDRs cannot satisfy are named
-> with the reason. Decisions **D-IW1…D-IW10 are open** (§14). Every volume or latency claim is a hypothesis until slice IW0 measures it.
+> with the reason. Decisions **D-IW1…D-IW10 answered 2026-10-20** (§14). Every volume or latency claim is a hypothesis until slice IW0 measures it.
 >
 > **Method.** Read the matrix rows D, E, H, I; the `telco-fraud` template (Jobs, Alert Rules, KPI, runbook, Anomaly Model, Schemas, sample
 > CDR); `okf/product/module/config/plan-spaces.md` §3.5; the Anomaly Scores and Entity Lists concepts; `docs/GLOSSARY.md`; the two sibling plans
@@ -456,6 +456,11 @@ generator is split per feature (disjoint files). Nothing here edits `telco-fraud
 | **D-IW8** | Keep `irsf_exposure_seconds` as the volume KPI beside the new cost KPI (breaking changes are free, so it could be retired)? | **Keep**, as volume. |
 | **D-IW9** | Local time zone and "off-hours" band: per Space or per partner country? | **Per Space** configuration; per-country later. |
 | **D-IW10** | Matrix: after IW3 + IW4 + IW6 mark row H as **Y** for IRSF / Wangiri, **P** for flash / CLI? RFP `FM-02`: leave "Partially compliant" until SIM-box and A2P lanes land? | Operator's call; the matrix is updated only when a slice ships (as the sibling plans decide). |
+
+**ANSWERED 2026-10-20 (operator, accepted the recommended answer): D-IW1…D-IW10, all as recommended** (D-IW10 stays the
+operator's own call at ship time: the matrix changes only when a slice ships). **Cross-note:** D-IW2 (local `partner_rate`
+Reference now, switch when settlement ships), D-BP7 and D-BP8 of the SIM-box plan (`bypass-simbox-detection-plan.md`) share
+one rate / CLI boundary: **no CLI column, signal or Alert Rule defined in both packs.**
 
 ## 15. Risks
 

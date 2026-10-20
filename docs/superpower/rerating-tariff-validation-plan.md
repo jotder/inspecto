@@ -5,7 +5,7 @@
 > control in the `telco-ra` Space Template and nothing more, while LATRO, Mobileum, Neural and Araxxe sell re-rating and
 > Subex and TEOCO sell it partially. The row `PACK-PARTNER-SETTLEMENT-1` filed both gap C and gap Q together; this plan
 > takes the **re-rating half**. Gap Q (partner settlement) is planned in a sibling document and is **not** touched here.
-> Decisions **D-RR1…D-RR10 are open** (§9). Every claim about volume is a hypothesis until slice R0 measures it.
+> Decisions **D-RR1…D-RR10 answered 2026-10-20** (§9; D-RR10 stays the operator's call). Every claim about volume is a hypothesis until slice R0 measures it.
 >
 > **Method.** Read the matrix rows C and Q, the revenue-assurance solution page, the `telco-ra` template and its golden
 > corpus, the Reconciliation module page, the Analytics Kernel concept and `docs/GLOSSARY.md`; every statement about "what
@@ -264,6 +264,14 @@ generator is split per feature (disjoint files). Nothing here edits `telco-ra`, 
 | **D-RR8** | `subscription_history` is a per-subscriber Reference (large, changing). Accept it as a Reference, or a Stream? Classification of `SUBSCRIBER_ID`? | Reference with `scd2`; `INTERNAL`, synthetic ids as in the pack today. |
 | **D-RR9** | Boundary with gap Q: retail here, wholesale there, one `rerated_usage` contract. | **Confirm**, and let Q's plan cite the contract. |
 | **D-RR10** | Commercial: `billable`, `orderCode` for the new solution pack; the matrix cell for C after R6 (**P** to **Y**?). | The operator's call; the matrix is updated only when a slice ships. |
+
+**ANSWERED 2026-10-20 (operator, accepted the recommended answer): D-RR1…D-RR10, all as recommended.** D-RR1 new
+`telco-rerating` template; D-RR2 no kernel now, gate G-K measured in R0; D-RR3 conservative range; D-RR4 separate over-billing
+class excluded from `revenue_at_risk` (**answered, but called out because it changes existing behaviour:** today's net
+`leakage_found` sum no longer nets over-billing against leakage); D-RR5 formula shipped, defaults are configuration; D-RR6 per
+root cause; D-RR7 R5 demand-gated; D-RR8 `scd2` Reference, `INTERNAL`; D-RR9 retail here / wholesale there, one `rerated_usage`
+contract; D-RR10 commercial (`billable`, `orderCode`, matrix cell C) **stays the operator's own call** and is still open.
+R0 and R1 are now startable; R5 stays demand-gated.
 
 ## 10. Risks
 

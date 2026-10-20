@@ -35,4 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | — | P3 | feature | D-11 hand-authored relations component | demand |
-| `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-10-18: the containment rule is BUILT; what is left is making the ingest lane write to it. | operator |
+| `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-10-18: the containment rule is BUILT; what is left is making the ingest lane write to it. | — |
