@@ -55,13 +55,8 @@ public final class EntityHistory {
     private static final List<ObjectType> KINDS = List.of(ObjectType.INCIDENT, ObjectType.CASE);
 
     static Object byEntity(ApiContext api, HttpExchange ex) {
-        ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
-        // A caller who cannot reveal gets no match through a classified key: a raw number that hits one would confirm
-        // that the number is under investigation, so such an object is absent (D-P8, fail closed).
-        java.util.function.BiPredicate<OperationalObject, String> hidden =
-                (o, on) -> masking != null && masking.hides(o.attributes(), on);
         Result r = query(api.writeRoot(), OpsEngine.of(api), ex, ApiContext.query(ex, "type"), ApiContext.query(ex, "id"),
-                ApiContext.query(ex, "status"), ApiContext.query(ex, "limit"), hidden);
+                ApiContext.query(ex, "status"), ApiContext.query(ex, "limit"));
         ApiContext.pagination(ex, null, null, r.limit(), r.total());
         if (r.truncated()) {
             // The scan stopped at its cap: older references may exist, so `total` is a lower bound — say so.
@@ -89,7 +84,12 @@ public final class EntityHistory {
      * (Link Analysis's masked case history), so the two cannot disagree. {@code status}/{@code limit} may be null.
      */
     public static Result query(Path root, ObjectService svc, HttpExchange ex, String typeIn, String idIn, String statusIn, String limitIn) {
-        return query(root, svc, ex, typeIn, idIn, statusIn, limitIn, (o, on) -> false);
+        ObjectReadMasking masking = ObjectReadMasking.forRequest(root, ex);
+        // A caller who cannot reveal gets no match through a classified key: a raw number that hits one would confirm
+        // that the number is under investigation, so such an object is absent (D-P8, fail closed). Applied HERE, so the
+        // route and every seam caller (Link Analysis case history) share it and none can skip it.
+        return query(root, svc, ex, typeIn, idIn, statusIn, limitIn,
+                (o, on) -> masking != null && masking.hides(o.attributes(), on));
     }
 
     /** As above; {@code hidden} drops a match the caller may not learn of (an object, the attribute that matched it). */
