@@ -1,0 +1,31 @@
+name: settlement_payment
+active: true
+
+dirs:
+  poll:       data/inbox/settlement_payment
+  database:   data/settlement_payment/database
+  backup:     data/settlement_payment/backup
+  temp:       data/settlement_payment/temp
+  errors:     data/settlement_payment/errors
+  quarantine: data/settlement_payment/quarantine
+  markers:    data/settlement_payment/markers
+  status_dir: data/settlement_payment/status
+  log_dir:    data/settlement_payment/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: settlement_payment_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

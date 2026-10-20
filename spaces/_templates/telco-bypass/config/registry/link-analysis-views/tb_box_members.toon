@@ -1,0 +1,14 @@
+name: tb_box_members
+description: "Suspected SIM-box members: each candidate SIM linked to the box it belongs to (the cluster key reads imei:, cell: or batch:, then the value; the link kind is the key that decided it). Open it from a tb_box_suspected Incident to see every SIM of one box as a Working Set, then Explain node or Centrality on the device or the cell. Synthetic until fed from an operator's CDRs."
+sourceId: entity-projection
+layout: force-cluster
+profile: telecom
+query:
+  projection:
+    datasetId: tb_cluster_members
+    sourceCol: msisdn
+    targetCol: cluster_key
+    linkKindCol: cluster_kind
+view:
+  legend: true
+  workingSet: true

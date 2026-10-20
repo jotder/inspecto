@@ -1,0 +1,19 @@
+job:
+  name: tb_clusters
+  type: sql.template
+  description: "Bypass / SIM-box cluster stage 2 - one row per suspected box per day (a device, a cell or an activation batch with at least min_box_sims candidate SIMs): how many candidates, how many were scored and alerting, the highest score, the talk minutes, the cells, devices and batches involved, how many members swap IMEIs, the days seen, and alert_value (zero in shadow mode), the only column the tb_box_suspected Alert Rule reads"
+  sql: "WITH win AS ( SELECT CAST($window_start AS DATE) AS d ), m AS ( SELECT * FROM tb_cluster_members WHERE CAST(window_date AS DATE) = (SELECT d FROM win) ), feat AS ( SELECT DISTINCT msisdn FROM tb_features WHERE CAST(window_date AS DATE) = (SELECT d FROM win) ), fnd AS ( SELECT entity_key, score, status FROM tb_findings WHERE CAST(window_date AS DATE) = (SELECT d FROM win) ), agg AS ( SELECT m.cluster_kind, m.cluster_key, count(*) AS candidate_sims, count(f.msisdn) AS scored_sims, count(*) FILTER (WHERE x.status = 'alert') AS alerting_sims, max(x.score) AS max_score, round(sum(m.talk_minutes), 1) AS est_bypass_minutes, count(DISTINCT m.cell_key) AS cells, count(DISTINCT m.imei_key) AS imeis, count(DISTINCT m.batch_key) AS batches, count(*) FILTER (WHERE m.imei_count >= CAST($spoof_imei_count AS INTEGER)) AS spoofed_sims, array_to_string(list_slice(list_sort(list(m.msisdn)), 1, 5), ',') AS example_msisdns FROM m LEFT JOIN feat f ON f.msisdn = m.msisdn LEFT JOIN fnd x ON x.entity_key = m.msisdn GROUP BY m.cluster_kind, m.cluster_key ), hist AS ( SELECT t.cluster_key, min(CAST(t.window_date AS DATE)) AS first_day, count(DISTINCT CAST(t.window_date AS DATE)) AS prior_days FROM tb_clusters t CROSS JOIN win WHERE CAST(t.window_date AS DATE) < win.d GROUP BY t.cluster_key ) SELECT a.cluster_kind, a.cluster_key, a.candidate_sims, a.scored_sims, a.alerting_sims, a.max_score, a.est_bypass_minutes, a.cells, a.imeis, a.batches, a.spoofed_sims, coalesce(h.first_day, win.d) AS first_day, win.d AS last_day, coalesce(h.prior_days, 0) + 1 AS days_seen, a.example_msisdns, CASE WHEN CAST($shadow AS BOOLEAN) THEN 0 ELSE a.candidate_sims END AS alert_value, win.d AS window_date FROM agg a CROSS JOIN win LEFT JOIN hist h ON h.cluster_key = a.cluster_key"
+  sources: "tb_cluster_members,tb_features,tb_findings,tb_clusters"
+  sink_dataset: tb_clusters
+  cron: "50 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  day: "$yesterday"
+  incremental:
+    by: day
+    column: window_date
+    lookback: 1
+    retain: 31
+  spoof_imei_count: "3"
+  shadow: "false"
+  enabled: true

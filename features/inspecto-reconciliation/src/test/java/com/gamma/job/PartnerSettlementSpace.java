@@ -49,8 +49,13 @@ final class PartnerSettlementSpace {
 
     static final Path TEMPLATE = Path.of("..", "..", "spaces", "_templates", "partner-settlement").toAbsolutePath().normalize();
     /** The Jobs in chain order. */
-    static final List<String> CHAIN = List.of("ps_calendar", "ps_statement_current", "ps_statement_findings", "ps_expected", "ps_billed", "ps_findings");
-    static final List<String> FEEDS = List.of("partner", "settlement_agreement", "fx_rate", "holiday", "settlement_statement", "rerated_usage");
+    static final List<String> CHAIN = List.of("ps_calendar", "ps_statement_current", "ps_statement_findings", "ps_expected", "ps_billed", "ps_findings",
+            "ps_movement", "ps_position", "ps_rollforward");
+    /** The first six Jobs (S1 to S3). */
+    static final List<String> COMPARE_CHAIN = CHAIN.subList(0, 6);
+    /** The S4 Jobs, which read what the compare chain wrote. */
+    static final List<String> POSITION_CHAIN = CHAIN.subList(6, 9);
+    static final List<String> FEEDS = List.of("partner", "settlement_agreement", "fx_rate", "holiday", "settlement_statement", "rerated_usage", "settlement_payment");
 
     final Path root;
     final Path space;
@@ -199,6 +204,12 @@ final class PartnerSettlementSpace {
         java.util.Set<String> out = new java.util.TreeSet<>();
         for (ReconBreaks.Break b : new ReconStateStore(config()).read(recon).breaks()) out.add(b.day() + "|" + b.type() + "|" + b.key());
         return out;
+    }
+
+    /** A copy of this Space (config and data) under a new root, so a Job can be mutated and re-run without ingesting again. */
+    PartnerSettlementSpace copyTo(Path newRoot) throws Exception {
+        copyTree(root, newRoot);
+        return new PartnerSettlementSpace(newRoot, newRoot.resolve(root.relativize(space).toString()));
     }
 
     static void copyTree(Path src, Path dst) throws Exception {

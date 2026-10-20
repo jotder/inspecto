@@ -59,6 +59,37 @@ class BypassCorpusTest {
     }
 
     @Test
+    void theB3ExtensionAddsOnlyTheFourClusterArchetypesAfterTheB2CorpusAndIsDeterministic() {
+        BypassCorpus a = new BypassCorpus().generateB3(), b = new BypassCorpus().generateB3(), base = new BypassCorpus().generateB2();
+        assertEquals(a.files(true), b.files(true));
+        assertEquals(a.callsOnDay(1, a.archetypes.get("L2")), b.callsOnDay(1, b.archetypes.get("L2")));
+        assertEquals(12, a.farm.size());
+        assertEquals(6, a.receivingBlock.size());
+        assertEquals(5, a.oneShort.size());
+        assertEquals(5, a.smallestBox.size());
+        Set<String> planted = new HashSet<>(a.farm);
+        planted.addAll(a.receivingBlock);
+        planted.addAll(a.oneShort);
+        planted.addAll(a.smallestBox);
+        Set<String> added = new HashSet<>(a.allPlanted());
+        added.removeAll(base.allPlanted());
+        assertEquals(planted, added, "B3 adds exactly X4 to X7");
+        for (Map.Entry<String, Set<String>> e : base.archetypes.entrySet()) assertEquals(e.getValue(), a.archetypes.get(e.getKey()), e.getKey());
+        assertEquals(base.boxLike, a.boxLike, "the B3 archetypes are not planted as box_like fixtures: the cluster golden owns them");
+        assertTrue(a.calls().containsAll(base.calls()), "every B2 row is in the B3 corpus, unchanged");
+        assertEquals(base.calls().size() + 12 * 30 + 6 * 33 + 4 * 30 + 9 + 5 * 30, a.calls().size());
+    }
+
+    @Test
+    void callsOnDayAreTheRowsFilesOnDayWrites() {
+        BypassCorpus c = new BypassCorpus().generateB2();
+        Set<String> moved = Set.of(c.archetypes.get("L2").iterator().next());
+        StringBuilder want = new StringBuilder(BypassCorpus.HEADER).append('\n');
+        for (BypassCorpus.Call call : c.callsOnDay(1, moved)) want.append(call.csv(true)).append('\n');
+        assertEquals(want.toString(), c.filesOnDay(1, moved).values().iterator().next());
+    }
+
+    @Test
     void aLaterDayShiftsEveryRowAndRelocatesOnlyTheNamedLines() {
         BypassCorpus c = new BypassCorpus().generateB2();
         Set<String> moved = Set.of(c.archetypes.get("L2").iterator().next());

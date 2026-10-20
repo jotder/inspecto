@@ -1,8 +1,9 @@
 # Partner settlement runbooks
 
-> **Slices S1 to S3 of the plan** (`docs/superpower/partner-settlement-wholesale-plan.md`): the References, statement ingestion and
-> the compare. There is no dispute Case workflow, netting, aging or accrual here yet; a finding opens an Incident through the
-> Reconciliation and the Alert Rule, and the Case, the evidence pack and the finance positions arrive with the next slices.
+> **Slices S1 to S4 of the plan** (`docs/superpower/partner-settlement-wholesale-plan.md`): the References, statement ingestion, the
+> compare, and the netting positions with the roll-forward. There is no dispute Case workflow, aging or accrual here yet; a finding
+> opens an Incident through the Reconciliation and the Alert Rule, and the Case, the evidence pack and the aged balances arrive with
+> the next slices.
 
 **Every number here is synthetic.** No real partner statement, TAP file or wholesale invoice has been seen: the statement layout
 is one canonical Schema, and mapping a partner's own layout into it is a Pipeline mapping, outside this pack. A finding is a
@@ -10,7 +11,7 @@ difference between what a partner says is owed and what we price ourselves, neve
 
 ## What runs
 
-Six chained `sql.template` Jobs (each runs when the previous one succeeds; the first runs daily at 01:00) and two `recon.run` Jobs
+Nine chained `sql.template` Jobs (each runs when the previous one succeeds; the first runs daily at 01:00) and two `recon.run` Jobs
 (05:30):
 
 | Job | Writes | What it does |
@@ -21,9 +22,12 @@ Six chained `sql.template` Jobs (each runs when the previous one succeeds; the f
 | `ps_expected` | `settlement_expected` | Our independently re-rated usage per agreement, direction, service, destination class and day, in the agreement's settlement currency, with the tolerance in force that day. |
 | `ps_billed` | `settlement_billed` | The partner's usage lines at the same grain and currency. `amount` is snapped to our expected amount when the variance is inside the tolerance (so the Reconciliation compares at tolerance 0); `amount_billed` is always the true billed amount. |
 | `ps_findings` | `settlement_findings` | `amount_mismatch`, `cutoff_difference`, `fx_difference` (finding class `variance`); `missing_statement`, `unrated_usage`, `fx_rate_missing` (class `data_quality`). |
+| `ps_movement` | `settlement_movement` | Every money movement at line level: each current statement line and each finance payment, credit or debit note, in the settlement currency, with both currencies, the FX rate, its date and its type, and a `status` (`ok`, `fx_missing`, `unknown_agreement`). Signed from our side: positive is what we owe. |
+| `ps_position` | `settlement_position` | Per netting group, cycle month and settlement currency: `payable`, `receivable`, `net` (positive = we pay) and `net_direction`, `orig_net` (the net in each original currency), the statement and line counts, and `lines_unconverted`. |
+| `ps_rollforward` | `settlement_rollforward` | Per netting group and settlement currency, one row for every month from the first movement to the as-of month: `opening` + `invoiced` - `paid` + `adjustments` = `closing`. A month with no movement carries the balance. |
 | `ps_voice`, `ps_sms` | Break state | One Reconciliation per service family on `settlement_expected` vs `settlement_billed`: Break lifecycle, recurrence and the Incident. |
 
-The two Jobs that read the as-of day, `ps_calendar` and `ps_expected`, take an `as_of` parameter (a date, default today); pass the
+The three Jobs that read the as-of day, `ps_calendar`, `ps_expected` and `ps_rollforward`, take an `as_of` parameter (a date, default today); pass the
 same date to both to reproduce a past day. Only cycles that ended before `as_of` are calendared, and a cycle's expected amounts are
 compared only once its statement is received or its `statement_due` is before `as_of`.
 
@@ -59,10 +63,35 @@ class, day and rating run, with `units`, `amount_expected`, `currency`, `rate_id
 re-rating pack exists, load it as a feed (copy the CSV into `data/inbox/rerated_usage`). The compare uses the latest run per
 agreement and cycle; a row with a blank `amount_expected` must carry a `reason` and becomes `unrated_usage`.
 
+## Positions and the roll-forward
+
+Both read what the partner's current statements say is owed and what finance recorded as paid, never our own pricing, so a position
+is not an agreed balance: a flagged variance is in `settlement_findings`, and no dispute is read or netted away here.
+
+- **The feed `settlement_payment`** is finance's record, read and never written: `payment_id`, `agreement_id`, `partner_id`,
+  `direction` (`we_pay`: money left us, or a note that reduces what we owe; `they_pay`: money came to us), `payment_date`, `kind`
+  (`payment`, `credit_note`, `debit_note`), a positive `amount`, `currency` and `recorded_at`. A record sent twice counts once and the
+  latest `recorded_at` wins, so a correction is a new record with the same `payment_id`. Copy the CSV into `data/inbox/settlement_payment`.
+- **Sign.** From our side: a `we_pay` statement line raises what we owe, a `they_pay` line lowers it (a receivable); a payment or a
+  credit note lowers the balance on the side it names, a debit note raises it. `paid` is money we paid minus money received, so it is
+  negative in a month where partners paid us more than we paid.
+- **Cycle.** A statement belongs to the calendar month its cycle ends in (a semi-monthly agreement puts two statements in one month);
+  a payment or note belongs to the month of its date. `invoiced` is usage, fee and tax lines; a credit or adjustment line on a statement
+  and every credit or debit note are `adjustments`.
+- **Currency.** Every movement converts into its agreement's settlement currency with the agreement's `fx_rate_type`, at the latest
+  rate on or before the usage day or the cycle end (the agreement's `fx_date_rule`; a fee, tax, credit or adjustment line has no usage
+  day and uses the cycle end; a payment uses its own date). Netting happens inside one settlement currency: two agreements of one
+  netting group in different settlement currencies give two positions, not one. The platform does not net across currencies.
+- **A line that cannot be placed is named, not dropped.** `status` `fx_missing` (no rate) is counted in `lines_unconverted` and left
+  out of every amount; `unknown_agreement` (the agreement is not in the Reference, or belongs to another partner, on that date) stays
+  in `settlement_movement` and in no balance. Read `settlement_movement` filtered on `status` after every run.
+- **No opening balance feed.** The first month of a series opens at zero; a balance that existed before the first statement must be fed
+  as an adjustment note.
+
 ## Limits
 
-- A statement line with `line_kind` other than `usage` (tax, fee, credit, adjustment) counts toward the control totals but is not
-  compared in this slice; netting and positions arrive in S4.
+- A statement line with `line_kind` other than `usage` (tax, fee, credit, adjustment) counts toward the control totals and the
+  positions, but is not compared in the compare Jobs.
 - An agreement's `cycle` must not change between two versions inside one cycle: cycles are calendar-aligned (monthly, semi-monthly
   1-15 and 16-end, weekly Monday-Sunday).
 - The compare is per day. A Reconciliation reads one day, so the `recon.run` Jobs run for the latest day on any side unless a

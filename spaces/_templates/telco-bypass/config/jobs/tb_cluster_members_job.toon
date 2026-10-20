@@ -1,0 +1,25 @@
+job:
+  name: tb_cluster_members
+  type: sql.template
+  description: "Bypass / SIM-box cluster stage 1 - one row per candidate SIM of the day (the five box_like clauses at a lower volume floor, so a slow-roll SIM under the SIM-day floor still counts) that shares a box with enough other candidates: a device (imei), a cell or an activation batch. A SIM joins the first key that reaches min_box_sims, in that order, so one box is one cluster_key; allowed lines are left out"
+  sql: "WITH win AS ( SELECT CAST($window_start AS DATE) AS d, CAST($window_end AS TIMESTAMP) AS ts ), w AS NOT MATERIALIZED ( SELECT * FROM voice_cdr WHERE start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP) ), mo AS ( SELECT a_number AS msisdn, b_number, duration_s, cell_id, nullif(imei, '') AS imei FROM w WHERE direction = 'MO' AND service = 'VOICE' AND coalesce(roaming, 'N') <> 'Y' ), cc AS ( SELECT msisdn, cell_id, count(*) AS n FROM mo GROUP BY msisdn, cell_id ), cells AS ( SELECT msisdn, arg_max(cell_id, (n, cell_id)) AS cell_key, max(n) AS top_cell_calls FROM cc GROUP BY msisdn ), ic AS ( SELECT msisdn, imei, count(*) AS n FROM mo WHERE imei IS NOT NULL GROUP BY msisdn, imei ), imeis AS ( SELECT msisdn, arg_max(imei, (n, imei)) AS imei_key, count(*) AS imei_count FROM ic GROUP BY msisdn ), agg AS ( SELECT msisdn, count(*) AS calls_mo, CAST(count(DISTINCT b_number) AS DOUBLE) / count(*) AS b_diversity, CAST(count(*) FILTER (WHERE duration_s > 0 AND duration_s <= CAST($short_s AS INTEGER)) AS DOUBLE) / nullif(count(*) FILTER (WHERE duration_s > 0), 0) AS short_call_ratio, round(coalesce(sum(duration_s) FILTER (WHERE duration_s > 0), 0) / 60.0, 1) AS talk_minutes FROM mo GROUP BY msisdn ), ev AS ( SELECT a_number AS msisdn, service, direction FROM w WHERE direction = 'MO' UNION ALL SELECT b_number AS msisdn, service, direction FROM w WHERE direction = 'MT' ), evs AS ( SELECT msisdn, count(*) AS events, count(*) FILTER (WHERE service = 'VOICE') AS voice_events, count(*) FILTER (WHERE service = 'VOICE' AND direction = 'MT') AS calls_mt FROM ev GROUP BY msisdn ), prof AS ( SELECT msisdn, max(activated_on) AS activated_on, arg_max(dealer_id, activated_on) AS dealer_id FROM subscriber_profile GROUP BY msisdn ), sim AS ( SELECT a.msisdn, a.calls_mo, a.b_diversity, a.short_call_ratio, a.talk_minutes, CAST(e.calls_mt AS DOUBLE) / (e.calls_mt + a.calls_mo) AS inbound_ratio, CAST(e.voice_events AS DOUBLE) / e.events AS voice_only_share, CAST(c.top_cell_calls AS DOUBLE) / a.calls_mo AS top_cell_share, c.cell_key, i.imei_key, coalesce(i.imei_count, 0) AS imei_count, CASE WHEN p.dealer_id IS NOT NULL AND p.activated_on IS NOT NULL THEN concat(p.dealer_id, '/', CAST(p.activated_on AS VARCHAR)) END AS batch_key FROM agg a JOIN evs e ON e.msisdn = a.msisdn JOIN cells c ON c.msisdn = a.msisdn LEFT JOIN imeis i ON i.msisdn = a.msisdn LEFT JOIN prof p ON p.msisdn = a.msisdn WHERE a.calls_mo >= CAST($cand_min_events AS INTEGER) ), cand AS ( SELECT s.* FROM sim s CROSS JOIN win WHERE coalesce(s.inbound_ratio < CAST($cand_max_inbound AS DOUBLE) AND s.b_diversity > CAST($cand_min_b_div AS DOUBLE) AND s.short_call_ratio > CAST($cand_min_short AS DOUBLE) AND s.voice_only_share > CAST($cand_min_voice_only AS DOUBLE) AND s.top_cell_share > CAST($cand_min_top_cell AS DOUBLE), false) AND NOT EXISTS (SELECT 1 FROM entity_list_tb_allow a WHERE a.purpose = 'allow' AND (a.expires_at IS NULL OR a.expires_at > win.ts) AND CASE a.match WHEN 'key' THEN a.entry = s.msisdn WHEN 'prefix' THEN starts_with(s.msisdn, a.entry) WHEN 'range' THEN length(s.msisdn) = length(a.lo) AND s.msisdn BETWEEN a.lo AND a.hi ELSE false END) ), sz AS ( SELECT *, CASE WHEN imei_key IS NULL THEN 0 ELSE count(*) OVER (PARTITION BY imei_key) END AS imei_sims, count(*) OVER (PARTITION BY cell_key) AS cell_sims, CASE WHEN batch_key IS NULL THEN 0 ELSE count(*) OVER (PARTITION BY batch_key) END AS batch_sims FROM cand ), boxed AS ( SELECT *, CASE WHEN imei_sims >= CAST($min_box_sims AS INTEGER) THEN 'imei' WHEN cell_sims >= CAST($min_box_sims AS INTEGER) THEN 'cell' WHEN batch_sims >= CAST($min_box_sims AS INTEGER) THEN 'batch' END AS cluster_kind FROM sz ) SELECT msisdn, cluster_kind, concat(cluster_kind, ':', CASE cluster_kind WHEN 'imei' THEN imei_key WHEN 'cell' THEN cell_key ELSE batch_key END) AS cluster_key, imei_key, cell_key, batch_key, imei_sims, cell_sims, batch_sims, imei_count, calls_mo, talk_minutes, b_diversity, short_call_ratio, inbound_ratio, voice_only_share, top_cell_share, CAST($window_start AS DATE) AS window_date FROM boxed WHERE cluster_kind IS NOT NULL"
+  sources: "voice_cdr,subscriber_profile,entity_list_tb_allow"
+  sink_dataset: tb_cluster_members
+  cron: "40 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  day: "$yesterday"
+  incremental:
+    by: day
+    column: window_date
+    lookback: 1
+    retain: 31
+  cand_min_events: "10"
+  min_box_sims: "5"
+  short_s: "60"
+  cand_max_inbound: "0.05"
+  cand_min_b_div: "0.9"
+  cand_min_short: "0.9"
+  cand_min_voice_only: "0.99"
+  cand_min_top_cell: "0.9"
+  enabled: true

@@ -1,0 +1,19 @@
+physicalRef: tb_clusters
+columns[17]{name,type,classification}:
+  cluster_kind,string,
+  cluster_key,string,
+  candidate_sims,number,
+  scored_sims,number,
+  alerting_sims,number,
+  max_score,number,
+  est_bypass_minutes,number,
+  cells,number,
+  imeis,number,
+  batches,number,
+  spoofed_sims,number,
+  first_day,date,
+  last_day,date,
+  days_seen,number,
+  example_msisdns,string,MSISDN
+  alert_value,number,
+  window_date,date,

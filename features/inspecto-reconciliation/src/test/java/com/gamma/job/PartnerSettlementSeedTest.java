@@ -129,7 +129,7 @@ class PartnerSettlementSeedTest {
         }
         // the feed seeds equal what the Pipelines really write
         PartnerSettlementSpace s = PartnerSettlementSpace.create(root);
-        s.ingest(PartnerSettlementCorpus.generate().files());
+        s.ingest(PartnerSettlementCorpus.generateWithPositions().files());
         try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
             for (String feed : PartnerSettlementSpace.FEEDS) {
                 Path db = s.data().resolve(feed).resolve("database");

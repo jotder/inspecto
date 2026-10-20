@@ -30,6 +30,10 @@ timestamp: 2026-10-20T00:00:00Z
    once) and the re-rating output at `data/inbox/rerated_usage`. **No sample files ship** for a real contract: use the Schemas in
    `config/<feed>/<feed>_schema.toon`. The synthetic corpus used by the tests is generated, not committed.
 
+5. Point finance's record of payments, credit notes and debit notes at `data/inbox/settlement_payment` (the positions work without
+   it, with nothing paid). A record sent twice counts once and a correction is a new record with the same `payment_id` and a later
+   `recorded_at`. The pack reads these records and never writes one.
+
 ## The statement contract
 
 Each statement line carries its statement's `control_total_amount` and `control_total_lines`; the integrity control sums the lines
@@ -48,15 +52,15 @@ calendar assigns a cycle to the version in force on its last day. Keep `cycle` c
 
 ## Tuning and as-of
 
-There are no thresholds in the SQL. `ps_calendar` and `ps_expected` read the Job parameter `as_of` (default today); pass the same
-date to both to reproduce a past day. Reconciliations read one day: run `ps_voice` and `ps_sms` per day when catching up.
+There are no thresholds in the SQL. `ps_calendar`, `ps_expected` and `ps_rollforward` read the Job parameter `as_of` (default today); pass the same
+date to all three to reproduce a past day (the roll-forward has a row for every month up to the `as_of` month). Reconciliations read one day: run `ps_voice` and `ps_sms` per day when catching up.
 
 ## Verify
 
 - `GET /api/v1/jobs` lists the chain Jobs `ps_calendar`, `ps_statement_current`, `ps_statement_findings`, `ps_expected`, `ps_billed`,
-  `ps_findings` and the Jobs `ps_voice`, `ps_sms`.
+  `ps_findings`, `ps_movement`, `ps_position`, `ps_rollforward` and the Jobs `ps_voice`, `ps_sms`.
 - After the first run the Dataset `settlement_calendar` has the closed cycles with business-day due dates.
-- The golden tests are `PartnerSettlementPackGoldenTest`, `PartnerSettlementReferenceTest`, `PartnerSettlementSeedTest` and
+- The golden tests are `PartnerSettlementPackGoldenTest`, `PartnerSettlementPositionGoldenTest`, `PartnerSettlementReferenceTest`, `PartnerSettlementSeedTest` and
   `PartnerSettlementCorpusTest` in module `inspecto-reconciliation`.
 
 ## Safety

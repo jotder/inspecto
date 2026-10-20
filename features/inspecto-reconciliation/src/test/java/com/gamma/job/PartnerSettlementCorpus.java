@@ -80,6 +80,14 @@ final class PartnerSettlementCorpus {
 
     record Fx(LocalDate from, String fromCur, String toCur, String type, BigDecimal rate) {}
 
+    /** A finance record (S4): a payment, or a credit or debit note; the amount is positive and the kind and direction give the sign. */
+    record Payment(String id, String agreement, String partner, String direction, LocalDate date, String kind, BigDecimal amount,
+                   String currency, LocalDateTime recordedAt) {
+        String csv() {
+            return String.join(",", id, agreement, partner, direction, date.toString(), kind, amount.toPlainString(), currency, TS.format(recordedAt));
+        }
+    }
+
     final List<String> partners = new ArrayList<>();
     final List<Agreement> agreements = new ArrayList<>();
     final List<Fx> fx = new ArrayList<>();
@@ -87,6 +95,8 @@ final class PartnerSettlementCorpus {
     final List<Rerated> rerated = new ArrayList<>();
     /** statement file name to its lines (a re-sent statement is a second file). */
     final Map<String, List<Line>> statements = new LinkedHashMap<>();
+    /** finance file name to its payment records (S4 only; empty for {@link #generate()}). */
+    final Map<String, List<Payment>> payments = new LinkedHashMap<>();
 
     /** reason to the ITEM_KEYs {@code ps_findings} must emit, exactly these. */
     final Map<String, Set<String>> plantedFindings = new TreeMap<>();
@@ -100,6 +110,19 @@ final class PartnerSettlementCorpus {
     static PartnerSettlementCorpus generate() {
         PartnerSettlementCorpus c = new PartnerSettlementCorpus();
         c.build();
+        return c;
+    }
+
+    /**
+     * The S3 corpus plus the S4 additions: a fifth partner and agreement {@code AG-VOICE-F1} invoiced in EUR into a USD agreement
+     * (so the billed side is converted, by a rate that changes mid-cycle and a decoy spot rate), and finance payments, credit and
+     * debit notes. The additions raise no finding, so the S3 findings of this corpus equal those of {@link #generate()}.
+     */
+    static PartnerSettlementCorpus generateWithPositions() {
+        PartnerSettlementCorpus c = new PartnerSettlementCorpus();
+        c.build();
+        c.buildF1();
+        c.buildPayments();
         return c;
     }
 
@@ -152,7 +175,7 @@ final class PartnerSettlementCorpus {
         BigDecimal best = null;
         LocalDate bestDate = null;
         for (Fx f : fx)
-            if (f.type().equals("contract") && !f.from().isAfter(d) && (bestDate == null || f.from().isAfter(bestDate))) { best = f.rate(); bestDate = f.from(); }
+            if (f.type().equals("contract") && f.fromCur().equals("USD") && f.toCur().equals("EUR") && !f.from().isAfter(d) && (bestDate == null || f.from().isAfter(bestDate))) { best = f.rate(); bestDate = f.from(); }
         return best;
     }
 
@@ -324,6 +347,62 @@ final class PartnerSettlementCorpus {
         benign.add(a + "|" + dir + "|ALL-OF-JULY");
     }
 
+    // ---- S4: AG-VOICE-F1 (billed in EUR, settled in USD) and the finance records ---------------------------------
+
+    /** The latest rate of a type from one currency to another on or before a day; null before the first row. */
+    BigDecimal rateOn(String from, String to, String type, LocalDate d) {
+        Fx best = null;
+        for (Fx f : fx)
+            if (f.fromCur().equals(from) && f.toCur().equals(to) && f.type().equals(type) && !f.from().isAfter(d) && (best == null || f.from().isAfter(best.from()))) best = f;
+        return best == null ? null : best.rate();
+    }
+
+    private void buildF1() {
+        partners.add("P5,Ember Test Wholesale,interconnect,XB,active");
+        agreements.add(new Agreement("AG-VOICE-F1", "P5", "interconnect_voice", "we_pay", "USD", "started_minute", "abs", bd("0.5"), "monthly", 10, 30, 30, "NG-XB", "contract", "period_end", FIRST, null));
+        // contract EUR to USD changes mid-June; the spot rows are later decoys the agreement must not use
+        for (String[] r : new String[][]{{"2026-05-01", "1.2500"}, {"2026-06-01", "1.2000"}, {"2026-06-16", "1.1000"}})
+            fx.add(new Fx(LocalDate.parse(r[0]), "EUR", "USD", "contract", bd(r[1])));
+        for (String r : new String[]{"2026-05-20", "2026-06-20"}) fx.add(new Fx(LocalDate.parse(r), "EUR", "USD", "spot", bd("2.0000")));
+
+        String a = "AG-VOICE-F1", dir = "we_pay";
+        for (int m = 5; m <= 6; m++) {   // May and June only: July has no usage and no statement, and raises nothing
+            LocalDate s = LocalDate.of(2026, m, 1), e = s.withDayOfMonth(s.lengthOfMonth());
+            BigDecimal rate = rateOn("EUR", "USD", "contract", e);   // the agreement converts at the cycle end
+            List<Usage> lines = new ArrayList<>();
+            for (LocalDate d = s; !d.isAfter(e); d = d.plusDays(1)) {
+                BigDecimal eur = bd("" + (40 + 2 * (d.getDayOfMonth() % 5))), usd = mul(eur, rate);
+                rate(a, dir, "VOICE", "NATIONAL", d, "F1-R1", "RR-F1-2026-0" + m, LocalDateTime.of(2026, m + 1, 1, 9, 0), usd, "USD", bd("20"));
+                lines.add(new Usage(d, "NATIONAL", mul(bd("20"), eur), eur, null));
+            }
+            statement("F1-2026-0" + m + ".csv", "STM-F1-2026-0" + m, 1, "P5", a, s, e, dir, "VOICE", "EUR", e.plusDays(6).atTime(9, 0), lines,
+                    m == 5 ? bd("10") : bd("-4"), m == 5 ? "fee" : "credit", null);
+        }
+    }
+
+    private void buildPayments() {
+        LocalDateTime t = LocalDateTime.of(2026, 6, 25, 12, 0);
+        payments.put("payments-2026-06.csv", new ArrayList<>(List.of(
+                new Payment("PAY-A1-01", "AG-VOICE-A1", "P1", "we_pay", LocalDate.of(2026, 6, 20), "payment", bd("10000"), "USD", t),
+                new Payment("PAY-F1-01", "AG-VOICE-F1", "P5", "we_pay", LocalDate.of(2026, 6, 25), "payment", bd("800"), "EUR", t),
+                new Payment("PAY-E1-01", "AG-VOICE-E1", "P4", "they_pay", LocalDate.of(2026, 6, 15), "payment", bd("500"), "USD", t),
+                // finance's records that settle nothing we know: an unknown agreement, and a known agreement under another partner
+                new Payment("PAY-NONE-01", "AG-VOICE-NONE", "P2", "we_pay", LocalDate.of(2026, 6, 30), "payment", bd("77"), "USD", t),
+                new Payment("PAY-D1-BAD", "AG-VOICE-D1", "P4", "we_pay", LocalDate.of(2026, 6, 30), "payment", bd("33"), "USD", t))));
+        // the file sent again: PAY-A1-01 repeats unchanged, PAY-E1-01 is corrected (the later record wins)
+        payments.put("payments-2026-06-resend.csv", new ArrayList<>(List.of(
+                new Payment("PAY-A1-01", "AG-VOICE-A1", "P1", "we_pay", LocalDate.of(2026, 6, 20), "payment", bd("10000"), "USD", t.plusDays(3)),
+                new Payment("PAY-E1-01", "AG-VOICE-E1", "P4", "they_pay", LocalDate.of(2026, 6, 15), "payment", bd("450"), "USD", t.plusDays(3)))));
+        LocalDateTime u = LocalDateTime.of(2026, 7, 28, 12, 0);
+        payments.put("payments-2026-07.csv", new ArrayList<>(List.of(
+                new Payment("CN-A1-01", "AG-VOICE-A1", "P1", "we_pay", LocalDate.of(2026, 7, 5), "credit_note", bd("150"), "USD", u),
+                new Payment("PAY-C1-01", "AG-SMS-C1", "P3", "they_pay", LocalDate.of(2026, 7, 10), "payment", bd("1000"), "EUR", u),
+                new Payment("PAY-A1-02", "AG-VOICE-A1", "P1", "we_pay", LocalDate.of(2026, 7, 25), "payment", bd("2500"), "USD", u))));
+        // a debit note in August, a month in which no statement exists: only the roll-forward has a row
+        payments.put("payments-2026-08.csv", new ArrayList<>(List.of(
+                new Payment("DN-A1-01", "AG-VOICE-A1", "P1", "we_pay", LocalDate.of(2026, 8, 3), "debit_note", bd("25.5"), "USD", LocalDateTime.of(2026, 8, 4, 12, 0)))));
+    }
+
     private void buildUnknowns() {
         LocalDate s = LocalDate.of(2026, 6, 1), e = LocalDate.of(2026, 6, 30);
         List<Usage> lines = List.of(new Usage(LocalDate.of(2026, 6, 2), "NATIONAL", bd("100"), bd("40"), null),
@@ -389,6 +468,11 @@ final class PartnerSettlementCorpus {
                     + "destination_class,units,amount,currency,fx_rate_applied,line_kind,control_total_amount,control_total_lines,received_at" + NL);
             for (Line l : s.getValue()) b.append(l.csv()).append(NL);
             f.put("settlement_statement/" + s.getKey(), b.toString());
+        }
+        for (Map.Entry<String, List<Payment>> p : payments.entrySet()) {
+            StringBuilder b = new StringBuilder("payment_id,agreement_id,partner_id,direction,payment_date,kind,amount,currency,recorded_at" + NL);
+            for (Payment x : p.getValue()) b.append(x.csv()).append(NL);
+            f.put("settlement_payment/" + p.getKey(), b.toString());
         }
         return f;
     }

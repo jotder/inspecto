@@ -1,10 +1,10 @@
 # Telecom bypass (SIM-box) runbooks
 
-> **Slice B2.** This Space Template computes the daily per-SIM signals, scores each SIM with the `tb_sim` Risk Score, applies
-> agreement, persistence, the `tb_allow` and `tb_watch` Entity Lists and a shadow switch, and raises the Alert Rules
-> `tb_sim_high` and `tb_allowed_line_changed`. The box-level Incident, the cluster stage and the per-Alert runbook links are
-> the next slices (`docs/superpower/bypass-simbox-detection-plan.md`); until then the reading guide below and the
-> section on `tb_findings` rows are what an analyst works from.
+> **Slice B3.** This Space Template computes the daily per-SIM signals, scores each SIM with the `tb_sim` Risk Score, applies
+> agreement, persistence, the `tb_allow` and `tb_watch` Entity Lists and a shadow switch, raises the Alert Rules
+> `tb_sim_high` and `tb_allowed_line_changed`, and finds the BOX: the SIMs that share a device, a cell or an activation batch,
+> one Incident (`tb_box_suspected`) and one Case (`tb_box_case`) per box. The Anomaly Model factor and the 7-day device signals
+> are the next slices (`docs/superpower/bypass-simbox-detection-plan.md`).
 
 **A CDR pattern is evidence of consistency with a SIM-box, never proof.** Only a verification step (a call to the
 customer or the dealer, a test call) separates a quiet box from a quiet dialler or PBX, and that step is a process, not
@@ -12,17 +12,19 @@ something this pack does.
 
 ## What runs
 
-Four Jobs, in this order (the clock gives each ten minutes; a Job that fails leaves the later ones reading the earlier night):
+Six Jobs, in this order (the clock gives each ten minutes; a Job that fails leaves the later ones reading the earlier night):
 
 | Time | Job | Writes |
 |---|---|---|
 | 03:00 | `tb_features` (`sql.template`) | one row per SIM per day with at least `min_events` (default 20) non-roaming MO voice calls: the Dataset `tb_features` (31 days kept) |
 | 03:10 | `tb_factors` (`sql.template`) | the factor columns of the Risk Score for the latest window only: the Dataset `tb_factors` |
 | 03:20 | `tb_risk_score` (`risk.score`) | the score of each SIM and the factors behind it: the Datasets `risk_scores_tb_sim` (history) and `risk_scores_tb_sim_latest` |
-| 03:30 | `tb_findings` (`sql.template`) | one row per SIM at or above the high threshold (and per allowed SIM): the Dataset `tb_findings` (31 days kept), the only Dataset the Alert Rules read |
+| 03:30 | `tb_findings` (`sql.template`) | one row per SIM at or above the high threshold (and per allowed SIM): the Dataset `tb_findings` (31 days kept), the Dataset the two SIM Alert Rules read |
+| 03:40 | `tb_cluster_members` (`sql.template`) | one row per candidate SIM that shares a box (see below): the Dataset `tb_cluster_members` (31 days kept) |
+| 03:50 | `tb_clusters` (`sql.template`) | one row per suspected box per day: the Dataset `tb_clusters` (31 days kept), the only Dataset the box Alert Rule reads |
 
 Run one for another day by passing `window_start`, `window_end` and `day` on the run; without `day` the rows fall outside the
-run's day and are dropped. Run the four in order for the same day.
+run's day and are dropped. Run the six in order for the same day.
 
 ## Reading a row
 
@@ -74,6 +76,30 @@ expiry (the plan recommends at most 365 days, so a verification is renewed; noth
 not yet read). **An allowed SIM is not unmonitored:** if its inbound, service-mix or mobility signals change from one night to the
 next, the Alert Rule `tb_allowed_line_changed` (INFO, one Alert for all such lines) fires and the entry may no longer describe it.
 
+## Reading a box (`tb_clusters`)
+
+A box is a **candidate SIM** group. A candidate has at least `cand_min_events` (default 10, lower than the SIM-day floor of 20, so a slow-roll box
+whose SIMs each make a dozen calls still counts) non-roaming MO voice calls and all five `box_like` clauses, and is not on a live `tb_allow` entry.
+Three keys can group candidates: the SIM's dominant **IMEI** (`imei:<imei>`), its dominant **cell** (`cell:<cell>`) and its **activation batch**
+(`batch:<dealer>/<day>`). A key is a box when at least `min_box_sims` (default 5) candidates share it; a SIM joins the first key that is a box, in
+that order, so one box is one `cluster_key` and one Incident. Two devices at one cell are two boxes (bar each device). A box that puts a different IMEI on
+every call has no shared device: its SIMs share a cell, and `spoofed_sims` counts the members that used `spoof_imei_count` (3) or more IMEIs today.
+
+| Column | Reads as |
+|---|---|
+| `cluster_kind`, `cluster_key` | which key made the box, and its value (the Incident key) |
+| `candidate_sims` | the size of the box today (`alert_value` is this, or 0 in shadow mode) |
+| `scored_sims`, `alerting_sims`, `max_score` | how many members have a SIM-day row (none for a slow-roll box), how many alert on their own (`tb_findings.status = alert`) and the highest score |
+| `est_bypass_minutes` | the members' talk minutes (answered call seconds / 60), an estimate of the traffic, not money |
+| `cells`, `imeis`, `batches` | what else the members share: one cell and one device is a classic box; many cells on one device is a rotated box |
+| `days_seen`, `first_day`, `last_day` | how long this key has been a box (the Incident is opened once and not refreshed; this row is) |
+| `example_msisdns` | up to five members, in number order; `tb_cluster_members` lists them all with their device, cell and batch |
+
+**What to do with a box Incident.** Open the `tb_box_members` Link Analysis view for the key, read the members, then verify before acting: a call to the
+owner of the site or to the dealer of the batch, or a test call. A verified PBX or dialler goes on `tb_allow` (its SIMs then stop counting toward the box);
+a confirmed box is barred through the operator's provisioning process (an approval-gated step, never automatic) and its SIMs go on `tb_block`. A box
+whose SIMs share no device, no cell and no activation batch cannot be linked from CDRs and will not appear here.
+
 ## What looks like a box and is not (from CDRs alone)
 
 - **Silent by design:** a call centre (many inbound callers), an alarm or M2M line (few numbers), a courier (moves across
@@ -87,7 +113,8 @@ next, the Alert Rule `tb_allowed_line_changed` (INFO, one Alert for all such lin
 Every threshold is a Job parameter: `config/jobs/tb_features_job.toon` (`min_events`, `short_s`, `seq_step`, `seq_prefix`,
 `night_end_hour`, `feed_zone`, `local_zone` and the five `cand_*` clauses), `tb_factors_job.toon` (the same five `cand_*` values, which must
 stay equal to the first Job's, and `inbound_full`, `mix_full`, `mobility_top_cell`, `mobility_max_kmh`, `rtc_hours`) and
-`tb_findings_job.toon` (`min_signals`, `persist_days`, `persist_window`, `shadow`). The weights and the high threshold are in
+`tb_findings_job.toon` (`min_signals`, `persist_days`, `persist_window`, `shadow`), `tb_cluster_members_job.toon` (`cand_min_events`, `min_box_sims`
+and the same five `cand_*` clauses and `short_s`, which must stay equal to `tb_features`' values) and `tb_clusters_job.toon` (`spoof_imei_count`, `shadow`: set it with the findings' `shadow` when running in shadow mode). The weights and the high threshold are in
 `config/registry/risk-scores/tb_sim.toon`. The shipped values are **illustrative**: no number
 here is a vendor or industry fact, and none has been calibrated on a real operator's traffic. Calibrate them in a shadow
 period before anyone acts on `box_like`.

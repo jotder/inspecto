@@ -1,0 +1,44 @@
+raw:
+  name: SETTLEMENT_PAYMENT
+  format: CSV
+  fields[9]{name,selector,type,description,unit,classification}:
+    payment_id,"0",VARCHAR,"Finance identifier of the payment or note; a re-sent record repeats it and the latest recorded_at wins","","INTERNAL"
+    agreement_id,"1",VARCHAR,"Agreement the payment or note settles","","INTERNAL"
+    partner_id,"2",VARCHAR,"Partner paid or paying","","INTERNAL"
+    direction,"3",VARCHAR,"we_pay (money left us, or a note reducing what we owe) or they_pay (money came to us)","","INTERNAL"
+    payment_date,"4",DATE,"Value date of the payment, or the date of the note","","INTERNAL"
+    kind,"5",VARCHAR,"payment, credit_note or debit_note","","INTERNAL"
+    amount,"6","DECIMAL(18,4)","Positive amount in the record currency; the kind and the direction give the sign","","CONFIDENTIAL"
+    currency,"7",VARCHAR,"Record currency (ISO 4217)","","INTERNAL"
+    recorded_at,"8",TIMESTAMP,"When finance recorded it","","INTERNAL"
+mapping:
+  canonicalName: settlement_payment
+  rawName: SETTLEMENT_PAYMENT
+  fields[9]:
+    - name: payment_id
+      from: payment_id
+      fn: keep
+    - name: agreement_id
+      from: agreement_id
+      fn: keep
+    - name: partner_id
+      from: partner_id
+      fn: keep
+    - name: direction
+      from: direction
+      fn: keep
+    - name: payment_date
+      from: payment_date
+      fn: keep
+    - name: kind
+      from: kind
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: currency
+      from: currency
+      fn: keep
+    - name: recorded_at
+      from: recorded_at
+      fn: keep
