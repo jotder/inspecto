@@ -42,14 +42,14 @@ class RerateCorpusTest {
         RerateCorpus c = new RerateCorpus().generate();
         Map<String, Long> byClass = new java.util.TreeMap<>();
         for (String v : c.planted.values()) byClass.merge(v.substring(0, v.lastIndexOf('|')), 1L, Long::sum);
-        assertEquals(Map.of("rate_mismatch|leakage", 33L, "rate_mismatch|overbilled", 8L, "ambiguous_tariff|data_quality", 9L, "no_tariff|data_quality", 11L,
-                "unratable_call|data_quality", 2L), byClass);
+        assertEquals(Map.of("rate_mismatch|leakage", 41L, "rate_mismatch|overbilled", 59L, "ambiguous_tariff|data_quality", 9L, "no_tariff|data_quality", 11L,
+                "unratable_call|data_quality", 3L), byClass);
         assertEquals(37, c.plantedTariff.size());
-        assertEquals(3, c.outsideWindow.size(), "one second before the day, midnight after it, and day 2's stale-version call");
+        assertEquals(4, c.outsideWindow.size(), "one second before the day, midnight after it, day 2's stale-version call and a wrong-plan subscriber's correct call");
     }
 
     @Test
-    void everyCallIsInsideTheDayExceptTheThreeDeliberateOnes() {
+    void everyCallIsInsideTheDayExceptTheFourDeliberateOnes() {
         RerateCorpus c = new RerateCorpus().generate();
         Set<String> outside = new HashSet<>();
         for (RerateCorpus.Usage u : c.usage()) {
@@ -65,6 +65,7 @@ class RerateCorpusTest {
         for (RerateCorpus.Usage u : c.usage()) {
             assertTrue(u.plan().startsWith("PLAN_"), u.plan());
             assertTrue(u.subscriber().matches("SUB[0-9]{4}"), u.subscriber());
+            assertTrue(u.id().startsWith("XWP_") == u.subscriber().compareTo("SUB9000") > 0, u.id() + ": a plan-inference call belongs to a SUB9xxx subscriber and no other call does");
             assertTrue(u.charge() == null || u.charge().scale() <= 4, u.id());
         }
         for (RerateCorpus.Tariff t : c.tariffs()) {

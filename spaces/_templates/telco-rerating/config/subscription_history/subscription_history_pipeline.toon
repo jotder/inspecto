@@ -1,0 +1,31 @@
+name: subscription_history
+active: true
+
+dirs:
+  poll:       data/inbox/subscription_history
+  database:   data/subscription_history/database
+  backup:     data/subscription_history/backup
+  temp:       data/subscription_history/temp
+  errors:     data/subscription_history/errors
+  quarantine: data/subscription_history/quarantine
+  markers:    data/subscription_history/markers
+  status_dir: data/subscription_history/status
+  log_dir:    data/subscription_history/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: subscription_history_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

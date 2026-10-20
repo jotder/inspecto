@@ -29,6 +29,10 @@ import java.util.TreeSet;
  *       it), precedence by an explicit {@code PRIORITY} (and a tie), a gap in the tariff, a plan with no tariff, a
  *       row with no rate, and a charge one cent either side of the tolerance. Tariff-table defects are recorded in
  *       {@link #plantedTariff}.</li>
+ *   <li><b>Plan inference (slice R3)</b>: subscribers SUB9001 and up, each owning its calls (a call never moves a subscriber of the
+ *       older archetypes), the plans PLAN_P1 to PLAN_P7 and a {@link #history() subscription history}: billed at another plan's rate
+ *       (both directions, within tolerance), too few calls, a share AT and below the floor, two plans with the same rate, an
+ *       ambiguous or absent assignment, a mid-window plan change, the version in force, and the instant of the change.</li>
  *   <li><b>Benign look-alikes</b> that must stay silent ({@link #benign}): a call that STARTS before a rate change and
  *       runs past it, a one-cent difference, a zero-rate plan, a row whose interval is inverted (never in force), two
  *       versions that meet exactly at the change instant, and the calls an overlap with the same rate makes
@@ -46,6 +50,8 @@ final class RerateCorpus {
     static final String USAGE_HEADER = "XDR_ID,EVENT_TS,EVENT_DATE,SUBSCRIBER_ID,PLAN,SERVICE,USAGE_UNITS,CHARGE";
     static final String TARIFF_FILE = "tariff_version/TARIFF_VERSION_20260701.csv";
     static final String USAGE_FILE = "rated_usage/RATED_USAGE_20260701.csv";
+    static final String HISTORY_HEADER = "SUBSCRIBER_ID,PLAN,FROM_TS,TO_TS";
+    static final String HISTORY_FILE = "subscription_history/SUBSCRIPTION_HISTORY_20260701.csv";
 
     private static final char NL = (char) 10;
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -66,7 +72,15 @@ final class RerateCorpus {
         }
     }
 
+    /** One subscription period: the plan a subscriber was assigned from an instant (inclusive) until another (exclusive; null = open). */
+    record Assignment(String subscriber, String plan, LocalDateTime from, LocalDateTime to) {
+        String csv() { return String.join(",", subscriber, plan, TS.format(from), to == null ? "" : TS.format(to)); }
+    }
+
     private final Random rnd = new Random(SEED);
+    private final List<Assignment> history = new ArrayList<>();
+    /** When set, the calls added take this subscriber and leave the rotation of the older archetypes untouched. */
+    private String forced;
     private final List<Tariff> tariffs = new ArrayList<>();
     private final List<Usage> usage = new ArrayList<>();
 
@@ -85,6 +99,8 @@ final class RerateCorpus {
 
     List<Usage> usage() { return usage; }
 
+    List<Assignment> history() { return history; }
+
     /** The two feed files; {@code withPriority} false drops the optional PRIORITY column (a feed that does not carry it). */
     Map<String, String> files(boolean withPriority) { return files(withPriority, false); }
 
@@ -99,6 +115,11 @@ final class RerateCorpus {
         Map<String, String> files = new LinkedHashMap<>();
         files.put(TARIFF_FILE, t.toString());
         files.put(USAGE_FILE, u.toString());
+        StringBuilder h = new StringBuilder(HISTORY_HEADER).append(NL);
+        List<Assignment> periods = new ArrayList<>(history);
+        if (reverseTariff) java.util.Collections.reverse(periods);   // the order of the history file changes no verdict either
+        for (Assignment a : periods) h.append(a.csv()).append(NL);
+        files.put(HISTORY_FILE, h.toString());
         return files;
     }
 
@@ -222,6 +243,17 @@ final class RerateCorpus {
         // PLAN_NG: the version that ended at noon had a NEGATIVE rate (a defect the hygiene Job reports); it explains nothing
         rate("NG-V-1", "PLAN_NG", "VOICE", "-0.0020", "2026-01-01 00:00:00", "2026-07-01 12:00:00", null);
         rate("NG-V-2", "PLAN_NG", "VOICE", "0.0030", "2026-07-01 12:00:00", null, null);
+        // PLAN_P1..P5 (slice R3): each plan's DATA rate is its own (no other plan charges 0.0070, 0.0090 or 0.0110 for DATA), so a charge
+        // names one plan. P3's rate changes at noon. P4 and P5 charge the SAME MMS rate (a charge at it names no plan); P1 has a MMS row.
+        rate("P1-D-1", "PLAN_P1", "DATA", "0.0070", "2026-01-01 00:00:00", null, null);
+        rate("P1-M-1", "PLAN_P1", "MMS", "0.0500", "2026-01-01 00:00:00", null, null);
+        rate("P2-D-1", "PLAN_P2", "DATA", "0.0090", "2026-01-01 00:00:00", null, null);
+        rate("P7-M-1", "PLAN_P7", "MMS", "0.0090", "2026-01-01 00:00:00", null, null);       // a MMS rate that charges the same 9.00 for 1000 units: it must not tie with PLAN_P2 on DATA calls
+        rate("P6-D-1", "PLAN_P6", "DATA", "0.0090", "2026-07-01 12:00:00", "2026-07-01 13:00:00", null);   // as PLAN_P2's DATA rate, for one hour only
+        rate("P3-D-1", "PLAN_P3", "DATA", "0.0110", "2026-01-01 00:00:00", "2026-07-01 12:00:00", null);
+        rate("P3-D-2", "PLAN_P3", "DATA", "0.0130", "2026-07-01 12:00:00", null, null);
+        rate("P4-M-1", "PLAN_P4", "MMS", "0.0600", "2026-01-01 00:00:00", null, null);
+        rate("P5-M-1", "PLAN_P5", "MMS", "0.0600", "2026-01-01 00:00:00", null, null);
         // PLAN_J: a single clean row for the tolerance boundary; PLAN_K: a row with no rate; PLAN_Z has no row at all
         rate("J-V-1", "PLAN_J", "VOICE", "0.0020", "2026-01-01 00:00:00", null, null);
         rate("K-V-1", "PLAN_K", "VOICE", null, "2026-01-01 00:00:00", null, null);
@@ -246,7 +278,7 @@ final class RerateCorpus {
     /** As {@link #call}, but {@code units} or {@code charge} may be null (blank in the feed). */
     private String callRaw(String archetype, String idSuffix, String ts, String plan, String service, Long units, String charge, String outcome, boolean look) {
         String id = "X" + archetype + "-" + idSuffix;
-        usage.add(new Usage(id, at(ts), String.format(Locale.ROOT, "SUB%04d", 1 + (seq++ * 7) % 40), plan, service, units, charge == null ? null : money(charge)));
+        usage.add(new Usage(id, at(ts), forced != null ? forced : String.format(Locale.ROOT, "SUB%04d", 1 + (seq++ * 7) % 40), plan, service, units, charge == null ? null : money(charge)));
         archetypes.computeIfAbsent(archetype, k -> new TreeSet<>()).add(id);
         if (outcome != null) planted.put(id, outcome);
         if (look) benign.add(id);
@@ -369,6 +401,8 @@ final class RerateCorpus {
         call("BF_BOTH", "1", "2026-07-01 14:00:00", "PLAN_BF", "VOICE", 1000, "2.0000", UNDER + "1.00", false);
         call("BF_BOTH", "2", "2026-07-01 14:01:00", "PLAN_BF", "VOICE", 1000, "2.0000", UNDER + "1.00", false);
 
+        planInference();
+
         // the window's own edges: the first second and the last second of the day belong to it
         call("EDGE_START", "1", "2026-07-01 00:00:00", "PLAN_A", "SMS", 10, "0.5000", null, true);
         call("EDGE_END", "1", "2026-07-01 23:59:59", "PLAN_A", "SMS", 10, "0.5000", null, true);
@@ -417,6 +451,91 @@ final class RerateCorpus {
         plantedTariff.add("negative_rate|PLAN_NG|VOICE|NG-V-1|");
         plantedTariff.add("overlap_same_rate|PLAN_BF|VOICE|BF-V-1|BF-V-3");
         plantedTariff.add("overlap_different_rate|PLAN_BF|VOICE|BF-V-3|BF-V-2");
+    }
+
+    // ------------------------------------------------------------------------------------------- plan inference (R3)
+
+    private void assign(String subscriber, String plan, String from, String to) {
+        history.add(new Assignment(subscriber, plan, at(from), to == null ? null : at(to)));
+    }
+
+    /** {@code n} calls (1000 units, 100 for MMS) a minute apart from {@code hhmm}, numbered from {@code firstNo}, all charged {@code charge}. */
+    private void run(String archetype, int firstNo, String plan, String service, String hhmm, int n, String charge, String outcome, boolean look) {
+        long units = service.equals("MMS") ? 100 : 1000;
+        for (int i = 0; i < n; i++) {
+            String hh = hhmm.substring(0, 3) + String.format(Locale.ROOT, "%02d", Integer.parseInt(hhmm.substring(3)) + i);
+            call(archetype, String.valueOf(firstNo + i), "2026-07-01 " + hh + ":00", plan, service, units, charge, outcome, look);
+        }
+    }
+
+    private void planInference() {
+        String all = "2026-01-01 00:00:00";
+        for (String s : List.of("SUB9001", "SUB9003", "SUB9004", "SUB9008", "SUB9009", "SUB9010", "SUB9012")) assign(s, "PLAN_P1", all, null);
+        assign("SUB9002", "PLAN_P2", all, null);
+        for (String s : List.of("SUB9005", "SUB9006", "SUB9007")) { assign(s, "PLAN_P1", all, "2026-07-01 12:00:00"); assign(s, "PLAN_P2", "2026-07-01 12:00:00", null); }
+        assign("SUB9011", "PLAN_P1", all, null);
+        assign("SUB9014", "PLAN_P1", all, null);
+        assign("SUB9011", "PLAN_P3", "2026-06-01 00:00:00", null);   // two plans in force at once: no single assigned plan
+
+        // billed at PLAN_P2's rate (9.00) although PLAN_P1 is assigned; one call at its own rate, one with no units, one with no charge, one on day 2
+        forced = "SUB9001";
+        run("WP_WRONG", 1, "PLAN_P1", "DATA", "16:01", 5, "9.0000", OVER + "2.00", false);
+        call("WP_WRONG", "6", "2026-07-01 16:06:00", "PLAN_P1", "DATA", 1000, "7.0000", null, true);
+        call("WP_WRONG", "7", "2026-07-01 16:07:00", "PLAN_P1", "DATA", 0, "0.0000", null, true);           // zero units: every plan "explains" it, so it infers nothing
+        callRaw("WP_WRONG", "8", "2026-07-01 16:08:00", "PLAN_P1", "DATA", 1000L, null, UNRATABLE, false);   // no charge: not a row to infer from
+        outsideWindow.add(call("WP_WRONG", "9", "2026-07-02 09:00:00", "PLAN_P1", "DATA", 1000, "7.0000", null, false));   // day 2, its own window
+        // the other direction: PLAN_P2 assigned, billed at PLAN_P1's rate (7.00); the last call a cent off (within the tolerance)
+        forced = "SUB9002";
+        run("WP_WRONG_UNDER", 1, "PLAN_P2", "DATA", "16:11", 3, "7.0000", UNDER + "2.00", false);
+        call("WP_WRONG_UNDER", "4", "2026-07-01 16:14:00", "PLAN_P2", "DATA", 1000, "7.0100", UNDER + "1.99", false);
+        call("WP_WRONG_UNDER", "5", "2026-07-01 16:15:00", "PLAN_P2", "DATA", 1000, "7.0200", UNDER + "1.98", false);          // exactly AT the tolerance of PLAN_P1's amount
+        // a second subscriber with the same plan pair: the SAME root cause
+        forced = "SUB9003";
+        run("WP_WRONG_TWO", 1, "PLAN_P1", "DATA", "16:21", 3, "9.0000", OVER + "2.00", false);
+        // too few calls (2 < 3): nothing is inferred
+        forced = "SUB9004";
+        run("WP_FEW", 1, "PLAN_P1", "DATA", "16:31", 2, "9.0000", OVER + "2.00", false);
+        // a legitimate plan change at noon whose label did not follow: the subscriber IS on PLAN_P2 after noon, so billing at its rate is not a wrong plan
+        forced = "SUB9005";
+        run("WP_DRIFT", 1, "PLAN_P1", "DATA", "10:01", 2, "7.0000", null, true);
+        run("WP_DRIFT", 3, "PLAN_P1", "DATA", "13:01", 4, "9.0000", OVER + "2.00", false);
+        // the instant of the change: PLAN_P2 assigned AT 12:00:00 (FROM inclusive, TO exclusive), billed at PLAN_P1's rate
+        forced = "SUB9006";
+        run("WP_ASOF_AFTER", 1, "PLAN_P1", "DATA", "10:01", 2, "7.0000", null, true);
+        call("WP_ASOF_AFTER", "3", "2026-07-01 12:00:00", "PLAN_P2", "DATA", 1000, "7.0000", UNDER + "2.00", false);
+        run("WP_ASOF_AFTER", 4, "PLAN_P2", "DATA", "14:01", 2, "7.0000", UNDER + "2.00", false);
+        // before the change PLAN_P1 is assigned, billed at PLAN_P2's rate (the new plan's rate, early); after it, correct
+        forced = "SUB9007";
+        run("WP_ASOF_BEFORE", 1, "PLAN_P1", "DATA", "10:01", 3, "9.0000", OVER + "2.00", false);
+        run("WP_ASOF_BEFORE", 4, "PLAN_P2", "DATA", "14:01", 2, "9.0000", null, true);
+        // the share: exactly AT 0.6 (3 of 5) is inferred; 3 of 6 is not
+        forced = "SUB9008";
+        run("WP_SHARE_AT", 1, "PLAN_P1", "DATA", "10:01", 3, "9.0000", OVER + "2.00", false);
+        run("WP_SHARE_AT", 4, "PLAN_P1", "DATA", "10:04", 2, "11.0000", OVER + "4.00", false);
+        forced = "SUB9009";
+        // (3 of 6 = 0.5 would pass the confidence floor of 0.5, so only the share keeps it from being claimed)
+        run("WP_SHARE_BELOW", 1, "PLAN_P1", "DATA", "10:01", 3, "9.0000", OVER + "2.00", false);
+        call("WP_SHARE_BELOW", "4", "2026-07-01 10:04:00", "PLAN_P1", "DATA", 1000, "12.0000", OVER + "5.00", false);
+        call("WP_SHARE_BELOW", "5", "2026-07-01 10:05:00", "PLAN_P1", "DATA", 1000, "15.0000", OVER + "8.00", false);
+        call("WP_SHARE_BELOW", "6", "2026-07-01 10:06:00", "PLAN_P1", "DATA", 1000, "20.0000", OVER + "13.00", false);
+        // two plans with the SAME rate: the charge names neither
+        forced = "SUB9010";
+        run("WP_TIE", 1, "PLAN_P1", "MMS", "10:01", 4, "6.0000", OVER + "1.00", false);
+        // two plans assigned at once, and no history at all: no single assigned plan, no claim
+        forced = "SUB9011";
+        run("WP_OVERLAP", 1, "PLAN_P1", "DATA", "10:01", 4, "9.0000", OVER + "2.00", false);
+        forced = "SUB9013";
+        run("WP_NO_HISTORY", 1, "PLAN_P1", "DATA", "10:01", 4, "9.0000", OVER + "2.00", false);
+        // the version in force: PLAN_P3 charged 11.00 before noon and 13.00 after; a call after noon at the OLD 11.00 is not explained by it
+        forced = "SUB9012";
+        run("WP_VERSION", 1, "PLAN_P1", "DATA", "10:01", 4, "11.0000", OVER + "4.00", false);
+        call("WP_VERSION", "5", "2026-07-01 13:01:00", "PLAN_P1", "DATA", 1000, "11.0000", OVER + "4.00", false);
+        call("WP_VERSION", "6", "2026-07-01 10:05:00", "PLAN_P1", "DATA", 1000, "13.0000", OVER + "6.00", false);   // the NEW rate billed before it starts: not in force yet, so not a hit
+        // PLAN_P6 charges PLAN_P2's rate between 12:00 and 13:00: its 3 calls there are explained by both plans (60 percent), yet PLAN_P2 alone is the top plan
+        forced = "SUB9014";
+        run("WP_TOP", 1, "PLAN_P1", "DATA", "10:01", 2, "9.0000", OVER + "2.00", false);
+        run("WP_TOP", 3, "PLAN_P1", "DATA", "12:10", 3, "9.0000", OVER + "2.00", false);
+        forced = null;
     }
 
     // ------------------------------------------------------------------------------------------- background

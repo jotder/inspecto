@@ -76,6 +76,7 @@ class TelcoRerateGoldenTest {
     static {
         FEED_COLUMNS.put("tariff_version", "{'TARIFF_VERSION_ID':'VARCHAR','PLAN':'VARCHAR','SERVICE':'VARCHAR','RATE_PER_UNIT':'DECIMAL(18,4)',"
                 + "'EFFECTIVE_FROM':'TIMESTAMP','EFFECTIVE_TO':'TIMESTAMP','PRIORITY':'INTEGER'}");
+        FEED_COLUMNS.put("subscription_history", "{'SUBSCRIBER_ID':'VARCHAR','PLAN':'VARCHAR','FROM_TS':'TIMESTAMP','TO_TS':'TIMESTAMP'}");
         FEED_COLUMNS.put("rated_usage", "{'XDR_ID':'VARCHAR','EVENT_TS':'TIMESTAMP','EVENT_DATE':'DATE','SUBSCRIBER_ID':'VARCHAR','PLAN':'VARCHAR',"
                 + "'SERVICE':'VARCHAR','USAGE_UNITS':'BIGINT','CHARGE':'DECIMAL(18,4)'}");
     }
@@ -116,7 +117,7 @@ class TelcoRerateGoldenTest {
     // ------------------------------------------------------------------------------------------- the shipped template
 
     @Test
-    void theTemplateShipsFourChainedJobsAndSixDatasetsAndItsFilesReachTheSpace(@TempDir Path root) throws Exception {
+    void theTemplateShipsFourChainedJobsAndSevenDatasetsAndItsFilesReachTheSpace(@TempDir Path root) throws Exception {
         Path space = createSpace(root);
         Path config = space.resolve("config");
         Map<String, JobConfig> jobs = jobs(config);
@@ -129,11 +130,13 @@ class TelcoRerateGoldenTest {
         assertEquals("window_date", explain.params().get("incremental.column"));
         assertEquals("31", explain.params().get("incremental.retain"));
         assertEquals("rerating_findings", explain.params().get("sink_dataset"));
-        assertEquals(Set.of("rerated_usage", "tariff_version"), new TreeSet<>(List.of(explain.params().get("sources").split(","))));
+        assertEquals(Set.of("rerated_usage", "tariff_version", "subscription_history"), new TreeSet<>(List.of(explain.params().get("sources").split(","))));
         assertEquals("0.02", explain.params().get("tolerance"));
         assertEquals("0.9", explain.params().get("within_tolerance_confidence"));
         assertEquals("0.5", explain.params().get("confidence_floor"));
-        for (String literal : List.of("0.02", "0.9)", "0.5)")) assertFalse(explain.params().get("sql").contains(literal), "no threshold literal in the statement: " + literal);
+        assertEquals("0.6", explain.params().get("plan_share"), "the share of a subscriber's calls one plan must explain is a Job parameter");
+        assertEquals("3", explain.params().get("plan_min_rows"), "so is the number of calls it takes to infer a plan");
+        for (String literal : List.of("0.02", "0.9)", "0.5)", "0.6")) assertFalse(explain.params().get("sql").contains(literal), "no threshold literal in the statement: " + literal);
         assertTrue(roots.hasSignal() && !roots.hasCron(), "rr_root_cause runs when the explanation has succeeded");
         assertEquals("$signal.job == rr_explain && $signal.outcome == SUCCESS", roots.when());
         assertEquals("rerating_findings", roots.params().get("sources"));
@@ -158,7 +161,7 @@ class TelcoRerateGoldenTest {
         assertFalse(rerate.params().get("sql").contains("0.02"), "no tolerance literal in the statement");
         try (Stream<Path> s = Files.list(config.resolve("registry").resolve("datasets"))) {
             assertEquals(Set.of("tariff_version.toon", "rated_usage.toon", "rerating_tariff_findings.toon", "rerated_usage.toon",
-                    "rerating_findings.toon", "rerating_root_causes.toon"), new TreeSet<>(s.map(p -> p.getFileName().toString()).toList()));
+                    "rerating_findings.toon", "rerating_root_causes.toon", "subscription_history.toon"), new TreeSet<>(s.map(p -> p.getFileName().toString()).toList()));
         }
         try (Stream<Path> s = Files.list(config.resolve("registry").resolve("kpis"))) {
             assertEquals(Set.of("revenue_at_risk.toon", "overbilled_amount.toon"), new TreeSet<>(s.map(p -> p.getFileName().toString()).toList()));
@@ -298,8 +301,8 @@ class TelcoRerateGoldenTest {
         assertEquals(corpus.planted, got, "the findings: exactly the planted set");
         Map<String, Long> byClass = new TreeMap<>();
         for (String v : got.values()) byClass.merge(v.substring(0, v.lastIndexOf('|')), 1L, Long::sum);
-        assertEquals(Map.of("rate_mismatch|leakage", 33L, "rate_mismatch|overbilled", 8L, "ambiguous_tariff|data_quality", 9L, "no_tariff|data_quality", 11L,
-                "unratable_call|data_quality", 2L), byClass);
+        assertEquals(Map.of("rate_mismatch|leakage", 41L, "rate_mismatch|overbilled", 59L, "ambiguous_tariff|data_quality", 9L, "no_tariff|data_quality", 11L,
+                "unratable_call|data_quality", 3L), byClass);
         for (String id : corpus.benign) {
             assertNotNull(r.calls.get(id), id + " is in the window");
             assertNull(r.calls.get(id).get("FINDING"), id + " is a look-alike and must stay silent");
@@ -316,8 +319,8 @@ class TelcoRerateGoldenTest {
         }
         assertEquals(0, plantedSum(corpus, "rate_mismatch|leakage|").compareTo(under), "revenue at risk of the planted leakage, nothing netted against over-billing");
         assertEquals(0, plantedSum(corpus, "rate_mismatch|overbilled|").compareTo(over), "the over-billed amount is its own figure");
-        assertEquals(0, new BigDecimal("36.84").compareTo(under), "the planted leakage, summed by hand");
-        assertEquals(0, new BigDecimal("10.76").compareTo(over), "the planted over-billing, summed by hand");
+        assertEquals(0, new BigDecimal("52.81").compareTo(under), "the planted leakage, summed by hand (36.84 before slice R3, plus 15.97 of wrong-plan calls)");
+        assertEquals(0, new BigDecimal("146.76").compareTo(over), "the planted over-billing, summed by hand (10.76 before slice R3, plus 136.00)");
     }
 
     /**
@@ -547,7 +550,7 @@ class TelcoRerateGoldenTest {
             assertEquals(r.calls.size(), sinkRows(data, "rerated_usage", "window_date = DATE '2026-07-01'"), "a same-window re-run duplicates no row");
             assertEquals("SUCCESS", runJob(js, "rr_rerate", window(DAY1.plusDays(1))).status(), "the next window");
             assertEquals(r.calls.size(), sinkRows(data, "rerated_usage", "window_date = DATE '2026-07-01'"), "day 1 survives the next window's run");
-            assertEquals(2, sinkRows(data, "rerated_usage", "window_date = DATE '2026-07-02'"), "the next window holds only the two calls the corpus keeps for it: one at midnight, one stale-version call");
+            assertEquals(3, sinkRows(data, "rerated_usage", "window_date = DATE '2026-07-02'"), "the next window holds only the three calls the corpus keeps for it: one at midnight, one stale-version call, one correct call of a wrong-plan subscriber");
             assertEquals("SUCCESS", runJob(js, "rr_explain", WINDOW1).status());
             assertEquals(r.findings.size(), sinkRows(data, "rerating_findings", "window_date = DATE '2026-07-01'"), "a same-window re-run of the explanation duplicates no row");
             assertEquals("SUCCESS", runJob(js, "rr_root_cause", Map.of()).status());
@@ -593,6 +596,21 @@ class TelcoRerateGoldenTest {
         PLANTED_CAUSE.put("XBF_BOTH-2", "stale_version|1.0000|lower_priority_rate");
         PLANTED_CAUSE.put("XST_STALE-1", "stale_version|0.8333|");          // exact (1.0) times support 5/6
         for (String id : List.of("XST_STALE-2", "XST_STALE-3", "XST_STALE-4", "XST_STALE-5")) PLANTED_CAUSE.put(id, "stale_version|0.7500|");   // within tolerance (0.9) times 5/6
+        // slice R3: a claimed wrong plan carries exactness times the share of the subscriber's calls the inferred plan explains
+        for (int i = 1; i <= 5; i++) PLANTED_CAUSE.put("XWP_WRONG-" + i, "wrong_plan|0.8333|");              // 5 of 6 calls
+        for (int i = 1; i <= 3; i++) PLANTED_CAUSE.put("XWP_WRONG_UNDER-" + i, "wrong_plan|1.0000|");
+        for (int i = 4; i <= 5; i++) PLANTED_CAUSE.put("XWP_WRONG_UNDER-" + i, "wrong_plan|0.9000|");       // a cent off, and AT the tolerance: exactness 0.9 times 5 of 5
+        for (int i = 1; i <= 3; i++) PLANTED_CAUSE.put("XWP_WRONG_TWO-" + i, "wrong_plan|1.0000|");
+        for (int i = 3; i <= 5; i++) PLANTED_CAUSE.put("XWP_ASOF_AFTER-" + i, "wrong_plan|1.0000|");
+        for (int i = 1; i <= 3; i++) PLANTED_CAUSE.put("XWP_ASOF_BEFORE-" + i, "wrong_plan|1.0000|");
+        for (int i = 1; i <= 3; i++) PLANTED_CAUSE.put("XWP_SHARE_AT-" + i, "wrong_plan|0.6000|");          // exactly AT the share of 0.6
+        for (int i = 1; i <= 4; i++) PLANTED_CAUSE.put("XWP_VERSION-" + i, "wrong_plan|0.6667|");           // 4 of 6 calls
+        for (int i = 1; i <= 5; i++) PLANTED_CAUSE.put("XWP_TOP-" + i, "wrong_plan|1.0000|");
+        for (String id : List.of("XWP_FEW-1", "XWP_FEW-2", "XWP_DRIFT-3", "XWP_DRIFT-4", "XWP_DRIFT-5", "XWP_DRIFT-6", "XWP_SHARE_AT-4", "XWP_SHARE_AT-5",
+                "XWP_SHARE_BELOW-1", "XWP_SHARE_BELOW-2", "XWP_SHARE_BELOW-3", "XWP_SHARE_BELOW-4", "XWP_SHARE_BELOW-5", "XWP_SHARE_BELOW-6", "XWP_TIE-1", "XWP_TIE-2", "XWP_TIE-3", "XWP_TIE-4",
+                "XWP_OVERLAP-1", "XWP_OVERLAP-2", "XWP_OVERLAP-3", "XWP_OVERLAP-4", "XWP_NO_HISTORY-1", "XWP_NO_HISTORY-2", "XWP_NO_HISTORY-3", "XWP_NO_HISTORY-4",
+                "XWP_VERSION-5", "XWP_VERSION-6"))
+            PLANTED_CAUSE.put(id, "unexplained|0.0000|");
         for (String id : List.of("XST_STALE-6", "XB_AGREE_LEAK-1", "XC_RANGE-5", "XC_RANGE-7", "XC_RANGE-8", "XD_PRECEDENCE-3", "XE_TIE-2", "XE_BLANK_PRIORITY-4",
                 "XJ_TOLERANCE-5", "XJ_TOLERANCE-6", "XJ_TOLERANCE-7", "XJ_TOLERANCE-8", "XI_INVERTED_OVER-1", "XST_EARLY_LEAK-1", "XNG_NEGATIVE_STALE-1",
                 "XWK_WEAK-1", "XWK_WEAK-2", "XWK_WEAK-3", "XWK_WEAK-4", "XWK_WEAK-5"))
@@ -612,7 +630,7 @@ class TelcoRerateGoldenTest {
         Run r = run(root, corpus.files(true), Map.of());
         Map<String, Map<String, Object>> want = oracleExplain(corpus, oracleCalls(corpus, TOLERANCE), DAY1, TOLERANCE, WITHIN, FLOOR);
         assertEquals(want.keySet(), r.findings.keySet(), "one row per finding");
-        assertEquals(63, r.findings.size(), "33 leakage + 8 over-billed + 9 range + 11 no tariff + 2 unratable");
+        assertEquals(123, r.findings.size(), "41 leakage + 59 over-billed + 9 range + 11 no tariff + 3 unratable");
         for (String id : want.keySet()) assertSameRow(id, want.get(id), r.findings.get(id));
         assertEquals(23, r.findings.values().iterator().next().size());
         // the columns the starter leakage union reads are all there, and the amount it sums is the revenue at risk
@@ -851,6 +869,70 @@ class TelcoRerateGoldenTest {
         }
     }
 
+    // ------------------------------------------------------------------------------------------- R3: plan inference
+
+    /** A wrong plan is claimed where the history and the calls agree on a different plan, with the plan's share as support; every look-alike stays unexplained. */
+    @Test
+    void aWrongPlanIsClaimedOnlyWhereTheHistoryAndTheCallsDisagreeAndEveryLookAlikeIsUnexplained(@TempDir Path root) throws Exception {
+        RerateCorpus corpus = new RerateCorpus().generate();
+        Run r = run(root, corpus.files(true), Map.of());
+        // the claims name the version of the INFERRED plan, in both directions, and keep no alternative (nothing else fits)
+        assertEquals("P2-D-1", r.findings.get("XWP_WRONG-1").get("CAUSE_TARIFF_VERSION_ID"));
+        assertEquals("P1-D-1", r.findings.get("XWP_WRONG_UNDER-1").get("CAUSE_TARIFF_VERSION_ID"));
+        assertEquals("P3-D-1", r.findings.get("XWP_VERSION-1").get("CAUSE_TARIFF_VERSION_ID"), "the version of the inferred plan in force at the call");
+        assertEquals("P1-D-1", r.findings.get("XWP_ASOF_AFTER-3").get("CAUSE_TARIFF_VERSION_ID"), "at the instant of the change the NEW plan is the assigned one");
+        for (String id : PLANTED_CAUSE.keySet())
+            if (id.startsWith("XWP_")) assertNull(r.findings.get(id).get("CAUSE_ALTERNATIVE"), id);
+        // a call that is right is never a finding, whatever plan is inferred for its subscriber
+        for (String id : List.of("XWP_WRONG-6", "XWP_WRONG-7", "XWP_DRIFT-1", "XWP_DRIFT-2", "XWP_ASOF_AFTER-1", "XWP_ASOF_AFTER-2", "XWP_ASOF_BEFORE-4", "XWP_ASOF_BEFORE-5"))
+            assertNull(r.calls.get(id).get("FINDING"), id + " is a look-alike");
+        // the same plan pair is ONE root cause, over every subscriber it touches (WRONG 5, WRONG_TWO 3, ASOF_BEFORE 3, SHARE_AT 3, TOP 5)
+        Map<String, Object> over = r.causes.get("wrong_plan|overbilled|PLAN_P1|DATA|P1-D-1|P2-D-1");
+        assertNotNull(over, "the plan pair is the root cause");
+        assertEquals(19L, over.get("CALLS"));
+        assertEquals(0, new BigDecimal("0.6000").compareTo((BigDecimal) over.get("CAUSE_CONFIDENCE")), "the weakest call of the group: the share AT its floor");
+        assertEquals(0, BigDecimal.ZERO.compareTo((BigDecimal) over.get("LEAKAGE_LOW")), "a wrong plan that over-bills is no revenue at risk");
+        assertEquals(0, new BigDecimal("38.00").compareTo((BigDecimal) over.get("OVERBILLED_AMOUNT")));
+        Map<String, Object> under = r.causes.get("wrong_plan|leakage|PLAN_P2|DATA|P2-D-1|P1-D-1");
+        assertEquals(8L, under.get("CALLS"), "WRONG_UNDER 5 and ASOF_AFTER 3");
+        assertEquals(0, new BigDecimal("15.97").compareTo((BigDecimal) under.get("LEAKAGE_LOW")));
+        assertEquals(0, new BigDecimal("0.9000").compareTo((BigDecimal) under.get("CAUSE_CONFIDENCE")));
+        // each look-alike is a finding with NO cause; the reason it is silent is the planted case
+        for (String id : PLANTED_CAUSE.keySet())
+            if (id.startsWith("XWP_") && PLANTED_CAUSE.get(id).startsWith("unexplained")) {
+                assertEquals("unexplained", r.findings.get(id).get("CAUSE"), id);
+                assertNull(r.findings.get(id).get("CAUSE_TARIFF_VERSION_ID"), id);
+            }
+    }
+
+    /** The share, the number of calls and the floor are Job parameters; each run equals the oracle under the same parameters. */
+    @Test
+    void thePlanInferenceThresholdsAreJobParameters(@TempDir Path root) throws Exception {
+        RerateCorpus corpus = new RerateCorpus().generate();
+        Map<String, Map<String, Object>> calls = oracleCalls(corpus, TOLERANCE);
+        Run strict = run(root.resolve("share"), corpus.files(true), Map.of("plan_share", "0.8"));
+        Map<String, Map<String, Object>> wantStrict = oracleExplain(corpus, calls, DAY1, TOLERANCE, WITHIN, FLOOR, new BigDecimal("0.8"), PLAN_MIN_ROWS);
+        for (String id : wantStrict.keySet()) assertSameRow(id, wantStrict.get(id), strict.findings.get(id));
+        assertEquals("wrong_plan", strict.findings.get("XWP_WRONG-1").get("CAUSE"), "5 of 6 is above 0.8");
+        assertEquals("unexplained", strict.findings.get("XWP_SHARE_AT-1").get("CAUSE"), "0.6 is below a share of 0.8");
+        assertEquals("unexplained", strict.findings.get("XWP_VERSION-1").get("CAUSE"), "4 of 6 is below a share of 0.8");
+        Run few = run(root.resolve("few"), corpus.files(true), Map.of("plan_min_rows", "2"));
+        Map<String, Map<String, Object>> wantFew = oracleExplain(corpus, calls, DAY1, TOLERANCE, WITHIN, FLOOR, PLAN_SHARE, 2);
+        for (String id : wantFew.keySet()) assertSameRow(id, wantFew.get(id), few.findings.get(id));
+        assertEquals("wrong_plan", few.findings.get("XWP_FEW-1").get("CAUSE"), "two calls are enough when two are asked for");
+        assertEquals(0, BigDecimal.ONE.compareTo((BigDecimal) few.findings.get("XWP_FEW-1").get("CAUSE_CONFIDENCE")));
+        Run many = run(root.resolve("many"), corpus.files(true), Map.of("plan_min_rows", "6"));
+        Map<String, Map<String, Object>> wantMany = oracleExplain(corpus, calls, DAY1, TOLERANCE, WITHIN, FLOOR, PLAN_SHARE, 6);
+        for (String id : wantMany.keySet()) assertSameRow(id, wantMany.get(id), many.findings.get(id));
+        assertEquals("wrong_plan", many.findings.get("XWP_WRONG-1").get("CAUSE"), "six calls were seen");
+        assertEquals("unexplained", many.findings.get("XWP_WRONG_UNDER-1").get("CAUSE"), "five calls are too few when six are asked for");
+        Run floor = run(root.resolve("floor"), corpus.files(true), Map.of("confidence_floor", "0.7"));
+        Map<String, Map<String, Object>> wantFloor = oracleExplain(corpus, calls, DAY1, TOLERANCE, WITHIN, new BigDecimal("0.7"));
+        for (String id : wantFloor.keySet()) assertSameRow(id, wantFloor.get(id), floor.findings.get(id));
+        assertEquals("unexplained", floor.findings.get("XWP_SHARE_AT-1").get("CAUSE"), "the confidence floor applies to a wrong plan as to any cause");
+        assertEquals("wrong_plan", floor.findings.get("XWP_WRONG-1").get("CAUSE"));
+    }
+
     // ------------------------------------------------------------------------------------------- the mutation pass
 
     /**
@@ -965,6 +1047,31 @@ class TelcoRerateGoldenTest {
             why.put("cohort is per finding", "XD_PRECEDENCE-2");
             why.put("cohort is per candidate set", "XST_STALE-1");
             why.put("leakage high is strict", "XC_RANGE-9");
+            why.put("plan: a call with no units infers nothing", "XWP_WRONG-1");
+            why.put("plan: a call with no charge infers nothing", "XWP_WRONG-1");
+            why.put("plan: only the day's own calls", "XWP_WRONG-1");
+            why.put("plan: a rate of another service is not a hit", "XWP_WRONG-1");
+            why.put("plan: the version in force has not ended", "XWP_VERSION-1");
+            why.put("plan: the version in force has started", "XWP_VERSION-1");
+            why.put("plan: a hit is AT the tolerance", "XWP_WRONG_UNDER-1");
+            why.put("plan: the top plan only", "XWP_TOP-1");
+            why.put("plan: a single top plan", "XWP_TIE-1");
+            why.put("plan: enough calls", "XWP_FEW-1");
+            why.put("plan: the share is a floor AT it", "XWP_SHARE_AT-1");
+            why.put("plan: below the share is no plan", "XWP_SHARE_BELOW-1");
+            why.put("plan: the history of this subscriber", "XWP_WRONG-1");
+            why.put("plan: an assignment holds AT its start", "XWP_ASOF_AFTER-3");
+            why.put("plan: an assignment has started", "XWP_ASOF_BEFORE-1");
+            why.put("plan: an assignment ends before its end instant", "XWP_ASOF_AFTER-3");
+            why.put("plan: an open assignment is in force", "XWP_WRONG-1");
+            why.put("plan: an assignment ends", "XWP_ASOF_AFTER-4");
+            why.put("plan: one assigned plan only", "XWP_OVERLAP-1");
+            why.put("plan: no history, no claim", "XWP_NO_HISTORY-1");
+            why.put("plan: the assigned plan must differ", "XWP_DRIFT-3");
+            why.put("plan: the counterfactual version has not ended", "XWP_VERSION-5");
+            why.put("plan: the counterfactual version has started", "XWP_VERSION-6");
+            why.put("plan: the confidence is the share", "XWP_WRONG-1");
+            why.put("plan: the counterfactual is the inferred plan", "XWP_WRONG-1");
             why.put("run rate counts calendar days inclusively", "stale_version|leakage|PLAN_ST");
             why.put("first day", "stale_version|leakage|PLAN_ST");
             Set<String> whyChecked = new TreeSet<>();
@@ -1033,9 +1140,9 @@ class TelcoRerateGoldenTest {
                     new String[]{"fit at the tolerance", "WHERE abs(cf.CF_AMOUNT - m.ACTUAL_CHARGE) <= CAST($tolerance AS DECIMAL(18,4))", "WHERE abs(cf.CF_AMOUNT - m.ACTUAL_CHARGE) < CAST($tolerance AS DECIMAL(18,4))"},
                     new String[]{"within tolerance is its own confidence", "ELSE CAST($within_tolerance_confidence AS DOUBLE) END", "ELSE 1.0 END"},
                     new String[]{"exact is full confidence", "CASE WHEN DIFF = 0 THEN 1.0", "CASE WHEN DIFF = 0 THEN 0.5"},
-                    new String[]{"support counts the same cause", "FINDING, CAUSE) / COHORT_N", "FINDING) / COHORT_N"},
-                    new String[]{"support is a share of the cohort", "/ COHORT_N, 4) AS CONF", "/ 1, 4) AS CONF"},
-                    new String[]{"confidence is rounded to four places", "/ COHORT_N, 4) AS CONF", "/ COHORT_N, 1) AS CONF"},
+                    new String[]{"support counts the same cause", "FINDING, CAUSE)) / coalesce(SUP_D, COHORT_N)", "FINDING)) / coalesce(SUP_D, COHORT_N)"},
+                    new String[]{"support is a share of the cohort", "/ coalesce(SUP_D, COHORT_N), 4) AS CONF", "/ 1, 4) AS CONF"},
+                    new String[]{"confidence is rounded to four places", "/ coalesce(SUP_D, COHORT_N), 4) AS CONF", "/ coalesce(SUP_D, COHORT_N), 1) AS CONF"},
                     new String[]{"the floor keeps a confidence AT it", "WHERE CONF >= CAST($confidence_floor AS DOUBLE)", "WHERE CONF > CAST($confidence_floor AS DOUBLE)"},
                     new String[]{"the most confident leads", "ORDER BY CONF DESC, CAUSE_RANK) AS RN", "ORDER BY CONF, CAUSE_RANK) AS RN"},
                     new String[]{"a tie goes to the fixed order", "ORDER BY CONF DESC, CAUSE_RANK) AS RN", "ORDER BY CONF DESC, CAUSE_RANK DESC) AS RN"},
@@ -1050,7 +1157,33 @@ class TelcoRerateGoldenTest {
                     new String[]{"leakage high is strict", "f.EXPECTED_HIGH - f.ACTUAL_CHARGE > CAST($tolerance AS DECIMAL(18,4))", "f.EXPECTED_HIGH - f.ACTUAL_CHARGE >= CAST($tolerance AS DECIMAL(18,4))"},
                     new String[]{"leakage high is against the dearest", "THEN f.EXPECTED_HIGH - f.ACTUAL_CHARGE ELSE 0", "THEN f.EXPECTED_LOW - f.ACTUAL_CHARGE ELSE 0"},
                     new String[]{"overbilled amount", "coalesce(f.OVERBILLED_AMOUNT, 0) AS OVERBILLED_AMOUNT", "coalesce(f.UNDERCHARGED_AMOUNT, 0) AS OVERBILLED_AMOUNT"},
-                    new String[]{"leakage amount repeats the low", "LEAKAGE_LOW AS LEAKAGE_AMOUNT", "LEAKAGE_HIGH AS LEAKAGE_AMOUNT"});
+                    new String[]{"leakage amount repeats the low", "LEAKAGE_LOW AS LEAKAGE_AMOUNT", "LEAKAGE_HIGH AS LEAKAGE_AMOUNT"},
+                    // slice R3: plan inference. Each is red for the row of the planted case it names (see the why map)
+                    new String[]{"plan: a call with no units infers nothing", "AND r.USAGE_UNITS <> 0 )", "AND r.USAGE_UNITS IS NOT NULL )"},
+                    new String[]{"plan: a call with no charge infers nothing", "AND r.ACTUAL_CHARGE IS NOT NULL AND r.USAGE_UNITS", "AND r.USAGE_UNITS"},
+                    new String[]{"plan: only the day's own calls", "WHERE CAST(r.window_date AS DATE) = CAST($window_start AS DATE) AND r.ACTUAL_CHARGE", "WHERE r.ACTUAL_CHARGE"},
+                    new String[]{"plan: a rate of another service is not a hit", "JOIN tv t ON t.SERVICE = pc.SERVICE AND", "JOIN tv t ON"},
+                    new String[]{"plan: the version in force has not ended", "AND (t.EFFECTIVE_TO IS NULL OR pc.EVENT_TS < t.EFFECTIVE_TO) WHERE", "WHERE"},
+                    new String[]{"plan: the version in force has started", "t.EFFECTIVE_FROM <= pc.EVENT_TS AND (", "t.EFFECTIVE_FROM IS NOT NULL AND ("},
+                    new String[]{"plan: a hit is AT the tolerance", "- pc.ACTUAL_CHARGE) <= CAST($tolerance AS DECIMAL(18,4))", "- pc.ACTUAL_CHARGE) < CAST($tolerance AS DECIMAL(18,4))"},
+                    new String[]{"plan: the top plan only", "WHERE RK = 1 AND", "WHERE RK >= 1 AND"},
+                    new String[]{"plan: a single top plan", "QUALIFY count(*) OVER (PARTITION BY SUBSCRIBER_ID, SERVICE) = 1 )", ")"},
+                    new String[]{"plan: enough calls", "N >= CAST($plan_min_rows AS INTEGER) AND", "N >= 1 AND"},
+                    new String[]{"plan: the share is a floor AT it", "/ N >= CAST($plan_share AS DOUBLE)", "/ N > CAST($plan_share AS DOUBLE)"},
+                    new String[]{"plan: below the share is no plan", "AND CAST(HITS AS DOUBLE) / N >= CAST($plan_share AS DOUBLE)", ""},
+                    new String[]{"plan: the history of this subscriber", "h.SUBSCRIBER_ID = m.SUBSCRIBER_ID AND h.FROM_TS", "h.FROM_TS"},
+                    new String[]{"plan: an assignment holds AT its start", "h.FROM_TS <= m.EVENT_TS AND (", "h.FROM_TS < m.EVENT_TS AND ("},
+                    new String[]{"plan: an assignment has started", "h.FROM_TS <= m.EVENT_TS AND (", "TRUE AND ("},
+                    new String[]{"plan: an assignment ends before its end instant", "m.EVENT_TS < h.TO_TS) GROUP BY", "m.EVENT_TS <= h.TO_TS) GROUP BY"},
+                    new String[]{"plan: an open assignment is in force", "(h.TO_TS IS NULL OR m.EVENT_TS < h.TO_TS)", "(m.EVENT_TS < h.TO_TS)"},
+                    new String[]{"plan: an assignment ends", "AND (h.TO_TS IS NULL OR m.EVENT_TS < h.TO_TS) GROUP BY", "GROUP BY"},
+                    new String[]{"plan: one assigned plan only", "GROUP BY m.ITEM_KEY HAVING count(DISTINCT h.PLAN) = 1", "GROUP BY m.ITEM_KEY"},
+                    new String[]{"plan: no history, no claim", "WHERE a.APLAN <> i.QPLAN", "WHERE a.APLAN IS DISTINCT FROM i.QPLAN"},
+                    new String[]{"plan: the assigned plan must differ", "WHERE a.APLAN <> i.QPLAN", "WHERE a.APLAN IS NOT NULL"},
+                    new String[]{"plan: the counterfactual version has not ended", "AND (t.EFFECTIVE_TO IS NULL OR m.EVENT_TS < t.EFFECTIVE_TO) WHERE a.APLAN", "WHERE a.APLAN"},
+                    new String[]{"plan: the counterfactual version has started", "t.PLAN = i.QPLAN AND t.SERVICE = m.SERVICE AND t.EFFECTIVE_FROM <= m.EVENT_TS", "t.PLAN = i.QPLAN AND t.SERVICE = m.SERVICE"},
+                    new String[]{"plan: the confidence is the share", "i.HITS AS SUP_N, i.N AS SUP_D", "CAST(NULL AS BIGINT) AS SUP_N, CAST(NULL AS BIGINT) AS SUP_D"},
+                    new String[]{"plan: the counterfactual is the inferred plan", "JOIN tv t ON t.PLAN = i.QPLAN AND", "JOIN tv t ON t.PLAN = a.APLAN AND"});
             for (String[] m : exMutants) {
                 assertTrue(count(explainSql, m[1]) >= 1, m[0] + ": the clause text is not in the statement: " + m[1]);
                 String mutated = explainSql.replace(m[1], m[2]);
@@ -1215,7 +1348,50 @@ class TelcoRerateGoldenTest {
         return out;
     }
 
-    private record Fit(String cause, int rank, String version, BigDecimal diff) {}
+    /** A hypothesis that reproduces the charge; {@code supD > 0} = its support is {@code supN / supD} (wrong_plan: the plan's share), else the cohort's. */
+    private record Fit(String cause, int rank, String version, BigDecimal diff, long supN, long supD) {}
+
+    private record Inferred(String plan, long hits, long n) {}
+
+    private static final BigDecimal PLAN_SHARE = new BigDecimal("0.6");
+    private static final int PLAN_MIN_ROWS = 3;
+
+    private static boolean inForce(RerateCorpus.Tariff t, LocalDateTime ts) { return !t.from().isAfter(ts) && (t.to() == null || ts.isBefore(t.to())); }
+
+    /**
+     * The plan whose rate, in force at each call, reproduces the charge of the most of a subscriber's calls of the day for one service,
+     * when it is the ONLY such plan, it explains at least {@code share} of them and there are at least {@code minRows}; else none.
+     */
+    private static Inferred infer(RerateCorpus corpus, Map<String, Map<String, Object>> calls, Map<String, RerateCorpus.Usage> usage, String subscriber,
+                                  String service, BigDecimal tol, BigDecimal share, int minRows) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> c : calls.values())
+            if (subscriber.equals(c.get("SUBSCRIBER_ID")) && service.equals(c.get("SERVICE")) && c.get("ACTUAL_CHARGE") != null && c.get("USAGE_UNITS") != null
+                    && !Long.valueOf(0).equals(c.get("USAGE_UNITS"))) rows.add(c);
+        Map<String, Long> hits = new TreeMap<>();
+        for (Map<String, Object> c : rows) {
+            RerateCorpus.Usage u = usage.get((String) c.get("ITEM_KEY"));
+            Set<String> plans = new TreeSet<>();
+            for (RerateCorpus.Tariff t : corpus.tariffs())
+                if (valid(t) && t.service().equals(service) && inForce(t, u.ts())
+                        && RerateCorpus.expected(u.units(), t.rate()).subtract(u.charge()).abs().compareTo(tol) <= 0) plans.add(t.plan());
+            for (String p : plans) hits.merge(p, 1L, Long::sum);
+        }
+        if (hits.isEmpty()) return null;
+        long top = hits.values().stream().mapToLong(Long::longValue).max().getAsLong();
+        List<String> tops = hits.entrySet().stream().filter(e -> e.getValue() == top).map(Map.Entry::getKey).toList();
+        long n = rows.size();
+        if (tops.size() != 1 || n < minRows || BigDecimal.valueOf(top).compareTo(share.multiply(BigDecimal.valueOf(n))) < 0) return null;
+        return new Inferred(tops.get(0), top, n);
+    }
+
+    /** The one plan the history assigns the subscriber at {@code ts}; none when no period or several different plans are in force. */
+    private static String assigned(RerateCorpus corpus, String subscriber, LocalDateTime ts) {
+        Set<String> plans = new TreeSet<>();
+        for (RerateCorpus.Assignment a : corpus.history())
+            if (a.subscriber().equals(subscriber) && !a.from().isAfter(ts) && (a.to() == null || ts.isBefore(a.to()))) plans.add(a.plan());
+        return plans.size() == 1 ? plans.iterator().next() : null;
+    }
 
     private static boolean valid(RerateCorpus.Tariff t) {
         return t.rate() != null && rateOf(t).signum() >= 0 && t.from() != null && (t.to() == null || t.to().isAfter(t.from()));
@@ -1227,7 +1403,13 @@ class TelcoRerateGoldenTest {
      */
     private static Map<String, Map<String, Object>> oracleExplain(RerateCorpus corpus, Map<String, Map<String, Object>> calls, LocalDate day,
                                                                   BigDecimal tol, BigDecimal within, BigDecimal floor) {
+        return oracleExplain(corpus, calls, day, tol, within, floor, PLAN_SHARE, PLAN_MIN_ROWS);
+    }
+
+    private static Map<String, Map<String, Object>> oracleExplain(RerateCorpus corpus, Map<String, Map<String, Object>> calls, LocalDate day,
+                                                                  BigDecimal tol, BigDecimal within, BigDecimal floor, BigDecimal planShare, int planMinRows) {
         Map<String, RerateCorpus.Usage> usage = new HashMap<>();
+        Map<String, Inferred> inferred = new HashMap<>();
         for (RerateCorpus.Usage u : corpus.usage()) usage.put(u.id(), u);
         Map<String, List<String>> cohorts = new TreeMap<>();
         Map<String, Map<String, Fit>> fits = new TreeMap<>();
@@ -1253,6 +1435,13 @@ class TelcoRerateGoldenTest {
             same.stream().filter(t -> t.from().isAfter(u.ts()))
                     .min(Comparator.comparing(RerateCorpus.Tariff::from).thenComparing(RerateCorpus.Tariff::id))
                     .ifPresent(t -> fit(mine, "early_version", 3, t, u, charge, tol));
+            // wrong_plan: the plan the subscriber's calls are billed at, when the history assigns another one at the call's start
+            Inferred q = inferred.computeIfAbsent(u.subscriber() + "|" + u.service(), k -> infer(corpus, calls, usage, u.subscriber(), u.service(), tol, planShare, planMinRows));
+            String a = assigned(corpus, u.subscriber(), u.ts());
+            if (q != null && a != null && !a.equals(q.plan()))
+                corpus.tariffs().stream().filter(t -> valid(t) && t.plan().equals(q.plan()) && t.service().equals(u.service()) && inForce(t, u.ts()))
+                        .min(Comparator.comparing((RerateCorpus.Tariff t) -> RerateCorpus.expected(u.units(), t.rate()).subtract(charge).abs()).thenComparing(RerateCorpus.Tariff::id))
+                        .ifPresent(t -> fit(mine, "wrong_plan", 4, t, u, charge, tol, q.hits(), q.n()));
             fits.put(id, mine);
         }
         Map<String, Map<String, Object>> out = new TreeMap<>();
@@ -1268,9 +1457,10 @@ class TelcoRerateGoldenTest {
                 record Scored(Fit fit, BigDecimal conf) {}
                 List<Scored> scored = new ArrayList<>();
                 for (Fit f : fits.get(id).values()) {
-                    long support = cohort.stream().filter(o -> fits.get(o).containsKey(f.cause())).count();
+                    long support = f.supD() > 0 ? f.supN() : cohort.stream().filter(o -> fits.get(o).containsKey(f.cause())).count();
+                    long of = f.supD() > 0 ? f.supD() : cohort.size();
                     BigDecimal exact = f.diff().signum() == 0 ? BigDecimal.ONE : within;
-                    BigDecimal cf = exact.multiply(BigDecimal.valueOf(support)).divide(BigDecimal.valueOf(cohort.size()), 4, RoundingMode.HALF_UP);
+                    BigDecimal cf = exact.multiply(BigDecimal.valueOf(support)).divide(BigDecimal.valueOf(of), 4, RoundingMode.HALF_UP);
                     if (cf.compareTo(floor) >= 0) scored.add(new Scored(f, cf));
                 }
                 scored.sort(Comparator.comparing((Scored x) -> x.conf()).reversed().thenComparingInt(x -> x.fit().rank()));
@@ -1315,8 +1505,12 @@ class TelcoRerateGoldenTest {
     }
 
     private static void fit(Map<String, Fit> mine, String cause, int rank, RerateCorpus.Tariff t, RerateCorpus.Usage u, BigDecimal charge, BigDecimal tol) {
+        fit(mine, cause, rank, t, u, charge, tol, 0, 0);
+    }
+
+    private static void fit(Map<String, Fit> mine, String cause, int rank, RerateCorpus.Tariff t, RerateCorpus.Usage u, BigDecimal charge, BigDecimal tol, long supN, long supD) {
         BigDecimal diff = RerateCorpus.expected(u.units(), t.rate()).subtract(charge).abs();
-        if (diff.compareTo(tol) <= 0) mine.put(cause, new Fit(cause, rank, t.id(), diff));
+        if (diff.compareTo(tol) <= 0) mine.put(cause, new Fit(cause, rank, t.id(), diff, supN, supD));
     }
 
     /** Independent grouping of explained findings (any number of days) into root causes. */

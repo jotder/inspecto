@@ -1,0 +1,24 @@
+raw:
+  name: SUBSCRIPTION_HISTORY
+  format: CSV
+  fields[4]{name,selector,type,description,unit,classification}:
+    SUBSCRIBER_ID,"0","VARCHAR","Synthetic or masked subscriber identifier","","INTERNAL"
+    PLAN,"1","VARCHAR","The tariff plan the subscriber was assigned for this period","","INTERNAL"
+    FROM_TS,"2","TIMESTAMP","The assignment holds from this instant (inclusive)","","INTERNAL"
+    TO_TS,"3","TIMESTAMP","The assignment holds until this instant (exclusive; blank = open)","","INTERNAL"
+mapping:
+  canonicalName: subscription_history
+  rawName: SUBSCRIPTION_HISTORY
+  fields[4]:
+    - name: SUBSCRIBER_ID
+      from: SUBSCRIBER_ID
+      fn: keep
+    - name: PLAN
+      from: PLAN
+      fn: keep
+    - name: FROM_TS
+      from: FROM_TS
+      fn: keep
+    - name: TO_TS
+      from: TO_TS
+      fn: keep

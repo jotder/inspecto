@@ -1,6 +1,6 @@
 # Telecom re-rating (tariff validation) runbooks
 
-> **Skeleton (slices R0 to R2).** This Space Template judges the tariff table, re-rates one day of rated usage at a time, explains each
+> **Skeleton (slices R0 to R3).** This Space Template judges the tariff table, re-rates one day of rated usage at a time, explains each
 > finding and groups the findings into root causes. It compares nothing with the invoice and raises no Alert, so there is no Incident to
 > work from this file: the reading guide below is for the analyst who opens the `rerating_tariff_findings`, `rerated_usage`,
 > `rerating_findings` and `rerating_root_causes` Datasets. The root-cause and Incident runbooks arrive with the Alert Rules in the next slices
@@ -71,6 +71,7 @@ One row per finding. `CAUSE` is what a counterfactual re-rating is **consistent 
 | `stale_version` | The charge equals the amount of the version of that plan and service that ended most recently (`CAUSE_TARIFF_VERSION_ID`): an old rate is still in use. |
 | `lower_priority_rate` | The call has a winner by `PRIORITY`, and the charge equals the amount of a row in force that lost (`CAUSE_TARIFF_VERSION_ID`). |
 | `early_version` | The charge equals the amount of the next version, billed before it starts. |
+| `wrong_plan` | The charge equals the amount of **another plan** that the subscriber's own calls of the day are billed at, while `subscription_history` assigns the subscriber a different plan at the call's start (`CAUSE_TARIFF_VERSION_ID` is the other plan's version). Its confidence is exactness times the share of the subscriber's calls (same service, that day) the inferred plan explains. Silent when fewer than `plan_min_rows` calls, no single top plan (two plans with the same rate), a share below `plan_share`, no history for the subscriber, two different plans assigned at once, or the assigned plan IS the inferred one (a plan change the rating label did not follow). |
 | `unexplained` | No hypothesis fits, or none is supported well enough (confidence below `confidence_floor`). Confidence is 0. |
 | `no_tariff`, `ambiguous_tariff`, `unratable_call` | A data-quality finding is its own cause (confidence 1): no usable tariff row; a charge inside the range an ambiguous tariff allows; no charge or no units on the call. |
 
@@ -97,6 +98,9 @@ rater once per root cause, not once per call. The KPIs `revenue_at_risk` (sum of
 - `rated_usage`: one row per rated call or event: `XDR_ID`, `EVENT_TS` (the start; naive, one agreed zone), `EVENT_DATE`,
   `SUBSCRIBER_ID`, `PLAN`, `SERVICE` (`VOICE`, `SMS` or `DATA`), `USAGE_UNITS` and `CHARGE`. Flat `USAGE_UNITS x RATE_PER_UNIT`,
   rounded to two decimals; billing increments, minimum charges, zones, time bands, tax and allowances arrive with later slices.
+- `subscription_history`: one row per period a subscriber was assigned a plan: `SUBSCRIBER_ID`, `PLAN`, `FROM_TS` (inclusive), `TO_TS`
+  (exclusive; blank = open). Deliver the **whole** history in every file, like the tariff. It is an ordinary feed, not a `reference.load: scd2`
+  store, for the reason below. `SUBSCRIBER_ID` is `INTERNAL` classified: use masked or synthetic ids. Without it (an empty Dataset) no `wrong_plan` is claimed.
 - `tariff_version`: one row per version of a plan and service: `TARIFF_VERSION_ID`, `PLAN`, `SERVICE`, `RATE_PER_UNIT`,
   `EFFECTIVE_FROM`, `EFFECTIVE_TO` (blank = open) and the optional `PRIORITY`. Load the whole table in every file you deliver.
   Versions live in the file: a `reference.load: scd2` store stamps the **ingest** time as the version start and has no end, so it
@@ -105,7 +109,8 @@ rater once per root cause, not once per call. The KPIs `revenue_at_risk` (sum of
 ## Thresholds are configuration
 
 `tolerance` is a Job parameter in `config/jobs/rr_rerate_job.toon`. The shipped value is **illustrative**; set it from the
-operator's own rounding behaviour.
+operator's own rounding behaviour. In `config/jobs/rr_explain_job.toon`: `plan_share` (0.6, the share of a subscriber's calls one plan must
+explain) and `plan_min_rows` (3, the calls it takes to infer a plan) are illustrative too; the confidence floor applies to a `wrong_plan` as to any cause.
 
 ## Sizing
 
