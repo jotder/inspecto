@@ -530,6 +530,58 @@ class ControlApiAnalystUploadTest {
         }
     }
 
+    /** One raw HTTP/1.1 POST whose Content-Length need not match the bytes sent. Returns the status line, or "" when the server closed with no response. */
+    private static String rawUpload(Ctx c, String name, long declared, byte[] sent) throws Exception {
+        try (java.net.Socket s = new java.net.Socket("localhost", c.port)) {
+            s.setSoTimeout(5000);
+            String head = "POST /api/v1/inv/uploads/up_feed?name=" + name + " HTTP/1.1\r\nHost: localhost\r\nAuthorization: " + UPLOADER
+                    + "\r\nContent-Type: text/csv\r\nContent-Length: " + declared + "\r\n\r\n";
+            var out = s.getOutputStream();
+            out.write(head.getBytes(StandardCharsets.ISO_8859_1));
+            out.write(sent);
+            out.flush();
+            s.shutdownOutput();
+            try {
+                String line = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream(), StandardCharsets.ISO_8859_1)).readLine();
+                return line == null ? "" : line;
+            } catch (java.net.SocketTimeoutException hang) {
+                throw new AssertionError("the route hung on a mismatched Content-Length", hang);
+            }
+        }
+    }
+
+    /** LYING Content-Length, longer than the body: the JDK server's fixed-length stream hits EOF early; nothing may land. */
+    @Test
+    void aContentLengthLargerThanTheBodySentLandsNothingAndTheServerStaysUp(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            byte[] body = CSV.getBytes(StandardCharsets.UTF_8);
+            String line = rawUpload(c, "UPL_SHORT.csv", body.length + 500, body);
+            assertTrue(line.contains(" 400 "), "a body cut short of its Content-Length is a 400, not a 500: " + line);
+            assertEquals(List.of(), inboxFiles(c), "no file, and no staging temp file, from a truncated body");
+            status(201, up(c, "UPL_NEXT.csv", body), "the server still serves the next request");
+            assertEquals(List.of("UPL_NEXT.csv"), inboxFiles(c));
+        }
+    }
+
+    /** LYING Content-Length, smaller than the body: HTTP framing says the body is the first N bytes; the route is bounded by that N. */
+    @Test
+    void aContentLengthSmallerThanTheBodySentIsBoundedByTheDeclaredLength(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            limits(c, "{\"upload.max_bytes\":1024}");
+            byte[] body = CSV.getBytes(StandardCharsets.UTF_8);
+            byte[] extra = new byte[8 * 1024];
+            java.util.Arrays.fill(extra, (byte) 'x');
+            byte[] all = java.util.Arrays.copyOf(body, body.length + extra.length);
+            System.arraycopy(extra, 0, all, body.length, extra.length);
+            String line = rawUpload(c, "UPL_LONG.csv", body.length, all);
+            assertTrue(line.contains(" 201 "), "HTTP framing: the body is the declared N bytes, the surplus is ignored: " + line);
+            assertEquals(List.of("UPL_LONG.csv"), inboxFiles(c));
+            assertEquals(body.length, Files.size(c.inbox().resolve("UPL_LONG.csv")), "only the declared bytes landed, not the 8 KB surplus");
+            assertTrue(inboxFiles(c).stream().noneMatch(f -> f.endsWith(".tmp")), "no staging temp file: " + inboxFiles(c));
+            status(201, up(c, "UPL_NEXT.csv", body), "the server still serves the next request");
+        }
+    }
+
     @Test
     void dailyQuotaIs413AndOnlyLandedBytesCount(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, true)) {
