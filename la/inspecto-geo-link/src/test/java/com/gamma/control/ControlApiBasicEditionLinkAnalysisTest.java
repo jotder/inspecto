@@ -49,6 +49,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
     /** {method, path} - explorer routes Basic serves: one per explorer route module. */
     private static final List<String[]> EXPLORER = List.of(
             new String[]{"GET", "/inv/schema/relationships"},                 // InvRoutes
+            new String[]{"POST", "/inv/projection"},                         // InvRoutes: what a Link Analysis dashboard widget reads (D-LAE2: stays open)
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes
             new String[]{"GET", "/inv/entity-identities"},                    // EntityIdentityRoutes
             new String[]{"GET", "/inv/entity-types"},                         // EntityProfileRoutes
@@ -144,6 +145,8 @@ class ControlApiBasicEditionLinkAnalysisTest {
             assertFalse(features.at("/investigations").asBoolean(true), "Basic reports no Investigations: " + features);
             assertTrue(features.has("geoMap") && !features.at("/geoMap").asBoolean(),
                     "Basic reports the Geo map present-and-false while geoLink stays true: " + features);
+            assertTrue(features.has("laWidgets") && !features.at("/laWidgets").asBoolean(),
+                    "Basic reports the LA dashboard widgets present-and-false (a UI flag; the routes stay open, asserted above): " + features);
         } finally {
             api.close();
             spaces.close();
@@ -228,6 +231,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
             JsonNode features = JSON.readTree(send(port, "GET", "/bootstrap", null, ADMIN).body()).at("/data/features");
             assertTrue(features.at("/investigations").asBoolean(), "Standard reports Investigations: " + features);
             assertTrue(features.at("/geoMap").asBoolean(), "Standard reports the Geo map: " + features);
+            assertTrue(features.at("/laWidgets").asBoolean(), "Standard reports the LA dashboard widgets: " + features);
         } finally {
             api.close();
             spaces.close();

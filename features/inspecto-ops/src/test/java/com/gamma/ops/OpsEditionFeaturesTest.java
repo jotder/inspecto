@@ -3,6 +3,7 @@ package com.gamma.ops;
 import com.gamma.etl.EditionFeatures;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -25,5 +26,12 @@ class OpsEditionFeaturesTest {
         EditionFeatures.overrideForTest(null);
         assertTrue(EditionFeatures.present(EditionFeatures.GEO_MAP), "Standard and up bring the Geo map through inspecto-ops (D-LAE5)");
         assertTrue(EditionFeatures.gatesRoutes(EditionFeatures.GEO_MAP));
+    }
+
+    @Test
+    void opsDeclaresTheDashboardWidgetFlagButItIsNotARouteFeature() {
+        EditionFeatures.overrideForTest(null);
+        assertTrue(EditionFeatures.present(EditionFeatures.LA_WIDGETS), "Standard and up bring the LA dashboard widgets (D-LAE2)");
+        assertFalse(EditionFeatures.gatesRoutes(EditionFeatures.LA_WIDGETS), "a UI flag only: no route is gated by it");
     }
 }

@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { ComponentType, ComponentsService, apiErrorMessage } from 'app/inspecto/api';
+import { ComponentType, ComponentsService, SessionService, apiErrorMessage } from 'app/inspecto/api';
 import { ColumnMeta } from 'app/inspecto/query';
 import {
     ControlValues,
@@ -83,6 +83,7 @@ export class ExploreComponent implements OnInit {
     private router = inject(Router);
     private toastr = inject(ToastrService);
     private draftHandoff = inject(ImportDraftHandoff);
+    private session = inject(SessionService);
     private transfer = inject(BundleTransferService);
 
     /** Route param — the widget id to edit; absent on the `new` route. */
@@ -157,10 +158,19 @@ export class ExploreComponent implements OnInit {
     readonly sourceName = computed(() => this.dataset()?.sourceName ?? 'data');
 
     /** The view-bound plugins (geo-map / link-analysis) — offered without a dataset; excluded from Show-Me. The
-     *  Working Set Widget is not offered: it is pinned and saved from the Link Analysis Investigation panel (LA-21). */
-    readonly viewPlugins: VizPlugin[] = allViz().filter(
-        (p) => !!p.meta.viewKind && p.meta.viewKind !== WORKING_SET_VIEW_KIND,
-    );
+     *  Working Set Widget is not offered: it is pinned and saved from the Link Analysis Investigation panel (LA-21).
+     *  The Link view and Geo map types follow `/bootstrap` (D-LAE2, D-LAE5): `laWidgets` and, for the Geo map, `geoMap` too, so
+     *  Basic does not offer them. ⚠ Cosmetic: the routes behind them stay open on Basic, and a widget already saved still opens. */
+    readonly viewPlugins = computed<VizPlugin[]>(() => {
+        const f = this.session.features();
+        return allViz().filter(
+            (p) =>
+                !!p.meta.viewKind &&
+                p.meta.viewKind !== WORKING_SET_VIEW_KIND &&
+                (p.meta.viewKind !== 'link-analysis-view' || f['laWidgets'] === true) &&
+                (p.meta.viewKind !== 'geo-map-view' || (f['laWidgets'] === true && f['geoMap'] === true)),
+        );
+    });
     readonly viewBound = computed(() => !!this.plugin()?.meta.viewKind);
     /** The selected saved view (a view-bound widget's binding) + the picker's choices. */
     readonly viewId = signal<string>('');

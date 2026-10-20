@@ -62,6 +62,13 @@ public final class EditionFeatures {
      * Link Analysis route module, so gating it would take all of them down.
      */
     public static final String GEO_MAP = "geoMap";
+    /**
+     * Link Analysis widgets on dashboards (the Explore picker's Link view and Geo map widget types) - Standard and up (D-LAE2,
+     * operator 2026-10-20). ⚠ A <b>UI flag only</b>, deliberately not a route feature (it is not in {@link #ROUTE_FEATURES}): the
+     * projection routes those widgets call stay open on Basic, so hiding the offer is cosmetic, not access control. Reported to
+     * the SPA as {@code /bootstrap} {@code features.laWidgets}; declared by {@code inspecto-ops} beside the route features.
+     */
+    public static final String LA_WIDGETS = "laWidgets";
 
     /** The finding / error code every refusal carries. Mirrors {@code FindingCodes.ERR_EDITION_FEATURE}. */
     public static final String CODE = "ERR_EDITION_FEATURE";

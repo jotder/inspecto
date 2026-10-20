@@ -6,7 +6,7 @@ import { of } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
-import { ComponentsService } from 'app/inspecto/api';
+import { ComponentsService, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRows, DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
@@ -48,7 +48,10 @@ const QUERIES = [
     { id: 'structured', name: 'Structured', type: 'structured', datasetId: 'cdr_sample', parameters: [] },
 ];
 
-function create(ds: Dataset = DS, page: DatasetRows = CDR_PAGE) {
+/** Standard and up: `/bootstrap` reports the Link Analysis widgets and the Geo map. */
+const STANDARD = { laWidgets: true, geoMap: true };
+
+function create(ds: Dataset = DS, page: DatasetRows = CDR_PAGE, features: Record<string, boolean> = STANDARD) {
     runs.length = 0;
     TestBed.configureTestingModule({
         imports: [ExploreComponent],
@@ -97,6 +100,8 @@ function create(ds: Dataset = DS, page: DatasetRows = CDR_PAGE) {
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
+    // the real SessionService (the Lens reads it too): only the `/bootstrap` feature flags are pinned
+    TestBed.inject(SessionService).features.set(features);
     return TestBed.createComponent(ExploreComponent);
 }
 
@@ -191,6 +196,30 @@ describe('ExploreComponent', () => {
         expect(c.viewBound()).toBe(true);
         expect(c.controls()).toEqual({});
         expect(c.savedViews()).toEqual([{ id: 'dhaka-network', name: 'Example — Dhaka cell network' }]);
+    });
+
+    // D-LAE2 (operator 2026-10-20): Link Analysis widgets on dashboards are Standard and up - a UI flag, the routes stay open.
+    const offered = (features: Record<string, boolean>) =>
+        create(DS, CDR_PAGE, features)
+            .componentInstance.viewPlugins()
+            .map((p) => p.meta.type);
+
+    it('offers the Link view and Geo map widget types on Standard and up', () => {
+        expect(offered(STANDARD)).toEqual(expect.arrayContaining(['geo-map', 'link-analysis']));
+    });
+
+    it('offers neither on Basic (laWidgets and geoMap false) but keeps the other view-bound types', () => {
+        const types = offered({ laWidgets: false, geoMap: false });
+        expect(types).not.toContain('geo-map');
+        expect(types).not.toContain('link-analysis');
+        expect(types).toContain('reconciliation'); // not a Link Analysis widget: untouched
+        expect(types).not.toContain('working-set'); // never offered here (LA-21)
+    });
+
+    it('holds the Geo map widget back when only the Geo map is withheld', () => {
+        const types = offered({ laWidgets: true, geoMap: false });
+        expect(types).toContain('link-analysis');
+        expect(types).not.toContain('geo-map');
     });
 
     it('renders the initial (no dataset) state with no a11y violations', async () => {

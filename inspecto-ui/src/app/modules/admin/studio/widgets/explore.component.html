@@ -82,7 +82,7 @@
                     Investigation views
                 </div>
                 <div class="flex flex-wrap gap-1">
-                    @for (p of viewPlugins; track p.meta.type) {
+                    @for (p of viewPlugins(); track p.meta.type) {
                         <button
                             mat-stroked-button
                             class="!min-w-0"

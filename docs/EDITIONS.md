@@ -31,7 +31,7 @@ explorer* below.
 | | Entity Lists, identity resolution, Entity profile pages | ✅ | ✅ | ✅ | ✅ |
 | | Reference data beside a node | ✅ | ✅ | ✅ | ✅ |
 | | Export (PNG, CSV), snapshots (not evidence-grade) | ✅ | ✅ | ✅ | ✅ |
-| | Link Analysis widgets on dashboards | ✅ | ✅ | ✅ | ✅ |
+| | Link Analysis widgets on dashboards (offer hidden on Basic; routes stay open) | — | ✅ | ✅ | ✅ |
 | | Industry packs (Telecom, Mobile Money) | ✅ | ✅ | ✅ | ✅ |
 | | Masking | display only (no sign-in: anyone may reveal) | ✅ enforced | ✅ | ✅ |
 | Investigate | Investigations: sealed op log, replay, compare, temporal findings | — | ✅ | ✅ | ✅ |
@@ -77,6 +77,13 @@ all down. `/bootstrap` reports `features.geoMap` (false on Basic, with `geoLink`
 'geoMap'`), the Geo area of the standalone LA app and the Menu Builder's Geo view key on it, so Basic offers nothing that
 only 503s. Release note: an existing Basic install loses the Geo map on upgrade; no migration shim (D-LAE12). The module
 switch stays as before: a Space may still turn `geoLink` (all of Link Analysis) off.
+
+**Link Analysis widgets on dashboards are Standard and up as a UI flag only (D-LAE2, operator 2026-10-20).** `EditionFeatures.LA_WIDGETS`
+(`laWidgets`), declared by `inspecto-ops`, is reported as `/bootstrap` `features.laWidgets` (true only where `geoLink` is on and the
+edition has it). On Basic the Widget builder (Explore) does not offer the *Link analysis* and *Geo map* widget types (the Geo map one
+also needs `geoMap`). ⚠ **This is cosmetic, by decision, not access control:** the feature is deliberately not a route feature, the
+Link view's projection route (`POST /inv/projection`) stays open on Basic (the Geo map widget's routes are gated by `geoMap`, above), and a widget saved earlier still opens.
+Release note: an existing Basic install can no longer add these widget types; no migration shim (D-LAE12).
 
 ## Matrix
 
