@@ -1,5 +1,6 @@
 com.gamma.la.api.GeoRoutes
 com.gamma.la.api.InvRoutes
+com.gamma.la.api.CaseHistoryRoutes
 com.gamma.la.api.PatternRoutes
 com.gamma.la.api.ValueMeasureRoutes
 com.gamma.la.api.InvestigationRoutes

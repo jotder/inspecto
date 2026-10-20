@@ -935,8 +935,10 @@ answers each of them `503 CAPABILITY_UNAVAILABLE` "… available in Standard and
 edge-index tool. Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
 ⚠ **Masking on Basic is display-only:** with no sign-in there is no Subject, so the capability behind an audited reveal
 is never checked and anyone may reveal; masking stops a casual glance, not a user. Enforced masking starts in Standard.
-⚠ `POST /inv/case-history` (Case history beside a node, Standard in the placement matrix) stays in `InvRoutes`; on Basic it
-has no Case module to read. The scheduled link-index builder (`la.index.build` Job) is not edition-gated — its routes are.
+⚠ `POST /inv/case-history` (Case history beside a node) is Standard and up by an explicit gate since 2026-10-20 (D-LAE1): it
+moved out of `InvRoutes` into its own route module `CaseHistoryRoutes` (an edition gate is per `RouteModule`) naming
+`geoLink` and `investigations`, so Basic answers 503 "available in Standard and above" at dispatch and the node dialog hides
+the section. The scheduled link-index builder (`la.index.build` Job) is not edition-gated — its routes are.
 The Postgres store also needs `-Dinvestigations.backend=db` plus a `jdbc:postgresql:` URL; the jar alone keeps the
 filesystem store.
 

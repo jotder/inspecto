@@ -232,7 +232,7 @@ flagged, and Compute risk is then held - an incomplete score map would understat
   (`graph_run.propagated_risk_weights`, shipped 1.0 / 0.6 / 0.35 / 0.15).
 * **Enrichment** — the node's CRM/KYC row when the profile maps one (Telecom: `crm_kyc` by `msisdn`; if the Space
   cannot read it, the section says so), and the Entity Lists of its Entity Type it is on.
-* **Case history** — collapsed; opening it reads the Incidents and Cases that reference the node's entity (Telecom:
+* **Case history** — Standard and up only (the section is not shown on Basic). Collapsed; opening it reads the Incidents and Cases that reference the node's entity (Telecom:
   by `msisdn`), newest first: kind, title (a link to the Incident or Case), status, severity and date, and *via
   Incident …* for a Case found through an Incident it contains. *Show* filters all / open / closed. When the server
   searched only its newest objects the section warns that older ones may be missing. A masked node (an alias) is

@@ -21,6 +21,7 @@ import { factorLine, nodeScoresFor, numberOf, riskMappingFor, riskOf, round1 } f
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { CaseHistoryService, EntityHistory, EntityHistoryStatus } from './case-history.service';
 import { laLimit } from './la-limits';
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 
 /** What the node detail dialog's insight sections know about the clicked node and the graph around it. */
 export interface NodeInsightContext {
@@ -219,106 +220,112 @@ interface Membership {
             </div>
         </section>
 
-        <section class="mt-4" aria-labelledby="ni-history">
-            <h3 id="ni-history" class="text-base font-semibold">
-                <button
-                    type="button"
-                    class="flex items-center gap-1"
-                    data-testid="history-toggle"
-                    aria-controls="ni-history-body"
-                    [attr.aria-expanded]="historyOpen()"
-                    (click)="toggleHistory()"
-                >
-                    <span aria-hidden="true">{{ historyOpen() ? '▾' : '▸' }}</span> Case history
-                </button>
-            </h3>
-            @if (historyOpen()) {
-                <div id="ni-history-body" class="mt-1 text-sm">
-                    @if (historyBlocked(); as why) {
-                        <p class="text-secondary" data-testid="history-unavailable">{{ why }}</p>
-                    } @else {
-                        <label class="text-secondary text-xs">
-                            Show
-                            <select
-                                class="ml-1"
-                                data-testid="history-status"
-                                [value]="historyStatus()"
-                                (change)="setHistoryStatus($any($event.target).value)"
-                            >
-                                <option value="all">all</option>
-                                <option value="open">open</option>
-                                <option value="closed">closed</option>
-                            </select>
-                        </label>
-                        @if (history(); as h) {
-                            @if (h.error) {
-                                <inspecto-alert variant="warning" data-testid="history-error">{{
-                                    h.error
-                                }}</inspecto-alert>
-                            } @else {
-                                @if (h.truncated) {
-                                    <inspecto-alert variant="warning" data-testid="history-truncated">
-                                        @if (h.truncatedMessage) {
-                                            {{ h.truncatedMessage }}
-                                        } @else {
-                                            Only the newest objects were searched: older Incidents or Cases may be
-                                            missing.
-                                        }
-                                        @if (h.total != null) {
-                                            ({{ h.total.toLocaleString('en') }} in all)
-                                        }
-                                    </inspecto-alert>
-                                }
-                                @if (historyItems().length) {
-                                    <ul class="mt-1 flex flex-col gap-1" data-testid="history-list">
-                                        @for (o of historyItems(); track o.kind + o.id) {
-                                            <li class="flex flex-wrap items-baseline gap-2">
-                                                <inspecto-chip [tone]="o.kind === 'case' ? 'primary' : 'neutral'">{{
-                                                    o.kind === 'case' ? 'Case' : 'Incident'
-                                                }}</inspecto-chip>
-                                                <a [routerLink]="[o.kind === 'case' ? '/cases' : '/incidents', o.id]">{{
-                                                    o.title || o.id
-                                                }}</a>
-                                                <span>{{ o.status }}</span>
-                                                @if (o.severity) {
-                                                    <span class="text-secondary">{{ o.severity }}</span>
-                                                }
-                                                <span class="text-secondary text-xs">{{
-                                                    o.createdAt | date: 'medium'
-                                                }}</span>
-                                                @if (o.matchedOn === 'investigation') {
-                                                    <span class="text-secondary text-xs" data-testid="history-via"
-                                                        >via Investigation {{ o.via }}</span
-                                                    >
-                                                } @else if (o.matchedOn === 'snapshot') {
-                                                    <span class="text-secondary text-xs" data-testid="history-via"
-                                                        >via sealed snapshot</span
-                                                    >
-                                                } @else if (o.via) {
-                                                    <span class="text-secondary text-xs" data-testid="history-via"
-                                                        >via
-                                                        <a [routerLink]="['/incidents', o.via]"
-                                                            >Incident {{ o.via }}</a
-                                                        ></span
-                                                    >
-                                                }
-                                            </li>
-                                        }
-                                    </ul>
-                                } @else {
-                                    <p class="text-secondary mt-1" data-testid="history-empty">
-                                        No {{ historyStatus() === 'all' ? '' : historyStatus() + ' ' }}Incident or Case
-                                        references {{ ctx().label }}.
-                                    </p>
-                                }
-                            }
+        @if (investigationsEnabled()) {
+            <section class="mt-4" aria-labelledby="ni-history">
+                <h3 id="ni-history" class="text-base font-semibold">
+                    <button
+                        type="button"
+                        class="flex items-center gap-1"
+                        data-testid="history-toggle"
+                        aria-controls="ni-history-body"
+                        [attr.aria-expanded]="historyOpen()"
+                        (click)="toggleHistory()"
+                    >
+                        <span aria-hidden="true">{{ historyOpen() ? '▾' : '▸' }}</span> Case history
+                    </button>
+                </h3>
+                @if (historyOpen()) {
+                    <div id="ni-history-body" class="mt-1 text-sm">
+                        @if (historyBlocked(); as why) {
+                            <p class="text-secondary" data-testid="history-unavailable">{{ why }}</p>
                         } @else {
-                            <p class="text-secondary mt-1" role="status">Reading case history…</p>
+                            <label class="text-secondary text-xs">
+                                Show
+                                <select
+                                    class="ml-1"
+                                    data-testid="history-status"
+                                    [value]="historyStatus()"
+                                    (change)="setHistoryStatus($any($event.target).value)"
+                                >
+                                    <option value="all">all</option>
+                                    <option value="open">open</option>
+                                    <option value="closed">closed</option>
+                                </select>
+                            </label>
+                            @if (history(); as h) {
+                                @if (h.error) {
+                                    <inspecto-alert variant="warning" data-testid="history-error">{{
+                                        h.error
+                                    }}</inspecto-alert>
+                                } @else {
+                                    @if (h.truncated) {
+                                        <inspecto-alert variant="warning" data-testid="history-truncated">
+                                            @if (h.truncatedMessage) {
+                                                {{ h.truncatedMessage }}
+                                            } @else {
+                                                Only the newest objects were searched: older Incidents or Cases may be
+                                                missing.
+                                            }
+                                            @if (h.total != null) {
+                                                ({{ h.total.toLocaleString('en') }} in all)
+                                            }
+                                        </inspecto-alert>
+                                    }
+                                    @if (historyItems().length) {
+                                        <ul class="mt-1 flex flex-col gap-1" data-testid="history-list">
+                                            @for (o of historyItems(); track o.kind + o.id) {
+                                                <li class="flex flex-wrap items-baseline gap-2">
+                                                    <inspecto-chip [tone]="o.kind === 'case' ? 'primary' : 'neutral'">{{
+                                                        o.kind === 'case' ? 'Case' : 'Incident'
+                                                    }}</inspecto-chip>
+                                                    <a
+                                                        [routerLink]="[
+                                                            o.kind === 'case' ? '/cases' : '/incidents',
+                                                            o.id,
+                                                        ]"
+                                                        >{{ o.title || o.id }}</a
+                                                    >
+                                                    <span>{{ o.status }}</span>
+                                                    @if (o.severity) {
+                                                        <span class="text-secondary">{{ o.severity }}</span>
+                                                    }
+                                                    <span class="text-secondary text-xs">{{
+                                                        o.createdAt | date: 'medium'
+                                                    }}</span>
+                                                    @if (o.matchedOn === 'investigation') {
+                                                        <span class="text-secondary text-xs" data-testid="history-via"
+                                                            >via Investigation {{ o.via }}</span
+                                                        >
+                                                    } @else if (o.matchedOn === 'snapshot') {
+                                                        <span class="text-secondary text-xs" data-testid="history-via"
+                                                            >via sealed snapshot</span
+                                                        >
+                                                    } @else if (o.via) {
+                                                        <span class="text-secondary text-xs" data-testid="history-via"
+                                                            >via
+                                                            <a [routerLink]="['/incidents', o.via]"
+                                                                >Incident {{ o.via }}</a
+                                                            ></span
+                                                        >
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    } @else {
+                                        <p class="text-secondary mt-1" data-testid="history-empty">
+                                            No {{ historyStatus() === 'all' ? '' : historyStatus() + ' ' }}Incident or
+                                            Case references {{ ctx().label }}.
+                                        </p>
+                                    }
+                                }
+                            } @else {
+                                <p class="text-secondary mt-1" role="status">Reading case history…</p>
+                            }
                         }
-                    }
-                </div>
-            }
-        </section>
+                    </div>
+                }
+            </section>
+        }
 
         @if (hasActions()) {
             <section class="mt-4" aria-labelledby="ni-actions" data-testid="ni-actions">
@@ -441,6 +448,8 @@ export class NodeInsightComponent implements OnInit {
     private readonly addedHere = new Set<string>();
 
     private readonly historySvc = inject(CaseHistoryService);
+    /** Case history is Standard and up (D-LAE1): `POST /inv/case-history` is an `investigations` route, so Basic hides the section instead of offering a 503. */
+    readonly investigationsEnabled = inject(LA_FEATURES).investigations;
     readonly historyOpen = signal(false);
     readonly historyStatus = signal<EntityHistoryStatus>('all');
     readonly history = signal<EntityHistory | null>(null);

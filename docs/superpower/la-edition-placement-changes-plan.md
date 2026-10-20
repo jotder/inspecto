@@ -115,6 +115,13 @@ All four use mechanism 2 (a route feature) or a UI flag; none needs a jar change
   a security regression, and the code is shared); (c) *keep it as is*.
 - Consequence to state in the doc whichever is chosen: on Basic, classified Dataset columns show **unmasked**.
 
+### 4.2 As built, lane A (2026-10-20)
+
+Built for the answered decisions only (D-LAE1, D-LAE2, D-LAE5; D-LAE12 is the no-shim rule). Corrections the build found in this draft:
+
+- **`gatesRoutes` is generalised** to the set `EditionFeatures.ROUTE_FEATURES`; a member needs its own `refusal()` text (pinned by `EditionFeaturesTest`).
+- **Case history (D-LAE1).** The edition gate is per `RouteModule`, not per route, so naming `investigations` on the one route was impossible while it sat in `InvRoutes` beside the explorer routes: it moved into its own module `CaseHistoryRoutes` (`featureIds` `geoLink` + `investigations`). ⚠ Overrides the archived LA-EDITIONS-1 plan, which kept Case history in the explorer ("stays explorer") with Basic refusing it only for want of a Case module. The SPA flag is the existing `investigations`, no new one.
+
 ## 5. Patterns and pattern packs on Basic (request 4)
 
 What exists: `POST /inv/pattern/branching` and `POST /inv/pattern/temporal` (`PatternRoutes.java:73-74`, gated by

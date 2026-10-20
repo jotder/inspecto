@@ -98,7 +98,7 @@ public final class InvRoutes implements RouteModule {
         api.post("/inv/schema/overlap-profile", (e, m) -> overlapProfile(api, e, api.body(e)));
         api.post("/inv/traversal/recursive-paths", (e, m) -> recursivePaths(api, e, api.body(e)));
         api.post("/inv/reference-rows", (e, m) -> ReferenceRows.handle(api, e, api.body(e)));
-        api.post("/inv/case-history", (e, m) -> CaseHistory.handle(api, e, api.body(e)));
+        // POST /inv/case-history is CaseHistoryRoutes' now: an edition gate is per RouteModule, and Case history is Standard and up (D-LAE1).
         // ⛔ The two POSTs genuinely PERSIST, so unlike the projection routes above they cannot take the
         // "read-shaped" exemption — that exemption says "persists nothing", and claiming it here would be a
         // false declaration in the file whose whole job is to say what each route is gated on. They are gated

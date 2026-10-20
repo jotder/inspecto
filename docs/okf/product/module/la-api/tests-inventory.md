@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-40 test class(es): 40 unit, 0 real-HTTP control-plane, 0 IT.
+41 test class(es): 41 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl la/inspecto-la-api
-mvn -o test -pl la/inspecto-la-api -Dtest=ColumnProfileGoldenTest,ConnectSeedsTest
+mvn -o test -pl la/inspecto-la-api -Dtest=CaseHistoryRoutesContractTest,ColumnProfileGoldenTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `CaseHistoryRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/CaseHistoryRoutesContractTest.java` | {@link CaseHistoryRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-1 P5a): no host, no processor boot. |
 | `ColumnProfileGoldenTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/ColumnProfileGoldenTest.java` | Golden figures of Link Analysis' column-profile SQL (ANALYTICS-CORE-1 M4): {@link ColumnProfile#stats} over numbers, text, |
 | `ConnectSeedsTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/ConnectSeedsTest.java` | LA-SEED-CONNECT-1: the pair table on a planted graph - the search itself, with no HTTP. |
 | `DatasetFilesRoutesTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/DatasetFilesRoutesTest.java` | LA-DATA-TRUST-1 S1: how a lineage ledger's written path is matched to an index manifest's data-root-relative input path. |

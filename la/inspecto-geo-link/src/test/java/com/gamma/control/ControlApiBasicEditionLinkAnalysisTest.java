@@ -132,6 +132,46 @@ class ControlApiBasicEditionLinkAnalysisTest {
         }
     }
 
+    /**
+     * D-LAE1 (operator 2026-10-20): Case history beside a node is Standard and up by an EXPLICIT gate. Before, Basic answered
+     * its 503 only because no Case module was there to read ("Case management is not installed"); this pins the EDITION
+     * refusal instead, so installing a Case module on a Basic host would not open the route.
+     */
+    @Test
+    void caseHistoryIsRefusedByEditionOnBasicAndReachesItsHandlerOnStandard(@TempDir Path root) throws Exception {
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        api.start();
+        try {
+            int port = api.port();
+            Authenticators.forTest(ex -> {
+                if (!ADMIN.equals(ex.getRequestHeaders().getFirst("Authorization"))) return Optional.empty();
+                Roles.Def def = Roles.effective(ex).get("admin");
+                ComponentAccess.heldRoles(ex, Set.of("admin"));
+                return Optional.of(new Subject("admin-1", def.capabilities(), def.dataScopes()));
+            });
+            assertEquals(200, send(port, "POST", "/spaces", "{\"id\":\"s\"}", ADMIN).statusCode());
+            String body = "{\"key\":\"27820000001\",\"entityType\":\"msisdn\"}";
+
+            EditionFeatures.overrideForTest(Set.of());   // Basic
+            HttpResponse<String> basic = send(port, "POST", "/spaces/s/inv/case-history", body, ADMIN);
+            JsonNode err = JSON.readTree(basic.body()).at("/error");
+            assertEquals(503, basic.statusCode(), basic.body());
+            assertEquals(ErrorCodes.CAPABILITY_UNAVAILABLE, err.at("/errorCode").asText(), basic.body());
+            assertTrue(err.at("/message").asText().contains("available in Standard and above"), "the EDITION refusal: " + basic.body());
+            assertTrue(err.at("/message").asText().contains("Case history"), basic.body());
+
+            EditionFeatures.overrideForTest(null);       // Standard: the classpath stand-in declares Investigations
+            HttpResponse<String> standard = send(port, "POST", "/spaces/s/inv/case-history", body, ADMIN);
+            assertFalse(standard.body().contains("available in Standard and above"),
+                    "Standard is past the edition gate (it may still refuse for want of a Case module): " + standard.body());
+        } finally {
+            api.close();
+            spaces.close();
+            MetricRegistry.global().reset();
+        }
+    }
+
     @Test
     void standardServesBothTheExplorerAndInvestigations(@TempDir Path root) throws Exception {
         Authenticators.forTest(ex -> {

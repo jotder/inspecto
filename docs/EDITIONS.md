@@ -60,9 +60,13 @@ Telecom ASN.1 decoder (`inspecto-telecom-asn1`, a CDR parser rather than a pack)
 integration (phases 5–6: `POST /inv/inbound/investigations`, `POST /inv/deep-links/resolve`, `GET/PUT /inv/integration`,
 `POST /inv/investigations/{id}/handoff`, the outbound webhooks) is withheld on Basic by the same `investigations` edition
 feature (ED-6, `LD-EDITIONS-12`): the routes answer 503 and the webhook tap sends nothing; the SPA `/open` page explains
-it. Still open: "Investigate a number" on Basic explains that Investigations are a Standard feature and leaves the number
-to a projection instead of seeding the canvas; Case history beside a node (`POST /inv/case-history`) sits in an explorer
-route module and simply has no Case module to read on Basic.
+it. "Investigate a number" on Basic explains that Investigations are a Standard feature and leaves the number
+to a projection instead of seeding the canvas. **Case history beside a node** (`POST /inv/case-history`) is Standard and up
+**by an explicit gate** (D-LAE1, operator 2026-10-20): it has its own route module (`CaseHistoryRoutes`) naming the
+`investigations` feature, so Basic answers `503 CAPABILITY_UNAVAILABLE` "available in Standard and above" at dispatch, and
+the SPA hides the section (`LA_FEATURES.investigations`). ⚠ This overrides the archived LA-EDITIONS-1 plan, which left Case
+history "explorer" with Basic refusing it only because no Case module was there to read. Release note: an existing Basic
+install loses Case history on upgrade; no migration shim (D-LAE12).
 
 ## Matrix
 
@@ -240,7 +244,7 @@ sign-in** (Basic ships no Authenticator). The graph library the plan called `la-
 **What is withheld, and how.** One edition feature, `EditionFeatures.INVESTIGATIONS` (`investigations`), declared by
 `inspecto-ops` (`OpsEditionFeatures`) — a module only Standard, Advanced and Preview bundle. Every Link Analysis route
 module of the Investigation surface names it in `featureIds()` beside `geoLink` (Investigations, Drafts, Dossier and
-bundle, Working Set, references, templates, coverage, compare, Case link, members, embeds and the public embed view,
+bundle, Working Set, references, templates, coverage, compare, Case link, Case history, members, embeds and the public embed view,
 Graph Run, link index builds, Dataset Files, measures / Alert Rules / standing detection, data-changes). When no
 installed module declares it, the host answers those routes **`503 CAPABILITY_UNAVAILABLE`** — "Link Analysis
 Investigations (…) are available in Standard and above — this build (Basic) is the Link Analysis explorer and does not

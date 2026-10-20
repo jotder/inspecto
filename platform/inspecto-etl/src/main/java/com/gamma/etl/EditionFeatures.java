@@ -46,7 +46,7 @@ public final class EditionFeatures {
     /**
      * The Link Analysis <b>Investigation surface</b> — Investigations (sealed op log, replay, compare), Drafts, the Dossier
      * and its bundle, templates and external references, members, embed links, Case linking, data trust (coverage,
-     * Dataset Files, data-changes), Graph Run, link index builds, and Alert Rules / standing detection on Investigations
+     * Dataset Files, data-changes), Case history beside a node (D-LAE1), Graph Run, link index builds, and Alert Rules / standing detection on Investigations
      * ({@code LA-EDITIONS-1} ED-4, operator 2026-10-17: "Basic has no sign-in and no Investigations"). Declared by
      * {@code inspecto-ops}, which only the Standard, Advanced and Preview flavours bundle. Unlike the config features
      * above it is also a ROUTE FEATURE: a route module whose {@code featureIds()} names it is answered
@@ -84,7 +84,7 @@ public final class EditionFeatures {
             case SINK_DUCKLAKE -> "DuckLake catalog registration (sink.ducklake — ducklake.enabled: true)";
             case PII_MASK -> "PII masking (quality.pii.mask — a steps: mask Step)";
             case INVESTIGATIONS -> "Link Analysis Investigations (Investigations, Drafts, Dossier, templates, members, embed links, "
-                    + "data trust, Graph Run, index builds and Alert Rules on Investigations)";
+                    + "data trust, Case history, Graph Run, index builds and Alert Rules on Investigations)";
             default -> "'" + feature + "'";
         };
         if (PII_MASK.equals(feature))

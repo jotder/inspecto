@@ -13,6 +13,7 @@ import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { signal } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { CaseHistoryService, EntityHistory, EntityHistoryItem } from './case-history.service';
 
 const item = (over: Partial<EntityHistoryItem>): EntityHistoryItem => ({
@@ -115,6 +116,8 @@ function make(
         matched?: string[];
         masked?: boolean;
         truncated?: boolean;
+        /** The host's `investigations` flag (Standard and up); on by default. */
+        investigations?: boolean;
         history?: (type: string, id: string, status: string) => Promise<EntityHistory>;
         maskedHistory?: (key: string, inv: string | null, status: string) => Promise<EntityHistory>;
     } = {},
@@ -161,6 +164,15 @@ function make(
             provideNoopAnimations(),
             provideRouter([]),
             { provide: CaseHistoryService, useValue: { byEntity, byMaskedKey } },
+            {
+                provide: LA_FEATURES,
+                useValue: {
+                    ops: signal(true),
+                    exchange: signal(false),
+                    geoLink: signal(true),
+                    investigations: signal(opts.investigations ?? true),
+                },
+            },
             { provide: NodeRiskService, useValue: svc },
             { provide: MatDialog, useValue: dialog },
             { provide: MatDialogRef, useValue: { close } },
@@ -517,6 +529,15 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         c.toggleHistory();
         await settle(fixture);
         expect(byEntity).toHaveBeenCalledTimes(2);
+    });
+
+    it('offers no Case history on Basic: the host says investigations is off, so the route is never called', async () => {
+        const { fixture, el, byEntity, byMaskedKey } = make({}, { investigations: false });
+        await settle(fixture);
+        expect(el.querySelector('[data-testid=history-toggle]')).toBeNull();
+        expect(el.textContent).not.toContain('Case history');
+        expect(byEntity).not.toHaveBeenCalled();
+        expect(byMaskedKey).not.toHaveBeenCalled();
     });
 
     it('links the Entity page when the host passes one, and offers nothing otherwise', () => {

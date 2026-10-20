@@ -203,7 +203,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/geo/routes` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java:71` |
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:78` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:79` |
-| POST | `/inv/case-history` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:101` |
+| POST | `/inv/case-history` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/CaseHistoryRoutes.java:28` |
 | POST | `/inv/deep-links/resolve` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java:79` |
 | POST | `/inv/entities/([^/]+)/resolve` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java:51` |
 | POST | `/inv/entity-identities` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:94` |
