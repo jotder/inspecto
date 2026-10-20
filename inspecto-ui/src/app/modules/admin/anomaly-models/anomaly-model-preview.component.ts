@@ -27,6 +27,11 @@ export function bandBadge(band: string | null): { value: string; label: string }
     }
 }
 
+/** Said instead of calling the server: the forest is fitted over the whole population by the Job only (W7). */
+export const NO_FOREST_PREVIEW =
+    'No preview for the isolation forest: it is fitted over the whole population by the anomaly.score Job, ' +
+    'not on request. Switch the Scoring method to the robust statistical baseline to preview, or run the Job.';
+
 const fmt = (v: number | null | undefined, digits = 2): string =>
     v == null || !Number.isFinite(v) ? '—' : formatNumber(v, { decimals: digits });
 
@@ -240,6 +245,11 @@ export class AnomalyModelPreviewComponent {
         const content = draft ? draft() : null;
         this.invalidDraft.set(!!draft && !content);
         if (draft && !content) return;
+        if (content?.['method'] === 'isolation_forest') {
+            this.error.set(NO_FOREST_PREVIEW);
+            this.result.set(null);
+            return;
+        }
         const asOf = this.asOfDraft.value || undefined;
         this.running.set(true);
         this.error.set(null);

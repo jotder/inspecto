@@ -17,6 +17,12 @@ export const ANOMALY_DIRECTIONS: { value: string; label: string }[] = [
     { value: 'both', label: 'Both' },
 ];
 
+/** `IsolationForest` bounds and defaults, as `AnomalyModel.forest` validates them. */
+const FOREST_MAX_TREES = 1000;
+const FOREST_DEFAULT_TREES = 100;
+const FOREST_MAX_SAMPLE_SIZE = 4096;
+const FOREST_DEFAULT_SAMPLE_SIZE = 256;
+
 /** The flat top-level fields, one schema-form. Nested `peers` / `watchList` are flattened here. */
 export function anomalyModelAttributes(isEdit: boolean): AttributeSpec[] {
     return [
@@ -79,6 +85,53 @@ export function anomalyModelAttributes(isEdit: boolean): AttributeSpec[] {
             max: 100,
             default: 80,
             help: 'A score at or above this (above Elevated, at most 100) is High.',
+        },
+        {
+            key: 'method',
+            label: 'Scoring method',
+            type: 'select',
+            tier: 'optional',
+            required: false,
+            default: 'robust_z',
+            options: [
+                { value: 'robust_z', label: 'Robust statistical baseline (default)' },
+                { value: 'isolation_forest', label: 'Isolation forest (fitted by the anomaly.score Job; no preview)' },
+            ],
+            help: 'The isolation forest scores the whole population in a Job; the per-Feature explanation is kept.',
+        },
+        {
+            key: 'forestTrees',
+            label: 'Forest trees',
+            type: 'number',
+            tier: 'optional',
+            required: false,
+            min: 1,
+            max: FOREST_MAX_TREES,
+            group: 'Isolation forest',
+            dependsOn: { key: 'method', equals: 'isolation_forest' },
+            help: `Default ${FOREST_DEFAULT_TREES}, at most ${FOREST_MAX_TREES}.`,
+        },
+        {
+            key: 'forestSampleSize',
+            label: 'Forest sample size',
+            type: 'number',
+            tier: 'optional',
+            required: false,
+            min: 2,
+            max: FOREST_MAX_SAMPLE_SIZE,
+            group: 'Isolation forest',
+            dependsOn: { key: 'method', equals: 'isolation_forest' },
+            help: `Entities drawn per tree. Default ${FOREST_DEFAULT_SAMPLE_SIZE}, at most ${FOREST_MAX_SAMPLE_SIZE}.`,
+        },
+        {
+            key: 'forestSeed',
+            label: 'Forest seed',
+            type: 'number',
+            tier: 'optional',
+            required: false,
+            group: 'Isolation forest',
+            dependsOn: { key: 'method', equals: 'isolation_forest' },
+            help: 'A whole number; default 1. The same seed and data always give the same scores.',
         },
         { key: 'description', label: 'Description', type: 'multiline', tier: 'optional' },
         {
@@ -244,8 +297,13 @@ const text = (v: unknown): string => (Array.isArray(v) ? v.map(String).join(', '
 export function anomalyModelInitial(content: Record<string, unknown>): Record<string, unknown> {
     const peers = (content['peers'] ?? null) as Record<string, unknown> | null;
     const watch = (content['watchList'] ?? null) as Record<string, unknown> | null;
+    const forest = (content['forest'] ?? null) as Record<string, unknown> | null;
     return {
         entityType: str(content['entityType']),
+        method: str(content['method']) || 'robust_z',
+        forestTrees: forest ? (forest['trees'] ?? null) : null,
+        forestSampleSize: forest ? (forest['sampleSize'] ?? null) : null,
+        forestSeed: forest ? (forest['seed'] ?? null) : null,
         window: content['window'] ?? null,
         seasonality: str(content['seasonality']) || 'none',
         elevatedThreshold: content['elevatedThreshold'] ?? null,
@@ -344,6 +402,17 @@ export function toAnomalyModelContent(
     for (const k of TOP_PASSTHROUGH) if (k in stored) out[k] = stored[k];
     out['id'] = id;
     out['entityType'] = str(top['entityType']).trim();
+    if (top['method'] === 'isolation_forest') {
+        out['method'] = 'isolation_forest';
+        const forest: Record<string, unknown> = {};
+        for (const [k, f] of [
+            ['trees', 'forestTrees'],
+            ['sampleSize', 'forestSampleSize'],
+            ['seed', 'forestSeed'],
+        ])
+            if (top[f] != null && top[f] !== '') forest[k] = top[f];
+        if (Object.keys(forest).length) out['forest'] = forest;
+    } else if (stored['method'] === 'robust_z') out['method'] = 'robust_z'; // an explicit default stays as stored
     out['window'] = top['window'];
     out['seasonality'] = str(top['seasonality']) || 'none';
     out['elevatedThreshold'] = top['elevatedThreshold'];
@@ -400,6 +469,7 @@ export interface AnomalyRefusalTarget {
 
 const TOP_FIELD: Record<string, string> = {
     entityType: 'entityType',
+    method: 'method',
     window: 'window',
     seasonality: 'seasonality',
     elevatedThreshold: 'elevatedThreshold',
@@ -409,6 +479,7 @@ const TOP_FIELD: Record<string, string> = {
     dataScope: 'dataScope',
     description: 'description',
     peers: 'peersBy',
+    forest: 'method',
     watchList: 'watchList',
     exclusionList: 'exclusionList',
 };
@@ -422,6 +493,8 @@ export function mapAnomalyRefusal(message: string): AnomalyRefusalTarget {
     const f = /anomaly-model\.features\[(\d+)\](?:\.(\w+))?/.exec(message);
     if (f) return { feature: Number(f[1]), ...(f[2] ? { featureField: f[2] } : {}) };
     if (/anomaly-model thresholds/.test(message)) return { field: 'highThreshold' };
+    const fo = /anomaly-model\.forest\.(trees|sampleSize|seed)/.exec(message);
+    if (fo) return { field: `forest${fo[1][0].toUpperCase()}${fo[1].slice(1)}` };
     const t = /anomaly-model\.(\w+)/.exec(message);
     if (t && TOP_FIELD[t[1]]) return { field: TOP_FIELD[t[1]] };
     if (/^anomaly-model id /.test(message)) return { field: 'id' };
