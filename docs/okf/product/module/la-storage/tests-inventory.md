@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-storage`](../../../../../product-map/module/la-storage.toon).
 
-12 test class(es): 12 unit, 0 real-HTTP control-plane, 0 IT.
+13 test class(es): 13 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -30,6 +30,7 @@ mvn -o test -pl la/inspecto-la-storage -Dtest=BucketFunctionTest,IndexAppendTest
 | `IndexBuilderTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexBuilderTest.java` | D-3 step 3. Every corpus is generated at test time into a TempDir; nothing is committed. |
 | `IndexBuildServiceHostTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexBuildServiceHostTest.java` | {@code LA-CONFIG-LIMITS-1} P4 on the build service: the install-wide resources ({@link Host}: memory limit, bucket sizing) |
 | `IndexBuildServiceTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexBuildServiceTest.java` | The index-build lifecycle (D-3 step 4). The state-machine tests drive a controllable fake builder through the package-private |
+| `IndexFullPinTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexFullPinTest.java` | LA-DAILY-INGEST-1, the live Job-versus-build race: a day that LANDS while a FULL build runs. The relation of a plain store |
 | `IndexLinkStatsTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexLinkStatsTest.java` | Entity profile D-EP4: the link statistics a build records in its manifest ({@code kindEdges}, {@code typeNodes}, |
 | `IndexManifestTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexManifestTest.java` |  |
 | `IndexPinsTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexPinsTest.java` | D7-2 - pinned index versions survive gc and pool eviction; pins expire after 30 days; an unreadable pin file fails closed. |

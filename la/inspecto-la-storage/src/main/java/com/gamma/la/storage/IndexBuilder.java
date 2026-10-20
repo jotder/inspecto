@@ -461,6 +461,25 @@ public final class IndexBuilder {
             return d;
         }
 
+        /**
+         * What a FULL build reads: the relation PINNED to the input listing the caller recorded, when the Dataset can render the
+         * relation over a file list ({@code deltaSql}). The relation itself is usually a glob that every statement of the build
+         * re-expands, so a file that lands while a long FULL runs is read by some statements and not others (the verification then
+         * fails the build) or by all of them while the manifest, which records the listing taken at submit, does not list it (the
+         * next plan appends it again and counts its rows twice). Pinned, the index holds exactly the files the manifest lists.
+         * The manifest's relation hash stays that of {@link Request#relationSql()}. No listing, no list renderer, or a path the
+         * renderer refuses: the relation as given.
+         */
+        String fullReadSql() {
+            if (req.deltaSql() == null || req.inputFiles() == null || req.inputFiles().isEmpty()) return req.relationSql();
+            try {
+                String pinned = req.deltaSql().apply(req.inputFiles().stream().map(IndexManifest.InputFile::path).toList());
+                return pinned == null ? req.relationSql() : pinned;
+            } catch (IllegalArgumentException notAnInput) {
+                return req.relationSql();
+            }
+        }
+
         Result execute(long t0) throws Exception {
             IndexMapping m = req.mapping();
             Path spill = stage.resolve(".spill");
@@ -469,7 +488,7 @@ public final class IndexBuilder {
             // -- estimate -------------------------------------------------------------------------------------
             long t = System.nanoTime();
             progress("estimate", 1);
-            Edges ed = defineEdges(req.relationSql());
+            Edges ed = defineEdges(fullReadSql());
             Map<String, String> types = ed.types();
             long[] counts = countEdges(ed);
             long total = counts[0];

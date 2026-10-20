@@ -327,6 +327,52 @@ class ScheduledIndexBuildTest {
         }
     }
 
+    /**
+     * LA-DAILY-INGEST-1, the live Job-versus-build race with the REAL builder: a day lands while a FULL build runs. The daily run
+     * that meets the FULL waits (BUILD_IN_PROGRESS, audited), and once the FULL is published it re-plans and APPENDS the landed
+     * day. The FULL holds only the day it listed (3 edges), so the append brings the index to 6, never 9.
+     */
+    @Test
+    void aDayLandingWhileAFullRunsIsAppendedOnceByTheRunThatWaitedOnTheFull(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        com.gamma.la.api.ScheduledIndexBuild.backoffForTest(50);
+        java.util.concurrent.atomic.AtomicInteger builds = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.CountDownLatch landed = new java.util.concurrent.CountDownLatch(1);
+        try (Ctx c = open(cfg, root, Map.of("owner", "analyst-1", "shares", List.of()))) {
+            land(c.dir.resolve("day0.parquet"), 0);
+            com.gamma.la.api.IndexRoutes.forTest(req -> {
+                if (builds.incrementAndGet() > 1) return com.gamma.la.storage.IndexBuilder.build(req);
+                var o = req.options();
+                var slowOpt = new com.gamma.la.storage.IndexBuilder.Options(o.buckets(), o.memoryLimit(), o.threads(), o.cancel(), p -> {
+                    if (o.progress() != null) o.progress().accept(p);
+                    if ("estimate".equals(p.phase())) {
+                        try {
+                            land(c.dir.resolve("day1.parquet"), 1);                 // the next day lands while the FULL runs
+                            landed.countDown();
+                            Thread.sleep(800);                                      // the FULL stays in flight while the daily run meets it
+                        } catch (Exception e) {
+                            throw new IllegalStateException(e);
+                        }
+                    }
+                }, o.sizing());
+                return com.gamma.la.storage.IndexBuilder.build(new com.gamma.la.storage.IndexBuilder.Request(req.datasetId(),
+                        req.mapping(), req.relationSql(), req.store(), req.baseFingerprint(), slowOpt, req.inputFiles(), req.mode(),
+                        req.deltaSql(), req.readRoots(), req.maxDeltas(), req.srcType(), req.dstType()));
+            });
+            Thread full = new Thread(() -> run(c, true, "analyst-1"));
+            full.start();
+            assertTrue(landed.await(30, java.util.concurrent.TimeUnit.SECONDS), "day 1 landed while the FULL ran");
+            Outcome daily = run(c, true, "analyst-1");                              // meets the live FULL, waits, then re-plans
+            full.join(30_000);
+            assertEquals("BUILT", daily.result(), daily.message());
+            assertEquals("append", daily.mode(), "the landed day is an append onto the FULL, not a second FULL");
+            Outcome after = run(c, false, "analyst-1");
+            assertEquals("UP_TO_DATE", after.result(), after.message());
+            assertEquals(6L, after.edges(), "day 0 once and day 1 once");
+        } finally {
+            com.gamma.la.api.IndexRoutes.forTest(null);
+        }
+    }
+
     /** wait_seconds = 0 never waits: the in-flight build is the answer at once. */
     @Test
     void aZeroWaitBudgetNeverWaits(@TempDir Path cfg, @TempDir Path root) throws Exception {

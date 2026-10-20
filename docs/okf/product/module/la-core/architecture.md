@@ -299,9 +299,17 @@ book of what this server minted for this Space (bounded LRU; nothing raw is ever
 `alias<TAB>base64(raw)` line per newly minted alias, to `<root>.secrets/.exploration-alias-book` beside the Space key
 (owner-only, outside every exported tree), and every in-memory miss scans that file, so an alias survives a restart
 or an eviction; a line is believed only when its alias is the token of its raw value, so a torn line is skipped
-(LA-EDITIONS-RESIDUALS-1 4c, 2026-10-19; `ExplorationMaskingSpaceKeyTest`). ⚠ The first miss of an alias reads the whole
-file (about 64 ms at 500k lines / 20 MB); a repeated miss on a book of unchanged size answers from a bounded negative
-cache without reading it (any mint grows the book and re-opens the question). Case history tries the Investigation's own
+(LA-EDITIONS-RESIDUALS-1 4c, 2026-10-19; `ExplorationMaskingSpaceKeyTest`). **Measured and fixed 2026-10-20
+(`LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1`, `ExplorationAliasBookScaleBench`):** the per-miss scan was a half-file read on average
+(109 ms per alias on a 1 M-line / 39 MB book, so resolving 200 distinct evicted aliases took 21.8 s and a 1000-node graph after
+a restart about 110 s: linear in the book per alias, quadratic over a graph). A per-book-file offset index (alias to line
+start, 64 bits of the token, first line wins, two `long[]`, about 32 bytes per alias) is now built by ONE pass and only
+extended over the bytes appended since; each miss then reads the one indexed line and still believes it only when its alias
+is the token of its raw value (a torn first line of an alias falls back to the full scan, so a later good line is found). The
+same 200 aliases cost 1.5 s (one 1.2 s pass plus 200 single-line reads, 7.6 ms each); a never-minted alias costs nothing after the pass.
+A book above 4 M lines (about 160 MB) stops being indexed and falls back to the scan (4.5 M lines: 0.8 s per alias, accepted: far
+above the 500k in-memory bound). A repeated miss on a book of unchanged size still answers from the bounded negative cache
+(any mint grows the book and re-opens the question), pinned by `ExplorationMaskingSpaceKeyTest`. Case history tries the Investigation's own
 pseudonym before the book, so Investigation-alias nodes never read it. An append first ends a torn last line with a
 newline, so a crash mid-append cannot swallow the next line; appends go through an `APPEND` channel as one write, so
 two processes sharing a Space lose no line. ⚠ The negative cache is keyed on the file's SIZE: an outside rewrite of the
@@ -1020,7 +1028,18 @@ lane record: [`archived plan`](../../../../archived-documents/plans-archive/la-c
   PUT or restart and a Graph Run service's traversal policy at its idle-out; the Case member cap is a fixed 100 on both sides
   (`CaseRoutes.MAX_CASE_ENTITIES`, 422 above it; SPA `MAX_CASE_MEMBERS`), not a configuration item. Open: the CL-10 defaults
   were measured on a laptop, not a server-class host (`LA-CONFIG-LIMITS-RESIDUALS-1`).
-* Index scale is proven to 10^8 edges; 10^9 is extrapolation (`LA-INDEX-SCALE-MEASURE-1`).
+* Index scale is proven to 10^8 edges; 10^9 is extrapolation (`LA-INDEX-SCALE-MEASURE-1`). Entity cardinality measured
+  2026-10-20 (`IndexCardinalityBench`, 10^7 edges in one file): 4.85 M nodes FULL 38 s, 12.1 M nodes FULL 48 s, peak 3.5-3.6 GB
+  (1.8 M nodes: 31 s, 3.3 GB), so cardinality costs time in the nodes step, not memory.
+* **A day that lands while a FULL runs (2026-10-20, `IndexFullPinTest`, `ScheduledIndexBuildTest`).** The scheduled run renders
+  the relation, the service lists the inputs at submit, and the build reads the relation later: three moments. A store with a
+  Consignment registry renders a pinned file list (a landing day never reaches that read), but the relation and the
+  manifest's listing are two separate reads, and the fallback relation is a glob every statement re-expands. A FULL now reads
+  exactly the listing it records in its manifest (`IndexBuilder.fullReadSql`, through the Dataset's own file-list renderer;
+  no renderer or no listing = the relation as given), so the index never holds a day the manifest lacks nor lacks one it claims.
+  Without it a day listed after the relation was rendered was silently missing from an index its manifest called current, and
+  over a glob a day landing mid-FULL failed the build's own verification or was appended a second time. The Job that meets the
+  FULL waits (audited `BUILD_IN_PROGRESS`), then re-plans and APPENDs the landed day once (6 edges, not 9).
 * The index builder connection is deliberately unsandboxed; its safety rests on the trusted-relation contract and
   the caller's view gate.
 * Per-key index lookup cost is linear in the key's degree; the frontier cap bounds key count, not hub cost.

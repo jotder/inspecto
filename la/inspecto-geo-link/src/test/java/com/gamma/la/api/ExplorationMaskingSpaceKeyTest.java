@@ -95,6 +95,55 @@ class ExplorationMaskingSpaceKeyTest {
         assertEquals(scans + 1, ExplorationMasking.SCANS.get(), "a grown book is read again");
     }
 
+    /** LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1: N evicted aliases cost ONE pass over the book, not one scan each. */
+    @Test
+    void manyEvictedAliasesCostOnePassOverTheBook(@TempDir Path root) {
+        String[] aliases = new String[300];
+        for (int i = 0; i < 3000; i++) {
+            String a = ExplorationMasking.alias(root, "4417" + i);
+            if (i % 10 == 0) aliases[i / 10] = a;
+        }
+        ExplorationMasking.forgetInMemoryForTest();
+        int passes = ExplorationMasking.SCANS.get();
+        for (int i = 0; i < 300; i++) assertEquals("4417" + (i * 10), ExplorationMasking.lookup(root, aliases[i]));
+        assertEquals(passes + 1, ExplorationMasking.SCANS.get(), "300 distinct evicted aliases: one pass, then one line read each");
+        String later = ExplorationMasking.alias(root, "4417-late");
+        ExplorationMasking.forgetInMemoryForTest();   // keep the index cleared too: a restart
+        assertEquals("4417-late", ExplorationMasking.lookup(root, later));
+    }
+
+    /** The index only reads the bytes appended since its last pass, and a book that was replaced by a shorter one is re-read. */
+    @Test
+    void theIndexFollowsAGrowingAndAReplacedBook(@TempDir Path root) throws Exception {
+        String a = ExplorationMasking.alias(root, "441700900101");
+        ExplorationMasking.forgetInMemoryForTest();
+        assertEquals("441700900101", ExplorationMasking.lookup(root, a));
+        String b = ExplorationMasking.alias(root, "441700900202");
+        ExplorationMasking.evictForTest(root, b);
+        int passes = ExplorationMasking.SCANS.get();
+        assertEquals("441700900202", ExplorationMasking.lookup(root, b), "a mint after the index pass is found by the next pass");
+        assertEquals(passes + 1, ExplorationMasking.SCANS.get());
+        Path book = com.gamma.util.SpaceSecretKeys.keyFile(root, ".exploration-alias-book");
+        String lineB = Files.readAllLines(book).get(1);
+        Files.writeString(book, lineB + "\n");   // replaced by a shorter book that holds only b
+        ExplorationMasking.evictForTest(root, b);
+        assertEquals("441700900202", ExplorationMasking.lookup(root, b));
+        ExplorationMasking.evictForTest(root, a);
+        assertEquals(null, ExplorationMasking.lookup(root, a), "a is gone with the old book");
+    }
+
+    /** A torn line for an alias that precedes a good line for the SAME alias does not hide it. */
+    @Test
+    void aTornFirstLineDoesNotHideALaterGoodLine(@TempDir Path root) throws Exception {
+        String alias = ExplorationMasking.alias(root, "441700900101");
+        Path book = com.gamma.util.SpaceSecretKeys.keyFile(root, ".exploration-alias-book");
+        String good = Files.readString(book);
+        String b64 = good.substring(good.indexOf('\t') + 1).trim();
+        Files.writeString(book, alias + "\t" + b64.substring(0, 12) + "\n" + good);
+        ExplorationMasking.forgetInMemoryForTest();
+        assertEquals("441700900101", ExplorationMasking.lookup(root, alias));
+    }
+
     /** A line torn by a crash (no newline) does not swallow the next minted line. */
     @Test
     void aMintAfterATornLineResolves(@TempDir Path root) throws Exception {

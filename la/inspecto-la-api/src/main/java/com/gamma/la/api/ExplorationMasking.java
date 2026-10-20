@@ -157,7 +157,7 @@ final class ExplorationMasking {
         }
         Long missedAt = MISSES.get(k);
         if (missedAt != null && missedAt == size) return null;
-        raw = size < 0 ? null : scan(writeRoot, alias);
+        raw = size < 0 ? null : indexed(writeRoot, f, alias, size);
         if (raw != null) {
             BOOK.put(k, raw);
             MISSES.remove(k);
@@ -258,10 +258,165 @@ final class ExplorationMasking {
         return com.gamma.util.SpaceSecretKeys.keyFile(writeRoot, ".exploration-alias-book");
     }
 
+    /**
+     * Book-file offset index, per book file: the line start of each alias (64 bits of its hex token, first line wins),
+     * built by ONE pass over the file and then only extended over the bytes appended since, so resolving N evicted aliases
+     * costs one pass plus N single-line reads instead of N half-file scans (measured 2026-10-20: 109 ms per alias on a
+     * 1 M-line book, so a 1000-node graph after a restart took 110 s). Open addressing over two {@code long[]} (about 32
+     * bytes per alias). A book of more than {@link #INDEX_MAX} lines stops being indexed and falls back to the file scan.
+     */
+    private static final int INDEX_MAX = 4_000_000;
+    private static final Map<Path, Index> INDEXES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final class Index {
+        long[] keys = new long[1 << 12];
+        long[] offs = new long[1 << 12];
+        int count;
+        long scanned;      // the file is indexed up to here (just after the last newline read)
+        boolean full;
+
+        Index() {
+            java.util.Arrays.fill(offs, -1);
+        }
+
+        private int slot(long key, int mask) {
+            return (int) (key ^ (key >>> 32)) & mask;
+        }
+
+        long get(long key) {
+            int mask = keys.length - 1;
+            for (int i = slot(key, mask); offs[i] >= 0; i = (i + 1) & mask) if (keys[i] == key) return offs[i];
+            return -1;
+        }
+
+        void putFirst(long key, long off) {
+            if (count * 2 >= keys.length) grow();
+            int mask = keys.length - 1;
+            int i = slot(key, mask);
+            for (; offs[i] >= 0; i = (i + 1) & mask) if (keys[i] == key) return;
+            keys[i] = key;
+            offs[i] = off;
+            count++;
+        }
+
+        private void grow() {
+            long[] k = keys, o = offs;
+            keys = new long[k.length * 2];
+            offs = new long[o.length * 2];
+            java.util.Arrays.fill(offs, -1);
+            count = 0;
+            for (int i = 0; i < k.length; i++) if (o[i] >= 0) putFirst(k[i], o[i]);
+        }
+
+        void reset() {
+            keys = new long[1 << 12];
+            offs = new long[1 << 12];
+            java.util.Arrays.fill(offs, -1);
+            count = 0;
+            scanned = 0;
+            full = false;
+        }
+
+        /** Indexes the complete lines appended since the last pass. */
+        void catchUp(Path f, long size) throws IOException {
+            if (size < scanned) reset();
+            if (size == scanned || full) return;
+            SCANS.incrementAndGet();
+            byte[] head = new byte[24];
+            try (var ch = java.nio.channels.FileChannel.open(f, StandardOpenOption.READ)) {
+                ch.position(scanned);
+                var in = new java.io.BufferedInputStream(java.nio.channels.Channels.newInputStream(ch), 1 << 20);
+                long pos = scanned, lineStart = scanned;
+                int inLine = 0, b;
+                while ((b = in.read()) >= 0) {
+                    pos++;
+                    if (b == '\n') {
+                        if (inLine >= 24 && head[23] == '\t') {
+                            try {
+                                putFirst(Long.parseUnsignedLong(new String(head, 7, 16, StandardCharsets.ISO_8859_1), 16), lineStart);
+                            } catch (NumberFormatException skip) {
+                                // not a line of this book
+                            }
+                        }
+                        scanned = pos;
+                        lineStart = pos;
+                        inLine = 0;
+                        if (count >= INDEX_MAX) {
+                            full = true;
+                            return;
+                        }
+                    } else {
+                        if (inLine < 24) head[inLine] = (byte) b;
+                        inLine++;
+                    }
+                }
+            }
+        }
+
+        /** The line at {@code off} without its newline. */
+        static String lineAt(Path f, long off) throws IOException {
+            try (var r = new java.io.RandomAccessFile(f.toFile(), "r")) {
+                r.seek(off);
+                var out = new java.io.ByteArrayOutputStream(96);
+                byte[] buf = new byte[512];
+                int n;
+                outer:
+                while ((n = r.read(buf)) > 0) {
+                    for (int i = 0; i < n; i++) {
+                        if (buf[i] == '\n') break outer;
+                        out.write(buf[i]);
+                    }
+                }
+                return out.toString(StandardCharsets.UTF_8);
+            }
+        }
+    }
+
+    /** The raw id behind {@code alias} via the offset index, or null; falls back to {@link #scan} when the index cannot answer. */
+    private static String indexed(Path writeRoot, Path f, String alias, long size) {
+        if (!alias.startsWith(MaskTokens.TOKEN_PREFIX) || alias.length() != MaskTokens.TOKEN_PREFIX.length() + 16)
+            return scan(writeRoot, alias);
+        long key;
+        try {
+            key = Long.parseUnsignedLong(alias.substring(MaskTokens.TOKEN_PREFIX.length()), 16);
+        } catch (NumberFormatException e) {
+            return scan(writeRoot, alias);
+        }
+        Index ix = INDEXES.computeIfAbsent(f, x -> new Index());
+        try {
+            String line;
+            synchronized (ix) {
+                ix.catchUp(f, size);
+                if (ix.full) return scan(writeRoot, alias);
+                long off = ix.get(key);
+                if (off < 0) return null;
+                line = Index.lineAt(f, off);
+            }
+            String raw = believe(writeRoot, alias, line);
+            return raw != null ? raw : scan(writeRoot, alias);   // the first line of that alias was torn: a later one may be good
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** The raw id of a book line for {@code alias}, only when the alias really is the token of that raw value. */
+    private static String believe(Path writeRoot, String alias, String line) {
+        String prefix = alias + "\t";
+        if (!line.startsWith(prefix)) return null;
+        String raw;
+        try {
+            raw = new String(Base64.getDecoder().decode(line.substring(prefix.length())), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException torn) {
+            return null;
+        }
+        return MaskTokens.token(spaceKey(writeRoot), raw).equals(alias) ? raw : null;
+    }
+
     /** Test seam: drops the in-memory book, as a restart does. */
     static void forgetInMemoryForTest() {
         BOOK.clear();
         MISSES.clear();
+        INDEXES.clear();
     }
 
     /** Test seam: drops one entry from the in-memory book, as an LRU eviction does. */
