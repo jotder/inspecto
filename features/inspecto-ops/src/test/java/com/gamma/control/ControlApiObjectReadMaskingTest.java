@@ -209,6 +209,29 @@ class ControlApiObjectReadMaskingTest {
         }
     }
 
+    /** LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1 (1): Link Analysis's case history reads through the engine seam, which must
+     *  hide exactly what the route hides — a non-revealer learns of no object matched through a classified key. */
+    @Test
+    void theEngineSeamBehindCaseHistoryHidesWhatTheRouteHides(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            open(c, ObjectType.INCIDENT);
+            var seam = c.svc.objects().orElseThrow();
+            for (String who : List.of("viewer", "revealer")) {
+                int http = JSON.readTree(get(c, who, "/objects/by-entity?type=msisdn&id=" + RAW).body()).get("data").size();
+                var ex = new com.gamma.spi.auth.SweepExchange("/objects/by-entity");
+                com.gamma.spi.auth.RequestAttrs.attr(ex, com.gamma.spi.auth.RequestAttrs.ATTR_SUBJECT,
+                        new Subject(who, "revealer".equals(who) ? Set.of("canRevealLinkEntities") : Set.of()));
+                try {
+                    Map<String, Object> r = seam.byEntity(root, ex, "msisdn", RAW, null, 50);
+                    assertEquals(http, ((List<?>) r.get("objects")).size(), who + " seam must match the route");
+                    assertEquals(http, r.get("total"), who);
+                } finally {
+                    com.gamma.spi.auth.RequestAttrs.REQUEST_SCOPES.remove(ex);
+                }
+            }
+        }
+    }
+
     @Test
     void byEntityStillMatchesAnUnclassifiedKeyForANonRevealer(@TempDir Path dir, @TempDir Path root) throws Exception {
         try (Ctx c = open(dir, root, false)) {

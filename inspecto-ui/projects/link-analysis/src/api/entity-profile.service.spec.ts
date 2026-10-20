@@ -27,6 +27,11 @@ describe('EntityProfileService (la-entity-profile-plan section 4.5)', () => {
         http.expectOne(
             (r) => r.method === 'GET' && r.url.endsWith('/inv/entities/msisdn/masked%3Af01a%2F9b/profile'),
         ).flush({});
+        svc.entityProfile('msisdn', 'k', { from: '2026-10-01T00:00:00Z', to: '2026-10-04T00:00:00Z' }).subscribe();
+        const win = http.expectOne((r) => r.method === 'GET' && r.url.endsWith('/inv/entities/msisdn/k/profile'));
+        expect(win.request.params.get('from')).toBe('2026-10-01T00:00:00Z');
+        expect(win.request.params.get('to')).toBe('2026-10-04T00:00:00Z');
+        win.flush({});
         // The raw value travels in the body of the resolve POST only, never in its URL.
         svc.resolveEntity('msisdn', '+249 911').subscribe();
         const res = http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/inv/entities/msisdn/resolve'));

@@ -1406,6 +1406,18 @@
           "required" : true,
           "description" : "The exploration alias for a masked type; the value (URL-encoded) for an unmasked one.",
           "schema" : { "type" : "string" }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "description" : "Window start (ISO-8601 instant with a zone, inclusive), from an Open in Inspecto LA deep link. With 'to', scopes where, firstSeen, lastSeen, activeDays, coveredDays and perDay to the window (UTC, [from, to)) and echoes {window: {from, to}}; links and related stay whole-history. 422 for a malformed instant, one outside 0001-01-01..9999-12-31, or from >= to.",
+          "schema" : { "type" : "string", "format" : "date-time" }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "description" : "Window end (ISO-8601 instant with a zone, exclusive); see 'from'.",
+          "schema" : { "type" : "string", "format" : "date-time" }
         } ],
         "responses" : {
           "200" : {
@@ -1473,7 +1485,7 @@
         "tags" : [ "inv" ],
         "summary" : "Third-party integration (inbound): open a seeded Investigation for an external record",
         "operationId" : "postInvInboundInvestigations",
-        "description" : "LA-EDITIONS-1 section 4, phase 5. A fraud product or case manager hands over its own record and the entities it is about. Body {reference: {system, type? (default alert), id, url?, label?}, entities: [\"<type>:<key>\" ...], purpose, title?, window?: {from?, to?, ...}, binding?: {dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?}}. Each entity is typed by an Entity Type in force; its key is a raw value (sent in the body) or an exploration alias, normalised by the type's normaliser. Without a binding, the first saved Link Analysis view or published index that links a column of the first entity's type is used (its kind and time columns come along). Composes the existing writes: POST /inv/investigations (purpose, R3 Dataset gate), one seed op per Entity Type, an optional window op, and an external reference (trusted:false). Idempotent on (reference.system, reference.id): the Investigation id is derived from them (ext-<32 hex>), so a repeat - or a racing duplicate on any node - answers the SAME Investigation with created:false and adds nothing. Answers {investigationId, created, seeded, reference, link: \"/open?investigation=<id>\" (the la-app route; the console mounts it at /studio/open), note}. Gated on canManageIncidents; the caller authenticates as any Subject (an OIDC service-account token works). Rate-limited with the expensive Link Analysis class (429: retry, it is idempotent).",
+        "description" : "LA-EDITIONS-1 section 4, phase 5. A fraud product or case manager hands over its own record and the entities it is about. Body {reference: {system, type? (default alert), id, url?, label?}, entities: [\"<type>:<key>\" ...], purpose, title?, window?: {from?, to?, ...}, binding?: {dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?}}. Each entity is typed by an Entity Type in force; its key is a raw value (sent in the body) or an exploration alias, normalised by the type's normaliser. Without a binding, the first saved Link Analysis view or published index that links a column of EVERY Entity Type the call names is used (its kind and time columns come along); when no single mapping covers all the named types the call is refused 422 naming them, so name one type per call or send a binding. BEHAVIOUR CHANGE for integrators: a call naming several types used to bind through the first entity's type only and seed the rest unbound; it is now refused 422 unless one mapping covers them all or a binding is sent (an explicit binding is never second-guessed). Composes the existing writes: POST /inv/investigations (purpose, R3 Dataset gate), one seed op per Entity Type, an optional window op, and an external reference (trusted:false). Idempotent on (reference.system, reference.id): the Investigation id is derived from them (ext-<32 hex>), so a repeat - or a racing duplicate on any node - answers the SAME Investigation with created:false and adds nothing. Answers {investigationId, created, seeded, reference, link: \"/open?investigation=<id>\" (the la-app route; the console mounts it at /studio/open), note}. Gated on canManageIncidents; the caller authenticates as any Subject (an OIDC service-account token works). Rate-limited with the expensive Link Analysis class (429: retry, it is idempotent).",
         "requestBody" : {
           "required" : true,
           "content" : {

@@ -42,9 +42,13 @@ public final class ObjectReadMasking {
 
     /** The masker for this request, or {@code null} when the caller may see raw keys (or there is no Space root). */
     public static ObjectReadMasking forRequest(ApiContext api, HttpExchange ex) {
+        return forRequest(api.writeRoot(), ex);
+    }
+
+    /** As {@link #forRequest(ApiContext, HttpExchange)} for a caller holding only the Space's write root (engine seams). */
+    public static ObjectReadMasking forRequest(Path root, HttpExchange ex) {
         boolean privileged = ApiContext.subject(ex)
                 .map(s -> s.capabilities().contains(AuditReadMasking.UNMASK_CAPABILITY)).orElse(true);
-        Path root = api.writeRoot();
         return privileged || root == null ? null : new ObjectReadMasking(root);
     }
 

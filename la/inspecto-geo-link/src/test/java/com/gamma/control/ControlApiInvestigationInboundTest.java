@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.gamma.control.EntityProfileFixture.A;
+import static com.gamma.control.EntityProfileFixture.B;
 import static com.gamma.control.EntityProfileFixture.I1;
 import static com.gamma.control.EntityProfileFixture.OWNER;
 import static com.gamma.control.EntityProfileFixture.RAW;
@@ -71,7 +72,7 @@ class ControlApiInvestigationInboundTest {
     void anExternalRecordOpensASeededInvestigationAndARepeatAnswersTheSameOne(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();
         try (EntityProfileFixture.Ctx c = open(cfg, root)) {
-            String body = alert("fraudpro", "AL-1001", "\"msisdn:" + A + "\",\"imei:" + I1 + "\"",
+            String body = alert("fraudpro", "AL-1001", "\"msisdn:" + A + "\",\"msisdn:" + B + "\"",
                     ",\"window\":{\"from\":\"2026-10-01T00:00:00Z\",\"to\":\"2026-10-04T00:00:00Z\"}");
             JsonNode first = noRaw(send(c, "POST", INBOUND, body, OWNER));
             String id = first.get("investigationId").asText();
@@ -83,7 +84,7 @@ class ControlApiInvestigationInboundTest {
             assertEquals("alert", first.at("/reference/type").asText(), "type defaults to alert");
 
             JsonNode log = data(get(c, "/inv/investigations/" + id + "/log", OWNER));
-            assertEquals(List.of("seed", "seed", "window"), ops(log), "one seed per Entity Type, then the window: " + log);
+            assertEquals(List.of("seed", "window"), ops(log), "one seed per Entity Type, then the window: " + log);
             assertEquals("calls_ds", log.at("/header/dataset").asText(), "bound through the saved view's mapping");
             assertEquals("a_msisdn", log.at("/header/sourceCol").asText());
             assertEquals("b_msisdn", log.at("/header/targetCol").asText());
@@ -100,7 +101,7 @@ class ControlApiInvestigationInboundTest {
             assertEquals(id, again.get("investigationId").asText(), "idempotent on (system, id)");
             assertFalse(again.get("created").asBoolean());
             assertEquals(0, again.get("seeded").asInt());
-            assertEquals(3, data(get(c, "/inv/investigations/" + id + "/log", OWNER)).get("entries").size(), "a repeat adds no step");
+            assertEquals(2, data(get(c, "/inv/investigations/" + id + "/log", OWNER)).get("entries").size(), "a repeat adds no step");
             assertEquals(1, data(get(c, "/inv/investigations/" + id + "/references", OWNER)).get("count").asInt(), "nor a reference");
 
             String other = data(send(c, "POST", INBOUND, alert("fraudpro", "AL-1002", "\"msisdn:" + A + "\"", ""), OWNER))
@@ -110,6 +111,24 @@ class ControlApiInvestigationInboundTest {
                     .get("investigationId").asText();
             assertNotEquals(id, otherSystem, "the same id in another system is another Investigation");
             assertEquals(3, data(get(c, "/inv/investigations", OWNER)).get("total").asInt());
+        }
+    }
+
+    /** LA-EDITIONS-RESIDUALS-1 (4b): an Investigation has ONE link mapping, so a call naming a type it cannot bind is refused, never half-bound. */
+    @Test
+    void aCallNamingATypeNoMappingBindsAlongsideTheOthersIsRefusedNamingTheAmbiguity(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c, "POST", INBOUND,
+                    alert("fraudpro", "AL-9", "\"msisdn:" + A + "\",\"imei:" + I1 + "\"", ""), OWNER);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("imei") && r.body().contains("msisdn") && r.body().contains("binding"), r.body());
+            for (String raw : RAW) assertFalse(r.body().contains(raw), r.body());
+            assertEquals(0, data(get(c, "/inv/investigations", OWNER)).get("total").asInt(), "nothing was created");
+            JsonNode ok = noRaw(send(c, "POST", INBOUND, alert("fraudpro", "AL-9", "\"msisdn:" + A + "\",\"imei:" + I1 + "\"",
+                    ",\"binding\":{\"dataset\":\"calls_ds\",\"sourceCol\":\"a_msisdn\",\"targetCol\":\"b_msisdn\"}"), OWNER));
+            assertEquals(2, ok.get("seeded").asInt(), "an explicit binding is the caller's own statement: both types are seeded");
+            assertEquals(List.of("seed", "seed"), ops(data(get(c, "/inv/investigations/" + ok.get("investigationId").asText() + "/log", OWNER))));
         }
     }
 
