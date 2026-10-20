@@ -17,6 +17,25 @@ class PartnerSettlementCorpusTest {
     }
 
     @Test
+    void theS4ExtensionIsDeterministicSyntheticAndLeavesTheS3PlantedSetsAlone() {
+        PartnerSettlementCorpus a = PartnerSettlementCorpus.generateWithPositions(), b = PartnerSettlementCorpus.generateWithPositions();
+        assertEquals(a.files(), b.files());
+        assertEquals(PartnerSettlementCorpus.generate().plantedFindings, a.plantedFindings);
+        assertEquals(PartnerSettlementCorpus.generate().plantedStatementFindings, a.plantedStatementFindings);
+        assertTrue(PartnerSettlementCorpus.generate().payments.isEmpty(), "the S3 corpus carries no finance records");
+        assertEquals(11, a.payments.values().stream().mapToInt(java.util.List::size).sum());
+        for (java.util.List<PartnerSettlementCorpus.Payment> ps : a.payments.values())
+            for (PartnerSettlementCorpus.Payment p : ps) {
+                assertEquals(4, p.amount().scale(), p.csv());
+                assertTrue(p.amount().signum() > 0, "an amount is a positive magnitude: " + p.csv());
+                assertFalse(p.csv().matches(".*\\d{9,}.*"), "a long digit run in a fixture");
+            }
+        for (String p : a.partners) assertTrue(p.split(",")[1].contains("Test"), p);
+        // a statement and the S4 corpus's own FX rows never touch the S3 USD to EUR rate
+        assertEquals(PartnerSettlementCorpus.generate().contractRate(PartnerSettlementCorpus.LAST), a.contractRate(PartnerSettlementCorpus.LAST));
+    }
+
+    @Test
     void plantedAndLookAlikeKeysAreDisjoint() {
         PartnerSettlementCorpus c = PartnerSettlementCorpus.generate();
         Set<String> planted = new HashSet<>();

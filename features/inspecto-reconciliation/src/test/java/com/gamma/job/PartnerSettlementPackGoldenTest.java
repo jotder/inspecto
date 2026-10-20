@@ -56,7 +56,7 @@ class PartnerSettlementPackGoldenTest {
                 else assertEquals("recon.run", j.type());
             }
         }
-        assertEquals(new TreeSet<>(PartnerSettlementSpace.CHAIN), new TreeSet<>(sqlJobs), "six chained sql.template Jobs, no more");
+        assertEquals(new TreeSet<>(PartnerSettlementSpace.CHAIN), new TreeSet<>(sqlJobs), "nine chained sql.template Jobs (six compare, three position), no more");
         // the chain: each Job after the first runs on the previous Job's success
         for (int i = 1; i < PartnerSettlementSpace.CHAIN.size(); i++) {
             JobConfig j = JobConfig.load(s.config().resolve("jobs").resolve(PartnerSettlementSpace.CHAIN.get(i) + "_job.toon").toString());
@@ -65,7 +65,7 @@ class PartnerSettlementPackGoldenTest {
         }
         assertEquals("0 1 * * *", JobConfig.load(s.config().resolve("jobs").resolve("ps_calendar_job.toon").toString()).cron());
         try (var files = Files.list(s.config().resolve("registry").resolve("datasets"))) {
-            assertEquals(12, files.count(), "six feeds and six Job-written Datasets");
+            assertEquals(16, files.count(), "seven feeds and nine Job-written Datasets");
         }
         assertTrue(Files.isRegularFile(s.config().resolve("runbooks").resolve("partner-settlement-runbooks.md")), "the runbook ships");
         assertTrue(Files.isRegularFile(s.config().resolve("registry").resolve("alert-rules").resolve("ps_findings_found.toon")));

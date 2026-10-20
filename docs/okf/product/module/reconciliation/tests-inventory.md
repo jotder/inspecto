@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.reconciliation`](../../../../../product-map/module/reconciliation.toon).
 
-25 test class(es): 20 unit, 5 real-HTTP control-plane, 0 IT.
+26 test class(es): 21 unit, 5 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -33,6 +33,7 @@ mvn -o test -pl features/inspecto-reconciliation -Dtest=ControlApiReconDayTest,C
 | `MobileMoneyPackGoldenTest` | `com.gamma.job` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/job/MobileMoneyPackGoldenTest.java` | {@code PACK-MOBILE-MONEY-1} golden test. Boots the shipped {@code spaces/_templates/mobile-money} Space Template |
 | `PartnerSettlementCorpusTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementCorpusTest.java` | {@link PartnerSettlementCorpus}: deterministic, planted and benign sets disjoint, synthetic names and identifiers only. |
 | `PartnerSettlementPackGoldenTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementPackGoldenTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slices S2 and S3 golden test. The shipped {@code partner-settlement} Space Template is created |
+| `PartnerSettlementPositionGoldenTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementPositionGoldenTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slice S4 golden test: netting, positions and the roll-forward. The shipped template is created |
 | `PartnerSettlementReferenceTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementReferenceTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slice S1: the four References and the settlement-cycle calendar. The shipped |
 | `PartnerSettlementSeedTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementSeedTest.java` | The zero-row schema seeds of the {@code partner-settlement} Space Template. Every Dataset a Job reads or writes ships a seed |
 | `TelcoRaGoldenTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` | Golden test of the {@code telco-ra} Space Template ({@code ASSURE-PACK-TELCO-RA-1}): the template's OWN |

@@ -8,13 +8,13 @@ timestamp: 2026-10-20T00:00:00Z
 
 # Partner settlement — user guide
 
-What a Space created from the `partner-settlement` template gives an analyst in slices S1 to S3. Design detail is in [architecture](architecture.md); the per-reason reading guide is `config/runbooks/partner-settlement-runbooks.md` in the Space.
+What a Space created from the `partner-settlement` template gives an analyst in slices S1 to S4. Design detail is in [architecture](architecture.md); the per-reason reading guide is `config/runbooks/partner-settlement-runbooks.md` in the Space.
 
 ## The daily cycle
 
 | When | What runs | Output |
 |---|---|---|
-| 01:00 | `ps_calendar`, then the five Jobs after it, each on the previous one's success | the calendar, the current statement lines, statement findings, expected and billed amounts, settlement findings |
+| 01:00 | `ps_calendar`, then the eight Jobs after it, each on the previous one's success | the calendar, the current statement lines, statement findings, expected and billed amounts, settlement findings, then the movements, the position and the roll-forward |
 | 05:30 | `ps_voice`, `ps_sms` | Breaks per agreement, direction, service, destination class and day; an Incident when a Reconciliation breaches |
 
 ## Reading the work
@@ -32,6 +32,13 @@ What a Space created from the `partner-settlement` template gives an analyst in 
 6. **Breaks** work as in any Reconciliation (assign, resolve, auto-close when the data is fixed); promote a Break to an Incident from
    the Reconciliation screen.
 
+## Reading the position and the roll-forward
+
+1. **`settlement_position`** has one row per netting group, cycle month and settlement currency: `payable` (what the partner statements say we owe), `receivable`, `net` (positive = we pay) and `net_direction`. `orig_net` shows the net in each original currency (for example `EUR:-4.0000,USD:123.0000`), so a converted statement is visible in both currencies. A cycle with no statement has no row.
+2. **`settlement_rollforward`** has one row per month for every netting group and currency, from the first movement to today: `opening + invoiced - paid + adjustments = closing` (positive = we owe). A quiet month repeats the balance. A restated statement changes the `invoiced` of its month and every later `closing`.
+3. **`settlement_movement`** is the line-level truth under both, with the FX rate, its date and its type on every converted line. Filter on `status`: `fx_missing` lines add no amount and are counted in `lines_unconverted`; `unknown_agreement` lines (a payment naming an agreement or partner finance has not set up) are in no balance.
+4. Netting is inside one settlement currency, and a position is what the statements say, not an agreed balance: disputes are not read.
+
 ## What it will not tell you
 
 A finding is a difference between what a partner says is owed and what we price ourselves, never proof the partner is wrong: the
@@ -40,5 +47,5 @@ accruals or open a dispute with the partner; those are later slices and finance 
 
 ## Verify
 
-- `GET /api/v1/jobs` lists the six `ps_*` chain Jobs and the two Reconciliation Jobs.
+- `GET /api/v1/jobs` lists the nine `ps_*` chain Jobs and the two Reconciliation Jobs.
 - After a run, `settlement_calendar` has a row per agreement and closed cycle; `settlement_findings` is empty on clean data.

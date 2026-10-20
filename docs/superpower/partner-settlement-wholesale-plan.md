@@ -1,6 +1,6 @@
 # Partner / settlement / wholesale: plan (`PACK-PARTNER-SETTLEMENT-1`, settlement half)
 
-> 🟡 **PLAN 2026-10-18; S0 to S3 (the smallest cut) BUILT 2026-10-20, see §16; S4 to S8 and W1 to W3 not built.** Closes competitive gap **Q** (partner / settlement / wholesale) in
+> 🟡 **PLAN 2026-10-18; S0 to S3 (the smallest cut) BUILT 2026-10-20, see §16; S4 BUILT 2026-10-21, see §17; S5 to S8 and W1 to W3 not built.** Closes competitive gap **Q** (partner / settlement / wholesale) in
 > [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md). Gap **C** (re-rating) has
 > its own plan, written in parallel by a sibling session; this plan states only the **contract it needs from it** (§5) and
 > does not design re-rating. Decisions below are marked **PS-D1…PS-D10**: each was a recommendation, accepted by the operator
@@ -427,3 +427,84 @@ S8 (the glossary entries of §13, the matrix row Q refresh, the `okf` plan-space
 operator or the sibling plan: (1) sign the §5 table, in particular R6 (the completeness Signal); (2) PS-D0 (`PACK-RERATING-1` already exists as its own row; the open part is moving the matrix wording and the shared row text); (3) the real statement layout (flat or header plus lines) once a real file is seen; (4) whether the
 dispute workflow of S5 is applied by an administrator step or a governance seed; (5) the class of `restated_statement` (`info`,
 neither variance nor data quality).
+
+## 17. S4 as built (2026-10-21)
+
+Branch `lane/ps-s4`, on top of S0 to S3 (§16). Hub: [`okf/product/solution-pack/partner-settlement/`](../okf/product/solution-pack/partner-settlement/index.md).
+S4 is netting, the roll-forward and FX as a column set; S5 (disputes) is **not** built, because its authored CASE workflow needs a
+Workflow and SLA seed decision that is the operator's (§16, open item 4). Decisions PS-D1 to PS-D10 are followed; PS-D6 to PS-D9 do not apply to S4.
+
+### 17.1 The §5 contract against what the re-rating pack really shipped
+
+S3's stand-in `rerated_usage` implements R1 to R8 as §5 wrote them. Re-rating R1 and R2 are shipped ([`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md)
+§13, §14) and publish a Dataset also called `rerated_usage`. Compared on 2026-10-21 against `spaces/_templates/telco-rerating/config/registry/datasets/rerated_usage.toon`
+(21 columns) and the plan text, **the two are not the same contract**, and the real one cannot feed S3 as it stands:
+
+| §5 requirement | The real `rerated_usage` (telco-rerating) | Match |
+|---|---|---|
+| R1 grain `(agreement_id, direction, service, destination_class, usage_date, rate_id, rating_run_id)` | One row per **call** (`ITEM_KEY`, `EVENT_TS`, `SUBSCRIBER_ID`, `PLAN`, `SERVICE`); no agreement, direction or destination class | **No**: retail per-call, not a wholesale aggregate |
+| R2 `units`, `amount_expected`, `currency`, `record_count` | `USAGE_UNITS`; a **range** `EXPECTED_LOW` / `EXPECTED_HIGH` plus `EXPECTED_CHARGE` when the tariff is unambiguous; no currency (one implied retail currency); no count (the row is the call) | **Partly**: an amount exists, as a range |
+| R3 `agreement_id` is the join key; rate card a separate Reference keyed by `rate_id` | A rate card exists as the `tariff_version` Reference keyed by `TARIFF_VERSION_ID`, so the open question of §5 is answered the way §5 hoped; but nothing maps a call to a settlement agreement | **Half**: price yes, attribution no |
+| R4 effective dating, `rate_id` names the version | `TARIFF_VERSION_ID` and `CANDIDATE_VERSIONS`; a call is rated at its start (`EVENT_TS`) | **Yes** |
+| R5 `rating_run_id` and `rated_at`, latest complete run per period | None. `rr_rerate` is incremental by `window_date` and a re-run replaces that day's partition, so older runs are not kept | **No** |
+| R6 a completeness Signal naming the period | `job.run.completed` of `rr_rerate` exists for the chain, with the window `$yesterday`; it names no period and S3's chain does not consume it | **No** |
+| R7 exceptions as rows with a blank amount and a `reason` | `REASON` and `FINDING` (`no_tariff`, `ambiguous_tariff`, `unratable_call`, class `data_quality`) | **Yes in spirit**; the names differ and a blank amount was not checked |
+| R8 cut-off zone and time, never re-bucketed | `EVENT_DATE` from the call; no cut-off zone | **No** |
+
+The retail plan states wholesale and interconnect settlement are out of its v1 scope (its §4), and D-RR9 puts retail there and wholesale here.
+So the gap is real and not a defect of either pack: **no wholesale re-rater exists**, and the `rerated_usage` seam of §5 is still the stand-in.
+**S3 is unchanged**: `ps_expected` reads the stand-in as before, no column was added, renamed or reinterpreted, and the S3 golden is unmodified except that its
+shipped-shape counts now include the new Jobs and feed. Recorded, not decided (open decision 1 below): who writes the adapter that turns a per-call retail
+`rerated_usage` plus an attribution Reference (trunk, route, PLMN, IMSI range to agreement) into the §5 aggregate. `rerating_findings` plays no role: it is a
+retail finding list, and settlement must not read billing output.
+
+### 17.2 What S4 delivers
+
+Three more chained `sql.template` Jobs (after `ps_findings`, each on the previous one's success), one more feed, four more Datasets, in the Space Template
+`partner-settlement` (now 7 feeds, 9 Job-written Datasets, 9 chained Jobs).
+
+- **`settlement_payment` (feed).** Finance's payments, credit notes and debit notes, read and never written (plan §7 named it): `payment_id`, `agreement_id`, `partner_id`,
+  `direction`, `payment_date`, `kind` (`payment`, `credit_note`, `debit_note`), a positive `amount`, `currency`, `recorded_at`. A re-sent record counts once and the latest
+  `recorded_at` wins.
+- **`ps_movement` writes `settlement_movement`**: every current statement line and every payment at line level, in the agreement's settlement currency **with both currencies and the
+  FX row** (`amount_orig`, `currency_orig`, `amount`, `currency`, `fx_rate`, `fx_rate_date`, `fx_rate_type`, `fx_status`), signed from our side (`signed_amount`, positive = we owe the
+  partner), `effect` (`invoiced`, `paid`, `adjustment`) and a `status` (`ok`, `fx_missing`, `unknown_agreement`). This is the "FX as a Dataset column set" of the S4 row.
+- **`ps_position` writes `settlement_position`** per `(netting_group, cycle_month, currency)`: `payable` (we_pay statement lines), `receivable` (they_pay), `net = payable - receivable`
+  (positive = we pay) and `net_direction`, `orig_net` (the net in each original currency, `EUR:-4.0000,USD:123.0000`), statement and line counts and `lines_unconverted`.
+- **`ps_rollforward` writes `settlement_rollforward`** per `(netting_group, currency, cycle_month)`: `opening + invoiced - paid + adjustments = closing`, one row for **every month** from
+  the first movement to the as-of month, so a quiet month carries the balance (`as_of` parameter, default today).
+
+### 17.3 Decisions made inside S4 (each reversible, none touches an existing engine)
+
+1. **Netting is inside one settlement currency.** The corpus group `NG-XA` holds a USD agreement (A1) and a EUR one (C1); they give two positions and two roll-forward series, not one. Cross-currency
+   netting needs a position currency per group and, for EUR to USD, a reverse rate the `fx_rate` Reference does not carry; inventing `1 / rate` would be a convention. **Open decision 2.**
+2. **Cycle for netting is the calendar month in which a statement's cycle ends** (a semi-monthly or weekly agreement puts several statements in one month); a payment or note belongs to the month of its date.
+3. **The position reads what statements say, the roll-forward adds what finance recorded.** Neither reads our own pricing or any dispute: the "disputed amount, never netted away" column of §8 belongs to S5
+   (it needs a dispute state), so S4 shows no disputed column rather than a stand-in for one.
+4. **FX date for a movement:** a usage line uses the agreement's `fx_date_rule`; a fee, tax, credit or adjustment line has no usage day and uses the cycle end; a payment or note uses its own date. The rate is the latest on
+   or before the date for the agreement's `fx_rate_type`, as in S3.
+5. **Agreement version for a movement** is the latest version starting on or before the movement date, for the right partner (so a final payment after the last version ended still finds its agreement); a movement with no such version is `unknown_agreement`.
+6. **A movement that cannot be placed is named, never dropped:** `fx_missing` counts in `lines_unconverted` and adds no amount; `unknown_agreement` stays in `settlement_movement` and in no balance. A payment-integrity finding (duplicate or orphan payment) is **not built**: the orphan is visible in the Dataset, not raised.
+7. **No opening balance feed**: a series opens at zero. A balance older than the first statement is entered as an adjustment note.
+8. **`paid` is money we paid minus money received**, so it is negative in a month where partners paid us more.
+
+### 17.4 What the golden holds (module `inspecto-reconciliation`)
+
+`PartnerSettlementPositionGoldenTest` (18 tests), on `PartnerSettlementCorpus.generateWithPositions()`: the S3 corpus plus partner `P5` and agreement `AG-VOICE-F1` (invoiced in EUR into a USD agreement, converted at the cycle end by a rate that changes mid-June, with
+decoy spot rates), and 11 finance records for 9 payment ids (a payment sent twice, a payment corrected by a later record, a payment in EUR, a credit note, a debit note in a month with no statement, an unknown agreement and an agreement under another partner). The S3 corpus and
+`generate()` are unchanged (only `contractRate` now also filters the currency pair, a no-op for `generate()`); the extension raises no S2 or S3 finding, and a test asserts the planted sets are unchanged.
+
+- **Oracle, column for column**: all 24 columns of all 442 movements, all 11 columns of the 7 positions and all 10 columns of the 11 roll-forward rows equal an independent plain-Java oracle (`BigDecimal`, own statement and payment dedup, own agreement and rate lookup, no SQL, no shared code with the Jobs). The oracle shares the business rules with the SQL, as in S3 (§16).
+- **One SQL assertion per identity**: `net = payable - receivable` and `net_direction` on every position; `opening + invoiced - paid + adjustments = closing` on every roll-forward row; each opening equals the previous closing, the first is zero, no month is skipped, every series runs to the as-of month; the last closing of each series equals the sum of its movements; and the usage movements per agreement and cycle equal `settlement_billed.amount_billed` (S4 is tied to S3's money).
+- **Hand-worked amounts that do not come from the oracle**: a payment sent in two files is paid once (10000.0000), the corrected payment is the later record (E1 received 450, so NG-XB June paid is 880.0000 - 450.0000 = 430.0000), a EUR payment converts at the rate in force on its date (800 EUR = 880.0000 USD at 1.1000 from 2026-06-16), a credit note lowers and a debit note raises the balance, a month with no movement carries the balance, F1's June statement sums to the hand-computed 1.1000 conversion.
+- **A restated statement moves the closing balance and the roll-forward still closes**: the corpus without the restated July statement leaves the superseded line (999.0000, right amount 200.0000) current; July and August closings are higher by exactly 799.0000, the position's `payable` by the same, May and June do not move, and the closing identity holds in both runs.
+- **No FX rate**: with every rate removed, all 64 F1 movements are `fx_missing` with no amount, the June position counts 31 unconverted lines and sums only the converted ones, the roll-forward counts the unconverted payment too, and the whole set still equals the oracle.
+- A second run over the same window duplicates nothing.
+
+**Mutation pass (recorded): 11 mutants of the shipped S4 SQL, each a real test that is red for the named reason.** Rate type ignored (an F1 line takes the 2.0000 decoy spot rate); usage day instead of cycle end for a period-end agreement (2026-06-05 converts at 1.2000, not 1.1000); side sign flipped (the position stays equal to the oracle, every roll-forward balance is negated, **and the SQL identity stays green**, so only the oracle and the hand-worked amounts catch it); payment sign flipped (June paid -10000.0000); the earlier of two payment records taken (paid 380.0000, not 430.0000); net as payable plus receivable; opening not carried (June opens at zero and the closing identity breaks); series ending at the last movement (NG-XB loses July and August); a credit line counted as invoiced (the split moves, **the closing does not**); payment FX date taken from the cycle end (the EUR payment becomes `fx_missing`); partner not matched (another partner's payment settles the agreement). Each mutant first asserts its target is present in the shipped text.
+
+**Measurements (honest).** On the corpus: 442 movements, 7 positions, 11 roll-forward rows. Across 28 runs in the test run: `ps_movement` 90 to 141 ms (median 122), `ps_position` 55 to 84 ms (median 71), `ps_rollforward` 45 to 74 ms (median 54), on a loaded desktop JVM. **Not measured at volume**: a real wholesale feed is orders of magnitude larger, `ps_movement` re-converts every line each run (a full rebuild, like S3), and the roll-forward's cumulative window is per netting group and currency. The S3 risk R4 (Break volume) is unchanged and not touched by S4.
+
+**Traps found.** `string_agg(..., ';' ...)` inside a `sql.template` is refused ("only a single statement is allowed": the guard counts any `;`, even inside a quoted literal), so `orig_net` joins with a comma. A currency-blind `contractRate` in the corpus would have taken the new EUR to USD rows for the SMS agreement; it now filters the pair. The S3 `SeedTest` ingests the S4 corpus so the new feed has a Pipeline-written file to compare its seed against.
+
+**Not built, and open.** S5 disputes (Case Rule, authored CASE workflow, SLA, Impact), S6 aging and accruals and the dashboard, S7 evidence pack, S8 docs and registration, W1 to W3. Open for the operator: (1) who writes the wholesale re-rating adapter of §17.1 (the §5 table is still unsigned); (2) cross-currency netting: a position currency per netting group and a reverse-rate convention, or keep one currency per position; (3) an opening-balance feed or a first-month convention; (4) a payment-integrity finding (duplicate, orphan, wrong partner); (5) the S5 governance seed decision of §16.

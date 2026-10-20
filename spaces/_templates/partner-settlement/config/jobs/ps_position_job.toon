@@ -1,0 +1,10 @@
+job:
+  name: ps_position
+  type: sql.template
+  description: "Settlement position per netting group, cycle month and settlement currency: what the current statements say we owe (payable) and are owed (receivable), their net (positive = we pay), and the net in each original currency; lines with no FX rate are counted, not summed"
+  sql: "WITH m AS ( SELECT * FROM settlement_movement WHERE source = 'statement' AND status IN ('ok', 'fx_missing') ), g AS ( SELECT netting_group, cycle_month, currency, CAST(coalesce(sum(CASE WHEN direction = 'we_pay' THEN amount END), 0) AS DECIMAL(18,4)) AS payable, CAST(coalesce(sum(CASE WHEN direction = 'they_pay' THEN amount END), 0) AS DECIMAL(18,4)) AS receivable, CAST(count(DISTINCT document_id) AS BIGINT) AS statements, CAST(count(*) AS BIGINT) AS line_count, CAST(count(*) FILTER (WHERE status = 'fx_missing') AS BIGINT) AS lines_unconverted FROM m GROUP BY netting_group, cycle_month, currency ), o AS ( SELECT netting_group, cycle_month, currency, currency_orig, sum(CASE direction WHEN 'we_pay' THEN amount_orig ELSE -amount_orig END) AS n FROM m WHERE status = 'ok' GROUP BY netting_group, cycle_month, currency, currency_orig ), os AS ( SELECT netting_group, cycle_month, currency, string_agg(currency_orig || ':' || CAST(CAST(n AS DECIMAL(18,4)) AS VARCHAR), ',' ORDER BY currency_orig) AS orig_net FROM o GROUP BY netting_group, cycle_month, currency ) SELECT g.netting_group, g.cycle_month, g.currency, g.payable, g.receivable, CAST(g.payable - g.receivable AS DECIMAL(18,4)) AS net, CASE WHEN g.payable > g.receivable THEN 'we_pay' WHEN g.payable < g.receivable THEN 'they_pay' ELSE 'even' END AS net_direction, os.orig_net, g.statements, g.line_count, g.lines_unconverted FROM g LEFT JOIN os ON os.netting_group = g.netting_group AND os.cycle_month = g.cycle_month AND os.currency = g.currency"
+  sources: "settlement_movement"
+  sink_dataset: settlement_position
+  on_signal: job.run.completed
+  when: "$signal.job == ps_movement && $signal.outcome == SUCCESS"
+  enabled: true

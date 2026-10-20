@@ -2,7 +2,7 @@
 
 > **Settle with each partner under its own agreement: the right tolerance, the right currency, the right cycle, and a reason for every difference.**
 
-*Audience: customers, presales and sales. Product Map Item `solution-pack.partner-settlement` · status **preview** (References, statement ingestion and the compare). Prices are not published here.*
+*Audience: customers, presales and sales. Product Map Item `solution-pack.partner-settlement` · status **preview** (References, statement ingestion, the compare, and positions with a roll-forward). Prices are not published here.*
 
 ## Who it is for
 
@@ -17,14 +17,15 @@ Wholesale finance and revenue-assurance teams at operators and MVNOs that settle
 
 ## What is included
 
-- Six Pipelines for the partners, the agreements, the FX rates, the holidays, the statement and the independently re-rated usage.
-- A settlement-cycle calendar with business-day due dates, six chained Jobs from statement integrity to settlement findings, two Reconciliations (voice, SMS) and one Alert Rule per agreement.
+- Seven Pipelines for the partners, the agreements, the FX rates, the holidays, the statement, finance payments and the independently re-rated usage.
+- A settlement-cycle calendar with business-day due dates, nine chained Jobs from statement integrity to settlement positions and a roll-forward, two Reconciliations (voice, SMS) and one Alert Rule per agreement.
 - Findings that name their reason: amount, cut-off, FX, missing statement, unrated usage, missing FX rate.
+- Settlement positions per netting group and cycle (payable, receivable, net, in both currencies) and a roll-forward of the balance, with every converted line carrying its FX rate.
 - A synthetic corpus with planted variances and the look-alikes that must stay silent, and golden tests with mutation checks.
 
 ## What it does not do
 
-It posts no payment, accrual or ledger entry and fetches no market FX rate. Netting, the dispute Case with its partner-facing lifecycle, aging and the evidence pack follow in later slices; roaming (TAP) and MVNO constructs are demand-gated. No real partner statement has been used: the statement format is a synthetic proposal to be fitted to a real file in the first customer pass.
+It posts no payment, accrual or ledger entry and fetches no market FX rate. The dispute Case with its partner-facing lifecycle, aging and the evidence pack follow in later slices; roaming (TAP) and MVNO constructs are demand-gated. No real partner statement has been used: the statement format is a synthetic proposal to be fitted to a real file in the first customer pass.
 
 ## How it fits with the Editions
 
