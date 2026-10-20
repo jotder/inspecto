@@ -9,7 +9,9 @@ metadata:
   we practically don't have any release, just carry on master." The merge-forward set is permanently empty —
   do NOT ask the operator to confirm it; `.githooks/pre-push` prints that. If an instruction seems to change the
   branch model, ask for the reason before acting (it flip-flopped once).
-- **Push cadence:** local commits, push batches; see [[ci-gates-beyond-the-reactor]].
+- **Push cadence (operator 2026-10-20):** one lane — or one small related group — per push, integrated in a clean
+  sibling worktree and verified with targeted tests; one full gate per day or release; see
+  [[lane-integration-workflow]] and [[ci-gates-beyond-the-reactor]] (this replaces the earlier "push batches").
 - **Classifier push denials are per-attempt** and not a hook/policy failure: retry on the next push; if denied
   again, say it needs the operator's hands for now. Never work around it (`permissions.allow` is the wrong lever).
   History rewrite is also refused — squash-merge an integrated tree instead.

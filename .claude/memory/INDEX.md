@@ -22,6 +22,7 @@ Add a lesson as a new file here + one line below, in the same change. Personal o
 - [Shared tree & peer work](shared-tree-peer-work.md) — fetch first; red gate may be a peer's dirty files; stage shared docs by hunk
 - [Worktree location traps](worktree-location-traps.md) — sibling `C:\sandbox\<name>` only; never junction node_modules
 - [Push & branch policy](push-and-branch-policy.md) — master only, empty merge-forward set; push denials are per-attempt
+- [Lane integration workflow](lane-integration-workflow.md) — build lanes in parallel, integrate + push ONE lane at a time from a clean sibling worktree; targeted tests per lane, one full gate per day/release
 
 ## Docs, guards & claims
 - [Doc guard traps](doc-guard-traps.md) — citation headings are "References" (the vocabulary guard bans the acquisition word); git add new docs; absence phrase on the line; docs-relocate

@@ -307,6 +307,17 @@ if ! run_guard tools/check-split-identity-fixture.mjs "split-identity fixture gu
   exit 1
 fi
 
+# Lane-integration advisory (operator 2026-10-20, .claude/memory/lane-integration-workflow.md). NEVER blocks:
+# the guards above read the WORKING TREE this hook runs in, so a dirty tree judges uncommitted files too (a peer's
+# unfinished doc once failed another session's push), and the shared checkout's local master cannot fast-forward
+# while a peer has uncommitted edits. Integrate and push one lane at a time from a clean sibling worktree.
+if [ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+  echo "pre-push: NOTE — this working tree has uncommitted tracked changes; the guards above judged them too." >&2
+  echo "          Policy: integrate and push ONE lane at a time from a clean sibling worktree" >&2
+  echo "          (git worktree add C:\\sandbox\\integNN origin/master; git push origin HEAD:master)." >&2
+  echo "          See .claude/memory/lane-integration-workflow.md." >&2
+fi
+
 echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
 echo "          merge-forward set is EMPTY (BRANCHING.md §0-A; 4.x was deleted 2026-08-17)." >&2
 echo "          When the next major is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2

@@ -6,8 +6,9 @@ metadata:
 ---
 
 **CI cadence (operator 2026-10-09):** `ci.yml` (guards included) and `ui.yml` run only nightly, on
-`workflow_dispatch`, PR, or `v*` tag; a branch push runs only `branch-policy` commit lint. Keep commits LOCAL,
-batch, push when a batch is green or the operator asks; after a push touching shared seams offer
+`workflow_dispatch`, PR, or `v*` tag; a branch push runs only `branch-policy` commit lint. A push therefore costs no CI
+time: push each integrated lane (or small related group) once its targeted checks are green — see
+[[lane-integration-workflow]] (operator 2026-10-20; this replaces "keep commits LOCAL, batch"); after a push touching shared seams offer
 `gh workflow run CI --ref master` (and `UI`). Read `gh run list` after and fix a red master first.
 
 **Run locally before every push:** every no-build guard step listed in `.github/workflows/ci.yml`

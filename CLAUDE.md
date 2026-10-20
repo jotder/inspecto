@@ -137,6 +137,13 @@ shift gets the identical environment.
   and end the session. Mid-task compaction is the failure mode — externalize state instead.
 - Commits use the shared identity; work lands on `master` per the `release-workflow` skill — no
   per-user branches or PRs.
+- **One lane per push (operator, 2026-10-20 — binding for every session and subagent).** Lanes may be BUILT in
+  parallel, but each lane (or one small related group) is INTEGRATED and PUSHED on its own: in a clean sibling
+  worktree from `origin/master` (never by merging in this shared checkout — peers' uncommitted edits block its
+  fast-forward and the pre-push guards read the dirty tree), fix what it broke there, run the affected-build
+  protocol plus the lane's named tests, merge `origin/master` again if it moved, then `git push origin HEAD:master`.
+  One full gate per day or release. Detail and rationale: `.claude/memory/lane-integration-workflow.md`.
+  `.githooks/pre-push` prints a note (never blocks) when it runs from a dirty tree.
 
 ## Model & effort routing (token economy)
 
