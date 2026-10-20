@@ -70,6 +70,11 @@ and `anomaly_scores_<id>_latest`, naming facts in the engine's `com.gamma.alert.
 🔴 The `anomaly_scores_` prefix is **reserved** on every writer exactly as `risk_scores_` is, with the
 ownership marker `.anomaly-score-output` (`com.gamma.alert.ScoreOutputDirs`, shared with Risk Scores). The only
 Dataset accepted over a scores store is the identity shape (`id = physicalRef`, nothing else).
+Store-clash gate (`AnomalyKindValidator.requireStorable`, `ANOMALY-TF-STORE-CLASH-1`): a model is storable when a
+registered Dataset's `physicalRef` is exactly its own `latestDataset()` / `scoresDataset()` and carries no `path`
+override (the telco-fraud pack's `tf_subscriber_anomaly_latest` tile Dataset). Safe because the output name is the
+reserved prefix + this model's id, so it can never name a foreign model's or unrelated store, and reading one's own
+output is harmless; an id clash, an unowned existing directory and a `path` override stay refused.
 
 **Save-time gates (422), in Risk Score order:** `fromMap` (structure, unknown keys, every Feature compiled) →
 `AnomalyKindValidator` (`ComponentKindValidator` SPI: every named column — key, measure, filters, `time`, peers
