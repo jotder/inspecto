@@ -7,7 +7,7 @@ posture:
   objectsBackend: default
   postgresSidecar: absent
 modules[6]: connectors,entity-list,la-storage,la-core,la-api,geo-link
-contentPacks[3]: business-assurance,la-daily-feed,orders-starter
+contentPacks[2]: la-daily-feed,orders-starter
 addons:
   linkAnalysis:
     status: built

@@ -82,3 +82,11 @@ test('parsePom separates default modules from profile modules, ignoring comments
     assert.deepEqual(p, { defaults: ['a'], profiles: { p1: ['b'] } });
 });
 test('the real repository offerings are GREEN', () => assert.deepEqual(check(gather('.')), []));
+
+test('placement (OFFERING-DECLARATION-DRIFT-1): Basic lists no business-assurance, Standard does, Preview lists the four LA showcase templates and not la-showcase-off', () => {
+    const o = gather('.').offerings;
+    assert.ok(!o.basic.contentPacks.includes('business-assurance'));
+    assert.ok(o.standard.contentPacks.includes('business-assurance'));
+    for (const t of ['la-showcase', 'la-audit', 'la-claims', 'la-mobile-money']) assert.ok(o.preview.contentPacks.includes(t), t);
+    assert.ok(!o.preview.contentPacks.includes('la-showcase-off'));
+});

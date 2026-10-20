@@ -35,4 +35,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `ANOMALY-UI-FINDINGS-1` | P3 | defect | small defects and rough edges found driving the Anomaly Detection UI in a running demo build (2026-10-13; live-verification lane over the… | — |
-| `ANOMALY-TF-STORE-CLASH-1` | P3 | defect | defect: AnomalyTemplateModelsTest.thePackModelIsStorableAndWired[1] (telco-fraud / tf_subscriber_usage) ERRORS on clean master | — |

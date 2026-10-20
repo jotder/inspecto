@@ -162,7 +162,12 @@ public final class AnomalyKindValidator implements ComponentKindValidator {
                         + "', which is the id of a Dataset over another store");
             if (!ours)
                 for (ComponentRegistry.Component ds : store.list("dataset"))
-                    if (out.equals(String.valueOf(ds.content().get("physicalRef")).trim()))
+                    // A Dataset whose physicalRef is EXACTLY this model's own output is a read view of the model's own
+                    // store (a pack-shipped tile Dataset, ANOMALY-TF-STORE-CLASH-1): `out` is the reserved prefix + this
+                    // model's id, so it can never name a foreign model's or an unrelated store, and reading it is
+                    // harmless. A `path` override reads elsewhere, so it stays refused.
+                    if (out.equals(String.valueOf(ds.content().get("physicalRef")).trim())
+                            && ds.content().get("path") != null)
                         throw new IllegalArgumentException("anomaly-model '" + model.id() + "' would write '" + out
                                 + "', which Dataset '" + ds.content().get("name") + "' already reads as its store");
         }
