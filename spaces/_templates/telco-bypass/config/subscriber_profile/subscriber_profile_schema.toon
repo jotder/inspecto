@@ -1,0 +1,28 @@
+raw:
+  name: SUBSCRIBER_PROFILE
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    msisdn,"0",VARCHAR,"Subscriber number, one row per SIM","","MSISDN"
+    plan,"1",VARCHAR,"Tariff plan","","INTERNAL"
+    dealer_id,"2",VARCHAR,"Dealer that activated the SIM","","INTERNAL"
+    activated_on,"3",DATE,"Activation date","","INTERNAL"
+    corporate_flag,"4",VARCHAR,"Y for a corporate line","","INTERNAL"
+mapping:
+  canonicalName: subscriber_profile
+  rawName: SUBSCRIBER_PROFILE
+  fields[5]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: plan
+      from: plan
+      fn: keep
+    - name: dealer_id
+      from: dealer_id
+      fn: keep
+    - name: activated_on
+      from: activated_on
+      fn: keep
+    - name: corporate_flag
+      from: corporate_flag
+      fn: keep

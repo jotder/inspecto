@@ -1,0 +1,60 @@
+raw:
+  name: VOICE_CDR
+  format: CSV
+  fields[13]{name,selector,type,description,unit,classification}:
+    record_id,"0",VARCHAR,"Call detail record identifier","","INTERNAL"
+    start_ts,"1",TIMESTAMP,"Call, SMS or session start time (one agreed time zone for the whole feed)","","INTERNAL"
+    direction,"2",VARCHAR,"MO (originated by a_number) or MT (terminated on b_number)","","INTERNAL"
+    service,"3",VARCHAR,"VOICE, SMS or DATA (a data session)","","INTERNAL"
+    a_number,"4",VARCHAR,"Calling number (bare E.164 digits)","","MSISDN"
+    b_number,"5",VARCHAR,"Called number as dialled; the sequential-dialling and own-network signals expect bare E.164 digits (DATA: the APN)","","MSISDN"
+    duration_s,"6",INTEGER,"Answered duration, 0 when unanswered (DATA: session seconds)","s","INTERNAL"
+    roaming,"7",VARCHAR,"Y when the a_number was roaming; those calls are left out of the SIM-day signals","","INTERNAL"
+    cell_id,"8",VARCHAR,"Serving cell","","CONFIDENTIAL"
+    answered,"9",VARCHAR,"OPTIONAL. Y or N: whether the attempt was answered","","INTERNAL"
+    release_cause,"10",VARCHAR,"OPTIONAL. Release cause (ITU Q.850 code, 16 = normal clearing); used for the answer rate when answered is blank","","INTERNAL"
+    imei,"11",VARCHAR,"OPTIONAL. Device identity of the calling or called SIM","","PII"
+    imsi,"12",VARCHAR,"OPTIONAL. SIM identity of the calling or called SIM","","IMSI"
+mapping:
+  canonicalName: voice_cdr
+  rawName: VOICE_CDR
+  fields[13]:
+    - name: record_id
+      from: record_id
+      fn: keep
+    - name: start_ts
+      from: start_ts
+      fn: keep
+    - name: direction
+      from: direction
+      fn: keep
+    - name: service
+      from: service
+      fn: keep
+    - name: a_number
+      from: a_number
+      fn: keep
+    - name: b_number
+      from: b_number
+      fn: keep
+    - name: duration_s
+      from: duration_s
+      fn: keep
+    - name: roaming
+      from: roaming
+      fn: keep
+    - name: cell_id
+      from: cell_id
+      fn: keep
+    - name: answered
+      from: answered
+      fn: keep
+    - name: release_cause
+      from: release_cause
+      fn: keep
+    - name: imei
+      from: imei
+      fn: keep
+    - name: imsi
+      from: imsi
+      fn: keep

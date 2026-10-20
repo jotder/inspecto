@@ -37,6 +37,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (64 open rows
 * [Mobile money](solution-pack/mobile-money/index.md) - `solution-pack.mobile-money` · 5 doc(s) · 0 open row(s)
 * [Orders starter](solution-pack/orders-starter/index.md) - `solution-pack.orders-starter` · 5 doc(s) · 0 open row(s)
 * [Payment fraud starter](solution-pack/payment-fraud/index.md) - `solution-pack.payment-fraud` · 5 doc(s) · 0 open row(s)
+* [Telecom bypass (SIM-box)](solution-pack/telco-bypass/index.md) - `solution-pack.telco-bypass` · 5 doc(s) · 0 open row(s)
 * [Telecom fraud](solution-pack/telco-fraud/index.md) - `solution-pack.telco-fraud` · 5 doc(s) · 4 open row(s)
 * [Telecom revenue assurance](solution-pack/telco-ra/index.md) - `solution-pack.telco-ra` · 5 doc(s) · 0 open row(s)
 

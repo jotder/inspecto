@@ -8,7 +8,7 @@ posture:
   postgresSidecar: bundled
 includes[1]: basic
 modules[18]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,exchange,observability,ops,case-management,action-requests,regulatory-reporting,reconciliation,scoring,screening,anomaly,agent
-contentPacks[6]: business-assurance,mobile-money,aml,payment-fraud,telco-fraud,telco-ra
+contentPacks[7]: business-assurance,mobile-money,aml,payment-fraud,telco-fraud,telco-ra,telco-bypass
 addons:
   aiAssist:
     status: built

@@ -1,0 +1,30 @@
+name: number_plan
+active: true
+
+dirs:
+  poll:       data/inbox/number_plan
+  database:   data/number_plan/database
+  backup:     data/number_plan/backup
+  temp:       data/number_plan/temp
+  errors:     data/number_plan/errors
+  quarantine: data/number_plan/quarantine
+  markers:    data/number_plan/markers
+  status_dir: data/number_plan/status
+  log_dir:    data/number_plan/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: number_plan_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

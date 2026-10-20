@@ -1,0 +1,37 @@
+name: voice_cdr
+active: true
+
+dirs:
+  poll:       data/inbox/voice_cdr
+  database:   data/voice_cdr/database
+  backup:     data/voice_cdr/backup
+  temp:       data/voice_cdr/temp
+  errors:     data/voice_cdr/errors
+  quarantine: data/voice_cdr/quarantine
+  markers:    data/voice_cdr/markers
+  status_dir: data/voice_cdr/status
+  log_dir:    data/voice_cdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: voice_cdr_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "VOICE_CDR_{yyyyMMdd}"
+    file_template: "VOICE_CDR_{yyyyMMdd}.csv"

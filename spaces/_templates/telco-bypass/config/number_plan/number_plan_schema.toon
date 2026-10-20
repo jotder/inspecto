@@ -1,0 +1,20 @@
+raw:
+  name: NUMBER_PLAN
+  format: CSV
+  fields[3]{name,selector,type,description,unit,classification}:
+    prefix,"0",VARCHAR,"Number prefix (bare digits)","","INTERNAL"
+    operator,"1",VARCHAR,"Operator the range belongs to","","INTERNAL"
+    own,"2",VARCHAR,"Y when the range is the operator own network (the target of a terminated bypass call)","","INTERNAL"
+mapping:
+  canonicalName: number_plan
+  rawName: NUMBER_PLAN
+  fields[3]:
+    - name: prefix
+      from: prefix
+      fn: keep
+    - name: operator
+      from: operator
+      fn: keep
+    - name: own
+      from: own
+      fn: keep

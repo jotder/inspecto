@@ -1,0 +1,30 @@
+name: subscriber_profile
+active: true
+
+dirs:
+  poll:       data/inbox/subscriber_profile
+  database:   data/subscriber_profile/database
+  backup:     data/subscriber_profile/backup
+  temp:       data/subscriber_profile/temp
+  errors:     data/subscriber_profile/errors
+  quarantine: data/subscriber_profile/quarantine
+  markers:    data/subscriber_profile/markers
+  status_dir: data/subscriber_profile/status
+  log_dir:    data/subscriber_profile/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: subscriber_profile_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
