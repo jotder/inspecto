@@ -1,0 +1,10 @@
+name: ps_voice
+leftDataset: settlement_expected
+rightDataset: settlement_billed
+keyColumns[4]: agreement_id,direction,service,destination_class
+includeRecordCount: false
+filters:
+  settlement_expected: "service = 'VOICE' AND amount IS NOT NULL"
+  settlement_billed: "service = 'VOICE' AND amount IS NOT NULL"
+compareColumns[1]{column,agg,toleranceType,tolerance}:
+  amount,sum,absolute,0

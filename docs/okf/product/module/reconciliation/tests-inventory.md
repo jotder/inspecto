@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.reconciliation`](../../../../../product-map/module/reconciliation.toon).
 
-21 test class(es): 16 unit, 5 real-HTTP control-plane, 0 IT.
+25 test class(es): 20 unit, 5 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -31,6 +31,10 @@ mvn -o test -pl features/inspecto-reconciliation -Dtest=ControlApiReconDayTest,C
 | `ControlApiReconTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconTest.java` | Real-HTTP + real-DuckDB tests for the reconciliation routes (DAT-7, design |
 | `ReconAbsentSurfaceParityTest` | `com.gamma.control` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ReconAbsentSurfaceParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes its {@code RouteModule}s |
 | `MobileMoneyPackGoldenTest` | `com.gamma.job` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/job/MobileMoneyPackGoldenTest.java` | {@code PACK-MOBILE-MONEY-1} golden test. Boots the shipped {@code spaces/_templates/mobile-money} Space Template |
+| `PartnerSettlementCorpusTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementCorpusTest.java` | {@link PartnerSettlementCorpus}: deterministic, planted and benign sets disjoint, synthetic names and identifiers only. |
+| `PartnerSettlementPackGoldenTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementPackGoldenTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slices S2 and S3 golden test. The shipped {@code partner-settlement} Space Template is created |
+| `PartnerSettlementReferenceTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementReferenceTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slice S1: the four References and the settlement-cycle calendar. The shipped |
+| `PartnerSettlementSeedTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementSeedTest.java` | The zero-row schema seeds of the {@code partner-settlement} Space Template. Every Dataset a Job reads or writes ships a seed |
 | `TelcoRaGoldenTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` | Golden test of the {@code telco-ra} Space Template ({@code ASSURE-PACK-TELCO-RA-1}): the template's OWN |
 | `ReconBreaksParityTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconBreaksParityTest.java` | RECON-UPLIFT-1 B1 parity: {@link ReconBreaks#compute} now reads every Break set off ONE shared {@code __grain}; it |
 | `ReconBreaksTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconBreaksTest.java` | {@link ReconBreaks} — the server-side port of the SPA's Break lifecycle (R2-03): the {@code mergeBreaks} |

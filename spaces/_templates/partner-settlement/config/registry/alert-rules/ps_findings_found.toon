@@ -1,0 +1,8 @@
+name: ps_findings_found
+dataset: settlement_findings
+measure: count
+by[1]: agreement_id
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A settlement control raised a finding for an agreement (a variance beyond tolerance, a missing statement, unrated usage or a missing FX rate). It fires once per agreement; the rows name the day, cycle and reason. Runbook: config/runbooks/partner-settlement-runbooks.md."

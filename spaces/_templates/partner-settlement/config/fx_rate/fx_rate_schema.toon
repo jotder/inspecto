@@ -1,0 +1,32 @@
+raw:
+  name: FX_RATE
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    rate_date,"0",DATE,"Day the rate is valid from; a lookup takes the latest row on or before the date it needs","","INTERNAL"
+    from_currency,"1",VARCHAR,"Currency converted from (ISO 4217)","","INTERNAL"
+    to_currency,"2",VARCHAR,"Currency converted to (ISO 4217)","","INTERNAL"
+    rate_type,"3",VARCHAR,"spot, monthly_avg or contract","","INTERNAL"
+    rate,"4","DECIMAL(18,8)","Units of to_currency for one unit of from_currency","","INTERNAL"
+    rate_source,"5",VARCHAR,"Who supplied the rate (operator finance); the platform fetches none","","INTERNAL"
+mapping:
+  canonicalName: fx_rate
+  rawName: FX_RATE
+  fields[6]:
+    - name: rate_date
+      from: rate_date
+      fn: keep
+    - name: from_currency
+      from: from_currency
+      fn: keep
+    - name: to_currency
+      from: to_currency
+      fn: keep
+    - name: rate_type
+      from: rate_type
+      fn: keep
+    - name: rate
+      from: rate
+      fn: keep
+    - name: rate_source
+      from: rate_source
+      fn: keep

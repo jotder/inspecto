@@ -1,0 +1,6 @@
+job:
+  name: ps_sms
+  type: recon.run
+  reconciliation: ps_sms
+  cron: "30 5 * * *"
+  enabled: true

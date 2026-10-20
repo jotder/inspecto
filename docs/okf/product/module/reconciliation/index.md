@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | partner settlement and re-rating function pack | — |
+| `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | partner settlement function pack, slices S4…S8 and W1…W3 open; S0…S3 (the smallest cut) BUILT 2026-10-20 | — |

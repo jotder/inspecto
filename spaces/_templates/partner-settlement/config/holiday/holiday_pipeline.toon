@@ -1,0 +1,31 @@
+name: holiday
+active: true
+
+dirs:
+  poll:       data/inbox/holiday
+  database:   data/holiday/database
+  backup:     data/holiday/backup
+  temp:       data/holiday/temp
+  errors:     data/holiday/errors
+  quarantine: data/holiday/quarantine
+  markers:    data/holiday/markers
+  status_dir: data/holiday/status
+  log_dir:    data/holiday/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: holiday_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

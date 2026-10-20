@@ -1,0 +1,60 @@
+raw:
+  name: RERATED_USAGE
+  format: CSV
+  fields[13]{name,selector,type,description,unit,classification}:
+    agreement_id,"0",VARCHAR,"Agreement the usage is attributed to (the join key)","","INTERNAL"
+    direction,"1",VARCHAR,"we_pay or they_pay","","INTERNAL"
+    service,"2",VARCHAR,"VOICE, SMS or DATA","","INTERNAL"
+    destination_class,"3",VARCHAR,"Destination class the usage was priced at","","INTERNAL"
+    usage_date,"4",DATE,"Usage day, already bucketed in the agreement cut-off zone","","INTERNAL"
+    rate_id,"5",VARCHAR,"Version of the rate applied, so a mid-period rate change is explainable","","INTERNAL"
+    rating_run_id,"6",VARCHAR,"The re-rating run that produced the row","","INTERNAL"
+    rated_at,"7",TIMESTAMP,"When the run produced the row; the compare uses the latest run per agreement and period","","INTERNAL"
+    units,"8","DECIMAL(18,4)","Units after the agreement rounding rule","","INTERNAL"
+    amount_expected,"9","DECIMAL(18,4)","Independently priced amount; blank when the usage could not be priced","","CONFIDENTIAL"
+    currency,"10",VARCHAR,"Currency of amount_expected (ISO 4217)","","INTERNAL"
+    record_count,"11",INTEGER,"Usage records behind the row","","INTERNAL"
+    reason,"12",VARCHAR,"no_rate_found, ambiguous_rate or unknown_agreement when amount_expected is blank","","INTERNAL"
+mapping:
+  canonicalName: rerated_usage
+  rawName: RERATED_USAGE
+  fields[13]:
+    - name: agreement_id
+      from: agreement_id
+      fn: keep
+    - name: direction
+      from: direction
+      fn: keep
+    - name: service
+      from: service
+      fn: keep
+    - name: destination_class
+      from: destination_class
+      fn: keep
+    - name: usage_date
+      from: usage_date
+      fn: keep
+    - name: rate_id
+      from: rate_id
+      fn: keep
+    - name: rating_run_id
+      from: rating_run_id
+      fn: keep
+    - name: rated_at
+      from: rated_at
+      fn: keep
+    - name: units
+      from: units
+      fn: keep
+    - name: amount_expected
+      from: amount_expected
+      fn: keep
+    - name: currency
+      from: currency
+      fn: keep
+    - name: record_count
+      from: record_count
+      fn: keep
+    - name: reason
+      from: reason
+      fn: keep

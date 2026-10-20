@@ -1,0 +1,92 @@
+entityType: sim
+highThreshold: 60
+description: "SIM-box risk of one SIM-day: eight signals add (weights sum to 80 of 100; the device-cluster and anomaly factors arrive with the cluster and anomaly slices), three protective factors subtract. Illustrative weights, calibrate on the operator's own traffic"
+factors[11]:
+  - id: b_diversity
+    label: "Dials a new number almost every call (S1, above cand_min_b_div)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(b_diversity_excess)"
+    weight: 14
+    cap: 14
+    evidence[2]: b_diversity, calls_mo
+  - id: short_calls
+    label: "Short answered calls (S2, above cand_min_short)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(short_uniform_index)"
+    weight: 12
+    cap: 12
+    evidence[1]: short_call_ratio
+  - id: no_inbound
+    label: "Almost never called back (S4, below cand_max_inbound)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(no_inbound_flag)"
+    weight: 14
+    cap: 14
+    evidence[1]: inbound_ratio
+  - id: voice_only
+    label: "Voice only, no SMS or data (S5, above cand_min_voice_only)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(voice_only_flag)"
+    weight: 10
+    cap: 10
+    evidence[1]: voice_only_share
+  - id: static_cell
+    label: "Static, one cell (S6, above cand_min_top_cell)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(static_cell_flag)"
+    weight: 8
+    cap: 8
+    evidence[1]: top_cell_share
+  - id: seq_dial
+    label: "Number walking: share of calls within seq_step of the previous number (S7)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(seq_dial_share)"
+    weight: 8
+    cap: 8
+    evidence[1]: seq_dial_share
+  - id: night
+    label: "Night share of calls (S8)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(night_share)"
+    weight: 8
+    cap: 8
+    evidence[2]: night_share, active_hours
+  - id: onnet
+    label: "Own-network targets (S11)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(onnet_target_share)"
+    weight: 6
+    cap: 6
+    evidence[1]: onnet_target_share
+  - id: inbound_excess
+    label: "Protective: receives calls (inbound share above cand_max_inbound, full at inbound_full)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(inbound_excess)"
+    weight: -20
+    cap: 20
+    evidence[1]: inbound_ratio
+  - id: service_mix
+    label: "Protective: uses SMS or data (non-voice share, full at mix_full)"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(normal_service_mix)"
+    weight: -15
+    cap: 15
+    evidence[1]: voice_only_share
+  - id: mobility
+    label: "Protective: moves across cells at a plausible speed"
+    dataset: tb_factors
+    key: msisdn
+    measure: "max(mobility_flag)"
+    weight: -12
+    cap: 12
+    evidence[1]: top_cell_share

@@ -42,6 +42,42 @@ class BypassCorpusTest {
     }
 
     @Test
+    void theB2ExtensionAddsOnlyTheTwoScoreArchetypesAndIsDeterministic() {
+        BypassCorpus a = new BypassCorpus().generateB2(), b = new BypassCorpus().generateB2(), base = new BypassCorpus().generate();
+        assertEquals(a.files(true), b.files(true));
+        assertEquals(a.filesOnDay(1, a.archetypes.get("L2")), b.filesOnDay(1, b.archetypes.get("L2")));
+        assertEquals(2, a.agreementTrap.size());
+        Set<String> added = new HashSet<>(a.allPlanted());
+        added.removeAll(base.allPlanted());
+        Set<String> planted = new HashSet<>(a.agreementTrap);
+        planted.addAll(a.roundClockEdge);
+        assertEquals(planted, added, "B2 adds exactly X1 and X2");
+        assertEquals(1, a.roundClockEdge.size());
+        assertTrue(a.agreementTrap.stream().noneMatch(a.boxLike::contains) && a.agreementTrap.stream().noneMatch(a.ambiguous::contains));
+        for (Map.Entry<String, Set<String>> e : base.archetypes.entrySet()) assertEquals(e.getValue(), a.archetypes.get(e.getKey()), e.getKey());
+        assertEquals(base.boxLike, a.boxLike);
+    }
+
+    @Test
+    void aLaterDayShiftsEveryRowAndRelocatesOnlyTheNamedLines() {
+        BypassCorpus c = new BypassCorpus().generateB2();
+        Set<String> moved = Set.of(c.archetypes.get("L2").iterator().next());
+        Map<String, String> day2 = c.filesOnDay(1, moved);
+        assertEquals(Set.of("voice_cdr/VOICE_CDR_20260702.csv"), day2.keySet());
+        String[] rows = day2.values().iterator().next().split("\n");
+        assertEquals(c.calls().size() + 1, rows.length, "a header and every row");
+        Set<String> cellsOfMoved = new HashSet<>();
+        for (int i = 1; i < rows.length; i++) {
+            String[] f = rows[i].split(",", -1);
+            assertTrue(f[0].startsWith("D1V") && f[1].startsWith("2026-07-0"), rows[i]);
+            assertFalse(f[1].startsWith("2026-07-01"), "every row moved a day on: " + rows[i]);
+            if (moved.contains(f[4]) && f[2].equals("MO")) cellsOfMoved.add(f[8]);
+        }
+        assertEquals(12, cellsOfMoved.size(), "the relocated line is served by the twelve neighbouring cells in turn");
+        assertTrue(c.cellSite().contains("C3011,"), "the neighbouring cells are in the Reference feed from day one");
+    }
+
+    @Test
     void everyRowFallsInsideTheOneDay() {
         BypassCorpus c = new BypassCorpus().generate();
         Set<String> outside = new HashSet<>();

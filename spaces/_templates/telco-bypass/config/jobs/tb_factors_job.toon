@@ -1,0 +1,21 @@
+job:
+  name: tb_factors
+  type: sql.template
+  description: "Bypass / SIM-box Risk Score inputs - turns the day's tb_features rows into the factor columns the tb_sim Risk Score weighs: five 0-or-1 clause flags (the same strict clauses as box_like), three shares, three protective factors, and the count of primary signals; a snapshot of the latest window only"
+  sql: "WITH f AS ( SELECT * FROM tb_features WHERE CAST(window_date AS DATE) = CAST($window_start AS DATE) ), x AS ( SELECT msisdn, CASE WHEN b_diversity > CAST($cand_min_b_div AS DOUBLE) THEN 1.0 ELSE 0.0 END AS b_diversity_excess, CASE WHEN short_call_ratio > CAST($cand_min_short AS DOUBLE) THEN 1.0 ELSE 0.0 END AS short_uniform_index, CASE WHEN inbound_ratio < CAST($cand_max_inbound AS DOUBLE) THEN 1.0 ELSE 0.0 END AS no_inbound_flag, CASE WHEN voice_only_share > CAST($cand_min_voice_only AS DOUBLE) THEN 1.0 ELSE 0.0 END AS voice_only_flag, CASE WHEN top_cell_share > CAST($cand_min_top_cell AS DOUBLE) THEN 1.0 ELSE 0.0 END AS static_cell_flag, seq_dial_share, night_share, onnet_target_share, least(1.0, greatest(0.0, (inbound_ratio - CAST($cand_max_inbound AS DOUBLE)) / (CAST($inbound_full AS DOUBLE) - CAST($cand_max_inbound AS DOUBLE)))) AS inbound_excess, least(1.0, greatest(0.0, (1.0 - voice_only_share) / CAST($mix_full AS DOUBLE))) AS normal_service_mix, CASE WHEN top_cell_share < CAST($mobility_top_cell AS DOUBLE) AND coalesce(max_implied_kmh, 0) <= CAST($mobility_max_kmh AS DOUBLE) THEN 1.0 ELSE 0.0 END AS mobility_flag, CASE WHEN active_hours >= CAST($rtc_hours AS INTEGER) THEN 1 ELSE 0 END AS round_clock, round(calls_mo * coalesce(asr, 1.0) * coalesce(acd_s, 0) / 60.0, 1) AS est_bypass_minutes, calls_mo, b_diversity, short_call_ratio, inbound_ratio, voice_only_share, top_cell_share, active_hours, missing, evidence_ids, CAST(window_date AS DATE) AS window_date FROM f ) SELECT msisdn, b_diversity_excess, short_uniform_index, no_inbound_flag, voice_only_flag, static_cell_flag, seq_dial_share, night_share, onnet_target_share, inbound_excess, normal_service_mix, mobility_flag, CAST(b_diversity_excess + short_uniform_index + no_inbound_flag + voice_only_flag + static_cell_flag + round_clock AS BIGINT) AS primary_signals, est_bypass_minutes, calls_mo, b_diversity, short_call_ratio, inbound_ratio, voice_only_share, top_cell_share, active_hours, missing, evidence_ids, window_date FROM x"
+  sources: tb_features
+  sink_dataset: tb_factors
+  cron: "10 3 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
+  cand_max_inbound: "0.05"
+  cand_min_b_div: "0.9"
+  cand_min_short: "0.9"
+  cand_min_voice_only: "0.99"
+  cand_min_top_cell: "0.9"
+  inbound_full: "0.3"
+  mix_full: "0.2"
+  mobility_top_cell: "0.6"
+  mobility_max_kmh: "250"
+  rtc_hours: "18"
+  enabled: true

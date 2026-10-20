@@ -202,6 +202,23 @@
             </plugin>
 
             <!--
+                TELCO-BYPASS-SIMBOX-1 B2: publish a test-jar so the Scoring module's golden test can reuse the
+                synthetic BypassCorpus (the telco-bypass Space Template's fixture, which lives with its B1 golden here)
+                instead of copying it. Test classes only; never shipped in a bundle.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
                 The product jar = this module's OWN classes + every THIRD-PARTY dependency, shaded together
                 (MODULE-REORG-P3d stage 2, 2026-10-08). The first-party libraries below it (api, config, util, sql, etl,
                 event, audit-spi, auth-spi, http-spi, workflow, access, entity-store, acquire, engine; graph, which the

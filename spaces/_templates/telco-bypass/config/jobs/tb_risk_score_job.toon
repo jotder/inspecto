@@ -1,0 +1,6 @@
+job:
+  name: tb_risk_score
+  type: risk.score
+  model: tb_sim
+  cron: "20 3 * * *"
+  enabled: true

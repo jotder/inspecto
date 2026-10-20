@@ -1,0 +1,28 @@
+raw:
+  name: PARTNER
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    partner_id,"0",VARCHAR,"Partner identifier, the key of every agreement and statement","","INTERNAL"
+    name,"1",VARCHAR,"Partner legal name","","INTERNAL"
+    type,"2",VARCHAR,"interconnect, roaming, MVNO or aggregator","","INTERNAL"
+    country,"3",VARCHAR,"Country code of the partner; selects its public-holiday list","","INTERNAL"
+    status,"4",VARCHAR,"active or closed","","INTERNAL"
+mapping:
+  canonicalName: partner
+  rawName: PARTNER
+  fields[5]:
+    - name: partner_id
+      from: partner_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: type
+      from: type
+      fn: keep
+    - name: country
+      from: country
+      fn: keep
+    - name: status
+      from: status
+      fn: keep

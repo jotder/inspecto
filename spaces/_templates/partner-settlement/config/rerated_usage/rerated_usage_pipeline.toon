@@ -1,0 +1,31 @@
+name: rerated_usage
+active: true
+
+dirs:
+  poll:       data/inbox/rerated_usage
+  database:   data/rerated_usage/database
+  backup:     data/rerated_usage/backup
+  temp:       data/rerated_usage/temp
+  errors:     data/rerated_usage/errors
+  quarantine: data/rerated_usage/quarantine
+  markers:    data/rerated_usage/markers
+  status_dir: data/rerated_usage/status
+  log_dir:    data/rerated_usage/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: rerated_usage_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

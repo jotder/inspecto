@@ -1,0 +1,31 @@
+name: fx_rate
+active: true
+
+dirs:
+  poll:       data/inbox/fx_rate
+  database:   data/fx_rate/database
+  backup:     data/fx_rate/backup
+  temp:       data/fx_rate/temp
+  errors:     data/fx_rate/errors
+  quarantine: data/fx_rate/quarantine
+  markers:    data/fx_rate/markers
+  status_dir: data/fx_rate/status
+  log_dir:    data/fx_rate/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: fx_rate_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

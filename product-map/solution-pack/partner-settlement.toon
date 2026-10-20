@@ -1,0 +1,7 @@
+id: solution-pack.partner-settlement
+kind: solution-pack
+title: Partner settlement
+template: partner-settlement
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/partner-settlement/index.md

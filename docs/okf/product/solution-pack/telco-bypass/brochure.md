@@ -1,8 +1,8 @@
 # Telecom bypass (SIM-box) — brochure
 
-> **See which SIMs behave like part of a SIM-box, from the CDRs you already have, with every signal explained.**
+> **See which SIMs behave like part of a SIM-box, from the CDRs you already have, with every signal and every decision explained.**
 
-*Audience: customers, presales and sales. Product Map Item `solution-pack.telco-bypass` · status **preview** (signals only). Prices are not published here.*
+*Audience: customers, presales and sales. Product Map Item `solution-pack.telco-bypass` · status **preview** (signals, score, lists and the SIM Alert). Prices are not published here.*
 
 ## Who it is for
 
@@ -11,19 +11,21 @@ Fraud and revenue-assurance teams at operators and MVNOs that want bypass eviden
 ## The problems it solves
 
 - A box SIM looks ordinary one call at a time: it is the shape of a whole day (many different numbers, short even calls, no inbound, no SMS or data, one cell, round the clock) that gives it away.
-- A single yes-or-no rule scores a box that rotates SIMs or keeps a few calls alive as zero.
-- Analysts re-derive the reasons by hand.
+- A single yes-or-no rule scores a box that rotates SIMs or keeps a few calls alive as zero, and cannot say which signal fired.
+- A busy fraud team stops trusting a pack that pages on every PBX and call centre: here a verified line goes on an allow list that expires, a high score needs enough independent signals, and an alert needs more than one night.
+- Analysts re-derive the reasons by hand: every score carries the contribution of each signal.
 
 ## What is included
 
 - Four Pipelines: the voice CDR feed and three small Reference feeds.
-- One daily Job that writes one row per SIM per day with twelve signals and a `box_like` flag; every threshold is configuration.
+- A nightly chain of four Jobs: twelve signals per SIM, the score inputs, an explainable 0 to 100 Risk Score with protective factors, and the findings.
+- An allow list with an expiry and a watch list, a lower-severity Alert when a verified line changes shape, and a shadow mode that measures precision before anyone is paged.
 - Signals degrade one by one: a missing optional column or Reference is named, never an error.
-- A synthetic corpus with planted boxes and the look-alikes that must stay silent, and a golden test that holds the Job to them.
+- A synthetic corpus with planted boxes and the look-alikes that must stay silent (call centre, alarm line, couriers, a new heavy user, a dense building, a visiting roamer), and golden tests that hold the pack to each planted outcome and reason.
 
 ## What it does not do
 
-It is CDR-based only: no probes, signalling or test calls, and nothing is blocked or decided on a live call. A CDR pattern is evidence of consistency with a box, never proof. Scoring, lists, Alert Rules and the box-level Incident follow in later slices.
+It is CDR-based only: no probes, signalling or test calls, and nothing is blocked or decided on a live call. A CDR pattern is evidence of consistency with a box, never proof; a quiet PBX looks the same, so the pack asks for a verification step. The suspected-box Incident across many SIMs, the device signals and an Anomaly Model factor follow in later slices.
 
 ## How it fits with the Editions
 
@@ -31,7 +33,7 @@ Needs [Standard](../../edition/standard/brochure.md), [Advanced](../../edition/a
 
 ## Next step
 
-Run it on an anonymised extract of your voice CDRs in a proof of value, and calibrate the thresholds in a shadow period.
+Run it on an anonymised extract of your voice CDRs in a proof of value, in shadow mode, and calibrate the weights and thresholds against what your analysts would have accepted.
 
 ## Read more
 

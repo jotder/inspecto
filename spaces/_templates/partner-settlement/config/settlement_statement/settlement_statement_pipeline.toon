@@ -1,0 +1,31 @@
+name: settlement_statement
+active: true
+
+dirs:
+  poll:       data/inbox/settlement_statement
+  database:   data/settlement_statement/database
+  backup:     data/settlement_statement/backup
+  temp:       data/settlement_statement/temp
+  errors:     data/settlement_statement/errors
+  quarantine: data/settlement_statement/quarantine
+  markers:    data/settlement_statement/markers
+  status_dir: data/settlement_statement/status
+  log_dir:    data/settlement_statement/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: settlement_statement_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

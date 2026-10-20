@@ -1,0 +1,84 @@
+raw:
+  name: SETTLEMENT_AGREEMENT
+  format: CSV
+  fields[19]{name,selector,type,description,unit,classification}:
+    agreement_id,"0",VARCHAR,"Agreement identifier; one agreement has one row per effective-dated version","","INTERNAL"
+    partner_id,"1",VARCHAR,"Partner the agreement is with","","INTERNAL"
+    kind,"2",VARCHAR,"interconnect voice, SMS termination, roaming IOT, MVNO per-unit, capacity or commitment","","INTERNAL"
+    direction,"3",VARCHAR,"we_pay, they_pay or both","","INTERNAL"
+    currency,"4",VARCHAR,"Settlement currency (ISO 4217): both sides of the compare are converted into it","","INTERNAL"
+    rounding_rule,"5",VARCHAR,"How usage is rounded into billable units (documentation for the re-rater; the pack never re-rounds)","","INTERNAL"
+    tolerance_type,"6",VARCHAR,"pct (percent of the expected amount) or abs (an absolute amount in the settlement currency)","","INTERNAL"
+    tolerance,"7","DECIMAL(18,4)","Variance up to and including this is not a finding","","INTERNAL"
+    cutoff_zone,"8",VARCHAR,"IANA zone of the day cut-off (documentation: usage_date arrives already bucketed)","","INTERNAL"
+    cutoff_time,"9",VARCHAR,"Local time the usage day ends (documentation)","","INTERNAL"
+    cycle,"10",VARCHAR,"monthly, semi_monthly or weekly","","INTERNAL"
+    statement_due_days,"11",INTEGER,"Days after the cycle end the partner statement is due","","INTERNAL"
+    dispute_window_days,"12",INTEGER,"Days after the statement due date a dispute may be raised","","INTERNAL"
+    payment_due_days,"13",INTEGER,"Days after the statement due date payment is due","","INTERNAL"
+    netting_group,"14",VARCHAR,"Agreements sharing a group are netted against each other","","INTERNAL"
+    fx_rate_type,"15",VARCHAR,"Which fx_rate rows convert amounts for this agreement (spot, monthly_avg, contract)","","INTERNAL"
+    fx_date_rule,"16",VARCHAR,"usage_date or period_end: the date whose rate converts a line","","INTERNAL"
+    valid_from,"17",DATE,"First day this version is in force (inclusive)","","INTERNAL"
+    valid_to,"18",DATE,"Last day this version is in force (inclusive); blank = open-ended","","INTERNAL"
+mapping:
+  canonicalName: settlement_agreement
+  rawName: SETTLEMENT_AGREEMENT
+  fields[19]:
+    - name: agreement_id
+      from: agreement_id
+      fn: keep
+    - name: partner_id
+      from: partner_id
+      fn: keep
+    - name: kind
+      from: kind
+      fn: keep
+    - name: direction
+      from: direction
+      fn: keep
+    - name: currency
+      from: currency
+      fn: keep
+    - name: rounding_rule
+      from: rounding_rule
+      fn: keep
+    - name: tolerance_type
+      from: tolerance_type
+      fn: keep
+    - name: tolerance
+      from: tolerance
+      fn: keep
+    - name: cutoff_zone
+      from: cutoff_zone
+      fn: keep
+    - name: cutoff_time
+      from: cutoff_time
+      fn: keep
+    - name: cycle
+      from: cycle
+      fn: keep
+    - name: statement_due_days
+      from: statement_due_days
+      fn: keep
+    - name: dispute_window_days
+      from: dispute_window_days
+      fn: keep
+    - name: payment_due_days
+      from: payment_due_days
+      fn: keep
+    - name: netting_group
+      from: netting_group
+      fn: keep
+    - name: fx_rate_type
+      from: fx_rate_type
+      fn: keep
+    - name: fx_date_rule
+      from: fx_date_rule
+      fn: keep
+    - name: valid_from
+      from: valid_from
+      fn: keep
+    - name: valid_to
+      from: valid_to
+      fn: keep
