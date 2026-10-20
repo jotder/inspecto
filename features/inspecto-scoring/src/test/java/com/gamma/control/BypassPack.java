@@ -101,10 +101,21 @@ final class BypassPack {
         return JobConfig.load(space.resolve("config").resolve("jobs").resolve(name + "_job.toon").toString());
     }
 
+    /** The six nightly Jobs, in the order their cron times run them. */
+    static final List<String> NIGHTLY = List.of("tb_features", "tb_factors", "tb_risk_score", "tb_findings", "tb_cluster_members", "tb_clusters");
+
+    /** The two SIM-level Alert Rules of slice B2. */
+    static final Set<String> SIM_RULES = Set.of("tb_sim_high", "tb_allowed_line_changed");
+
     /** The shipped Jobs run in their nightly order, each for {@code day}, with {@code overrides} on top (a parameter by name). */
     static void runNight(Path space, String day, Map<String, String> overrides) throws Exception {
+        runJobs(space, NIGHTLY, day, overrides);
+    }
+
+    /** The named shipped Jobs, in the given order, each for {@code day}; a stage is run in isolation by naming only it. */
+    static void runJobs(Path space, List<String> names, String day, Map<String, String> overrides) throws Exception {
         List<JobConfig> jobs = new ArrayList<>();
-        for (String j : List.of("tb_features", "tb_factors", "tb_risk_score", "tb_findings")) jobs.add(job(space, j));
+        for (String j : names) jobs.add(job(space, j));
         System.setProperty("assist.write.root", space.resolve("config").toString());
         System.setProperty("data.dir", space.resolve("data").toString());
         try (Scheduler s = new Scheduler();
@@ -203,10 +214,14 @@ final class BypassPack {
         /** Keys of every non-critical rule that has raised its Alert (such a rule opens an Alert, not one Incident per key). */
         private final Map<String, Set<String>> lower = new TreeMap<>();
 
-        Sweep(Path space) {
+        Sweep(Path space) { this(space, null); }
+
+        /** {@code only}: the Alert Rules to sweep by name (the SIM-level B2 tests leave the box rule to the B3 tests); null = all. */
+        Sweep(Path space, Set<String> only) {
             Path cfg = space.resolve("config"), data = space.resolve("data");
             store = new ComponentStore(cfg.resolve("registry"));
-            rules = store.list("alert-rule").stream().map(c -> AlertRule.fromMap(c.content())).toList();
+            rules = store.list("alert-rule").stream().map(c -> AlertRule.fromMap(c.content()))
+                    .filter(r -> only == null || only.contains(r.name())).toList();
             svc = new AlertService(rules, noPipelines(), emptyStore(), objects);
             probe = new DatasetMeasureProbe(() -> cfg, () -> data);
             svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(), r.threshold(), r.stormCap()));
@@ -222,7 +237,7 @@ final class BypassPack {
                 AlertRule r = rules.stream().filter(x -> x.name().equals(raised.rule())).findFirst().orElseThrow();
                 Set<String> keys = new TreeSet<>();
                 probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(), r.threshold(), r.stormCap()).orElseThrow()
-                        .keys().forEach(b -> keys.add(String.valueOf(b.key().get("entity_key"))));
+                        .keys().forEach(b -> keys.add(String.valueOf(b.key().get(r.by().get(0)))));
                 assertEquals(keys.size(), (int) raised.value(), r.name() + ": the Alert's value is its breached-key count");
                 lower.computeIfAbsent(r.name(), k -> new TreeSet<>()).addAll(keys);
             }
@@ -231,9 +246,15 @@ final class BypassPack {
             for (FakeObjectAccess.Opened o : objects.opened) {
                 if (o.kind() != ObjectType.INCIDENT) continue;
                 String rule = String.valueOf(o.attributes().get("rule"));
-                out.computeIfAbsent(rule, k -> new TreeSet<>()).add(String.valueOf(o.attributes().get("key.entity_key")));
+                String by = rules.stream().filter(x -> x.name().equals(rule)).findFirst().orElseThrow().by().get(0);
+                out.computeIfAbsent(rule, k -> new TreeSet<>()).add(String.valueOf(o.attributes().get("key." + by)));
             }
             return out;
+        }
+
+        /** Incidents opened so far by one Alert Rule (a storm Incident counts as one). */
+        long incidents(String rule) {
+            return objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT && rule.equals(o.attributes().get("rule"))).count();
         }
 
         long incidents() {

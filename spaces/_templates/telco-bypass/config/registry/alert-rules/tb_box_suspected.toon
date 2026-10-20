@@ -1,0 +1,10 @@
+name: tb_box_suspected
+dataset: tb_clusters
+measure: max(alert_value)
+by[1]: cluster_key
+comparator: gte
+threshold: 1
+stormCap: 500
+severity: CRITICAL
+runbook: tb_box_suspected
+description: "SIM-box suspected: a device, a cell or an activation batch carries enough candidate SIMs (each one dials a new number almost every call, in short calls, never receives calls, uses no SMS or data and stays on one cell), not on the allow list and not in shadow mode. One Incident per box, the work item: the member SIMs are the evidence (tb_cluster_members, and tb_findings for those that also alert on their own). A CDR pattern is evidence of consistency with a box, never proof"

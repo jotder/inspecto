@@ -2,7 +2,7 @@
 
 > **See which SIMs behave like part of a SIM-box, from the CDRs you already have, with every signal and every decision explained.**
 
-*Audience: customers, presales and sales. Product Map Item `solution-pack.telco-bypass` · status **preview** (signals, score, lists and the SIM Alert). Prices are not published here.*
+*Audience: customers, presales and sales. Product Map Item `solution-pack.telco-bypass` · status **preview** (signals, score, lists, the SIM Alert and the box Incident). Prices are not published here.*
 
 ## Who it is for
 
@@ -18,14 +18,15 @@ Fraud and revenue-assurance teams at operators and MVNOs that want bypass eviden
 ## What is included
 
 - Four Pipelines: the voice CDR feed and three small Reference feeds.
-- A nightly chain of four Jobs: twelve signals per SIM, the score inputs, an explainable 0 to 100 Risk Score with protective factors, and the findings.
+- A nightly chain of six Jobs: twelve signals per SIM, the score inputs, an explainable 0 to 100 Risk Score with protective factors, the findings, and the boxes: SIMs that share a device, a cell or an activation batch become one suspected box.
+- One Incident and one Case per suspected box instead of an alert storm of a thousand SIMs, a Link Analysis view of its members, and a runbook.
 - An allow list with an expiry and a watch list, a lower-severity Alert when a verified line changes shape, and a shadow mode that measures precision before anyone is paged.
 - Signals degrade one by one: a missing optional column or Reference is named, never an error.
 - A synthetic corpus with planted boxes and the look-alikes that must stay silent (call centre, alarm line, couriers, a new heavy user, a dense building, a visiting roamer), and golden tests that hold the pack to each planted outcome and reason.
 
 ## What it does not do
 
-It is CDR-based only: no probes, signalling or test calls, and nothing is blocked or decided on a live call. A CDR pattern is evidence of consistency with a box, never proof; a quiet PBX looks the same, so the pack asks for a verification step. The suspected-box Incident across many SIMs, the device signals and an Anomaly Model factor follow in later slices.
+It is CDR-based only: no probes, signalling or test calls, and nothing is blocked or decided on a live call. A CDR pattern is evidence of consistency with a box, never proof; a quiet PBX looks the same, so the pack asks for a verification step. A box whose SIMs share no device, cell or activation batch cannot be linked from CDRs. The 7-day device signals and an Anomaly Model factor follow in later slices.
 
 ## How it fits with the Editions
 

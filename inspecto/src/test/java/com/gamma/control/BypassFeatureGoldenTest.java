@@ -112,8 +112,8 @@ class BypassFeatureGoldenTest {
         Path space = createSpace(root);
         Path config = space.resolve("config");
         List<JobConfig> jobs = jobs(config);
-        assertEquals(Set.of("tb_features", "tb_factors", "tb_findings"), new TreeSet<>(jobs.stream().map(JobConfig::name).toList()),
-                "B1's SIM-day stage, and B2's two sql.template stages (the risk.score Job is not one); B2's own golden pins them");
+        assertEquals(Set.of("tb_features", "tb_factors", "tb_findings", "tb_cluster_members", "tb_clusters"), new TreeSet<>(jobs.stream().map(JobConfig::name).toList()),
+                "B1's SIM-day stage, B2's two and B3's two sql.template stages (the risk.score Job is not one); B2's and B3's goldens pin them");
         JobConfig j = featureJob(config);
         assertEquals("tb_features", j.name());
         assertEquals("0 3 * * *", j.cron());
@@ -127,7 +127,7 @@ class BypassFeatureGoldenTest {
                 new TreeSet<>(List.of(j.params().get("sources").split(","))));
         try (Stream<Path> s = Files.list(config.resolve("registry").resolve("datasets"))) {
             assertEquals(Set.of("voice_cdr.toon", "cell_site.toon", "number_plan.toon", "subscriber_profile.toon", "tb_features.toon",
-                            "tb_factors.toon", "tb_findings.toon"),
+                            "tb_factors.toon", "tb_findings.toon", "tb_cluster_members.toon", "tb_clusters.toon"),
                     new TreeSet<>(s.map(p -> p.getFileName().toString()).toList()));
         }
         assertTrue(Files.isRegularFile(config.resolve("runbooks").resolve("telco-bypass-runbooks.md")), "the runbook skeleton ships");

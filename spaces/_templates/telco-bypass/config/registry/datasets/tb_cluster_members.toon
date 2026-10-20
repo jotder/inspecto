@@ -1,0 +1,20 @@
+physicalRef: tb_cluster_members
+columns[18]{name,type,classification}:
+  msisdn,string,MSISDN
+  cluster_kind,string,
+  cluster_key,string,
+  imei_key,string,IMEI
+  cell_key,string,
+  batch_key,string,
+  imei_sims,number,
+  cell_sims,number,
+  batch_sims,number,
+  imei_count,number,
+  calls_mo,number,
+  talk_minutes,number,
+  b_diversity,number,
+  short_call_ratio,number,
+  inbound_ratio,number,
+  voice_only_share,number,
+  top_cell_share,number,
+  window_date,date,

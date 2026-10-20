@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.case-management`](../../../../../product-map/module/case-management.toon).
 
-21 test class(es): 15 unit, 6 real-HTTP control-plane, 0 IT.
+22 test class(es): 16 unit, 6 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl features/inspecto-case-management
-mvn -o test -pl features/inspecto-case-management -Dtest=PerEntityAlertCaseRuleTest,CaseRuleEvaluateRunInAServiceTest
+mvn -o test -pl features/inspecto-case-management -Dtest=BypassBoxCaseRuleTest,PerEntityAlertCaseRuleTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `BypassBoxCaseRuleTest` | `com.gamma.alert` | unit | `features/inspecto-case-management/src/test/java/com/gamma/alert/BypassBoxCaseRuleTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B3 (decision D-BP3: the box Incident is the Case anchor). The SHIPPED |
 | `PerEntityAlertCaseRuleTest` | `com.gamma.alert` | unit | `features/inspecto-case-management/src/test/java/com/gamma/alert/PerEntityAlertCaseRuleTest.java` | ASSURE-PER-ENTITY-ALERTS-1 against the REAL object engine and a Case Rule: an existing Case Rule groups the |
 | `CaseRuleEvaluateRunInAServiceTest` | `com.gamma.control` | unit | `features/inspecto-case-management/src/test/java/com/gamma/control/CaseRuleEvaluateRunInAServiceTest.java` | {@code caserule.evaluate} (contributed by this module through {@code ServiceLoader}) RUN inside a real |
 | `CaseRuleUnmodelledKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/CaseRuleUnmodelledKeysTest.java` | {@code MODULE-REORG-P4-2} for the Case Rule writer (moved from {@code OpsWritersUnmodelledKeysTest}, MODULE-REORG-P7): an |
