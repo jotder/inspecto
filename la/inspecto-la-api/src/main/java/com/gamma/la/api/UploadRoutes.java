@@ -335,6 +335,9 @@ public final class UploadRoutes implements RouteModule {
             if (tooBig.status == 413) throw refuse("size", 413, ErrorCodes.PAYLOAD_TOO_LARGE,
                     "the upload is over the Space's upload.max_bytes (" + maxBytes + " bytes)");
             throw tooBig;
+        } catch (IOException cut) {
+            // the client sent fewer bytes than its Content-Length declared (connection closed mid-body): a bad request, nothing landed
+            throw refuse("body", 400, ErrorCodes.MALFORMED_REQUEST, "the request body ended before its declared Content-Length; nothing was uploaded");
         }
         size[0] = bytes.length;
         seen[1] = EntityFactLog.sha256(bytes);
