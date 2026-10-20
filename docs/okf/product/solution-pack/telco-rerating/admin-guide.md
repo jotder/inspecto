@@ -24,7 +24,7 @@ timestamp: 2026-10-21T00:00:00Z
    ```
 
    The first refusal creates no Space (`docs/api/openapi-v1.json`, `postSpaces`).
-3. Point the operator's rating output at `data/inbox/rated_usage` (one file per day, `RATED_USAGE_<yyyyMMdd>.csv`) deliver the whole tariff table, one row per version, to `data/inbox/tariff_version` whenever it changes, and the whole subscription history to `data/inbox/subscription_history`. No sample files ship: use the contracts in `config/rated_usage/rated_usage_schema.toon`, `config/tariff_version/tariff_version_schema.toon` and `config/subscription_history/subscription_history_schema.toon`.
+3. Point the operator's rating output at `data/inbox/rated_usage` (one file per day, `RATED_USAGE_<yyyyMMdd>.csv`), deliver the whole tariff table, one row per version, to `data/inbox/tariff_version` whenever it changes, and the whole subscription history to `data/inbox/subscription_history`. No sample files ship: use the contracts in `config/rated_usage/rated_usage_schema.toon`, `config/tariff_version/tariff_version_schema.toon` and `config/subscription_history/subscription_history_schema.toon`.
 
 ## The feed contracts
 

@@ -42,7 +42,7 @@ Four `sql.template` Jobs, chained on a signal:
 
 3. `rr_explain` (`on_signal` when `rr_rerate` succeeded; the same window and `incremental` settings) writes the Dataset `rerating_findings`: one row per finding of the day, 23 columns. A leakage or over-billing is tested against
    three counterfactual re-ratings, each a one-parameter change that must reproduce the charge within `tolerance`: `stale_version` (the most recently ended version), `lower_priority_rate` (a row in force that lost on
-   `PRIORITY`) `early_version` (the next version) and `wrong_plan` (the plan the subscriber's own calls are billed at, when `subscription_history` assigns a different one: see below). `CAUSE_CONFIDENCE` is exactness (1, or `within_tolerance_confidence`) times support (the share of the same plan, service, candidate versions and finding that the same cause
+   `PRIORITY`), `early_version` (the next version) and `wrong_plan` (the plan the subscriber's own calls are billed at, when `subscription_history` assigns a different one: see below). `CAUSE_CONFIDENCE` is exactness (1, or `within_tolerance_confidence`) times support (the share of the same plan, service, candidate versions and finding that the same cause
    also explains; for `wrong_plan`, the share of the subscriber's calls the inferred plan explains); below `confidence_floor`, or with no fit, `unexplained` with confidence 0; other fitting causes stay in `CAUSE_ALTERNATIVE`. `LEAKAGE_LOW` (revenue at risk), `LEAKAGE_HIGH` and `OVERBILLED_AMOUNT` are separate columns.
 4. `rr_root_cause` (`on_signal` when `rr_explain` succeeded) replaces the snapshot `rerating_root_causes`: one row per `ROOT_CAUSE_ID` (`CAUSE|FINDING|PLAN|SERVICE|CANDIDATE_VERSIONS|CAUSE_TARIFF_VERSION_ID`, no date)
    over every retained day, with calls, first and last day, the sums, `RUN_RATE_PER_DAY`, the weakest confidence and example keys.
@@ -82,7 +82,7 @@ columns and are never netted (D-RR4).
 - **Decided in R2:** a call on a negative-rate row has no usable tariff; a call with no charge or no units is `unratable_call`; `agree` outranks `precedence` (zero units); `PRIORITY_ORDERED` is a fact about one pair while `RESOLUTION` is the verdict
   for a call; the gap names the version that ends last, ties to the greater id (the tariff file's order changes nothing). Details and the equivalent clauses no mutant can claim: plan section 14.
 - **Not built:** orphan-plan detection (needs the plan Reference), the stage columns of R4 (increments, minimum charge, rounding scope, zone, time band, tax) and their causes, allowances (R5), the Reconciliation, the
-  Alert Rule by `ROOT_CAUSE_ID` and the dashboard (R6). `rr_explain` was measured at volume in R3 (admin guide).
+  Alert Rule by `ROOT_CAUSE_ID` and the dashboard (R6). `rr_explain` was measured in R3 only over in-memory tables, not the Job over Parquet (admin guide).
 
 ## Verification
 
@@ -90,7 +90,7 @@ columns and are never netted (D-RR4).
 seeded synthetic `RerateCorpus` through the template's own Pipelines, runs all four Jobs as authored and holds every contract column of
 every call, every tariff finding, every finding of `rr_explain` and every root cause to an independent plain-Java oracle (and the planted causes to hand-declared ones); the findings to the exact planted set with every look-alike
 silent; the degradation (no `PRIORITY` column), the tolerance parameter, zone independence, idempotent re-runs and the signal chain; and
-a pass of 157 clause mutants that must each change the oracle's rows (57 must change a named row); the known unpinned clauses and limits are in the plan sections 13 and 14.
+a pass of 157 clause mutants that must each change the oracle's rows (57 must change a named row); the known unpinned clauses and limits are in the plan sections 13 to 15 (15 adds the unpinned inference clauses and `count(DISTINCT ITEM_KEY)`, which no corpus plan with two versions in force at one call pins).
 
 ## Related
 
