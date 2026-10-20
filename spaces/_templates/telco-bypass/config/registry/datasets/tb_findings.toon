@@ -1,0 +1,19 @@
+physicalRef: tb_findings
+columns[17]{name,type,classification}:
+  entity_key,string,MSISDN
+  kind,string,
+  score,number,
+  high,boolean,
+  primary_signals,number,
+  status,string,
+  alert_score,number,
+  top_factors,string,
+  est_bypass_minutes,number,
+  allowed,boolean,
+  watched,boolean,
+  persist_hits,number,
+  shape_sig,string,
+  shape_changed,number,
+  evidence_ids,string,
+  factors,string,
+  window_date,date,

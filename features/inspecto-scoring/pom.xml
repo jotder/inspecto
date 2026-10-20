@@ -49,6 +49,16 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Test classes of the core: com.gamma.control.BypassCorpus, the telco-bypass template's synthetic fixture
+             (TELCO-BYPASS-SIMBOX-1 B2); the same fixture its B1 golden uses, not a copy. Test scope, never shipped. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
         <!-- The WatchListFeed seam (com.gamma.entitylist). Always shipped beside this module: both are in the same
              "Scoring and Lists" add-on (offerings/standard.toon scoringLists). -->
         <dependency>

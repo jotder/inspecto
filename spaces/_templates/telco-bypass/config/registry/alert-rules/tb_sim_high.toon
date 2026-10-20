@@ -1,0 +1,9 @@
+name: tb_sim_high
+dataset: tb_findings
+measure: max(alert_score)
+by[1]: entity_key
+comparator: gte
+threshold: 1
+stormCap: 1000
+severity: CRITICAL
+description: "SIM-box suspected: the SIM scored at or above the Risk Score's high threshold with enough primary signals, persisted for enough days, not on the allow list and not in shadow mode (tb_findings.status = alert). A CDR pattern is evidence of consistency with a box, never proof"

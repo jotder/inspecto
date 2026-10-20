@@ -1,0 +1,9 @@
+name: tb_allowed_line_changed
+dataset: tb_findings
+measure: max(shape_changed)
+by[1]: entity_key
+comparator: gte
+threshold: 1
+stormCap: 1000
+severity: INFO
+description: "An allowed line changed shape: a SIM on the tb_allow Entity List now differs from its previous day in an inbound, service-mix or mobility signal, so the allow entry may no longer describe it. Re-verify the line"

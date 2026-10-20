@@ -108,12 +108,13 @@ class BypassFeatureGoldenTest {
     // ------------------------------------------------------------------------------------------- the shipped template
 
     @Test
-    void theTemplateShipsOneDailyJobAndFiveDatasetsAndItsFilesReachTheSpace(@TempDir Path root) throws Exception {
+    void theTemplateShipsTheSimDayJobAndItsFilesReachTheSpace(@TempDir Path root) throws Exception {
         Path space = createSpace(root);
         Path config = space.resolve("config");
         List<JobConfig> jobs = jobs(config);
-        assertEquals(1, jobs.size(), "slice B1 ships exactly the SIM-day stage");
-        JobConfig j = jobs.get(0);
+        assertEquals(Set.of("tb_features", "tb_factors", "tb_findings"), new TreeSet<>(jobs.stream().map(JobConfig::name).toList()),
+                "B1's SIM-day stage, and B2's two sql.template stages (the risk.score Job is not one); B2's own golden pins them");
+        JobConfig j = featureJob(config);
         assertEquals("tb_features", j.name());
         assertEquals("0 3 * * *", j.cron());
         assertEquals("$yesterday", j.params().get("window_start"));
@@ -125,7 +126,8 @@ class BypassFeatureGoldenTest {
         assertEquals(Set.of("voice_cdr", "cell_site", "number_plan", "subscriber_profile"),
                 new TreeSet<>(List.of(j.params().get("sources").split(","))));
         try (Stream<Path> s = Files.list(config.resolve("registry").resolve("datasets"))) {
-            assertEquals(Set.of("voice_cdr.toon", "cell_site.toon", "number_plan.toon", "subscriber_profile.toon", "tb_features.toon"),
+            assertEquals(Set.of("voice_cdr.toon", "cell_site.toon", "number_plan.toon", "subscriber_profile.toon", "tb_features.toon",
+                            "tb_factors.toon", "tb_findings.toon"),
                     new TreeSet<>(s.map(p -> p.getFileName().toString()).toList()));
         }
         assertTrue(Files.isRegularFile(config.resolve("runbooks").resolve("telco-bypass-runbooks.md")), "the runbook skeleton ships");
@@ -147,7 +149,7 @@ class BypassFeatureGoldenTest {
     void everyDatasetShipsAnEmptySeedWithTheSchemaOfTheRealThing(@TempDir Path root) throws Exception {
         Path tpl = template();
         DuckDbUtil.loadDriver();
-        JobConfig job = jobs(tpl.resolve("config")).get(0);
+        JobConfig job = featureJob(tpl.resolve("config"));
         try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
             for (Map.Entry<String, String> feed : FEED_COLUMNS.entrySet()) {
                 Path seed = tpl.resolve("data").resolve(feed.getKey()).resolve("database").resolve("schema-seed.parquet");
@@ -655,7 +657,7 @@ class BypassFeatureGoldenTest {
         Files.createDirectories(root);
         Path space = createSpace(root);
         ingest(space, files);
-        JobConfig job = jobs(space.resolve("config")).get(0);
+        JobConfig job = featureJob(space.resolve("config"));
         Map<String, String> args = new HashMap<>(WINDOW1);
         args.putAll(overrides);
         Map<String, String> params = new HashMap<>(job.params());
@@ -758,6 +760,10 @@ class BypassFeatureGoldenTest {
             Thread.sleep(50);
         }
         throw new AssertionError(name + ": no run within 120s");
+    }
+
+    private static JobConfig featureJob(Path config) throws Exception {
+        return jobs(config).stream().filter(j -> j.name().equals("tb_features")).findFirst().orElseThrow();
     }
 
     private static List<JobConfig> jobs(Path config) throws Exception {

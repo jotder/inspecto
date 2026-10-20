@@ -109,6 +109,65 @@ final class BypassCorpus {
         return this;
     }
 
+    // ------------------------------------------------------------------------------------------- slice B2 extension
+
+    /** SIMs with a high score and only four primary signals (X1): the agreement rule must hold the Alert back. */
+    final Set<String> agreementTrap = new TreeSet<>();
+    /** The one SIM active in exactly 18 hours (X2, the round-the-clock primary signal AT its threshold) and otherwise a box. */
+    final Set<String> roundClockEdge = new TreeSet<>();
+
+    /**
+     * {@link #generate()} plus the slice B2 archetypes: X1, two SIMs whose score reaches the high threshold with only four
+     * of the six primary signals (S1, S2, S4, S5 and number walking at night, but spread over two cells and not round the
+     * clock), so the agreement rule (not the score) decides them; and X2, one box-like SIM active in exactly 18 hours, the
+     * round-the-clock threshold (so that signal counts AT its boundary). Also creates the twelve neighbouring cells a relocated
+     * line moves across on a later day ({@link #filesOnDay}). B1's own archetypes, counts and seed are unchanged.
+     */
+    BypassCorpus generateB2() {
+        generate();
+        Set<String> x1 = archetype("X1");
+        for (int s = 0; s < 2; s++) {
+            String m = sim(16, s);
+            x1.add(m);
+            agreementTrap.add(m);
+            Dev d = new Dev(device(600 + s), imsi(16, s));
+            String near = cell(5000 + s).id(), far = cell(5100 + s).id();
+            for (int k = 0; k < 60; k++)
+                mo(m, d, k % 10 < 7 ? near : far, home(800000 + 100 * s + k), at(290L * k + 7), 20 + rnd.nextInt(41));
+            profile(m, "PREPAID", "D10", LocalDate.of(2026, 5, 2), "N");
+        }
+        String m2 = sim(17, 0);
+        archetype("X2").add(m2);
+        roundClockEdge.add(m2);
+        Dev d2 = new Dev(device(610), imsi(17, 0));
+        for (int k = 0; k < 36; k++)   // two calls in each of the hours 0 to 17
+            mo(m2, d2, cell(5200).id(), spread(9000 + k), at(3600L * (k / 2) + 1800L * (k % 2) + 7), 20 + rnd.nextInt(41));
+        profile(m2, "PREPAID", "D11", LocalDate.of(2026, 5, 3), "N");
+        for (int i = 0; i < 12; i++) cell(3000 + i);
+        calls.sort(Comparator.comparing(Call::ts).thenComparing(Call::id));
+        return this;
+    }
+
+    /**
+     * The voice feed of a LATER day (the Reference feeds are loaded once): every row moved {@code days} days on, record ids
+     * prefixed so they stay unique across files, and every MO call of the SIMs in {@code relocate} served by one of the
+     * twelve neighbouring cells C3000 to C3011 in turn (a line that has started to move). Needs {@link #generateB2()}.
+     */
+    Map<String, String> filesOnDay(int days, Set<String> relocate) {
+        StringBuilder cdr = new StringBuilder(HEADER).append(NL);
+        Map<String, Integer> served = new LinkedHashMap<>();
+        for (Call c : calls) {
+            String cell = c.cell();
+            if (relocate.contains(c.a()) && "MO".equals(c.direction()) && "VOICE".equals(c.service()))
+                cell = cells.get(String.format(Locale.ROOT, "C%04d", 3000 + served.merge(c.a(), 1, Integer::sum) % 12)).id();
+            cdr.append(new Call("D" + days + c.id(), c.ts().plusDays(days), c.direction(), c.service(), c.a(), c.b(), c.dur(),
+                    c.roaming(), cell, c.answered(), c.cause(), c.imei(), c.imsi()).csv(true)).append(NL);
+        }
+        Map<String, String> out = new LinkedHashMap<>();
+        out.put("voice_cdr/VOICE_CDR_" + DAY.plusDays(days).format(DateTimeFormatter.BASIC_ISO_DATE) + ".csv", cdr.toString());
+        return out;
+    }
+
     // ------------------------------------------------------------------------------------------- planted
 
     private void planted() {
