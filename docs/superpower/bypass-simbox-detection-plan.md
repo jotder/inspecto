@@ -1,12 +1,12 @@
 # Bypass / SIM-box detection from CDRs: a plan
 
-> 🟡 **PLAN 2026-10-18 (`TELCO-BYPASS-SIMBOX-1`): design only, nothing built.** Competitive gap **E** (bypass /
+> 🟡 **PLAN 2026-10-18 (`TELCO-BYPASS-SIMBOX-1`): B0 measured and B1 built 2026-10-20 (§16, §17); B2 to B7 not built.** Competitive gap **E** (bypass /
 > SIM-box detection) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../okf/product/layer/product/brochure-competitive-matrix.md):
 > LATRO, Subex, Mobileum, Neural and Araxxe sell it, and the matrix records Inspecto as "CDR-based only". The same
 > matrix places signalling probes (row F) and test-call generation (row G) **out of scope**, so this plan is
 > **CDR-based only by design** and says in §11 which RFP lines it therefore cannot close. Interconnect-side fraud that is
 > not bypass (IRSF, Wangiri, flash calls; row H) is planned by a sibling document and is **not** touched here.
-> Decisions **D-BP1…D-BP10 are open** (§14). Every number in this plan (volumes, thresholds, weights) is a hypothesis
+> Decisions **D-BP1…D-BP9 were answered 2026-10-20; D-BP10 stays open** (§14). Every number in this plan (volumes, thresholds, weights) is a hypothesis
 > until slice B0 measures it or an operator calibrates it; none is a vendor or industry fact.
 >
 > **Method.** Read the matrix rows E, F, G and H, the `telco-fraud` Space Template (its `fraud_simbox` Job, Alert Rule,
@@ -344,7 +344,7 @@ list of S1 to S16 cannot express is named by a prospect.
 | Slice | Delivers | Done when (verifiable) | Tests (unit level) |
 |---|---|---|---|
 | **B0 spike** | Facts, no shipped config: (1) throughput and memory of the SIM-day stage on a synthetic 5M-row day with the `lag` / overlap / speed windows; (2) can one Alert Rule `by` take two key columns, and what does `stormCap` do at a box-per-site cardinality; (3) can a Case Rule group on a cluster key that SIM Incidents carry; (4) can one Alert Rule express score **and** `primary_signals`; (5) does an `allow` Entity List sidecar filter on `expires_at` inside a `sql.template` Job read; (6) the module that owns `TelcoFraudTemplateGoldenTest`. | A measured table in this plan (§16) with the budget that gates **G-SB(a)**; the six answers recorded; **no repository change except this document**. | Throwaway harness, not committed; numbers only. |
-| **B1 signals + corpus** | Template skeleton `telco-bypass`; `voice_cdr` schema and Pipeline; Reference seeds; `tb_features` with S1 to S12; the corpus generator `BypassCorpus` (fixed seed) planting every archetype and look-alike of §12; zero-row seeds. | Golden asserts **exactly** the planted signal values per archetype and each look-alike's expected zero or sub-threshold column; the two host-zone run gives identical rows; missing optional columns flag, they do not fail. | `BypassCorpusTest` (deterministic; planted and benign sets disjoint), `BypassFeatureGoldenTest` (Jobs run, Datasets equal the planted set), a clause-by-clause mutation pass, a time-zone test. |
+| **B1 signals + corpus** (**BUILT 2026-10-20, §17**) | Template skeleton `telco-bypass`; `voice_cdr` schema and Pipeline; Reference seeds; `tb_features` with S1 to S12; the corpus generator `BypassCorpus` (fixed seed) planting every archetype and look-alike of §12; zero-row seeds. | Golden asserts **exactly** the planted signal values per archetype and each look-alike's expected zero or sub-threshold column; the two host-zone run gives identical rows; missing optional columns flag, they do not fail. | `BypassCorpusTest` (deterministic; planted and benign sets disjoint), `BypassFeatureGoldenTest` (Jobs run, Datasets equal the planted set), a clause-by-clause mutation pass, a time-zone test. |
 | **B2 score + lists + alert** | `tb_sim` Risk Score; `tb-watch`, `tb-allow`, `tb-block`, `tb-ranges`; `tb_findings` with `primary_signals` and persistence; Alert Rule `tb_sim_high`; the anti-join with `tb-allow`; the shadow switch. | Every planted SIM alerts exactly once with its planted top factors; every look-alike is silent **for the planted reason** (the factor that suppresses it is asserted); an allow entry suppresses and its **expiry** un-suppresses; a changed allowed line raises the lower Alert; the score recomputes from stored factors; `-shadow` writes scores and raises nothing. | `BypassScoreTest` (each factor, protective sign, cap), `TelcoBypassGoldenTest` (Alerts equal planted set), `BypassAllowListTest` (expiry, four-eyes hold), mutation pass. |
 | **B3 cluster + Incident + Case** | `tb_clusters` (imei, cell, batch); Alert Rule `tb_box_suspected`; Case grouping per B0 answer; runbooks; Action Request template for barring; Link Analysis projection config. | The corpus's three boxes (one spoofing its IMEI, one on one IMEI, one slow-roll across many SIMs) each yield **one** box Incident and its member SIM Alerts; the IMEI-spoofing box is still caught by the `cell` key; a second night **updates** the Incident; a benign dense building (many SIMs, one cell, normal mix) is silent. | extend the golden; `BypassClusterTest` (each key, fallback when `imei` absent); a two-run stability test. |
 | **B4 anomaly layer** | `tb_sim_behaviour` Anomaly Model with plan cohort, the `anomaly.score` Job, the Risk Score factor from its `_latest`; `exclusionList`. | A planted **novel** archetype (a pattern no fixed signal threshold covers) is flagged by the anomaly factor alone and **below** `high` in the score; a heavy-user plan is not flagged against its own cohort; the anomaly factor never alerts alone (D-BP4). | `BypassAnomalyTest` (golden extension), `AnomalyKindValidator` gate on the model (peers column not classified). |
@@ -435,20 +435,20 @@ real call is ever read or copied; a real CDR sample, if one arrives, is calibrat
     *Reference* / *Stream*, *Entity List*; the bid plan calls the lists by another name that the glossary bans, so the word
     **Entity List** is used throughout (`docs/GLOSSARY.md` §0).
 
-## 14. Open decisions for the operator
+## 14. Decisions for the operator
 
 | ID | Decision | Recommendation |
 |---|---|---|
-| **D-BP1** | Home: new template `telco-bypass`, or extend `telco-fraud`? | **New template**; keep `fraud_simbox` as the starter. |
-| **D-BP2** | The CDR contract: which extra columns can the operator (or the MVNE) supply: IMEI, IMSI, attempts or release cause, cell site? | Ship with **optional** columns and per-signal degradation; ask the operator at B0. |
-| **D-BP3** | Work item: per SIM, per box, or both? | **Both**: the box Incident is the work item, SIM Alerts are evidence; confirm the Case grouping in B0. |
-| **D-BP4** | Scoring: Risk Score primary with the Anomaly Model as one factor, or the anomaly layer as its own alert? | **Risk Score primary**; anomaly never alerts alone in v1. No ML (`G-21`). |
-| **D-BP5** | Latency versus precision: persistence `persist_days` and run frequency (daily only, or an hourly window)? | **Daily with persistence** first; hourly is a later slice measured against `WS-21`. |
-| **D-BP6** | Action: automatic barring, an approval-gated Action Request, or a manual task? | **Approval-gated Action Request** (or manual until a provisioning API exists); never automatic; only `watch` entries (≤ 24 h) auto-apply. |
-| **D-BP7** | Build the interconnect-side slice B5 now, or only when a prospect supplies gateway CDRs? | **Demand-gated**; boundary with the IRSF / Wangiri lane agreed first. |
-| **D-BP8** | Exposure: minutes only, or a monetary estimate from a termination-rate Reference? | **Minutes**, with an optional rate parameter; impact stays manual. |
-| **D-BP9** | A TAC (device class) Reference: the operator licenses one, or the pack ships without it? | **Optional**; absent means S14 is omitted. |
-| **D-BP10** | Commercial and matrix: `billable`, `orderCode` for the new pack; matrix cell E after B3 (**P** to **Y**, with the note "CDR-based")? | The operator's call; the matrix is updated only when a slice ships. |
+| **D-BP1** | Home: new template `telco-bypass`, or extend `telco-fraud`? | **ANSWERED 2026-10-20 (operator: go with the recommendations): new template `telco-bypass`;** `fraud_simbox` stays in `telco-fraud` as the starter and `telco-fraud`'s pinned counts stay untouched. Built in B1. |
+| **D-BP2** | The CDR contract: which extra columns can the operator (or the MVNE) supply: IMEI, IMSI, attempts or release cause, cell site? | **ANSWERED 2026-10-20: accept optional columns with per-signal degradation.** IMEI, IMSI, release cause or attempts and the cell site are optional; a missing optional column is flagged per signal (`missing`), it does not fail. S13 / S14 and the cluster `imei` key are deferred until after B3. Built in B1 for S1 to S12. |
+| **D-BP3** | Work item: per SIM, per box, or both? | **ANSWERED 2026-10-20: the box Incident (`by: cluster_key`) is the Case anchor;** SIM rows are evidence in `tb_findings` (§16.4 answers 2 and 3). Decided now, built in B2 / B3. |
+| **D-BP4** | Scoring: Risk Score primary with the Anomaly Model as one factor, or the anomaly layer as its own alert? | **ANSWERED 2026-10-20: Risk Score primary**; the anomaly layer never alerts alone in v1; no ML (`G-21`). |
+| **D-BP5** | Latency versus precision: persistence `persist_days` and run frequency (daily only, or an hourly window)? | **ANSWERED 2026-10-20: daily with persistence** first; hourly is a later slice measured against `WS-21`. |
+| **D-BP6** | Action: automatic barring, an approval-gated Action Request, or a manual task? | **ANSWERED 2026-10-20: approval-gated Action Request** (or manual until a provisioning API exists); never automatic; only `watch` entries (≤ 24 h) auto-apply. |
+| **D-BP7** | Build the interconnect-side slice B5 now, or only when a prospect supplies gateway CDRs? | **ANSWERED 2026-10-20: B5 demand-gated**; boundary with the IRSF / Wangiri lane agreed first. |
+| **D-BP8** | Exposure: minutes only, or a monetary estimate from a termination-rate Reference? | **ANSWERED 2026-10-20: minutes**, with an optional rate parameter; impact stays manual. |
+| **D-BP9** | A TAC (device class) Reference: the operator licenses one, or the pack ships without it? | **ANSWERED 2026-10-20: optional, never bundled**; absent means S14 is omitted. |
+| **D-BP10** | Commercial and matrix: `billable`, `orderCode` for the new pack; matrix cell E after B3 (**P** to **Y**, with the note "CDR-based")? | **OPEN, deferred: the operator's call.** Until then B1 lists the template in `offerings/standard.toon` `contentPacks` and as Product Map Item `solution-pack.telco-bypass` with `billable: false`, `status: preview` and no `orderCode`; the matrix is updated only when a slice ships. |
 
 ## 15. Backlog and docs touched
 
@@ -619,3 +619,67 @@ No G-SB clause trips, so **B1 can start now**. Size `stormCap` and the SIM versu
 (box Incident as the work item is the safer default). D-BP2 (the CDR contract: IMEI, IMSI, attempts, cell site) does **not** block B1,
 because B1 degrades per signal; it blocks the device signals (S13, S14) and the cluster stage's `imei` key, so ask it in parallel and
 re-measure the cluster stage after B3. Record the memory note of §16.3 in the pack admin guide at B7.
+
+## 17. B1 as built (2026-10-20)
+
+Commits on `lane/bypass-b1`: `cf5dda252` (template skeleton, feeds, seeds, runbook skeleton, offering and Product Map Item),
+`add360e45` (the `tb_features` Job and the golden). Hub: [`okf/product/solution-pack/telco-bypass/`](../okf/product/solution-pack/telco-bypass/index.md).
+
+**Delivered.** The `telco-bypass` Space Template: four Pipelines (`voice_cdr` with the optional `answered`, `release_cause`, `imei`,
+`imsi`; the Reference feeds `cell_site`, `number_plan`, `subscriber_profile`), their Datasets and zero-row seeds, one daily
+`sql.template` Job `tb_features` (S1 to S12, `box_like`, `missing`, `has_imei`, `has_imsi`, `evidence_ids`; every threshold a Job
+parameter), a runbook skeleton and the inert SLA examples every template carries. Test side, in module `inspecto` beside
+`TelcoFraudTemplateGoldenTest`: `BypassCorpus` (seed 20261020, 18,614 CDR rows, 613 SIMs), `BypassCorpusTest` (4 tests) and
+`BypassFeatureGoldenTest` (8 tests).
+
+**What the golden pins.** (1) Every signal of every one of the 211 scored SIMs equals an independent plain-Java oracle to 1e-9.
+(2) `box_like` is exactly the planted set: a 60-SIM box (P1), a 20-SIM IMEI-spoofing box (P3) and one SIM just inside each of the
+five clauses plus the volume floor (86 SIMs), and the pinned ambiguous pair (L2 registered PBX, L3 unregistered dialler: 4 SIMs,
+identical to a quiet box from CDRs alone, §7.9); every other SIM is silent, including the slow-roll box under the floor (P2), the
+sequential dialler (P4, P4b), the cloned SIM (P5, speed above 1,000 km/h, 2 overlapping calls), the novel shape (P6), the call
+centre (L1), the alarm line (L4), couriers (L5), the new heavy user (L6), the dense building (L7), the roamer (L8, no row) and the
+SIM exactly AT each clause's threshold. (3) A feed with blank, absent or release-cause-only optional columns, and a Space with no
+Reference loaded, still runs and names the omitted signals. (4) The statement gives the same rows under two host session zones, and
+`local_zone` moves the hour signals. (5) A same-window re-run duplicates nothing and the next window keeps the earlier one.
+
+**Deviations from the plan, and traps found.**
+
+- `new_batch_share` is the share of the dealer-and-activation-day batch that is `box_like` today; "consecutive MSISDN" waits for the
+  cluster stage's `batch` key. S13 and S14 are not computed (D-BP2); `has_imei` / `has_imsi` record presence only.
+- ⚠ **Shared CTE materialisation.** A CTE read three times is materialised with every column. `WITH w AS NOT MATERIALIZED (...)` took
+  the 5M-row peak from about 2.8 to 1.8 GiB; a per-SIM `list(record_id ORDER BY ...)` for the evidence ids cost four times the run
+  time and is now `arg_min(record_id, (duration_s, record_id), 3)`. The B0 harness's 12.6 s and 1.8 GiB were measured without the MT
+  scan and the evidence ids; with them and without these two changes the statement took 18 to 23 s at 2.9 GiB.
+- ⚠ `avg(CASE WHEN x THEN 1.0 ELSE 0.0 END)` reads a NULL `x` as 0, so the answer rate and the own-network share would be 0, not
+  missing, when their input is absent; both are written `CASE WHEN x IS NULL THEN NULL ...`. The golden's blank-column case found it.
+- A CSV with fewer fields than the schema is quarantined as `field_mismatch` unless the Pipeline sets `csv_settings.null_padding:
+  true`; `voice_cdr` does, so "optional" can mean absent from the file.
+- Float aggregates (the entropy sum, the gap deviation) differ in the last digit with thread scheduling, whatever the zone: the golden
+  compares to 1e-9, not bit for bit. Window ties are broken by `record_id` so the order of equal timestamps is stable.
+- The B1 predicate is `box_like`, five strict clauses (the B0 sanity predicate plus a static-cell clause); the plan's `primary_signals`
+  agreement, protective factors and persistence are B2.
+- Plan §6.1 still says each offender gets its own Alert; since ALERT-PER-RULE-1 it is one Alert per Alert Rule and an Incident per
+  key (§16.4 answer 2).
+
+**Measurements (synthetic day, 12-core box, default 3,246 MiB cap, `duckdb_jdbc` 1.5.6.0).** Standalone with the engine's settings:
+1M rows 0.68 GiB; 5M rows 4.6 s, **1.78 GiB**, no spill; 7.5M rows 7.9 s, 2.47 GiB; 10M rows 9.9 s, **3.14 GiB (97 % of the cap)**;
+5M rows under a 1 GiB cap 12.1 s with 394 MiB spilled; 4 threads at 5M 6.4 s, 1.90 GiB. The **real Job through `JobService`** at 5M
+rows (with `IncrementalSink`, the Decision Rule pass and the Parquet write; 400,000 SIMs, 2,700 scored, 1,200 `box_like`): 6.8 s,
+process commit 2.37 GiB (JVM plus DuckDB). That closes the B0 caveat for this stage. **Gate G-SB(a) holds**: a 5M-row day in 60 s on
+4 cores, peak 2.5 GiB, no spill. The 4 GiB advice above about 8M rows a day is now interpolated between measured points
+(7.5M, 10M) and is in the runbook and the admin guide. Not measured: the cluster stage, the Risk Score and Anomaly Model Jobs, more
+than 405,000 SIMs a day, a real operator's volume or signal quality (the synthetic cell coordinates are a grid, the call shapes are
+planted).
+
+**Mutation pass.** Hand-built mutants, each of which turned a named assertion red: every clause's threshold and its `>` to `>=`
+(or `<` to `<=`), the volume floor in both directions, `short_s` 60 to 59, the roaming filter, `S1` distinct to plain count, `S2`
+answered denominator and `<=`, `S3` release cause 16 and the answered flag, `S4` denominator and MT filter, `S5` voice filter and
+SMS direction, `S6` radius, the one-second floor and the different-cell condition, `S7` step inclusive, zero step and prefix
+check, `S8` night end and entropy base, `S9`, `S10` overlap `<` and the frame, `S11` own filter and `starts_with`, `S12` tenure
+and batch candidates, the window edges and the zone. Real Maven runs of six of them (`cand_max_inbound`, the roaming filter,
+`min_events`, the sequential step, the release cause, the `missing` flag) were red for the named reason; the rest were run against
+the same corpus in a scratch DuckDB and each changed a column the oracle pins.
+
+**Still open for B2 and later:** the Risk Score `tb_sim`, `tb_findings`, the four Entity Lists, `tb_sim_high`; the cluster stage and
+the box Incident (D-BP3); S13 to S16; D-BP10; an operator's real CDR contract (D-BP2's actual columns); sample CSVs for the gallery
+(B7); the corpus split per archetype before B4 starts.
