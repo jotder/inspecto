@@ -1,0 +1,86 @@
+# Nightly Postgres-gated tests (ASSURE-OPERABILITY-1, decision D2, operator 2026-10-20).
+#
+# These classes ASSUME-SKIP without a server (INSPECTO_TEST_PG_URL unset), so a green local or ci.yml run says
+# nothing about them -- yet they are the only coverage of the pgjdbc 42.7.12 bump (a hang on a silent peer already
+# needed a loginTimeout fix in DbConnections). This workflow gives them a real postgres:18 service container.
+#
+# A separate workflow rather than a third job in nightly-perf.yml: that file is the throughput floor (one concern,
+# its own artifact names, no service container); this one needs a service container and a skip safeguard, and
+# `gh workflow run "Nightly postgres tests"` should trigger exactly this and nothing else.
+#
+# ⚠ The last step FAILS when any named class was skipped: a skipped test is reported green by surefire, so without
+# it a missing/unreachable server would silently make this job pass. The one allowed skip is the TLS test in
+# PostgresPublishPgTest, which needs a locally pulled TLS Postgres image (or INSPECTO_TEST_PG_TLS_*).
+#
+# Credentials are throwaway values for an ephemeral service container that dies with the job.
+#
+# Excluded on purpose: PostgresPublishJobTest (DuckDB stands in for Postgres, reads no env var) and
+# ConnectionSourceTest (only mentions the variable in a comment) -- both run in ci.yml.
+name: Nightly postgres tests
+
+on:
+  schedule:
+    - cron: '47 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-gated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      INSPECTO_TEST_PG_URL: jdbc:postgresql://localhost:5432/postgres?user=postgres&password=test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 27
+        uses: actions/setup-java@v4
+        with:
+          distribution: oracle
+          java-version: '27'
+          cache: maven
+
+      - name: Postgres-gated test classes against the service container
+        run: >-
+          mvn --batch-mode --no-transfer-progress test -Pedition-advanced
+          -pl :inspecto-processor,:inspecto-ops,:inspecto-case-management,:inspecto-engine,:inspecto-la-store-pg -am
+          -Dtest=PostgresStateStoreTest,PostgresRunLeaseSchemaPerSpaceTest,PostgresSchemaPerSpaceTest,PostgresSchemaPerSpaceStoresTest,DbEventStoreChainWriterTest,PostgresOpsStoreTest,PostgresSchemaPerSpaceOpsTest,PostgresTwoNodeSoakTest,ObjectServiceRaceTest,ObjectStoreContractTest,ObjectAnalyticsGoldenTest,CaseRuleEvaluateGoldenTest,PgInvestigationStoreContractTest,PgInvestigationStoreTwoJvmRaceTest,PgEmbedGrantStoreTest,PostgresPublishPgTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Fail when any named class was skipped or did not run
+        if: always()
+        run: |
+          fail=0
+          for c in PostgresStateStoreTest PostgresRunLeaseSchemaPerSpaceTest PostgresSchemaPerSpaceTest \
+                   PostgresSchemaPerSpaceStoresTest DbEventStoreChainWriterTest PostgresOpsStoreTest \
+                   PostgresSchemaPerSpaceOpsTest PostgresTwoNodeSoakTest ObjectServiceRaceTest \
+                   ObjectStoreContractTest ObjectAnalyticsGoldenTest CaseRuleEvaluateGoldenTest \
+                   PgInvestigationStoreContractTest PgInvestigationStoreTwoJvmRaceTest PgEmbedGrantStoreTest \
+                   PostgresPublishPgTest; do
+            f=$(find . -path '*/target/surefire-reports/TEST-*.'"$c"'.xml' | head -n 1)
+            if [ -z "$f" ]; then echo "NOT RUN: $c"; fail=1; continue; fi
+            skipped=$(awk '/<testcase /{n=$0} /<skipped/{print n}' "$f" | grep -v verifyFullAgainstARealTlsPostgresChecksTheAuthoredHost || true)
+            if [ -n "$skipped" ]; then echo "SKIPPED in $c:"; echo "$skipped"; fail=1; else echo "ok: $c"; fi
+          done
+          exit $fail
+
+      - name: Upload surefire reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-postgres-reports
+          path: '**/target/surefire-reports/*'
