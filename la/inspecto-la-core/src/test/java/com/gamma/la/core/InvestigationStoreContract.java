@@ -622,6 +622,19 @@ abstract class InvestigationStoreContract {
         assertEquals(InvestigationStore.DraftState.OPEN, s.draftState("r", d));
     }
 
+    @Test
+    void replaceDraftIsRefusedAndWritesNothingWhenMainMovedUnderIt() throws Exception {
+        InvestigationStore s = fresh();
+        String d = promotable(s, "rm", 2, 2);
+        List<String> own = s.log(draft("rm", d));
+        String mainHash = DraftStore.prefixHash(s.log(main("rm")), 2), ownHash = DraftStore.prefixHash(own, own.size());
+        s.append(main("rm"), 2, 3, line(3), "{}");   // main moved after the rebase was computed
+        assertThrows(InvestigationVersionConflictException.class, () -> s.replaceDraft("rm", d, 2, mainHash, ownHash,
+                "{\"new\":1}", List.of("{\"x\":1}"), List.of("{}"), List.of(3)));
+        assertEquals(own, s.log(draft("rm", d)), "a refused swap changed nothing");
+        assertEquals(draftHeader(d, "ann", 2), s.draftHeader("rm", d).orElseThrow());
+    }
+
     // ── the per-set size limit (D-IS2; operator 2026-10-10): at the limit passes, one byte over is refused 413 and writes nothing ──
 
     private static final long LIMIT = 1024;
