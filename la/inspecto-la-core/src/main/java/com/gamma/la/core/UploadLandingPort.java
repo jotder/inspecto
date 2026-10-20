@@ -77,9 +77,18 @@ public interface UploadLandingPort {
      *                     duplicate-check marker exists) | {@code quarantined} (the whole file was moved to quarantine) |
      *                     {@code consumed} (left the inbox, no marker or quarantine record - duplicate check is off)
      * @param rejectedRows rows the Pipeline refused into the per-file reject ledger, or {@code null} when there is none
+     * @param rejectedCapped {@code true} when the reject ledger held more rows than the read counts, so {@code rejectedRows}
+     *                     is a lower bound (LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1 (5))
      * @param reason       the quarantine reason folder for {@code quarantined}, else {@code null}
      */
-    record Ingest(String state, Long rejectedRows, String reason) {}
+    record Ingest(String state, Long rejectedRows, boolean rejectedCapped, String reason) {}
+
+    /**
+     * Run {@code action} under the Pipeline's run claim (no cycle in flight or able to start), after sweeping stranded
+     * {@code .withdraw-*.tmp} claim files from the inbox; empty when a cycle holds the claim. A write into the inbox that could
+     * race an ingest (a {@code replace=true} upload) goes through here.
+     */
+    <T> Optional<T> whileIdle(ApiContext api, Target target, java.util.concurrent.Callable<T> action) throws Exception;
 
     /** The ingest state of {@code file}, an upload to {@code target}. Metadata only - never a row or a header value. */
     Ingest ingest(ApiContext api, Target target, String file);

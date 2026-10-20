@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -132,6 +133,7 @@ public final class UploadRoutes implements RouteModule {
             UploadLandingPort.Ingest in = port.ingest(api, target, String.valueOf(rec.get("file")));
             rec.put("state", in.state());
             if (in.rejectedRows() != null) rec.put("rejectedRows", in.rejectedRows());
+            if (in.rejectedCapped()) rec.put("rejectedRowsCapped", true);
             if (in.reason() != null) rec.put("quarantineReason", in.reason());
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -367,18 +369,51 @@ public final class UploadRoutes implements RouteModule {
         }
 
         long daily = lim.get(LaLimit.UPLOAD_DAILY_BYTES);
-        synchronized (QUOTA_LOCK) {
-            Path ledger = root.resolve("audit").resolve("la-uploads")
-                    .resolve(java.time.LocalDate.now(ZoneOffset.UTC) + ".bytes");
-            long used = readLong(ledger);
-            if (used + bytes.length > daily)
-                throw refuse("quota", 413, ErrorCodes.PAYLOAD_TOO_LARGE, "the Space's analyst uploads have landed " + used
-                        + " of upload.daily_bytes (" + daily + ") today; this file would exceed it");
-            AtomicFiles.write(dest, bytes, ".upload-");
+        final String landName = name;
+        java.util.concurrent.Callable<Boolean> landIt = () -> {
+            // A replace decided on a file that was in the inbox; under the claim, check it still is (the Collector may have
+            // taken it in between) - writing it fresh would be a new upload the analyst did not ask for.
+            if (existed && !Files.isRegularFile(dest))
+                throw refuse("conflict", 409, ErrorCodes.CONFLICT, "'" + landName + "' left the Collector's inbox while the replace was"
+                        + " being made (the Collector picked it up); nothing was changed - upload it again without replace");
+            synchronized (QUOTA_LOCK) {
+                Path ledger = root.resolve("audit").resolve("la-uploads")
+                        .resolve(java.time.LocalDate.now(ZoneOffset.UTC) + ".bytes");
+                long used = readLong(ledger);
+                if (used + bytes.length > daily)
+                    throw refuse("quota", 413, ErrorCodes.PAYLOAD_TOO_LARGE, "the Space's analyst uploads have landed " + used
+                            + " of upload.daily_bytes (" + daily + ") today; this file would exceed it");
+                AtomicFiles.write(dest, bytes, ".upload-");
+                try {
+                    AtomicFiles.write(ledger, Long.toString(used + bytes.length).getBytes(StandardCharsets.UTF_8), ".quota-");
+                } catch (IOException ledgerFault) {
+                    // the file landed; an unwritable ledger must not fail a landed upload (the next write retries)
+                }
+            }
+            return Boolean.TRUE;
+        };
+        if (existed) {
+            // Replacing overwrites a file the Collector may be reading: take the run claim, like delete does (LA-CASE-HISTORY-
+            // UPLOAD-FOLLOWUPS-1 (6)). A fresh name needs none - the poll never sees a name before the atomic move lands it.
+            Optional<Boolean> done;
             try {
-                AtomicFiles.write(ledger, Long.toString(used + bytes.length).getBytes(StandardCharsets.UTF_8), ".quota-");
-            } catch (IOException ledgerFault) {
-                // the file landed; an unwritable ledger must not fail a landed upload (the next write retries)
+                done = UploadLandingPorts.active().orElseThrow().whileIdle(api, target, landIt);
+            } catch (ApiException refused) {
+                throw refused;
+            } catch (Exception fault) {
+                throw refuse("io", 409, ErrorCodes.CONFLICT, "'" + name + "' could not be replaced (" + fault.getClass().getSimpleName()
+                        + "); nothing was changed - try again");
+            }
+            if (done.isEmpty())
+                throw refuse("busy", 409, ErrorCodes.CONFLICT, "'" + name + "' may be being ingested right now (a run of the Pipeline is in flight);"
+                        + " nothing was replaced - try again when the run finishes");
+        } else {
+            try {
+                landIt.call();
+            } catch (IOException | RuntimeException fault) {
+                throw fault;
+            } catch (Exception impossible) {
+                throw new IllegalStateException(impossible);
             }
         }
 

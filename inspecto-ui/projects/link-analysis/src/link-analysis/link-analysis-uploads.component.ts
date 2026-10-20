@@ -14,7 +14,7 @@ import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-sta
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
-import { formatBytes, uploadErrorMessage, uploadFileProblem, uploadStateView } from './upload-state';
+import { formatBytes, isBusyRefusal, uploadErrorMessage, uploadFileProblem, uploadStateView } from './upload-state';
 
 /**
  * **Link Analysis - Upload a CSV** (LA-ANALYST-UPLOAD-1 D-UP8, the pane) over `/inv/uploads*`: pick one of the Collectors
@@ -274,6 +274,7 @@ export class LinkAnalysisUploadsComponent {
             const name = this.file()?.name;
             this.canReplace.set(
                 (err as { status?: number } | null)?.status === 409 &&
+                    !isBusyRefusal(err) &&
                     (this.uploads() ?? []).some((u) => u.file === name && u.state === 'pending'),
             );
             this.fail(err, 'The upload failed.', 'upload');

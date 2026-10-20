@@ -10,7 +10,7 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisUploadsComponent } from './link-analysis-uploads.component';
-import { uploadErrorMessage, uploadFileProblem, uploadStateView } from './upload-state';
+import { isBusyRefusal, uploadErrorMessage, uploadFileProblem, uploadStateView } from './upload-state';
 
 @Component({
     standalone: true,
@@ -99,6 +99,20 @@ describe('upload-state helpers', () => {
         expect(uploadStateView({ state: 'ingested', rejectedRows: 2 }).label).toBe('Ingested, 2 rows rejected');
         expect(uploadStateView({ state: 'quarantined', quarantineReason: 'parse' }).label).toBe('Quarantined (parse)');
     });
+
+    it('says "at least" when the server capped the rejected-row count', () => {
+        const v = uploadStateView({ state: 'ingested', rejectedRows: 10000, rejectedRowsCapped: true });
+        expect(v.label).toBe('Ingested, at least 10,000 rows rejected');
+    });
+
+    it('shows the server message for a replace refused while a run is in flight', () => {
+        const busy = "'UPL_1.csv' may be being ingested right now (a run of the Pipeline is in flight); nothing was replaced - try again when the run finishes";
+        const e = new HttpErrorResponse({ status: 409, error: { error: { message: busy } } });
+        expect(uploadErrorMessage(e, 'x')).toContain('being ingested right now');
+        expect(uploadErrorMessage(e, 'x')).not.toContain('still waiting');
+        expect(isBusyRefusal(e)).toBe(true);
+        expect(isBusyRefusal(new HttpErrorResponse({ status: 409, error: { error: { message: 'already in the inbox' } } }))).toBe(false);
+    });
 });
 
 describe('LinkAnalysisUploadsComponent', () => {
@@ -169,6 +183,16 @@ describe('LinkAnalysisUploadsComponent', () => {
         inv.uploadCsv.mockReturnValue(of({ collector: 'up_feed', pipeline: 'P', file: 'UPL_1.csv', bytes: 50, sha256: 'x', replaced: true, landedAt: 't' }));
         await cmp.upload(true);
         expect(inv.uploadCsv).toHaveBeenLastCalledWith('up_feed', f, true);
+    });
+
+    it('does not offer Replace while a run is in flight and shows why', async () => {
+        const { cmp, el, settle } = create({ uploadResult: http(409, "'UPL_1.csv' may be being ingested right now (a run of the Pipeline is in flight); nothing was replaced") });
+        await settle();
+        cmp.file.set(csv('UPL_1.csv'));
+        await cmp.upload(true);
+        await settle();
+        expect(el.textContent).toContain('being ingested right now');
+        expect(el.querySelector('[data-testid="la-upload-replace"]')).toBeNull();
     });
 
     it("never offers Replace for a waiting file that is not the caller's own", async () => {
