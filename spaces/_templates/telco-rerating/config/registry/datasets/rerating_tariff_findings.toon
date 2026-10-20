@@ -1,0 +1,15 @@
+physicalRef: rerating_tariff_findings
+columns[13]{name,type,classification}:
+  FINDING_KEY,string,
+  REASON,string,
+  FINDING,string,
+  PLAN,string,
+  SERVICE,string,
+  TARIFF_VERSION_ID,string,
+  OTHER_TARIFF_VERSION_ID,string,
+  RATE_PER_UNIT,number,
+  OTHER_RATE_PER_UNIT,number,
+  PERIOD_FROM,timestamp,
+  PERIOD_TO,timestamp,
+  PRIORITY_ORDERED,boolean,
+  CONTROL,string,

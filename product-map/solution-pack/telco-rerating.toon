@@ -1,0 +1,7 @@
+id: solution-pack.telco-rerating
+kind: solution-pack
+title: Telecom re-rating (tariff validation)
+template: telco-rerating
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/telco-rerating/index.md

@@ -1,0 +1,85 @@
+# Telecom re-rating (tariff validation)
+
+> **Level 2 solution page.** Content pack: Space Template `telco-rerating`
+> (`spaces/_templates/telco-rerating/template.toon`). **Slices R0 and R1 of `PACK-RERATING-1` are built: tariff versioning,
+> tariff-table hygiene and ambiguity verdicts.** Causes, root-cause grouping, revenue at risk, Alert Rules and the
+> re-rated-versus-billed Reconciliation are later slices ([plan](../../../../superpower/rerating-tariff-validation-plan.md)).
+> Checked against the template on 2026-10-20. This pack is an unbilled preview: commercial terms are not set (D-RR10).
+
+## Business problem
+
+The `telco-ra` starter re-rates each call with one SQL control. It picks a tariff row, flags a call when two rows match, and
+reports one finding per call. It cannot tell a harmless duplicate row from a harmful one (twelve findings for one duplicate row
+with the same rate), it judges the tariff only indirectly after a billing run, and it nets over-billing against leakage in one
+signed figure. This pack re-rates independently of the rater and separates three questions: is the **tariff table** sound, what
+should this call have cost, and how sure can the answer be.
+
+## Data in
+
+Two Pipelines with Schemas under `spaces/_templates/telco-rerating/config/`:
+
+| Feed | Contents |
+|---|---|
+| `rated_usage` | one row per rated call or event: `XDR_ID, EVENT_TS, EVENT_DATE, SUBSCRIBER_ID, PLAN, SERVICE, USAGE_UNITS, CHARGE` (the same canonical Schema as `telco-ra`) |
+| `tariff_version` | one row per version of a plan and service: `TARIFF_VERSION_ID, PLAN, SERVICE, RATE_PER_UNIT, EFFECTIVE_FROM, EFFECTIVE_TO` (blank = open), optional `PRIORITY` |
+
+Versions live **in the file**. `reference.load: scd2` was measured in slice R0 and does not fit: it appends a version row per
+changed key with `__valid_from` set to the ingest time and no end column, so it cannot carry an effective date in the past (see
+plan section 12). `tariff_version` is therefore an ordinary feed, and the file carries the whole table each time. The Pipeline sets
+`csv_settings.null_padding: true`, so a file without the optional `PRIORITY` column ingests with it NULL. Every Dataset ships a
+zero-row schema seed under `spaces/_templates/telco-rerating/data/`, so both Jobs run on a fresh Space.
+
+## What the pack sets up
+
+Two `sql.template` Jobs, chained on a signal:
+
+1. `rr_tariff_hygiene` (04:30 daily) judges the whole table and replaces the Dataset `rerating_tariff_findings`: `overlap_same_rate`,
+   `overlap_different_rate` (with `PRIORITY_ORDERED`), `gap`, `negative_rate`, `missing_rate`, `inverted_interval`. A zero rate is a
+   free plan, not a defect.
+2. `rr_rerate` (`on_signal: job.run.completed` when `rr_tariff_hygiene` succeeded; window `$yesterday`, `incremental` by
+   `window_date`, `lookback: 1`, `retain: 31`) writes the Dataset `rerated_usage`, one row per call: the contract other packs read.
+
+`rr_rerate` first cuts each plan and service into **segments** between consecutive tariff boundaries, so the candidate rows are
+decided once per segment (a few hundred) and not once per call; each call then joins the one segment in force at its start.
+
+| `RESOLUTION` | Meaning | Expected charge |
+|---|---|---|
+| `single` | one row in force | its amount |
+| `agree` | several rows, the rounded amounts are equal | that amount |
+| `precedence` | several amounts, exactly one row holds the highest non-blank `PRIORITY` | that row's amount |
+| `disagree` | several amounts and no winner (a tie, or no `PRIORITY`) | none: the range `EXPECTED_LOW` to `EXPECTED_HIGH` |
+| `none` | no usable row in force | none |
+
+A charge more than `tolerance` (absolute, strict, default 0.02) below `EXPECTED_LOW` is `leakage` by the shortfall; above
+`EXPECTED_HIGH` it is `overbilled` by the excess; inside the range of a `disagree` call it is `data_quality` (`ambiguous_tariff`),
+explained and never leakage. `no_tariff` is `data_quality`. `UNDERCHARGED_AMOUNT` and `OVERBILLED_AMOUNT` are separate non-negative
+columns and are never netted (D-RR4).
+
+## Decisions and seams worth knowing
+
+- **Rated at the start.** A call is rated at `EVENT_TS`: `EFFECTIVE_FROM` inclusive, `EFFECTIVE_TO` exclusive; a call that starts
+  before a rate change and runs past it is not flagged.
+- **Precedence needs an explicit `PRIORITY` (D-RR3).** The plan's section 6.2 also named "latest `EFFECTIVE_FROM`" as a tie-break;
+  D-RR3 as answered says precedence only with an explicit `PRIORITY`, and that is what is built. A blank counts as lowest and a tie
+  has no winner.
+- **A reversal** (negative units and charge) is re-rated like any call; the range ends are the least and greatest of the two extreme
+  rates' amounts, so the order does not flip.
+- **Hygiene reads only usable rows.** A row with no rate, or an interval that ends at or before its start, never takes part in an
+  overlap or gap, and is reported on its own.
+- **No zone arithmetic.** Both Jobs compare naive timestamps only, so the result does not depend on the host's session zone; the
+  golden runs both statements under two zones.
+- **Not built in R1:** orphan-plan detection (needs the plan Reference), the stage columns of R4 (increments, minimum charge,
+  rounding scope, zone, time band, tax) and everything from R2 on.
+
+## Verification
+
+`TelcoRerateGoldenTest` (module `inspecto`, beside `BypassFeatureGoldenTest`) boots the template through `POST /spaces`, ingests the
+seeded synthetic `RerateCorpus` through the template's own Pipelines, runs both Jobs as authored and holds every contract column of
+every call and every tariff finding to an independent plain-Java oracle; the findings to the exact planted set with every look-alike
+silent; the degradation (no `PRIORITY` column), the tolerance parameter, zone independence, idempotent re-runs and the signal chain; and
+every clause of both statements to a mutant that must change the oracle's rows.
+
+## Related
+
+[user guide](user-guide.md) · [admin guide](admin-guide.md) · [features](features.md) · [plan](../../../../superpower/rerating-tariff-validation-plan.md) ·
+the starter control it extends: [Telecom revenue assurance](../telco-ra/architecture.md).

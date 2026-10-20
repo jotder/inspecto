@@ -1,0 +1,36 @@
+raw:
+  name: TARIFF_VERSION
+  format: CSV
+  fields[7]{name,selector,type,description,unit,classification}:
+    TARIFF_VERSION_ID,"0","VARCHAR","Identifier of this tariff row (one row per version of a plan and service)","","INTERNAL"
+    PLAN,"1","VARCHAR","Tariff plan","","INTERNAL"
+    SERVICE,"2","VARCHAR","VOICE, SMS or DATA","","INTERNAL"
+    RATE_PER_UNIT,"3","DECIMAL(18,4)","Rate per second, event or MB","USD","INTERNAL"
+    EFFECTIVE_FROM,"4","TIMESTAMP","The rate applies to calls starting at or after this instant","","INTERNAL"
+    EFFECTIVE_TO,"5","TIMESTAMP","The rate applies to calls starting before this instant (blank = open)","","INTERNAL"
+    PRIORITY,"6","INTEGER","OPTIONAL. Precedence when two rows are in force at once: the higher number wins, a blank counts as lowest","","INTERNAL"
+mapping:
+  canonicalName: tariff_version
+  rawName: TARIFF_VERSION
+  fields[7]:
+    - name: TARIFF_VERSION_ID
+      from: TARIFF_VERSION_ID
+      fn: keep
+    - name: PLAN
+      from: PLAN
+      fn: keep
+    - name: SERVICE
+      from: SERVICE
+      fn: keep
+    - name: RATE_PER_UNIT
+      from: RATE_PER_UNIT
+      fn: keep
+    - name: EFFECTIVE_FROM
+      from: EFFECTIVE_FROM
+      fn: keep
+    - name: EFFECTIVE_TO
+      from: EFFECTIVE_TO
+      fn: keep
+    - name: PRIORITY
+      from: PRIORITY
+      fn: keep

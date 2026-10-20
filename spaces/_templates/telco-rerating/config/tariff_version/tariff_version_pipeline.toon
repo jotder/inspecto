@@ -1,0 +1,31 @@
+name: tariff_version
+active: true
+
+dirs:
+  poll:       data/inbox/tariff_version
+  database:   data/tariff_version/database
+  backup:     data/tariff_version/backup
+  temp:       data/tariff_version/temp
+  errors:     data/tariff_version/errors
+  quarantine: data/tariff_version/quarantine
+  markers:    data/tariff_version/markers
+  status_dir: data/tariff_version/status
+  log_dir:    data/tariff_version/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: tariff_version_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

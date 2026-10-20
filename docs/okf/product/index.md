@@ -40,6 +40,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (64 open rows
 * [Telecom bypass (SIM-box)](solution-pack/telco-bypass/index.md) - `solution-pack.telco-bypass` · 5 doc(s) · 1 open row(s)
 * [Telecom fraud](solution-pack/telco-fraud/index.md) - `solution-pack.telco-fraud` · 5 doc(s) · 4 open row(s)
 * [Telecom revenue assurance](solution-pack/telco-ra/index.md) - `solution-pack.telco-ra` · 5 doc(s) · 0 open row(s)
+* [Telecom re-rating (tariff validation)](solution-pack/telco-rerating/index.md) - `solution-pack.telco-rerating` · 5 doc(s) · 0 open row(s)
 
 # Layers
 

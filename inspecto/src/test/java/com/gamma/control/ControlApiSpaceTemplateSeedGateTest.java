@@ -158,7 +158,8 @@ class ControlApiSpaceTemplateSeedGateTest {
             "mobile-money", "mobile-money-runbooks.md",
             "aml", "aml-runbooks.md",
             "payment-fraud", "payment-fraud-runbooks.md",
-            "telco-bypass", "telco-bypass-runbooks.md");
+            "telco-bypass", "telco-bypass-runbooks.md",
+            "telco-rerating", "telco-rerating-runbooks.md");
 
     private static void seedAlertTemplate(Path root, String alertToon) throws Exception {
         Path cfg = root.resolve("_templates").resolve("alerting").resolve("config");
