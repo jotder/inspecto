@@ -34,6 +34,12 @@ export function formatBytes(n: number): string {
  * capability id). 409 on an upload is "that name is still waiting"; on a delete it is "already picked up" - the caller
  * passes which one it is.
  */
+/** A 409 that is the server's "a run of the Pipeline is in flight" refusal (retry later), not "that name is waiting". */
+export function isBusyRefusal(err: unknown): boolean {
+    const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
+    return status === 409 && /being ingested right now/.test(apiErrorMessage(err, ''));
+}
+
 export function uploadErrorMessage(err: unknown, fallback: string, action: 'upload' | 'delete' | 'read' = 'upload'): string {
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
@@ -47,6 +53,7 @@ export function uploadErrorMessage(err: unknown, fallback: string, action: 'uplo
                 ? 'That upload is no longer listed - it may already have been deleted. Refresh the list.'
                 : 'That Collector does not accept uploads here. Choose another, or ask a Space administrator to enable uploads on it.';
         case 409:
+            if (action !== 'delete' && isBusyRefusal(err)) return server;
             return action === 'delete'
                 ? 'The Collector has already picked this file up, so it cannot be withdrawn - its rows are in the Dataset.'
                 : "A file with this name is still waiting in the Collector's inbox. If it is your upload, delete or replace it below; otherwise rename your file.";
@@ -68,13 +75,13 @@ export function uploadErrorMessage(err: unknown, fallback: string, action: 'uplo
 }
 
 /** The status badge value (its colour) and the words for one upload's ingest state. */
-export function uploadStateView(u: Pick<UploadRecord, 'state' | 'rejectedRows' | 'quarantineReason'>): { tone: string; label: string } {
+export function uploadStateView(u: Pick<UploadRecord, 'state' | 'rejectedRows' | 'rejectedRowsCapped' | 'quarantineReason'>): { tone: string; label: string } {
     switch (u.state) {
         case 'pending':
             return { tone: 'pending', label: 'Waiting for the Collector' };
         case 'ingested':
             return u.rejectedRows
-                ? { tone: 'warning', label: `Ingested, ${u.rejectedRows} ${u.rejectedRows === 1 ? 'row' : 'rows'} rejected` }
+                ? { tone: 'warning', label: `Ingested, ${u.rejectedRowsCapped ? 'at least ' + u.rejectedRows.toLocaleString('en-US') : u.rejectedRows} ${u.rejectedRows === 1 && !u.rejectedRowsCapped ? 'row' : 'rows'} rejected` }
                 : { tone: 'success', label: 'Ingested' };
         case 'quarantined':
             return { tone: 'quarantined', label: 'Quarantined' + (u.quarantineReason ? ` (${u.quarantineReason})` : '') };

@@ -369,7 +369,13 @@ public final class UploadRoutes implements RouteModule {
         }
 
         long daily = lim.get(LaLimit.UPLOAD_DAILY_BYTES);
+        final String landName = name;
         java.util.concurrent.Callable<Boolean> landIt = () -> {
+            // A replace decided on a file that was in the inbox; under the claim, check it still is (the Collector may have
+            // taken it in between) - writing it fresh would be a new upload the analyst did not ask for.
+            if (existed && !Files.isRegularFile(dest))
+                throw refuse("conflict", 409, ErrorCodes.CONFLICT, "'" + landName + "' left the Collector's inbox while the replace was"
+                        + " being made (the Collector picked it up); nothing was changed - upload it again without replace");
             synchronized (QUOTA_LOCK) {
                 Path ledger = root.resolve("audit").resolve("la-uploads")
                         .resolve(java.time.LocalDate.now(ZoneOffset.UTC) + ".bytes");

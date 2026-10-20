@@ -2104,6 +2104,8 @@ export interface UploadRecord {
     landedAt: string;
     state: UploadState;
     rejectedRows?: number;
+    /** True when the server counted only up to its cap, so `rejectedRows` is a lower bound. */
+    rejectedRowsCapped?: boolean;
     quarantineReason?: string;
 }
 export interface UploadList {

@@ -35,6 +35,9 @@ public final class HostUploadLandingPort implements UploadLandingPort {
     /** At most this many reject-ledger rows are counted per file; past it the count is this and the read says "capped". */
     public static final int REJECT_COUNT_CAP = 10_000;
 
+    /** At most this many BYTES of a reject ledger are read per file (one enormous line cannot be pulled whole). */
+    public static final int REJECT_READ_CAP_BYTES = 4 * 1024 * 1024;
+
     @Override
     public Optional<Target> target(ApiContext api, String collector) {
         var service = HostContext.of(api).service();
@@ -107,12 +110,12 @@ public final class HostUploadLandingPort implements UploadLandingPort {
     }
 
     /** A claim file left by a withdraw that died between its rename and its delete: {@code .<name>.withdraw-<nanos>.tmp}. */
-    private static final java.util.regex.Pattern STRANDED = java.util.regex.Pattern.compile("\\..+\\.withdraw-\\d+\\.tmp");
+    private static final java.util.regex.Pattern STRANDED = java.util.regex.Pattern.compile("\\.(.+)\\.withdraw-\\d+\\.tmp");
 
     @Override
     public <T> Optional<T> whileIdle(ApiContext api, Target target, java.util.concurrent.Callable<T> action) throws Exception {
         return HostContext.of(api).service().whileIdle(target.pipeline(), () -> {
-            sweepStranded(target.inbox());
+            sweepStranded(target);
             return action.call();
         });
     }
@@ -122,10 +125,13 @@ public final class HostUploadLandingPort implements UploadLandingPort {
      * is mid-rename (each holds the claim), so a match is always stranded. Plain regular files of that exact name shape only:
      * never a folder, a junction or a link (not followed, not deleted), never a file of any other name.
      */
-    static void sweepStranded(Path inbox) {
-        try (Stream<Path> s = Files.list(inbox)) {
+    static void sweepStranded(Target target) {
+        try (Stream<Path> s = Files.list(target.inbox())) {
             for (Path p : s.toList()) {
-                if (!STRANDED.matcher(p.getFileName().toString()).matches()) continue;
+                java.util.regex.Matcher m = STRANDED.matcher(p.getFileName().toString());
+                // Only a name THIS Collector's withdraw could have made: the run claim is per Pipeline, so another Pipeline
+                // polling the same inbox may hold a live claim file under a name its own patterns accept.
+                if (!m.matches() || !target.accepts(m.group(1))) continue;
                 if (!Files.isRegularFile(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
                 try {
                     Files.deleteIfExists(p);
@@ -182,14 +188,29 @@ public final class HostUploadLandingPort implements UploadLandingPort {
             if (cfg.dirs().errors() == null) return null;
             Path ledger = Paths.get(cfg.dirs().errors()).toAbsolutePath().resolve(FileNames.errorsFileName(cfg, file));
             if (!Files.isRegularFile(ledger)) return null;
-            try (java.io.BufferedReader in = Files.newBufferedReader(ledger)) {
-                long rows = -1;   // the header line is not a row
-                String line;
-                while ((line = in.readLine()) != null) {
-                    if (line.isBlank()) continue;
-                    if (++rows >= REJECT_COUNT_CAP) return new long[]{REJECT_COUNT_CAP, in.readLine() == null ? 0 : 1};
+            try (java.io.InputStream in = Files.newInputStream(ledger)) {
+                // Count non-blank lines by scanning bytes in blocks: at most REJECT_READ_CAP_BYTES are read, so neither a huge
+                // ledger nor one enormous line is pulled into memory; the header line is not a row.
+                byte[] buf = new byte[64 * 1024];
+                long lines = 0, read = 0;
+                boolean content = false, capped = false;
+                int n;
+                scan:
+                while ((n = in.read(buf)) != -1) {
+                    for (int i = 0; i < n; i++) {
+                        byte b = buf[i];
+                        if (b == '\n') {
+                            if (content) lines++;
+                            content = false;
+                            if (lines - 1 > REJECT_COUNT_CAP) { capped = true; break scan; }
+                        } else if (b != '\r' && b != ' ' && b != '\t') content = true;
+                    }
+                    read += n;
+                    if (read >= REJECT_READ_CAP_BYTES && in.read() != -1) { capped = true; break; }
                 }
-                return new long[]{Math.max(0L, rows), 0};
+                if (!capped && content) lines++;
+                if (lines - 1 > REJECT_COUNT_CAP) capped = true;
+                return new long[]{Math.max(0L, Math.min(lines - 1, REJECT_COUNT_CAP)), capped ? 1 : 0};
             }
         } catch (IOException | RuntimeException unreadable) {
             return null;

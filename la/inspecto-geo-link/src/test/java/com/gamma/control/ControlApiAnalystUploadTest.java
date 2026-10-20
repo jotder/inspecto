@@ -736,11 +736,15 @@ class ControlApiAnalystUploadTest {
             Files.writeString(stranded, "x");
             Path unrelated = c.inbox().resolve(".keep.tmp");
             Files.writeString(unrelated, "x");
-            Path folder = c.inbox().resolve(".dir.csv.withdraw-5.tmp");
+            Path folder = c.inbox().resolve(".UPL_D.csv.withdraw-5.tmp");
             Files.createDirectories(folder);
             Files.writeString(folder.resolve("inner.txt"), "x");
             Files.writeString(outside.resolve("precious.txt"), "x");
-            Path link = c.inbox().resolve(".lnk.csv.withdraw-6.tmp");
+            Path emptyFolder = c.inbox().resolve(".UPL_E.csv.withdraw-8.tmp");
+            Files.createDirectories(emptyFolder);
+            Path otherCollectors = c.inbox().resolve(".OTHER_1.csv.withdraw-9.tmp");   // not a name THIS Collector's withdraw could have made
+            Files.writeString(otherCollectors, "x");
+            Path link = c.inbox().resolve(".UPL_L.csv.withdraw-6.tmp");
             boolean linked = false;
             try {
                 Files.createSymbolicLink(link, outside);
@@ -755,6 +759,9 @@ class ControlApiAnalystUploadTest {
             assertTrue(Files.exists(unrelated), "other names are left alone");
             assertTrue(Files.exists(folder.resolve("inner.txt")), "a folder of that name is not swept into");
             assertTrue(Files.exists(outside.resolve("precious.txt")), "a link is never followed out of the inbox");
+            assertTrue(Files.exists(link, java.nio.file.LinkOption.NOFOLLOW_LINKS), "the link itself is not deleted");
+            assertTrue(Files.isDirectory(emptyFolder), "an EMPTY folder of that name survives (only regular files are swept)");
+            assertTrue(Files.exists(otherCollectors), "a claim-shaped name this Collector's pattern would not accept is another Pipeline's: left alone");
             assertTrue(linked, "the link fixture was created");
         }
     }
@@ -777,6 +784,37 @@ class ControlApiAnalystUploadTest {
             row = uploadsOf(c, UPLOADER).get(0);
             assertEquals(2, row.get("rejectedRows").asLong());
             assertFalse(row.has("rejectedRowsCapped"), "an exact count carries no flag");
+        }
+    }
+
+    /** Follow-up: exactly CAP rows then a blank line is an exact count, not capped. */
+    @Test
+    void aBlankLineAfterTheLastCountedRowDoesNotFlagCapped(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            status(201, up(c, "UPL_1.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            Path errors = c.inbox().getParent().resolve("errors");
+            Files.createDirectories(errors);
+            int cap = com.gamma.geolink.HostUploadLandingPort.REJECT_COUNT_CAP;
+            StringBuilder sb = new StringBuilder("line,reason\n");
+            for (int i = 0; i < cap; i++) sb.append(i).append(",bad\n");
+            Files.writeString(errors.resolve("UPL_1_errors.csv"), sb + "\n\n");
+            JsonNode row = uploadsOf(c, UPLOADER).get(0);
+            assertEquals(cap, row.get("rejectedRows").asLong(), row.toString());
+            assertFalse(row.has("rejectedRowsCapped"), row.toString());
+        }
+    }
+
+    /** Follow-up: the BYTES read are bounded too - one enormous line cannot be pulled whole into memory. */
+    @Test
+    void aSingleHugeLineInTheRejectLedgerIsReadOnlyUpToTheByteBound(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            status(201, up(c, "UPL_1.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            Path errors = c.inbox().getParent().resolve("errors");
+            Files.createDirectories(errors);
+            int bound = com.gamma.geolink.HostUploadLandingPort.REJECT_READ_CAP_BYTES;
+            Files.writeString(errors.resolve("UPL_1_errors.csv"), "line,reason\n" + "x".repeat(bound + 1024));
+            JsonNode row = uploadsOf(c, UPLOADER).get(0);
+            assertTrue(row.get("rejectedRowsCapped").asBoolean(), row.toString());
         }
     }
 
