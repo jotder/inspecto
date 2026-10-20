@@ -124,6 +124,130 @@ Built for the answered decisions only (D-LAE1, D-LAE2, D-LAE5; D-LAE12 is the no
 - **Geo map (D-LAE5).** New route feature `EditionFeatures.GEO_MAP` (`geoMap`) on `GeoRoutes` only (`featureIds` `geoLink` + `geoMap`), declared by `OpsEditionFeatures`; `/bootstrap` reports `features.geoMap`. Nav: the console entry `studio-geo-map` moves from `navFeature: 'geoLink'` to `'geoMap'`; the standalone LA app's Geo area and the Menu Builder's Geo view key on it too. The "co-location" is browser-side UI (`colocation-graph.dialog`) over `POST /geo/projection`, so it has no route of its own: the one gate covers it. Draft citation fixed: `GeoRoutes.java:70-71` is right, but the draft's `geo-map-routes` pane is `projects/link-analysis/src/geo-map/`.
 - **LA dashboard widgets (D-LAE2).** `EditionFeatures.LA_WIDGETS` (`laWidgets`), declared by `OpsEditionFeatures`, deliberately NOT in `ROUTE_FEATURES`; `/bootstrap` reports `features.laWidgets` (`geoLink` on AND the feature present). The SPA hides the *Link analysis* (and, with `geoMap`, *Geo map*) types in the Explore widget picker. Draft citation fixed: the draft's `dashboards.component.ts:43`, `widgets.component.ts:65` and `datasets.component.ts:71` are doc comments about the *tags* menu (`opsEnabled`), not LA widget offers; the real offers are the view-bound viz plugins offered by `explore.component.ts` (`viewPlugins`) and the Menu Builder's kinds (`menu-attach.dialog.ts:70`, which already followed `geoLink`). Menu items are not dashboard widgets, so the *Link view* menu kind keeps following `geoLink`; only the *Geo view* kind follows `geoMap`.
 
+### 4.3 Pre-build checks for D-LAE3, D-LAE4, D-LAE6 and the ingestion rows (2026-10-20, lane lae-checks)
+
+> Read-only check against `origin/master` (`275345998`). Nothing gated, **no decision marked answered** (the operator signs).
+> Every claim in §4 to §6 was treated as a hypothesis and grepped. Verdicts: HOLD (recommendation survives), CHANGE
+> (survives only reshaped).
+
+**D-LAE3, masking on Basic: CHANGE.** Option (a) holds in spirit, but "fix the mode to `none`" is wider than §4.1 says.
+
+- "Anyone may reveal" is not edition code (§4.1 guessed so). It is the generic capability gate: with no sign-in there is no
+  Subject, so `withCapability("canRevealLinkEntities", ...)` is unrestricted (`InvestigationRoutes.java:153-154`; stated for BI
+  results at `BiResultMasking.java:54`). Doc sites: `EDITIONS.md:36`, `:281`.
+- ⚠ §4.1 is wrong that Basic offers a reveal on explorer answers: the reveal route lives in `InvestigationRoutes`
+  (`featureIds` `geoLink` + `investigations`), so on Basic it already answers 503. Masked ids in Basic explorer answers have **no**
+  reveal path today (BI results do reveal for an unauthenticated caller).
+- What Basic exposes: `GET|PUT /settings/link-analysis` (`SettingsRoutes.java:230-231` reports `maskingMode` and
+  `maskingModeInForce`; `:478-483` validates) in the **base** `inspecto` module, and the admin pane
+  `inspecto-ui/src/app/modules/admin/settings/link-analysis-settings.component.ts:126-132`. The default is `typed`
+  (`LinkAnalysisSettings.effectiveMaskingMode`, `platform/inspecto-entity-store/.../LinkAnalysisSettings.java:336-338`).
+- The setting is **not Link Analysis only**. Readers of `effectiveMaskingMode()`: `BiResultMasking.java:107` (BI query and share
+  results, base), `EntityListFacts` and `EntityListRoutes` (Entity Lists stay on Basic), `EntityProfileRoutes:122,148`,
+  `EntityProfiles:121`, `ExplorationMasking:94`, `CaseHistory:109`, `EntityIdentityRoutes:460`, `InvestigationEmbedRoutes:89`.
+  Forcing `none` on Basic also un-masks classified columns in **BI results and Entity Lists**, not just the graph. That is the real
+  consequence to put in the doc (§4.1 names only Entity Lists and Industry packs).
+- Where an override can live: `effectiveMaskingMode()` is in `inspecto-entity-store`, which does **not** depend on `inspecto-etl`
+  (`EditionFeatures`) at compile scope (`pom.xml`: `inspecto-engine` is test scope only), so the method cannot read the edition.
+  Two shapes: (1) refuse a non-`none` PUT and make the settings loader report `none` through a small supplier the host sets at
+  boot; (2) leave the stored value and only report `maskingModeInForce: none` and hide the control. Shape (1) is the honest one;
+  (2) leaves audit text saying one thing and stored config another.
+- Gating change: a config-style feature (suggest `masking.enforce`, declared by `inspecto-ops` beside `LA_WIDGETS`, **not** in
+  `ROUTE_FEATURES`); `/bootstrap` `features.maskingEnforced` (pattern: `BootstrapRoutes.java:122-131`); the SPA hides the masking
+  picker when false; docs `EDITIONS.md:36`, `:281`, SCH-03 and SEC-08 notes. Tests to touch: `ControlApiBiQueryMaskingTest`,
+  `ControlApiSettingsTest`, `ControlApiEntityListTest`, `ReportJobMaskingTest` (pin with `overrideForTest`, reset in teardown).
+- Effort: 2 to 3 days with tests. Risk: security-relevant (raw ids in BI and Entity Lists on Basic). **Operator choice:** (a) global
+  `none` on Basic, accepting BI and Entity Lists go raw; (a') `none` only for the Link Analysis readers (`ExplorationMasking`,
+  `EntityMasking`, `EntityProfile*`), BI and Entity Lists stay `typed` (smaller, no new global behaviour); or (c) keep as is.
+
+**D-LAE4, Entity profile pages Standard and up: HOLD.** The dependency check passes; no blocker found.
+
+- Server: no route or module calls the four profile routes. Outside `EntityProfileRoutes` the references are the helper class
+  `EntityProfiles` (a plain class, not a route: `DatasetLinkStats`, `IndexLinkStats`, `InvestigationInboundRoutes.java:215`) and
+  one error text (`:219`). `EntityIdentityRoutes` (`featureIds` `geoLink`, `:77-79`) and `features/inspecto-entity-list` do not call
+  `/inv/entity-types` or `/inv/entities/...` (grep over main Java). Gating the routes cannot break identity resolution or Entity Lists.
+- Client: the API client `inspecto-ui/projects/link-analysis/src/api/entity-profile.service.ts:214-236` is imported only under
+  `projects/link-analysis/src/entities/` (`entities`, `entity-type`, `entity`, `entity-lookup` components, `entity-profile-view`).
+  Mounts: `inspecto-ui/src/app/modules/admin/studio/studio.routes.ts:16` (`studio/entities`), `navigation-data.ts:292-297`
+  (`studio-entities`, `navFeature: 'geoLink'`), `projects/la-app/src/app/la-nav.ts` (area `entities`; the list already supports `feature:`).
+  Back-links to hide when the flag is false: `link-analysis.component.ts:2358-2362` (`entityPageOf`) and `open/open-in-la.component.ts`.
+- ⚠ Missed by §4: `GET /inv/entity-types` (the Entity Type list with bindings) lives on `EntityProfileRoutes` too, and
+  `ControlApiBasicEditionLinkAnalysisTest.java:55` uses it as the "one route per explorer module" probe for that module; it must change
+  to another module's route when this gate lands.
+- Gating change: a route feature (suggest `entityPages`) on `EntityProfileRoutes.featureIds()` (`:41-44`); add it to
+  `EditionFeatures.ROUTE_FEATURES`, `refusal()` text, `OpsEditionFeatures`, the module's `module.toon` `provides.features`
+  (`ModuleManifestGuardTest`); `/bootstrap` `features.entityPages`; SPA `navFeature: 'entityPages'` on `studio-entities`,
+  `feature: 'entityPages'` on the la-app area, hide the two back-links; docs `EDITIONS.md` Explore row, hub text, route-gating evidence.
+  Tests: `BootstrapEditionTest`, `EditionFeaturesTest`, a Basic-503 case in `ControlApiBasicEditionLinkAnalysisTest`.
+- Effort: 1 to 1.5 days. Risk: low. Same shape as the built Geo map gate (D-LAE5).
+
+**D-LAE6, patterns and packs on Basic (P-A): CHANGE.** P-A as worded cannot be built; a narrower P-A can.
+
+- Server routes: `POST /inv/pattern/branching` and `/temporal` (`PatternRoutes.java:73-74`, `featureIds` `geoLink` at `:65`).
+  Browser: a branching engine (`graph/branching-pattern-engine.ts`) and the linear matcher (`matchPattern`), both time-aware, run
+  first (`link-analysis-toolbox.component.ts:1221-1235`); the server branching run is the fallback for a truncated projection
+  (`link-analysis.component.ts:2515-2530`, over an Investigation `:1727-1745`). **There is no browser burst/periodicity engine**:
+  `temporalPattern` (`inv.service.ts:1669-1671`, called at `link-analysis.component.ts:2573`) is server-only. "Temporal patterns" is
+  therefore two things: motif time constraints (browser, stay on Basic) and the burst/periodicity scan (server, would move).
+- "Investigate a number" does **not** call `/inv/pattern/*` (`investigate-number.ts` validates an MSISDN and builds a seed). The §5
+  worry is closed: gating the pattern routes does not break it.
+- Pattern packs: the built-in packs are SPA constants (`link-analysis/pattern-packs.ts`, `PATTERN_PACKS`) with no server route.
+  Authored packs are Space components read through the **base** `GET /components/pattern-pack` (`ComponentRegistry.java:79`,
+  `ComponentRoutes.java:76-77`, called at `link-analysis-toolbox.component.ts:266`). So "packs on Standard" is a **UI flag only**,
+  cosmetic like D-LAE2; a server gate would have to gate the platform-wide `/components` family, which is not recommended.
+- The edition gate is per `RouteModule` (the D-LAE1 lesson), and `PatternRoutes` holds both routes. `ControlApiBasicEditionLinkAnalysisTest.java:56`
+  pins `/inv/pattern/branching` as Basic-served. To move only the temporal scan, it must split into its own module first.
+- Gating change (narrow P-A): new `TemporalRoutes` module (`featureIds` `geoLink` + `serverPatterns`), new route feature
+  `serverPatterns` (`ROUTE_FEATURES`, refusal, `OpsEditionFeatures`, `module.toon`, `/bootstrap`); SPA hides the temporal findings
+  panel and, if server branching also moves, the server-run buttons (degrade with a notice via `canRunOnServer`, toolbox `:387`);
+  a UI flag hides the pack picker; docs `EDITIONS.md`.
+- Effort: 2 to 3 days (module split, SPA degrade path, tests). **Operator choice:** narrow P-A (temporal scan, and optionally server
+  branching, on Standard; pack picker hidden by flag) or P-C (keep everything, no work). Not recommended: gating the browser engines
+  (no server seam, cosmetic only).
+
+**D-LAE7 to D-LAE11, ingestion gates: what each would touch (not built).**
+
+- Grounding the §6 premise. An absent `trigger:` is `Kind.DEFAULT_POLL` (`PipelineTrigger.java:28, 101, 120`), which maps to
+  `Scheduler.LOOP` (`:55`), so **a Pipeline with no `trigger:` already polls every tick**; `dueThisTick`
+  (`inspecto/.../service/PipelineScheduler.java:481-494`) is false only for `EVENT` and `MANUAL`. "Manual stays Basic" therefore means a
+  Basic Pipeline must declare `trigger: {type: manual}`, and the gate must refuse the trigger-less default form, which is what almost
+  every existing config uses. Making the default manual for Basic only is a larger change (touches `PipelineTrigger.of`).
+- **D-LAE7 (gate by trigger mode).** Touches `EditionFeatures` (new `ingest.continuous`, `refusal()`, `pipelineRefusals` at `:137`
+  draft and `:173` parsed), `SaveGate.java:155`, `ConfigRegistry.java:166`, `SpaceManager.java:454-475`, `PipelineScheduler.dueThisTick`
+  (`:481`) and the acquire driver (`dispatchAcquireCycle:661`, `selectDueForAcquire` just after it, timers `CollectorService.java:764,1276`),
+  a Standard-only provider in `inspecto-ops`, a `/bootstrap` flag, UI hiding of cron, interval and default poll. Risks: refusing the
+  default poll breaks every legacy config and **both Basic packs** (neither declares `trigger:`); authored Pipelines
+  (`PipelineGraphRoutes.java:77`) carry their trigger on the entry node; `STREAM` is `LOOP` too (`PipelineTrigger.java:55`); a config
+  copied onto disk skips the save gate, so the scheduler guard is the only defence. Effort 3 to 4 days.
+- **D-LAE9 (Postgres `db` Collector, manual only).** `DbExportConnector` ships in the `inspecto-connectors` sidecar Basic stages. Under
+  D-LAE7 a manual-only rule needs no per-connector code: a watermark `db` Collector is refused only when its Pipeline is non-manual.
+  Open point for the operator: a manual run still advances the watermark (an incremental pull); say whether that counts. Effort 0 on
+  top of D-LAE7, plus docs.
+- **D-LAE10 (Jobs and `EVENT` count as continuous).** `EVENT` is `Scheduler.EVENT`, not `LOOP`, so `dueThisTick` never sees it: its gate
+  belongs in `pipelineRefusals` (save and load), not the scheduler. Scheduled Jobs run through `JobRoutes` and the Job scheduler (a
+  second gate site: Job save plus the Job tick). ⚠ Signal-driven Jobs (`on_signal: pipeline.commit`, as `la_index_build_job.toon`
+  uses) are not scheduled: they follow their Pipeline, so a manual Pipeline commit still fires them. State that, or the gate has a hole.
+  Effort 2 days plus Job tests.
+- **D-LAE8 (step families on Basic).** `ProcessorCatalog.Processor` has no edition field; the notes carry "Standard+" as free text
+  (`ProcessorCatalog.java:44`). Needs a machine-readable field, a refuse walk in `pipelineRefusals` (the `maskRefusals` nested-branch
+  walk is the model; run-time precedent `RowShaper.java:314`) and a UI badge. ⚠ Transformation is **not only steps**: schema field
+  `expression:` entries (`orders_schema.toon:27,44`, `UPPER(TRIM(...))`, `ROUND(...)`) derive and clean columns inside the schema,
+  outside the step catalog, so a step gate leaves them open. Decide whether schema expressions are in scope. Effort 3 to 5 days, the
+  largest row, last in the chain (as already ordered).
+- **D-LAE11 (packs).** Corrects §7: **`orders-starter` has no `steps:` and no filter**
+  (`spaces/_templates/orders-starter/config/orders/orders_pipeline.toon`); its only transformations are two schema `expression:`
+  columns. A step gate would not touch it; a trigger gate would (default poll), and so would a schema-expression gate.
+  `la-daily-feed` has a local `collector: discovery: poll`, no `trigger:`, two Jobs (`la.index.build` on `pipeline.commit`,
+  `expectation.evaluate`) and two Alert Rules (`registry/alert-rules/daily_xdr_*.toon`; Alert Rules are Standard+); `EDITIONS.md`
+  already lists daily ingestion as Standard+, so moving the pack is consistent. Touches `offerings/basic.toon:10` (`contentPacks[2]`)
+  and `standard.toon`, `tools/render-offerings-matrix.mjs --check`, `tools/check-offerings.mjs`, the pack hub under
+  `docs/okf/product/solution-pack/`, and for the trim, `trigger: {type: manual}` in `orders_pipeline.toon` plus README text ("copy
+  files, then Run"). Effort 0.5 to 1 day. Risk: a first Basic Space loses auto-ingest; the trimmed pack must say how to run it.
+
+**Net, for the operator (nothing marked answered):** D-LAE4 can be answered YES now (HOLD). D-LAE3 needs a choice between global
+`none`, Link-Analysis-only `none` and keep (CHANGE). D-LAE6 needs the module split accepted, or P-C (CHANGE). The ingestion chain is
+buildable in the order D-LAE7, D-LAE10, D-LAE9, D-LAE11, D-LAE8 once the default-poll rule is decided.
+
 ## 5. Patterns and pattern packs on Basic (request 4)
 
 What exists: `POST /inv/pattern/branching` and `POST /inv/pattern/temporal` (`PatternRoutes.java:73-74`, gated by
