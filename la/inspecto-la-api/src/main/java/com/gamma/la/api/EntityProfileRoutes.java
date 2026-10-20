@@ -86,13 +86,8 @@ public final class EntityProfileRoutes implements RouteModule {
     }
 
     /**
-     * {@code GET /inv/entities/{type}/{key}/profile}. For a type masked under the Space's mode the key must be the alias: a raw
-     * value is refused 422 BEFORE anything is read, pointing at {@code POST /inv/entities/{type}/resolve}, so a raw identifier
-     * is never looked up through a URL (operator 2026-10-15: never in a URL or a log). The refusal never repeats the key.
-     */
-    /**
      * The optional {@code from} / {@code to} of a deep link (ISO-8601 instants with a zone, half-open [from, to)) as
-     * {@code {from, to}} (either may be null), or null for no window; 422 for a malformed instant or a window that ends before it starts.
+     * {@code {from, to}} (either may be null), or null for no window; 422 for a malformed instant an instant outside 0001-01-01..9999-12-31, or a window that ends before it starts.
      */
     static String[] window(String from, String to) {
         if ((from == null || from.isBlank()) && (to == null || to.isBlank())) return null;
@@ -102,15 +97,25 @@ public final class EntityProfileRoutes implements RouteModule {
         return new String[] {f == null ? null : f.toString(), t == null ? null : t.toString()};
     }
 
+    /** The instants a window may take: what a TIMESTAMP holds and the SQL text round-trips (years 0001 to 9999). */
+    static final java.time.Instant MIN = java.time.Instant.parse("0001-01-01T00:00:00Z"), MAX = java.time.Instant.parse("9999-12-31T23:59:59Z");
+
     private static java.time.Instant instant(String v, String name) {
         if (v == null || v.isBlank()) return null;
         try {
-            return java.time.OffsetDateTime.parse(v.trim()).toInstant();
-        } catch (java.time.format.DateTimeParseException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' must be an ISO-8601 instant with a zone, e.g. 2026-10-01T00:00:00Z");
+            java.time.Instant i = java.time.OffsetDateTime.parse(v.trim()).toInstant();
+            if (i.isBefore(MIN) || i.isAfter(MAX)) throw new java.time.DateTimeException("out of range");
+            return i;
+        } catch (java.time.DateTimeException | ArithmeticException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' must be an ISO-8601 instant with a zone between 0001-01-01 and 9999-12-31, e.g. 2026-10-01T00:00:00Z");
         }
     }
 
+    /**
+     * {@code GET /inv/entities/{type}/{key}/profile}. For a type masked under the Space's mode the key must be the alias: a raw
+     * value is refused 422 BEFORE anything is read, pointing at {@code POST /inv/entities/{type}/resolve}, so a raw identifier
+     * is never looked up through a URL (operator 2026-10-15: never in a URL or a log). The refusal never repeats the key.
+     */
     private static Object entityProfile(ApiContext api, HttpExchange ex, String type, String urlKey) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity profile");
         EntityTypes.EntityType t = type(writeRoot, type);

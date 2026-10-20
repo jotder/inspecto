@@ -145,7 +145,9 @@ describe('OpenInLaComponent (Open in Inspecto LA)', () => {
         expect(q(el, 'entity')!.textContent).toContain('+249912000001');
         expect(q(el, 'masked')).toBeNull();
         expect(q(el, 'reveal')).toBeNull();
-        expect(q(el, 'open-entity')!.getAttribute('href')).toContain(`/studio/entities/msisdn/${ALIAS}`);
+        expect(q(el, 'open-entity')!.getAttribute('href')).toBe(
+            `/studio/entities/msisdn/${ALIAS}?from=2026-10-01T00:00:00Z&to=2026-10-04T00:00:00Z`,
+        );
     });
 
     it('has no axe violations and one h1, resolved or refused', async () => {

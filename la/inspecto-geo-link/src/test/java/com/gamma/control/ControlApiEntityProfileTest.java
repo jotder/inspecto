@@ -105,6 +105,10 @@ class ControlApiEntityProfileTest {
             assertEquals("2026-10-03T11:00:00Z", open.get("firstSeen").asText());
             assertFalse(noRaw(get(c, p, OWNER)).has("window"), "no window, no echo");
             assertEquals(422, get(c, p + "?from=yesterday", OWNER).statusCode());
+            for (String bad : List.of("from=" + enc("-999999999-01-01T00:00:00+18:00"), "to=" + enc("+10000-01-01T00:00:00Z"),
+                    "from=" + enc("0000-12-31T23:59:59Z"), "to=" + enc("+999999999-12-31T23:59:59Z")))
+                assertEquals(422, get(c, p + "?" + bad, OWNER).statusCode(), "out-of-range instant: " + bad);
+            assertEquals(200, get(c, p + "?from=" + enc("0001-01-01T00:00:00Z") + "&to=" + enc("9999-12-31T23:59:59Z"), OWNER).statusCode());
             assertEquals(422, get(c, p + "?from=" + enc("2026-10-04T00:00:00Z") + "&to=" + enc("2026-10-01T00:00:00Z"), OWNER).statusCode());
         }
     }

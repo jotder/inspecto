@@ -131,7 +131,9 @@ type Identity = { members: string[] | null; note: string } | null;
                             tier="mini"
                             [rows]="p.where"
                             [columns]="whereCols"
-                            noRowsTitle="This Entity appears in no bound Dataset"
+                            [noRowsTitle]="
+                                window() ? 'No activity in this window' : 'This Entity appears in no bound Dataset'
+                            "
                         ></inspecto-data-table>
                     </mat-expansion-panel>
 

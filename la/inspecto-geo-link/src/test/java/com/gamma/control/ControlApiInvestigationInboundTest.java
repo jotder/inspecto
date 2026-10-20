@@ -125,9 +125,10 @@ class ControlApiInvestigationInboundTest {
             assertTrue(r.body().contains("imei") && r.body().contains("msisdn") && r.body().contains("binding"), r.body());
             for (String raw : RAW) assertFalse(r.body().contains(raw), r.body());
             assertEquals(0, data(get(c, "/inv/investigations", OWNER)).get("total").asInt(), "nothing was created");
-            assertEquals(200, send(c, "POST", INBOUND, alert("fraudpro", "AL-9", "\"msisdn:" + A + "\",\"imei:" + I1 + "\"",
-                    ",\"binding\":{\"dataset\":\"calls_ds\",\"sourceCol\":\"a_msisdn\",\"targetCol\":\"b_msisdn\"}"), OWNER).statusCode(),
-                    "an explicit binding is the caller's own statement");
+            JsonNode ok = noRaw(send(c, "POST", INBOUND, alert("fraudpro", "AL-9", "\"msisdn:" + A + "\",\"imei:" + I1 + "\"",
+                    ",\"binding\":{\"dataset\":\"calls_ds\",\"sourceCol\":\"a_msisdn\",\"targetCol\":\"b_msisdn\"}"), OWNER));
+            assertEquals(2, ok.get("seeded").asInt(), "an explicit binding is the caller's own statement: both types are seeded");
+            assertEquals(List.of("seed", "seed"), ops(data(get(c, "/inv/investigations/" + ok.get("investigationId").asText() + "/log", OWNER))));
         }
     }
 

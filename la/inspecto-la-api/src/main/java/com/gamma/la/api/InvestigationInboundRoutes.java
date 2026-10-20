@@ -85,7 +85,7 @@ public final class InvestigationInboundRoutes implements RouteModule {
      * Body {@code {reference: {system, type?, id, url?, label?}, entities: ["<type>:<key>", ...], purpose, title?,
      * window?: {from?, to?, ...}, binding?: {dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?}}}.
      * Gates: {@code canManageIncidents} 403 → write root 503 → a malformed reference, entity or window 422 → then, only when the
-     * reference is new: a malformed binding, or (no binding) no link mapping binds the first entity's type 422 → the create's own
+     * reference is new: a malformed binding, or (no binding) no single link mapping binds EVERY entity type the call names 422 → the create's own
      * gates; and for a repeat: an Investigation the caller cannot change 409.
      */
     private Object inbound(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
@@ -229,8 +229,8 @@ public final class InvestigationInboundRoutes implements RouteModule {
 
     /**
      * The create body: the caller's {@code binding} when given, else the first link mapping the Space knows (a saved Link
-     * Analysis view or a published index, the order {@link EntityTypeBindings} reads them) with the first entity's type bound
-     * at a link end. Its kind and time columns come along; a {@code window} needs a time column.
+     * Analysis view or a published index, the order {@link EntityTypeBindings} reads them) with every entity type the
+     * call names at a link end (none covers them all: 422 naming the types). Its kind and time columns come along; a {@code window} needs a time column.
      */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> createBody(HttpExchange ex, Path writeRoot, Map<String, Object> body, List<TypedEntity> entities,

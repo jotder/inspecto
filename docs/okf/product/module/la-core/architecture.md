@@ -748,7 +748,7 @@ surface). Outbound (case hand-off, webhooks, client-credentials trust) is a sepa
   `coveredDays` and `perDay`, and echoes `window {from, to}`; `links` and `related` stay whole-history (the page says so, with a *Show the
   whole history* link). A mixed-type inbound call binds through ONE link mapping that links a column of EVERY type it names; when no
   single mapping does, it is refused 422 naming the types (an Investigation has one mapping), unless the caller sends an explicit
-  `binding`. A mapping covering all types is preferred over the first one that covers the first type.
+  `binding`. The window bounds are 0001-01-01..9999-12-31 (422 outside). A deep link carries only `from` / `to`: an Investigation window's other settings (slots, day or timezone rules) stay on the Investigation and are not carried to the Entity page. A mapping covering all types is preferred over the first one that covers the first type.
 
 ### 6.5 Third-party integration (outbound) (LA-EDITIONS-1 phase 6, built 2026-10-17)
 
