@@ -96,12 +96,19 @@ public final class EditionFeatures {
     }
 
     /**
+     * The edition features the HOST enforces on routes ({@link #gatesRoutes}). A member needs its own {@link #refusal} text
+     * (pinned by {@code EditionFeaturesTest}). {@code LA-EDITIONS-PLACEMENT-1}: a set, so a second route feature is one
+     * more member instead of one more hard-coded comparison.
+     */
+    static final Set<String> ROUTE_FEATURES = Set.of(INVESTIGATIONS);
+
+    /**
      * Whether {@code featureId} — a {@code RouteModule.featureIds()} id — is an edition feature the HOST enforces on routes:
      * a route owned by it answers {@code 503 CAPABILITY_UNAVAILABLE} with {@link #refusal} when the feature is absent.
-     * Only {@link #INVESTIGATIONS} today; every other route feature is decided by whether its module is installed.
+     * The members of {@link #ROUTE_FEATURES}; every other route feature is decided by whether its module is installed.
      */
     public static boolean gatesRoutes(String featureId) {
-        return INVESTIGATIONS.equals(featureId);
+        return featureId != null && ROUTE_FEATURES.contains(featureId);
     }
 
     /** Throws {@link IllegalStateException} with {@link #refusal} when {@code feature} is absent. */

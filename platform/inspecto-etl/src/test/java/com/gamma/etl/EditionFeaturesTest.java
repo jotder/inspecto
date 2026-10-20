@@ -41,6 +41,21 @@ class EditionFeaturesTest {
     }
 
     @Test
+    void gatesRoutesIsExactlyTheRouteFeatureSetAndEveryMemberHasItsOwnRefusalText() {
+        assertTrue(EditionFeatures.ROUTE_FEATURES.contains(EditionFeatures.INVESTIGATIONS));
+        for (String id : EditionFeatures.ROUTE_FEATURES) {
+            assertTrue(EditionFeatures.gatesRoutes(id), id + " is a route feature the host enforces");
+            assertFalse(EditionFeatures.refusal(id).startsWith("'" + id + "'"),
+                    id + " needs a refusal() text of its own, not the generic fallback: " + EditionFeatures.refusal(id));
+        }
+        // config features are enforced by the save / load gates, never by the route gate; unknown ids and null never gate
+        for (String id : List.of(EditionFeatures.ALERT_DISPATCH, EditionFeatures.SINK_ARCHIVE,
+                EditionFeatures.SINK_DUCKLAKE, EditionFeatures.PII_MASK, "geoLink", "ops", "no.such.feature"))
+            assertFalse(EditionFeatures.gatesRoutes(id), id);
+        assertFalse(EditionFeatures.gatesRoutes(null));
+    }
+
+    @Test
     void noProviderMeansPersonal() {
         assertFalse(EditionFeatures.present(EditionFeatures.ALERT_DISPATCH));
         assertFalse(EditionFeatures.present(EditionFeatures.SINK_ARCHIVE));
