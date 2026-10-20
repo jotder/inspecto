@@ -148,7 +148,7 @@ class TelcoBypassGoldenTest {
         }
         try (Stream<Path> s = Files.list(cfg.resolve("registry/datasets"))) {
             assertEquals(Set.of("voice_cdr.toon", "cell_site.toon", "number_plan.toon", "subscriber_profile.toon", "tb_features.toon",
-                    "tb_factors.toon", "tb_findings.toon"), new TreeSet<>(s.map(f -> f.getFileName().toString()).toList()));
+                    "tb_factors.toon", "tb_findings.toon", "tb_cluster_members.toon", "tb_clusters.toon"), new TreeSet<>(s.map(f -> f.getFileName().toString()).toList()));
         }
     }
 
@@ -263,7 +263,7 @@ class TelcoBypassGoldenTest {
         Set<String> want1 = new TreeSet<>(high1);
         assertEquals(want1, find1.keySet(), "a finding for every high SIM and every allowed scored SIM, and nothing else");
         assertStatuses(find1, pl.allowed1(), pl.x1, Set.of(pl.watched), "night 1");
-        BypassPack.Sweep sweep = new BypassPack.Sweep(space);
+        BypassPack.Sweep sweep = new BypassPack.Sweep(space, BypassPack.SIM_RULES);
         Map<String, Set<String>> alerts1 = sweep.evaluate();
         assertEquals(Map.of("tb_sim_high", Set.of(pl.watched)), alerts1, "night 1: persistence holds everything back except the watched SIM");
 
@@ -356,7 +356,7 @@ class TelcoBypassGoldenTest {
             assertEquals(0.0, ((Number) r.get("alert_score")).doubleValue(), "no alert score anywhere: " + r.get("entity_key"));
             assertEquals(0L, ((Number) r.get("shape_changed")).longValue(), "the allowed-line signal is a page too: silent in shadow");
         }
-        assertEquals(Map.of(), new BypassPack.Sweep(space).evaluate(), "no Alert Rule has anything to raise");
+        assertEquals(Map.of(), new BypassPack.Sweep(space, BypassPack.SIM_RULES).evaluate(), "no Alert Rule has anything to raise");
     }
 
     // ------------------------------------------------------------------------------------------- the planted sets

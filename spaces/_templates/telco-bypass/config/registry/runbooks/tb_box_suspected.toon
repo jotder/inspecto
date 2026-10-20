@@ -1,0 +1,16 @@
+name: tb_box_suspected
+title: "Suspected SIM-box runbook"
+steps[5]:
+  - text: "Detects: a device (imei), a cell or an activation batch that carries at least min_box_sims candidate SIMs on the day. A candidate dials a new number almost every call, in short calls, never receives calls, uses no SMS or data and stays on one cell. The Incident is the box; the key reads imei:, cell: or batch: then the value. A CDR pattern is evidence of consistency with a box, never proof."
+    link:
+      kind: dataset
+      id: tb_clusters
+  - text: "Read the row: candidate_sims, scored_sims and alerting_sims (how many members also alert on their own), max_score, est_bypass_minutes (talk minutes), cells, imeis, batches, spoofed_sims (members that swap IMEIs: a box that spoofs its IMEI is still caught by its cell), days_seen and first_day."
+  - text: "Look at the members: tb_cluster_members for this cluster_key lists every SIM with its device, cell and batch, and tb_findings gives the factors of those that alert. Open the Link Analysis view tb_box_members to see SIMs, devices, cells and batches as one graph."
+    link:
+      kind: dataset
+      id: tb_cluster_members
+  - text: "Verify before acting: only a call to the owner or the dealer, or a test call, separates a box from an unregistered PBX or dialler. A verified line goes on the tb_allow Entity List with an expiry. Bar the SIMs and the device through the operator's provisioning process (an approval-gated step, never automatic); a confirmed box adds its SIMs to tb_block."
+  - text: "Silent by design: a dense building or a call centre (its SIMs receive calls, send SMS or use data), a courier (moves across cells), fewer than min_box_sims candidates, an allowed line, and shadow mode."
+ownerRole: fraud-analyst
+tags[2]: fraud, telco

@@ -1,9 +1,9 @@
 # Telecom bypass (SIM-box)
 
 > **Level 2 solution page.** Content pack: Space Template `telco-bypass`
-> (`spaces/_templates/telco-bypass/template.toon`). **Slices B1 and B2 of `TELCO-BYPASS-SIMBOX-1` are built: the signals, the
-> Risk Score, the allow and watch lists, persistence, agreement, shadow mode and the SIM Alert.** The cluster stage, the box-level
-> Incident and Case, the Anomaly Model factor and the device signals are later slices
+> (`spaces/_templates/telco-bypass/template.toon`). **Slices B1 to B3 of `TELCO-BYPASS-SIMBOX-1` are built: the signals, the
+> Risk Score, the allow and watch lists, persistence, agreement, shadow mode, the SIM Alert, the cluster stage and the box Incident
+> and Case.** The Anomaly Model factor and the 7-day device signals are later slices
 > ([plan](../../../../superpower/bypass-simbox-detection-plan.md)). Checked against the template on 2026-10-20.
 
 ## Business problem
@@ -40,7 +40,9 @@ agreed zone, named by the Job parameter `feed_zone`. Every Dataset ships a zero-
 | 03:00 | `tb_features` | `sql.template`, `incremental` by `window_date`, `retain: 31` | the four feeds | `tb_features`: one row per SIM per day with at least `min_events` (default 20) non-roaming MO voice calls |
 | 03:10 | `tb_factors` | `sql.template`, a snapshot of the latest window | `tb_features` | `tb_factors`: the Risk Score's factor columns, the count of primary signals, `est_bypass_minutes` |
 | 03:20 | `tb_risk_score` | `risk.score` | `tb_factors` | `risk_scores_tb_sim` (history) and `risk_scores_tb_sim_latest` |
-| 03:30 | `tb_findings` | `sql.template`, `incremental`, `retain: 31` | `tb_factors`, `risk_scores_tb_sim_latest`, its own history, `entity_list_tb_allow`, `entity_list_tb_watch` | `tb_findings`: the Dataset both Alert Rules read |
+| 03:30 | `tb_findings` | `sql.template`, `incremental`, `retain: 31` | `tb_factors`, `risk_scores_tb_sim_latest`, its own history, `entity_list_tb_allow`, `entity_list_tb_watch` | `tb_findings`: the Dataset both SIM Alert Rules read |
+| 03:40 | `tb_cluster_members` | `sql.template`, `incremental`, `retain: 31` | `voice_cdr`, `subscriber_profile`, `entity_list_tb_allow` | `tb_cluster_members`: one row per candidate SIM that shares a box (below) |
+| 03:50 | `tb_clusters` | `sql.template`, `incremental`, `retain: 31` | `tb_cluster_members`, `tb_features`, `tb_findings`, its own history | `tb_clusters`: one row per suspected box per day, the Dataset the box Alert Rule reads |
 
 The twelve signals of `tb_features`:
 
@@ -94,16 +96,43 @@ One row per SIM at or above the high threshold, and one per allowed SIM whatever
 signature differs from its previous finding and shadow mode is off. `top_factors` lists the three largest positive contributions
 (ties by factor id), `est_bypass_minutes` is calls x answer rate x mean answered duration / 60 (an estimate, D-BP8; the optional rate parameter is not built).
 
+## The cluster stage and the box
+
+A box is many SIMs on one site and few devices, so the work item is the box, not the SIM (D-BP3). Two Jobs find it.
+
+**`tb_cluster_members`** reads the day's `voice_cdr` itself (not `tb_features`, because a slow-roll box keeps every SIM under the SIM-day
+volume floor) and keeps the SIMs that are **candidates**: at least `cand_min_events` (default 10, against 20 for `tb_features`) non-roaming MO
+voice calls and all five `box_like` clauses (inbound under 5 %, B-number diversity over 0.9, short-call share over 0.9, voice-only share over
+0.99, top-cell share over 0.9; every clause strict, the same parameter values as `tb_features`, pinned equal in a test), and which are not
+on a live `tb_allow` entry. Each candidate has three possible keys: its dominant **IMEI** (`imei`), its dominant **cell** (`cell`) and its
+**activation batch** (`dealer/activation day`, `batch`). A key is a box when at least `min_box_sims` (default 5) candidates share it, and a
+SIM joins the **first** key that is a box, in that order, so one box is one `cluster_key` (`imei:<imei>`, `cell:<cell>`, `batch:<dealer>/<day>`).
+Two devices at one cell are two boxes; a box that swaps IMEIs on every call has no shared device and is caught by its cell; with no `imei`
+column at all the cell key finds every box whose SIMs share a cell. Only SIMs in a box are written, so no row has a NULL key (the Case Rule trap of
+plan section 16.4). `imei_count` (IMEIs a SIM used today) is the evidence of swapping.
+
+**`tb_clusters`** rolls the members up to one row per box per day: `candidate_sims`, `scored_sims` (members that have a `tb_features` row; a slow-roll
+box has none), `alerting_sims` (members whose `tb_findings.status` is `alert`), `max_score`, `est_bypass_minutes` (the members' talk minutes),
+the distinct `cells`, `imeis` and `batches` (what else the members share), `spoofed_sims` (members using at least `spoof_imei_count` (3) IMEIs),
+`first_day`, `last_day`, `days_seen` (from the Job's own history; a re-run does not count its own night twice and a gap does not reset the
+first day), up to five `example_msisdns`, and `alert_value`: `candidate_sims`, or 0 when the `shadow` parameter is `true`.
+
 ## The Alert Rules
 
 | Rule | Reads | Severity | Raises |
 |---|---|---|---|
-| `tb_sim_high` | `max(alert_score)` of `tb_findings`, by `entity_key`, `gte 1`, `stormCap 1000` | CRITICAL | one Alert and one Incident per SIM |
+| `tb_box_suspected` | `max(alert_value)` of `tb_clusters`, by `cluster_key`, `gte 1`, `stormCap 500`, runbook `tb_box_suspected` | CRITICAL | one Alert and **one Incident per box**: the work item and the Case anchor |
+| `tb_sim_high` | `max(alert_score)` of `tb_findings`, by `entity_key`, `gte 1`, `stormCap 1000` | CRITICAL | one Alert and one Incident per SIM: the evidence beneath the box |
 | `tb_allowed_line_changed` | `max(shape_changed)` of `tb_findings`, by `entity_key`, `gte 1` | INFO | one Alert for all such lines; no per-SIM Incident (only CRITICAL or error opens one) |
 
-⚠ Both rules read the whole retained Dataset (31 days), so a SIM that alerted stays breached until its day partition is pruned: an Incident
-opens once and the rule does not heal early. The `stormCap` is 1000, the ceiling, because the probe counts distinct SIMs over the retention.
-D-BP3 makes the box Incident the Case anchor; that is slice B3, and this per-SIM rule is the evidence beneath it.
+The Case Rule `tb_box_case` (`config/ops/tb_box_caserule.toon`: CRITICAL Incidents, `groupBy: cluster_key`, threshold 1) opens one Case per box
+Incident. A per-SIM Incident carries `key.entity_key`, not `key.cluster_key`, so it never joins a box Case. The `tb_box_members` Link Analysis view
+projects `tb_cluster_members` (SIM to box, link kind = the key that decided it) and the registry runbook `tb_box_suspected` tells the analyst what to read.
+
+⚠ Every rule reads the whole retained Dataset (31 days), so a SIM or a box that alerted stays breached until its day partition is pruned: an Incident
+opens once and the rule does not heal early, and a second night opens no second Incident for the same box (the box row's `days_seen` and `last_day`
+move; the Incident's text is not refreshed). The SIM rule's `stormCap` is 1000, the ceiling, because the probe counts distinct SIMs over the retention, and
+above it the rule opens ONE storm Incident and no per-SIM Incident: 1,200 SIMs of 20 boxes are expressed by the 20 box Incidents (plan section 19).
 
 ## Entity Lists
 
@@ -118,7 +147,12 @@ the operator adds it after creating `tb_watch`.
   whose input is absent is NULL and named in `missing` (`S3`, `S6`, `S11`, `S12`); nothing fails. In the score a NULL factor input is
   `missing`, counts as 0 and is flagged in the stored factors, so a Space without `number_plan` scores lower than one with it for the same traffic.
   Release cause `16` counts as answered only when `answered` is blank.
-- **Device signals deferred.** S13 and S14 (SIMs per IMEI, IMSI churn, TAC class) and the cluster stage are not built.
+- **Device signals.** The `imei` cluster key (SIMs per IMEI today) and the IMEI-swap count are built. S13's 7-day IMSI churn, S14 (TAC class) and S15's
+  cell concentration and concurrent calls per IMEI are not.
+- **A box nothing links is invisible.** SIMs on different cells, different devices and different activation batches share no key; with no device column, a
+  box of that shape cannot be found from CDRs by this stage.
+- **No box persistence.** A box Incident opens on the first night `min_box_sims` candidates share a key (the SIM Alerts wait for persistence); raise
+  `min_box_sims` or run in shadow first if that is too eager for your traffic.
 - **Batch, as built.** `new_batch_share` is the share of the SIMs activated by the same dealer on the same day that are `box_like` today.
 - **Roaming.** MO calls with `roaming = Y` are left out of every call-shape signal; they still count in the SIM's service mix and inbound share.
 - **Window and zone.** The window is `[window_start, window_end)`. Hour signals are judged in `local_zone`, converted from
@@ -144,6 +178,14 @@ signal of every scored SIM to an independent plain-Java oracle, the `box_like` s
 test-jar) hold the rest: the factor columns, primary signals and score of every scored SIM to the same kind of oracle; the Alerts to the planted set
 (every planted SIM once, with its planted top factors) and every look-alike silent for the factor asserted to suppress it; an allow entry that
 suppresses and one whose expiry un-suppresses; a changed allowed line; persistence, agreement and the watch list; shadow mode; and the seeds to the Jobs' SQL.
+
+`BypassClusterTest` runs the two cluster stages in isolation over hand-made inputs (each key, the fallback without a device column, the
+precedence between keys, the box size and every candidate clause AT and just INSIDE its threshold, the volume floor, the window edges, roaming, the allow
+list, the IMEI-swap count and the roll-up). `TelcoBypassClusterGoldenTest` runs the full chain over the B3 corpus and holds every member of every box to a
+plain-Java oracle written from the raw call rows, the six planted boxes by name (one device, a slow-roll box under the SIM-day floor, an IMEI-swapping box caught
+by its cell, a two-device farm, the smallest box of five), every look-alike silent (a dense building, a block of SIMs that receive calls, four candidates and a
+fifth under the floor, the PBX pair), one Incident per box that a second night and a re-run do not repeat, the same boxes through the cell key without a device column, and
+shadow mode. `BypassBoxCaseRuleTest` (module `inspecto-case-management`) runs the shipped Alert Rules and Case Rule against the real object engine.
 
 ## Related
 

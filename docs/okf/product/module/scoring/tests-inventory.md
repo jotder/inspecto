@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.scoring`](../../../../../product-map/module/scoring.toon).
 
-28 test class(es): 25 unit, 3 real-HTTP control-plane, 0 IT.
+30 test class(es): 27 unit, 3 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -27,6 +27,7 @@ mvn -o test -pl features/inspecto-scoring -Dtest=RiskScoreAlertTest,BypassAllowL
 |---|---|---|---|---|
 | `RiskScoreAlertTest` | `com.gamma.alert` | unit | `features/inspecto-scoring/src/test/java/com/gamma/alert/RiskScoreAlertTest.java` | ASSURE-RISK-SCORE-1 step 3: Incident priority through the EXISTING Alert Rule machinery — a per-entity rule |
 | `BypassAllowListTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/BypassAllowListTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B2: the {@code tb_findings} stage in isolation (gate G-SB(c): a stage's SQL can be |
+| `BypassClusterTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/BypassClusterTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B3: the two cluster stages in isolation (gate G-SB(c): a stage's SQL can be |
 | `BypassScaleMeasureTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/BypassScaleMeasureTest.java` | Measurement, not a gate ({@code TELCO-BYPASS-SIMBOX-1} slice B2). Runs only with {@code TELCO_BYPASS_PERF=1} and prints: |
 | `BypassScoreTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/BypassScoreTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B2: the shipped {@code tb_sim} Risk Score model, factor by factor. Pure arithmetic |
 | `ControlApiRiskScorePreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScorePreviewTest.java` | ASSURE-RISK-SCORE-RESIDUALS-1 S3 over real HTTP with an ARMED Subject: {@code POST /risk-scores/preview} scores ONE |
@@ -34,6 +35,7 @@ mvn -o test -pl features/inspecto-scoring -Dtest=RiskScoreAlertTest,BypassAllowL
 | `PaymentFraudDashboardTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-scoring/src/test/java/com/gamma/control/PaymentFraudDashboardTest.java` | ASSURE-PACK-PAYMENT-FRAUD-1 (WS-44 dashboards + KPIs): the shipped {@code payment-fraud} Space Template is created |
 | `PendingAlertRulesTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/PendingAlertRulesTest.java` | TEMPLATE-RISK-SCORE-ALERT-RULE-1 (operator 2026-10-06, deferred seed): a pending Alert Rule over a Risk Score's |
 | `ScoringAbsentSurfaceParityTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/ScoringAbsentSurfaceParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes its {@code RouteModule}s |
+| `TelcoBypassClusterGoldenTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/TelcoBypassClusterGoldenTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B3 golden test. The shipped {@code telco-bypass} Space Template, copied verbatim, |
 | `TelcoBypassGoldenTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/TelcoBypassGoldenTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B2 golden test. The shipped {@code telco-bypass} Space Template, copied verbatim, |
 | `AmlPackGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/AmlPackGoldenTest.java` | {@code PACK-AML-1}: the {@code aml} Space Template RUN end to end from a verbatim copy. The two Pipelines ingest the |
 | `MobileMoneyRiskScoreGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/MobileMoneyRiskScoreGoldenTest.java` | {@code PACK-MOBILE-MONEY-1}: the {@code mobile-money} template's per-agent Risk Score ({@code mm_agent}), run over |

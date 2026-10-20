@@ -42,7 +42,7 @@ POST /api/v1/entity-lists/tb_allow/members   {"add": ["<msisdn>"], "expiresAt": 
 
 | List | Purpose | Read by | Notes |
 |---|---|---|---|
-| `tb_allow` | `allow` | `tb_findings`: a SIM with a live entry (a key, a prefix or a same-length range) has status `allowed` | Entries are written by the Fraud Lead for a verified PBX, dialler or call-centre line. Give each an expiry: it is the only enforcement, an expired entry stays in the sidecar and simply stops matching. Put the registry id in `reason`. The plan recommends at most 365 days. |
+| `tb_allow` | `allow` | `tb_findings`: a SIM with a live entry (a key, a prefix or a same-length range) has status `allowed`; `tb_cluster_members`: such a SIM is not counted toward a box | Entries are written by the Fraud Lead for a verified PBX, dialler or call-centre line. Give each an expiry: it is the only enforcement, an expired entry stays in the sidecar and simply stops matching. Put the registry id in `reason`. The plan recommends at most 365 days. |
 | `tb_watch` | `watch` | `tb_findings`: a watched SIM needs `persist_days` minus one high nights | An entry with an expiry of 24 hours or less applies without a second approver; longer ones are held for four-eyes. |
 | `tb_block` | `block` | nothing yet | Create it for confirmed boxes; the barring Action Request and the partner list push of a later slice read it. Four-eyes recommended. |
 | `tb_ranges` | `watch` | nothing yet | Prefix and range entries for own-network and suspect ranges; today the own-network signal reads the `number_plan` Reference. |
@@ -53,11 +53,11 @@ POST /api/v1/entity-lists/tb_allow/members   {"add": ["<msisdn>"], "expiresAt": 
 
 ## Shadow mode
 
-Set `shadow: "true"` in `config/jobs/tb_findings_job.toon` (or pass `shadow` on a run) for the first weeks on real traffic. Scores and findings are written as usual, with `status = shadow` where an alert would have been raised, `alert_score` is 0 everywhere, and the `tb_allowed_line_changed` signal is silent too, so no Alert Rule has anything to raise and nobody is paged. Count the `shadow` findings a night against what your analysts would have accepted, calibrate the weights, the high threshold, `min_signals` and `persist_days`, then switch it off. The shipped value is `false`.
+Set `shadow: "true"` in `config/jobs/tb_findings_job.toon` **and** `config/jobs/tb_clusters_job.toon` (or pass `shadow` on a run of each) for the first weeks on real traffic. Scores and findings are written as usual, with `status = shadow` where an alert would have been raised, `alert_score` is 0 everywhere, the `tb_allowed_line_changed` signal is silent too, and in `tb_clusters` `alert_value` is 0 (the box rows are still written, with their counts), so no Alert Rule has anything to raise and nobody is paged. Count the `shadow` findings a night against what your analysts would have accepted, calibrate the weights, the high threshold, `min_signals` and `persist_days`, then switch it off. The shipped value is `false`.
 
 ## Nightly order and failure
 
-`tb_features` 03:00, `tb_factors` 03:10, `tb_risk_score` 03:20, `tb_findings` 03:30, each reading what the one before wrote. Run them in that order for any backfilled day. `tb_factors` is a snapshot of one window, so a day that failed upstream leaves it dated for the earlier day and `tb_findings` writes nothing for the later one (it reads only rows of its own window) rather than relabelling old rows. `tb_risk_score` fails closed above its entity cap (200,000 SIMs scored in one run by default; a typical day scores under 1 % of the SIMs).
+`tb_features` 03:00, `tb_factors` 03:10, `tb_risk_score` 03:20, `tb_findings` 03:30, `tb_cluster_members` 03:40, `tb_clusters` 03:50, each reading what the one before wrote (`tb_cluster_members` reads the CDR feed itself; `tb_clusters` reads `tb_features` and `tb_findings` for the box row's scored and alerting counts). Run them in that order for any backfilled day. `tb_factors` is a snapshot of one window, so a day that failed upstream leaves it dated for the earlier day and `tb_findings` writes nothing for the later one (it reads only rows of its own window) rather than relabelling old rows. `tb_risk_score` fails closed above its entity cap (200,000 SIMs scored in one run by default; a typical day scores under 1 % of the SIMs).
 
 ## Sizing
 
@@ -65,9 +65,9 @@ Peak DuckDB memory by CDR rows in one day, on the default memory cap (3,246 MiB)
 
 ## Verify
 
-- `GET /api/v1/jobs` lists `tb_features`, `tb_factors`, `tb_risk_score` and `tb_findings`; `GET /api/v1/alerts/rules` lists `tb_sim_high` and `tb_allowed_line_changed`.
+- `GET /api/v1/jobs` lists `tb_features`, `tb_factors`, `tb_risk_score`, `tb_findings`, `tb_cluster_members` and `tb_clusters`; `GET /api/v1/alerts/rules` lists `tb_box_suspected`, `tb_sim_high` and `tb_allowed_line_changed`; the Case Rule `tb_box_case` loads at boot from `config/ops/`.
 - After the first day's run, the Dataset `tb_features` has one row per SIM with at least `min_events` MO voice calls; `missing` names every omitted signal. `tb_factors` has the same SIMs; `risk_scores_tb_sim_latest` has one score per SIM with its `factors`; `tb_findings` has a row for every SIM at or above 60 and every allowed SIM.
-- The golden tests are `BypassFeatureGoldenTest` (module `inspecto`) and `TelcoBypassGoldenTest`, `BypassScoreTest`, `BypassAllowListTest` (module `inspecto-scoring`, which reads the same `BypassCorpus` through the core's test-jar).
+- The golden tests are `BypassFeatureGoldenTest` (module `inspecto`) and `TelcoBypassGoldenTest`, `TelcoBypassClusterGoldenTest`, `BypassScoreTest`, `BypassAllowListTest`, `BypassClusterTest` (module `inspecto-scoring`, which reads the same `BypassCorpus` through the core's test-jar) and `BypassBoxCaseRuleTest` (module `inspecto-case-management`).
 
 ## Safety
 

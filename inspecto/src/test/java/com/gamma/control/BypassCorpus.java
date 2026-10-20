@@ -155,17 +155,84 @@ final class BypassCorpus {
      */
     Map<String, String> filesOnDay(int days, Set<String> relocate) {
         StringBuilder cdr = new StringBuilder(HEADER).append(NL);
+        for (Call c : callsOnDay(days, relocate)) cdr.append(c.csv(true)).append(NL);
+        Map<String, String> out = new LinkedHashMap<>();
+        out.put("voice_cdr/VOICE_CDR_" + DAY.plusDays(days).format(DateTimeFormatter.BASIC_ISO_DATE) + ".csv", cdr.toString());
+        return out;
+    }
+
+    /** The rows {@link #filesOnDay} writes: every row moved {@code days} days on, the named lines relocated (see there). */
+    List<Call> callsOnDay(int days, Set<String> relocate) {
+        List<Call> out = new ArrayList<>();
         Map<String, Integer> served = new LinkedHashMap<>();
         for (Call c : calls) {
             String cell = c.cell();
             if (relocate.contains(c.a()) && "MO".equals(c.direction()) && "VOICE".equals(c.service()))
                 cell = cells.get(String.format(Locale.ROOT, "C%04d", 3000 + served.merge(c.a(), 1, Integer::sum) % 12)).id();
-            cdr.append(new Call("D" + days + c.id(), c.ts().plusDays(days), c.direction(), c.service(), c.a(), c.b(), c.dur(),
-                    c.roaming(), cell, c.answered(), c.cause(), c.imei(), c.imsi()).csv(true)).append(NL);
+            out.add(new Call("D" + days + c.id(), c.ts().plusDays(days), c.direction(), c.service(), c.a(), c.b(), c.dur(),
+                    c.roaming(), cell, c.answered(), c.cause(), c.imei(), c.imsi()));
         }
-        Map<String, String> out = new LinkedHashMap<>();
-        out.put("voice_cdr/VOICE_CDR_" + DAY.plusDays(days).format(DateTimeFormatter.BASIC_ISO_DATE) + ".csv", cdr.toString());
         return out;
+    }
+
+    // ------------------------------------------------------------------------------------------- slice B3 extension
+
+    /** X4: two devices of six SIMs each at ONE cell (a farm): two box Incidents, one per device. */
+    final Set<String> farm = new TreeSet<>();
+    /** X5: six SIMs at one cell on six devices that look like boxes outbound but each RECEIVES calls: no candidate, no box. */
+    final Set<String> receivingBlock = new TreeSet<>();
+    /** X6: four candidate SIMs on one device plus a fifth under the candidate volume floor: one short of a box. */
+    final Set<String> oneShort = new TreeSet<>();
+    /** X7: exactly five candidate SIMs on one device, on five cells and five batches: the smallest box. */
+    final Set<String> smallestBox = new TreeSet<>();
+
+    /**
+     * {@link #generateB2()} plus the slice B3 archetypes, each in its own number block (18 to 21): X4, X5, X6 and X7 above.
+     * B1's and B2's archetypes, counts and seed are unchanged, and the new rows are appended after them, so a test that
+     * does not ask for B3 sees exactly the B2 corpus.
+     */
+    BypassCorpus generateB3() {
+        generateB2();
+        Set<String> x4 = archetype("X4");
+        for (int s = 0; s < 12; s++) {
+            String m = sim(18, s);
+            x4.add(m);
+            farm.add(m);
+            Dev d = new Dev(device(700 + s / 6), imsi(18, s));
+            for (int k = 0; k < 30; k++) mo(m, d, cell(6000).id(), spread(30000 + 100 * s + k), at(evenOffset(k, 30)), 20 + rnd.nextInt(41));
+            profile(m, "PREPAID", "D13", LocalDate.of(2026, 5, 5), "N");
+        }
+        Set<String> x5 = archetype("X5");
+        for (int s = 0; s < 6; s++) {
+            String m = sim(19, s);
+            x5.add(m);
+            receivingBlock.add(m);
+            Dev d = new Dev(device(710 + s), imsi(19, s));
+            for (int k = 0; k < 30; k++) mo(m, d, cell(6100).id(), spread(33000 + 100 * s + k), at(evenOffset(k, 30)), 20 + rnd.nextInt(41));
+            for (int k = 0; k < 3; k++) mt(m, d, cell(6100).id(), foreign(70 + k), at(evenOffset(k, 3) + 311), 60 + rnd.nextInt(100));
+            profile(m, "PREPAID", "D14", LocalDate.of(2026, 5, 5), "N");
+        }
+        Set<String> x6 = archetype("X6");
+        for (int s = 0; s < 5; s++) {
+            String m = sim(20, s);
+            x6.add(m);
+            oneShort.add(m);
+            Dev d = new Dev(device(720), imsi(20, s));
+            int n = s < 4 ? 30 : 9;
+            for (int k = 0; k < n; k++) mo(m, d, cell(6200 + s).id(), spread(36000 + 100 * s + k), at(evenOffset(k, n)), 20 + rnd.nextInt(41));
+            profile(m, "PREPAID", "D15", LocalDate.of(2026, 5, 6).plusDays(s), "N");
+        }
+        Set<String> x7 = archetype("X7");
+        for (int s = 0; s < 5; s++) {
+            String m = sim(21, s);
+            x7.add(m);
+            smallestBox.add(m);
+            Dev d = new Dev(device(730), imsi(21, s));
+            for (int k = 0; k < 30; k++) mo(m, d, cell(6300 + s).id(), spread(39000 + 100 * s + k), at(evenOffset(k, 30)), 20 + rnd.nextInt(41));
+            profile(m, "PREPAID", "D16", LocalDate.of(2026, 5, 7).plusDays(s), "N");
+        }
+        calls.sort(Comparator.comparing(Call::ts).thenComparing(Call::id));
+        return this;
     }
 
     // ------------------------------------------------------------------------------------------- planted
