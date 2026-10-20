@@ -52,8 +52,15 @@ class ControlApiBasicEditionLinkAnalysisTest {
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes
             new String[]{"GET", "/inv/entity-identities"},                    // EntityIdentityRoutes
             new String[]{"GET", "/inv/entity-types"},                         // EntityProfileRoutes
-            new String[]{"POST", "/inv/pattern/branching"},                   // PatternRoutes
-            new String[]{"POST", "/geo/projection"});                         // GeoRoutes
+            new String[]{"POST", "/inv/pattern/branching"});                  // PatternRoutes
+
+    /**
+     * {method, path} - the Geo map routes (GeoRoutes), Standard and up through their OWN edition feature (D-LAE5, operator
+     * 2026-10-20), refused on Basic while every explorer route above stays up.
+     */
+    private static final List<String[]> GEO = List.of(
+            new String[]{"POST", "/geo/projection"},
+            new String[]{"POST", "/geo/routes"});
 
     /** {method, path} - one per Investigation route module, every one refused on Basic. */
     private static final List<String[]> INVESTIGATION = List.of(
@@ -112,6 +119,16 @@ class ControlApiBasicEditionLinkAnalysisTest {
             }
             assertTrue(refusedExplorer.isEmpty(), "explorer routes Basic must serve:\n" + String.join("\n", refusedExplorer));
 
+            List<String> geoServed = new ArrayList<>();
+            for (String[] r : GEO) {
+                HttpResponse<String> res = send(port, r[0], "/spaces/s" + r[1], "{}", null);
+                JsonNode err = res.body().isBlank() ? JSON.missingNode() : JSON.readTree(res.body()).at("/error");
+                if (res.statusCode() != 503 || !ErrorCodes.CAPABILITY_UNAVAILABLE.equals(err.at("/errorCode").asText())
+                        || !err.at("/message").asText().contains("available in Standard and above"))
+                    geoServed.add(r[0] + " " + r[1] + " -> " + res.statusCode() + " " + res.body());
+            }
+            assertTrue(geoServed.isEmpty(), "Geo routes Basic must refuse by edition:\n" + String.join("\n", geoServed));
+
             List<String> leaks = new ArrayList<>();
             for (String[] r : INVESTIGATION) {
                 HttpResponse<String> res = send(port, r[0], "/spaces/s" + r[1], "{}", null);
@@ -125,6 +142,8 @@ class ControlApiBasicEditionLinkAnalysisTest {
             JsonNode features = JSON.readTree(send(port, "GET", "/bootstrap", null, null).body()).at("/data/features");
             assertTrue(features.at("/geoLink").asBoolean(), "the explorer is installed on Basic: " + features);
             assertFalse(features.at("/investigations").asBoolean(true), "Basic reports no Investigations: " + features);
+            assertTrue(features.has("geoMap") && !features.at("/geoMap").asBoolean(),
+                    "Basic reports the Geo map present-and-false while geoLink stays true: " + features);
         } finally {
             api.close();
             spaces.close();
@@ -201,9 +220,14 @@ class ControlApiBasicEditionLinkAnalysisTest {
                 if (res.statusCode() == 503) refused.add(r[0] + " " + r[1] + " -> " + res.body());
             }
             assertTrue(refused.isEmpty(), "Standard must reach every Investigation handler:\n" + String.join("\n", refused));
+            for (String[] r : GEO) {
+                HttpResponse<String> res = send(port, r[0], "/spaces/s" + r[1], "{}", ADMIN);
+                assertFalse(res.body().contains("available in Standard and above"), "Standard is past the Geo edition gate: " + r[1] + " " + res.body());
+            }
 
             JsonNode features = JSON.readTree(send(port, "GET", "/bootstrap", null, ADMIN).body()).at("/data/features");
             assertTrue(features.at("/investigations").asBoolean(), "Standard reports Investigations: " + features);
+            assertTrue(features.at("/geoMap").asBoolean(), "Standard reports the Geo map: " + features);
         } finally {
             api.close();
             spaces.close();

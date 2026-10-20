@@ -26,7 +26,7 @@ explorer* below.
 | | Find paths, neighbours, "Investigate a number", connect seeds | ✅ | ✅ | ✅ | ✅ |
 | | Temporal and branching patterns, pattern packs | ✅ | ✅ | ✅ | ✅ |
 | | Value Measures | ✅ | ✅ | ✅ | ✅ |
-| | Geo map, routes, co-location | ✅ | ✅ | ✅ | ✅ |
+| | Geo map, routes, co-location | — | ✅ | ✅ | ✅ |
 | | Browser graph algorithms | ✅ | ✅ | ✅ | ✅ |
 | | Entity Lists, identity resolution, Entity profile pages | ✅ | ✅ | ✅ | ✅ |
 | | Reference data beside a node | ✅ | ✅ | ✅ | ✅ |
@@ -67,6 +67,16 @@ to a projection instead of seeding the canvas. **Case history beside a node** (`
 the SPA hides the section (`LA_FEATURES.investigations`). ⚠ This overrides the archived LA-EDITIONS-1 plan, which left Case
 history "explorer" with Basic refusing it only because no Case module was there to read. Release note: an existing Basic
 install loses Case history on upgrade; no migration shim (D-LAE12).
+
+**Geo map, routes and co-location are Standard and up (D-LAE5, operator 2026-10-20), by a feature of their own.** `GeoRoutes`
+names a second edition feature, `EditionFeatures.GEO_MAP` (`geoMap`), declared by `inspecto-ops` beside `investigations`:
+Basic answers `POST /geo/projection` and `POST /geo/routes` `503 CAPABILITY_UNAVAILABLE` "available in Standard and above"
+at dispatch, while every other Link Analysis module stays up. ⛔ It is deliberately **not** done through `geoLink`: that
+id is the Space-level module switch every one of the Link Analysis route modules shares, so withholding it would take them
+all down. `/bootstrap` reports `features.geoMap` (false on Basic, with `geoLink` still true); the console nav (`navFeature:
+'geoMap'`), the Geo area of the standalone LA app and the Menu Builder's Geo view key on it, so Basic offers nothing that
+only 503s. Release note: an existing Basic install loses the Geo map on upgrade; no migration shim (D-LAE12). The module
+switch stays as before: a Space may still turn `geoLink` (all of Link Analysis) off.
 
 ## Matrix
 

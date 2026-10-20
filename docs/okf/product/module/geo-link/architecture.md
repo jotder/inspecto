@@ -52,7 +52,8 @@ Diagram of the whole Link Analysis stack: [la-core architecture](../la-core/arch
 Default-reactor module (root `pom.xml`) and bundled in **every** Edition, Basic included
 (`tools/bundle-modules.mjs` `from: 'all'`; `offerings/basic.toon` add-on `linkAnalysis`). The Investigation
 surface is still gated in Basic by the `investigations` edition feature, which only the Standard-and-up
-`inspecto-ops` declares. Outbound delivery needs a `WebhookSinkTransport` (`inspecto-notify-channels`,
+`inspecto-ops` declares; the Geo map routes (`GeoRoutes`) are gated the same way by their own `geoMap` edition feature
+(D-LAE5, 2026-10-20), never through `geoLink`. Outbound delivery needs a `WebhookSinkTransport` (`inspecto-notify-channels`,
 Standard and up).
 
 ## References

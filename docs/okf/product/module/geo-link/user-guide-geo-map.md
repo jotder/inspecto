@@ -15,6 +15,11 @@ timestamp: 2026-07-07T00:00:00Z
 > that still reaches the page gets a 503 from the core stub, which the component renders as an edition message
 > rather than a generic query failure. ⚠ The flag is derived server-side from what actually registered, never
 > guessed from the edition string.
+>
+> **Standard and up only (2026-10-20, D-LAE5).** The Geo map itself, its routes and co-location are withheld on Basic by a
+> feature of their own, `geoMap` (`/bootstrap` `features.geoMap`), declared by `inspecto-ops`; `POST /geo/projection` and
+> `POST /geo/routes` answer 503 there, and the nav entry, the LA app's Geo area and the Menu Builder's Geo view are hidden.
+> The rest of Link Analysis (`geoLink`) stays on Basic.
 
 The Builder-lens studio at `/studio/geo-map` for the *where* of an investigation (sibling of
 [Link Analysis](../la-core/user-guide-link-analysis.md)'s *who-connects-to-whom*). Vocabulary:

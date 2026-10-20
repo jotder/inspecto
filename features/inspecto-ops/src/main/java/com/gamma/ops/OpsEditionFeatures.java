@@ -13,11 +13,14 @@ import java.util.Set;
  * <p>Also declares the Link Analysis Investigation surface ({@link EditionFeatures#INVESTIGATIONS}, {@code LA-EDITIONS-1}
  * ED-4): Investigations are evidence-grade, team work that links Cases and raises Alerts — this module's objects — so they
  * ride with it. Basic ships the Link Analysis explorer without it, and the host answers the Investigation routes 503.
+ *
+ * <p>Also declares the Geo map, routes and co-location ({@link EditionFeatures#GEO_MAP}, D-LAE5, operator 2026-10-20): Standard
+ * and up, by a route feature of its own on {@code GeoRoutes}, never through {@code geoLink}.
  */
 public final class OpsEditionFeatures implements EditionFeatureProvider {
 
     @Override
     public Set<String> features() {
-        return Set.of(EditionFeatures.ALERT_DISPATCH, EditionFeatures.INVESTIGATIONS);
+        return Set.of(EditionFeatures.ALERT_DISPATCH, EditionFeatures.INVESTIGATIONS, EditionFeatures.GEO_MAP);
     }
 }

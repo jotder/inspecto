@@ -20,7 +20,7 @@ describe('la-app shell and landing page', () => {
 
     let harness: RouterTestingHarness;
 
-    async function render() {
+    async function render(features: Record<string, boolean> = { geoMap: true }) {
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(),
@@ -29,7 +29,12 @@ describe('la-app shell and landing page', () => {
                 { provide: LensService, useValue: { canAuthorWorkbench: signal(false), canManageIncidents: signal(false) } },
                 {
                     provide: SessionService,
-                    useValue: { authMode: signal('none'), actorName: signal(''), loginRequired: signal(false) },
+                    useValue: {
+                        authMode: signal('none'),
+                        actorName: signal(''),
+                        loginRequired: signal(false),
+                        features: signal(features),
+                    },
                 },
                 provideRouter([
                     { path: '', component: LaShellComponent, children: [{ path: '', component: LandingComponent }] },
@@ -71,6 +76,17 @@ describe('la-app shell and landing page', () => {
         const el = await render();
         expect(el.querySelector('nav[aria-label="Areas"] a[href="/alerts"]')).toBeTruthy();
         expect(el.querySelector('ul a[href="/alerts"]')).toBeTruthy();
+    });
+
+    // D-LAE5 (operator 2026-10-20): the Geo map is Standard and up, so Basic's `/bootstrap` says geoMap false and the area is not offered.
+    it('does not offer Geo in the rail or on the landing page when the edition withholds the Geo map (Basic)', async () => {
+        const el = await render({ geoMap: false });
+        expect(el.querySelector('nav[aria-label="Areas"] a[href="/geo-map"]')).toBeNull();
+        expect(el.querySelector('ul a[href="/geo-map"]')).toBeNull();
+        // the other areas stay
+        expect(el.querySelector('nav[aria-label="Areas"] a[href="/link-analysis"]')).toBeTruthy();
+        expect(el.querySelector('nav[aria-label="Areas"] a[href="/entities"]')).toBeTruthy();
+        expect(el.querySelector('ul a[href="/link-analysis"]')).toBeTruthy();
     });
 
     it('offers the Settings link to every user, last in the rail and not on the landing page', async () => {

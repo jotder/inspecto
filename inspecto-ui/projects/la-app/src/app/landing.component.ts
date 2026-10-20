@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { LA_PRODUCT_NAME } from './la-brand';
-import { LA_APP_NAV } from './la-nav';
+import { SessionService } from '@inspecto/core/auth/session.service';
+import { visibleLaNav } from './la-nav';
 
 /** The front door: one card per area of the application. */
 @Component({
@@ -20,7 +21,7 @@ import { LA_APP_NAV } from './la-nav';
                 </p>
             </header>
             <ul class="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
-                @for (item of nav; track item.path) {
+                @for (item of nav(); track item.path) {
                     <li>
                         <a
                             [routerLink]="'/' + item.path"
@@ -38,5 +39,6 @@ import { LA_APP_NAV } from './la-nav';
 })
 export class LandingComponent {
     protected readonly product = LA_PRODUCT_NAME;
-    protected readonly nav = LA_APP_NAV;
+    private readonly session = inject(SessionService);
+    protected readonly nav = computed(() => visibleLaNav(this.session.features()));
 }

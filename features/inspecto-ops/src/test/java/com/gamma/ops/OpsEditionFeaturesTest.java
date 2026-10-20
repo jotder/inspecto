@@ -19,4 +19,11 @@ class OpsEditionFeaturesTest {
         assertTrue(EditionFeatures.present(EditionFeatures.INVESTIGATIONS), "Standard and up bring Investigations through inspecto-ops");
         assertTrue(EditionFeatures.gatesRoutes(EditionFeatures.INVESTIGATIONS));
     }
+
+    @Test
+    void opsDeclaresTheGeoMapRouteFeatureToo() {
+        EditionFeatures.overrideForTest(null);
+        assertTrue(EditionFeatures.present(EditionFeatures.GEO_MAP), "Standard and up bring the Geo map through inspecto-ops (D-LAE5)");
+        assertTrue(EditionFeatures.gatesRoutes(EditionFeatures.GEO_MAP));
+    }
 }

@@ -51,10 +51,17 @@ public final class EditionFeatures {
      * {@code inspecto-ops}, which only the Standard, Advanced and Preview flavours bundle. Unlike the config features
      * above it is also a ROUTE FEATURE: a route module whose {@code featureIds()} names it is answered
      * {@code 503 CAPABILITY_UNAVAILABLE} with {@link #refusal} at dispatch when it is absent ({@link #gatesRoutes}),
-     * while the Link Analysis EXPLORER routes beside it (projection, paths, patterns, Value Measures, geo, Entity
+     * while the Link Analysis EXPLORER routes beside it (projection, paths, patterns, Value Measures, Entity
      * identities, Entity profile pages) answer in Basic as in every edition.
      */
     public static final String INVESTIGATIONS = "investigations";
+    /**
+     * The Geo map, routes and co-location ({@code POST /geo/projection}, {@code POST /geo/routes}) - Standard and up (D-LAE5,
+     * operator 2026-10-20). A ROUTE FEATURE of its own on {@code GeoRoutes} only, declared by {@code inspecto-ops} beside
+     * {@link #INVESTIGATIONS}. ⛔ Never withhold the Geo map through {@code geoLink}: that Space-level module id is shared by every
+     * Link Analysis route module, so gating it would take all of them down.
+     */
+    public static final String GEO_MAP = "geoMap";
 
     /** The finding / error code every refusal carries. Mirrors {@code FindingCodes.ERR_EDITION_FEATURE}. */
     public static final String CODE = "ERR_EDITION_FEATURE";
@@ -85,10 +92,13 @@ public final class EditionFeatures {
             case PII_MASK -> "PII masking (quality.pii.mask — a steps: mask Step)";
             case INVESTIGATIONS -> "Link Analysis Investigations (Investigations, Drafts, Dossier, templates, members, embed links, "
                     + "data trust, Case history, Graph Run, index builds and Alert Rules on Investigations)";
+            case GEO_MAP -> "The Geo map, routes and co-location (POST /geo/projection, POST /geo/routes)";
             default -> "'" + feature + "'";
         };
         if (PII_MASK.equals(feature))
             return what + " is an Advanced feature — this build does not include it";
+        if (GEO_MAP.equals(feature))
+            return what + " are available in Standard and above - this build (Basic) does not include them";
         if (INVESTIGATIONS.equals(feature))
             return what + " are available in Standard and above — this build (Basic) is the Link Analysis explorer and does not "
                     + "include them";
@@ -100,7 +110,7 @@ public final class EditionFeatures {
      * (pinned by {@code EditionFeaturesTest}). {@code LA-EDITIONS-PLACEMENT-1}: a set, so a second route feature is one
      * more member instead of one more hard-coded comparison.
      */
-    static final Set<String> ROUTE_FEATURES = Set.of(INVESTIGATIONS);
+    static final Set<String> ROUTE_FEATURES = Set.of(INVESTIGATIONS, GEO_MAP);
 
     /**
      * Whether {@code featureId} — a {@code RouteModule.featureIds()} id — is an edition feature the HOST enforces on routes:

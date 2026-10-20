@@ -123,6 +123,9 @@ final class BootstrapRoutes implements RouteModule {
         // LA-EDITIONS-1 phase 3 (ED-4): the Link Analysis Investigation surface. False on Basic (the explorer: geoLink true,
         // investigations false) and wherever geo-link is absent; the SPA hides Investigation affordances on false.
         f.put("investigations", on.contains("investigations"));
+        // LA-EDITIONS-PLACEMENT-1 D-LAE5: the Geo map, routes and co-location have their OWN edition feature (never geoLink, which every
+        // Link Analysis module shares): false on Basic, where POST /geo/projection and /geo/routes answer 503. The SPA nav keys on it.
+        f.put("geoMap", on.contains("geoMap"));
         // SEP-08: true only when the optional inspecto-entity-list module registered its routes — derived from
         // what registered, never an edition guess, and never from the stub (hasRoute excludes stubs). Probed on
         // POST /entity-lists, a LITERAL write, not on the GET /entity-lists/([^/]+) catch-all shape.

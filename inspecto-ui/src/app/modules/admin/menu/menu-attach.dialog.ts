@@ -65,11 +65,14 @@ export class MenuAttachDialog {
     /**
      * The kinds this bundle can actually place. Geo view and Link view ride on an optional backend module
      * (EDITIONS CP-09); when `/bootstrap` says it is absent they are not OFFERED — offering them and then
-     * failing on the query would be the dishonest half of the same edition boundary.
+     * failing on the query would be the dishonest half of the same edition boundary. The Geo view also needs the
+     * `geoMap` edition feature (Standard and up, D-LAE5): on Basic the Geo studio it opens is withheld.
      */
-    private readonly kinds = this.session.geoLinkEnabled()
-        ? KINDS
-        : KINDS.filter((k) => k.kind !== 'geo-map-view' && k.kind !== 'link-analysis-view');
+    private readonly kinds = KINDS.filter(
+        (k) =>
+            (k.kind !== 'geo-map-view' || (this.session.geoLinkEnabled() && this.session.features()['geoMap'] === true)) &&
+            (k.kind !== 'link-analysis-view' || this.session.geoLinkEnabled()),
+    );
 
     readonly rows = signal<PickRow[]>([]);
     readonly loading = signal(true);

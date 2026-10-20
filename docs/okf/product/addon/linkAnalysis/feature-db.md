@@ -13,7 +13,7 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.linkAnalysis`](../../../../../product-map/addon/linkAnalysis.toon).
 
-101 row(s).
+102 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -27,6 +27,7 @@ tags: [feature-db, addon]
 | "POST /inv/investigations/([^/]+)/standing-detection" | route | geo-link | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/standing-detection"` | `la/inspecto-geo-link/src/main/resources/META-INF/inspecto/module.toon` |
 | "PUT /inv/investigations/([^/]+)/alert-rules/([^/]+)" | route | geo-link | basic;standard;advanced;preview | linkAnalysis | ga | `"PUT /inv/investigations/([^/]+)/alert-rules/([^/]+)"` | `la/inspecto-geo-link/src/main/resources/META-INF/inspecto/module.toon` |
 | geoLink | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `geoLink` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| geoMap | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `geoMap` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | investigations | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `investigations` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "DELETE /inv/investigations/([^/]+)/case" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"DELETE /inv/investigations/([^/]+)/case"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "DELETE /inv/uploads/([^/]+)/([^/]+)" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"DELETE /inv/uploads/([^/]+)/([^/]+)"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

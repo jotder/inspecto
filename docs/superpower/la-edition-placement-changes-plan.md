@@ -121,6 +121,7 @@ Built for the answered decisions only (D-LAE1, D-LAE2, D-LAE5; D-LAE12 is the no
 
 - **`gatesRoutes` is generalised** to the set `EditionFeatures.ROUTE_FEATURES`; a member needs its own `refusal()` text (pinned by `EditionFeaturesTest`).
 - **Case history (D-LAE1).** The edition gate is per `RouteModule`, not per route, so naming `investigations` on the one route was impossible while it sat in `InvRoutes` beside the explorer routes: it moved into its own module `CaseHistoryRoutes` (`featureIds` `geoLink` + `investigations`). ⚠ Overrides the archived LA-EDITIONS-1 plan, which kept Case history in the explorer ("stays explorer") with Basic refusing it only for want of a Case module. The SPA flag is the existing `investigations`, no new one.
+- **Geo map (D-LAE5).** New route feature `EditionFeatures.GEO_MAP` (`geoMap`) on `GeoRoutes` only (`featureIds` `geoLink` + `geoMap`), declared by `OpsEditionFeatures`; `/bootstrap` reports `features.geoMap`. Nav: the console entry `studio-geo-map` moves from `navFeature: 'geoLink'` to `'geoMap'`; the standalone LA app's Geo area and the Menu Builder's Geo view key on it too. The "co-location" is browser-side UI (`colocation-graph.dialog`) over `POST /geo/projection`, so it has no route of its own: the one gate covers it. Draft citation fixed: `GeoRoutes.java:70-71` is right, but the draft's `geo-map-routes` pane is `projects/link-analysis/src/geo-map/`.
 
 ## 5. Patterns and pattern packs on Basic (request 4)
 

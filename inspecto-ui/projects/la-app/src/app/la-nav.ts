@@ -8,6 +8,8 @@ export const LA_APP_NAV = [
     },
     {
         path: 'geo-map',
+        /** The `/bootstrap` feature that must be true for the area to be offered: the Geo map is Standard and up (D-LAE5). */
+        feature: 'geoMap',
         label: 'Geo',
         icon: 'heroicons_outline:map',
         blurb: 'Place entities and routes on a map, over any Dataset with coordinates.',
@@ -31,6 +33,11 @@ export const LA_APP_NAV = [
         blurb: 'See fired Alerts, and open the Investigation behind a standing detection.',
     },
 ] as const;
+
+/** The areas `features` (`/bootstrap`) allows: an area that names a `feature` is offered only when it is true, so Basic never shows a screen that only 503s. */
+export function visibleLaNav(features: Record<string, boolean>) {
+    return LA_APP_NAV.filter((n) => !('feature' in n) || features[n.feature] === true);
+}
 
 /**
  * The rail link to Settings: shown to every signed-in user, because the page always has a section for them (their own

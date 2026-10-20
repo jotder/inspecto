@@ -13,11 +13,12 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-92 row(s).
+93 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
 | geoLink | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `geoLink` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| geoMap | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `geoMap` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | investigations | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `investigations` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "DELETE /inv/investigations/([^/]+)/case" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"DELETE /inv/investigations/([^/]+)/case"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "DELETE /inv/uploads/([^/]+)/([^/]+)" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"DELETE /inv/uploads/([^/]+)/([^/]+)"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

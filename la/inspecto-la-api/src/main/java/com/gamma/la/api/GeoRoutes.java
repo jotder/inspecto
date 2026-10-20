@@ -62,7 +62,9 @@ public final class GeoRoutes implements RouteModule {
 
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("geoLink");
+        // geoLink: the Space's Link Analysis module switch. geoMap: the EDITION feature (D-LAE5) - Basic answers 503 here and
+        // nowhere else; the other Link Analysis route modules are untouched.
+        return java.util.Set.of("geoLink", "geoMap");
     }
 
     @Override

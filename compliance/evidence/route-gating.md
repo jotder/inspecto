@@ -199,8 +199,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/expectations/([^/]+)/baseline/clear` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java:56` |
 | POST | `/expectations/([^/]+)/evaluate` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java:50` |
 | POST | `/expectations/evaluate` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java:49` |
-| POST | `/geo/projection` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java:70` |
-| POST | `/geo/routes` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java:71` |
+| POST | `/geo/projection` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java:72` |
+| POST | `/geo/routes` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java:73` |
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:78` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:79` |
 | POST | `/inv/case-history` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/CaseHistoryRoutes.java:28` |

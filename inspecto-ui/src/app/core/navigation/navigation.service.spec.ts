@@ -19,6 +19,7 @@ describe('NavigationService — optional-module nav entries', () => {
         casesEnabled = opsEnabled,
         actionRequestsEnabled = opsEnabled,
         screeningEnabled = true,
+        geoMapEnabled = geoLinkEnabled,
     ) {
         TestBed.resetTestingModule();
         TestBed.configureTestingModule({
@@ -31,6 +32,7 @@ describe('NavigationService — optional-module nav entries', () => {
                     useValue: {
                         features: signal({
                             geoLink: geoLinkEnabled,
+                            geoMap: geoMapEnabled,
                             events: eventsEnabled,
                             ops: opsEnabled,
                             cases: casesEnabled,
@@ -70,6 +72,15 @@ describe('NavigationService — optional-module nav entries', () => {
         const ids = studioChildIds(nav as never);
         expect(ids).toContain('studio-geo-map');
         expect(ids).toContain('studio-link-analysis');
+    });
+
+    // D-LAE5 (operator 2026-10-20): Basic keeps Link Analysis (geoLink true) but withholds the Geo map (its own geoMap feature, false).
+    it('hides Geo Map Analysis alone, keeping Link Analysis, when the edition withholds the Geo map (Basic)', async () => {
+        const nav = await firstValueFrom(mount(true, true, true, true, true, true, false).get());
+        const ids = studioChildIds(nav as never);
+        expect(ids).not.toContain('studio-geo-map');
+        expect(ids).toContain('studio-link-analysis');
+        expect(ids).toContain('studio-entities');
     });
 
     it('hides them — and ONLY them — when the module is absent (Personal)', async () => {

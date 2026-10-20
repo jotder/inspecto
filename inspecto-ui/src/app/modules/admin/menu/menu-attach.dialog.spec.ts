@@ -14,7 +14,7 @@ import { MenuAttachDialog } from './menu-attach.dialog';
  * failed on the query would be the dishonest half of the same edition boundary.
  */
 describe('MenuAttachDialog — optional-module placeables', () => {
-    function mount(geoLinkEnabled: boolean) {
+    function mount(geoLinkEnabled: boolean, geoMap = geoLinkEnabled) {
         TestBed.resetTestingModule();
         // Typed parameter so `mock.calls[i][0]` is a string, not `never` — the whole assertion reads it.
         const list = vi.fn((_kind: string) => of([]));
@@ -27,7 +27,10 @@ describe('MenuAttachDialog — optional-module placeables', () => {
                 { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
                 { provide: MatDialogRef, useValue: { close: vi.fn() } },
                 { provide: ComponentsService, useValue: { list } },
-                { provide: SessionService, useValue: { geoLinkEnabled: signal(geoLinkEnabled) } },
+                {
+                    provide: SessionService,
+                    useValue: { geoLinkEnabled: signal(geoLinkEnabled), features: signal({ geoMap }) },
+                },
             ],
         });
         const fixture = TestBed.createComponent(MenuAttachDialog);
@@ -49,5 +52,13 @@ describe('MenuAttachDialog — optional-module placeables', () => {
         // Both directions: the other kinds must still be requested, or an over-broad filter would also pass.
         expect(asked).toContain('dashboard');
         expect(asked).toContain('widget');
+    });
+
+    // D-LAE5: Basic keeps the Link Analysis module (geoLink true) but not the Geo map (its own feature, geoMap false).
+    it('offers Link view but not Geo view when the Geo map is withheld by the edition (Basic)', () => {
+        const asked = mount(true, false);
+        expect(asked).not.toContain('geo-map-view');
+        expect(asked).toContain('link-analysis-view');
+        expect(asked).toContain('dashboard');
     });
 });

@@ -305,7 +305,7 @@ export const defaultNavigation: GammaNavigationItem[] = [
                     },
                     {
                         id: 'studio-geo-map',
-                        navFeature: 'geoLink',
+                        navFeature: 'geoMap', // its OWN edition feature (D-LAE5): Standard and up; never geoLink, which every LA entry shares
                         title: 'Geo Map Analysis',
                         type: 'basic',
                         icon: 'heroicons_outline:globe-alt',
