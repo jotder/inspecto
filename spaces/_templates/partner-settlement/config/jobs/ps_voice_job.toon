@@ -1,0 +1,6 @@
+job:
+  name: ps_voice
+  type: recon.run
+  reconciliation: ps_voice
+  cron: "30 5 * * *"
+  enabled: true

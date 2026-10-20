@@ -1,0 +1,10 @@
+job:
+  name: ps_statement_current
+  type: sql.template
+  description: "Current statement lines: re-sent lines (same statement id, version and line number) counted once, and only the highest version per agreement and cycle kept"
+  sql: "WITH d AS ( SELECT *, row_number() OVER (PARTITION BY statement_id, statement_version, line_no ORDER BY received_at) AS rn FROM settlement_statement s WHERE EXISTS (SELECT 1 FROM partner p WHERE p.partner_id = s.partner_id) AND EXISTS (SELECT 1 FROM settlement_agreement a WHERE a.agreement_id = s.agreement_id AND a.partner_id = s.partner_id) ), l AS ( SELECT *, max(statement_version) OVER (PARTITION BY agreement_id, period_start, period_end) AS top_version FROM d WHERE rn = 1 ) SELECT statement_id, statement_version, line_no, partner_id, agreement_id, period_start, period_end, usage_date, direction, service, destination_class, units, amount, currency, fx_rate_applied, line_kind, received_at FROM l WHERE statement_version = top_version"
+  sources: "settlement_statement,partner,settlement_agreement"
+  sink_dataset: settlement_statement_current
+  on_signal: job.run.completed
+  when: "$signal.job == ps_calendar && $signal.outcome == SUCCESS"
+  enabled: true

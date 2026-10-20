@@ -1,0 +1,31 @@
+name: settlement_agreement
+active: true
+
+dirs:
+  poll:       data/inbox/settlement_agreement
+  database:   data/settlement_agreement/database
+  backup:     data/settlement_agreement/backup
+  temp:       data/settlement_agreement/temp
+  errors:     data/settlement_agreement/errors
+  quarantine: data/settlement_agreement/quarantine
+  markers:    data/settlement_agreement/markers
+  status_dir: data/settlement_agreement/status
+  log_dir:    data/settlement_agreement/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: settlement_agreement_schema.toon
+  csv_settings:
+    delimiter: ","
+    null_padding: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
