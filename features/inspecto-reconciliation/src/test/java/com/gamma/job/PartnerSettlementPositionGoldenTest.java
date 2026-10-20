@@ -262,6 +262,24 @@ class PartnerSettlementPositionGoldenTest {
                 "the roll-forward also counts the unconverted EUR payment of the month");
     }
 
+    @Test
+    void anAgreementWithNoNettingGroupIsStillCountedNotZeroed() throws Exception {
+        Map<String, String> files = new LinkedHashMap<>(corpus.files());
+        String ag = files.get("settlement_agreement/settlement_agreement.csv");
+        String blank = ag.replace(",NG-XB,", ",,");
+        assertNotEquals(ag, blank);
+        files.put("settlement_agreement/settlement_agreement.csv", blank);
+        PartnerSettlementCorpus c = PartnerSettlementCorpus.generateWithPositions();
+        c.agreements.replaceAll(a -> a.group().equals("NG-XB") ? new PartnerSettlementCorpus.Agreement(a.id(), a.partner(), a.kind(), a.direction(), a.currency(), a.rounding(),
+                a.tolType(), a.tolerance(), a.cycle(), a.stmtDue(), a.dispute(), a.payment(), "", a.fxType(), a.fxRule(), a.from(), a.to()) : a);
+        assertEquals(blank, c.files().get("settlement_agreement/settlement_agreement.csv"));
+        PartnerSettlementSpace s = build(tmp.resolve("nogroup"), c.files());
+        Oracle o = new Oracle(c);
+        assertSame("positions, blank group", o.positionRows(), rows(s, "settlement_position", POSITION_COLS, 3));
+        assertSame("roll-forward, blank group", o.rollForwardRows(), rows(s, "settlement_rollforward", ROLLFORWARD_COLS, 3));
+        assertTrue(s.read("settlement_rollforward", "netting_group IS NULL AND movements > 0 AND invoiced <> 0", "currency").size() > 0, "the blank group keeps its money");
+    }
+
     // ------------------------------------------------------------------------------------------- mutation checks
 
     /** A copy of the base Space with one clause of one shipped Job changed, the three S4 Jobs re-run. */
@@ -492,7 +510,7 @@ class PartnerSettlementPositionGoldenTest {
             BigDecimal rate = null, amount = null, signed = null;
             LocalDate rateDate = null;
             if (a != null) {
-                group = a.group();
+                group = a.group().isEmpty() ? null : a.group();   // a blank CSV field is a NULL
                 cur = a.currency();
                 fxType = a.fxType();
                 if (curOrig.equals(cur)) {
@@ -534,7 +552,7 @@ class PartnerSettlementPositionGoldenTest {
 
         Map<String, String> positionRows() {
             Map<String, List<Mv>> groups = new TreeMap<>();
-            for (Mv m : counted(true)) groups.computeIfAbsent(m.group() + "|" + m.cycle() + "|" + m.cur(), k -> new ArrayList<>()).add(m);
+            for (Mv m : counted(true)) groups.computeIfAbsent(fmt(m.group()) + "|" + m.cycle() + "|" + m.cur(), k -> new ArrayList<>()).add(m);
             Map<String, String> out = new TreeMap<>();
             for (Map.Entry<String, List<Mv>> e : groups.entrySet()) {
                 BigDecimal payable = BigDecimal.ZERO.setScale(4), receivable = BigDecimal.ZERO.setScale(4);
@@ -560,7 +578,7 @@ class PartnerSettlementPositionGoldenTest {
 
         Map<String, String> rollForwardRows() {
             Map<String, Map<LocalDate, List<Mv>>> series = new TreeMap<>();
-            for (Mv m : counted(false)) series.computeIfAbsent(m.group() + "|" + m.cur(), k -> new TreeMap<>()).computeIfAbsent(m.cycle(), k -> new ArrayList<>()).add(m);
+            for (Mv m : counted(false)) series.computeIfAbsent(fmt(m.group()) + "|" + m.cur(), k -> new TreeMap<>()).computeIfAbsent(m.cycle(), k -> new ArrayList<>()).add(m);
             LocalDate asOfMonth = PartnerSettlementCorpus.AS_OF.withDayOfMonth(1);
             Map<String, String> out = new TreeMap<>();
             for (Map.Entry<String, Map<LocalDate, List<Mv>>> s : series.entrySet()) {

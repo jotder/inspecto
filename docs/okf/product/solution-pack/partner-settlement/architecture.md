@@ -109,7 +109,7 @@ including a holiday plus weekend roll. Mutation checks, each of which turns a na
 and the finding comparator made strict / non-strict, the re-sent line counted twice, the oldest rating run, the superseded statement
 version, the cut-off neighbour test inverted, and a feed without FX rates.
 
-`PartnerSettlementPositionGoldenTest` (S4, same module, 18 tests) runs the same Space on `generateWithPositions()`: the S3 corpus plus
+`PartnerSettlementPositionGoldenTest` (S4, same module, 19 tests) runs the same Space on `generateWithPositions()`: the S3 corpus plus
 an agreement invoiced in EUR into a USD agreement and finance payments, credit and debit notes. Every column of every movement,
 position and roll-forward row equals an independent oracle; the identities (net = payable - receivable; opening + invoiced - paid +
 adjustments = closing; opening = previous closing; the last closing = the sum of the movements) are one SQL assertion each; a
