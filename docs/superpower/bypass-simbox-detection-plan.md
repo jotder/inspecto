@@ -471,7 +471,151 @@ real call is ever read or copied; a real CDR sample, if one arrives, is calibrat
   [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md).
 - Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).
 
-## 16. Measurements (filled by slice B0)
+## 16. Measurements (slice B0 results, 2026-10-20)
 
-_Empty until B0 runs: SIM-day throughput and memory, Alert Rule `by` with two keys and `stormCap` at box cardinality, Case grouping on a
-cluster key, a two-condition Alert Rule, the `allow` sidecar expiry read, and the test's owning module._
+B0 was a throwaway spike: a harness and a synthetic CDR generator kept **outside the repository**; the only repository change is this
+section. Nothing below is a vendor or industry fact; every figure is one synthetic day on one developer box.
+
+**Box.** Intel64 Family 6 Model 158 (12 logical cores), 31.7 GiB RAM, Windows 11, JDK 27, local SSD.
+**DuckDB.** `duckdb_jdbc` 1.5.6.0 (the repo pin, `pom.xml` `duckdb.version`), reported `v1.5.6`.
+**Engine settings mirrored.** An in-memory database, Parquet views over the day, `SET allowed_directories` to the data root,
+`enable_external_access=false` and `lock_configuration=true` (what `SqlTemplateJob` does through `DuckDbUtil.openInMemory`), the
+statement run as `CREATE TABLE … AS <sql>` then `COPY … TO parquet`. `memory_limit` = the engine default
+`max(1 GiB, 40 % of RAM ÷ 4)` = **3246 MiB** on this host (`DuckDbUtil.defaultMemoryLimit`); `threads` = the DuckDB default
+(12), because `SqlTemplateJob` sets none.
+**⚠ Which path was measured: standalone DuckDB with the engine's settings, NOT a `sql.template` Job run through a throwaway Space and
+backend.** Standing up that Space was not cheap, so it was not attempted. What was run through the real code: the statement text passes
+`SqlGuard.check` (the guard `SqlTemplateJob` applies) with **0 findings**. Not measured: `IncrementalSink.replace` (the partition
+write the Job uses with `lookback`), Decision Rule application, Job queueing, concurrent Jobs.
+
+### 16.1 Synthetic day and SQL
+
+A generator (DuckDB SQL, deterministic hashes) writes a `voice_cdr` day of N rows: ~400 000 ordinary SIMs (50 % MO, 60 % voice,
+25 % SMS, 15 % data, 2 % roaming, three cells each) plus planted populations scaled with N (at 5M: **20 boxes × 60 SIMs = 1 200 box
+SIMs** with 250 short (20 to 60 s) MO calls each, round the clock, one cell, one IMEI, B-numbers walking +1 with 10 % jumps,
+on-net targets, no inbound; **1 000 call-centre SIMs** with 50 % inbound; **500 couriers** moving across 40 cells). The SIM-day
+statement (`tb_features`-style) computes S1, S2, S4, S5, S6 (haversine implied speed with a `cell_site` join), S7 (`lag` plus
+prefix-and-step test), S8, S9 (hourly peak, distinct B per hour, gap CV), S10 (running-max overlap window), S11 (range join to
+`number_plan`, an inequality join), S12 (`tenure_days`) and 3 evidence ids per SIM. It uses four window functions over
+`PARTITION BY a_number ORDER BY start_ts`, one inequality join and six aggregation CTEs. The 5M day: 5 000 000 rows, 402 698 distinct SIMs, 1 793 270 MO voice calls, 258 150 output rows
+(SIMs with at least 3 MO calls).
+
+**Sanity (the signals separate the planted from the look-alikes).** A plain predicate (≥ 200 calls, inbound ratio < 0.05, B diversity
+> 0.9, short-call share > 0.9, voice-only share > 0.99) flagged **1 200 of 1 200** box SIMs, **0 of 1 000** call-centre SIMs and **0 of 500**
+couriers. Box SIMs: `seq_dial_share` 0.79, `max_calls_1h` 11, night share 0.21, on-net share 1.0.
+⚠ The synthetic cell coordinates are random, so S6 `max_implied_kmh` values (e.g. 118 682 for couriers) are meaningless; B0 measures the
+cost of the speed window, not its signal quality.
+
+### 16.2 Results (SIM-day stage, one run each unless stated)
+
+| Case | Rows in | Output rows | Wall (CTAS + COPY) | Peak DuckDB memory | Peak process commit | Spill |
+|---|---|---|---|---|---|---|
+| 1M, engine default (3246 MiB, 12 threads) | 1 000 000 | 12 152 | 1.8 s | 593 MiB | 840 MiB | 0 |
+| **5M, engine default**, three runs | 5 000 000 | 258 150 | **9.8 s, 12.6 s, 14.6 s** (median 12.6 s) | 1 810 to 1 830 MiB | 2 129 to 2 159 MiB | 0 |
+| 5M, 4 threads | 5 000 000 | 258 150 | 9.1 s | 1 821 MiB | 2 059 MiB | 0 |
+| 5M, 1 thread | 5 000 000 | 258 150 | 24.3 s | 674 MiB | 917 MiB | 0 |
+| 5M, `memory_limit` 1 GiB | 5 000 000 | 258 150 | 23.7 s | 1 024 MiB (at cap) | 1 356 MiB | 370 MiB |
+| 5M, `memory_limit` 512 MiB | 5 000 000 | none | **fails: Out of Memory Error** (511.6 of 512 MiB) | at cap | n/a | n/a |
+| **10M, engine default** | 10 000 000 | 389 205 | 22.3 s | **3 145 MiB (97 % of the 3 246 MiB cap)** | 3 448 MiB | 0 |
+
+Derived: about 380 bytes of peak DuckDB memory per input row at 5M (1 810 MiB) and about 330 at 10M; throughput 0.4 to 0.5 M rows/s on
+12 threads, 0.2 M rows/s on one. Time is steady across run repetition within ±20 %; 4 threads was as fast as 12 (cause not investigated). Peak memory is polled every 50 ms from a second connection
+(`duckdb_memory()`), so it is a floor on the true peak; process commit is the JVM's committed virtual memory.
+
+### 16.3 G-SB(a) budget recommendation
+
+**Not tripped: the staged SQL with `lag`, overlap and implied-speed windows is fast enough on a 5M-row day.** Recommended budget for
+the gate (to be re-checked after B3, when the cluster stage is added):
+
+- **Time:** the SIM-day stage completes a **5M-row day in ≤ 60 s** on a 4-core allowance at the default memory cap (measured median
+  12.6 s at 12 cores and 9.1 s at 4 threads, so the budget carries about 5× headroom for a slower host, concurrent Jobs and the
+  two-day `lookback` read); ≤ 120 s fails the gate.
+- **Memory is the binding limit, not time.** Peak must stay **≤ 2.5 GiB at 5M rows with zero spill**, which the default cap
+  (3 246 MiB on a 32 GiB host) meets (1.8 GiB). At **10M rows the stage sits at 97 % of the default cap**, one step from the 1 GiB
+  behaviour (2× slower, spills) and the 512 MiB cliff (fails), so the pack must document: above about **7 to 8M rows a day on the
+  default cap** (a linear extrapolation from two points, not a measurement), raise `processing.duckdb.memory_limit` to at least 4 GiB;
+  on an 8 GiB host the default is the 1 GiB floor and a 5M day then costs about 24 s with spill.
+- Volume unknown stays unknown: B0 fixes the cost per row, not the real operator's volume (risk 13.4).
+
+### 16.4 The six answers
+
+1. **Throughput and memory:** §16.2 and §16.3. Gate G-SB(a) holds. Unmeasured: the cluster stage (`tb_clusters`: S13, S14, S15, the
+   `new_batch_share` part of S12), S3 (no `answered` column was used), the Anomaly Model and Risk Score Jobs, hour-grain buckets,
+   a real operator's SIM cardinality above 405 000 SIMs a day (group-by memory grows with it), and the two-host-zone test (the
+   statement uses naive `hour(start_ts)`, so zone sensitivity is not exercised; the host zone here was Asia/Calcutta).
+
+2. **Alert Rule `by` with two keys: yes; `stormCap` at box cardinality: it caps individual Incidents, so size it.**
+   - `AlertRule.by` is a list (a comma-separated scalar is accepted), any length, each a plain column present in the Dataset
+     Schema, and `stormCap` defaults to 100. Two keys are already shipped: `by: [model, entity_key]` in the Risk Score and Anomaly Score
+     Alert Rules (`RiskScoreAlertTest`, `AnomalyScoreAlertTest`). Proven by running `PerEntityAlertTest` (module
+     `platform/inspecto-engine`, 15 tests, 0 failures, 8.1 s), which exercises `by [msisdn, region]` with 40 and 64 keys.
+   - ⚠ **Plan §6.1 is stale:** since ALERT-PER-RULE-1 (2026-10-14) there is **one Alert per Alert Rule** (a count of breached keys) and
+     **one Incident per key** (at CRITICAL or ERROR; dedupe `<rule>|<keyId>`). §6.1's "each offender or box gets its own Alert" must read
+     "own Incident".
+   - `stormCap` mechanics: the probe reads at most `stormCap` breaching keys and a total (`COUNT(*) OVER ()`). When the total exceeds the
+     cap the rule keeps its one Alert (marked storm) and opens **one storm Incident** (`<rule>|*`); **no per-key Incident opens and none
+     heals** until the count is back under the cap (`PerEntityAlertTest` case at line 225). Persisted open-key digests are truncated at
+     `MAX_DIGESTS` = 1 000.
+   - At box cardinality: the box-level Alert Rule `by: cluster_key` stays well under the default (20 boxes a day in the synthetic day);
+     the **SIM-level** Alert Rule would breach it (1 200 box SIMs against the default 100 and the pack's 500), producing one storm Incident
+     and no SIM Incidents. Either raise `stormCap` above the expected daily offenders (and above `retain` × them, §13.6, because the probe
+     groups the **whole Dataset**, every retained day, unless the Alert Rule reads a `…_latest` identity Dataset), keeping it ≤ 1 000, or
+     let the box Incident be the only Incident and keep SIM rows as evidence in `tb_findings` (recommended; see answer 3).
+   - Also: one Measure (`count` or `agg(field)`), one comparator and one threshold per Alert Rule.
+
+3. **Case Rule grouping on a cluster key: yes, through the Alert Rule's `by`, not through a free attribute.** `CaseRule.groupBy` is one plain
+   column name and reads the Incident attribute `key.<groupBy>`; an Alert Rule stamps `key.<col>` for **every** `by` column
+   (`AlertService.openKeyIncident`). So a SIM Alert Rule with `by: [entity_key, cluster_key]` and a Case Rule with `groupBy: cluster_key` yield one
+   Case per box with the member SIM Incidents attached (a Case holds only a digest of the key). Determined by code read
+   (`CaseRule`, `CaseOperations.evaluateCaseRule`) and the single-key `CaseRuleGroupByTest`; **not run end to end**. Traps for B3:
+   (i) a NULL `cluster_key` is stamped as the **string `NULL`**, which is non-blank, so every unclustered SIM would join one Case: the
+   Alert Dataset must carry a non-null cluster key or exclude those rows; (ii) the Incident dedupe is the whole key tuple, so a SIM that
+   changes box tomorrow opens a new Incident; (iii) above `stormCap` there are no SIM Incidents to group; (iv) the Case Rule `threshold`
+   and `windowMinutes` apply per group. The alternative that needs no Case Rule: the box Incident (`by: cluster_key`) is the Case anchor
+   and the SIM rows are evidence. **G-SB(b) is not tripped**, provided `stormCap` is sized as in answer 2.
+
+4. **Score and `primary_signals` in one Alert Rule: no.** An Alert Rule watches one Measure with one comparator and one threshold, and
+   `alert.when` is refused on a Dataset Measure Alert Rule (`AlertRule` constructor). Two options: (a) the Job writes only rows that pass
+   both conditions into `tb_findings` (as §8.2 already says) and the Alert Rule is `max(score) gt 0` / `max(alert_score) gt <high>`;
+   (b) a Dataset `calculated: [{name: alert_score, expr: CASE WHEN score >= … AND primary_signals >= … THEN score ELSE 0 END}]`
+   (row-wise, re-evaluated per read; `DatasetRelation`, DAT-5), which keeps the thresholds visible in config but duplicates the `high`
+   constant. **Recommend (a):** the thresholds are Job parameters the golden test pins. (b) was read in code, not run.
+
+5. **`allow` Entity List sidecar filtering on `expires_at` inside a Job read: yes.** The sidecar column is `expires_at TIMESTAMP`
+   (`EntityListSidecar` DDL) and keeps expired rows. A tiny proof, standalone DuckDB sealed like the Job (view over the
+   `entity_list_<id>/**/*.parquet` glob, `enable_external_access=false`, locked), with three `allow` entries (permanent, future expiry,
+   expired) and four SIMs: the anti-join `LEFT JOIN (SELECT entry FROM entity_list_… WHERE purpose='allow' AND match='key' AND
+   (expires_at IS NULL OR expires_at > <ts>)) … WHERE entry IS NULL` returned the **expired** SIM and the unlisted one (the permanent and
+   future-dated entries suppressed), with a substituted timestamp and with `now()`; both statements pass `SqlGuard.check` with 0
+   findings. **Not proven through a real Job run:** the Job's store list reads `<dataDir>/<store>/**/*.parquet`, which is where the sidecar
+   lives by code read, but no precedent in any template uses it and the Consignment resolution on a non-Consignment folder was not
+   exercised. Gotchas for B2: the store name is `entity_list_<id>`, so a list id `tb-allow` needs the quoted view name
+   `"entity_list_tb-allow"` (plan §5.3 spells it `entity_list_tb_allow`; prefer underscore ids, charset to be checked at B2); the
+   sidecar exists only after the first write; expiry has no write, so the filter is the only enforcement; prefer a run-day parameter to
+   `now()` so a backfill is reproducible.
+
+6. **Owner of `TelcoFraudTemplateGoldenTest`:** module **`inspecto`**, file
+   `inspecto/src/test/java/com/gamma/control/TelcoFraudTemplateGoldenTest.java` (package `com.gamma.control`). B1's golden test lands there:
+   `-pl inspecto -Dtest=BypassFeatureGoldenTest`.
+
+### 16.5 Plan numbers: confirmed, contradicted, unmeasured
+
+| Plan statement | Status |
+|---|---|
+| S1 to S12 are expressible in one `sql.template` statement with `lag`, overlap, speed and prefix-range joins (§3, §4.2) | **Confirmed** (ran; `SqlGuard` 0 findings) except S3 (no `answered` column used) and the `new_batch_share` half of S12 |
+| A 5M-row synthetic daily volume is feasible (§10 G-SB(a), "budget set in B0") | **Confirmed**: median 12.6 s, 1.8 GiB (§16.2); budget in §16.3 |
+| Daily volume itself (§13.4) | **Unmeasured** (no operator volume; 10M sits at 97 % of the default memory cap) |
+| `by` can carry the keys the stage needs (§6.1, §6.3, D-BP3) | **Confirmed** for two keys; **contradicted** wording: "own Alert" (it is one Alert per Alert Rule, an Incident per key) |
+| `stormCap` must stay above `retain` × daily offenders (§13.6) | **Confirmed**, and sharpened: the probe groups the whole Dataset; digests persist at most 1 000 |
+| One Alert Rule can express score and `primary_signals` (§5.2) | **Contradicted**: needs a Job-written or calculated column |
+| Case grouping on a cluster key (§6.3) | **Confirmed** via `by: [entity_key, cluster_key]` + `groupBy: cluster_key`; the NULL-string trap is new |
+| The allow sidecar filters on expiry in a Job read (§5.3) | **Confirmed** (standalone proof); not via a real Job run |
+| Test module for `TelcoFraudTemplateGoldenTest` (§10) | **Confirmed**: `inspecto` |
+| Cluster stage cost (S13, S14, S15), Anomaly Model, Risk Score Jobs, `persist_days` (D-BP5), hour-grain Anomaly refusal, two-host-zone behaviour, 58 / 14 / 14 pack counts | **Unmeasured** in B0 |
+
+### 16.6 Sequencing recommendation
+
+No G-SB clause trips, so **B1 can start now**. Size `stormCap` and the SIM versus box Incident choice at B2 and B3 using answers 2 and 3
+(box Incident as the work item is the safer default). D-BP2 (the CDR contract: IMEI, IMSI, attempts, cell site) does **not** block B1,
+because B1 degrades per signal; it blocks the device signals (S13, S14) and the cluster stage's `imei` key, so ask it in parallel and
+re-measure the cluster stage after B3. Record the memory note of §16.3 in the pack admin guide at B7.
