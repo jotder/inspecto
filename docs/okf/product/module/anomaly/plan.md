@@ -35,8 +35,12 @@ per-Feature explanation that can be recomputed; authored as an **Anomaly Model**
 ## Left
 
 - `ANOMALY-UI-FINDINGS-1`: a live check of the sign-in return path under a real token lapse.
-- `ANOMALY-ML-SCORING-1`: the Anomaly Model form does not author `method` / `forest` (D-AN29); no golden-pack
-  template uses the option yet.
+- `ANOMALY-ML-SCORING-1`: nothing code-side. The form authors `method` / `forest` (D-AN29, closed 2026-10-20: a
+  selector, and only for the isolation forest its `trees` / `sampleSize` / `seed`; a stored model round-trips both
+  keys verbatim); the AML pack model `aml_account_transfers` ships on `method: isolation_forest`, proven by
+  `PackFraudAmlAnomalyPropertyTest`. The telco-fraud and mobile-money models stay on the robust scorer: one steady
+  Feature spike (telco) or a Peer Group (mobile-money) gives the forest no clear separation to prove.
+- The isolation forest has no preview by design (W7): the preview box says so instead of scoring with the robust method.
 
 ## Refused or deferred
 

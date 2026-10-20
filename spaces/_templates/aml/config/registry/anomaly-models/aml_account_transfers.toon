@@ -3,6 +3,7 @@ description: "Each account's daily outgoing transfer and wire count and value ag
 bucket: day
 window: 28
 seasonality: weekday
+method: isolation_forest
 minBaselinePoints: 3
 elevatedThreshold: 60
 highThreshold: 80
