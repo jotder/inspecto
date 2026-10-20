@@ -742,8 +742,13 @@ surface). Outbound (case hand-off, webhooks, client-credentials trust) is a sepa
 * **Tests:** `ControlApiInvestigationInboundTest` (geo-link, armed Authenticator: seeding and window, idempotency incl. other system /
   id, invalid entity / reference / window / binding 422 with nothing written, 403 / 401 / 409, 503, the deep-link masking and reveal
   rules, Investigation 404), `InvestigationInboundRoutesContractTest` (TCK). SPA: `open-link.spec.ts`, `open-in-la.component.spec.ts` (axe).
-* **Residuals:** the `window` of a link to an Entity alone is validated and shown, but the Entity page does not apply a window yet;
-  a mixed-type alert binds through the first entity's type only.
+* **As built 2026-10-20 (`a6866a45f`):** the `window` of a link to an Entity applies. The Open page forwards `?from=&to=` to the Entity
+  page, which passes them to `GET /inv/entities/{type}/{key}/profile?from=&to=` (ISO-8601 instants with a zone, half-open `[from, to)`,
+  UTC; 422 for a malformed instant or `from >= to`). Inside the window the server reads `where`, `firstSeen`, `lastSeen`, `activeDays`,
+  `coveredDays` and `perDay`, and echoes `window {from, to}`; `links` and `related` stay whole-history (the page says so, with a *Show the
+  whole history* link). A mixed-type inbound call binds through ONE link mapping that links a column of EVERY type it names; when no
+  single mapping does, it is refused 422 naming the types (an Investigation has one mapping), unless the caller sends an explicit
+  `binding`. The window bounds are 0001-01-01..9999-12-31 (422 outside). A deep link carries only `from` / `to`: an Investigation window's other settings (slots, day or timezone rules) stay on the Investigation and are not carried to the Entity page. A mapping covering all types is preferred over the first one that covers the first type.
 
 ### 6.5 Third-party integration (outbound) (LA-EDITIONS-1 phase 6, built 2026-10-17)
 

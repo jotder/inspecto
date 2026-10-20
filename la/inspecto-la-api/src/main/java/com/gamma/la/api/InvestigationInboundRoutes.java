@@ -85,7 +85,7 @@ public final class InvestigationInboundRoutes implements RouteModule {
      * Body {@code {reference: {system, type?, id, url?, label?}, entities: ["<type>:<key>", ...], purpose, title?,
      * window?: {from?, to?, ...}, binding?: {dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?}}}.
      * Gates: {@code canManageIncidents} 403 → write root 503 → a malformed reference, entity or window 422 → then, only when the
-     * reference is new: a malformed binding, or (no binding) no link mapping binds the first entity's type 422 → the create's own
+     * reference is new: a malformed binding, or (no binding) no single link mapping binds EVERY entity type the call names 422 → the create's own
      * gates; and for a repeat: an Investigation the caller cannot change 409.
      */
     private Object inbound(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
@@ -229,8 +229,8 @@ public final class InvestigationInboundRoutes implements RouteModule {
 
     /**
      * The create body: the caller's {@code binding} when given, else the first link mapping the Space knows (a saved Link
-     * Analysis view or a published index, the order {@link EntityTypeBindings} reads them) with the first entity's type bound
-     * at a link end. Its kind and time columns come along; a {@code window} needs a time column.
+     * Analysis view or a published index, the order {@link EntityTypeBindings} reads them) with every entity type the
+     * call names at a link end (none covers them all: 422 naming the types). Its kind and time columns come along; a {@code window} needs a time column.
      */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> createBody(HttpExchange ex, Path writeRoot, Map<String, Object> body, List<TypedEntity> entities,
@@ -246,20 +246,24 @@ public final class InvestigationInboundRoutes implements RouteModule {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'binding': unknown key '" + k + "' (allowed: " + BINDING_KEYS + ")");
             create.putAll((Map<String, Object>) b);
         } else {
-            String typeId = entities.get(0).type().id();
+            List<String> named = entities.stream().map(t -> t.type().id()).distinct().toList();
+            String typeId = named.get(0);
             List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
             EntityTypeBindings.Resolved resolved = EntityTypeBindings.resolve(ex, writeRoot, types);
             EntityTypeBindings.LinkMapping chosen = null;
             for (EntityTypeBindings.LinkMapping m : resolved.mappings()) {
                 EntityTypes.EntityType src = resolved.typeOf(m.dataset(), m.source()), tgt = resolved.typeOf(m.dataset(), m.target());
-                if (src != null && src.id().equals(typeId) || tgt != null && tgt.id().equals(typeId)) {
-                    chosen = m;
+                if (named.stream().allMatch(n -> src != null && src.id().equals(n) || tgt != null && tgt.id().equals(n))) {
+                    chosen = m;   // one mapping binds EVERY type the call names
                     break;
                 }
             }
             if (chosen == null)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "no Link Analysis view or index of this Space links a column "
-                        + "of Entity Type '" + typeId + "' - send 'binding': {dataset, sourceCol, targetCol}");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, named.size() == 1
+                        ? "no Link Analysis view or index of this Space links a column of Entity Type '" + typeId
+                                + "' - send 'binding': {dataset, sourceCol, targetCol}"
+                        : "no single Link Analysis view or index of this Space links a column of EACH Entity Type the call names " + named
+                                + " (an Investigation has one link mapping) - name one type per call, or send 'binding': {dataset, sourceCol, targetCol}");
             create.put("dataset", chosen.dataset());
             create.put("sourceCol", chosen.source());
             create.put("targetCol", chosen.target());

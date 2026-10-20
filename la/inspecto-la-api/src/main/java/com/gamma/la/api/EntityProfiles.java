@@ -19,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -806,8 +807,27 @@ final class EntityProfiles {
      * the route; {@code shownKey} is what the response names it by (the alias under masking). One filtered read per section over
      * the union relation.
      */
-    static Map<String, Object> entityProfile(Frame f, String key, String shownKey) {
+    static Map<String, Object> entityProfile(Frame f, String key, String shownKey, String[] window) {
         Map<String, Object> out = new LinkedHashMap<>();
+        // A deep link's window (half-open [from, to), UTC): rows, span and days are read inside it; links and related stay whole-history.
+        String within = "";
+        List<String> wb = new ArrayList<>();
+        if (window != null) {
+            Map<String, Object> echo = new LinkedHashMap<>();
+            echo.put("from", window[0]);
+            echo.put("to", window[1]);
+            out.put("window", echo);
+            if (window[0] != null) {
+                within += " AND ts >= CAST(? AS TIMESTAMP)";
+                wb.add(LocalDateTime.ofInstant(Instant.parse(window[0]), UTC).toString());
+            }
+            if (window[1] != null) {
+                within += " AND ts < CAST(? AS TIMESTAMP)";
+                wb.add(LocalDateTime.ofInstant(Instant.parse(window[1]), UTC).toString());
+            }
+        }
+        List<String> keyed = new ArrayList<>(List.of(key));
+        keyed.addAll(wb);
         Map<String, Object> entity = new LinkedHashMap<>();
         entity.put("type", f.type.id());
         entity.put("key", shownKey);
@@ -821,8 +841,8 @@ final class EntityProfiles {
         boolean truncated = f.datasetsTruncated;
         try {
             List<Map<String, Object>> where = new ArrayList<>();
-            for (Map<String, Object> r : f.keys("SELECT b, COUNT(*) AS n FROM " + KEYS + " WHERE k = ? GROUP BY b ORDER BY b",
-                    f.usable.size(), List.of(key)).rows()) {
+            for (Map<String, Object> r : f.keys("SELECT b, COUNT(*) AS n FROM " + KEYS + " WHERE k = ?" + within + " GROUP BY b ORDER BY b",
+                    f.usable.size(), keyed).rows()) {
                 EntityTypeBindings.Binding b = f.usable.get((int) ColumnProfile.num(r.get("b")));
                 Map<String, Object> w = new LinkedHashMap<>();
                 w.put("dataset", b.dataset());
@@ -831,11 +851,11 @@ final class EntityProfiles {
                 where.add(w);
             }
             Map<String, Object> span = f.keys("SELECT strftime(MIN(ts), '%Y-%m-%dT%H:%M:%SZ') AS mn, strftime(MAX(ts), '%Y-%m-%dT%H:%M:%SZ') AS mx, "
-                    + "COUNT(DISTINCT CAST(ts AS DATE)) AS active FROM " + KEYS + " WHERE k = ? AND ts IS NOT NULL", 1, List.of(key)).rows().get(0);
-            long covered = ColumnProfile.num(f.keys("SELECT COUNT(DISTINCT CAST(ts AS DATE)) AS n FROM " + KEYS + " WHERE ts IS NOT NULL",
-                    1, List.of()).rows().get(0).get("n"));
+                    + "COUNT(DISTINCT CAST(ts AS DATE)) AS active FROM " + KEYS + " WHERE k = ? AND ts IS NOT NULL" + within, 1, keyed).rows().get(0);
+            long covered = ColumnProfile.num(f.keys("SELECT COUNT(DISTINCT CAST(ts AS DATE)) AS n FROM " + KEYS + " WHERE ts IS NOT NULL" + within,
+                    1, wb).rows().get(0).get("n"));
             DatasetProvider.Result days = f.keys("SELECT CAST(CAST(ts AS DATE) AS VARCHAR) AS day, COUNT(*) AS n FROM " + KEYS
-                    + " WHERE k = ? AND ts IS NOT NULL GROUP BY day ORDER BY day DESC", f.lim.timelineDays(), List.of(key));
+                    + " WHERE k = ? AND ts IS NOT NULL" + within + " GROUP BY day ORDER BY day DESC", f.lim.timelineDays(), keyed);
             List<Map<String, Object>> perDay = new ArrayList<>();
             for (Map<String, Object> r : days.rows()) perDay.add(row("day", String.valueOf(r.get("day")), "rows", ColumnProfile.num(r.get("n"))));
             Collections.reverse(perDay);

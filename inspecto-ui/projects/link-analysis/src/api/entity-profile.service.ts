@@ -192,6 +192,8 @@ export interface EntityProfile extends Assessed {
     links: EntityLinks;
     related: { type: string; count: number; keys: string[] }[];
     dataAsOf: DatasetAsOf[];
+    /** Echo of the `from` / `to` the profile was scoped to; absent for the whole history. */
+    window?: { from: string | null; to: string | null };
 }
 
 /**
@@ -225,10 +227,14 @@ export class EntityProfileService {
         return this.http.post<EntityResolution>(apiUrl(`/inv/entities/${encodeURIComponent(type)}/resolve`), { key });
     }
 
-    /** One Entity's profile; `key` is the alias for a masked type (a raw value is refused 422), else the value. */
-    entityProfile(type: string, key: string): Observable<EntityProfile> {
+    /**
+     * One Entity's profile; `key` is the alias for a masked type (a raw value is refused 422), else the value. A `window`
+     * (a deep link's `from` / `to`) scopes the rows, days and span to it; the answer echoes it.
+     */
+    entityProfile(type: string, key: string, window?: { from?: string; to?: string }): Observable<EntityProfile> {
         return this.http.get<EntityProfile>(
             apiUrl(`/inv/entities/${encodeURIComponent(type)}/${encodeURIComponent(key)}/profile`),
+            { params: toParams({ from: window?.from, to: window?.to }) },
         );
     }
 }

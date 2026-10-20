@@ -84,6 +84,13 @@ type Identity = { members: string[] | null; note: string } | null;
             @if (error(); as e) {
                 <inspecto-alert variant="error" data-testid="profile-error">{{ e }}</inspecto-alert>
             } @else if (profile(); as p) {
+                @if (window(); as w) {
+                    <p class="m-0 text-sm" data-testid="window">
+                        Scoped to {{ w.from ?? 'the start' }} to {{ w.to ?? 'now' }}: rows, days and the span are inside
+                        it; links and related are the whole history.
+                        <a data-testid="window-clear" [routerLink]="entityLink()">Show the whole history</a>
+                    </p>
+                }
                 @if (p.entity.masked) {
                     <p class="text-secondary m-0 text-xs" data-testid="masked">
                         This Entity Type is masked: the key is the exploration alias, never the raw value.
@@ -124,7 +131,9 @@ type Identity = { members: string[] | null; note: string } | null;
                             tier="mini"
                             [rows]="p.where"
                             [columns]="whereCols"
-                            noRowsTitle="This Entity appears in no bound Dataset"
+                            [noRowsTitle]="
+                                window() ? 'No activity in this window' : 'This Entity appears in no bound Dataset'
+                            "
                         ></inspecto-data-table>
                     </mat-expansion-panel>
 
@@ -256,6 +265,9 @@ export class EntityComponent implements OnInit {
     readonly identity = signal<Identity>(null);
     readonly typeId = signal('');
     readonly keyParam = signal('');
+    /** The deep link's window (`?from=&to=`), or null for the whole history; the server scopes the profile to it. */
+    readonly window = signal<{ from?: string; to?: string } | null>(null);
+    readonly entityLink = computed(() => [...this.base, this.typeId(), this.keyParam()]);
 
     readonly profile = computed(() => {
         const l = this.load();
@@ -327,15 +339,21 @@ export class EntityComponent implements OnInit {
             map((r) => r.items ?? []),
             catchError(() => of<EntityTypeSummary[]>([])),
         );
-        combineLatest([this.route.paramMap, types$])
+        combineLatest([this.route.paramMap, this.route.queryParamMap, types$])
             .pipe(
-                switchMap(([pm, types]) => {
+                switchMap(([pm, qp, types]) => {
                     const type = pm.get('type') ?? '';
                     const key = pm.get('key') ?? '';
+                    const from = qp.get('from') ?? undefined;
+                    const to = qp.get('to') ?? undefined;
+                    const window = from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : null;
                     this.typeId.set(type);
                     this.keyParam.set(key);
+                    this.window.set(window);
                     const summary = types.find((t) => t.id === type) ?? null;
-                    return this.svc.entityProfile(type, key).pipe(
+                    return (
+                        window ? this.svc.entityProfile(type, key, window) : this.svc.entityProfile(type, key)
+                    ).pipe(
                         map((profile): Load => ({ profile, type: summary })),
                         catchError((e) =>
                             of<Load>({ error: apiErrorMessage(e, 'The Entity Profile could not be read.') }),
