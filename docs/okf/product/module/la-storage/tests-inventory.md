@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-storage`](../../../../../product-map/module/la-storage.toon).
 
-13 test class(es): 13 unit, 0 real-HTTP control-plane, 0 IT.
+14 test class(es): 14 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -33,6 +33,7 @@ mvn -o test -pl la/inspecto-la-storage -Dtest=BucketFunctionTest,IndexAppendTest
 | `IndexFullPinTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexFullPinTest.java` | LA-DAILY-INGEST-1, the live Job-versus-build race: a day that LANDS while a FULL build runs. The relation of a plain store |
 | `IndexLinkStatsTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexLinkStatsTest.java` | Entity profile D-EP4: the link statistics a build records in its manifest ({@code kindEdges}, {@code typeNodes}, |
 | `IndexManifestTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexManifestTest.java` |  |
+| `IndexNodesFoldTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexNodesFoldTest.java` | LA-INDEX-SCALE-MEASURE-1: the node table is folded ONE BUCKET AT A TIME from the written {@code out} and {@code in} |
 | `IndexPinsTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexPinsTest.java` | D7-2 - pinned index versions survive gc and pool eviction; pins expire after 30 days; an unreadable pin file fails closed. |
 | `IndexReaderPoolTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexReaderPoolTest.java` | LA-INDEX-READER-POOL-1 - sealed readers are reused per version directory and dropped when a newer version is borrowed. |
 | `IndexReaderTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexReaderTest.java` | D-3 step 5 - the sealed per-request reader. The index is generated at test time; nothing is committed. |

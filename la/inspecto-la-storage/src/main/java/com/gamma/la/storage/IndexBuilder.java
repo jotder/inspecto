@@ -50,7 +50,8 @@ import java.util.stream.Stream;
  * VARCHAR; rows with a NULL endpoint are dropped and counted ({@code droppedNull}). {@code ts} is the instant of the time
  * column stored as a NAIVE UTC timestamp (a naive source column is read in the mapping's explicit zone, UTC when none;
  * the session TimeZone is pinned to UTC and never decides anything). {@code kind} / {@code ts} / {@code w} are NULL when
- * unmapped. The bucket is {@link BucketFunction}. {@code nodes} folds {@code *_links} as distinct (neighbour, kind).
+ * unmapped. The bucket is {@link BucketFunction}. {@code nodes} folds {@code *_links} as distinct (neighbour, kind); it is folded one
+ * bucket at a time from the written {@code out} and {@code in}, so its memory is that of a bucket, not of the node count.
  *
  * <h2>Failure and cancel</h2>
  * ANY failure or cancel closes the connection, deletes the stage and leaves CURRENT untouched. Cancel is
@@ -433,8 +434,11 @@ public final class IndexBuilder {
             return new long[] {((Number) counts[0]).longValue(), ((Number) counts[1]).longValue()};
         }
 
-        /** COPYs out, in and nodes of the EDGES view into {@code root}, sorted and bucketed; {@code step} is the first progress step. */
-        void copyTables(Path root, int n, int step) throws SQLException {
+        /**
+         * COPYs out and in of the EDGES view into {@code root}, sorted and bucketed, then folds nodes from those two tables
+         * ({@link #copyNodes}); {@code step} is the first progress step.
+         */
+        void copyTables(Path root, int n, int step) throws SQLException, IOException {
             String edgeCols = "src, dst, kind, ts, w" + attrAliases(req.mapping());
             long t;
             for (String[] d : new String[][] {{"out", "src"}, {"in", "dst"}}) {
@@ -446,12 +450,50 @@ public final class IndexBuilder {
             }
             t = System.nanoTime();
             progress("nodes", step);
-            exec("COPY (SELECT " + BucketFunction.sql("id", n) + " AS bucket, id, coalesce(o.oe, 0) AS out_edges, coalesce(i.ie, 0) AS in_edges,"
-                    + " coalesce(o.ol, 0) AS out_links, coalesce(i.il, 0) AS in_links, least(o.f, i.f) AS first_ts, greatest(o.l, i.l) AS last_ts FROM"
-                    + " (SELECT src AS id, count(*) AS oe, count(DISTINCT struct_pack(n := dst, k := kind)) AS ol, min(ts) AS f, max(ts) AS l FROM " + EDGES + " GROUP BY src) o"
-                    + " FULL JOIN (SELECT dst AS id, count(*) AS ie, count(DISTINCT struct_pack(n := src, k := kind)) AS il, min(ts) AS f, max(ts) AS l FROM " + EDGES + " GROUP BY dst) i USING (id)"
-                    + " ORDER BY bucket, id) TO " + SqlIdent.pathStr(root.resolve("nodes")) + " " + COPY_OPTIONS);
+            copyNodes(root);
             timings.put("nodes", ms(t));
+        }
+
+        /**
+         * The node table of the edges {@code root} holds, ONE BUCKET AT A TIME, read from {@code root}'s own {@code out} and
+         * {@code in} (so it is the fold of exactly the rows just written, and the relation is not read again).
+         *
+         * <p>The earlier statement folded the whole EDGES view in one pass - two global {@code GROUP BY}s over every edge, a
+         * {@code FULL JOIN} of them and a global {@code ORDER BY} - whose working set grows with the node count and, with it, the
+         * edge count. At 3x10^8 edges (60 M nodes) it died with DuckDB's {@code Out of Memory Error} at a 6 GB cap
+         * (LA-INDEX-SCALE-MEASURE-1) and at 3x10^7 edges it needed more than 256 MB; DuckDB's spill did not rescue it. Here the
+         * working set is the edges of ONE bucket (the sizing aims at {@link BucketFunction#EDGES_PER_BUCKET}), independent of
+         * the total, and the statements are plain bounded ones that DuckDB spills.
+         *
+         * <p>Same rows as before: a node's out and in edges share its bucket (the bucket is a function of the id alone), so a
+         * bucket's nodes are the {@code FULL JOIN} of its {@code out} and {@code in} folds. One {@code data_0.parquet} per
+         * non-empty bucket, sorted by id, same row-group size and codec; a bucket with no edge on either side has no directory.
+         */
+        void copyNodes(Path root) throws SQLException, IOException {
+            java.util.SortedSet<Integer> buckets = new java.util.TreeSet<>(bucketDirs(root.resolve("out")));
+            buckets.addAll(bucketDirs(root.resolve("in")));
+            for (int b : buckets) {
+                Path file = Files.createDirectories(root.resolve("nodes").resolve("bucket=" + b)).resolve("data_0.parquet");
+                exec("COPY (SELECT id, coalesce(o.oe, 0) AS out_edges, coalesce(i.ie, 0) AS in_edges, coalesce(o.ol, 0) AS out_links,"
+                        + " coalesce(i.il, 0) AS in_links, least(o.f, i.f) AS first_ts, greatest(o.l, i.l) AS last_ts FROM ("
+                        + nodeSide(root.resolve("out"), b, "src", "dst", "oe", "ol") + ") o FULL JOIN ("
+                        + nodeSide(root.resolve("in"), b, "dst", "src", "ie", "il") + ") i USING (id) ORDER BY id) TO "
+                        + SqlIdent.pathStr(file) + " " + NODES_COPY_OPTIONS);
+            }
+        }
+
+        /**
+         * One side of a bucket's nodes: per {@code key} the edge count, the distinct (neighbour, kind) count and the time span of
+         * {@code table}'s bucket {@code b}; an empty relation of the same columns when that side has no edge in the bucket.
+         */
+        static String nodeSide(Path table, int b, String key, String neighbour, String edges, String links) {
+            Path dir = table.resolve("bucket=" + b);
+            if (!Files.isDirectory(dir))
+                return "SELECT CAST(NULL AS VARCHAR) AS id, CAST(NULL AS BIGINT) AS " + edges + ", CAST(NULL AS BIGINT) AS " + links
+                        + ", CAST(NULL AS TIMESTAMP) AS f, CAST(NULL AS TIMESTAMP) AS l WHERE false";
+            return "SELECT " + key + " AS id, count(*) AS " + edges + ", count(DISTINCT struct_pack(n := " + neighbour + ", k := kind)) AS " + links
+                    + ", min(ts) AS f, max(ts) AS l FROM " + SqlViews.parquet(SqlIdent.pathStr(dir, "/*.parquet"), false, SqlViews.Hive.OFF)
+                    + " GROUP BY " + key;
         }
 
         /** What the sealed connection may touch: the relation's declared roots plus the store directory (stage, .spill, parent version, .delta). */
@@ -812,6 +854,8 @@ public final class IndexBuilder {
     // -------------------------------------------------------------------------------------------------- shared helpers
 
     private static final String COPY_OPTIONS = "(FORMAT parquet, PARTITION_BY (bucket), ROW_GROUP_SIZE " + ROW_GROUP_SIZE + ", COMPRESSION zstd)";
+    /** One bucket's node file: the options of {@link #COPY_OPTIONS} without the partitioning (the bucket directory is made by the caller). */
+    private static final String NODES_COPY_OPTIONS = "(FORMAT parquet, ROW_GROUP_SIZE " + ROW_GROUP_SIZE + ", COMPRESSION zstd)";
 
     private static Connection open(String memoryLimit, Integer threads, Path spill, List<Path> dirs) throws SQLException {
         // DuckDbUtil.openInMemory caps memory and points the spill at a real directory (a raw in-memory open spills to .tmp
@@ -857,6 +901,24 @@ public final class IndexBuilder {
             out.put(table, new TableStats(rows, files.size(), bytes));
         }
         return out;
+    }
+
+    /** The bucket numbers of the {@code bucket=<n>} directories of a table directory (none when it does not exist). */
+    private static List<Integer> bucketDirs(Path tableDir) throws IOException {
+        List<Integer> ids = new ArrayList<>();
+        if (!Files.isDirectory(tableDir)) return ids;
+        try (Stream<Path> dirs = Files.list(tableDir)) {
+            for (Path d : (Iterable<Path>) dirs::iterator) {
+                String name = d.getFileName().toString();
+                try {
+                    if (!name.startsWith("bucket=")) throw new NumberFormatException();
+                    ids.add(Integer.parseInt(name.substring("bucket=".length())));
+                } catch (NumberFormatException e) {
+                    throw new IndexBuildException("unexpected entry '" + name + "' in " + tableDir.getFileName() + " (expected bucket=<n>)");
+                }
+            }
+        }
+        return ids;
     }
 
     private static List<Path> parquetFiles(Path tableDir, int buckets) {
