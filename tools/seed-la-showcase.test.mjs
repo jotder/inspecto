@@ -363,3 +363,22 @@ test('coverage stage soft-fails when the Collector is not assessed or no day is 
   const b = await go(staged({ coverage: { collectors: { assessed: true, collectors: [{ collector: 'c', coveredDays: 4, missingDays: [] }] } } }), { stages: { pending: false, alert: false, draft: false, coverage: true } });
   assert.match(b.warnings[0], /no missing day/);
 });
+
+test('Basic (exchange and Investigations answer 503): seeds only the Entity Lists, with no Authorization, and does not fail', async () => {
+  const calls = [];
+  const fetchFn = async (url, init = {}) => {
+    const u = url.replace('http://h/api/v1', '');
+    calls.push({ method: init.method || 'GET', u, auth: init.headers && init.headers.authorization });
+    const status = u === '/auth/exchange' || u.startsWith('/spaces/s/inv/') ? 503 : 200;
+    return { ok: status === 200, status, json: async () => (status === 200 ? { data: {} } : { error: { errorCode: 'CAPABILITY_UNAVAILABLE' } }) };
+  };
+  const r = await run({ fetchFn, base: 'http://h', space: 's', apply: true });
+  assert.deepEqual(r.failed, []);
+  assert.equal(calls.filter((c) => c.u === '/auth/exchange').length, 1);
+  const space = calls.filter((c) => c.u.startsWith('/spaces/s/'));
+  assert.ok(space.every((c) => c.auth === undefined));
+  assert.deepEqual(space.filter((c) => !c.u.startsWith('/spaces/s/entity-lists')).map((c) => c.u), ['/spaces/s/inv/investigations?limit=200']);   // the one probe
+  assert.deepEqual(r.done, ['list-smurfs', 'list-smurfs-members', 'list-smurfs-expiring', 'list-msisdn-watch', 'list-msisdn-watch-members']);
+  assert.ok(r.unavailable.includes('investigation') && r.unavailable.includes('case'));
+  assert.ok(r.warnings.some((w) => w.startsWith('Basic edition')));
+});
