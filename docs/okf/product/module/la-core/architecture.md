@@ -559,7 +559,7 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **97**<!--count:la-routes--> routes (**90**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **98**<!--count:la-routes--> routes (**91**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -900,6 +900,41 @@ OIDC client-credentials trust exists. Owed before any is built, a formal securit
 ### 6.7 Masked-alias refusal on identity writes (as built 2026-10-18)
 
 `EntityIdentityRoutes.refuseAlias` (predicate `MaskTokens.TOKEN_PREFIX`, the one the other routes use) answers **422 before any fact is appended** when `POST /inv/entity-identities` (`a` or `b`) or `POST /inv/entity-identities/import` (any Dataset row) carries an alias-shaped value such as `msisdn:masked:<16hex>`. Why: a masked analyst only holds aliases, and asserting one appended a permanent Space-wide `identity.asserted` fact on a garbage literal key. That is an **integrity** hole, not a read leak (the response re-masks it). The server does not resolve the alias (that would need `canRevealLinkEntities`); it refuses. Retract takes a seq and resolve/seed carry no identity facts, so they are unaffected. Probes: `ControlApiEntityIdentityTest.assertRefusesAMaskedAliasAndWritesNothing`, `ControlApiEntityIdentityImportTest.aMaskedAliasInTheDatasetRefusesTheImportAndWritesNothing`.
+
+### 6.8 Category exclusion lists in Investigations (LA-GROW-EXCLUDE-1 phase 4, as built 2026-10-22)
+
+The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclusionCategories`) is in the entity-list hub
+[spec](../entity-list/spec.md), "Category lists". What Link Analysis does with them:
+
+- **Auto-apply (GE-9).** `InvestigationRoutes.create` reads the fact log and turns every live admin exclusion list with
+  `autoApply` (`EntityList.autoApplies()`, creation order) into an `excludeBy` step numbered from 1: params from the same
+  `params()` an append uses, reason `auto-applied category list` (`EntityListFacts.AUTO_APPLY_REASON`), the list sealed by
+  the same `sealList`. With any such step the header and the steps are written in ONE move (`store.createFork`, as a fork or
+  an instantiation), so an Investigation never exists without them; with none, `create` is unchanged. A list that cannot be
+  sealed (Entity Type out of force 409, more than `input.list_members` 422) refuses the create, naming the list: fail closed,
+  an Investigation never starts silently without a policy list. The create answer adds `autoApplied: [listId]` (only when
+  non-empty; the sealed header is unchanged). Template instantiation prepends the same steps, skipping a list the template's
+  own method already excludes by; a fork (reorder) carries the parent's steps and adds none. Being ordinary steps, they
+  replay, undo and appear in the Dossier like any `excludeBy`, and a later change to the list moves nothing already sealed.
+- **Seal.** A restricted list's seal carries `visibility: "restricted"`; an open list seals exactly what it did before.
+- **`seedBy` over a restricted list is refused (403)** to a caller without either grant (`requireSeedable`, on append and
+  on template instantiation): a seed admits every member the Dataset holds as an entity. `excludeBy` stays allowed.
+- **Restricted answers (GE-8, plan §7).** `RestrictedLists.of(ex, writeRoot, log)` names the list ops over a list sealed
+  restricted OR restricted now (fail closed, as masking reads a list's flag), for a caller holding neither
+  `canManageExclusionCategories` nor `canRevealLinkEntities`. Render time only, after every hash. For that caller: a step
+  answer (`commit`, so `/ops`, a Draft's ops, an approved expand) has `list.unmatched: null`, `list.membersHidden: true`,
+  `protected: null` and `list.removed` rounded (nearest 5, never below 5, 0 stays 0); the log view's "Excluded N entities"
+  is rounded; `/replay` (main and Draft) drops the `excludedKeys` those steps remembered and says `excludedKeysHidden: true`.
+  ⚠ Not hidden, deliberately: the step's Working Set **delta** still names the admitted entities it removed (the canvas
+  needs them, and the analyst saw them a step earlier), and the **Dossier** (its ledger counts and negative space) is
+  unchanged — BACKLOG row on `LA-GROW-EXCLUDE-1`.
+- **`GET /inv/exclusion-lists`** (`ExclusionListRoutes`, feature `geoLink`, so Basic serves it) →
+  `{lists: [{id, title, entityType, ownerKind, autoApply, visibility, size}]}`: live exclusion lists, admin first, then by
+  title and id; never members. Read-gated like the Entity List reads (Space access; 503 without a write root). Rate class
+  exempt.
+- Tests: `ControlApiInvestigationCategoryListsTest` (geo-link, 5: auto-apply recorded and replayed with an optional, an
+  analyst and a retired list beside it; the unsealable list refusing the create with nothing written; the chips in Basic;
+  503; restricted hiding and rounding for an analyst against the true values for a `canRevealLinkEntities` lead).
 
 ## 7. Host registration, Jobs and live detection
 

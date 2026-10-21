@@ -208,7 +208,8 @@ class OidcAuthenticatorTest {
                 Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6, 2026-10-01
                 Roles.CAN_BUILD_LINK_INDEX,   // LA separation D-3 step 4, 2026-10-02
                 Roles.CAN_UPLOAD_DATA,   // analyst upload, D-UP3
-                Roles.CAN_SHARE_INVESTIGATION),   // LA-EMBED-VIEW-1, 2026-10-12
+                Roles.CAN_SHARE_INVESTIGATION,   // LA-EMBED-VIEW-1, 2026-10-12
+                Roles.CAN_MANAGE_EXCLUSION_CATEGORIES),   // LA-GROW-EXCLUDE-1 phase 4, 2026-10-22
                 admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
@@ -318,7 +319,8 @@ class OidcAuthenticatorTest {
                         Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6, 2026-10-01
                         Roles.CAN_BUILD_LINK_INDEX,   // LA separation D-3 step 4, 2026-10-02
                         Roles.CAN_UPLOAD_DATA,   // analyst upload, D-UP3
-                        Roles.CAN_SHARE_INVESTIGATION),   // LA-EMBED-VIEW-1, 2026-10-12
+                        Roles.CAN_SHARE_INVESTIGATION,   // LA-EMBED-VIEW-1, 2026-10-12
+                        Roles.CAN_MANAGE_EXCLUSION_CATEGORIES),   // LA-GROW-EXCLUDE-1 phase 4, 2026-10-22
                 subject.get().capabilities());
     }
 

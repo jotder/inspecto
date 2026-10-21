@@ -73,11 +73,14 @@ class DecisionRuleWritersTest {
             Map.entry("EntityListRoutes#list", NOT_CONFIG), Map.entry("EntityListRoutes#one", NOT_CONFIG),
             Map.entry("EntityListRoutes#create", NOT_CONFIG), Map.entry("EntityListRoutes#members", NOT_CONFIG),
             Map.entry("EntityListRoutes#retire", NOT_CONFIG), Map.entry("InvestigationRoutes#sealList", NOT_CONFIG),
+            Map.entry("EntityListRoutes#attributes", NOT_CONFIG), Map.entry("ExclusionListRoutes#lists", NOT_CONFIG),
+            Map.entry("InvestigationRoutes#autoApplied", NOT_CONFIG), Map.entry("RestrictedLists#of", NOT_CONFIG),
             Map.entry("InvestigationRoutes#sealResolution", NOT_CONFIG),
             Map.entry("ValueMeasures#agents", NOT_CONFIG),   // operator-approved 2026-09-30   // operator-approved 2026-09-30
             Map.entry("EntityListRoutes#registerDataset", FIXED_KIND + " (dataset)"),
             // SCREENING-1: operator-approved 2026-10-09 (a read of the Identity Fact log, never a write).
-            Map.entry("Screener#load", NOT_CONFIG),
+            Map.entry("Screener#load", NOT_CONFIG), Map.entry("ScreeningRoutes#check", NOT_CONFIG),
+            Map.entry("ScreeningRoutes#hiddenLists", NOT_CONFIG),
             Map.entry("EntityListRoutes#match", NOT_CONFIG), Map.entry("RiskWatchListFeed#check", NOT_CONFIG),
             Map.entry("RiskWatchListFeed#feed", NOT_CONFIG),
             Map.entry("EntityIdentityRoutes#assertIdentity", NOT_CONFIG), Map.entry("EntityIdentityRoutes#retract", NOT_CONFIG),

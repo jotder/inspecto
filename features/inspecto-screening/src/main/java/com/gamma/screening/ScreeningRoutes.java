@@ -1,7 +1,9 @@
 package com.gamma.screening;
 
 import com.gamma.access.WriteGates;
+import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.EntityListFacts;
+import com.gamma.entitystore.EntityRegistry;
 import com.gamma.ops.ObjectService;
 import com.gamma.opsapi.OpsEngine;
 import com.gamma.spi.auth.ApiException;
@@ -51,19 +53,26 @@ public final class ScreeningRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
-        api.post("/screening/check", (e, m) -> check(api, api.body(e)));
+        api.post("/screening/check", (e, m) -> check(api, e, api.body(e)));
         api.get("/screening/hits", (e, m) -> hits(api, e));
-        api.get("/screening/hits/([^/]+)", (e, m) -> one(api, m.group(1)));
+        api.get("/screening/hits/([^/]+)", (e, m) -> one(api, e, m.group(1)));
         api.get("/screening/hits/([^/]+)/reveal", ApiContext.withCapability("canRevealLinkEntities",
                 (e, m) -> reveal(api, e, m.group(1))));
         api.post("/screening/hits/([^/]+)/decide", ApiContext.withCapability("canWorkIncidents",
                 (e, m) -> decide(api, e, m.group(1), api.body(e))));
     }
 
-    private Object check(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object check(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "screening");
         List<Screener.Subject> subjects = subjects(body);
         List<String> listIds = lists(body);
+        // LA-GROW-EXCLUDE-1 GE-8: a check answers the matched entry, so a restricted list is refused (403) to a caller who
+        // may not see its members. A Screening Job's hits are not refused: the hit reads hide a restricted list's entry
+        // (hiddenLists / shown below).
+        EntityFactLog.Log facts = EntityListFacts.read(new EntityFactLog(root));
+        Map<String, EntityRegistry.EntityList> folded = EntityRegistry.fold(facts.facts(), facts.headSeq());
+        for (String id : listIds)
+            if (folded.get(id) != null) EntityListFacts.requireSeesMembers(ex, folded.get(id), "screen against");
         double threshold = threshold(body.get("threshold"));
         int maxMatches = maxMatches(body.get("maxMatches"));
         Instant now = Instant.now();
@@ -95,16 +104,40 @@ public final class ScreeningRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'state' must be one of "
                     + new java.util.TreeSet<>(ScreeningHits.STATES));
         List<Map<String, Object>> out = new ArrayList<>();
+        Set<String> hidden = hiddenLists(ex, root);
         for (Map<String, Object> rec : ScreeningHits.list(root))
-            if (state == null || state.equals(rec.get("state"))) out.add(ScreeningHits.render(rec));
+            if (state == null || state.equals(rec.get("state"))) out.add(shown(rec, hidden));
         return Map.of("hits", out);
     }
 
-    private Object one(ApiContext api, String id) throws IOException {
+    private Object one(ApiContext api, HttpExchange ex, String id) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "screening hits");
         Map<String, Object> rec = ScreeningHits.read(root, id);
         if (rec == null) throw notFound(id);
-        return ScreeningHits.render(rec);
+        return shown(rec, hiddenLists(ex, root));
+    }
+
+    /**
+     * LA-GROW-EXCLUDE-1 GE-8: the restricted Entity Lists whose members this caller may not see (none for a holder of
+     * canManageExclusionCategories or canRevealLinkEntities, or with no Subject). A hit stores the matched member as its
+     * {@code entry}, so a hit on such a list is read with {@code entry} and {@code dedupeKey} (a hash over it) removed.
+     */
+    private static Set<String> hiddenLists(HttpExchange ex, Path root) throws IOException {
+        if (EntityListFacts.seesRestricted(ex)) return Set.of();
+        EntityFactLog.Log facts = EntityListFacts.read(new EntityFactLog(root));
+        Set<String> out = new java.util.HashSet<>();
+        for (EntityRegistry.EntityList l : EntityRegistry.fold(facts.facts(), facts.headSeq()).values())
+            if (l.restricted()) out.add(l.id());
+        return out;
+    }
+
+    private static Map<String, Object> shown(Map<String, Object> rec, Set<String> hidden) {
+        Map<String, Object> out = ScreeningHits.render(rec);
+        if (!hidden.contains(String.valueOf(rec.get("listId")))) return out;
+        out.put("entry", null);
+        out.put("dedupeKey", null);
+        out.put("entryHidden", true);
+        return out;
     }
 
     /**
@@ -213,7 +246,7 @@ public final class ScreeningRoutes implements RouteModule {
         if (rec.get("caseId") != null) attrs.put("caseId", rec.get("caseId"));
         ScreeningHits.audit(actor, ApiContext.actorType(ex), "screening.hit.decided",
                 "screening hit " + id + " " + from + " -> " + to, attrs);
-        return ScreeningHits.render(rec);
+        return shown(rec, hiddenLists(ex, root));
     }
 
     // ── body parsing ──────────────────────────────────────────────────────────────────────────────────────

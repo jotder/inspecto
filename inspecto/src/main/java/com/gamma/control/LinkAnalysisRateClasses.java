@@ -120,6 +120,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/entity-identities"},
             {"POST", "/inv/entity-identities/import"},
             {"POST", "/inv/entity-identities/([^/]+)/retract"},
+            {"GET", "/inv/exclusion-lists"},                   // LA-GROW-EXCLUDE-1: a fold of the fact log, no members
             {"GET", "/inv/graph/algorithms"},
             {"GET", "/inv/graph/runs"},
             {"GET", "/inv/graph/runs/([^/]+)"},
@@ -136,6 +137,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/entity-lists"},
             {"POST", "/entity-lists/([^/]+)/members"},
             {"POST", "/entity-lists/([^/]+)/retire"},
+            {"PUT", "/entity-lists/([^/]+)/attributes"},       // LA-GROW-EXCLUDE-1: one fact
             {"POST", "/entity-lists/([^/]+)/match"},
             {"POST", "/entity-lists/([^/]+)/register-dataset"},
     };

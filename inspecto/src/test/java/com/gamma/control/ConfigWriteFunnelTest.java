@@ -271,6 +271,11 @@ class ConfigWriteFunnelTest {
             Map.entry("EntityListRoutes#registerDataset", ENTITY_FACTS + " (only READS the log; the Dataset itself is "
                     + "written by DatasetRegistration, which holdRefusing's under a policy then takes the component save path)"),
             Map.entry("RiskWatchListFeed#check", ENTITY_FACTS + " (a read)"),
+            // LA-GROW-EXCLUDE-1 phase 4: three READS of the Identity Fact log, never a write.
+            Map.entry("ExclusionListRoutes#lists", ENTITY_FACTS + " (a read: the exclusion lists for the graph's chips)"),
+            Map.entry("RestrictedLists#of", ENTITY_FACTS + " (a read: which sealed lists are restricted now, to hide members)"),
+            Map.entry("InvestigationRoutes#autoApplied", "READS the Identity Fact log to seal the auto-applied category "
+                    + "lists into a new Investigation's first steps, as sealList does; " + ENTITY_FACTS),
             Map.entry("RiskWatchListFeed#feed", MACHINE + " (the risk.score watch-list feed; expiring entries only, D-P5)"),
             Map.entry("EntityIdentityRoutes#assertIdentity", ENTITY_FACTS),
             Map.entry("EntityIdentityRoutes#retract", ENTITY_FACTS),
@@ -286,6 +291,8 @@ class ConfigWriteFunnelTest {
                     + "Investigation op (LA-17) — the signal matches opening the log, which is not a write; "
                     + ENTITY_FACTS),
             // SCREENING-1: operator-approved 2026-10-09 (a read of the Identity Fact log, never a write).
+            Map.entry("ScreeningRoutes#hiddenLists", "READS the Identity Fact log to hide a restricted list's matched entry on the hit reads (LA-GROW-EXCLUDE-1 GE-8) - not a write; " + ENTITY_FACTS),
+            Map.entry("ScreeningRoutes#check", "READS the Identity Fact log to refuse a restricted list to a caller who may not see its members (LA-GROW-EXCLUDE-1 GE-8) - not a write; " + ENTITY_FACTS),
             Map.entry("Screener#load", "READS the Identity Fact log to fold the Entity Lists a screening is matched against (SCREENING-1) - opening the log, not a write; Screening never appends a fact; " + ENTITY_FACTS),
             Map.entry("ActionRequestRoutes#propose", ACTION_REQUESTS),
             Map.entry("ActionRequestRoutes#decide", ACTION_REQUESTS), Map.entry("ActionRequestRoutes#retry", ACTION_REQUESTS),

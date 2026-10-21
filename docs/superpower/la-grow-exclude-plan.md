@@ -121,7 +121,9 @@ Recorded, replayable steps remain the reason to upgrade.
 2. **Super-node tray + Remove held** — reuse the held-hub data `expand` already returns.
 3. **Exclude right-click + Exclusions panel** — `exclude` / `excludeBy`, list creation from the graph.
 4. **List ownership** — `owner_kind`, `auto_apply`, `visibility` on Entity Lists; admin-only category lists;
-   restricted members; capability GE-11; Settings page for categories.
+   restricted members; capability GE-11; Settings page for categories. **Built 2026-10-22** (wire names `ownerKind`,
+   `autoApply`, `visibility`): as built in the entity-list hub [spec](../okf/product/module/entity-list/spec.md)
+   "Category lists" and la-core [architecture §6.8](../okf/product/module/la-core/architecture.md).
 5. **Basic explorer variant** (GE-10).
 6. **New-user polish** — first-time hints, keyboard shortcuts, pack-aware wording, user-guide chapter
    "Grow and clean a graph", a think-aloud test with two new users (`tests-think-aloud-script.md`).

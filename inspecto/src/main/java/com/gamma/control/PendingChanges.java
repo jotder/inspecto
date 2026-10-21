@@ -549,6 +549,7 @@ public final class PendingChanges {
             "POST /jobs", "PUT /jobs/([^/]+)", "DELETE /jobs/([^/]+)", "POST /jobs/([^/]+)/enable",
             "POST /jobs/([^/]+)/disable", "POST /jobs/([^/]+)/reschedule",
             "POST /entity-lists/([^/]+)/members", "POST /entity-lists/([^/]+)/retire",
+            "PUT /entity-lists/([^/]+)/attributes",
             "POST /notifications/channels", "PUT /notifications/channels/([^/]+)",
             "DELETE /notifications/channels/([^/]+)",
             "POST /notifications/rules", "PUT /notifications/rules/([^/]+)", "DELETE /notifications/rules/([^/]+)");

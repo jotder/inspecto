@@ -1341,6 +1341,23 @@
         "x-optional-module" : true
       }
     },
+    "/inv/exclusion-lists" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "The exclusion lists an Investigation can apply",
+        "operationId" : "getInvExclusionLists",
+        "description" : "LA-GROW-EXCLUDE-1 phase 4. Read-shaped, like the Entity List reads (Space access; every edition, Basic included). Answers {lists: [{id, title, entityType, ownerKind, autoApply, visibility, size}]}: every live (not retired) Entity List of purpose exclusion, category (ownerKind admin) lists first, then by title. Never members: a restricted list shows its size only.",
+        "responses" : {
+          "200" : {
+            "description" : "The exclusion lists."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/entity-types" : {
       "get" : {
         "tags" : [ "inv" ],

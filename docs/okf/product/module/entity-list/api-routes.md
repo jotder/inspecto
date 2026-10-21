@@ -11,13 +11,14 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-7 route(s) registered; 7 in the OpenAPI contract, 0 not.
+8 route(s) registered; 8 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
 | GET | `/entity-lists` | GET /entity-lists (generated skeleton) | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 | POST | `/entity-lists` | POST /entity-lists (generated skeleton) | entity-lists | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 | GET | `/entity-lists/{entitylistId}` | GET /entity-lists/{entitylistId} (generated skeleton) | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
+| PUT | `/entity-lists/{entitylistId}/attributes` | Change an exclusion list's ownership, auto-apply and visibility | entity-lists | `canManageExclusionCategories` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 | POST | `/entity-lists/{entitylistId}/match` | POST /entity-lists/{entitylistId}/match (generated skeleton) | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 | POST | `/entity-lists/{entitylistId}/members` | POST /entity-lists/{entitylistId}/members (generated skeleton) | entity-lists | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 | POST | `/entity-lists/{entitylistId}/register-dataset` | Register an Entity List's sidecar as a Dataset | entity-lists | `canAuthorWorkbench` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |

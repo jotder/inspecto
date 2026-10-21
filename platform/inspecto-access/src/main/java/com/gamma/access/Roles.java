@@ -194,6 +194,17 @@ public final class Roles {
      */
     public static final String CAN_APPROVE_CHANGES = "canApproveChanges";
 
+    /**
+     * Owning the Space's <b>category exclusion lists</b> (LA-GROW-EXCLUDE-1 GE-6 / GE-11, 2026-10-22): creating an Entity
+     * List of purpose {@code exclusion} with {@code ownerKind: admin}, changing its members, retiring it, and changing any
+     * list's {@code ownerKind} / {@code autoApply} / {@code visibility} ({@code PUT /entity-lists/{id}/attributes}). Such a
+     * list may apply itself to every new Investigation and may hide its members, so it is policy, not case work: it is
+     * NOT {@link #CAN_MANAGE_INCIDENTS}, which keeps the analyst lists. A holder also sees a {@code restricted} list's
+     * members, as a holder of {@link #CAN_REVEAL_LINK_ENTITIES} does. Granted in {@link #SEED} to {@code admin};
+     * {@code super} holds everything.
+     */
+    public static final String CAN_MANAGE_EXCLUSION_CATEGORIES = "canManageExclusionCategories";
+
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
     public static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
@@ -251,7 +262,8 @@ public final class Roles {
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
                 CAN_OFFER_DATASETS, CAN_OFFER_SIGNALS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
                 CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS,
-                CAN_APPROVE_CHANGES, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX, CAN_UPLOAD_DATA, CAN_SHARE_INVESTIGATION), null));
+                CAN_APPROVE_CHANGES, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX, CAN_UPLOAD_DATA, CAN_SHARE_INVESTIGATION,
+                CAN_MANAGE_EXCLUSION_CATEGORIES), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
                 CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_MANAGE_INCIDENTS,
                 CAN_WORK_INCIDENTS, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX, CAN_UPLOAD_DATA, CAN_SHARE_INVESTIGATION), null));

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-109 test class(es): 18 unit, 91 real-HTTP control-plane, 0 IT.
+110 test class(es): 18 unit, 92 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -63,6 +63,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiInvestigationAlertRuleTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationAlertRuleTest.java` | LA-23 — <b>Measure over the Working Set → Alert Rule → Alert</b> over real HTTP: the declared Measures and one |
 | `ControlApiInvestigationApprovalInboxTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationApprovalInboxTest.java` | {@code GET /inv/pending} — the four-eyes approver inbox (D-U7), over real HTTP with an armed Authenticator. The inbox |
 | `ControlApiInvestigationCaseShareTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationCaseShareTest.java` | LA-24 — sharing an Investigation with a Case team, over real HTTP and with an armed Authenticator (with no Subject |
+| `ControlApiInvestigationCategoryListsTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationCategoryListsTest.java` | LA-GROW-EXCLUDE-1 phase 4 over real HTTP — admin category exclusion lists in Link Analysis: an {@code autoApply} list |
 | `ControlApiInvestigationCompareOpTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationCompareOpTest.java` | The {@code compare} OP (LA-INVESTIGATION-OPS-DEFERRED-1, sealed form of comparison mode), over real HTTP. Same fixture as |
 | `ControlApiInvestigationComparisonTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationComparisonTest.java` | Comparison mode (LA-INVESTIGATION-OPS-DEFERRED-1), over real HTTP: {@code GET /inv/investigations/{id}/compare} and the |
 | `ControlApiInvestigationConnectOpTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationConnectOpTest.java` | LA-SEED-CONNECT-1, over real HTTP: the {@code connect} op - the shortest connection for every pair of seeds within 3 hops, |

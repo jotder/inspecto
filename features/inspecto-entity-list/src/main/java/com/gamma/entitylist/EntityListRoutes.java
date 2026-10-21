@@ -51,6 +51,8 @@ import com.gamma.entitystore.MaskTokens;
  *   <li>{@code POST /entity-lists} {@code {id?, title, purpose, entityType, reason}} → 201 + the list.</li>
  *   <li>{@code POST /entity-lists/{id}/members} {@code {add?, remove?, reason}} → 200 + the list + {@code changed}.</li>
  *   <li>{@code POST /entity-lists/{id}/retire} {@code {reason}} → 200 + the list.</li>
+ *   <li>{@code PUT /entity-lists/{id}/attributes} {@code {ownerKind?, autoApply?, visibility?, reason}} → 200 + the list +
+ *       {@code changed} (LA-GROW-EXCLUDE-1 phase 4; see below).</li>
  *   <li>{@code POST /entity-lists/{id}/match} {@code {values[]}} → {@code {matches: [{value, matched, entry?, match?}]}}
  *       (ASSURE-ENTITY-LISTS-1; read-shaped: a POST so keys never ride in a URL). A value may be a {@code masked:}
  *       alias - the Space key's token, what Link Analysis exploration shows a masked node as - and matches the member it
@@ -71,6 +73,17 @@ import com.gamma.entitystore.MaskTokens;
  * Reads need only Space access, but the log lives under the write root, so no write root is a 503 there too (as
  * {@code GET /inv/snapshots}). A broken fact chain is a 500 {@code INTEGRITY_VIOLATION} on every route.
  *
+ * <p><b>Category exclusion lists</b> (LA-GROW-EXCLUDE-1 phase 4, GE-6 / GE-8 / GE-9 / GE-11). A list of purpose
+ * {@code exclusion} carries {@code ownerKind} ({@code admin | analyst}, default analyst), {@code autoApply} (default false)
+ * and {@code visibility} ({@code open | restricted}, default open), in {@code list.created} and in
+ * {@code list.attributes-changed}; any other purpose refuses them (422). {@code autoApply: true} and
+ * {@code visibility: restricted} belong to an admin list only (422 on an analyst one). Creating, changing the members of
+ * or retiring an {@code ownerKind: admin} list needs {@code canManageExclusionCategories} on top of the route's
+ * {@code canManageIncidents} (403), and every attribute change needs it (the route's own gate). A {@code restricted} list
+ * answers {@code members: null, membersHidden: true} (ranges and expiring entries likewise) to a caller holding neither
+ * {@code canManageExclusionCategories} nor {@code canRevealLinkEntities}; its {@code match} and {@code register-dataset}
+ * are refused to that caller (403), because both would disclose membership.
+ *
  * <p><b>{@code headHash} on a single list</b> is the hash of the fact AT {@code atSeq} — the head of the prefix that
  * was folded — so {@code {atSeq, headHash}} is a self-verifying pin, and without {@code at} it is the log's head.
  *
@@ -82,6 +95,8 @@ import com.gamma.entitystore.MaskTokens;
 public final class EntityListRoutes implements RouteModule {
 
     private static final List<String> PURPOSES = List.of("allow", "block", "watch", "exclusion");
+    private static final List<String> OWNER_KINDS = List.of("admin", "analyst");
+    private static final List<String> VISIBILITIES = List.of("open", "restricted");
     private static final int MAX_VALUES = 5_000;
     private static final int MAX_TITLE = 200;
     private static final int MAX_VALUE_LENGTH = 512;
@@ -102,7 +117,9 @@ public final class EntityListRoutes implements RouteModule {
                 (e, m) -> members(api, e, m.group(1), api.body(e))));
         api.post("/entity-lists/([^/]+)/retire", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> retire(api, e, m.group(1), api.body(e))));
-        api.post("/entity-lists/([^/]+)/match", (e, m) -> match(api, m.group(1), api.body(e)));
+        api.put("/entity-lists/([^/]+)/attributes", ApiContext.withCapability("canManageExclusionCategories",
+                (e, m) -> attributes(api, e, m.group(1), api.body(e))));
+        api.post("/entity-lists/([^/]+)/match", (e, m) -> match(api, e, m.group(1), api.body(e)));
         // ASSURE-ENTITY-LISTS-RESIDUALS-1 (3): the Dataset over the sidecar is registered only on this explicit call —
         // authoring a Dataset needs canAuthorWorkbench, whatever the list's own write capability.
         api.post("/entity-lists/([^/]+)/register-dataset", ApiContext.withCapability("canAuthorWorkbench",
@@ -121,6 +138,7 @@ public final class EntityListRoutes implements RouteModule {
         Path root = WriteGates.requireWriteRoot(api, "entity list dataset registration");
         EntityRegistry.EntityList l = current(read(new EntityFactLog(root)), id);
         if (l == null) throw notFound(id, "");
+        EntityListFacts.requireSeesMembers(ex, l, "register a Dataset over");   // the Dataset would serve every member
         String ref = EntityListSidecar.ref(id);
         if (!EntityListSidecar.present(api.dataRoot(), id))
             throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + id + "' has no sidecar on disk yet (" + ref
@@ -174,10 +192,12 @@ public final class EntityListRoutes implements RouteModule {
         long atSeq = at < 0 ? facts.headSeq() : at;
         EntityRegistry.EntityList l = EntityRegistry.fold(facts.facts(), atSeq).get(id);
         if (l == null) throw notFound(id, rawAt != null ? " at seq " + atSeq : "");
-        return render(root, log, facts, l, atSeq);
+        // GE-8: restricted as of that seq OR now - a list restricted later never shows its members through an old seq
+        EntityRegistry.EntityList now = current(facts, id);
+        return render(root, log, facts, l, atSeq, hidden(ex, l) || hidden(ex, now));
     }
 
-    private Object match(ApiContext api, String id, Map<String, Object> body) throws IOException {
+    private Object match(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "entity lists");
         List<String> values = values(body, "values");
         if (values.isEmpty() || values.size() > MAX_VALUES)
@@ -186,6 +206,7 @@ public final class EntityListRoutes implements RouteModule {
         EntityFactLog.Log facts = read(log);
         EntityRegistry.EntityList l = current(facts, id);
         if (l == null) throw notFound(id, "");
+        EntityListFacts.requireSeesMembers(ex, l, "match values against");   // a match answers membership, value by value
         boolean masked = masked(root, l);
         byte[] key = masked ? log.maskKey() : null;
         Instant now = Instant.now();
@@ -244,6 +265,8 @@ public final class EntityListRoutes implements RouteModule {
         if (sealedType.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'entityType' must be an Entity Type in force "
                     + typeIds(root) + ", got '" + entityType + "'");
+        Map<String, Object> attrs = attributesOf(body, purpose, true);
+        if ("admin".equals(attrs.get("ownerKind"))) ApiContext.requireCapability(ex, EntityListFacts.MANAGE_CATEGORIES);
         String given = ApiContext.str(body, "id");
         String id = given != null ? given : "el-" + UUID.randomUUID();
         if (!LIST_ID.matcher(id).matches())
@@ -262,9 +285,10 @@ public final class EntityListRoutes implements RouteModule {
             payload.put("purpose", purpose);
             payload.put("entityType", entityType);
             payload.put("normaliser", sealedType.get().normaliser());   // D-M9: sealed; member writes use this, not the type
+            payload.putAll(attrs);   // an exclusion list states its three attributes; any other purpose carries none
             head = append(log, head, ex, reason, "list.created", id, payload);
             emit(ex, id, "list.created", 0, 0, head.headSeq());
-            created = render(root, log, head, current(head, id), head.headSeq());
+            created = render(root, log, head, current(head, id), head.headSeq(), hidden(ex, current(head, id)));
             created.put("sidecar", EntityListSidecar.write(api.dataRoot(), current(head, id), head.facts()));
         }
         return ApiContext.respondJson(ex, 201, created);   // outside the lock: a slow client must not stall writers
@@ -290,6 +314,7 @@ public final class EntityListRoutes implements RouteModule {
             EntityRegistry.EntityList l = EntityRegistry.fold(head.facts(), head.headSeq()).get(id);
             if (l == null) throw notFound(id, "");
             if (l.retired()) throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + id + "' is retired");
+            if (l.adminOwned()) ApiContext.requireCapability(ex, EntityListFacts.MANAGE_CATEGORIES);   // GE-6
             type(root, l.entityType()).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT,
                     "entity list '" + id + "' is of Entity Type '" + l.entityType() + "', which is no longer in force"));
             Set<String> toAdd = normalise(l, add, "add");
@@ -348,7 +373,7 @@ public final class EntityListRoutes implements RouteModule {
                 emit(ex, id, "list.range.removed", 0, rangesRemove.size(), head.headSeq());
             }
             EntityRegistry.EntityList after = current(head, id);
-            Map<String, Object> out = render(root, log, head, after, head.headSeq());
+            Map<String, Object> out = render(root, log, head, after, head.headSeq(), hidden(ex, after));
             out.put("changed", changed);
             if (reviewAfter) out.put("reviewAfter", true);
             out.put("sidecar", changed == 0 ? "unchanged" : EntityListSidecar.write(api.dataRoot(), after, head.facts()));
@@ -365,15 +390,121 @@ public final class EntityListRoutes implements RouteModule {
             EntityRegistry.EntityList l = EntityRegistry.fold(head.facts(), head.headSeq()).get(id);
             if (l == null) throw notFound(id, "");
             if (l.retired()) throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + id + "' is already retired");
+            if (l.adminOwned()) ApiContext.requireCapability(ex, EntityListFacts.MANAGE_CATEGORIES);   // GE-6
             PendingChanges.hold(api, ex, KIND, id, null, heldBase(l));   // retiring a block list loosens control
             Map<String, Object> approved = approvedBy(ex);
             head = append(log, head, ex, reason, "list.retired", id,
                     approved == null ? Map.of() : Map.of("approvedChange", approved));
             emit(ex, id, "list.retired", 0, 0, head.headSeq());
-            Map<String, Object> out = render(root, log, head, current(head, id), head.headSeq());
+            Map<String, Object> out = render(root, log, head, current(head, id), head.headSeq(), hidden(ex, current(head, id)));
             out.put("sidecar", EntityListSidecar.write(api.dataRoot(), current(head, id), head.facts()));
             return out;
         }
+    }
+
+    /**
+     * {@code PUT /entity-lists/{id}/attributes} {@code {ownerKind?, autoApply?, visibility?, reason}} (LA-GROW-EXCLUDE-1
+     * phase 4). Gates: {@code canManageExclusionCategories} (the wrapper) → no write root 503 → body 422 (no reason, no
+     * attribute, a bad value) → unknown list 404 → retired 409 → not an exclusion list, or a combination an analyst list
+     * cannot hold, 422 → the approval policy for kind {@code entity-list} (a Pending Change) → one
+     * {@code list.attributes-changed} fact naming only the keys that change. Nothing changes: {@code changed: 0}, no fact.
+     */
+    private Object attributes(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "entity list attributes");
+        String reason = reason(body);
+        Map<String, Object> asked = attributesOf(body, "exclusion", false);
+        if (asked.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "name at least one of 'ownerKind', 'autoApply', "
+                    + "'visibility'");
+        EntityFactLog log = new EntityFactLog(root);
+        synchronized (log.lock()) {
+            EntityFactLog.Log head = read(log);
+            EntityRegistry.EntityList l = EntityRegistry.fold(head.facts(), head.headSeq()).get(id);
+            if (l == null) throw notFound(id, "");
+            if (l.retired()) throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + id + "' is retired");
+            if (!"exclusion".equals(l.purpose()))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "entity list '" + id + "' is a " + l.purpose()
+                        + " list; ownerKind, autoApply and visibility belong to exclusion lists only");
+            Map<String, Object> was = new LinkedHashMap<>();
+            was.put("ownerKind", l.ownerKind());
+            was.put("autoApply", l.autoApply());
+            was.put("visibility", l.visibility());
+            Map<String, Object> next = new LinkedHashMap<>(was);
+            next.putAll(asked);
+            requireAdminOnlyAttributes(next);
+            Map<String, Object> changes = new LinkedHashMap<>();
+            for (var e : next.entrySet()) if (!e.getValue().equals(was.get(e.getKey()))) changes.put(e.getKey(), e.getValue());
+            if (!changes.isEmpty()) {
+                Map<String, Object> base = heldBase(l);
+                base.putAll(was);
+                PendingChanges.hold(api, ex, KIND, id, new LinkedHashMap<>(changes), base);
+                Map<String, Object> payload = new LinkedHashMap<>(changes);
+                Map<String, Object> approved = approvedBy(ex);
+                if (approved != null) payload.put("approvedChange", approved);
+                head = append(log, head, ex, reason, "list.attributes-changed", id, payload);
+                emit(ex, id, "list.attributes-changed", 0, 0, head.headSeq());
+            }
+            Map<String, Object> out = render(root, log, head, current(head, id), head.headSeq(), hidden(ex, current(head, id)));
+            out.put("changed", changes.size());
+            return out;
+        }
+    }
+
+    // ── LA-GROW-EXCLUDE-1 phase 4 helpers ──────────────────────────────────────────────────────────────────
+
+    /**
+     * The attributes a body states, validated (a wrong type or value is a 422). On a create ({@code create}) of an
+     * {@code exclusion} list all three are returned, the defaults filling what the body leaves out, so
+     * {@code list.created} records them; a create of any other purpose that states one is a 422. On an attribute change
+     * only the stated ones are returned, for the caller to merge.
+     */
+    private static Map<String, Object> attributesOf(Map<String, Object> body, String purpose, boolean create) {
+        Map<String, Object> stated = new LinkedHashMap<>();
+        Object owner = body.get("ownerKind"), auto = body.get("autoApply"), vis = body.get("visibility");
+        if (owner != null) {
+            if (!(owner instanceof String o) || !OWNER_KINDS.contains(o))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'ownerKind' must be one of " + OWNER_KINDS);
+            stated.put("ownerKind", owner);
+        }
+        if (auto != null) {
+            if (!(auto instanceof Boolean))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'autoApply' must be true or false");
+            stated.put("autoApply", auto);
+        }
+        if (vis != null) {
+            if (!(vis instanceof String v) || !VISIBILITIES.contains(v))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'visibility' must be one of " + VISIBILITIES);
+            stated.put("visibility", vis);
+        }
+        if (!create) return stated;
+        if (!"exclusion".equals(purpose)) {
+            if (!stated.isEmpty())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "ownerKind, autoApply and visibility belong to "
+                        + "exclusion lists only, not a " + purpose + " list");
+            return stated;
+        }
+        Map<String, Object> all = new LinkedHashMap<>();
+        all.put("ownerKind", stated.getOrDefault("ownerKind", "analyst"));
+        all.put("autoApply", stated.getOrDefault("autoApply", false));
+        all.put("visibility", stated.getOrDefault("visibility", "open"));
+        requireAdminOnlyAttributes(all);
+        return all;
+    }
+
+    /** {@code autoApply: true} and {@code visibility: restricted} are category-list (admin) attributes (GE-8, GE-9). */
+    private static void requireAdminOnlyAttributes(Map<String, Object> attrs) {
+        if ("admin".equals(attrs.get("ownerKind"))) return;
+        if (Boolean.TRUE.equals(attrs.get("autoApply")))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'autoApply' is for a category list "
+                    + "(ownerKind admin); an analyst list is switched on per Investigation");
+        if ("restricted".equals(attrs.get("visibility")))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'visibility: restricted' is for a category list "
+                    + "(ownerKind admin); an analyst list stays open to the analysts who keep it");
+    }
+
+    /** Whether {@code l}'s members are hidden from this caller (GE-8): restricted, and the caller holds neither grant. */
+    private static boolean hidden(HttpExchange ex, EntityRegistry.EntityList l) {
+        return l.restricted() && !EntityListFacts.seesRestricted(ex);
     }
 
     // ── ASSURE-ENTITY-LISTS-1 helpers ──────────────────────────────────────────────────────────────────────
@@ -523,15 +654,34 @@ public final class EntityListRoutes implements RouteModule {
         m.put("size", l.members().size());
         m.put("rangeCount", l.ranges().size());
         m.put("retired", l.retired());
+        if ("exclusion".equals(l.purpose())) {   // LA-GROW-EXCLUDE-1 phase 4: an exclusion list's three attributes
+            m.put("ownerKind", l.ownerKind());
+            m.put("autoApply", l.autoApply());
+            m.put("visibility", l.visibility());
+        }
         m.put("createdAt", l.createdAt());
         m.put("createdBy", l.createdBy());
         m.put("lastSeq", l.lastSeq());
         return m;
     }
 
-    /** Summary + members rendered through the Space's {@code maskingMode} + {@code atSeq} + the hash of that fact. */
+    /**
+     * Summary + members rendered through the Space's {@code maskingMode} + {@code atSeq} + the hash of that fact. With
+     * {@code hide} (a restricted list, read by a caller who may not see its members, GE-8) it answers {@code members}, {@code ranges} and
+     * {@code expiring} as {@code null} and {@code membersHidden: true}; the size and range count stay.
+     */
     private static Map<String, Object> render(Path root, EntityFactLog log, EntityFactLog.Log facts,
-                                              EntityRegistry.EntityList l, long atSeq) throws IOException {
+                                              EntityRegistry.EntityList l, long atSeq, boolean hide) throws IOException {
+        if (hide) {
+            Map<String, Object> out = summary(l);
+            out.put("members", null);
+            out.put("membersHidden", true);
+            out.put("ranges", null);
+            out.put("expiring", null);
+            out.put("atSeq", atSeq);
+            out.put("headHash", atSeq == 0 ? "" : facts.facts().get((int) atSeq - 1).hash());
+            return out;
+        }
         Map<String, Object> out = summary(l);
         List<String> members = new ArrayList<>(l.members());
         if (!members.isEmpty() && masked(root, l)) {

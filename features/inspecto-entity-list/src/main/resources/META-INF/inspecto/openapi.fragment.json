@@ -97,6 +97,46 @@
         "x-optional-module" : true
       }
     },
+    "/entity-lists/{entitylistId}/attributes" : {
+      "put" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "Change an exclusion list's ownership, auto-apply and visibility",
+        "operationId" : "putEntityListsByEntitylistIdAttributes",
+        "description" : "LA-GROW-EXCLUDE-1 phase 4. Body {ownerKind?: admin|analyst, autoApply?: boolean, visibility?: open|restricted, reason}: at least one attribute; a key left out keeps its value. Gated on canManageExclusionCategories. Only a list of purpose exclusion carries these attributes (422 otherwise); autoApply true and visibility restricted belong to an ownerKind admin list only (422 on an analyst one). Appends one list.attributes-changed fact naming only the keys that change; nothing to change answers changed 0 and writes nothing. Held as a Pending Change under an approval policy for kind entity-list. Answers the list as GET /entity-lists/{id} does, plus changed.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The list after the change, and changed (how many attributes changed)."
+          },
+          "401" : {
+            "description" : "No credential (when an authenticator is installed)."
+          },
+          "403" : {
+            "description" : "The caller lacks canManageExclusionCategories."
+          },
+          "404" : {
+            "description" : "No such Entity List."
+          },
+          "409" : {
+            "description" : "The list is retired, or the identity fact log moved on concurrently."
+          },
+          "422" : {
+            "description" : "No reason, no attribute, a bad value, not an exclusion list, or an admin-only attribute on an analyst list."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/entity-lists/{entitylistId}/match" : {
       "post" : {
         "tags" : [ "entity-lists" ],

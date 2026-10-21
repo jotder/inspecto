@@ -1070,10 +1070,12 @@ origin (§3). ⛔ Never *Control List* (the assurance bid plan's name — one co
 serves assurance allow / block / watch and Link Analysis `excludeBy` / `seedBy`. ⛔ Not *watchlist* as the noun: *watch* is
 one purpose of an Entity List.
 
+**Category list** *(added 2026-10-22, `LA-GROW-EXCLUDE-1` phase 4; ✅ built: `ownerKind`/`autoApply`/`visibility` on `/entity-lists*`, `GET /inv/exclusion-lists`)* — An **Entity List** of purpose `exclusion` that an administrator keeps (`ownerKind: admin`, capability `canManageExclusionCategories`): marketing VIPs, politicians, defence, intelligence. It may apply itself as the first `excludeBy` step of every new **Investigation** (`autoApply`) and may hide its members from analysts (`visibility: restricted`). Its counterpart is an **analyst list** (`ownerKind: analyst`, the default; `canManageIncidents`), such as call centres, switched on per Investigation. Say *category list* in UI text; *category exclusion list* where the purpose must be explicit. ⛔ Not the *Category* of the 3-layer categorization: a category list is always an Entity List.
+
 **Identity Fact** *(added 2026-09-26, `LA-17`; ✅ list kinds built 2026-09-26: `EntityFactLog`)* — One immutable record in a Space's
 append-only identity log (`audit/entity-facts/<seq>.json`), SHA-256-chained to its predecessor, always carrying an actor and
 a reason; the chain is re-verified on every read. Built kinds: `list.created` · `list.member.added` ·
-`list.member.removed` · `list.retired` · `identity.asserted` · `identity.retracted` (analyst assertions, built
+`list.member.removed` · `list.retired` · `list.attributes-changed` (2026-10-22, `LA-GROW-EXCLUDE-1`) · `identity.asserted` · `identity.retracted` (analyst assertions, built
 2026-09-27: `/inv/entity-identities*`). Planned: **asserted** identity facts by a named mapping Dataset and **resolved** ones derived deterministically from them — never by similarity (`D-M1`) — each
 withdrawn by a later `retract` fact, never edited.
 

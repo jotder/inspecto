@@ -23,6 +23,11 @@ import java.util.TreeSet;
  *       carries every EFFECTIVE key of one call (normalised, sorted), not one fact per key, so a 5 000-key call is
  *       one file, not 5 000;</li>
  *   <li>{@code list.retired} — flagged; its members are kept (a retired list still reads as it was).</li>
+ *   <li>LA-GROW-EXCLUDE-1 (phase 4): an {@code exclusion} list carries three attributes — {@code ownerKind}
+ *       ({@code admin | analyst}, default {@code analyst}), {@code autoApply} (default {@code false}) and
+ *       {@code visibility} ({@code open | restricted}, default {@code open}) — set by {@code list.created} and changed
+ *       by {@code list.attributes-changed {ownerKind?, autoApply?, visibility?}} (a key left out keeps its value). A
+ *       fact written before they existed reads as the defaults.</li>
  *   <li>ASSURE-ENTITY-LISTS-1 (WS-12): {@code list.member.added} may carry {@code expiresAt} (an ISO instant) for
  *       every key it names; a later add without it makes them permanent, a remove forgets the expiry.
  *       {@code list.range.added {ranges[], expiresAt?}} / {@code list.range.removed {ranges[]}} keep the range entries
@@ -54,7 +59,23 @@ public final class EntityRegistry {
     public record EntityList(String id, String title, String purpose, String entityType, String normaliser, String createdAt,
                       String createdBy, boolean retired, long lastSeq, SortedSet<String> members,
                       SortedSet<String> ranges, java.util.SortedMap<String, String> expiresAt,
-                      java.util.SortedMap<String, String> rangeExpiresAt) {
+                      java.util.SortedMap<String, String> rangeExpiresAt, String ownerKind, boolean autoApply,
+                      String visibility) {
+
+        /** An {@code exclusion} list an administrator owns (a category list, LA-GROW-EXCLUDE-1 GE-6). */
+        public boolean adminOwned() {
+            return "exclusion".equals(purpose) && "admin".equals(ownerKind);
+        }
+
+        /** Whether a new Investigation applies this list on its own (GE-9): an admin exclusion list, live, auto-apply on. */
+        public boolean autoApplies() {
+            return adminOwned() && autoApply && !retired;
+        }
+
+        /** Whether its members are hidden from a caller without the category or reveal grant (GE-8). */
+        public boolean restricted() {
+            return "exclusion".equals(purpose) && "restricted".equals(visibility);
+        }
 
         /** Whether member {@code key} still matches at {@code now}: it has no expiry, or one after now. */
         public boolean live(String key, java.time.Instant now) {
@@ -98,8 +119,11 @@ public final class EntityRegistry {
             Map<String, Object> b = f.body();
             String id = f.listId();
             if ("list.created".equals(f.kind())) {
-                lists.putIfAbsent(id, new Acc(id, str(b, "title"), str(b, "purpose"), str(b, "entityType"),
-                        b.get("normaliser") == null ? "default" : str(b, "normaliser"), str(b, "at"), str(b, "actor"), f.seq()));
+                if (lists.containsKey(id)) continue;
+                Acc created = new Acc(id, str(b, "title"), str(b, "purpose"), str(b, "entityType"),
+                        b.get("normaliser") == null ? "default" : str(b, "normaliser"), str(b, "at"), str(b, "actor"), f.seq());
+                created.attributes(b);
+                lists.put(id, created);
                 continue;
             }
             Acc l = lists.get(id);
@@ -110,6 +134,7 @@ public final class EntityRegistry {
                 case "list.range.added" -> expiring(strings(b.get("ranges")), b.get("expiresAt"), l.ranges, l.rangeExpires);
                 case "list.range.removed" -> forget(strings(b.get("ranges")), l.ranges, l.rangeExpires);
                 case "list.retired" -> l.retired = true;
+                case "list.attributes-changed" -> l.attributes(b);
                 default -> { continue; }
             }
             l.lastSeq = f.seq();
@@ -118,7 +143,7 @@ public final class EntityRegistry {
         lists.forEach((id, l) -> out.put(id, new EntityList(l.id, l.title, l.purpose, l.entityType, l.normaliser, l.createdAt,
                 l.createdBy, l.retired, l.lastSeq, Collections.unmodifiableSortedSet(l.members),
                 Collections.unmodifiableSortedSet(l.ranges), Collections.unmodifiableSortedMap(l.expires),
-                Collections.unmodifiableSortedMap(l.rangeExpires))));
+                Collections.unmodifiableSortedMap(l.rangeExpires), l.ownerKind, l.autoApply, l.visibility)));
         return out;
     }
 
@@ -209,6 +234,16 @@ public final class EntityRegistry {
         final java.util.SortedMap<String, String> rangeExpires = new java.util.TreeMap<>();
         boolean retired;
         long lastSeq;
+        String ownerKind = "analyst";
+        boolean autoApply;
+        String visibility = "open";
+
+        /** Apply the attribute keys a fact states; an absent key keeps the value. */
+        void attributes(Map<String, Object> b) {
+            if (b.get("ownerKind") != null) ownerKind = String.valueOf(b.get("ownerKind"));
+            if (b.get("autoApply") instanceof Boolean a) autoApply = a;
+            if (b.get("visibility") != null) visibility = String.valueOf(b.get("visibility"));
+        }
 
         Acc(String id, String title, String purpose, String entityType, String normaliser, String createdAt,
             String createdBy, long seq) {

@@ -40,6 +40,11 @@ public final class ScreeningLists {
         append(root, "list.range.added", id, Map.of("ranges", ranges));
     }
 
+    /** Make {@code id} a restricted category list (LA-GROW-EXCLUDE-1 phase 4). */
+    public static void restrict(Path root, String id) throws Exception {
+        append(root, "list.attributes-changed", id, Map.of("ownerKind", "admin", "visibility", "restricted"));
+    }
+
     public static void retire(Path root, String id) throws Exception {
         append(root, "list.retired", id, Map.of());
     }

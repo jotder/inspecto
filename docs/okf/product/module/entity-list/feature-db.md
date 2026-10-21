@@ -13,7 +13,7 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.entity-list`](../../../../../product-map/module/entity-list.toon).
 
-8 row(s).
+9 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -25,3 +25,4 @@ tags: [feature-db, module]
 | "POST /entity-lists/([^/]+)/members" | route | entity-list | basic;standard;advanced;preview | scoringLists | ga | `"POST /entity-lists/([^/]+)/members"` | `features/inspecto-entity-list/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /entity-lists/([^/]+)/register-dataset" | route | entity-list | basic;standard;advanced;preview | scoringLists | ga | `"POST /entity-lists/([^/]+)/register-dataset"` | `features/inspecto-entity-list/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /entity-lists/([^/]+)/retire" | route | entity-list | basic;standard;advanced;preview | scoringLists | ga | `"POST /entity-lists/([^/]+)/retire"` | `features/inspecto-entity-list/src/main/resources/META-INF/inspecto/module.toon` |
+| "PUT /entity-lists/([^/]+)/attributes" | route | entity-list | basic;standard;advanced;preview | scoringLists | ga | `"PUT /entity-lists/([^/]+)/attributes"` | `features/inspecto-entity-list/src/main/resources/META-INF/inspecto/module.toon` |

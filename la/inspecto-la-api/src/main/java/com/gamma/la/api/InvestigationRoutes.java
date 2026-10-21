@@ -276,13 +276,59 @@ public final class InvestigationRoutes implements RouteModule {
         // D-E3: no version-addressable read exists, so nothing is pinned — reads are sealed at use instead.
         header.put("datasetVersion", null);
         header.put("parent", null);
-        if (!createChecked(store, id, canonical(header)))
+        // LA-GROW-EXCLUDE-1 GE-9: the Space's auto-applied category lists are this Investigation's first steps, sealed now and
+        // written with the header in one move (as a fork is), so it never exists without them.
+        List<Map<String, Object>> auto = autoApplied(ex, writeRoot, Set.of());
+        boolean created;
+        if (auto.isEmpty()) {
+            created = createChecked(store, id, canonical(header));
+        } else {
+            InvestigationEvaluator.State state = new InvestigationEvaluator.State();
+            List<String> lines = new ArrayList<>(), sets = new ArrayList<>();
+            for (Map<String, Object> a : auto) {
+                Map<String, Object> e = roundTrip(a);
+                InvestigationEvaluator.apply(state, e);
+                e.put("workingSetHash", state.hash());
+                lines.add(canonical(e));
+                sets.add(canonical(setDoc(((Number) e.get("step")).intValue(), state)));
+            }
+            created = forkChecked(store, id, canonical(header), lines, sets);
+        }
+        if (!created)
             throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
         if (caseLink != null) InvestigationCaseRoutes.write(ex, store, id, caseLink);
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_CREATED, "link.investigation.created",
                 "link.investigation.created — " + id + " over " + dataset,
                 b -> b.attr("investigationId", id).attr("dataset", dataset));
-        return header;
+        if (auto.isEmpty()) return header;
+        Map<String, Object> out = new LinkedHashMap<>(header);   // the answer names them; the sealed header does not change
+        out.put("autoApplied", auto.stream().map(a -> ((Map<?, ?>) a.get("params")).get("listId")).toList());
+        return out;
+    }
+
+    /**
+     * LA-GROW-EXCLUDE-1 GE-9 — the first steps of a NEW Investigation: one {@code excludeBy} per live admin exclusion list
+     * with {@code autoApply} (fact-log creation order), numbered from 1, each validated by {@link #params} and its list
+     * SEALED by {@link #sealList} exactly as an appended {@code excludeBy}, with the reason
+     * {@value EntityListFacts#AUTO_APPLY_REASON}. Recorded like any step, so replay, undo and the Dossier treat them as such.
+     * A list that cannot be sealed (its Entity Type out of force, too many members) refuses the create — fail closed: an
+     * Investigation never starts silently without a policy list. {@code skip}: lists the caller applies itself.
+     */
+    private static List<Map<String, Object>> autoApplied(HttpExchange ex, Path writeRoot, Set<String> skip) throws IOException {
+        EntityFactLog.Log head = EntityListFacts.read(new EntityFactLog(writeRoot));
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (EntityRegistry.EntityList l : EntityRegistry.fold(head.facts(), head.headSeq()).values()) {
+            if (!l.autoApplies() || skip.contains(l.id())) continue;
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("listId", l.id());
+            body.put("reason", EntityListFacts.AUTO_APPLY_REASON);
+            Map<String, Object> e = entry(out.size() + 1, "op", ex);
+            e.put("op", "excludeBy");
+            e.put("params", params("excludeBy", body, SpaceLimits.of(writeRoot)));
+            e.put("list", sealList(writeRoot, l.id(), "auto-applied category list '" + l.id() + "': "));
+            out.add(e);
+        }
+        return out;
     }
 
     /**
@@ -386,6 +432,7 @@ public final class InvestigationRoutes implements RouteModule {
             entry.put("params", params);
             if (LIST_OPS.contains(op)) {
                 Map<String, Object> list = sealList(inv.writeRoot(), String.valueOf(params.get("listId")), "");
+                if (op.equals("seedBy")) requireSeedable(ex, list);
                 entry.put("list", list);
                 if (op.equals("seedBy")) entry.put("read", seedRead(api, ex, inv, list));
             }
@@ -670,6 +717,19 @@ public final class InvestigationRoutes implements RouteModule {
         InvestigationEvaluator.State state = new InvestigationEvaluator.State();
         List<String> lines = new ArrayList<>(), sets = new ArrayList<>();
         int step = 0;
+        // LA-GROW-EXCLUDE-1 GE-9: a NEW Investigation starts with the Space's auto-applied category lists, as a created one
+        // does - except a list the template's own method already excludes by (saved from an Investigation that had it).
+        Set<String> byTemplate = new HashSet<>();
+        for (Map<String, Object> body : ops)
+            if ("excludeBy".equals(ApiContext.str(body, "op")) && ApiContext.str(body, "listId") != null)
+                byTemplate.add(ApiContext.str(body, "listId"));
+        for (Map<String, Object> a : autoApplied(ex, writeRoot, byTemplate)) {
+            Map<String, Object> e = roundTrip(a);
+            InvestigationEvaluator.apply(state, e);
+            e.put("workingSetHash", state.hash());
+            lines.add(canonical(e));
+            sets.add(canonical(setDoc(++step, state)));
+        }
         for (Map<String, Object> body : ops) {
             String op = ApiContext.str(body, "op");
             if (!SHIPPED.contains(op)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
@@ -681,6 +741,7 @@ public final class InvestigationRoutes implements RouteModule {
             e.put("derivedFrom", body.get("derivedFrom"));
             if (LIST_OPS.contains(op)) {   // LA-17: re-resolved at THIS moment's head — the method travels, not the membership
                 Map<String, Object> list = sealList(writeRoot, String.valueOf(params.get("listId")), "template step " + step + ": ");
+                if (op.equals("seedBy")) requireSeedable(ex, list);
                 e.put("list", list);
                 if (op.equals("seedBy")) e.put("read", seedRead(api, ex, inv, list));
             }
@@ -779,6 +840,7 @@ public final class InvestigationRoutes implements RouteModule {
         Map<String, Object> ws = new LinkedHashMap<>(s.toMap());
         stampExpanded(ws, s);
         ws.put("hash", s.hash());
+        RestrictedLists.of(ex, inv.writeRoot(), log).workingSet(ws);   // GE-8: after the hash, which is over the full state
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("at", hashes.size());
@@ -833,6 +895,7 @@ public final class InvestigationRoutes implements RouteModule {
                 ? InvestigationEvaluator.entityCounts(log) : List.of();
         // ...and so is what each merged exclude actually removed (plan §5.10: the line never claims more).
         Map<Integer, Map<String, List<String>>> merged = InvestigationEvaluator.mergedExcludeOutcomes(log);
+        RestrictedLists.View restricted = RestrictedLists.of(ex, inv.writeRoot(), log);   // GE-8: counts rounded for such a caller
         for (Map<String, Object> e : log.subList(Math.min(skip, log.size()), Math.min(skip + limit, log.size()))) {
             int step = ((Number) e.get("step")).intValue();
             Map<String, Object> out = new LinkedHashMap<>(e);
@@ -854,6 +917,7 @@ public final class InvestigationRoutes implements RouteModule {
             if (e.get("resolution") instanceof Map<?, ?> r) out.put("resolution", resolutionSummary(r));   // ...and groups
             Integer removed = "excludeBy".equals(e.get("op"))
                     ? (step == 1 ? 0 : counts.get(step - 2)) - counts.get(step - 1) : null;
+            if (removed != null && restricted.hides(step)) removed = restricted.count(removed);
             out.put("undoneBy", undoneBy.get(step));
             out.put("text", step + ". " + render(e, removed, merged.get(step)) + (undoneBy.containsKey(step)
                     ? " (undone by step " + undoneBy.get(step) + ")" : ""));
@@ -960,6 +1024,7 @@ public final class InvestigationRoutes implements RouteModule {
         // LA-17 slice 2: while a resolve is in force every step answers the merged nodes, so the canvas can redraw them.
         if (after.resolution != null) out.put("resolution", after.toMap().get("resolution"));
         out.put("workingSet", summary(after));
+        RestrictedLists.of(ex, inv.writeRoot(), next).stepAnswer(out);   // GE-8: a restricted list's members never echo
         return out;
     }
 
@@ -1402,10 +1467,25 @@ public final class InvestigationRoutes implements RouteModule {
         sealed.put("normaliser", l.normaliser());   // D-M9: the list's sealed rule — its members were stored under it
         sealed.put("purpose", l.purpose());
         sealed.put("masked", type.masked());   // the type's masking flag AS SEALED — EntityMasking reads only the log
+        // LA-GROW-EXCLUDE-1 GE-8: a restricted list says so in the seal (RestrictedLists reads it, or today's flag); an open
+        // list seals exactly what it did before.
+        if (l.restricted()) sealed.put("visibility", "restricted");
         // ASSURE-ENTITY-LISTS-1: an expired entry no longer matches, so it is not sealed. Range entries are not
         // sealed by excludeBy / seedBy yet (they match exact keys only).
         sealed.put("members", new ArrayList<>(l.liveMembers(java.time.Instant.now())));
         return sealed;
+    }
+
+    /**
+     * LA-GROW-EXCLUDE-1 GE-8: a {@code seedBy} admits every member the Dataset holds as a Working Set entity, so seeding
+     * from a restricted list is refused (403) to a caller who may not see its members. An {@code excludeBy} is not: it
+     * applies the list, and its answers hide the members ({@link RestrictedLists}).
+     */
+    private static void requireSeedable(HttpExchange ex, Map<String, Object> sealed) {
+        if ("restricted".equals(sealed.get("visibility")) && !EntityListFacts.seesRestricted(ex))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "entity list '" + sealed.get("listId") + "' is restricted: "
+                    + "only a holder of " + EntityListFacts.MANAGE_CATEGORIES + " or " + EntityListFacts.REVEAL
+                    + " may seed from it");
     }
 
     /**

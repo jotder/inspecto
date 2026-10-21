@@ -398,6 +398,7 @@ public final class DraftRoutes implements RouteModule {
         Map<String, Object> ws = new LinkedHashMap<>(s.toMap());
         InvestigationRoutes.stampExpanded(ws, s);
         ws.put("hash", s.hash());
+        RestrictedLists.of(ex, v.writeRoot(), log).workingSet(ws);   // LA-GROW-EXCLUDE-1 GE-8, as the main replay
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("investigationId", invId);
         out.put("draftId", draftId);

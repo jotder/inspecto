@@ -26,9 +26,17 @@ timestamp: 2026-10-19T00:00:00Z
 |---|---|
 | List, read, `match` | Space access only |
 | Create, members, retire | `canManageIncidents` |
+| Create, members, retire of a category list (`ownerKind: admin`) | `canManageIncidents` and `canManageExclusionCategories` |
+| Change `ownerKind` / `autoApply` / `visibility` (`PUT .../attributes`) | `canManageExclusionCategories` |
+| See a `restricted` list's members, `match` it, register it as a Dataset | `canManageExclusionCategories` or `canRevealLinkEntities` |
 | Register the sidecar as a Dataset | `canAuthorWorkbench` |
 
 Route table: [api-routes](api-routes.md).
+
+Category lists are created and switched in **Settings > Link Analysis > Category exclusion lists** (members are
+added on the Entity Lists page). An auto-applied list that cannot be sealed (its Entity Type is no longer in force,
+or it holds more members than `input.list_members`) refuses every new Investigation in the Space with a 409/422
+naming the list, until it is fixed or switched off. Detail: [spec](spec.md), "Category lists".
 
 ## Four-eyes
 

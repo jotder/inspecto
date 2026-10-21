@@ -258,6 +258,45 @@ class ControlApiScreeningTest {
         });
     }
 
+    /** LA-GROW-EXCLUDE-1 GE-8: a check answers the matched entry, so a restricted list is refused to a caller who may not see it. */
+    @Test
+    void checkRefusesARestrictedListToACallerWithoutTheGrant(@TempDir Path spaces) throws Exception {
+        Path cfg = space(spaces, "acme");
+        ScreeningLists.create(cfg, "pols", "exclusion", "subscriber", "default");
+        ScreeningLists.add(cfg, "pols", "default", List.of("Vladimir Putin"));
+        ScreeningLists.restrict(cfg, "pols");
+        withSpaces(spaces, port -> {
+            String body = "{\"lists\":[\"pols\"],\"subjects\":[{\"key\":\"a\",\"name\":\"Putin, Vladimir\"}]}";
+            HttpResponse<String> refused = send(port, "POST", "/spaces/acme/screening/check", body, DEV);
+            assertEquals(403, refused.statusCode(), refused.body());
+            assertFalse(refused.body().contains("vladimir"), refused.body());
+            JsonNode ok = data(send(port, "POST", "/spaces/acme/screening/check", body, ADM), 200);
+            assertEquals("vladimir putin", ok.at("/results/0/matches/0/entry").asText(), "admin holds the grants");
+        });
+    }
+
+    /** LA-GROW-EXCLUDE-1 GE-8: a Job's hit stores the matched member, so the hit reads hide it for a restricted list. */
+    @Test
+    void aHitOnARestrictedListHidesTheMatchedEntry(@TempDir Path spaces) throws Exception {
+        Path cfg = space(spaces, "acme");
+        ScreeningLists.create(cfg, "pols", "exclusion", "subscriber", "default");
+        ScreeningLists.add(cfg, "pols", "default", List.of("Vladimir Putin"));
+        ScreeningLists.restrict(cfg, "pols");
+        String id = ScreeningLists.seedHit(cfg, "c1", "masked:0123456789abcdef", "pols", "vladimir putin", 0.98);
+        String open = ScreeningLists.seedHit(cfg, "c2", "masked:0123456789abcdee", "sanctions", "osama bin laden", 0.97);
+        withSpaces(spaces, port -> {
+            JsonNode hidden = data(send(port, "GET", "/spaces/acme/screening/hits/" + id, null, OPS), 200);
+            assertTrue(hidden.get("entry").isNull() && hidden.get("entryHidden").asBoolean(), hidden.toString());
+            assertTrue(hidden.get("dedupeKey").isNull(), "a hash over the entry is enumerable: " + hidden);
+            JsonNode all = data(send(port, "GET", "/spaces/acme/screening/hits", null, OPS), 200);
+            assertFalse(all.toString().contains("vladimir"), all.toString());
+            assertTrue(all.toString().contains("osama bin laden"), "an open list's hit is unchanged: " + all);
+            assertEquals("vladimir putin", data(send(port, "GET", "/spaces/acme/screening/hits/" + id, null, ADM), 200)
+                    .get("entry").asText(), "admin holds the grants");
+            assertTrue(open.startsWith("sh-"));
+        });
+    }
+
     /** SCREENING-1-D3: reveal is gated on canRevealLinkEntities and audited; a hit whose Job is gone says why. */
     @Test
     void revealIsGatedOnCanRevealLinkEntities(@TempDir Path spaces) throws Exception {

@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LensService } from 'app/inspecto/api';
+import { ExclusionCategoriesService } from 'app/inspecto/api/exclusion-categories.service';
 import {
     LinkAnalysisLimits,
     LinkAnalysisSettingsService,
@@ -55,7 +56,11 @@ function setup(opts: { served?: Partial<LinkAnalysisLimits>; save?: () => unknow
             provideNoopAnimations(),
             { provide: LinkAnalysisSettingsService, useValue: api },
             { provide: ToastrService, useValue: toastr },
-            { provide: LensService, useValue: { canAuthorWorkbench: () => opts.canEdit !== false } },
+            {
+                provide: LensService,
+                useValue: { canAuthorWorkbench: () => opts.canEdit !== false, canManageExclusionCategories: () => false },
+            },
+            { provide: ExclusionCategoriesService, useValue: { list: () => of({ lists: [] }) } },
         ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisSettingsComponent);

@@ -82,6 +82,9 @@ public final class CapabilityManifest {
             new Entry("POST", "/entity-lists", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/entity-lists/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/entity-lists/([^/]+)/retire", Roles.CAN_MANAGE_INCIDENTS),
+            // LA-GROW-EXCLUDE-1 phase 4 (GE-6, GE-11): ownership, auto-apply and visibility make a list Space policy, so changing
+            // them is its own verb. The three writes above also demand it, in the handler, when the list is an admin one.
+            new Entry("PUT", "/entity-lists/([^/]+)/attributes", Roles.CAN_MANAGE_EXCLUSION_CATEGORIES),
             // ASSURE-ENTITY-LISTS-RESIDUALS-1 (3): registers a DATASET (Dataset config), so the Dataset-authoring capability.
             new Entry("POST", "/entity-lists/([^/]+)/register-dataset", Roles.CAN_AUTHOR_WORKBENCH),
             // EntityIdentityRoutes (LA-17 slice 2) — identity assertions share the same fact log, same capability.

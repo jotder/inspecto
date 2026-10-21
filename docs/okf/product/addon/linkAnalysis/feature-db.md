@@ -13,7 +13,7 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.linkAnalysis`](../../../../../product-map/addon/linkAnalysis.toon).
 
-102 row(s).
+103 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -37,6 +37,7 @@ tags: [feature-db, addon]
 | "GET /inv/entity-identities/group" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/entity-identities/group"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/entity-types" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/entity-types"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/entity-types/([^/]+)/profile" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/entity-types/([^/]+)/profile"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "GET /inv/exclusion-lists" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/exclusion-lists"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/graph/algorithms" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/graph/algorithms"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/graph/runs" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/graph/runs"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/graph/runs/([^/]+)" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/graph/runs/([^/]+)"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

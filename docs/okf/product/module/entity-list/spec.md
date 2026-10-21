@@ -185,3 +185,48 @@ The row is closed: (2)-(4) shipped and (1) was retired to BACKLOG §6 *Link Anal
 ## Scale facts (SP4, 2026-10-06)
 
 Measured in `inspecto-entity-store` (`ListPruningSp4Bench`, `FactLogReplaySp4Bench`, gated `-Dbench.run=true`; findings in `docs/superpower/link-analysis-roadmap.md` "SP4 findings"). As an exclusion/barrier anti-join over a 10^7-edge Parquet relation, a distinct-live-key table derived from the sidecar adds within noise of 25% up to ~10^6 members; filtering the raw sidecar per hop degrades past ~5x10^6 rows, and a literal `NOT IN (...)` list is unusable (seconds at 2,000 literals, a JVM crash at 10^4). `EntityFactLog.read()` verifies the whole chain on every call: ~1 s at 10^4 facts, ~10 s at 10^5, minutes at 10^6; a head-hash cache (0.2 ms) is the cheapest fix and is recommended but not built (a deep tamper is then caught only by the next full verify).
+
+## Category lists: ownership, auto-apply, restricted members (LA-GROW-EXCLUDE-1 phase 4, 2026-10-22)
+
+Decisions GE-6, GE-8, GE-9 and GE-11 of [`la-grow-exclude-plan.md`](../../../../superpower/la-grow-exclude-plan.md), as built.
+
+- **Three attributes on an `exclusion` list**, in the fact log: `ownerKind` (`admin` | `analyst`, default `analyst`),
+  `autoApply` (default `false`) and `visibility` (`open` | `restricted`, default `open`). `list.created` of an exclusion
+  list records all three (defaults filled in); the new kind `list.attributes-changed {ownerKind?, autoApply?, visibility?}`
+  records only the keys that change. The fold (`EntityRegistry`) reads a fact written before them as the defaults, so
+  `?at=` time travel shows the attributes as they were. Any other purpose stating one is a 422, and its summary carries
+  none of the three. `EntityList.adminOwned()`, `autoApplies()` (admin, `autoApply`, not retired) and `restricted()` are
+  the one reading of them.
+- **Admin-only attributes.** `autoApply: true` and `visibility: restricted` belong to an `ownerKind: admin` list: an
+  analyst list stating either is a 422 (at create and on change), so an analyst never hides members from themselves.
+- **`PUT /entity-lists/{id}/attributes`** `{ownerKind?, autoApply?, visibility?, reason}` — gated on
+  `canManageExclusionCategories` (route capability; `CapabilityManifest`). Gates: 503 no write root → 422 no reason, no
+  attribute, a bad value → 404 → 409 retired → 422 not an exclusion list or an admin-only attribute on an analyst list →
+  the approval policy for kind `entity-list` (held as a Pending Change; `PendingChanges.REPLAYABLE` lists the route) →
+  one fact. Nothing to change answers `changed: 0` and writes nothing. ⚠ Because every attribute change needs the
+  capability, an analyst's no-op (`{ownerKind: analyst}` on an analyst list) is a 403, not a 200.
+- **`canManageExclusionCategories`** (`Roles.CAN_MANAGE_EXCLUSION_CATEGORIES`, seeded to `admin`; `super` holds all).
+  Creating an `ownerKind: admin` list, changing its members and retiring it demand it **in the handler**, on top of the
+  route's `canManageIncidents` (an admin needs both; the `admin` seed has both); analyst lists keep `canManageIncidents`
+  alone. No Subject (Basic) checks nothing, as every gate.
+- **Restricted members (GE-8).** For a caller holding neither `canManageExclusionCategories` nor `canRevealLinkEntities`
+  (`EntityListFacts.seesRestricted`), every route that renders the list (`GET /entity-lists/{id}`, and the answers of
+  members / retire / attributes) answers `members: null, membersHidden: true`, `ranges: null`, `expiring: null`; title,
+  size and range count stay. `POST /entity-lists/{id}/match` and `/register-dataset` are a **403** for that caller: a match
+  answers membership value by value, and the Dataset would serve every member. `GET /entity-lists` never carried members.
+  A historic read (`?at=`) hides the members when the list is restricted at that seq OR now, so a list restricted later
+  never shows them through an older position. `POST /screening/check` refuses a restricted list the same way (403;
+  `EntityListFacts.requireSeesMembers` is the one check). A Screening Job's hit stores the matched member as `entry`, so
+  `GET /screening/hits`, `/screening/hits/{id}` and the decide answer return `entry: null, dedupeKey: null,
+  entryHidden: true` for a hit on a restricted list to that caller; reveal already needs `canRevealLinkEntities`.
+  ⚠ A confirmed hit's Case is opened as before (not reviewed here). ⚠ A Dataset registered over a list's sidecar BEFORE it became restricted
+  keeps serving its members (an authoring decision; the confirm already says masking does not apply to it).
+- **In Link Analysis** the sealed list carries `visibility: restricted`, a new Investigation applies every auto-apply list as
+  its first steps, and Investigation answers hide the members and round the removed counts (nearest 5, never below 5, 0
+  stays 0, `EntityListFacts.roundedCount`): la-core [architecture §6.8](../la-core/architecture.md).
+- **Not done (deliberate):** the Parquet sidecar of a restricted list is written like any other (it is under the data root,
+  not a served route); the Pending Change shown to an approver lists the proposed keys as for any list.
+- Tests: `ControlApiEntityListCategoryTest` (5: attributes recorded and refused, the attributes route and time travel, 503,
+  the armed 401/403/200 and the analyst-on-admin-list 403s, restricted hiding with the reveal and manager controls and the
+  historic read); `ControlApiScreeningTest.checkRefusesARestrictedListToACallerWithoutTheGrant` and
+  `aHitOnARestrictedListHidesTheMatchedEntry`.
