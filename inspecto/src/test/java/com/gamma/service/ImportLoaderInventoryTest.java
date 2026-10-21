@@ -101,6 +101,13 @@ class ImportLoaderInventoryTest {
                 + "and no import lands outside <config>");
         ALLOWED.put("nodes", "the LA index's node-table directory (IndexBuilder, D-3) inside a staged index version under "
                 + "<write root>/la-index/... - a derived artefact, outside the config tree and never read as config");
+        ALLOWED.put("in", "the LA index's in-edge table directory (IndexBuilder, D-3), the sibling of `out` below, inside a "
+                + "staged index version under <write root>/la-index/... - a derived artefact, outside the config tree and "
+                + "never read as config (LA-INDEX-SCALE-MEASURE-1: the nodes fold now names it beside `out`)");
+        ALLOWED.put("data_0.parquet", "the per-bucket node file the index builder writes under nodes/bucket=B/ (IndexBuilder, "
+                + "LA-INDEX-SCALE-MEASURE-1) inside a staged index version under <write root>/la-index/... - written by the "
+                + "builder and read back only by its own verify, outside the config tree, under a path built from a validated "
+                + "dataset id and mapping hash; no import lands outside <config>");
         ALLOWED.put("out", "the LA index's out-edge table directory (IndexBuilder, D-3; read again since 2026-10-15 for the "
                 + "link statistics kindEdges / degree) inside a staged index version under <write root>/la-index/... - a derived "
                 + "artefact, outside the config tree and never read as config");
