@@ -1,15 +1,17 @@
 # Inspecto — Enterprise Product & Solutions Whitepaper
 > **Sovereign Data Operations: the end-to-end platform for environments where data cannot leave**
 > *Audience: CIOs, CTOs, Enterprise Data Architects, Heads of Revenue Assurance and Fraud, Compliance Officers*
-> *Publication: September 2026 · Document version **1.2***
+> *Publication: October 2026 · Document version **1.4** of 2026-10-21*
 
-> **Release basis.** This edition describes Inspecto **at the close of Sprint 8** — the Professional bundle as
-> shipped on 2026-09-10 plus the seven Sprint 8 rows (`EVENTS-DURABLE-1`, `AIRGAP-EXTENSIONS-1`,
-> `DEPLOY-SERVICE-WRAPPER-1`, `BREAK-INCIDENT-1`, `BREAK-AGING-1`, `INCIDENT-KPI-MTTR-1`,
-> `SIGNAL-STALE-TILES-1`), the scale-out plan's phases A and B (the Professional DR tier), and the `PKG-5`
-> decision that bundles the embedded assistant. Two items are described as **signed design**, not shipped
-> code, and are marked where they appear: the Enterprise Kubernetes tier (T5) and the Postgres query
-> surface. Before any external use, confirm against `BACKLOG.md` §0 that this basis holds. Every count in
+> **Release basis.** This edition describes Inspecto **as of 2026-10-21** — the Sprint 8 rows
+> (`EVENTS-DURABLE-1`, `AIRGAP-EXTENSIONS-1`, `DEPLOY-SERVICE-WRAPPER-1`, `BREAK-INCIDENT-1`, `BREAK-AGING-1`,
+> `INCIDENT-KPI-MTTR-1`, `SIGNAL-STALE-TILES-1`), the scale-out plan's phases A and B (the Standard DR tier),
+> the `PKG-5` decision that bundles the embedded assistant, and the edition rename of 2026-10-17
+> (`LA-EDITIONS-1`): the editions are **Basic, Standard and Advanced**, which replaced Personal, Professional
+> and Enterprise; a fourth build, **Preview**, carries every module with a demo sign-in and is never sold
+> (`docs/EDITIONS.md`). Two items are described as **signed design**, not shipped code, and are marked where
+> they appear: the Advanced Kubernetes tier (T5) and the Postgres query surface. Before any external use,
+> confirm against `BACKLOG.md` §0 that this basis holds. Every count in
 > this document is derived from the committed contracts by `tools/check-doc-counts.mjs`; every measured
 > figure cites its benchmark; the claims register it is written to is `brochure-competitive-landscape.md` §4.
 
@@ -17,8 +19,8 @@
 
 # 1 · Executive summary — one artifact, the whole operation
 
-**Inspecto** is a lean, superfast, configuration-driven platform for **Data Acquisition, Processing, Reconciliation, Business Intelligence, Investigation and Operational management**, delivered as  a single self-contained artifact. It can run on a laptop, an air-gapped bare-metal server, or a container cluster — with **zero external runtime services** in its Personal and Professional forms, and scale out with exactly two declared
-dependencies (PostgreSQL and S3-compatible object storage) at Enterprise scale.
+**Inspecto** is a lean, superfast, configuration-driven platform for **Data Acquisition, Processing, Reconciliation, Business Intelligence, Investigation and Operational management**, delivered as  a single self-contained artifact. It can run on a laptop, an air-gapped bare-metal server, or a container cluster — with **zero external runtime services** in its Basic and Standard forms (Standard's fault-tolerant DR tier adds PostgreSQL), while Advanced keeps its operational state in PostgreSQL and scales out with exactly two declared
+dependencies (PostgreSQL and S3-compatible object storage).
 
 It embraces the principles of Data Mesh, allowing data to be treated as a product and enabling data mesh architectures with decentralized data ownership and data governance. It provides the necessary tools and capabilities to implement data mesh architectures, including data discovery, data quality, data governance, and data access control.
 
@@ -51,8 +53,8 @@ It embeds vectorised processing engine over an open Parquet lakehouse, and colla
 3. **The cluster tax.** Distributed frameworks were designed for servers with 4–8 cores. A modern node has
    64–128 cores and NVMe. For most enterprise feeds, coordination costs more than it delivers. Inspecto's
    vectorised single-node engine ingests **over half a million rows per second on a 12-column feed**,
-   measured; and when one node is genuinely not enough, Enterprise partitions the same artifact across
-   Kubernetes.
+   measured; and when one node is genuinely not enough, Advanced partitions the same artifact across
+   Kubernetes (signed design).
 
 ### Four enterprise pillars
 
@@ -64,8 +66,8 @@ It embeds vectorised processing engine over an open Parquet lakehouse, and colla
    lineage, run-level conservation invariants ($N_{\text{in}} = N_{\text{out}} + N_{\text{quarantined}} + N_{\text{filtered}}$),
    and deterministic causation chaining (`causationId`) from raw consignment to visual KPI tile.
 3. **Radical maintainability.** A single ~90 MB self-contained binary, declarative `.toon` configuration
-   with GitOps promotion and schema-drift tolerance, crash-isolated execution, self-healing breaks, and 19
-   clean SPI extension points that eliminate custom fork debt.
+   with GitOps promotion and schema-drift tolerance, crash-isolated execution, self-healing breaks, and **44**<!--count:spi-extension-points-->
+   clean extension points that eliminate custom fork debt.
 4. **Rapid, air-gapped deployment.** Production-ready in 5 minutes via bundled `systemd` and Windows
    Service wrappers (`DEPLOY-SERVICE-WRAPPER-1`), turnkey vertical Space Templates, and 100 % sovereign
    air-gapped portability with zero outbound network calls, verified by CI.
@@ -87,7 +89,7 @@ It embeds vectorised processing engine over an open Parquet lakehouse, and colla
               ▼                         ▼                     ▼
   ┌────────────────────────────────────────────────────────────────────────┐
   │              CONTROL PLANE — versioned REST /api/v1 (OpenAPI)          │
-  │  OIDC/PKCE SSO · RBAC · ABAC (Enterprise) · optimistic concurrency     │
+  │  OIDC/PKCE SSO · RBAC · ABAC (Advanced) · optimistic concurrency       │
   │  (If-Match) · four-stage write gate · single-dispatch audit trail      │
   └───────────┬───────────────────────────────────────────────┬────────────┘
               ▼                                               ▼
@@ -142,11 +144,10 @@ substrate:
 6. **Dashboard Studio & visual analytics.** An integrated self-service BI Studio with parameterized queries,
    live KPI cards, and dashboard tiles bound directly to Datasets. Eliminates external BI platforms (Tableau,
    Superset) and guarantees that dashboard queries execute against warm columnar Parquet without pre-computed cubes.
-7. **Forensic Link Analysis & offline Geo.** Server-side entity and link projection powered by DuckDB graph
-   algorithms (PageRank, Louvain community detection, fraud pattern packs), paired with a 100 % offline MapLibre
-   vector Geo studio — replacing separate graph databases (Neo4j) and GIS servers.
+7. **Forensic Link Analysis & offline Geo.** **Inspecto LA** (the product name for Link Analysis) with an
+   offline Geo map — replacing separate graph databases (Neo4j) and GIS servers (Section 5).
 8. **Security, identity & audit governance.** Delegated OIDC/PKCE authentication against enterprise IAM
-   (Keycloak, Okta, Entra, WSO2), with fine-grained RBAC and Enterprise ABAC tenant isolation. Single-dispatch,
+   (Keycloak, Okta, Entra, WSO2), with fine-grained RBAC and Advanced ABAC tenant isolation. Single-dispatch,
    append-only, actor-attributed audit logging, path jail containment, and cryptographic SBOMs provide compliance
    with SOC 2, ISO 27001, and NIST 800-53 — replacing third-party governance and PAM tools.
 9. **Spaces: multi-tenancy without cluster tax.** Complete logical and physical isolation: configurations,
@@ -201,7 +202,8 @@ because nothing has to be integrated across vendor boundaries:
 Inspecto specialises in the formats generic ETL engines struggle with:
 
 * **Telecom-grade ASN.1 decoding.** A 154-file decoder subsystem with vendor corpora processes raw Call
-  Detail Records from switch manufacturers out of the box — a capability generic data platforms do not have.
+  Detail Records from switch manufacturers out of the box (Standard and above) — a capability generic data
+  platforms do not have.
 * **Binary and text fixed-width**, both record modes (line-oriented and byte-layout).
 * **Delimited, xlsx, JSON and regex-text** frontends, all first-class node types —
   **7**<!--count:parser-node-types--> `parser.*` node types over **6**<!--count:builtin-parsers-->
@@ -244,7 +246,8 @@ Inspecto specialises in the formats generic ETL engines struggle with:
 
 ### 4.1 Dataset-vs-Dataset reconciliation
 In banking, insurance and telecommunications, the gap between an upstream generation feed and the
-downstream billing or ledger system is revenue. Inspecto reconciles Datasets declaratively: key columns,
+downstream billing or ledger system is revenue. Inspecto reconciles Datasets declaratively (Standard and
+above, like Breaks and Incidents): key columns,
 compare columns, and a tolerance per column that is **exact, absolute or percentage**. It runs as
 vectorised SQL, so a full-volume join across millions of records is seconds, not a batch window.
 
@@ -268,38 +271,13 @@ Unlike BI tools that chart a variance, Inspecto manages each discrepancy as a st
 
 ---
 
-# 5 · Forensic investigation — Link Analysis and offline Geo
+# 5 · Forensic investigation — Inspecto LA (Link Analysis) and offline Geo
 
-```
-  ┌────────────────────────────────────┐   ┌────────────────────────────────────┐
-  │        LINK ANALYSIS STUDIO        │   │          GEO MAP STUDIO            │
-  │ server-side entity/link projection │   │ offline MapLibre basemap + vectors │
-  │ PageRank · betweenness · closeness │   │ heatmaps · origin-destination     │
-  │ eigenvector · degree               │   │ routes · time slider + playback   │
-  │ Louvain · label propagation ·      │   │ measure · radius · polygon · notes│
-  │ connected components               │   │ layer manager · GeoJSON overlays  │
-  │ six pattern packs · suspicion score│   │ saved Geo Views                   │
-  └────────────────────────────────────┘   └────────────────────────────────────┘
-```
-
-### 5.1 Link Analysis
-Uncover fraud rings, laundering networks and coordinated behaviour without a separate graph database:
-* **Server-side projection.** Relational Datasets are projected into entity/link graphs by DuckDB
-  aggregation on the server; the browser receives a graph, not a table.
-* **Centrality** — PageRank, betweenness, closeness, eigenvector and degree — to find the actors that
-  matter.
-* **Community detection** — Louvain, label propagation and connected components.
-* **Six pattern packs** for common topologies: *Circular flow*, *Layering chain*, *Pass-through
-  intermediary*, *Inbound collector*, *Call-forwarding relay*, *Shared associates*.
-* **Suspicion scoring** that composes connectivity and pattern hits into a ranked list of nodes to look
-  at first, plus saved Views so an investigation resumes where it stopped.
-
-### 5.2 Geo Map Analysis
-* **100 % offline.** A bundled MapLibre basemap with vector land, boundaries and places — no tile server,
-  no internet.
-* **Origin-destination routes**, **heatmaps**, a **time slider with playback**, and an intelligence
-  toolbox — measure, radius, polygon and notes — over a layer manager with GeoJSON overlays.
-* **Saved Geo Views** for repeatable analysis.
+**Inspecto LA (Link Analysis)** is Inspecto's forensic link-analysis product: it projects Datasets into
+entity-and-link graphs and runs sealed, replayable Investigations over them without a separate graph database,
+paired with an offline Geo map. Its explorer ships in every edition; Investigations, the server Graph Run, the
+link index and the Geo map are Standard and above. Capabilities, architecture, measured scale, limits and the
+claims register are in the [Inspecto LA whitepaper](../../module/la-core/brochure-inspecto-la-whitepaper.md).
 
 ---
 
@@ -308,11 +286,11 @@ Uncover fraud rings, laundering networks and coordinated behaviour without a sep
 ```
                           THE GOVERNED AUTONOMY LADDER
   ┌─────────────────────────────────────────────────────────────────────────┐
-  │ L3  BOUNDED AUTONOMY (Enterprise, opt-in)                               │
+  │ L3  BOUNDED AUTONOMY (Advanced, opt-in)                                 │
   │     bounded remediation classes · hourly budgets · kill switch ·        │
   │     mandatory SHADOW mode first                                         │
   ├─────────────────────────────────────────────────────────────────────────┤
-  │ L2  ACT WITH APPROVAL (Professional+)                                   │
+  │ L2  ACT WITH APPROVAL (Advanced today)                                  │
   │     the agent drafts; the Approvals Inbox shows the preview;            │
   │     nothing executes until an operator approves; the approval is        │
   │     actor-attributed and audited like any human action                  │
@@ -333,14 +311,18 @@ perimeter, and the build pipeline runs `EgressGuardTest`, which fails the releas
 ever enters the air-gapped artifact.
 
 ### 6.2 Sell the ladder, not the ceiling
-* **Tier A — Explain & Investigate (L0–L1, all editions).** Diagnose a failed run from its error ledgers
+The assistant ships from Standard (`/assist/*`; Basic has none); the intelligence agent that holds the
+investigation tier, the Approvals Inbox and the autonomy policy (`/agent/*`) is staged in the Advanced
+bundle only (`docs/EDITIONS.md`, row `CP-14`).
+
+* **Tier A — Explain & Investigate (L0–L1, Standard and above).** Diagnose a failed run from its error ledgers
   and schema, explain a grammar, translate a question into a validated query. Highest value, lowest risk,
   and it works in the deployments regulated buyers actually have.
-* **Tier B — Author & Act with Approval (L2, Professional+).** The agent drafts a fix — a delimiter, a field
+* **Tier B — Author & Act with Approval (L2, Advanced today).** The agent drafts a fix — a delimiter, a field
   width, a backfill. It lands in the **Approvals Inbox** with a preview. When approved, it executes through
   **the same authenticated `/api/v1` routes a human uses**, producing an identical actor-attributed audit
   entry.
-* **Tier C — Bounded Autonomy (L3, Enterprise).** Never lead with `AUTO`. Enable `SHADOW` for one action
+* **Tier C — Bounded Autonomy (L3, Advanced).** Never lead with `AUTO`. Enable `SHADOW` for one action
   class, review what it *would* have done in the `/autonomy` ledger, then promote that class with a
   conservative hourly budget and a single-click kill switch.
 
@@ -418,11 +400,11 @@ Three conditions make the projection hold, and a sizing engagement checks all th
 * **Headroom for the console.** Dashboard queries, reconciliations and the assistant share the same
   cores; the "sized to peak" column already leaves that room, the "100 %" column does not.
 
-Above 32 cores the honest answer is a **measurement on your feeds**, or Enterprise partitioning across
-nodes, which scales the same arithmetic without the single-box ceiling.
+Above 32 cores the honest answer is a **measurement on your feeds**, or Advanced partitioning across
+nodes (signed design), which scales the same arithmetic without the single-box ceiling.
 
 > **The rule.** One 8-core node runs the daily CDR volume of a mid-sized operator or the clearing ledger
-> of a retail bank — no cluster. A trillion rows a day is real, and it is an **Enterprise** conversation:
+> of a retail bank — no cluster. A trillion rows a day is real, and it is an **Advanced** conversation:
 > on the order of 15–20 partitioned 32-core nodes of the same artifact, writing 100–270 TB of Parquet daily.
 
 ### Architectural drivers of sub-microsecond performance
@@ -459,27 +441,27 @@ Inspecto delivers high processing density not by managing distributed cluster ov
 * **Restart as recovery.** Processing is stateless with respect to the JVM. The bundled **service
   wrapper** (systemd unit; Windows service) restarts a dead process, which re-arms and resumes.
 * **A durable audit trail.** Every audited mutation and every Signal is written to rolling Parquet — and
-  in DR and Enterprise modes to PostgreSQL — so a restart loses nothing an auditor will ask for.
+  in DR and Advanced modes to PostgreSQL — so a restart loses nothing an auditor will ask for.
 
 ### 8.2 The recovery ladder
-*Targets signed 2026-09-06 as contract service levels (`editions.md` §3.14).*
+*Targets signed 2026-09-06 as contract service levels (`docs/okf/product/layer/platform/plan-editions.md` §3.14).*
 
 | Tier | Profile | Edition | RPO | RTO | Mechanism |
 |---|---|---|---|---|---|
-| **T1** | workstation | Personal | ≤ 24 h | ≤ 4 h | daily config backup + local restore |
-| **T2** | single server | Professional | ≤ 1 h | ≤ 1 h | hourly config + daily full (post-checkpoint) + volume snapshot |
-| **T3** | gateway-fronted, multi-team | Enterprise | ≤ 15 min | ≤ 2 h | T2 + Postgres PITR/WAL + off-site copy |
-| **T4** | **active/passive warm standby** | **Professional** | **≤ 5–15 min** | **≤ 30 min** | streaming replica + spaces-tree sync + automatic lease failover |
-| **T5** | partitioned Kubernetes cluster | Enterprise | as T3/T4 | as T3/T4 | shared lakehouse; a lost pod loses nothing committed *(signed design)* |
+| **T1** | workstation | Basic | ≤ 24 h | ≤ 4 h | daily config backup + local restore |
+| **T2** | single server | Standard | ≤ 1 h | ≤ 1 h | hourly config + daily full (post-checkpoint) + volume snapshot |
+| **T3** | gateway-fronted, multi-team | Advanced | ≤ 15 min | ≤ 2 h | T2 + Postgres PITR/WAL + off-site copy |
+| **T4** | **active/passive warm standby** | **Standard** | **≤ 5–15 min** | **≤ 30 min** | streaming replica + spaces-tree sync + automatic lease failover |
+| **T5** | partitioned Kubernetes cluster | Advanced | as T3/T4 | as T3/T4 | shared lakehouse; a lost pod loses nothing committed *(signed design)* |
 
-### 8.3 T4 — fault-tolerant DR in Professional
+### 8.3 T4 — fault-tolerant DR in Standard
 * **Two sites, one artifact.** PostgreSQL streaming replication carries operational state; a scheduled
   `spaces/` tree sync carries the lakehouse.
 * **Automatic failover.** A run lease with a heartbeat means the standby takes over the moment the active
   node stops renewing — inside the 30-minute RTO, with no runbook step in the critical path.
 * **Backup, verify, restore — as jobs.** Scheduled backup and restore-verification run as ordinary jobs
   with their own Signals, so a backup that would not restore is an Incident before it is a disaster.
-* **Honest dependency.** DR needs PostgreSQL. Professional without DR needs nothing.
+* **Honest dependency.** DR needs PostgreSQL. Standard without DR needs nothing.
 
 ```
   SITE A (active)                                  SITE B (warm standby)
@@ -500,9 +482,9 @@ Inspecto delivers high processing density not by managing distributed cluster ov
   │  Delegated IAM          │  Zero-egress core       │  Audit trail        │
   │  · OIDC + PKCE          │  · offline maps + AI    │  · single dispatch  │
   │  · Keycloak/Okta/Entra  │  · bundled extensions   │  · append-only,     │
-  │  · RBAC · ABAC (Ent.)   │  · EgressGuardTest      │    durable, attributed│
+  │  · RBAC · ABAC (Adv.)   │  · EgressGuardTest      │    durable, attributed│
   │  Secret hygiene         │  Supply chain           │  Write safety       │
-  │  · SecretsProvider seam │  · 95 locked deps       │  · four-stage gate  │
+  │  · SecretsProvider seam │  · 89 locked deps       │  · four-stage gate  │
   │  · no plaintext, ever   │  · CycloneDX + SPDX SBOM│  · path jail        │
   │  · env/file/keystore/   │  · SHA-256 + GPG signed │  · If-Match         │
   │    vault (by edition)   │    releases             │    concurrency      │
@@ -585,31 +567,40 @@ A structural comparison. Put your own figures against each line — the shape is
 
 ### 10.2 Editions — one codebase, three build flavours
 
+Editions were renamed on 2026-10-17 (`LA-EDITIONS-1`): **Basic, Standard and Advanced** replaced Personal,
+Professional and Enterprise across the whole product. The placement below follows `docs/EDITIONS.md`.
+
 ```
   ┌────────────────────────┐
-  │       ENTERPRISE       │  the cluster: partitioned scale-out on Kubernetes (T5, signed design)
-  │                        │  ABAC tenant isolation · gateway assertion trust · L3 autonomy
+  │        ADVANCED        │  govern it and scale it:
+  │                        │  ABAC policy engine (can only narrow access) · per-tenant Space isolation ·
+  │                        │  PostgreSQL operational state · Investigations on PostgreSQL ·
+  │                        │  intelligence agent (approvals, L3 autonomy) · gateway assertion trust
+  │                        │  + partitioned scale-out on Kubernetes (T5, signed design)
   │                        │  + Postgres SQL/BI query surface over the lakehouse (signed design)
   └───────────▲────────────┘
               │
   ┌───────────┴────────────┐
-  │      PROFESSIONAL      │  operate it, prove it, survive a node:
+  │        STANDARD        │  operate it with a team, prove it, survive a node:
   │                        │  OIDC SSO · HTTPS · RBAC · durable attributed audit ·
-  │                        │  Alerts → Incidents → Cases · Geo + Link Analysis ·
-  │                        │  backup/restore · notification channels · cross-Space Exchange ·
-  │                        │  fault-tolerant DR (T4) · Tier B "act with approval"
+  │                        │  Reconciliation & Breaks · Alerts → Incidents → Cases ·
+  │                        │  Inspecto LA Investigations, Geo map and third-party integration ·
+  │                        │  ASN.1 CDR decoder · backup/restore · notification channels ·
+  │                        │  cross-Space Exchange · fault-tolerant DR (T4) · Tier A assistant
   └───────────▲────────────┘
               │
   ┌───────────┴────────────┐
-  │        PERSONAL        │  the whole data plane, free, on a laptop:
-  │                        │  acquisition · every parser incl. ASN.1 · lakehouse · Query Library ·
-  │                        │  Studio dashboards · Reconciliation & Breaks · Spaces · Tier A assistant
+  │         BASIC          │  the data plane on a laptop, no sign-in:
+  │                        │  acquisition · parsers · lakehouse · Query Library · Studio dashboards ·
+  │                        │  Spaces · the Inspecto LA explorer (no Investigations) · industry packs
   └────────────────────────┘
 ```
 
-*Personal finds the problem; Professional owns it; Enterprise scales it.* Reconciliation is free. The moment
-a Break needs an owner, an audit export or a second team, you are in Professional — because that is where
-those modules live. Enterprise adds nothing you must learn twice: the same artifact, as a pod, N times.
+*Basic explores the data; Standard owns the problem; Advanced governs and scales it.* The moment a Break or
+an Investigation needs an owner, an audit export or a second team, you are in Standard — because that is
+where those modules live. Advanced adds nothing you must learn twice: the same artifact, with stronger
+governance and shared state. A fourth build, **Preview**, carries every module of every edition with a demo
+sign-in for evaluation and testing; it is never sold.
 
 ### 10.3 Maintainability — zero cluster sprawl and declarative lifecycle
 
@@ -635,7 +626,7 @@ insights. Inspecto is designed from first principles for radical operational sim
   that auto-close the moment subsequent runs reconcile the variance. Downstream stale badges automatically clear
   when fresh data commits. Operators focus exclusively on genuine business discrepancies rather than routine
   alert noise.
-* **19 clean SPI extension points.** Custom connectors, proprietary parsers, bespoke transforms, and vault
+* **44**<!--count:spi-extension-points--> **clean extension points.** Custom connectors, proprietary parsers, bespoke transforms, and vault
   integrations plug into formal Java SPIs discovered at startup. Extensions live as separate JARs on the classpath
   — guaranteeing zero codebase fork debt, smooth version upgrades, and identical security and audit enforcement
   for all plugins.
@@ -646,7 +637,7 @@ Inspecto eliminates lengthy deployment cycles and complex infrastructure prerequ
 
 * **Five-minute operational setup.** Download the ~90 MB binary, unpack, and launch with `./serve.sh` (Linux)
   or `serve.bat` (Windows). The embedded columnar storage and vectorised compute require zero external
-  databases, message brokers, or storage daemons for Personal and Professional deployments.
+  databases, message brokers, or storage daemons for Basic and Standard deployments.
 * **Bundled production service wrappers (`DEPLOY-SERVICE-WRAPPER-1`).** Production readiness is built in,
   not left to bespoke shell scripting:
   * **Linux:** Generates a hardened `systemd` unit file with automatic restart policies, journald logging
@@ -661,9 +652,10 @@ Inspecto eliminates lengthy deployment cycles and complex infrastructure prerequ
   is strictly forbidden. The single artifact pre-bundles all DuckDB engine extensions, offline GIS/MapLibre vector
   basemaps, and ASN.1 vendor decoders. Zero phone-home telemetry, zero runtime cloud dependencies, continuously
   enforced by the CI `EgressGuardTest`.
-* **Frictionless scale-out path.** Start on a single analyst laptop (Personal), promote to an enterprise
-  production server with automated active/passive disaster recovery (Professional T4), and scale out horizontally
-  across Kubernetes pods (Enterprise T5) using the exact same core artifact, configuration language, and API surface.
+* **Frictionless scale-out path.** Start on a single analyst laptop (Basic), promote to an enterprise
+  production server with automated active/passive disaster recovery (Standard T4), and scale out horizontally
+  across Kubernetes pods (Advanced T5, signed design) using the exact same core artifact, configuration language,
+  and API surface.
 
 ### 10.5 Extend it, or have it extended — what happens when the shelf runs out
 No packaged product covers every estate. Inspecto is built so that what it does not do out of the box is
@@ -672,7 +664,7 @@ reached through **one of three lanes, in order of cost**, with no fork and no in
 ```
    LANE 1 · CONFIGURE            LANE 2 · PLUG IN                    LANE 3 · HAVE IT BUILT
    .toon pipelines · SQL in the   a jar on the classpath implementing  Gamma Analytics builds the
-   Query Library · Space          one of 19 extension points —         plugin or the bespoke feature,
+   Query Library · Space          one of 44 extension points —         plugin or the bespoke feature,
    Templates · /api/v1            discovered at start-up, no rebuild   ships it in the same artifact
    ─────────────────────────────  ─────────────────────────────────── ────────────────────────────────
    hours · your team              days · your team or ours             weeks · ours, one contract
@@ -726,7 +718,17 @@ explore the result in a dashboard — and ask the offline assistant why a row wa
 
 ---
 
+*Version 1.4 (2026-10-21) supersedes 1.3. Changes: Inspecto LA detail moved to the LA whitepaper; Section 5
+keeps a short reference.*
+
+*Version 1.3 (2026-10-21) supersedes 1.2. Changes: editions renamed Basic / Standard / Advanced (Preview never
+sold) and the edition ladder re-aligned to `docs/EDITIONS.md` (Reconciliation, Incidents, the assistant and the
+ASN.1 decoder from Standard; the intelligence agent and ABAC in Advanced; the Inspecto LA explorer and industry
+packs in every edition); Inspecto LA named, with its Investigations, industry packs, third-party integration,
+configurable limits and measured scale (Section 5.1); the extension-point and locked-dependency figures aligned
+to their derived counts.*
+
 *Version 1.2 supersedes 1.1 (September 2026). Changes: release basis stated; the edition ladder aligned
-to the signed tier decisions (DR at Professional, Kubernetes at Enterprise); every technical specific verified
-against the codebase or removed; counts derived; measured and projected figures distinguished; the
+to the signed tier decisions (DR at Standard, then named Professional; Kubernetes at Advanced, then named
+Enterprise); every technical specific verified against the codebase or removed; counts derived; measured and projected figures distinguished; the
 security vocabulary aligned to the compliance register.*

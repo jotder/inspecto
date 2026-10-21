@@ -1,7 +1,9 @@
-# Inspecto LA (Link Analysis) — Graph Intelligence Whitepaper
+# Inspecto LA whitepaper
 > **Sovereign Graph Operations: In-Process Entity Investigation, High-Scale Parquet Indexing, and Forensic Integrity Without Cluster or Cloud Sprawl**
-> *Audience: Chief Risk Officers (CRO), Chief Information Security Officers (CISO), Heads of Financial Crime & AML, Telecom Fraud Operations, Lead Enterprise Architects, Forensic Investigators*
-> *Publication: October 2026 · Document version **1.1** (supersedes 1.0 of 2026-10-14)*
+> *Audience: Chief Risk Officers (CRO), Chief Information Security Officers (CISO), Heads of Financial Crime & AML, Telecom Fraud Operations, Lead Enterprise Architects, Forensic Investigators, and the technical stakeholders who evaluate the system*
+> *Publication: October 2026 · Document version **1.3** of 2026-10-21 (supersedes 1.2)*
+
+**Inspecto LA (Link Analysis)** lets fraud and revenue-assurance investigators trace relationships across call records, wallets, devices and accounts, and turn what they find into court-grade evidence, inside the same platform that ingests and assures the data. This paper covers what the system does, how it is built, and what it has been measured to do.
 
 > **Release basis & evidentiary grounding.** This whitepaper specifies **Inspecto LA (Link Analysis)** — the product name; inside the Inspecto console the capability, its routes, configuration keys and modules keep the name **Link Analysis** — as delivered in the **Basic, Standard and Advanced** editions of Inspecto (a fourth edition, **Preview**, carries everything with a demo sign-in and is never sold). It reflects the committed codebase: the five `la/` Maven modules (`inspecto-geo-link`, `inspecto-la-api`, `inspecto-la-core`, `inspecto-la-storage`, `inspecto-la-store-pg`), the two platform modules they stand on (`platform/inspecto-graph`, `platform/inspecto-entity-store`), the shared Angular library `@inspecto/link-analysis`, and the standalone `la-app` shell (an Angular project, `inspecto-ui/projects/la-app`, not a Maven module). Every performance figure names the benchmark that produced it, the host and the date; where a number comes from a single run it says so. Section 7 is a Claims Register that classifies each capability as **PROVEN**, **MEASURED**, **DOCUMENTED** or **NOT YET**. What changed since version 1.0 is listed at the end of this document.
 
@@ -38,12 +40,24 @@ Modern financial institutions, sovereign intelligence services, and telecommunic
                                                                   • One security model, one audit trail
 ```
 
+### At a glance
+
+Measured headline figures, each sourced in Section 6: one-key link-index lookups at about $20\text{ ms}$ from $10^6$ up to $10^8$ edges; five-hop path searches under $350\text{ ms}$ over $10^6$ edges without the index; and 29 graph algorithms running on the server under explicit node, edge and time budgets. Every limit quoted is a configurable default (Section 6.3). Three properties shape the design:
+
+1. **Every Investigation is evidence.** Each step an analyst takes is sealed into a hash-chained log with the exact rows it read, so the whole Investigation replays byte for byte and exports as a verifiable Dossier (Section 2).
+2. **Privacy is the default, not a setting.** Identifiers are masked on the way out, reveals and sensitive expansions need a named capability or a second person, and every read is audited (Section 5).
+3. **It runs where the data lives.** Analysis reads the platform's own Datasets, or a versioned link index built from them daily, so there is no copy to keep in sync and no separate graph database to operate (Section 4).
+
+### Why generic graph tools fall short
+
+Telecom and mobile-money fraud is relational: a SIM box or a mule ring is invisible in any single record and obvious in the links between thousands of them. Generic graph tools fail on four counts: they hold thousands of nodes, while a telecom feed runs to about $10^9$ records a day (the input assumption of the call-record data-preparation plan, Section 7.1); they produce pictures, not reproducible evidence; they copy personal data out of the controlled estate; and their findings do not become Alerts or Cases. Sections 2 (evidence), 4 and 6 (scale), 5 (privacy) and 4.8 and 5.6 (operations) answer one count each.
+
 ### Three structural enterprise liabilities addressed
 
 1. **The Egress Exclusion & Regulatory Sovereignty**:
    Enterprise fraud and intelligence units operate under stringent regulatory mandates (such as GDPR Article 9, banking secrecy laws, and sovereign defense data-residency directives). Cloud graph databases and SaaS analytics require data replication outside the sovereign perimeter. Inspecto LA runs on the customer's own host and reads no external service. The air-gap claim is deliberately scoped: the standard distribution **physically cannot call hosted AI endpoints**, because the hosted-provider SDK classes are absent from its classpath — a fact checked by an automated test (`EgressGuardTest`), recorded in `compliance/evidence/air-gap-posture.md`. That is a packaging guarantee, not a runtime network control: network isolation of the host remains the operator's deployment responsibility, and the optional third-party integration of Section 5.7 sends only to a registered `https` Connection under the Space's egress allow-list.
 2. **The Cluster Tax & Latency Penalty**:
-   Distributed graph databases pay for coordination — network hops and consensus — on every traversal. Inspecto's vectorised single-node engine reads Parquet in process and runs its 29 graph algorithms inside one host, with no cluster to coordinate. The price of that design is stated plainly: it is a single-host engine. The link index is measured to $10^8$ edges (one-key reader latency of about $21\text{ ms}$ at $10^8$ on the bench of Section 6.1); $5\times10^8$ and $10^9$ edges are not measured.
+   Distributed graph databases pay for coordination — network hops and consensus — on every traversal. Inspecto's vectorised single-node engine reads Parquet in process and runs its 29 graph algorithms inside one host, with no cluster to coordinate. The price of that design is stated plainly: it is a single-host engine. The link index is measured to $10^8$ edges (one-key reader latency of about $21\text{ ms}$ at $10^8$ on the bench of Section 6.1). Above that it is not proven: full index builds at $2\times10^8$, $3\times10^8$ and $5\times10^8$ edges ran out of memory in their `nodes` phase under the bench's memory caps, and $10^9$ edges has not been run (Section 6.1).
 3. **The Evidentiary Fragility of Ad-Hoc Scripts**:
    When forensic analysts export graph snapshots to desktop software or run unversioned scripts, the chain of custody is broken. Upstream data changes can invalidate historical conclusions, and the provenance of the analysis can be challenged. Inspecto LA models every investigation as an **append-only, hash-sealed op log**. Replaying a step does not re-query the live Dataset, and the Dossier carries a SHA-256 manifest over every stored artefact so that a later change is detectable.
 
@@ -54,7 +68,8 @@ Inspecto LA is sold in the same editions as the rest of Inspecto (names fixed by
 | Capability | Basic | Standard | Advanced | Preview |
 | :--- | :---: | :---: | :---: | :---: |
 | Graph studio, projections from any Dataset, saved views, paths, neighbours, patterns, Value Measures | yes | yes | yes | yes |
-| Geo map, Entity Lists, identity resolution, Entity profile pages | yes | yes | yes | yes |
+| Entity Lists, identity resolution, Entity profile pages | yes | yes | yes | yes |
+| Geo map, routes and co-location (decision `D-LAE5`, 2026-10-20) | — | yes | yes | yes |
 | Browser graph algorithms (28 of the 29) | yes | yes | yes | yes |
 | Industry packs (Telecom, Mobile Money) and the Domain Profile | yes | yes | yes | yes |
 | Masking | display only (no sign-in, so anyone may reveal) | enforced | enforced | enforced |
@@ -71,7 +86,27 @@ Inspecto LA is sold in the same editions as the rest of Inspecto (names fixed by
 
 *Basis: `docs/EDITIONS.md` (Inspecto LA feature placement and *Basic — the Link Analysis explorer*), `offerings/basic.toon`, `offerings/standard.toon`, `offerings/advanced.toon`, `offerings/preview.toon`, and the as-built record of the editions plan (`docs/archived-documents/plans-archive/inspecto-la-editions-plan.md`, section 7). All seven phases of that plan shipped on 2026-10-17 (commit `f1b64ce03`).*
 
-How the explorer is separated from the Investigation surface: the five Link Analysis modules ship in every edition, and one edition feature, `investigations`, gates the Investigation routes, Graph Run, the index and the integration routes. On Basic those routes answer `503 CAPABILITY_UNAVAILABLE` ("available in Standard and above") and the single-page application hides the matching controls, so nothing offered can only fail. The separation is pinned over real HTTP by `ControlApiBasicEditionLinkAnalysisTest`. The Postgres store is built into Advanced and Preview and stays inert until `-Dinvestigations.backend=db` is set with a `jdbc:postgresql:` URL; every edition, Advanced included, defaults to the filesystem store. Two items are decided but not in the build: retention, legal hold and residency controls (the `docs/EDITIONS.md` row says "not built yet"), and machine-to-machine client-credentials trust for third-party callers, which awaits a security review (Section 5.7). Named adapters for specific case managers or fraud products do not exist: only a generic connector is built, and a named adapter is built only on a customer's request.
+How the explorer is separated from the Investigation surface: the five Link Analysis modules ship in every edition, and one edition feature, `investigations`, gates the Investigation routes, Graph Run, the index and the integration routes. On Basic those routes answer `503 CAPABILITY_UNAVAILABLE` ("available in Standard and above") and the single-page application hides the matching controls, so nothing offered can only fail. A second edition feature, `geoMap`, withholds the Geo map routes (`POST /geo/projection`, `POST /geo/routes`) on Basic in the same way. The separation is pinned over real HTTP by `ControlApiBasicEditionLinkAnalysisTest`. The Postgres store is built into Advanced and Preview and stays inert until `-Dinvestigations.backend=db` is set with a `jdbc:postgresql:` URL; every edition, Advanced included, defaults to the filesystem store. Two items are decided but not in the build: retention, legal hold and residency controls (the `docs/EDITIONS.md` row says "not built yet"), and machine-to-machine client-credentials trust for third-party callers, which awaits a security review (Section 5.7). Named adapters for specific case managers or fraud products do not exist: only a generic connector is built, and a named adapter is built only on a customer's request.
+
+Who each edition is for: **Basic** is one analyst exploring, with nothing evidence-grade (its masking tidies the display but is not a security control); **Standard** is for investigation teams; **Advanced** adds scale and policy for regulated organisations; **Preview** is for trials only.
+
+### Capabilities at a glance
+
+Every capability has a stated bound, and a request over its bound is refused with the measured size; nothing is truncated without saying so. Every bound is a configuration item, not code (Section 6.3): the values below are the shipped defaults.
+
+| Capability | What it does | Bound or default | Section |
+| :--- | :--- | :--- | :---: |
+| Projection and neighbours | Draws links between two identifier columns of any Dataset, with kind, time, weight and attributes | Canvas cap per Space (`projection_node_cap`, 1,000 entities) | 2.1 |
+| Recursive paths | Paths between entities across hops, filtered by kind, time and attributes | 12 hops by default, 20 at most, 10 s; on the index, depth $\le 2$ and $\le 20$ keys per level | 4.3, 6.2 |
+| Patterns and Value Measures | Temporal and branching pattern search, co-location on the Geo map (Standard and above), value measures such as money moved | Rate-limited per user as an expensive call | 3.4, 5.1 |
+| Investigations | Append-only op log, replayable to the byte | Expansions over the Space's four-eyes thresholds wait for a second person | 2.2, 5.3 |
+| Drafts | Private working copy per analyst; rebase with typed conflicts; all-or-nothing promote | 50 open per Space, 1 per member; hibernate after 60 min idle, expire after 30 days | 2.4 |
+| Graph Run | 29 server-side algorithms | Default 50,000 nodes, 500,000 edges, 30 s; install ceilings 500,000, 5,000,000, 300 s | 3.1, 6.3 |
+| Link index | Versioned Parquet index per Dataset and column mapping; full, append and compact builds | 8 deltas before compaction; disk estimated against the budget before the build starts | 4.3 |
+| Entity Lists and identities | Watch, block, allow and exclusion lists; asserted identity merges; hash-chained fact log | Up to 64 Entity Types per Space (`input.entity_types`); resolution is deterministic only | 2.5 |
+| Dossier | Export of graph, steps and sealed rows with a SHA-256 root and a verify route | Verifies with identifiers masked | 2.3 |
+| Standing detection | Value-measure Alert Rules on an Investigation, swept on a schedule under the owner's re-checked authority | Ten typed refusal codes; the sweep holds no capability of its own | 5.6 |
+| Data Trust | Data-as-of, missing days, waiting Files and index version on every Investigation; delivery problems as Alerts | Freshness Alert after twice the poll interval (`maximumAge: auto`, `la-daily-feed`) | 4.6, 4.8 |
 
 ---
 
@@ -118,7 +153,22 @@ At the core of an Investigation is the **Investigation Op Log**. An Investigatio
 
 $$W_n = \text{fold}(W_0, [O_1, O_2, \dots, O_n])$$
 
-The evaluator handles fifteen operation labels (`seed`, `seedBy`, `expand`, `exclude`, `excludeBy`, `hide`, `keep`, `threshold`, `annotate`, `window`, `resolve`, `connect`, and the markers `snapshot`, `compare`, `temporal`); an unknown operation is refused, never guessed. Each log entry records the SHA-256 of the Working Set it produced.
+The evaluator handles fifteen operation labels (`seed`, `seedBy`, `expand`, `exclude`, `excludeBy`, `hide`, `keep`, `threshold`, `annotate`, `window`, `resolve`, `connect`, and the markers `snapshot`, `compare`, `temporal`); an unknown operation is refused, never guessed. Each log entry records the SHA-256 of the Working Set it produced. The fold is pure: same log, same result, on any machine.
+
+| Operation | What it does | What is sealed into the log |
+| :--- | :--- | :--- |
+| `seed` / `seedBy` | Starts from named entities, or from every member of an Entity List | The resolved seed keys |
+| `expand` | Follows links one hop out from chosen entities, with direction, link-kind, time-window, minimum-event, degree, fan-out, budget and hub-threshold options | The rows that answered, with their fingerprint |
+| `connect` | Seeds the given ids and adds the routes connecting them | The rows of the connecting routes |
+| `exclude` / `excludeBy` | Removes entities (a reason is required), or every member of an exclusion list, before they spend any budget | The keys removed |
+| `hide` / `keep` | Hides entities from view only; `keep` protects an entity from exclusion | The selection |
+| `threshold` | Keeps entities inside a band of degree, weighted degree or event count | The band and measure applied |
+| `window` | Sets the time range later expands inherit (dates, slot, weekdays, excluded dates) | The window bounds |
+| `resolve` | Merges identifiers someone has asserted belong to one party (Section 2.5) | The assertions used |
+| `annotate` | Adds a note, with an optional NATO/Admiralty confidence grade, to an entity or a link | The note |
+| `snapshot` / `compare` / `temporal` | Marks a log position, diffs two windows, or records burst and periodicity findings | The marker; or the diff or findings, with a fingerprint |
+
+An `undo` is itself a recorded step that reverts the previous one, so the log is the full history of how the analyst reasoned, not only where they ended.
 
 **The Upstream Mutation-Resilience Invariant**:
 A persistent failure mode in legacy graph tools occurs when underlying databases change: an analyst re-opens a case six months later, only to find the graph topology altered because old records were purged or updated. In Inspecto LA, **the op log seals the exact retrieved rows into the log entry at execution time** (an `expand` stores the rows it read; `compare` and `temporal` store their findings with a fingerprint). Replaying an Investigation never re-queries the live Dataset; history is not rewritten by a later Dataset change. If an analyst wishes to check whether upstream data has evolved, replay accepts an explicit `reread` option that re-runs every recorded query and reports drift per step, without altering past steps. This is pinned with a real file append by `ControlApiReplayDriftOnFileAppendTest`.
@@ -176,6 +226,17 @@ Investigations often involve multiple analysts formulating competing hypotheses.
 3. **Four-Eyes Gating on Promotion**: If a Draft carries an expansion that exceeds the Space's four-eyes thresholds, promotion becomes a pending request in the approver inbox instead of merging; a different person must decide it (Section 5.3).
 4. **Atomic Append**: Promotion is all-or-nothing under the main-log lock — a per-directory monitor plus an operating-system file lock on the filesystem store (safe across two JVMs), or one transaction on the PostgreSQL store.
 
+**Members and roles.** Each Investigation has members with one of three roles, recorded in an append-only membership log (grant and revoke), so who could change what is itself part of the record:
+- **Lead**: the only role that writes the main log; manages members; works in their own Draft. The owner is implicitly a lead, and an Investigation always keeps at least one: revoking or demoting the last lead is refused.
+- **Analyst**: works in their own Draft and reaches the main log only by promotion.
+- **Reviewer**: reads, and — like a lead — may decide a pending four-eyes request (never their own) when they also hold `canApproveLinkExpansions` (Section 5.3).
+
+**Draft lifecycle.** A Draft is `OPEN`, then `HIBERNATED` after the idle limit, and ends `DISCARDED` (expiry is a discard) or `PROMOTED`. A Draft sees only its base (the main log's first steps when it was forked) plus its own steps; newer main-line work reaches it only by an explicit rebase. A rebase re-applies the Draft's effective steps on the current head and classifies each as `no-op`, `changed`, `superseded` or `blocked`; superseded and blocked steps are dropped and named in the panel, never silently. A Draft also pins the link-index version it read for 30 days (`IndexPins`), so its view does not shift under it while it is open.
+
+### 2.5 Entity Lists and asserted identities
+
+Entity Lists (purposes such as watch, block, allow and exclusion) and identity assertions live in one **Identity Fact log** per Space: one file per fact, each carrying the SHA-256 of the previous fact's bytes, published without overwrite. Every read verifies the whole chain; a gap or a wrong hash is an integrity error (`500 INTEGRITY_VIOLATION`), not a silently different list. Analysts assert that two identifiers belong to the same party, and resolution follows only those asserted facts — a deterministic union of assertions, never a fuzzy guess — which is what the `resolve` operation applies inside an Investigation. `seedBy` and `excludeBy` seal exact keys only: range and CIDR entries match within the lists but do not yet drive seeding or exclusion in an Investigation (deferred until a customer asks; `docs/okf/product/module/entity-list/spec.md`).
+
 ---
 
 # 3 · Analytical depth, graph algorithms & explainable detection
@@ -219,6 +280,26 @@ The algorithm library is the platform module `inspecto-graph` (pure Java, no Ins
 | | **Propagated risk** (`propagatedRisk`, server only) | job | Directed taint tracking with per-origin attribution (Section 3.3). |
 
 *The cost class is the catalogue's hint (inline answer or job); the budget, not the class, refuses a run that is too large. Complexity classes are omitted on purpose: they are textbook properties of the algorithms, not measurements of this implementation.* Server budgets are Space settings clamped by install-wide ceilings (Section 6.3); a run that exceeds its budget ends `BUDGET_EXCEEDED` with no result — never a silent cap.
+
+**The investigative question each family answers.** The same 29 algorithms, grouped by the question an analyst brings to them:
+
+| Family | Algorithms | Investigative question |
+| :--- | :--- | :--- |
+| Paths and reach | Shortest path, weighted shortest path, all paths, neighbourhood, ego network, descendants | How is this suspect connected to that one, and through whom? |
+| Centrality | Degree, betweenness, closeness, PageRank, eigenvector, Katz, HITS | Who is the hub, the broker or the controller of this ring? |
+| Communities | Connected components, Louvain, label propagation, k-core, cliques, triangles | Which accounts behave as one group, and which group is densest? |
+| Structure | Articulation points, bridges, cycles, is-forest, maximum spanning forest | Which single number holds the network together? Is money going round in a loop? |
+| Capacity and similarity | Maximum flow, Jaccard similarity, link prediction | How much value can move from A to B? Which two SIMs share the same contacts, as a swapped device would? |
+| Scoring | Suspicion score, propagated risk | Which entities combine several risk signals at once? How far does a known bad actor's risk spread, decaying hop by hop up to 6 hops? |
+
+**How a server Graph Run executes.**
+1. The request is validated first: an unknown field, an out-of-range value or a missing node is refused (`422`) before any work.
+2. The input is sized against the run's budget before work starts; over budget, the run ends `BUDGET_EXCEEDED` with the measured size and no result.
+3. The input is either the Investigation's Working Set, loaded in memory, or a reference into the link index. The engine is chosen by that input type alone (`RoutingGraphEngine`) and never switches silently because a graph is large.
+4. Each algorithm's node ceiling decides only whether the caller waits: at or under it, the request waits up to 3 s for an inline answer; above it, the request answers `202` and the run continues as a job. The ceiling is not a limit — the budget is (Section 6.2 lists the ceilings).
+5. The algorithm runs in a fixed server pool (2 threads, queue 16 by default) and checks for cancel and deadline at regular checkpoints; an overrun ends with no result rather than a late or partial one.
+6. Completed results are cached under a key that includes the caller's row scope, so a user who sees fewer rows never receives a result computed over more. Identifiers are masked after the cache, on the way out.
+7. Ties are broken by one canonical ordering in Java and TypeScript, so the same graph ranks the same way in the browser and on the server.
 
 ### 3.2 Explainable multi-factor Suspicion Score
 
@@ -282,13 +363,67 @@ Inspecto LA bundles Space Templates with deterministic synthetic data for demons
 
 ### 3.6 Industry packs and the Domain Profile
 
-An **Industry pack** maps a vertical's vocabulary onto the neutral concepts; it relabels and never adds a concept, so the core stays neutral. A pack is four files (manifest, terms, Entity Types, link kinds) loaded from the classpath of `inspecto-entity-store`, so **every edition ships the packs, Basic included**; a pack with any broken file is refused whole and reported. Two packs ship: **Telecom** (MSISDN, IMSI, IMEI, cell and similar terms) and **Mobile Money** (wallet, agent, cash-in and cash-out). A Space chooses its pack as its **Domain Profile** (`GET`/`PUT /settings/link-analysis/domain-profile`); the single-page application reads the vocabulary from the server and no longer ships industry profiles of its own. A vocabulary guard and `IndustryPackNeutralityTest` keep pack words out of the core text. Pack relabels of link kinds, pattern packs and typology terms are published but not yet drawn on the canvas legend or the pattern picker (`LA-EDITIONS-RESIDUALS-1`). Tests: `IndustryPacksTest`, `ControlApiDomainProfileTest`.
+An **Industry pack** maps a vertical's vocabulary onto the neutral concepts; it relabels and never adds a concept, so the core stays neutral. A pack is four files (manifest, terms, Entity Types, link kinds) loaded from the classpath of `inspecto-entity-store`, so **every edition ships the packs, Basic included**; a pack with any broken file is refused whole and reported. Two packs ship: **Telecom** speaks of subscribers, calls and call detail records, A-party and B-party, MSISDN, IMSI, IMEI, handset and cell, voice, SMS and call-forwarding links, SIM box, IRSF and Wangiri; **Mobile Money** of wallets and agents, transfers, P2P, cash-in, cash-out and merchant payment, time to cash-out, cash-out concentration and float. The demonstration data sets are separate Space Templates (Section 3.5), not part of a pack. A Space chooses its pack as its **Domain Profile** (`GET`/`PUT /settings/link-analysis/domain-profile`); the single-page application reads the vocabulary from the server and no longer ships industry profiles of its own. A vocabulary guard and `IndustryPackNeutralityTest` keep pack words out of the core text. Pack relabels of link kinds, pattern packs and typology terms are published but not yet drawn on the canvas legend or the pattern picker (`LA-EDITIONS-RESIDUALS-1`). Tests: `IndustryPacksTest`, `ControlApiDomainProfileTest`.
 
 ---
 
 # 4 · Systems architecture & data plane engineering
 
-Inspecto LA runs inside a single host process. The backend is partitioned into five `la/` Maven modules and two platform modules, with dependency arrows that a guard enforces.
+Inspecto LA runs inside a single host process. The backend is partitioned into five `la/` Maven modules and two platform modules, with dependency arrows that a guard enforces. It reads the same Datasets the platform ingests and assures, so there is no copy to keep in sync.
+
+**Architecture at a glance — ingest to analyst.** Files flow through Collectors into Parquet Datasets; a versioned link index is appended each day; requests pass the gates, read either the index or the Dataset, and are masked before they leave.
+
+```
+                      LINK ANALYSIS ARCHITECTURE · INGEST TO ANALYST
+
+  Files: Hive exports, database extracts, CSV, reference files
+        │
+        ▼
+  Collectors ──► Pipelines ──► Parquet Datasets (daily partitions) ───────────────┐
+                                    │                                             │
+                                    │ la.index.build Job                          │ direct read
+                                    ▼ (append a day · compact · full)             │ (flat path)
+                       Versioned link index: out/ · in/ · nodes/ ───────┐         │
+                                                                        ▼         ▼
+  Analyst (console lens or la-app) ──► request ──► gates (5.1) ──► read: index  OR  Dataset
+                                                                        │
+                                           op evaluator · Graph Run pool│
+                                                                        ▼
+                                             mask on the way out ──► response + audit event
+```
+
+- **Engine.** DuckDB executes every query, in a sandbox limited to the files that request may read. There is no long-running graph database; Parquet is the only stored format of the link index.
+- **Investigation store.** By default Investigations are files on local disk, with operating-system locks that are safe across two server processes; Advanced can keep them in PostgreSQL instead, one schema per Space, with each promotion in one transaction (Section 4.2).
+- **Same algorithms in browser and server.** The server's Java algorithms are a line-for-line port of the browser's TypeScript and are checked against shared fixtures, so a small graph in the browser and a large one on the server give the same answer.
+
+**Life of a request — four gates, one read choice.** After sign-in, rate limit, access policy, module and capability gates (Section 5.1), an Investigation request passes four gates in a fixed order, each failing closed; then the read path is chosen per request.
+
+```
+              LIFE OF AN INVESTIGATION REQUEST · 4 GATES, 1 READ CHOICE
+
+  request (signed in, within rate, module on, capability held)
+        │
+        ▼
+  ① member of the Investigation? ────────── no ──► 404  (same answer as "does not exist")
+        │ yes
+        ▼
+  ② may see the underlying Dataset? ─────── no ──► 404
+        │ yes
+        ▼
+  ③ policy engine allows? (Advanced) ────── no ──► 404
+        │ yes
+        ▼
+  ④ role allows the action? ─────────────── no ──► 403
+        │ yes
+        ▼
+  read choice: index enabled for the Space, built for this mapping, fresh enough,
+               depth ≤ 2 and ≤ 20 keys per level?
+        ├── yes ──► indexed read
+        └── no ───► Dataset read; the response names the closed Reason
+        │           (a response never mixes index rows and Dataset rows)
+        ▼
+  mask identifiers ──► response + audit event
+```
 
 ### 4.1 Modular component architecture & seam enforcement
 
@@ -310,7 +445,7 @@ Link Analysis is **an optional, ServiceLoader-discovered extension of the one ho
                                           │
    ┌──────────────────────────┐   ┌───────┴──────────────────┐
    │ la/inspecto-geo-link     │──►│ la/inspecto-la-api       │   routes, gates, masking,
-   │ bridge: engine ⇄ ports   │   │ (86 routes)              │   Drafts orchestration
+   │ bridge: engine ⇄ ports   │   │ (90 routes)              │   Drafts orchestration
    │ (7 routes)               │   └───┬──────────────────┬───┘
    └──────┬────────┬──────────┘       │                  │
           │        │                  ▼                  ▼
@@ -330,7 +465,17 @@ Link Analysis is **an optional, ServiceLoader-discovered extension of the one ho
                                                          └──────────────────────────┘
 ```
 
-The surface is **97**<!--count:la-routes--> routes: **90**<!--count:la-api-routes--> in `la-api` and **7**<!--count:geo-link-routes--> in `geo-link`, counted from each module's `module.toon` (`provides.routes`) and kept in step with the code by `LaApiRoutesManifestParityTest`. Every route is in `docs/api/openapi-v1.json`. `la-storage` depends on `la-core`, the SQL module and DuckDB; `geo-link` depends on `la-api`, `la-core`, `entity-list` and `entity-store`; `la-core` depends on `inspecto-graph` and `entity-store` among others. Ports point inward: `la-core` defines the engine, dataset, case and store ports, and storage, the bridge and the Postgres module implement them.
+The surface is **97**<!--count:la-routes--> routes: **90**<!--count:la-api-routes--> in `la-api` and **7**<!--count:geo-link-routes--> in `geo-link`, counted from each module's `module.toon` (`provides.routes`) and kept in step with the code by `LaApiRoutesManifestParityTest`. Every route is in `docs/api/openapi-v1.json`. `la-storage` depends on `la-core`, the SQL module and DuckDB; `geo-link` depends on `la-api`, `la-core`, `entity-list` and `entity-store`; `la-core` depends on `inspecto-graph` and `entity-store` among others. Ports point inward: `la-core` defines the engine, dataset, case and store ports, and storage, the bridge and the Postgres module implement them. The core never knows how the index is stored, and the host engine never names a Link Analysis class.
+
+| Module | Responsibility | Depends on (Inspecto modules, from its pom) |
+| :--- | :--- | :--- |
+| `platform/inspecto-graph` | The graph algorithms and run control (`RunControl`: cancel, deadline, budget) | nothing (JDK only) |
+| `la/inspecto-la-core` | The domain: op evaluator, `InvestigationStore` port and filesystem store, Drafts, Graph Run service, the algorithm catalogue, ports to the host | `inspecto-graph`, `inspecto-entity-store`, `inspecto-sql`, `inspecto-analytics`, `inspecto-config`, `inspecto-util`, platform SPIs |
+| `la/inspecto-la-storage` | The link index: builder, plan, reader, pins and the index-backed graph engine | `la-core`, `inspecto-sql`, `inspecto-analytics` |
+| `la/inspecto-la-api` | The HTTP surface (**90**<!--count:la-api-routes--> routes), the access gates, masking, Draft rebase and promote orchestration, scheduled builds, standing detection | `la-core`, `la-storage`, `inspecto-entity-store`, `inspecto-access`, `inspecto-analytics`, `inspecto-config`, `inspecto-sql`, `inspecto-util`, platform SPIs |
+| `la/inspecto-geo-link` | The bridge to the host (**7**<!--count:geo-link-routes--> routes): Datasets, Cases, Collector coverage, the index-build service, Alert measures | `la-api`, `la-core`, `inspecto-entity-list`, `inspecto-entity-store`, `inspecto-etl`, `inspecto-processor` |
+| `la/inspecto-la-store-pg` | Investigations on PostgreSQL (Advanced, opt-in) | `la-core` |
+| `platform/inspecto-entity-store` | Entity Types, the Identity Fact log behind Entity Lists and identities, mask keys, industry packs, Link Analysis settings and limits | platform only (`inspecto-api`, `inspecto-util`, `inspecto-graph`, `inspecto-config` and SPIs) |
 
 - **Clean Inversion of Control**: `inspecto-graph` and `la-storage` contain **no HTTP or UI dependencies**. Algorithms and storage primitives can be tested, benchmarked and embedded headless. `inspecto-graph` reaches no other Inspecto module at all.
 - **Seam Enforcement**: Module dependency arrows are checked twice — by `tools/check-module-deps.mjs` (a CI guard that derives the module graph from the poms and compares it with a policy table) and by a Maven Enforcer rule in each of the governed modules. A reverse import (for example `la-core` reaching `la-storage` or `la-api`) fails the build. A second guard, `tools/check-engine-names-no-la.mjs`, keeps the engine from naming any `la-*` class; the host reaches Link Analysis only through ServiceLoader interfaces it owns. Seam enforcement describes structure, not behaviour. In D-AN2 (2026-10-17) the graph library moved to the platform module `inspecto-graph` so that other capabilities can use it without Link Analysis, and the windowed motif matcher (`TemporalMotifMatcher`) moved there as well; Link Analysis keeps its pattern compiler. Link Analysis's SQL builders quote identifiers through the shared `SqlIdent` in `inspecto-util`.
@@ -447,6 +592,11 @@ Scanning flat lakehouse files makes interactive latency unattractive as edge cou
   where $E_b$ is `index.edges_per_bucket` (default $4{,}000{,}000$), $N_{\min}$ is `index.min_buckets` (default 16) and $N_{\max}$ is `index.max_buckets` (default 1,024) — all install-configurable; a changed sizing forces a full rebuild. The reader computes the bucket in Java and writes it as a literal, because DuckDB cannot derive the partition from a key equality; with that, a single-key lookup reads **one bucket** (plus up to 8 delta files, `MAX_DELTAS`).
 - **Incremental Appends & Compaction**: `IndexPlan.classify` decides the build mode. When a new day lands and the manifest's input files are an unchanged subset of today's, an `append` version indexes only the delta. When the delta count reaches its cap, `compact` merges main and deltas. Compaction runs **on demand** (`POST /inv/index/builds`) or from the `la.index.build` Job, which runs only the mode the plan advises (a `full` build only when the Job allows it); it is not a background process. Measured append and full-build times are in Section 6.1.
 - **Index statistics**: The manifest records link statistics (`kindEdges`, `typeNodes`, `degree`, `timeSpan`), served by `GET /inv/index` and read first by the Entity profile pages (Section 4.7).
+- **File format**: each table is written partitioned by bucket, sorted by (bucket, key, time), in row groups of 100,000 rows, compressed with zstd. MD5 is fixed (golden-tested), so an engine upgrade cannot move a key to another bucket.
+- **Build plan**: `IndexPlan.classify` compares the current input files with those the live version was built from. Only new files means an `append` delta; a removed, changed or unknown input file, a changed relation SQL, a changed bucket function or a changed DuckDB version forces a `full` build; reaching 8 deltas means `compact`.
+- **Build safety**: every build writes a staging directory with its own DuckDB connection and is published atomically by the one-line `CURRENT` pointer, so a failed build deletes its stage and leaves the live version untouched. One build service per Space runs one build at a time with a queue of 4 by default (install limits `index.threads`, `index.queue`), one live build per Dataset and mapping (a duplicate is `409`), and a build whose disk estimate exceeds the budget is refused before it starts. Builds run off the request path.
+- **Reads**: each request opens a sealed DuckDB connection whose readable directory is that one version directory; one hop per query, each direction answered from its own copy. An idle pool keeps up to four readers per version.
+- **Freshness**: the read gate compares the Dataset's input-file fingerprints with the index's. An index read served after new files landed says so (`read.index.stale`); a Dataset whose files cannot be fingerprinted is served from the index only while the index is younger than `index.max_age_hours` (default 24); otherwise the read goes to the Dataset with a closed Reason. Reference (dimension) data is joined at read time and never baked into the index, so a dimension change needs no rebuild (decision `D-ING6`).
 
 ### 4.4 User interface dual-delivery
 
@@ -475,9 +625,15 @@ Inspecto LA accommodates different personas through two Angular shells that shar
 1. **Embedded Studio Lens (`/studio/link-analysis`)**: Integrated into the Inspecto console for data engineers and authors who build and test graph views alongside dashboards and Pipelines.
 2. **Standalone `la-app` shell**: A dedicated bundle (`package.ps1 -Ui la-app`; it swaps the bundled application, not the edition). It has a left navigation rail (Link Analysis, Geo, Entities, Entity Lists, Alerts, Settings), no header chrome, and OIDC sign-in in Standard and above. Its **Settings** page is a master-detail split by audience: *My settings*, *This Space* (Link Analysis settings, analysis limits and an **Access** section with the console's roles editor), and *This server* (host resources); a section the user may not change opens read-only and says so, and the server remains the judge. The footer status bar carries the node and link counts, the caps in force and the installed modules. Working Set tiles never sum an identifier column.
 
+Both shells talk to the same server and, in Standard and above, sign in through the deployment's OpenID Connect provider. Deployment follows the platform:
+- **Per Space**: each Space switches Link Analysis on or off (the module gate, Section 5.1) and keeps its own Investigations, Entity Lists, link index and masking keys.
+- **On premises, offline**: DuckDB runs in process, and the bundle can embed its own Java runtime (a `jlink` image built by `package.ps1`); no internet access is needed and the data never leaves the operator's estate.
+- **Documentation**: analysts get an end-user guide and a full user manual (`user-guide-end-user.md`, `user-guide-manual.md` in this hub); every limit, its default and its range are listed in the product's own Settings (Section 6.3).
+
 ### 4.5 Spatio-temporal & cross-domain convergence
 
 Fraud and national security threats rarely occur in a topological vacuum; they exist across physical geography and time.
+- **Geo Map Analysis (Standard and above)**: a 100 % offline map — a bundled MapLibre basemap with vector land, boundaries and places, no tile server and no internet — with origin-destination routes, heatmaps, a time slider with playback, and a toolbox (measure, radius, polygon, notes) over a layer manager with GeoJSON overlays; saved Geo Views make an analysis repeatable. Its routes (`POST /geo/projection`, `POST /geo/routes`) are withheld on Basic (Section 1).
 - **Cross-Route Geo Brushing**: The single-page application's brushing service keeps the graph and the **Geo Map Analysis** page in step. A selection on one canvas is published and the other canvas highlights the matching elements, joined only by the entity key (never by a display label); selecting entities on the graph highlights their points on the map, and an area drawn on the map selects the matching entities. This is front-end behaviour, not a backend module.
 - **Continuous Timeline Slicing**: Every link retains its event timestamp. A timeline cut-off slider and a playback strip step through time over a chosen time column and highlight the links whose date falls in the current slice; they write nothing to the graph.
 
@@ -511,6 +667,15 @@ Fraud and national security threats rarely occur in a topological vacuum; they e
 - **Scale hardening (2026-10-16, after a 132-million-row day, Section 6.4)**: profile SQL runs under its own memory budget (`entity_profile.memory_limit_mb`, default 4,096 MB) instead of the 1 GB sandbox default; above `entity_profile.shape_sample_rows` the dominant value is read from a row reservoir; a relationship read that runs out of memory or times out is retried over a 1-in-64 Entity hash sample and flagged `sampled`, `sampleEvery` and `approximate`; and a Dataset column may carry a `party`, so relationships pair only columns of the same party (or where either has none) — a served IMSI pairs with the served number, not the other party's.
 - **Limits** are listed in Section 6.3. **Not built**: P4 — a scheduled `la.entity.profile` Job, a profile Dataset, drift Alert Rules and a 30-day history. **Open residuals** (`LA-ENTITY-PROFILE-RESIDUALS-1`): dominance ignores values that fail the normaliser; a 99.95 % share renders as 100 %; *Links* reads *Not assessed* for a type that is no link end; a cold profile still reads the Dataset several times.
 - Tests: `ControlApiEntityProfileTest`, `ControlApiEntityProfileScaleTest` (sandbox-scale figures only).
+
+### 4.8 From investigation to operations: the daily chain (LA-DAILY-INGEST-1)
+
+*Standard and above.* A day's records can land as files in the morning and be in the analyst's graph shortly after ingest; the analyst can see how fresh and complete the data is, and a finding can become a standing check that raises Alerts.
+
+- **Daily ingestion**: Hive exports (landed as Parquet files; a native Hive/Kerberos connector is not built, decision `D-ING5`), database extracts and reference files arrive through the platform's Collectors and Pipelines into daily-partitioned Datasets. A scheduled `la.index.build` Job then appends the new day to the link index; in the Data Trust live drive each append took $0.5\text{--}0.8\text{ s}$ (`docs/okf/product/module/la-core/tests-data-trust-live-drive.md`), and the scale of the daily chain is in Section 6.1 (Bench C).
+- **Data Trust**: each Investigation shows the strip of Section 4.6 (data as of, missing days, Files still waiting to be indexed, the index version), and a drawer lists every File with its event day, row count and rejected rows.
+- **Delivery problems are Alerts**: a missing day raises a sequence-gap Alert; a quarantined File, a File loaded with rejected rows, a stopped feed and a lagging index each raise one too, and a corrected day re-sent under the same name is signalled (`DUPLICATE_SKIPPED`) rather than skipped silently. Each Alert names the File, never an entity value.
+- **Standing detection and Cases**: a value-measure Alert Rule bound to an Investigation is swept on a schedule under the owner's re-checked authority (Section 5.6), and an Investigation links to a Case, so the evidence and the case workflow stay connected.
 
 ---
 
@@ -678,7 +843,7 @@ Senior leadership, prosecuting agencies, or external regulators frequently need 
 ### 5.6 Standing detection & operational closed loops
 
 Findings need not stay on a canvas. The scheduled **`la.detect` Job** connects an Investigation's measures to the platform's alerting:
-- **Standing Detection Sweeps**: A measure over an Investigation's Working Set (for example accounts showing a high pass-through ratio) is bound to an Alert Rule. A standing-detection record names the principal `sweep:<investigation id>`, its owner, Dataset and masking basis; the sweep **re-decides its authority before every read** (the owner must still lead the Investigation and view the Dataset; masking must not have tightened; the policy engine must not deny) and holds no capability of its own. The job needs the alerts module.
+- **Standing Detection Sweeps**: A measure over an Investigation's Working Set (for example accounts showing a high pass-through ratio) is bound to an Alert Rule. A standing-detection record names the principal `sweep:<investigation id>`, its owner, Dataset and masking basis; the sweep **re-decides its authority before every read** (the owner must still lead the Investigation and view the Dataset; masking must not have tightened; the policy engine must not deny) and holds no capability of its own. A refusal carries one of ten stable codes, which ride the audit trail (`LINK_STANDING_DETECTION_REFUSED`) and the response: `NOT_ENABLED`, `NO_OWNER`, `BINDING_CHANGED`, `DATASET_GONE`, `DATASET_NOT_SHARED`, `ROLE_SHARE_ONLY`, `NOT_LEAD`, `MASKING_TIGHTENED`, `POLICY_DENIED` and `UNDECIDABLE` — anything the sweep cannot decide is a refusal. The job needs the alerts module.
 - **From an Alert to the rest of the platform**: A breach fires an **Alert**. Under the platform's severity promotion, an Alert Rule of `CRITICAL` severity also opens a de-duplicated **Incident** linked `ESCALATED_FROM` its Alert. Grouping Incidents into **Cases** is done by the platform's Case Rules or by an analyst; Link Analysis does not open Cases by itself, and no automatic Incident-to-Case chain is claimed here.
 - **Privacy Preservation in Alerts**: the Alert's evidence carries only aggregates — the Measure, its threshold line, `breachCount`, and the worst entry's `worstOf` / `worstValue`. It carries no entity id, name or alias; the entities are named only inside the gated Investigation. Notification content is in any case always masked (Section 5.2.1).
 
@@ -688,6 +853,10 @@ Target products were unknown, so **one generic connector** is built, configured 
 - **Inbound**: `POST /inv/inbound/investigations` lets a fraud product or case manager hand over its own record and the entities it concerns; Inspecto LA opens a seeded Investigation and answers its id and a link. It is idempotent on the caller's system and record id, composes the existing write routes (so every gate and audit event applies), and records the caller's record as an **external reference** that is never fetched and grants nothing. `POST /inv/deep-links/resolve` serves the "Open in Inspecto LA" deep link (`/open`); a raw value of a masked type is refused and never repeated.
 - **Outbound**: `GET`/`PUT /inv/integration` (administrator-only; the endpoint is a registered `https` Connection, never a literal secret in configuration) and `POST /inv/investigations/{id}/handoff`, which sends the Dossier bundle and findings to the configured case manager, retries under one idempotency key, and links the returned case id as an external reference. **Signed webhooks** (HMAC-SHA256 over a timestamp and the body) announce `investigation.created`, `draft.promoted`, `alert.fired` and `approval.needed`; they carry no entity id. Every outbound call passes the Space's egress allow-list.
 - **Not enabled**: machine-to-machine client-credentials trust (an inbound token scoped to one integration role). A formal security review — SSRF, token scope, replay, audit on both sides, secret handling, masking — is owed before it is built. Tests: `ControlApiInvestigationInboundTest`, `ControlApiLaIntegrationTest`.
+
+### 5.8 Audit trail
+
+Every state change and every sensitive read emits a typed audit event: Investigation creation and each step (`LINK_INVESTIGATION_CREATED`, `LINK_INVESTIGATION_STEPPED`), reveals (`LINK_ENTITY_REVEALED`), four-eyes requests and decisions, membership grants and revokes, Draft fork, rebase, promote, discard and expiry, Dossier builds, exports and verifications, Graph Runs (`LINK_GRAPH_RUN_STARTED`, `_COMPLETED`, `_BUDGET_EXCEEDED`, `_CANCELLED`, `_FAILED`), index builds (`LINK_INDEX_BUILD_STARTED` through `_FAILED`), embed mints, views and denials, hand-offs and webhook deliveries. Refused and failed requests are recorded too — a refused sign-in at the authentication gate, a denied embed token, a refused standing-detection sweep, a failed Graph Run — and an audit row never carries a raw identifier that masking would hide (reveals record aliases, embed rows a token hash).
 
 ---
 
@@ -716,7 +885,7 @@ The failed walk is why the index serves only depth $\le 2$ and $\le 20$ keys per
 | $10^7$ | $22\text{ s}$ | $0.23\text{ GB}$ | $20.2 / 27.3\text{ ms}$ | $29.9\text{ ms}$ | $32 / 489\text{ ms}$ |
 | $10^8$ | $447\text{ s}$ (32 buckets) | $2.23\text{ GB}$ | $20.9 / 31.0\text{ ms}$ | $37.8\text{ ms}$ | $21.8 / 32.0\text{ ms}$ |
 
-A one-key lookup is flat in the number of edges at reader level (about $20\text{ ms}$ from $10^6$ to $10^8$); each delta file adds about $0.2\text{ ms}$. A walk costs its frontier: a full 20-key frontier costs about $0.4\text{ s}$ (about $20\text{ ms}$ per key, sequential; $408\text{ ms}$ at $10^8$ with no delta files). The $22\text{ ms}$ depth-2 figure at $10^8$ is over typical random keys, most of which have degree near 1, not over a 20-key frontier. **Beyond $10^8$**: at $5\times10^8$ edges the build ran out of memory at the $8\text{ GB}$ cap after 91 minutes; the $10^9$ attempt of 2026-10-13 was stopped when free disk reached its floor. So the scaling run is multi-hour on this class of host and **incomplete**: no $5\times10^8$ or $10^9$ latency figure exists, and a $10^9$ run needs a host with roughly $250\text{ GB}$ free disk and at least $16\text{ GB}$ for the build (`docs/okf/product/module/la-storage/tests-index-scale-run.md`).
+A one-key lookup is flat in the number of edges at reader level (about $20\text{ ms}$ from $10^6$ to $10^8$): what limits a walk is the size of its frontier, not the size of the data. Daily appends stay cheap: at $10^8$ each delta file adds about $2\text{ ms}$ to a lookup ($20.9\text{ ms}$ with none, $37.8\text{ ms}$ at the maximum of 8, so about $17\text{ ms}$ more), and a compaction restores the single-file figure. A walk costs its frontier: a full 20-key frontier costs about $0.4\text{ s}$ (about $20\text{ ms}$ per key, sequential; $408\text{ ms}$ at $10^8$ with no delta files). The $22\text{ ms}$ depth-2 figure at $10^8$ is over typical random keys, most of which have degree near 1, not over a 20-key frontier. **Beyond $10^8$**: at $5\times10^8$ edges the build ran out of memory at the $8\text{ GB}$ cap after 91 minutes; the $10^9$ attempt of 2026-10-13 was stopped when free disk reached its floor. On 2026-10-21 (same laptop, 31.7 GB RAM) the full builds at $3\times10^8$ and $2\times10^8$ edges both ran out of memory in the `nodes` phase under a $6\text{ GB}$ cap (DuckDB reported $5.5\text{ GiB}$ in use; 60 M and 40 M distinct nodes, after 64 and 39 minutes), and a $5\times10^8$ rerun ran out of memory in the same phase under a $12\text{ GB}$ cap ($11.1\text{ GiB}$ in use, 100 M distinct nodes, about 97 minutes). The `nodes` phase thus needs memory at least linear in distinct nodes, and bounding it is open work. So the scaling run is **incomplete**: no completed build, size or latency figure exists above $10^8$, $10^9$ is not proven, and a $10^9$ run needs a host with roughly $250\text{ GB}$ free disk and at least $16\text{ GB}$ for the build (`docs/okf/product/module/la-storage/tests-index-scale-run.md`, backlog `LA-INDEX-SCALE-MEASURE-1`). In production the build's memory is configurable: `index.build_memory_pct` gives a build that share of physical RAM (default 80 %), and a build waits in phase `waiting_for_ingest` while ingest runs, so a nightly build does not compete with the day's load (`docs/okf/product/module/la-storage/admin-guide.md`).
 
 **Bench C — the daily chain** (`LaDailyIngestScaleBench` then `DailyIndexScaleBench`, measured 2026-10-09; a 12-thread Windows laptop with 31.7 GB RAM that was 19–31 % busy with other work, so wall times are noisy; a synthetic 10-column day whose generator caps distinct entities at about 1.8 million nodes (real records carry far more, which raises sort and dictionary cost); index builds with no memory limit and all threads; one run each):
 
@@ -737,10 +906,24 @@ To prevent denial-of-service conditions during interactive exploration, Inspecto
 
 1. **Index scope (depth $\le 2$, frontier $\le 20$ keys per level)**: `index.traversal_depth` and `index.frontier_cap`. Single-key reads are the cheap case; the cost of a walk is linear in its frontier, and a hub key costs more (a hub key $36\text{--}56\text{ ms}$ in Bench B). The frontier cap bounds the number of keys, not the cost of a hub.
 2. **Deeper or wider requests**: a traversal deeper than 2 hops or wider than the frontier cap is **not** served by the index; it falls back to the flat recursive CTE over the Dataset with a closed, stated Reason in the answer (the traversal fences `traversal.*` bound depth, edge yield, paths and time). Whole-graph algorithms run in memory over the Working Set or through a Graph Run, routed by input type, not by size.
+3. **Index-backed reads cover** recursive paths to depth 2, neighbours, simple Investigation expands, temporal reads and three Graph Run algorithms on index input (neighbourhood, ego network, seeds-only degree). Everything else reads the Dataset directly.
+
+**Inline node ceilings per algorithm.** Each server algorithm carries a cost class and a node ceiling (the catalogue `Algorithm`): the largest benched node count — $10^3$, $10^4$ or $10^5$, on a heavy-tailed graph with 5 edges per node — whose median run took at most $1\text{ s}$, or 500 where even $10^3$ took longer. At or under its ceiling a Graph Run request waits up to 3 s for the answer; above it the run continues as a job. The ceiling is not a limit — the budget (Section 6.3) refuses a run that is too large.
+
+| Cost class | Node ceiling | Algorithms |
+| :--- | :---: | :--- |
+| Inline (SYNC) | 100,000 | shortest path, neighbourhood, ego network, degree centrality, connected components, articulation points, bridges, is-forest, descendants |
+| Inline (SYNC) | 10,000 | k-core, triangle count, weighted shortest path, maximum spanning forest, Jaccard similarity, PageRank |
+| Job | 100,000 | find cycles |
+| Job | 10,000 | Louvain, label propagation, all paths |
+| Job | 1,000 | closeness, cliques, maximum flow, link prediction, eigenvector, Katz, HITS, propagated risk |
+| Job | 500 | betweenness, suspicion score (the Space's `suspicion_node_cap`, default 1,000, decides the suspicion score's inline-or-job choice and the browser refusal) |
+
+In the browser, each algorithm has its own configurable cap, defaulting to `analysis_node_cap` (2,500 nodes) or a lower per-algorithm ceiling (500 for betweenness, 1,000 for closeness, cliques, maximum flow, link prediction, eigenvector, Katz and HITS). The measurement behind those caps: 25 of the browser algorithms finished under $60\text{ ms}$ at 2,000 nodes, while the suspicion score took about $7\text{ s}$ there (its cost is quadratic, dominated by betweenness), which is why large runs move to the server.
 
 ### 6.3 Layered configurable limits system (LA-CONFIG-LIMITS-1)
 
-Inspecto LA avoids hard-coded limits: the `LaLimit` catalogue (146 items on this tree) holds every limit with its key, layer, default and validated range. A value outside its range is refused `422` naming the key and the range; a stored value outside its range reads as the default. Limits fall in three layers, separating platform sizing, organisational policy and client rendering:
+Inspecto LA avoids hard-coded limits: the `LaLimit` catalogue (148 items on this tree, from canvas caps to rate limits) holds every limit with its key, layer, default and validated range, and the server enforces whatever value is in force. Deployments size the system to their hardware and their analysts, not to the laptop the defaults were measured on. A value outside its range is refused `422` naming the key and the range; a stored value outside its range reads as the default. Limits fall in three layers, separating platform sizing, organisational policy and client rendering:
 
 ```
                     LAYERED CONFIGURATION ARCHITECTURE
@@ -766,6 +949,11 @@ Inspecto LA avoids hard-coded limits: the `LaLimit` catalogue (146 items on this
   └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+- **One source of truth**: `GET /settings/link-analysis/limits` publishes every item with its default, range, stated value and the value in force; the single-page application reads them instead of keeping its own copies (`LaLimitCatalogueParityTest` pins its fallbacks to the catalogue). Space items are written by `PUT /settings/link-analysis/limits`, install items by `PUT /system/link-analysis/limits`, all or nothing.
+- **Changes apply without a restart**: Graph Run ceilings and pool size are re-tuned on the next request, index pools on the next build, rate buckets after the system write (a hand edit of `la-limits.toon` applies at the next write or restart), and traversal memory, threads and heavy-Draft permits are read per call.
+- **Index builds and ingest never compete**: a build may use up to 80 % of physical RAM by default (`index.build_memory_pct`) and waits in phase `waiting_for_ingest` while ingest runs.
+- **Defaults set from measurement**: canvas 1,000 entities; browser algorithms 2,500 nodes or their measured lower ceiling; suspicion score 1,000 nodes in browser and server; expand budget 4,000 rows (at most 40,000); recursive paths 12 hops by default (at most 20, 10 s); connect 40 seeds, 3 hops by default (at most 6).
+
 A selection of the shipped items (defaults and ranges are those of the catalogue on this tree):
 
 | Layer | Key | Default | Validated range | Enforced where, and on overflow |
@@ -778,12 +966,15 @@ A selection of the shipped items (defaults and ranges are those of the catalogue
 | | `index.edges_per_bucket`, `min_buckets`, `max_buckets` | 4,000,000, 16, 1,024 | 1,000 to $10^9$; 1 to 1,024; 1 to 65,536 | bucket sizing; a change forces a full rebuild |
 | | `rate.link_analysis_burst` / `per_s` | 30 / 0.5 | 1 to 3,000 / 0.01 to 1,000 | per-user bucket; 429 |
 | | `traversal.memory_limit_mb`, `traversal.threads` | 1,024, 4 | 64 to 1,048,576; 1 to 64 | one recursive path search |
+| | `drafts.heavy_jobs` | min(4, cores / 3), at least 1 | 1 to 64 | heavy Draft jobs (replays, Working Set builds, expands) at once; over it 429 |
 | | `entity_profile.memory_limit_mb` | 4,096 | 64 to 1,048,576 | memory of one Entity profile query |
 | **Space** | `graph_run.max_nodes` / `max_edges` / `timeout_ms` | 50,000 / 500,000 / 30,000 | 1 to $10^7$ each (clamped to the install ceiling) | `POST /inv/graph/runs`; overrun ends `BUDGET_EXCEEDED` with no result |
 | | `four_eyes_budget_above`, `four_eyes_fan_out_above` | none (off) | 1 to 100,000 | an expansion above is held for approval (Section 5.3) |
 | | `hub_threshold` | 500 | 1 to 100,000 | a candidate with more distinct contacts is flagged high-connectivity and not expanded further |
 | | `max_set_bytes` / `max_investigation_bytes` | 64 MiB / 4 GiB | 1 B to 1 GiB / 1 B to 1 TiB | one step's sealed Working Set / one Investigation's total; 413 `PAYLOAD_TOO_LARGE` |
 | | `investigation.expand_budget_default` / `_max`, `max_frontier` | 4,000 / 40,000 rows, 2,000 | 1 to 200,000 / 2,000,000; 1 to 100,000 | one expand; clamped or refused |
+| | `traversal.depth_default` / `depth_max`, `traversal.timeout_s` | 12 / 20 hops, 10 s | 1 to 50 each; 1 to 300 | one recursive path search |
+| | `connect.max_seeds`, `connect.default_hops` / `max_hops` | 40, 3 / 6 | 2 to 2,000; 1 to 6 each | one `connect` |
 | | `index.traversal_depth`, `frontier_cap`, `max_deltas`, `max_age_hours` | 2, 20, 8, 24 | 1 to 10; 1 to 2,000; 1 to 100; 1 to 8,760 | indexed reads; flat fallback with a Reason |
 | | `drafts.max_open`, `hibernate_after_minutes`, `expire_after_days` | 50, 60, 30 | 1 to 1,000; 1 to 10,080; 1 to 3,650 | Draft admission and lifecycle |
 | | `embed.default_ttl_hours` / `embed.max_ttl_hours` | 72 / 720 | 1 to 8,760 each | embed expiry; above the maximum is 422 |
@@ -823,6 +1014,33 @@ One day of an IMS call-and-message record feed was profiled and indexed end to e
 
 **Caveats to carry with these figures.** (1) A single run on a single laptop. (2) The server configuration differs between rows — a 10 GB cap for the link Job, one build thread for the index, two threads for the profile — so the rows do not form one consistent configuration. (3) The data is private, so no reader can reproduce it. (4) Two outliers in the data (one handset and one number carrying an unusually large count of the other identifier) are unexplained. (5) The scale test in the repository (`ControlApiEntityProfileScaleTest`) pins behaviour at sandbox scale, not these timings. (6) In this feed a delivery attempt is recorded as a record, so burst-style counts are inflated: a rule's count there must be read as *failed delivery attempts*, not as distinct targets.
 
+### 6.5 Concurrency and admission
+
+Every shared resource is bounded, and a full one refuses at once instead of queueing without bound (defaults; each is a limit of Section 6.3):
+
+| Resource | Limit | When full |
+| :--- | :--- | :--- |
+| Graph Run pool | 2 threads, queue of 16 (install) | refused at once: `REJECTED`, HTTP 503 `STORE_BUSY` (retryable) |
+| Index builds | one build service per Space: 1 thread, queue of 4 (install); one live build per Dataset and mapping | 503 when the queue is full; 409 for a duplicate |
+| Heavy Draft operations | min(4, cores / 3) permits, at least 1 (install) | 429 at once, never waited for |
+| Expensive exploration calls | per-user token bucket, burst 30, one more every 2 s (install) | 429 |
+| Graph Run result cache | 32 entries, 10 minutes; key includes the caller's row scope | evicted; a scope change never reuses a result |
+
+### 6.6 Draft rebase and promote cost
+
+Measured at 800 steps (`LA-DRAFT-PROMOTE-COST-1`, pinned by `DraftPromoteCostTest`): promote fell from $34.9\text{ s}$ to $3.3\text{ s}$ warm ($8.3\text{ s}$ cold) and is now linear in the bytes the sealed sets hold, because it reuses the Draft's sealed per-step hash and set file after verifying each file's bytes. Rebase fell from $36.7\text{ s}$ to $8.4\text{ s}$; it stays proportional to the state per step, because every sealed hash is re-checked. A cheaper rebase was examined and declined, since it would weaken the evidence chain.
+
+### 6.7 Test baseline and coverage
+
+The whole platform builds and passes its tests before a change ships. At the editions commit (`f1b64ce03`, 2026-10-17) the full reactor ran 56 modules and 10,566 tests with 0 failures, and the single-page application 5,913 tests (5 skipped). Coverage was measured on 2026-10-15 (backend over 48 module reports; browser over 553 spec files, 5,820 tests):
+
+| Layer | Coverage (2026-10-15) | Enforced floor | Baseline (2026-09-08) |
+| :--- | :--- | :--- | :--- |
+| Backend (Java) | 86.08 % of instructions, 73.59 % of branches | 78 % / 64 % | 81.01 % / 67.19 % |
+| Browser (TypeScript) | 81.51 % of statements, 76.64 % of branches | 70 % / 66 % | 73.82 % / 70.04 % |
+
+Both layers rose by five to eight points since the 2026-09-08 baseline. The floors are set below the measured figures on purpose: a ratchet, not a target (`docs/okf/product/layer/platform/tests-guard-coverage.md`, `docs/okf/product/layer/platform/plan-compliance.md`, `docs/PROJECT_NOTES.md`).
+
 ---
 
 # 7 · Transparent Claims Register (Evidentiary disclosure)
@@ -849,7 +1067,7 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | | Daily append at $10^8$: $30.6\text{ s}$ against $929\text{ s}$ for a full rebuild | **PROVEN** | `DailyIndexScaleBench`; append correctness by `IndexAppendTest` and `ScheduledIndexBuildTest` |
 | | 5-hop recursive path search on $10^6$ edges at warm p95 under $350\text{ ms}$ | **PROVEN** | `InvTraversalBench` (gate `G-R4`) |
 | | Index faster than flat through the real route from $10^7$ edges ($2\text{--}5\times$ a hop); not faster at $10^6$ | **MEASURED** | `okf/product/module/la-core/user-guide-link-analysis.md` index design record; not re-run at $10^8$ |
-| | $5\times10^8$ and $10^9$ edge index builds | **NOT YET** | $5\times10^8$ ran out of memory at the 8 GB cap; the $10^9$ attempt stopped at the disk floor (2026-10-13); `docs/okf/product/module/la-storage/tests-index-scale-run.md`, backlog `LA-INDEX-SCALE-MEASURE-1` |
+| | Index builds above $10^8$ edges ($2\times10^8$ to $10^9$) | **NOT YET** | $2\times10^8$ and $3\times10^8$ ran out of memory in the `nodes` phase at a 6 GB cap, $5\times10^8$ at 8 GB and at 12 GB (2026-10-21); the $10^9$ attempt stopped at the disk floor (2026-10-13); `docs/okf/product/module/la-storage/tests-index-scale-run.md`, backlog `LA-INDEX-SCALE-MEASURE-1` |
 | | One production-scale day (132 M records) profiled and indexed in the times of Section 6.4 | **MEASURED** | Single laptop run, private data, 2026-10-16 (`docs/superpower/la-ims-production-day-measurements.md`); estimates in that section are marked as such |
 | **Editions** | Basic is the explorer (no sign-in, no Investigations); the Investigation surface answers 503 on Basic and works on Standard | **PROVEN** | `ControlApiBasicEditionLinkAnalysisTest` |
 | | The Preview bundle carries every module | **PROVEN** | `tools/offering-classpath.test.mjs`; a Preview demo bundle booted and answered `/health` |
@@ -875,6 +1093,7 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | | Sealed reads survive upstream data growth; `reread` reports drift | **PROVEN** | `ControlApiReplayDriftOnFileAppendTest` |
 | | SHA-256 Dossier manifest; a tampered step is reported | **PROVEN** | `ControlApiDossierTest.anUntouchedStoreVerifiesAndATamperedStepIsReported` |
 | | Resilience to a rewrite that also recomputes every hash (store owner with root access) | **DOCUMENTED** | On-box evidence has this stated limit; external anchoring of the Dossier root is the countermeasure |
+| | Draft promote linear in the sealed bytes: 800 steps in $3.3\text{ s}$ warm (was $34.9\text{ s}$); rebase $8.4\text{ s}$ (was $36.7\text{ s}$) | **PROVEN** | `DraftPromoteCostTest` (`LA-DRAFT-PROMOTE-COST-1`) |
 | | Retention purge of closed Investigations | **NOT YET** | **Declined** (decision `D-U8`, 2026-09-24): the store is deliberately append-only; reopen on a regulator's or customer's retention demand (backlog standing refusals) |
 | **Analytics** | 29 in-process graph algorithms; browser twins of 28 | **PROVEN** | `GraphAlgorithmsParityTest`, `GraphSuspicionParityTest`, `ControlApiGraphRunTest` (`propagatedRisk` has no TypeScript twin, by design) |
 | | Explainable Suspicion Score with a factor breakdown | **PROVEN** | `GraphSuspicionParityTest`, `ControlApiGraphRunTest`; the user manual `docs/okf/product/module/la-core/user-guide-manual.md` |
@@ -883,15 +1102,31 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | | Entity profile pages: sections, honesty rules, masking, alias-only URLs | **PROVEN** | `ControlApiEntityProfileTest`; scale behaviour `ControlApiEntityProfileScaleTest` (sandbox scale) |
 | | Published false-positive or precision rates on real data | **NOT YET** | Depend on customer thresholds; unmeasured |
 | **Platform** | In-process execution with no external graph database | **PROVEN** | Architectural invariant; seam enforced by `tools/check-module-deps.mjs` and `tools/check-engine-names-no-la.mjs` |
-| | 93 Link Analysis API routes (86 in `la-api`, 7 in `geo-link`) | **PROVEN** | `LaApiRoutesManifestParityTest`; marker-checked against each `module.toon` |
+| | **97**<!--count:la-routes--> Link Analysis API routes (**90**<!--count:la-api-routes--> in `la-api`, **7**<!--count:geo-link-routes--> in `geo-link`) | **PROVEN** | `LaApiRoutesManifestParityTest`; marker-checked against each `module.toon` |
 | | PostgreSQL Investigation store (Advanced, opt-in) | **PROVEN** | `PgInvestigationStoreContractTest`, `PgInvestigationStoreTwoJvmRaceTest`; `docs/okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md`. Embed links are not supported on this store |
 | | Whole-product test baseline at the editions commit | **PROVEN** | Full reactor `-Pedition-advanced`, 56 modules, 10,566 tests, 0 failures; SPA 5,913 passed, 5 skipped (commit `f1b64ce03`) |
-| | Coverage measured 2026-10-15 | **MEASURED** | Backend instruction 86.08 % / branch 73.59 % (48 modules); UI statements 81.51 % / branch 76.64 % (553 spec files) |
+| | Coverage measured 2026-10-15 | **MEASURED** | Backend instruction 86.08 % / branch 73.59 % (48 modules); UI statements 81.51 % / branch 76.64 % (553 spec files); recorded in `docs/okf/product/layer/platform/tests-guard-coverage.md` and `docs/PROJECT_NOTES.md` (UI also in `docs/okf/product/layer/product/plan-surfaces.md`) |
 | | Multi-host high availability | **NOT YET** | A laptop-scale drill (two server processes, one Postgres) ran 2026-10-10; the two-host drill on plain Linux has not run (`docs/okf/product/layer/platform/admin-guide-ha-dr-drill.md`; backlog `ASSURE-OPERABILITY-1`) |
 | | Native Apache Hive / Kerberos JDBC connector | **NOT YET** | Supported through landed Parquet files via file Collectors (decision `D-ING5`) |
 | | Hosted-AI endpoints cannot be called by the standard distribution | **PROVEN** | `EgressGuardTest` (classpath absence); `compliance/evidence/air-gap-posture.md` — a packaging guarantee, not a network control |
 | | Accessibility: automated axe-core gate and live passes on Link Analysis pages | **PROVEN** | `docs/okf/product/layer/product/tests-accessibility-audit.md`; `LA-A11Y-AUDIT-1` |
 | | Full WCAG 2.2 AA conformance of Link Analysis | **NOT YET** | Two vendor data-grid findings and a not-audited list remain open (backlog `LA-A11Y-AUDIT-1`); a self-assessment, not a third-party certification |
+
+### 7.1 Roadmap and limits to know today
+
+The core is built and has been demonstrated end to end on telecom-fraud scenarios. The open work is about proving the largest scale and preparing call-record data at production volume.
+
+**Next**
+- **The $10^9$-edge proof** on a sized host (about $250\text{ GB}$ free disk and at least $16\text{ GB}$ for the build), after bounding the memory of the index build's `nodes` phase (backlog `LA-INDEX-SCALE-MEASURE-1`).
+- **Call-record preparation at volume** — a plan, not built, its decisions open (`docs/superpower/link-analysis-roadmap.md`, *Data preparation*): Hive acquisition, E.164 normalisation with a node dictionary, frozen index schemas and manifests, and a presence index with co-location ("who was with X") served from the server.
+- **Industry-pack relabels on the canvas**: pack terms for link kinds, pattern packs and typologies are published but not yet drawn on the canvas legend or the pattern picker (`LA-EDITIONS-RESIDUALS-1`). The Domain Profile itself is built (Section 3.6), with two packs.
+- **Machine-to-machine trust for integrations**, after its security review (Section 5.7).
+
+**Limits to know today**
+- The link index is enabled per Space by default (`index.enabled`, on since 2026-10-10) but serves only the reads of Section 6.2 item 3; everything else reads the Dataset directly.
+- Identity resolution is deterministic only: two identifiers merge only when someone asserts it. This is deliberate.
+- Range and CIDR entries in Entity Lists match within the lists but do not yet drive seeding or exclusion in an Investigation (Section 2.5).
+- Retention, legal hold and erasure controls are not built (Section 1; the purge of closed Investigations was declined, `D-U8`): real customer data should not be loaded until these rules are agreed for the deployment.
 
 ---
 
@@ -906,6 +1141,14 @@ Inspecto LA redefines the economics and operational posture of graph intelligenc
 For institutions seeking to modernize financial crime, intelligence and fraud operations without moving data outside their perimeter, Inspecto LA offers a graph platform whose claims are listed, sourced and bounded in Section 7.
 
 ---
+
+### What changed in version 1.3 (2026-10-21)
+
+- Merged the technical-stakeholder edition (renamed *Inspecto LA whitepaper*; new Sections 2.5, 4.8, 5.8, 6.5 to 6.7 and 7.1; limit count corrected to 148 and the per-delta lookup cost to about 2 ms).
+
+### What changed in version 1.2 (2026-10-21)
+
+- The scale runs of 2026-10-21 (full builds at $2\times10^8$ and $3\times10^8$ edges out of memory at a 6 GB cap, $5\times10^8$ at 12 GB; $10^9$ not proven), the production build-memory setting and the wait for ingest (Sections 1, 6.1 and 7); the Geo map placed in Standard and above (decision `D-LAE5`, Section 1); the route count of the Claims Register made marker-checked (97); the coverage figures cited to the documents that record them.
 
 ### What changed in version 1.1 (October 2026)
 

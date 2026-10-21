@@ -33,7 +33,7 @@ or the 10^8 claim moves.
 | 5x10^8 | 10 GB (341 s) | **OOM in `nodes` at 91 min** (8 GB cap; `out` 36 min, `in` 42 min) | 128 | not produced | — | — | — | — |
 | 10^9 | 20 GB (1519 s) | **stopped** at 39 min in `out` (disk floor) | 256 | not produced | — | — | — | — |
 
-Also measured: a hub key 36.2 to 56.2 ms and a 20-key lookup 408 to 766 ms at 10^8 (0 to 8 deltas); about +0.2 ms per delta;
+Also measured: a hub key 36.2 to 56.2 ms and a 20-key lookup 408 to 766 ms at 10^8 (0 to 8 deltas); about +2 ms per delta ((37.8 - 20.9) / 8 at 10^8);
 spill peak about 18 GB at 5x10^8; 21.8 GB of index plus spill written when the 10^9 run was stopped at free disk 145 GB of 476 GB
 against the operator's 30 % floor. Bucket count is `clamp(pow2(ceil(edges / 4e6)), 16, 1024)` (`BucketFunction.bucketsFor`),
 so 10^9 gives 256 and 5x10^8 gives 128.
