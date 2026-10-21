@@ -57,6 +57,11 @@ role refusal (403) → handler → masking → audit. Non-members get 404-as-abs
 - **Expand / neighbours / recursive paths.** `IndexedRead` checks `index.enabled`, a published index with a matching
   mapping, and staleness (`IndexStaleness`, `index.max_age_hours`); a miss returns a closed `Reason` and the flat path
   answers. Caps (`index.traversal_depth`, `index.frontier_cap`) overflowing mid-walk discard the partial index answer.
+- **Grow preview (LA-GROW-EXCLUDE-1).** `POST .../expand/preview` runs `InvestigationRoutes.previewExpand`: the append's
+  validation and read, then `evaluate` over the would-be entry with no write; `GrowPreview` shapes the counts (held hubs,
+  per-list removed counts rounded unless the list is open) and masking uses the would-be log. `POST
+  /inv/projection/neighbors/preview` (`InvRoutes.neighboursPreview`) is the explorer's flat equivalent for a set of ids.
+  Detail: [la-core architecture](../la-core/architecture.md) (Grow preview).
 - **Draft promote.** `DraftPromote` rebases to the main head (`DraftRebase`) and appends under the main lock, all or
   nothing, or files a four-eyes pending request when the Draft carries a sensitive expand.
 - **Index build.** `IndexRoutes` (on request) and `ScheduledIndexBuild` (the `la.index.build` Job via geo-link) submit

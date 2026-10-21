@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-90 route(s) registered; 90 in the OpenAPI contract, 0 not.
+92 route(s) registered; 92 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -70,6 +70,7 @@ tags: [api, routes, generated]
 | GET | `/inv/investigations/{investigationId}/embeds` | List the read-only embed links of an Investigation | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java` |
 | POST | `/inv/investigations/{investigationId}/embeds` | Mint a read-only embed link to an Investigation | inv | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java` |
 | POST | `/inv/investigations/{investigationId}/embeds/{grantId}/revoke` | Revoke one embed link of an Investigation | inv | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java` |
+| POST | `/inv/investigations/{investigationId}/expand/preview` | Grow preview: dry-run an expand and answer what it would add (appends nothing) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
 | POST | `/inv/investigations/{investigationId}/handoff` | Hand an Investigation's Dossier bundle and findings off to the external case manager | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/IntegrationRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/log` | GET /inv/investigations/{investigationId}/log (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/members` | GET /inv/investigations/{investigationId}/members (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationMemberRoutes.java` |
@@ -92,6 +93,7 @@ tags: [api, routes, generated]
 | POST | `/inv/projection` | POST /inv/projection (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/projection/multi` | POST /inv/projection/multi (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/projection/neighbors` | POST /inv/projection/neighbors (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
+| POST | `/inv/projection/neighbors/preview` | Grow preview for the explorer: what one neighbours step from a set of entities would add | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/reference-rows` | Reference Dataset rows for at most 500 entity keys, masked under the Space's maskingMode | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/schema/overlap-profile` | POST /inv/schema/overlap-profile (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | GET | `/inv/schema/relationships` | GET /inv/schema/relationships (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |

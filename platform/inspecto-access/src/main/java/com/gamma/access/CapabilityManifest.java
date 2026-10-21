@@ -34,6 +34,8 @@ public final class CapabilityManifest {
             // a snapshot. /replay persists nothing and is exempted as read-shaped below.
             new Entry("POST", "/inv/investigations", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/ops", Roles.CAN_MANAGE_INCIDENTS),
+            // LA-GROW-EXCLUDE-1: the Grow preview dry-runs that append - gated as it is, though it persists nothing
+            new Entry("POST", "/inv/investigations/([^/]+)/expand/preview", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/undo", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/reorder", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationTemplateRoutes (LA-23) — saving a method and instantiating one into a new Investigation
@@ -533,6 +535,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/geo/routes", "read-shaped", "computes routes from the body"),
             new Exemption("POST", "/inv/projection", "read-shaped", "computes a projection from the body"),
             new Exemption("POST", "/inv/projection/neighbors", "read-shaped", "computes neighbours from the body"),
+            new Exemption("POST", "/inv/projection/neighbors/preview", "read-shaped", "counts what one neighbours step would add (LA-GROW-EXCLUDE-1); persists nothing"),
             new Exemption("POST", "/inv/projection/multi", "read-shaped", "computes a multi-dataset projection from the body; persists nothing"),
             new Exemption("POST", "/inv/schema/overlap-profile", "read-shaped", "profiles column cardinality/overlap; persists nothing"),
             new Exemption("POST", "/inv/reference-rows", "read-shaped", "looks up reference rows for at most 500 entity keys; persists nothing"),

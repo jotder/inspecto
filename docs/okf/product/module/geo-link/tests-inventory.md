@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-109 test class(es): 18 unit, 91 real-HTTP control-plane, 0 IT.
+110 test class(es): 18 unit, 92 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -53,6 +53,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiGraphRunIndexTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiGraphRunIndexTest.java` | D-3 step 7 - a Graph Run {@code input:"index"} over REAL HTTP with an ARMED Authenticator. The proof is that the same question through |
 | `ControlApiGraphRunParityTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiGraphRunParityTest.java` | D-4 step 6 (design §3.5) - the ROUTE-level parity test: the graph of {@code graph-algorithms-parity.fixture.json}, the file the |
 | `ControlApiGraphRunTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiGraphRunTest.java` | D-4 step 6 - {@code /inv/graph/*} over REAL HTTP with an ARMED Authenticator throughout: with no Subject attached |
+| `ControlApiGrowPreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiGrowPreviewTest.java` | LA-GROW-EXCLUDE-1 phases 1-2 over real HTTP: the Grow preview. {@code POST /inv/investigations/{id}/expand/preview} dry-runs |
 | `ControlApiIndexAppendTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiIndexAppendTest.java` | D-3 step 8 - incremental append, compaction and the staleness probe's advice, over REAL HTTP with an ARMED Authenticator throughout |
 | `ControlApiIndexDefaultOnTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiIndexDefaultOnTest.java` | LA-DEMO-INDEX-1 (operator decision A, 2026-10-10) - the link index is ON BY DEFAULT, so it must be safe on every read route that can |
 | `ControlApiIndexMaxAgeTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiIndexMaxAgeTest.java` | LA-INDEX-MAX-AGE-1 (operator 2026-10-11) - a Dataset whose input files cannot be fingerprinted (view-backed) is never reported stale, |

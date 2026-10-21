@@ -25,6 +25,8 @@ final class LinkAnalysisRateClasses {
             {"POST", "/geo/routes"},
             {"POST", "/inv/projection/multi"},
             {"POST", "/inv/projection/neighbors"},
+            {"POST", "/inv/projection/neighbors/preview"},          // LA-GROW-EXCLUDE-1: the explorer's Grow preview reads like the step
+            {"POST", "/inv/investigations/([^/]+)/expand/preview"}, // LA-GROW-EXCLUDE-1: the dry run reads exactly what the expand would
             {"POST", "/geo/projection"},
             {"POST", "/inv/pattern/temporal"},
             {"POST", "/inv/pattern/branching"},

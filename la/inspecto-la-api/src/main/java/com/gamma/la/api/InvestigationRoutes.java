@@ -70,6 +70,8 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  *       ops (LA-17) SEAL the list as it stands at the fact log's head — see {@link #sealList} and
  *       {@link #seedRead}. A {@code resolve} (LA-17 slice 2) SEALS the Space's identity resolution at a pinned
  *       fact seq — see {@link #sealResolution}.</li>
+ *   <li>{@code POST /inv/investigations/{id}/expand/preview} — the Grow preview (LA-GROW-EXCLUDE-1): a dry run of that
+ *       expand body, answering its counts and appending nothing — see {@link #previewExpand}.</li>
  *   <li>{@code POST /inv/investigations/{id}/undo} — real undo: a log edit that reverts the latest op.</li>
  *   <li>{@code POST /inv/investigations/{id}/reorder} — re-ordering FORKS (D-E4): a new Investigation with explicit
  *       parent lineage; the original log, its Working Sets and any Artifact anchored to them are untouched.</li>
@@ -144,6 +146,9 @@ public final class InvestigationRoutes implements RouteModule {
         api.get("/inv/investigations", (e, m) -> list(api, e));
         api.post("/inv/investigations/([^/]+)/ops", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> appendOp(api, e, m.group(1), api.body(e))));
+        // LA-GROW-EXCLUDE-1 GE-3: gated as the append it dry-runs (a lead's act on the main log), though it persists nothing
+        api.post("/inv/investigations/([^/]+)/expand/preview", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> previewExpand(api, e, m.group(1), api.body(e))));
         api.post("/inv/investigations/([^/]+)/undo", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> undo(api, e, m.group(1))));
         api.post("/inv/investigations/([^/]+)/reorder", ApiContext.withCapability("canManageIncidents",
@@ -402,16 +407,7 @@ public final class InvestigationRoutes implements RouteModule {
             }
             if (op.equals("connect")) entry.put("read", sealConnect(api, ex, inv, params, before, null, ""));
             if (op.equals("expand")) {
-                for (String i : strings(params.get("expandHubs")))
-                    if (!before.entities.containsKey(i))
-                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + i + "' in 'expandHubs' is not in the Working Set");
-                Frontier fr = frontier(ids, params, before, true);
-                List<String> frontier = fr.ids();
-                if (frontier.isEmpty()) throw nothingToExpand("", fr);
-                int maxFrontier = SpaceLimits.get(inv.writeRoot(), LaLimit.INVESTIGATION_MAX_FRONTIER);
-                if (frontier.size() > maxFrontier)
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + maxFrontier
-                            + " entities; name them with 'ids'");
+                Frontier fr = expandFrontier(inv, params, before);
                 Map<String, Object> sensitive = sensitivity(inv, params);
                 if (sensitive != null && inv.draft() != null)   // D7-3: the four-eyes queue belongs to the main log (D-U7); promote (D7-5) is where it meets a Draft
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this expand is sensitive " + sensitive.get("exceeded")
@@ -421,6 +417,71 @@ public final class InvestigationRoutes implements RouteModule {
             }
             return masked(inv, commit(ex, inv, log, entry, before));
         });
+    }
+
+    /**
+     * The checks an appended {@code expand} runs before it reads, shared with the Grow preview so the two cannot drift:
+     * {@code expandHubs} must name admitted entities, the frontier (less held hubs, {@link #frontier}) must be non-empty
+     * and within the Space's {@code investigation.max_frontier}.
+     */
+    private static Frontier expandFrontier(Inv inv, Map<String, Object> params, InvestigationEvaluator.State before) {
+        for (String i : strings(params.get("expandHubs")))
+            if (!before.entities.containsKey(i))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + i + "' in 'expandHubs' is not in the Working Set");
+        Frontier fr = frontier(strings(params.get("ids")), params, before, true);
+        if (fr.ids().isEmpty()) throw nothingToExpand("", fr);
+        int maxFrontier = SpaceLimits.get(inv.writeRoot(), LaLimit.INVESTIGATION_MAX_FRONTIER);
+        if (fr.ids().size() > maxFrontier)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + maxFrontier
+                    + " entities; name them with 'ids'");
+        return fr;
+    }
+
+    /**
+     * {@code POST /inv/investigations/{id}/expand/preview} (LA-GROW-EXCLUDE-1 GE-3) — a DRY RUN of the {@code expand} this
+     * body would append: the same open gate (a lead), the same validation ({@link #params}, bindings, {@link #expandFrontier}),
+     * the same read (budget, fan-out, hub threshold, direction, window, link kinds, index-or-flat) and the same evaluation, so
+     * its counts equal the delta the append answers right after on the same data. It seals nothing and appends nothing (no
+     * log line, no Working Set, no event). A body that the four-eyes thresholds make sensitive (D-U7) is not read at all: it
+     * answers {@code needsApproval: true} instead of being held, and nothing is counted. Held ids are masked as the appended
+     * step's would be (the masking universe includes this read's rows). Counts: see {@link GrowPreview#ofExpand}.
+     */
+    private Object previewExpand(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        Inv inv = open(api, ex, id);
+        Object op = body.get("op");
+        if (op != null && !"expand".equals(op))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a Grow preview dry-runs an 'expand' only, got op '" + op + "'");
+        Map<String, Object> asOp = new LinkedHashMap<>(body);
+        asOp.put("op", "expand");
+        Map<String, Object> params = params("expand", resolvePseudonyms(inv, asOp), SpaceLimits.of(inv.writeRoot()));
+        requireBindings(inv.header(), "expand", params, "");
+        List<Map<String, Object>> log = readLog(inv);
+        InvestigationEvaluator.State before = stateBefore(inv, log);
+        for (String i : strings(params.get("ids")))
+            if (!before.entities.containsKey(i))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + i + "' is not in the Working Set");
+        Frontier fr = expandFrontier(inv, params, before);
+        Map<String, Object> sensitive = sensitivity(inv, params);
+        if (sensitive != null) return masked(inv, GrowPreview.needsApproval(sensitive));
+        Map<String, Object> entry = entry(log.size() + 1, "op", ex);
+        entry.put("op", "expand");
+        entry.put("params", params);
+        entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, ""), null, before.entities.keySet()));
+        Map<String, Object> e = roundTrip(entry);   // exactly what commit would evaluate
+        List<Map<String, Object>> next = new ArrayList<>(log);
+        next.add(e);
+        InvestigationEvaluator.State after = evaluate(next, -1, null);
+        Map<String, Object> out = GrowPreview.ofExpand(before, after, e, log, listsInForce(inv.writeRoot(), before));
+        EntityMasking mask = EntityMasking.of(inv, next, List.of());   // the would-be log: a held id masks as it will once appended
+        @SuppressWarnings("unchecked") Map<String, Object> answer = new LinkedHashMap<>((Map<String, Object>) mask.apply(out));
+        answer.put("masking", mask.describe());
+        return answer;
+    }
+
+    /** The Space's Entity Lists by id when an {@code excludeBy} is in force (titles for the preview); empty otherwise. */
+    private static Map<String, EntityRegistry.EntityList> listsInForce(Path writeRoot, InvestigationEvaluator.State before)
+            throws IOException {
+        return before.excludedKeys.isEmpty() ? Map.of() : GrowPreview.entityLists(writeRoot);
     }
 
     /**

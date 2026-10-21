@@ -52,6 +52,9 @@ import static com.gamma.util.SqlIdent.q;
  * {@code value}: the one-hop neighborhood of that entity (rows where it's either endpoint), so the
  * Studio's "expand node" action can grow the canvas without re-fetching the whole relation.
  *
+ * <p>{@code POST /inv/projection/neighbors/preview} (LA-GROW-EXCLUDE-1) — the explorer's Grow preview: the counts of one
+ * neighbours step from a set of entities, read-only. See {@link #neighboursPreview}.
+ *
  * <p>{@code POST /inv/projection/multi} (LA-08) — node mappings and edge projections across several Datasets
  * in one call, every row tagged with its {@code __provenance_dataset}. See {@link #projectMulti}.
  *
@@ -93,6 +96,7 @@ public final class InvRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.post("/inv/projection", (e, m) -> project(api, e, api.body(e), null));
         api.post("/inv/projection/neighbors", (e, m) -> neighbors(api, e, api.body(e)));
+        api.post("/inv/projection/neighbors/preview", (e, m) -> neighboursPreview(api, e, api.body(e)));   // LA-GROW-EXCLUDE-1: read-only
         api.post("/inv/projection/multi", (e, m) -> projectMulti(api, e, api.body(e)));
         api.get("/inv/schema/relationships", (e, m) -> schemaRelationships(api, e));
         api.post("/inv/schema/overlap-profile", (e, m) -> overlapProfile(api, e, api.body(e)));
@@ -608,6 +612,148 @@ public final class InvRoutes implements RouteModule {
         } catch (SQLException e) {
             throw DatasetReadFault.of("neighbour list failed", datasetId, writeRoot, e);
         }
+    }
+
+    /** A neighbours step's traversal directions - the Investigation {@code expand}'s. */
+    private static final List<String> DIRECTIONS = List.of("either", "out", "in", "reciprocal");
+
+    /**
+     * {@code POST /inv/projection/neighbors/preview} (LA-GROW-EXCLUDE-1 GE-3 / GE-10) — the Basic explorer's Grow preview:
+     * what one neighbours step from a SET of entities would add, with no Investigation. Body {@code {dataset, sourceCol,
+     * targetCol, linkKindCol?, ids[], direction? (either · out · in · reciprocal, default either), linkKinds?,
+     * hubThreshold? (default the Space's hub_threshold), excludeBy? [listIds], filter?, limit?}}. Answers
+     * {@link GrowPreview}'s shape: {@code addsNodes} the distinct neighbours outside {@code ids} not removed by a list,
+     * {@code addsLinks} their distinct {@code (source, target, kind)} links touching {@code ids} in the direction,
+     * {@code held} those neighbours with more distinct contacts than the threshold (counted over the whole Dataset, as an
+     * expand counts a hub; they are still added), {@code excludedByLists} per named list the neighbours it removes
+     * (rounded unless the list is open). Read-only and unrecorded — no event, no state; the flat Dataset answers
+     * ({@code readPath: flat}). {@code limit} caps the neighbours read (default / max the Space's traversal rows) and a
+     * breach sets {@code truncated}, the counts then being lower bounds. Gates as the neighbours read: write root 503 →
+     * a bad body 422 → unknown / not viewable Dataset or list 404 → retired list 409 → four-eyes 403 (D-U7). Ids in and
+     * out are the Space's exploration aliases when it masks them (DR-D2).
+     */
+    private Object neighboursPreview(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "entity projection");
+        String datasetId = ApiContext.str(body, "dataset");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        String sourceCol = ident(body, "sourceCol", true);
+        String targetCol = ident(body, "targetCol", true);
+        String kindCol = ident(body, "linkKindCol", false);
+        LaLimitValues lim = SpaceLimits.of(writeRoot);
+        int maxIds = SpaceLimits.get(lim, LaLimit.INPUT_MAX_IDS), maxIdLength = SpaceLimits.get(lim, LaLimit.INPUT_ID_LENGTH);
+        List<String> ids = boundedStrings(body, "ids", maxIds, maxIdLength);
+        if (ids.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'ids' - the entities to grow from");
+        String direction = body.get("direction") == null ? "either" : String.valueOf(body.get("direction"));
+        if (!DIRECTIONS.contains(direction))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be one of " + DIRECTIONS + ", got '" + direction + "'");
+        List<String> kinds = body.get("linkKinds") == null ? null
+                : boundedStrings(body, "linkKinds", SpaceLimits.get(lim, LaLimit.INPUT_LINK_KINDS), maxIdLength);
+        if (kinds != null && (kinds.isEmpty() || kindCol == null))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'linkKinds' must be a non-empty list and needs 'linkKindCol'");
+        Object t = body.get("hubThreshold");
+        if (t != null && (!(t instanceof Number n) || n.doubleValue() != Math.rint(n.doubleValue()) || n.longValue() < 1 || n.longValue() > Integer.MAX_VALUE))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'hubThreshold' must be an integer >= 1, got " + t);
+        int hubThreshold = t != null ? ((Number) t).intValue() : LinkAnalysisSettings.forRoot(writeRoot).effectiveHubThreshold();
+        List<String> listIds = body.get("excludeBy") == null ? List.of() : boundedStrings(body, "excludeBy", maxIds, maxIdLength);
+        int limit = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_MAX));
+
+        String relationSql = relationFor(api, ex, writeRoot, datasetId);
+        ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
+        java.util.TreeSet<String> frontier = new java.util.TreeSet<>();
+        for (String id : ids) frontier.add(mask.in(id));
+        DatasetProvider.BoundFilter filter = filterSql(body.get("filter"), datasetId, relationSql);
+        Map<String, com.gamma.entitystore.EntityRegistry.EntityList> lists = new LinkedHashMap<>();
+        if (!listIds.isEmpty()) {
+            var all = GrowPreview.entityLists(writeRoot);
+            for (String id : listIds) {
+                var l = all.get(id);
+                if (l == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "entity list '" + id + "' not found");
+                if (l.retired()) throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + id + "' is retired");
+                lists.put(id, l);
+            }
+        }
+        refuseIfSensitive(writeRoot, "a neighbours preview (limit " + limit + ")", limit, 0);
+
+        // Flat and bound: the frontier and kinds are parameters, identifiers validated. pairs = the distinct (source, target, kind)
+        // links; nb = each neighbour outside the frontier with its links touching the frontier in the direction; deg = each
+        // neighbour's distinct contacts over the whole Dataset (both directions), the number an expand flags a hub on.
+        List<String> binds = new ArrayList<>();
+        String src = q(sourceCol), tgt = q(targetCol);
+        StringBuilder sql = new StringBuilder("WITH fr AS ").append(com.gamma.la.storage.IndexReader.idRelation(frontier, binds))
+                .append(", pairs AS (SELECT CAST(").append(src).append(" AS VARCHAR) AS s, CAST(").append(tgt).append(" AS VARCHAR) AS t, ")
+                .append(kindCol != null ? "CAST(" + q(kindCol) + " AS VARCHAR)" : "NULL").append(" AS k FROM ").append(q(datasetId))
+                .append(" WHERE ").append(src).append(" IS NOT NULL AND ").append(tgt).append(" IS NOT NULL");
+        if (kinds != null)
+            sql.append(" AND CAST(").append(q(kindCol)).append(" AS VARCHAR) IN ").append(com.gamma.la.storage.IndexReader.idRelation(kinds, binds));
+        sql.append(" AND (").append(filter.sql()).append(") GROUP BY 1, 2, 3)");
+        binds.addAll(filter.binds());
+        String inF = " IN (SELECT id FROM fr)";
+        sql.append(", cand AS (SELECT CASE WHEN p.s").append(inF).append(" THEN p.t ELSE p.s END AS other FROM pairs p WHERE ")
+           .append(switch (direction) {
+               case "out" -> "p.s" + inF;
+               case "in" -> "p.t" + inF;
+               case "reciprocal" -> "(p.s" + inF + " OR p.t" + inF + ") AND EXISTS (SELECT 1 FROM pairs r WHERE r.s = p.t AND r.t = p.s)";
+               default -> "(p.s" + inF + " OR p.t" + inF + ")";
+           }).append(")")
+           .append(", nb AS (SELECT other, COUNT(*) AS links FROM cand WHERE other NOT").append(inF).append(" GROUP BY other)")
+           .append(", deg AS (SELECT id, COUNT(DISTINCT o) AS d FROM (SELECT s AS id, t AS o FROM pairs WHERE s IN (SELECT other FROM nb) "
+                   + "UNION ALL SELECT t AS id, s AS o FROM pairs WHERE t IN (SELECT other FROM nb)) u GROUP BY id)")
+           .append(" SELECT nb.other AS id, nb.links AS links, deg.d AS degree FROM nb JOIN deg ON deg.id = nb.other ORDER BY nb.other");
+        DatasetProvider.Result r;
+        try {
+            r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql.toString(),
+                    limit, 0, List.of(), List.of(), binds));
+        } catch (SQLException e) {
+            throw DatasetReadFault.of("neighbours preview failed", datasetId, writeRoot, e);
+        }
+        long addsNodes = 0, addsLinks = 0;
+        List<Map<String, Object>> held = new ArrayList<>();
+        Map<String, Long> removed = new LinkedHashMap<>();
+        Map<String, java.util.Set<String>> members = new LinkedHashMap<>();   // matched as an excludeBy matches: the id's key under the list's normaliser
+        java.time.Instant now = java.time.Instant.now();
+        for (var l : lists.entrySet()) {
+            removed.put(l.getKey(), 0L);
+            members.put(l.getKey(), l.getValue().liveMembers(now));
+        }
+        for (Map<String, Object> row : r.rows()) {
+            String id = String.valueOf(row.get("id"));
+            boolean dropped = false;
+            for (var l : lists.entrySet())   // counted under the FIRST list naming it, as an Investigation's earlier excludeBy wins
+                if (members.get(l.getKey()).contains(EntityTypes.normalise(l.getValue().normaliser(), id))) {
+                    removed.merge(l.getKey(), 1L, Long::sum);
+                    dropped = true;
+                    break;
+                }
+            if (dropped) continue;
+            addsNodes++;
+            addsLinks += ((Number) row.get("links")).longValue();
+            long degree = ((Number) row.get("degree")).longValue();
+            if (degree > hubThreshold) held.add(GrowPreview.held(String.valueOf(mask.out(id)), degree));
+        }
+        GrowPreview.sortHeld(held);
+        List<Map<String, Object>> lines = new ArrayList<>();
+        removed.forEach((id, n) -> lines.add(GrowPreview.listLine(id, lists.get(id), n)));
+        Map<String, Object> out = GrowPreview.answer(addsNodes, addsLinks, held, lines, r.truncated(), "flat", null);
+        out.put("hubThreshold", hubThreshold);
+        out.put("masking", mask.describe());
+        return out;
+    }
+
+    /** An optional list of non-blank strings under {@code key}: at most {@code max} entries of at most {@code maxLength} chars, deduplicated in order. */
+    private static List<String> boundedStrings(Map<String, Object> body, String key, int max, int maxLength) {
+        Object raw = body.get(key);
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> l) || l.size() > max)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' must be a list of at most " + max + " entries");
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (Object o : l) {
+            String v = o == null ? "" : String.valueOf(o);
+            if (v.isBlank() || v.length() > maxLength)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every '" + key + "' entry must be a non-blank string of at most "
+                        + maxLength + " chars");
+            out.add(v);
+        }
+        return new ArrayList<>(out);
     }
 
     /** LA-08: the tag on every node and edge naming the Dataset that produced it (contract §5.2). */

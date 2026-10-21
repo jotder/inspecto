@@ -50,6 +50,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
     private static final List<String[]> EXPLORER = List.of(
             new String[]{"GET", "/inv/schema/relationships"},                 // InvRoutes
             new String[]{"POST", "/inv/projection"},                         // InvRoutes: what a Link Analysis dashboard widget reads (D-LAE2: stays open)
+            new String[]{"POST", "/inv/projection/neighbors/preview"},       // InvRoutes: the explorer's Grow preview (LA-GROW-EXCLUDE-1 GE-10)
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes
             new String[]{"GET", "/inv/entity-identities"},                    // EntityIdentityRoutes
             new String[]{"GET", "/inv/entity-types"},                         // EntityProfileRoutes
@@ -67,6 +68,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
     private static final List<String[]> INVESTIGATION = List.of(
             new String[]{"GET", "/inv/investigations"},                       // InvestigationRoutes
             new String[]{"POST", "/inv/investigations"},                      // InvestigationRoutes (a write)
+            new String[]{"POST", "/inv/investigations/x/expand/preview"},     // InvestigationRoutes: the Grow preview (LA-GROW-EXCLUDE-1)
             new String[]{"GET", "/inv/investigations/x/dossier"},             // DossierRoutes
             new String[]{"GET", "/inv/investigations/x/dossier/bundle"},      // DossierBundleRoutes
             new String[]{"GET", "/inv/investigations/x/drafts"},              // DraftRoutes
