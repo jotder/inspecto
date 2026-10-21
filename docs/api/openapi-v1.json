@@ -12817,7 +12817,7 @@
         "tags" : [ "inv" ],
         "summary" : "Grow preview for the explorer: what one neighbours step from a set of entities would add",
         "operationId" : "postInvProjectionNeighborsPreview",
-        "description" : "LA-GROW-EXCLUDE-1 GE-3 / GE-10. Body {dataset, sourceCol, targetCol, linkKindCol?, ids[], direction? (either|out|in|reciprocal), linkKinds?, hubThreshold?, excludeBy? [listIds], filter?, limit?}. Read-only and unrecorded; available on Basic. addsNodes = distinct neighbours outside ids not removed by a list; held = those with more distinct contacts than hubThreshold (default the Space hub_threshold). limit caps the neighbours read; truncated then makes the counts lower bounds. Ids are exploration aliases when the Space masks.",
+        "description" : "LA-GROW-EXCLUDE-1 GE-3 / GE-10. Body {dataset, sourceCol, targetCol, linkKindCol?, ids[] (or value: one id, the neighbours read's body), direction? (either|out|in|reciprocal), linkKinds?, hubThreshold?, excludeBy? [listIds], filter?, limit?}. Read-only and unrecorded; available on Basic. addsNodes = distinct neighbours outside ids not removed by a list; held = those with more distinct contacts than hubThreshold (default the Space hub_threshold). limit caps the neighbours read; truncated then makes the counts lower bounds. Ids are exploration aliases when the Space masks.",
         "responses" : {
           "200" : {
             "description" : "Envelope data: the preview (readPath flat), plus hubThreshold and masking.",

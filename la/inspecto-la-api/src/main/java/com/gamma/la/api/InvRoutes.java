@@ -620,7 +620,7 @@ public final class InvRoutes implements RouteModule {
     /**
      * {@code POST /inv/projection/neighbors/preview} (LA-GROW-EXCLUDE-1 GE-3 / GE-10) — the Basic explorer's Grow preview:
      * what one neighbours step from a SET of entities would add, with no Investigation. Body {@code {dataset, sourceCol,
-     * targetCol, linkKindCol?, ids[], direction? (either · out · in · reciprocal, default either), linkKinds?,
+     * targetCol, linkKindCol?, ids[] (or the neighbours read's one-entity {@code value}), direction? (either · out · in · reciprocal, default either), linkKinds?,
      * hubThreshold? (default the Space's hub_threshold), excludeBy? [listIds], filter?, limit?}}. Answers
      * {@link GrowPreview}'s shape: {@code addsNodes} the distinct neighbours outside {@code ids} not removed by a list,
      * {@code addsLinks} their distinct {@code (source, target, kind)} links touching {@code ids} in the direction,
@@ -642,6 +642,12 @@ public final class InvRoutes implements RouteModule {
         LaLimitValues lim = SpaceLimits.of(writeRoot);
         int maxIds = SpaceLimits.get(lim, LaLimit.INPUT_MAX_IDS), maxIdLength = SpaceLimits.get(lim, LaLimit.INPUT_ID_LENGTH);
         List<String> ids = boundedStrings(body, "ids", maxIds, maxIdLength);
+        String value = ApiContext.str(body, "value");   // the neighbours read's one-entity body, accepted as ids: [value]
+        if (ids.isEmpty() && value != null) {
+            if (value.isBlank() || value.length() > maxIdLength)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'value' must be a non-blank string of at most " + maxIdLength + " chars");
+            ids = List.of(value);
+        }
         if (ids.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'ids' - the entities to grow from");
         String direction = body.get("direction") == null ? "either" : String.valueOf(body.get("direction"));
         if (!DIRECTIONS.contains(direction))

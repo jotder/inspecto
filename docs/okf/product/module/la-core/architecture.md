@@ -214,7 +214,7 @@ Design rules visible in the dependency graph:
   0 stays 0, for every list that does not read as open; Entity Lists carry no `visibility` yet (phase 4), so every count is
   rounded (`GrowPreview.open` is the one seam to flip). The explorer twin `POST /inv/projection/neighbors/preview` (Basic too,
   read-shaped exemption, no event) counts one neighbours step from a SET of ids with no Investigation: body `{dataset,
-  sourceCol, targetCol, linkKindCol?, ids[], direction?, linkKinds?, hubThreshold?, excludeBy? [listIds], filter?, limit?}`, one
+  sourceCol, targetCol, linkKindCol?, ids[] (or the neighbours read's one-entity `value`), direction?, linkKinds?, hubThreshold?, excludeBy? [listIds], filter?, limit?}`, one
   flat statement (distinct `(s, t, k)` pairs; neighbours outside `ids`; each neighbour's distinct contacts over the whole
   Dataset), list members matched in Java by each list's normaliser (unknown list 404, retired 409), `limit` caps the neighbours
   read (`truncated` then makes the counts lower bounds), ids in and out as exploration aliases. Both routes are rate-classed

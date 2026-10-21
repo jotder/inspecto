@@ -327,6 +327,8 @@ class ControlApiGrowPreviewTest {
             assertEquals(2, two.get("addsNodes").asInt(), "A1-B2 joins two frontier entities, so only HUB9 and C3 are new: " + two);
             assertEquals(2, two.get("addsLinks").asInt(), two.toString());
 
+            assertEquals(a.toString(), neighbours(c, "{\"value\":\"A1\",\"hubThreshold\":3}").toString(),
+                    "the neighbours read's one-entity body (value) is ids: [value]");
             assertEquals(422, post(c, "/inv/projection/neighbors/preview", "{" + BINDING + "}").statusCode(), "ids are required");
             assertEquals(404, post(c, "/inv/projection/neighbors/preview", "{" + BINDING + ",\"ids\":[\"A1\"],\"excludeBy\":[\"nope\"]}")
                     .statusCode(), "an unknown list");
