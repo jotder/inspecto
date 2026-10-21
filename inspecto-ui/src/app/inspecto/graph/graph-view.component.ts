@@ -509,6 +509,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         // Track container size (collapsible side panes resize the canvas live). Absent in jsdom.
         if (typeof ResizeObserver !== 'undefined') {
             this.resizeObserver = new ResizeObserver((entries) => {
+                // A zero box is a canvas taken out of the page (a kept-alive page while another shows), not a real
+                // size: shrinking to it and back would re-fit and throw the analyst's zoom away on their return.
+                const last = entries[entries.length - 1]?.contentRect;
+                if (last && (last.width === 0 || last.height === 0)) return;
                 this.graph?.resize();
                 // G6's resize keeps the old zoom and offset, so a canvas that grew or shrank leaves the graph off to a side:
                 // re-fit once the size settles (a drag of a panel edge fires many events), when the pointer model asks for it.

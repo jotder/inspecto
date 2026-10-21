@@ -24,5 +24,8 @@ metadata:
   emulation; prove a click lands with a click listener before filing a UI defect. Background panes give
   half-laid-out grid measurements. DataTable `defaultColDef flex:1` makes bare `width` dead.
 - **Minified bundle greps** for identifiers give false negatives; probe a string literal.
+- **A `RouteReuseStrategy` is constructed BY the Router:** injecting `SessionService` (which injects `Router`) in it is
+  NG0200 and a blank app, yet a spec with stubbed services passes. Resolve such services lazily via `Injector`, and
+  keep one spec on the REAL services (`keep-alive.strategy.spec.ts`, 2026-10-21).
 
 Related: [[bundle-and-process-traps]].

@@ -270,6 +270,17 @@
                 } @else {
                     <button mat-menu-item disabled>Nothing saved yet.</button>
                 }
+                @if (openWorkLabel(); as open) {
+                    <button
+                        mat-menu-item
+                        (click)="closeOpenWork()"
+                        [disabled]="investigation.busy()"
+                        data-testid="la-close-menu-item"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        <span>Close {{ open }}</span>
+                    </button>
+                }
             </mat-menu>
 
             <!-- per-view actions (shared submenu, parameterized by the row's view) -->
@@ -660,6 +671,19 @@
                     "
                 ></mat-icon>
             </button>
+            <!-- Close what is open (Investigation, Draft, imported view, drawn analysis): back to the empty state -->
+            @if (openWorkLabel(); as open) {
+                <button
+                    mat-icon-button
+                    (click)="closeOpenWork()"
+                    [disabled]="investigation.busy()"
+                    [matTooltip]="'Close ' + open"
+                    [attr.aria-label]="'Close ' + open"
+                    data-testid="la-close"
+                >
+                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                </button>
+            }
         </div>
     </header>
 

@@ -2,6 +2,8 @@ import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile
 import { installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
 import { TELECOM_PACK_FIXTURE } from '@inspecto/link-analysis/graph/domain-profile.testing';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -364,8 +366,165 @@ describe('LinkAnalysisComponent', () => {
         params.next(convertToParamMap({ investigation: 'inv-2' }));
         expect(adopt).toHaveBeenLastCalledWith('inv-2');
         params.next(convertToParamMap({ investigation: 'inv-2', other: 'x' })); // the store's own sync: no re-adopt
+        c.investigation.close();
         params.next(convertToParamMap({})); // closed: nothing to adopt
         expect(adopt).toHaveBeenCalledTimes(2);
+    });
+
+    it('puts ?investigation= back when the kept-alive page is reached through a link without it (the nav rail)', async () => {
+        const params = new BehaviorSubject(convertToParamMap({ investigation: 'inv-1' }));
+        const { fixture } = create({ queryParams: { investigation: 'inv-1' } });
+        (TestBed.inject(ActivatedRoute) as { queryParamMap: unknown }).queryParamMap = params;
+        const c = fixture.componentInstance;
+        vi.spyOn(c.investigation, 'adopt').mockImplementation(async (id) => {
+            c.investigation.activeId.set(id);
+            return true;
+        });
+        fixture.detectChanges();
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+        params.next(convertToParamMap({})); // back from Settings through the nav rail's plain /link-analysis
+
+        expect(c.investigation.activeId()).toBe('inv-1'); // still open
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({
+                queryParams: { investigation: 'inv-1' },
+                queryParamsHandling: 'merge',
+                replaceUrl: true,
+            }),
+        );
+    });
+
+    it('resolves a pivot that lands on the kept-alive page with its graph already drawn, without a new load', async () => {
+        const graphWithRef: G6GraphData = {
+            nodes: [
+                ...GRAPH.nodes,
+                { id: 'f', data: { label: 'F', kind: 'entity', objectRef: { id: 'case-1', type: 'CASE' } } },
+            ],
+            edges: GRAPH.edges,
+        };
+        const params = new BehaviorSubject(convertToParamMap({}));
+        const { fixture, queried } = create({ graph: graphWithRef });
+        const route = TestBed.inject(ActivatedRoute) as { queryParamMap: unknown; snapshot: unknown };
+        route.queryParamMap = params;
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.emphasis()).toBeNull();
+
+        const pivot = convertToParamMap({ pivotId: 'case-1', pivotType: 'CASE' });
+        route.snapshot = { queryParamMap: pivot };
+        params.next(pivot);
+
+        expect(c.emphasis()?.nodeIds).toEqual(['f']);
+        expect(queried).toHaveLength(1);
+    });
+
+    it('Close: absent on the empty state; names the drawn analysis, in the toolbar and Saved views, and goes back to empty', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="la-close"]')).toBeNull();
+
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const close = el.querySelector<HTMLButtonElement>('[data-testid="la-close"]')!;
+        expect(close.getAttribute('aria-label')).toBe('Close the analysis');
+        el.querySelector<HTMLButtonElement>('button[aria-label="Open saved views"]')!.click();
+        fixture.detectChanges();
+        expect(document.querySelector('[data-testid="la-close-menu-item"]')?.textContent?.trim()).toBe(
+            'Close the analysis',
+        );
+        await expectNoA11yViolations(el.querySelector('[data-testid="la-header"]')!);
+
+        close.click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        expect(c.graph()).toBeNull();
+        expect(c.lastRun()).toBeNull();
+        expect(el.textContent).toContain('No graph yet');
+        expect(el.querySelector('[data-testid="la-close"]')).toBeNull();
+    }, 45_000);
+
+    it('Close: an open Investigation in a Draft scope closes whole, and the store drops ?investigation=', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        c.investigation.refs.set([{ id: 'inv-1', title: 'Mule hub' }]);
+        c.investigation.activeId.set('inv-1');
+        c.investigation.activeDraftId.set('d-7');
+        TestBed.tick();
+        expect(c.openWorkLabel()).toBe('Draft d-7 of Investigation Mule hub');
+        c.investigation.busy.set(true); // a step in flight: Close waits for it, or the step's answer would reopen
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="la-close"]').disabled).toBe(true);
+        c.investigation.busy.set(false);
+
+        await c.closeOpenWork();
+        TestBed.tick();
+
+        expect(c.investigation.activeId()).toBeNull();
+        expect(c.investigation.activeDraftId()).toBeNull();
+        expect(c.openWorkLabel()).toBe('');
+        expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { investigation: null } }));
+    });
+
+    it('Close: an imported view that was never saved is asked about first; Cancel keeps it', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
+        const draft: LaImportDraft = {
+            kind: 'link-analysis-view',
+            id: 'mule_ring',
+            content: {},
+            sourceSpace: null,
+            targetExists: false,
+            integrity: null,
+            prerequisites: [],
+        };
+        c.importDraft.set(draft);
+        expect(c.openWorkLabel()).toBe('unsaved view mule_ring');
+
+        await c.closeOpenWork();
+        expect(ask).toHaveBeenCalledTimes(1);
+        expect(c.importDraft()).toBe(draft);
+
+        ask.mockResolvedValue(true);
+        await c.closeOpenWork();
+        expect(c.importDraft()).toBeNull();
+    });
+
+    it('says what a Space switch closed (remembered for the tab across the reload), once', () => {
+        sessionStorage.setItem(
+            'inspecto.la.openWork',
+            // actor '': no one is signed in under this TestBed, so the record is this (anonymous) user's own
+            JSON.stringify({ space: 'some-other-space', actor: '', label: 'Investigation Mule hub' }),
+        );
+        const { fixture } = create();
+        const info = vi.spyOn(TestBed.inject(ToastrService), 'info');
+        fixture.detectChanges();
+        expect(info).toHaveBeenCalledWith(
+            'Investigation Mule hub was closed when you switched Space. It stays in Space some-other-space; switch back to reopen it.',
+            'Closed',
+        );
+    });
+
+    it('ignores Ctrl+Z while kept alive behind another page (it is out of the document)', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const undo = vi.spyOn(fixture.componentInstance, 'undoPresentation');
+        const el = fixture.nativeElement as HTMLElement;
+        const parent = el.parentElement!;
+        el.remove();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+        expect(undo).not.toHaveBeenCalled();
+        parent.appendChild(el);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+        expect(undo).toHaveBeenCalledTimes(1);
     });
 
     it('says the Investigation is not available when the deep-linked id is unknown (404 is absence, DR-U9)', async () => {

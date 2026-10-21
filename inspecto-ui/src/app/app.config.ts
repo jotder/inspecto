@@ -4,7 +4,7 @@ import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { MAT_DIALOG_DEFAULT_OPTIONS, MatDialogConfig } from '@angular/material/dialog';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
+import { RouteReuseStrategy, provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { provideGamma } from '@gamma';
 import { appRoutes } from 'app/app.routes';
 import { provideIcons } from 'app/core/icons/icons.provider';
@@ -16,6 +16,7 @@ import { v1Interceptor } from './inspecto/api/v1.interceptor';
 import { registerGeoMapViz, registerLinkAnalysisViz } from '@inspecto/link-analysis';
 import { provideLaHostServices } from './modules/admin/studio/la-host.providers';
 import { SessionService } from './inspecto/auth/session.service';
+import { KeepAliveRouteReuseStrategy } from './inspecto/keep-alive.strategy';
 import { provideAppEnvironment } from './inspecto/api/app-environment';
 import { environment } from 'environments/environment';
 
@@ -46,6 +47,8 @@ export const appConfig: ApplicationConfig = {
             withInMemoryScrolling({ scrollPositionRestoration: 'enabled' }),
             withComponentInputBinding(),
         ),
+        // The Link Analysis page stays alive while the analyst visits another page (KEEP_ALIVE routes only).
+        { provide: RouteReuseStrategy, useClass: KeepAliveRouteReuseStrategy },
 
         // Material Date Adapter
         {

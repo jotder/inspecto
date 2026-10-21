@@ -116,6 +116,20 @@ left edge (with the Space switcher and your user menu). A user who may change Li
 * **Data strip** (bottom): the rows behind the graph as a table, with a SQL editor for questions the graph cannot
   ask. *Project result as graph* turns a query's rows back into a graph.
 * **Undo / Redo** step through display and filter changes.
+* **Close** (the **×** at the right end of the title row, and the last item of **Open saved views**) closes what is
+  open and goes back to the empty start page. Its label names what that is: *Close Investigation Mule hub*, *Close
+  Draft d-7 of Investigation Mule hub*, *Close unsaved view mule_ring* (an imported view not saved yet) or *Close the
+  analysis* (a drawn graph). It shows only while something is open. Closing an Investigation also takes
+  `?investigation=` out of the address bar. Nothing is deleted: reopen an Investigation from the Investigation tab
+  (**List Investigations**) and a view from **Open saved views**. An imported view you have not saved is asked about
+  first, because Close would lose it.
+* **What you have open stays open while you work elsewhere in the Space.** Go to Settings, Entities, Entity Lists or
+  Alerts and come back, by the menu or by Back: the graph as you left it, its selection, search and filters, the
+  panels and the open Investigation are all still there. Saving a setting, a *My browser* limit for example, closes
+  nothing; the new value applies to what you draw next. A reload reopens only the open Investigation (its id is in the
+  address bar); a drawn query graph does not survive a reload. **Switching Space closes everything that belongs to the
+  old Space**, because the app reloads in the new one. The next time you open Link Analysis it says what was closed
+  and the Space where it stays.
 
 ---
 

@@ -223,6 +223,10 @@ import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { laLimit } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
+import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
+// eslint-disable-next-line no-restricted-imports -- only `actor`, so the Space-switch notice never names another user's item; LA_FEATURES carries module flags, not identity
+import { SessionService } from '@inspecto/core/api';
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
@@ -384,6 +388,8 @@ export class LinkAnalysisComponent implements OnInit {
     private router = inject(Router);
     private route = inject(ActivatedRoute);
     private destroyRef = inject(DestroyRef);
+    private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+    private readonly confirm = inject(InspectoConfirmService);
     private readonly injector = inject(Injector);
     private datasetRows = inject(DatasetRowsService);
     /**
@@ -1309,7 +1315,20 @@ export class LinkAnalysisComponent implements OnInit {
         // The footer's server ceiling; absent when the server cannot answer. Graph Run is part of the Investigation surface,
         // so Basic (no Investigations) does not ask - its browser algorithms keep their own caps.
         if (this.investigationsEnabled()) this.graphRuns.loadCatalogue();
-        this.pendingPivot = this.pivotService.readIncoming(this.route);
+        if (this.closedBySpaceSwitch) this.toastr.info(closedBySpaceSwitchMessage(this.closedBySpaceSwitch), 'Closed');
+        // A stream, not one read: the page is kept alive (KEEP_ALIVE), so a later pivot lands on it with its graph
+        // already drawn - resolve that at once rather than after the next load.
+        this.route.queryParamMap
+            .pipe(
+                map((p) => `${p.get('pivotType')}:${p.get('pivotId')}`),
+                distinctUntilChanged(),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe(() => {
+                this.pendingPivot = this.pivotService.readIncoming(this.route);
+                const g = this.graph();
+                if (g) this.resolvePendingPivot(g);
+            });
         // DR-U9: `?investigation=<id>` (the Alerts page's link from a fired Investigation rule) opens that Investigation.
         // A stream, not the snapshot: a second Alert's link navigates to this same route with a NEW id, which Angular
         // reuses. The id the store already has open (it writes the param itself) is not adopted again.
@@ -1320,7 +1339,19 @@ export class LinkAnalysisComponent implements OnInit {
                 takeUntilDestroyed(this.destroyRef),
             )
             .subscribe((investigationId) => {
-                if (!investigationId || investigationId === this.investigation.activeId()) return;
+                const open = this.investigation.activeId();
+                if (!investigationId && open) {
+                    // Back on the kept-alive page through a link without the param (the nav rail): the Investigation is
+                    // still open, so put its id back in the URL - a reload then reopens it, as it did before leaving.
+                    void this.router.navigate([], {
+                        relativeTo: this.route,
+                        queryParams: { investigation: open },
+                        queryParamsHandling: 'merge',
+                        replaceUrl: true,
+                    });
+                    return;
+                }
+                if (!investigationId || investigationId === open) return;
                 if (!this.investigationsEnabled()) return; // Basic: no Investigation to open (LA-EDITIONS-1 ED-4)
                 this.openInvestigation();
                 void this.investigation.adopt(investigationId);
@@ -1515,14 +1546,8 @@ export class LinkAnalysisComponent implements OnInit {
         await this.execute(this.sourceId(), q);
     }
 
-    private async execute(sourceId: GraphSourceId, q: GraphSourceQuery): Promise<void> {
-        const source = this.graphSources.byId(sourceId);
-        if (!source) return;
-        const firstDraw = !this.graph();
-        const focusBefore = this.focusHolder();
-        this.loading.set(true);
-        this.loadError.set('');
-        // A fresh graph clears the canvas emphasis + presentation filters and the analysis toolbox's results.
+    /** A fresh graph (or none) clears the canvas emphasis + presentation filters and the analysis toolbox's results. */
+    private clearResults(): void {
         this.emphasis.set(null);
         this.toolbox?.reset();
         this.search.set('');
@@ -1531,7 +1556,6 @@ export class LinkAnalysisComponent implements OnInit {
         this.timeCutoff.set(null);
         this.localFilter.set(null);
         this.latestSnapshot.set(null);
-        this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
         this.serverPaths.set(null);
         this.expandSource.set(null);
@@ -1542,6 +1566,80 @@ export class LinkAnalysisComponent implements OnInit {
         this.temporalSealed.set(null);
         this.temporalSealError.set('');
         this.mappingSummary.set([]);
+    }
+
+    /**
+     * What is open, as the Close action names it: the Investigation (or the Draft of it that is the working scope), an
+     * imported view not saved yet, else the drawn analysis; '' = nothing open (the empty state).
+     */
+    readonly openWorkLabel = computed<string>(() => {
+        const inv = this.investigation;
+        if (inv.active()) {
+            const title = `Investigation ${inv.displayTitle()}`;
+            return inv.activeDraftId() ? `Draft ${inv.activeDraftId()} of ${title}` : title;
+        }
+        if (this.importDraft()) return `unsaved view ${this.importDraft()!.id}`;
+        return this.graph() ? 'the analysis' : '';
+    });
+
+    /**
+     * What a Space switch closed (the switch reloads the app, so it was remembered for the tab); said once on init. Read
+     * as a field, before {@link rememberOpen} first runs and overwrites the record with this page's own state.
+     */
+    private readonly actor = inject(SessionService).actor() ?? '';
+    private readonly closedBySpaceSwitch = takeClosedBySpaceSwitch(this.spaces.currentSpaceId() ?? '', this.actor);
+    /** The Space this page was opened in; everything it holds belongs to it (a Space switch reloads the app). */
+    private readonly pageSpace = this.spaces.currentSpaceId() ?? '';
+    /**
+     * Remember what is open for this tab, so a Space switch (an app reload) can say what it closed. Keyed by
+     * {@link pageSpace}, never the live Space: the switch changes that before the reload, and the record must still
+     * name the Space the item belongs to.
+     */
+    private readonly rememberOpen = effect(() => {
+        const label = this.openWorkLabel();
+        untracked(() => rememberOpenWork(label ? { space: this.pageSpace, actor: this.actor, label } : null));
+    });
+
+    /**
+     * Close what is open (operator 2026-10-21) and go back to the empty state: the Investigation and its Draft scope (the
+     * store drops `?investigation=` from the URL), an imported view, the drawn graph and its results. Nothing is deleted:
+     * an Investigation reopens from the Investigation tab, a saved view from Saved views. An imported view that was never
+     * saved is the one thing Close would lose, so that is asked first.
+     */
+    async closeOpenWork(): Promise<void> {
+        const draft = this.importDraft();
+        if (
+            draft &&
+            !(await this.confirm.confirmDestructive(`The imported view ${draft.id} is not saved. Close it anyway?`, {
+                title: 'Close unsaved view',
+                confirmText: 'Close',
+            }))
+        )
+            return;
+        this.clearDraft();
+        this.investigation.close();
+        this.investigation.clearQueuedSeeds();
+        this.pendingInvestigation.set(null);
+        this.investigateIssue.set('');
+        this.clearResults();
+        this.graph.set(null);
+        this.lastRun.set(null);
+        this.truncated.set(false);
+        this.loadError.set('');
+        this.kindFilter.set([]);
+        this.hiddenNodeIds.set([]);
+        this.queryOpen.set(true);
+    }
+
+    private async execute(sourceId: GraphSourceId, q: GraphSourceQuery): Promise<void> {
+        const source = this.graphSources.byId(sourceId);
+        if (!source) return;
+        const firstDraw = !this.graph();
+        const focusBefore = this.focusHolder();
+        this.loading.set(true);
+        this.loadError.set('');
+        this.clearResults();
+        this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         try {
             const g = await source.query(q);
             this.graph.set(g);
@@ -2002,6 +2100,8 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z (or Ctrl+Y) redo — ignored while typing in a form field. */
     onHistoryKeydown(e: KeyboardEvent): void {
+        // Kept alive while another page shows (KEEP_ALIVE): that page's Ctrl+Z is not ours.
+        if (!this.host.nativeElement.isConnected) return;
         const target = e.target as HTMLElement | null;
         if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
         if (!(e.ctrlKey || e.metaKey)) return;
