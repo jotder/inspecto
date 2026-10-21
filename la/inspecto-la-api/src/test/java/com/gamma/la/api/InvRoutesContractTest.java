@@ -16,6 +16,7 @@ class InvRoutesContractTest extends RouteModuleContract {
         return java.util.Map.of(
                 "POST /inv/projection", "read-shaped: computes a projection from the body",
                 "POST /inv/projection/neighbors", "read-shaped: computes neighbours from the body",
+                "POST /inv/projection/neighbors/preview", "read-shaped: counts what one neighbours step would add; persists nothing",
                 "POST /inv/projection/multi", "read-shaped: multi-dataset projection; persists nothing",
                 "POST /inv/schema/overlap-profile", "read-shaped: profiles column cardinality/overlap; persists nothing",
                 "POST /inv/traversal/recursive-paths", "read-shaped: walks paths over a Dataset; persists nothing",

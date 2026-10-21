@@ -60,6 +60,105 @@
         "x-optional-module" : true
       }
     },
+    "/inv/projection/neighbors/preview" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Grow preview for the explorer: what one neighbours step from a set of entities would add",
+        "operationId" : "postInvProjectionNeighborsPreview",
+        "description" : "LA-GROW-EXCLUDE-1 GE-3 / GE-10. Body {dataset, sourceCol, targetCol, linkKindCol?, ids[] (or value: one id, the neighbours read's body), direction? (either|out|in|reciprocal), linkKinds?, hubThreshold?, excludeBy? [listIds], filter?, limit?}. Read-only and unrecorded; available on Basic. addsNodes = distinct neighbours outside ids not removed by a list; held = those with more distinct contacts than hubThreshold (default the Space hub_threshold). limit caps the neighbours read; truncated then makes the counts lower bounds. Ids are exploration aliases when the Space masks.",
+        "responses" : {
+          "200" : {
+            "description" : "Envelope data: the preview (readPath flat), plus hubThreshold and masking.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "addsNodes" : {
+                      "type" : [ "integer", "null" ],
+                      "description" : "Entities the step would add (null when needsApproval)."
+                    },
+                    "addsLinks" : {
+                      "type" : [ "integer", "null" ],
+                      "description" : "Links the step would add (null when needsApproval)."
+                    },
+                    "held" : {
+                      "type" : "array",
+                      "description" : "Busy numbers (more distinct contacts than the hub threshold) the step would hold - ids masked as the step would mask them.",
+                      "items" : {
+                        "type" : "object",
+                        "properties" : {
+                          "id" : {
+                            "type" : "string"
+                          },
+                          "contacts" : {
+                            "type" : "integer"
+                          }
+                        }
+                      }
+                    },
+                    "heldCount" : {
+                      "type" : [ "integer", "null" ]
+                    },
+                    "excludedByLists" : {
+                      "type" : "array",
+                      "description" : "Per exclusion list, the nodes it removes from this step; removed is rounded (nearest 5, never below 5, 0 stays 0) unless the list is open.",
+                      "items" : {
+                        "type" : "object",
+                        "properties" : {
+                          "listId" : {
+                            "type" : "string"
+                          },
+                          "title" : {
+                            "type" : "string"
+                          },
+                          "removed" : {
+                            "type" : "integer"
+                          },
+                          "rounded" : {
+                            "type" : "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "truncated" : {
+                      "type" : "boolean"
+                    },
+                    "readPath" : {
+                      "type" : [ "string", "null" ],
+                      "enum" : [ "index", "flat", null ]
+                    },
+                    "reason" : {
+                      "type" : "string",
+                      "description" : "Why the flat Dataset answered, or why nothing was read."
+                    },
+                    "needsApproval" : {
+                      "type" : "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "A sensitive read above the Space four-eyes thresholds."
+          },
+          "404" : {
+            "description" : "Unknown Dataset or Entity List, or a Dataset the caller may not view."
+          },
+          "409" : {
+            "description" : "A named Entity List is retired."
+          },
+          "422" : {
+            "description" : "A malformed field or an unknown column."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/projection/multi" : {
       "post" : {
         "tags" : [ "inv" ],
@@ -309,6 +408,110 @@
           }
         },
         "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/investigations/{investigationId}/expand/preview" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Grow preview: dry-run an expand and answer what it would add (appends nothing)",
+        "operationId" : "postInvInvestigationsByInvestigationIdExpandPreview",
+        "description" : "LA-GROW-EXCLUDE-1 GE-3. Body = exactly the expand op body the Investigation would append (op optional, expand only): the same validation, budget, fan-out, hub threshold, direction, window, link kinds and index-or-flat read, evaluated against the Working Set, so the counts equal the delta of that expand appended right after on the same data. Seals nothing, appends nothing, emits no event. A body above the four-eyes thresholds is not read: it answers needsApproval: true with null counts and exceeded[]. Gated as the append: canManageIncidents, a lead of the Investigation (others 404 / a non-lead member 403). 503 on Basic.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope data: the preview.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "addsNodes" : {
+                      "type" : [ "integer", "null" ],
+                      "description" : "Entities the step would add (null when needsApproval)."
+                    },
+                    "addsLinks" : {
+                      "type" : [ "integer", "null" ],
+                      "description" : "Links the step would add (null when needsApproval)."
+                    },
+                    "held" : {
+                      "type" : "array",
+                      "description" : "Busy numbers (more distinct contacts than the hub threshold) the step would hold - ids masked as the step would mask them.",
+                      "items" : {
+                        "type" : "object",
+                        "properties" : {
+                          "id" : {
+                            "type" : "string"
+                          },
+                          "contacts" : {
+                            "type" : "integer"
+                          }
+                        }
+                      }
+                    },
+                    "heldCount" : {
+                      "type" : [ "integer", "null" ]
+                    },
+                    "excludedByLists" : {
+                      "type" : "array",
+                      "description" : "Per exclusion list, the nodes it removes from this step; removed is rounded (nearest 5, never below 5, 0 stays 0) unless the list is open.",
+                      "items" : {
+                        "type" : "object",
+                        "properties" : {
+                          "listId" : {
+                            "type" : "string"
+                          },
+                          "title" : {
+                            "type" : "string"
+                          },
+                          "removed" : {
+                            "type" : "integer"
+                          },
+                          "rounded" : {
+                            "type" : "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "truncated" : {
+                      "type" : "boolean"
+                    },
+                    "readPath" : {
+                      "type" : [ "string", "null" ],
+                      "enum" : [ "index", "flat", null ]
+                    },
+                    "reason" : {
+                      "type" : "string",
+                      "description" : "Why the flat Dataset answered, or why nothing was read."
+                    },
+                    "needsApproval" : {
+                      "type" : "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The caller lacks canManageIncidents, or is a member but not a lead."
+          },
+          "404" : {
+            "description" : "No such Investigation, or not visible to the caller."
+          },
+          "422" : {
+            "description" : "The expand body is invalid (the same refusal the append gives), or nothing to expand."
+          },
+          "503" : {
+            "description" : "No write root, or Investigations are not available in this edition (Basic)."
+          }
+        },
         "x-optional-module" : true
       }
     },

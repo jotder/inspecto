@@ -75,6 +75,7 @@ class DecisionRuleWritersTest {
             Map.entry("EntityListRoutes#retire", NOT_CONFIG), Map.entry("InvestigationRoutes#sealList", NOT_CONFIG),
             Map.entry("EntityListRoutes#attributes", NOT_CONFIG), Map.entry("ExclusionListRoutes#lists", NOT_CONFIG),
             Map.entry("InvestigationRoutes#autoApplied", NOT_CONFIG), Map.entry("RestrictedLists#of", NOT_CONFIG),
+            Map.entry("GrowPreview#entityLists", NOT_CONFIG),   // LA-GROW-EXCLUDE-1: a read of the Identity Fact log
             Map.entry("InvestigationRoutes#sealResolution", NOT_CONFIG),
             Map.entry("ValueMeasures#agents", NOT_CONFIG),   // operator-approved 2026-09-30   // operator-approved 2026-09-30
             Map.entry("EntityListRoutes#registerDataset", FIXED_KIND + " (dataset)"),

@@ -13,7 +13,7 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-94 row(s).
+96 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -86,6 +86,7 @@ tags: [feature-db, module]
 | "POST /inv/investigations/([^/]+)/drafts/([^/]+)/undo" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/drafts/([^/]+)/undo"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/investigations/([^/]+)/embeds" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/embeds"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/investigations/([^/]+)/embeds/([^/]+)/revoke" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/embeds/([^/]+)/revoke"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /inv/investigations/([^/]+)/expand/preview" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/expand/preview"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/investigations/([^/]+)/handoff" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/handoff"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/investigations/([^/]+)/members" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/members"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/investigations/([^/]+)/members/revoke" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/members/revoke"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
@@ -103,6 +104,7 @@ tags: [feature-db, module]
 | "POST /inv/projection" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/projection"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/projection/multi" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/projection/multi"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/projection/neighbors" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/projection/neighbors"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /inv/projection/neighbors/preview" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/projection/neighbors/preview"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/reference-rows" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/reference-rows"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/schema/overlap-profile" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/schema/overlap-profile"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/snapshots" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/snapshots"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

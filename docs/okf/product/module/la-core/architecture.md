@@ -199,6 +199,29 @@ Design rules visible in the dependency graph:
   budget and the fan-out clause); a longer list is judged by `budget` / `maxFanOut` as any expand. The log line and the Dossier say
   "restricted to N chosen neighbours" (`InvestigationTime.rungClause`), and a saved template drops `only` with `ids` (case data).
   `ControlApiInvestigationPickNeighboursTest` and `InvestigationExpandedFoldTest` pin it.
+  *Grow preview (LA-GROW-EXCLUDE-1 phases 1-2, 2026-10-22, as built, backend only):* `POST /inv/investigations/{id}/expand/preview`
+  takes exactly the `expand` op body (`op` optional, `expand` only) and runs the append's own path minus the write: the lead
+  open gate (`canManageIncidents` + member lead; non-member 404), `params` + `requireBindings`, the ids-in-Working-Set check,
+  `expandFrontier` (the `expandHubs` / held-frontier / empty / `max_frontier` checks, extracted so the append and the preview
+  share them), the same `read` (index or flat) and the same `evaluate` over the round-tripped would-be entry. Nothing is
+  appended, sealed, cached or emitted. Answer (`GrowPreview`): `addsNodes` = the delta's `admitted`, `addsLinks` = `linksAdded`,
+  `held [{id, contacts}]` = the read's hubs left flagged (the append's `hubsFlagged`, busiest first), `excludedByLists
+  [{listId, title, removed, rounded}]` = per `excludeBy` in force the distinct not-yet-admitted read endpoints its remembered
+  keys drop, `truncated`, `readPath` (`index` when the index answered, else `flat` with the fallback's `reason`),
+  `needsApproval`. Held ids are masked with the WOULD-BE log (`EntityMasking.of(inv, log + entry)`), so the pseudonym is the one
+  the appended step shows. A body the four-eyes thresholds make sensitive is NOT read: `needsApproval: true`, null counts,
+  `exceeded[]`, no pending request. *Restricted-list counts (plan §7):* `removed` is rounded to the nearest 5, never below 5,
+  0 stays 0, for every list that does not read as open; Entity Lists carry no `visibility` yet (phase 4), so every count is
+  rounded (`GrowPreview.open` is the one seam to flip). The explorer twin `POST /inv/projection/neighbors/preview` (Basic too,
+  read-shaped exemption, no event) counts one neighbours step from a SET of ids with no Investigation: body `{dataset,
+  sourceCol, targetCol, linkKindCol?, ids[] (or the neighbours read's one-entity `value`), direction?, linkKinds?, hubThreshold?, excludeBy? [listIds], filter?, limit?}`, one
+  flat statement (distinct `(s, t, k)` pairs; neighbours outside `ids`; each neighbour's distinct contacts over the whole
+  Dataset), list members matched in Java by each list's normaliser (unknown list 404, retired 409), `limit` caps the neighbours
+  read (`truncated` then makes the counts lower bounds), ids in and out as exploration aliases. Both routes are rate-classed
+  EXPENSIVE. *Remove held super nodes* needs no route: the SPA appends an `exclude` with `reason: "busy number above N
+  contacts"` - `exclude` already requires and seals `reason` (unchanged). `ControlApiGrowPreviewTest` pins parity (preview
+  counts = the append's delta right after, log length and Working Set unchanged), list rounding, masking, four-eyes, the
+  armed gate and Basic.
   *Neighbour list (LA-EXPAND-PICK-NEIGHBOURS-1 residuals, 2026-10-13):* the *Choose neighbours* list is the `list` form of `POST /inv/projection/neighbors`
   (`{..., value, list: true, offset?, limit?}`; no new route, so no manifest / route-gating / openapi entry changed): the server folds ONE entity's
   link rows per neighbour (events across kinds, sorted kinds), strongest first (ties by id), a self-link is no neighbour, and answers
@@ -559,7 +582,7 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **98**<!--count:la-routes--> routes (**91**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **100**<!--count:la-routes--> routes (**93**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -928,6 +951,10 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
   ⚠ Not hidden, deliberately: the step's Working Set **delta** still names the admitted entities it removed (the canvas
   needs them, and the analyst saw them a step earlier), and the **Dossier** (its ledger counts and negative space) is
   unchanged — BACKLOG row on `LA-GROW-EXCLUDE-1`.
+- **Grow previews.** `GrowPreview.listLine` rounds a list's `removed` only when the list is restricted (now, sealed, or
+  no longer known) and the caller holds neither grant; an open list's count is exact. The Basic explorer's
+  `POST /inv/projection/neighbors/preview` refuses `excludeBy` over a restricted list to such a caller (403), because two
+  previews, with and without the list or over a one-id frontier, would name its members by difference.
 - **`GET /inv/exclusion-lists`** (`ExclusionListRoutes`, feature `geoLink`, so Basic serves it) →
   `{lists: [{id, title, entityType, ownerKind, autoApply, visibility, size}]}`: live exclusion lists, admin first, then by
   title and id; never members. Read-gated like the Entity List reads (Space access; 503 without a write root). Rate class

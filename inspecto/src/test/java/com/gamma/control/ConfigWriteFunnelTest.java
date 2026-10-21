@@ -287,6 +287,8 @@ class ConfigWriteFunnelTest {
             Map.entry("InvestigationRoutes#sealResolution", "READS the Identity Fact log to seal a resolution into an "
                     + "Investigation op (LA-17 slice 2) — opening the log, not a write; operator-approved 2026-09-30; "
                     + ENTITY_FACTS),
+            Map.entry("GrowPreview#entityLists", "READS the Identity Fact log to fold the Entity Lists a Grow preview counts and "
+                    + "titles (LA-GROW-EXCLUDE-1) - opening the log, not a write; a preview appends nothing; " + ENTITY_FACTS),
             Map.entry("InvestigationRoutes#sealList", "READS the Identity Fact log to seal a list into an "
                     + "Investigation op (LA-17) — the signal matches opening the log, which is not a write; "
                     + ENTITY_FACTS),
