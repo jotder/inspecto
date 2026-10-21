@@ -28,7 +28,7 @@ default, with a second approver for wide expansions and standing detection on wh
 
 ## What the pack sets up
 
-- **Settings** — `spaces/_templates/la-showcase/config/link-analysis.toon`: `masking_mode: typed`,
+- **Settings** — `spaces/_templates/la-showcase/config/link-analysis.toon`: no `masking_mode` (the edition default applies: off in Basic, `typed` in Standard and above; operator 2026-10-21),
   `four_eyes_fan_out_above: 2000`, `index.enabled: true`, Drafts limits (`max_open: 10`,
   `hibernate_after_minutes: 60`, `expire_after_days: 14`). The mobile-money template sets a fan-out
   threshold of 100 (`spaces/_templates/la-mobile-money/config/link-analysis.toon`). Both templates declare

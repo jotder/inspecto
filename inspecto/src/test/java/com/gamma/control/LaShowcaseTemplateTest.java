@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,7 +31,7 @@ class LaShowcaseTemplateTest {
     @Test
     void settingsAreExplicitAndTheHubExpandWaitsForASecondPerson() {
         LinkAnalysisSettings s = LinkAnalysisSettings.forRoot(CFG);
-        assertEquals("typed", s.maskingMode());
+        assertNull(s.maskingMode(), "no stated mode: the edition default applies (Basic none, Standard and above typed; operator 2026-10-21)");
         assertEquals(2000, s.fourEyesFanOutAbove());
         assertEquals(Boolean.TRUE, s.index().enabled());
         assertEquals(10, s.drafts().maxOpen());

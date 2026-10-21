@@ -29,7 +29,7 @@ Pick a Demo User (`spaces/_templates/la-showcase/config/demo-users.toon`, `roles
 1. A new `mule_transfers` file commits (copy a file from `data/staged` into the inbox); `la_index_build` appends it to the index.
 2. As `fm.analyst`, open the saved view `mule_structuring` and seed it with `MULE-HUB-01`: the twelve smurfs appear. Run cycle detection: the `SHELL-A`..`SHELL-D` loop is the only directed cycle.
 3. Expanding the hub exceeds the four-eyes fan-out threshold, so it waits for `fm.manager`. With the seed applied, one pending expand on the Investigation `mule-hub-case` is already waiting.
-4. Identifiers stay masked (`masking_mode: typed`); only `admin` can reveal.
+4. Identifiers are masked in Standard and above (the edition default, `typed`); only `admin` can reveal. In Basic they show unmasked.
 5. Work happens in the Investigation `mule-hub-case`; the seed also leaves an open Draft and a second Investigation, `delivery-gap-case`, whose window reaches one day past the landed files.
 6. An Alert Rule bound to the Investigation with standing detection on is evaluated by `la_detect` every five minutes; the seed runs it once so the `mule-pass-through` Alert exists, and a hit can go to a Case.
 
