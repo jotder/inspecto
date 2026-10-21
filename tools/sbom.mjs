@@ -68,7 +68,18 @@ const SHIPPED = Object.fromEntries(modules.map((m) => [m.artifactId, m.bundleFil
 const plModules = modules.map((m) => m.dir);
 const profile = editionProfile(edition);
 
-const M2 = process.env.M2_REPO || join(homedir(), '.m2', 'repository');
+// The local repository Maven itself uses: M2_REPO, else <localRepository> in ~/.m2/settings.xml (a moved repo, e.g.
+// C:/.m2/repository, left every artifact unresolved and failed the SBOM with "no hash"), else ~/.m2/repository.
+function m2Repo() {
+    if (process.env.M2_REPO) return process.env.M2_REPO;
+    const settings = join(homedir(), '.m2', 'settings.xml');
+    if (existsSync(settings)) {
+        const m = readFileSync(settings, 'utf8').match(/<localRepository>\s*([^<]+?)\s*<\/localRepository>/);
+        if (m && !m[1].includes('${')) return m[1];
+    }
+    return join(homedir(), '.m2', 'repository');
+}
+const M2 = m2Repo();
 const rootPom = readFileSync(join(repoRoot, 'pom.xml'), 'utf8');
 const projectVersion =
     arg('--version', null) ||

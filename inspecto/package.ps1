@@ -308,7 +308,10 @@ if (-not $NoUi -and (Test-Path (Join-Path $uiDir 'package.json'))) {
 # compatibility shim this line carried since 2026-07-31 is gone: one name, one glob. The BUNDLE
 # file name below followed on 2026-08-13 — the deployment surface (serve.sh, the run-example
 # scripts, docs/EDITIONS.md) is now 'inspecto.jar', so nothing ships as 'file-processor' anymore.
+# Skip the -tests / -sources / -javadoc attachments: since 590a5a519 the module also publishes a test-jar, and
+# '-tests.jar' sorts before '.jar', so an unfiltered first match shipped the TEST jar as inspecto.jar.
 $jarSrc = Get-ChildItem -Path $targetDir -Filter 'inspecto-processor-*.jar' -ErrorAction SilentlyContinue |
+          Where-Object { $_.Name -notmatch '-(tests|sources|javadoc)\.jar$' } |
           Select-Object -First 1 -ExpandProperty FullName
 if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
     throw "JAR not found matching $targetDir\inspecto-processor-*.jar.  Run without -NoBuild or build manually first."
