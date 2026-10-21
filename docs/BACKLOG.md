@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **63<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 50<!--count:backlog-p3--> × P3** —
+> **64<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 50<!--count:backlog-p3--> × P3** —
+> ⬆ **63 → 64 (P2 13 → 14) on 2026-10-21**: filed P2 `DATA-TIERS-1` [items: edition.basic, module.etl, module.acquire, layer.platform · kind: feature · hold: operator] (the data layer by edition: Basic one-off "Add data" import, Standard flowing Pipelines, Advanced scale and governance; plan with recommendations DT-1…DT-10).
 > ↔ **63 (no count change) on 2026-10-21**: narrowed P3 `LA-INDEX-SCALE-MEASURE-1` (the `nodes` phase is folded one bucket at a time and the degree statistics use `DISTINCT` then `count(*)`: a 10^8-edge FULL build completes at 2 GB and at 1 GB, where the unmodified one died in the statistics at 2 GB and completed at 1 GB (1334 s: not monotone in the cap); the per-node memory figures of the earlier runs were the generator's id domain, withdrawn; a completed build above 10^8 stays open).
 > ↔ **63 (no count change) on 2026-10-21**: narrowed P3 `PACK-RERATING-1` (R3 built: plan inference and the `wrong_plan` cause over a `subscription_history` feed; R4 to R7 open).
 > ↔ **63 (no count change) on 2026-10-20**: narrowed P3 `PACK-RERATING-1` (R2 built: counterfactual causes with confidence, root causes, revenue at risk and the over-billing class in the `telco-rerating` template; R3 to R7 open).
@@ -300,11 +301,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 50<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 50<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 63<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 64<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -537,6 +538,7 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 
 
+- **P2** · `DATA-TIERS-1` — **the data layer by edition: Basic gets a one-off "Add data" import (CSV / Parquet upload, Postgres snapshot, no-code shaping) and no schedules, joins, Expectations or run statistics; Standard keeps flowing Pipelines; Advanced adds scale and governance (plan 2026-10-21, recommendations DT-1…DT-10 await operator confirmation, nothing built).** Plan: [`superpower/data-tier-editions-plan.md`](superpower/data-tier-editions-plan.md). Phase 1 ("Add data", Basic and up) is useful on its own; phase 2 (gating the data layer on Basic) is a breaking change for current Basic configurations and must refuse with a named feature (DT-9). → [`superpower/data-tier-editions-plan.md`](superpower/data-tier-editions-plan.md) [items: edition.basic, module.etl, module.acquire, layer.platform · kind: feature · hold: operator]
 - **P3** · `IMPORT-WHOLE-SPACE-SPLIT-1` — **split a whole-Space export into its kinds' own validated routes on import, if ever asked.** Operator 2026-09-29: importing a whole-Space export into an EXISTING Space is not supported — `POST /spaces/{id}/import` answers a `kind: space` bundle 403 naming the two supported flows (per-data-source import, or a new Space from the zip). Build only on a real request. → `okf/product/module/access/admin-guide-auth-security.md` (import section) [items: module.exchange, module.access · kind: feature · hold: demand]
 
 

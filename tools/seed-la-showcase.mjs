@@ -18,6 +18,8 @@
 //
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only. Never sends a credential: the Demo User exchange
 // takes a `demo:<id>` code and no password.
+// On a BASIC bundle (no sign-in: the exchange answers 503; no Investigations: /inv answers 503) it seeds what Basic carries, the
+// Entity Lists, with no Authorization header, and reports every other step and stage as not in this edition (exit code 0).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -87,7 +89,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)), ingestWaitTries = 30, alertWaitTries = 20, readyTries = 60, stages = {} } = {}) {
   const want = { pending: true, alert: true, draft: true, coverage: true, ...stages };
   const plan = buildPlan();
-  const out = { done: [], skipped: [], failed: [], warnings: [], summary: {} };
+  const out = { done: [], skipped: [], failed: [], warnings: [], unavailable: [], summary: {} };
   if (!apply) {
     log(`DRY RUN (no request is sent; add --apply). Space '${space}' at ${base}`);
     for (const s of plan) log(`  ${s.as.padEnd(11)} ${s.method} ${s.path}  ${JSON.stringify(s.body)}`);
@@ -98,17 +100,21 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     return out;
   }
   const tokens = {};
+  let authFree = false;   // Basic: no session broker, the exchange answers 503 and every route is served without sign-in
   const api = `${base}/api/v1`;
   const spaced = `${api}/spaces/${space}`;
   const token = async (user) => {
+    if (authFree) return null;
     if (tokens[user]) return tokens[user];
     const r = await fetchFn(`${api}/auth/exchange`, { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ code: `demo:${user}`, codeVerifier: 'x', redirectUri: `${base}/auth/callback` }) });
+    if (r.status === 503) { authFree = true; return null; }
     if (!r.ok) throw new Error(`demo sign-in as ${user} refused (${r.status}); is this the Demo Auth build and does the Space define ${user}?`);
     return (tokens[user] = unwrap(await r.json()).accessToken);
   };
   const call = async (user, method, p, body) => {
-    const r = await fetchFn(`${spaced}${p}`, { method, headers: { authorization: `Bearer ${await token(user)}`, 'content-type': 'application/json' },
+    const t = await token(user);
+    const r = await fetchFn(`${spaced}${p}`, { method, headers: { ...(t ? { authorization: `Bearer ${t}` } : {}), 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body) });
     let data = null;
     try { data = unwrap(await r.json()); } catch { /* empty body */ }
@@ -120,7 +126,10 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   // the LIST can answer 200 with no items while the create answers 409 (it is on disk) and every op 404s. So the list is polled until
   // it answers 200 (not merely once), and every Investigation is re-read by id before a write is trusted (see `readable`).
   const sleepRetry = async (fn, tries) => { let last; for (let i = 0; i < tries; i++) { try { last = await fn(); } catch (e) { last = { status: 0, data: String(e.message || e) }; } if (last.status === 200) return last; await sleep(1000); } return last; };
-  const listed = await sleepRetry(() => call('fm.analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
+  await token('fm.analyst');   // learns whether this build signs in at all
+  const basic = authFree && (await call('fm.analyst', 'GET', '/inv/investigations?limit=200')).status === 503;
+  if (basic) log('  Basic edition (no sign-in, Investigations answer 503): seeding the Entity Lists only');
+  const listed = basic ? { status: 200, data: { items: [] } } : await sleepRetry(() => call('fm.analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
   if (listed.status !== 200) throw new Error(`cannot list Investigations as fm.analyst (${listed.status}): is the Space '${space}' created from the la-showcase template?`);
   // There is NO by-id GET for an Investigation (only the list and the /log, /ops, ... sub-routes), so "readable" = the LIST shows the id.
   // A create answered 409 "already exists" can be spurious for a few seconds after /health (live-proven 2026-10-13: nothing on disk, nothing
@@ -146,6 +155,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   };
 
   for (const s of plan) {
+    if (basic && !s.path.startsWith('/entity-lists')) { out.unavailable.push(s.id); continue; }
     if (s.id === 'investigation' && existing) { out.skipped.push(s.id); continue; }
     if (s.opIndex !== undefined && s.opIndex < headStep) { out.skipped.push(s.id); continue; }
     if (['case', 'case-assign', 'case-link'].includes(s.id) && state.caseExisted) { out.skipped.push(s.id); continue; }
@@ -178,6 +188,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     if (s.id === 'investigation' && r.status >= 300 && r.status !== 409) break;   // nothing else can work
   }
   if (out.failed.length) { out.warnings.push('optional stages skipped: the plan above failed'); return out; }
+  if (basic) { out.warnings.push('Basic edition: the Investigation, Case and Alert Rule steps and every optional stage need Standard and above'); return out; }
   const warn = (stage, e) => { const m = `${stage}: ${e.message || e}; the stage was skipped and left no half-made state`; out.warnings.push(m); log(`  WARNING ${m}`); };
   const items = (d) => (Array.isArray(d) ? d : (d && d.items) || []);
   if (want.pending) try { await stagePending(call, out, log); } catch (e) { warn('pending', e); }
@@ -301,7 +312,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     run({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), apply: args.includes('--apply'), log: console.log, stages })
       .then((r) => {
         if (args.includes('--apply')) {
-          console.log(`created: ${r.done.join(', ') || '-'}\nalready there: ${r.skipped.join(', ') || '-'}\nfailed: ${r.failed.join('; ') || '-'}`);
+          console.log(`created: ${r.done.join(', ') || '-'}\nalready there: ${r.skipped.join(', ') || '-'}\nfailed: ${r.failed.join('; ') || '-'}\nnot in this edition: ${r.unavailable.join(', ') || '-'}`);
           console.log(`warnings: ${r.warnings.join('; ') || '-'}\nstaged: pending request ${r.summary.pendingRequestId || '-'} | Alert ${r.summary.alertId || '-'} | Draft ${r.summary.draftId || '-'} | coverage ${r.summary.coverage || '-'}`);
         }
         process.exit(r.failed.length ? 1 : 0);

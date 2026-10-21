@@ -69,6 +69,10 @@ before): **Basic carries the Link Analysis EXPLORER but no Investigations.**
 
 So on Basic the explorer works with no sign-in (projection, paths, patterns, Value Measures, geo, Entity profile
 pages), but `tools/seed-la-showcase.mjs --apply` cannot seed Investigations, e.g. `GET /inv/investigations` -> 503.
+On Basic the seed detects this (the sign-in exchange and `/inv/investigations` both answer 503), seeds only the two
+Entity Lists (`smurf-accounts`, `telecom-watch-msisdn`) without an Authorization header, lists every other step under
+"not in this edition" and exits 0. The Pipelines ingest the template's inbox files on the first poll, so the steps are:
+`--scaffold <root>`, boot `serve.bat` with `SPACES_ROOT=<root>`, then `--apply` (run live 2026-10-21).
 The launch config `inspecto-personal` (`.claude/launch.json`, port 8098) keeps its old name.
 
 If you need the full demo, use an Advanced or Standard bundle (filesystem store), or Advanced for variant A.
