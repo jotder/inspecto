@@ -9,7 +9,7 @@ Harness: `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexScaleBe
 **Update 2026-10-21 (lane `la-nodes-mem`).** The `nodes` phase that failed every run above 10^8 is now folded one bucket at a time and the link
 statistics' degree statement is bounded (see user guide §*The `nodes` phase and the degree statistics, bounded*): a 10^8-edge FULL build now
 completes at `buildMemory=1GB` (642 s; the unmodified code died in the statistics at 2 GB). **Correction that changes the sizing below:** the
-bench corpus has about 1.8 M distinct node ids at every scale, not `edges / 5` (that is the id domain), so every "per distinct node" memory
+bench corpus has at most about 2 M distinct node ids at any scale (1.8 M at 10^8), not `edges / 5` (that is the id domain), so every "per distinct node" memory
 figure in the earlier version of this plan was wrong and is withdrawn; what the old statement held grew with the distinct (node, neighbour, kind)
 links, about one per edge. No build above 10^8 edges has run since the change, so sections 2, 5 and 6 are the plan for the first one, not a result.
 
@@ -47,7 +47,7 @@ Per-row costs, all from the measured runs:
 | Parquet corpus | 20 B | 20 GB / 10^9 (measured); 10 GB / 5x10^8 |
 | Index (no weight columns) | 22.3 B | 2.23 GB / 10^8; the documented 34 B/edge is the planning upper bound |
 | Spill + stage peak | 36 B | 18 GB / 5x10^8 (measured); the 10^9 run needed "more than 65 GB working disk" beside the corpus (row) |
-| Build memory | n/a | **Before 2026-10-21:** the `nodes` statement died at 6 GB for 2x10^8 and 3x10^8 edges, at 7.4 GiB (8 GB cap) and 11.1 GiB (12 GB cap) for 5x10^8 - about 20 to 30 B of cap per edge, not per node (the corpus has 1.8 M nodes). **After:** completes at 1 GB for 10^8 edges (`out` needs more than 0.5 GB at 8 threads); above 10^8 unmeasured |
+| Build memory | n/a | **Before 2026-10-21:** the `nodes` statement died at 6 GB for 2x10^8 and 3x10^8 edges, at 7.4 GiB (8 GB cap) and 11.1 GiB (12 GB cap) for 5x10^8 - about 16 to 30 B of cap per edge, not per node (the corpus has 1.8 M nodes). **After:** completes at 1 GB for 10^8 edges (`out` needs more than 0.5 GB at 8 threads); above 10^8 unmeasured |
 
 **Memory lever.** The build runs inside DuckDB, so the lever is DuckDB's `memory_limit`, set from `-Dinspecto.bench.buildMemory`
 (default `8GB`; `IndexBuilder.open` issues `SET memory_limit`), **not** `-Xmx`. The JVM heap holds only key lists and timings; leave

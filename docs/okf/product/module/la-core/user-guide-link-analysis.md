@@ -1550,8 +1550,8 @@ delta files of 100,000 edges each (`IndexBuilder.Mode.APPEND`), then `COMPACT`; 
 **What was wrong, and a correction to the bullets above.** `nodes` was one statement over the whole edge relation: two global `GROUP BY`s
 each holding `count(DISTINCT (neighbour, kind))` per node, a `FULL JOIN` of them and a global `ORDER BY`. Its state is the set of distinct
 (node, neighbour, kind) links, about one per edge in this corpus, so it grows with the **edge** count. It is **not** the node count: the corpus
-has about 1.8 M distinct ids at every scale (1,551,076 at 3x10^7 edges, 1,778,237 at 10^8; at most about 2x10^6 by construction, because each
-endpoint column draws from 10^6 hash values). `nodes = edges / 5` is the id domain the generator draws from, so the "20 M / 40 M / 60 M / 100 M
+has at most about 2x10^6 distinct ids at any scale (587,878 at 3x10^6 edges, 1,551,076 at 3x10^7, 1,778,237 at 10^8), because each
+endpoint column draws from 10^6 hash values. `nodes = edges / 5` is the id domain the generator draws from, so the "20 M / 40 M / 60 M / 100 M
 distinct nodes" and the "B/node" figures in the bullets above are withdrawn. DuckDB spilled the statement (1 to 4 GB of temporary files at 10^7 to
 3x10^7 edges) but not enough to stay inside the cap: with the spill directory set it died with `Out of Memory Error ... failed to pin block` at 256 MB for
 3x10^7 edges (it completed at 512 MB) with 8 threads, at 64 MB for 3x10^6 edges (96 MB completed) with 1 thread, and at 128 MB for 10^7 edges with 2
@@ -1580,13 +1580,13 @@ the byte counts (`out` and `in` are written by unchanged code and their sizes di
 the new index equal the replaced statement run over the relation restricted to those buckets.
 
 **The bound, reproduced at small scale with a lowered cap** (gated `IndexNodesMemBench`, run from `la/inspecto-la-storage`): at 3x10^6 edges, 64 MB, 1
-thread the FULL build completes (73 s: out 24, in 25, nodes 9.7, statistics 13) and the replaced `nodes` statement dies after 30 s with `Out of Memory
+thread the FULL build completes (73 s on the first run: out 24, in 25, nodes 9.7, statistics 13; 25 s on a later one) and the replaced `nodes` statement dies after 9 to 30 s with `Out of Memory
 Error (60.9 MiB/61.0 MiB used)`; with the old `IndexBuilder` restored the build test goes red at `nodes` with the same error. At 3x10^7 edges, 512 MB, 2
-threads the FULL build completes (214 s: out 63, in 62, nodes 14.5, statistics 69.7), the replaced degree statement dies, and with the old degree statement put
+threads the FULL build completes (214 s: out 63, in 62, nodes 14.5, statistics 69.7), the replaced degree statement dies (after 33 to 39 s, `485.4 MiB/488.2 MiB used`), and with the old degree statement put
 back the build dies in the statistics (`failed to allocate data of size 8.0 MiB (480.5 MiB/488.2 MiB used)`).
 
-**Whole FULL builds at 10^8 edges** (D-S5 corpus, 32 buckets, 8 build threads, same laptop; seconds; the host is shared and noisy: one early run of the
-same code at the same cap was 1.5 to 2x slower in every phase, `nodes` 211 s instead of 35 s, so read the phase times as indicative):
+**Whole FULL builds at 10^8 edges** (D-S5 corpus, 32 buckets, 8 build threads, same laptop; seconds; the host is shared and noisy: an early run with the `nodes` change only at the same 2 GB cap
+took out 249 s, in 332 s and `nodes` 211 s against 146, 167 and 35 s in the run below, so read the phase times as indicative):
 
 | `buildMemory` | code | out | in | nodes | statistics | total | result |
 |---|---|---|---|---|---|---|---|
@@ -1599,7 +1599,7 @@ same code at the same cap was 1.5 to 2x slower in every phase, `nodes` 211 s ins
 | 512 MB | new | OOM in `out` after 88 s | | | | | `out` (unchanged) needs more than 0.5 GB with 8 threads |
 
 At 3x10^7 edges (4 GB, 8 threads, unmodified against the `nodes` change alone): 276 s (nodes 112, statistics 66) against 153 s (nodes 14.8, statistics 40).
-The `nodes` phase now costs about 0.35 to 0.5 microseconds per edge at every scale measured; the unmodified one cost 3.7 to 7 microseconds per edge at 10^8.
+The `nodes` phase now costs about 0.35 to 0.5 microseconds per edge at 3x10^7 and 10^8 edges (3.2 at 3x10^6 edges with 1 thread and 64 MB); the unmodified one cost 3.7 (3x10^7) and 4.2 to 7.0 (10^8) microseconds per edge.
 Peak working set of the bench JVM follows the cap (1.4 GB at 1 GB, 2.4 GB at 2 GB, 8.1 GB at 8 GB: DuckDB fills what it is given), so it is no
 measure of need; the lowest cap that completed is.
 
