@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.entity-list` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-GROW-EXCLUDE-1` | P2 | feature | grow the graph and exclude noise in a few clicks: one Grow control (both directions, preview, Undo), a held super-node tray with "Remove… | operator |

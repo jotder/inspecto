@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `LA-GROW-EXCLUDE-1` | P2 | feature | grow the graph and exclude noise in a few clicks: one Grow control (both directions, preview, Undo), a held super-node tray with "Remove… | operator |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | an InvestigationStore seam so the Investigation sidecar files can live on Postgres for multi-pod deployments. | demand |
 | `LA-INVESTIGATION-OPS-DEFERRED-1` | P3 | feature | the unbuilt half of the Investigation model. | demand |
 | `LA-A11Y-AUDIT-1` | P3 | chore | what remains of the Link Analysis / Geo accessibility audit is person-only: a screen-reader reading (NVDA / JAWS / VoiceOver: the node-li… | — |
