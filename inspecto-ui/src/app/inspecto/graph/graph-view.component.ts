@@ -445,6 +445,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @Output() nodeDblClick = new EventEmitter<string>();
     /** The nodes a box select enclosed, or `[]` when a click on the empty canvas cleared them (only with `interaction.boxSelect`). */
     @Output() selectionChange = new EventEmitter<string[]>();
+    /** A right click on a node (Link Analysis "Exclude…"): its id and the pointer's viewport position. The browser menu is suppressed. */
+    @Output() nodeContextMenu = new EventEmitter<{ id: string; x: number; y: number }>();
 
     @ViewChild('host') private hostEl!: ElementRef<HTMLDivElement>;
 
@@ -509,6 +511,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         // Track container size (collapsible side panes resize the canvas live). Absent in jsdom.
         if (typeof ResizeObserver !== 'undefined') {
             this.resizeObserver = new ResizeObserver((entries) => {
+                // A zero box is a canvas taken out of the page (a kept-alive page while another shows), not a real
+                // size: shrinking to it and back would re-fit and throw the analyst's zoom away on their return.
+                const last = entries[entries.length - 1]?.contentRect;
+                if (last && (last.width === 0 || last.height === 0)) return;
                 this.graph?.resize();
                 // G6's resize keeps the old zoom and offset, so a canvas that grew or shrank leaves the graph off to a side:
                 // re-fit once the size settles (a drag of a panel edge fires many events), when the pointer model asks for it.
@@ -934,6 +940,19 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     haloStroke: (d) => this.nodeColorOf(d),
                     haloLineWidth: (d) => (this.selSet.has(d.id as string) ? 16 : 10),
                     haloStrokeOpacity: (d) => (this.selSet.has(d.id as string) ? 0.6 : 0.35),
+                    // LA-GROW-EXCLUDE-1: a busy entity a Grow held wears a "held" badge over its ring.
+                    badges: (d) =>
+                        (d.data as { held?: boolean }).held
+                            ? [
+                                  {
+                                      text: 'held',
+                                      placement: 'right-top',
+                                      fontSize: 9,
+                                      fill: this.styleNodeFill,
+                                      backgroundFill: this.nodeColorOf(d),
+                                  },
+                              ]
+                            : [],
                     iconSrc: (d) => iconOf(d),
                     iconWidth: 22,
                     iconHeight: 22,
@@ -1021,6 +1040,22 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             this.cancelPendingClick();
             const id = targetId(e);
             if (id) this.nodeDblClick.emit(id);
+        });
+        graph.on(NodeEvent.CONTEXT_MENU, (e) => {
+            const ev = e as unknown as {
+                client?: { x: number; y: number };
+                nativeEvent?: MouseEvent;
+                preventDefault?: () => void;
+            };
+            ev.preventDefault?.();
+            ev.nativeEvent?.preventDefault?.();
+            const id = targetId(e);
+            if (id)
+                this.nodeContextMenu.emit({
+                    id,
+                    x: ev.client?.x ?? ev.nativeEvent?.clientX ?? 0,
+                    y: ev.client?.y ?? ev.nativeEvent?.clientY ?? 0,
+                });
         });
         graph.on(CanvasEvent.CLICK, () => {
             // The click that ends a box select must not clear what the box just selected.

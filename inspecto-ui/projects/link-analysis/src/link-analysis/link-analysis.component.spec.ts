@@ -2,6 +2,8 @@ import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile
 import { installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
 import { TELECOM_PACK_FIXTURE } from '@inspecto/link-analysis/graph/domain-profile.testing';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -85,6 +87,7 @@ class StubGraphView {
     @Output() edgeClick = new EventEmitter<string>();
     @Output() nodeDblClick = new EventEmitter<string>();
     @Output() selectionChange = new EventEmitter<string[]>();
+    @Output() nodeContextMenu = new EventEmitter<{ id: string; x: number; y: number }>();
 }
 
 // The Toolbox dock remembers an explicit open/close in sessionStorage; no test may inherit another's.
@@ -364,8 +367,165 @@ describe('LinkAnalysisComponent', () => {
         params.next(convertToParamMap({ investigation: 'inv-2' }));
         expect(adopt).toHaveBeenLastCalledWith('inv-2');
         params.next(convertToParamMap({ investigation: 'inv-2', other: 'x' })); // the store's own sync: no re-adopt
+        c.investigation.close();
         params.next(convertToParamMap({})); // closed: nothing to adopt
         expect(adopt).toHaveBeenCalledTimes(2);
+    });
+
+    it('puts ?investigation= back when the kept-alive page is reached through a link without it (the nav rail)', async () => {
+        const params = new BehaviorSubject(convertToParamMap({ investigation: 'inv-1' }));
+        const { fixture } = create({ queryParams: { investigation: 'inv-1' } });
+        (TestBed.inject(ActivatedRoute) as { queryParamMap: unknown }).queryParamMap = params;
+        const c = fixture.componentInstance;
+        vi.spyOn(c.investigation, 'adopt').mockImplementation(async (id) => {
+            c.investigation.activeId.set(id);
+            return true;
+        });
+        fixture.detectChanges();
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+        params.next(convertToParamMap({})); // back from Settings through the nav rail's plain /link-analysis
+
+        expect(c.investigation.activeId()).toBe('inv-1'); // still open
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({
+                queryParams: { investigation: 'inv-1' },
+                queryParamsHandling: 'merge',
+                replaceUrl: true,
+            }),
+        );
+    });
+
+    it('resolves a pivot that lands on the kept-alive page with its graph already drawn, without a new load', async () => {
+        const graphWithRef: G6GraphData = {
+            nodes: [
+                ...GRAPH.nodes,
+                { id: 'f', data: { label: 'F', kind: 'entity', objectRef: { id: 'case-1', type: 'CASE' } } },
+            ],
+            edges: GRAPH.edges,
+        };
+        const params = new BehaviorSubject(convertToParamMap({}));
+        const { fixture, queried } = create({ graph: graphWithRef });
+        const route = TestBed.inject(ActivatedRoute) as { queryParamMap: unknown; snapshot: unknown };
+        route.queryParamMap = params;
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.emphasis()).toBeNull();
+
+        const pivot = convertToParamMap({ pivotId: 'case-1', pivotType: 'CASE' });
+        route.snapshot = { queryParamMap: pivot };
+        params.next(pivot);
+
+        expect(c.emphasis()?.nodeIds).toEqual(['f']);
+        expect(queried).toHaveLength(1);
+    });
+
+    it('Close: absent on the empty state; names the drawn analysis, in the toolbar and Saved views, and goes back to empty', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="la-close"]')).toBeNull();
+
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const close = el.querySelector<HTMLButtonElement>('[data-testid="la-close"]')!;
+        expect(close.getAttribute('aria-label')).toBe('Close the analysis');
+        el.querySelector<HTMLButtonElement>('button[aria-label="Open saved views"]')!.click();
+        fixture.detectChanges();
+        expect(document.querySelector('[data-testid="la-close-menu-item"]')?.textContent?.trim()).toBe(
+            'Close the analysis',
+        );
+        await expectNoA11yViolations(el.querySelector('[data-testid="la-header"]')!);
+
+        close.click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        expect(c.graph()).toBeNull();
+        expect(c.lastRun()).toBeNull();
+        expect(el.textContent).toContain('No graph yet');
+        expect(el.querySelector('[data-testid="la-close"]')).toBeNull();
+    }, 45_000);
+
+    it('Close: an open Investigation in a Draft scope closes whole, and the store drops ?investigation=', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        c.investigation.refs.set([{ id: 'inv-1', title: 'Mule hub' }]);
+        c.investigation.activeId.set('inv-1');
+        c.investigation.activeDraftId.set('d-7');
+        TestBed.tick();
+        expect(c.openWorkLabel()).toBe('Draft d-7 of Investigation Mule hub');
+        c.investigation.busy.set(true); // a step in flight: Close waits for it, or the step's answer would reopen
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="la-close"]').disabled).toBe(true);
+        c.investigation.busy.set(false);
+
+        await c.closeOpenWork();
+        TestBed.tick();
+
+        expect(c.investigation.activeId()).toBeNull();
+        expect(c.investigation.activeDraftId()).toBeNull();
+        expect(c.openWorkLabel()).toBe('');
+        expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { investigation: null } }));
+    });
+
+    it('Close: an imported view that was never saved is asked about first; Cancel keeps it', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
+        const draft: LaImportDraft = {
+            kind: 'link-analysis-view',
+            id: 'mule_ring',
+            content: {},
+            sourceSpace: null,
+            targetExists: false,
+            integrity: null,
+            prerequisites: [],
+        };
+        c.importDraft.set(draft);
+        expect(c.openWorkLabel()).toBe('unsaved view mule_ring');
+
+        await c.closeOpenWork();
+        expect(ask).toHaveBeenCalledTimes(1);
+        expect(c.importDraft()).toBe(draft);
+
+        ask.mockResolvedValue(true);
+        await c.closeOpenWork();
+        expect(c.importDraft()).toBeNull();
+    });
+
+    it('says what a Space switch closed (remembered for the tab across the reload), once', () => {
+        sessionStorage.setItem(
+            'inspecto.la.openWork',
+            // actor '': no one is signed in under this TestBed, so the record is this (anonymous) user's own
+            JSON.stringify({ space: 'some-other-space', actor: '', label: 'Investigation Mule hub' }),
+        );
+        const { fixture } = create();
+        const info = vi.spyOn(TestBed.inject(ToastrService), 'info');
+        fixture.detectChanges();
+        expect(info).toHaveBeenCalledWith(
+            'Investigation Mule hub was closed when you switched Space. It stays in Space some-other-space; switch back to reopen it.',
+            'Closed',
+        );
+    });
+
+    it('ignores Ctrl+Z while kept alive behind another page (it is out of the document)', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const undo = vi.spyOn(fixture.componentInstance, 'undoPresentation');
+        const el = fixture.nativeElement as HTMLElement;
+        const parent = el.parentElement!;
+        el.remove();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+        expect(undo).not.toHaveBeenCalled();
+        parent.appendChild(el);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+        expect(undo).toHaveBeenCalledTimes(1);
     });
 
     it('says the Investigation is not available when the deep-linked id is unknown (404 is absence, DR-U9)', async () => {
@@ -2719,5 +2879,232 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         expect(c.investigation.mergeDraft()).toBe(draft);
         await expectNoA11yViolations(el.querySelector('[data-testid="la-selection-bar"]') as HTMLElement);
         fixture.destroy();
+    });
+});
+
+describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-EXCLUDE-1)', () => {
+    const BASIC_EDITION_FEATURES = { ...STANDARD_EDITION_FEATURES, investigations: signal(false) };
+    const notThere = () => throwError(() => new HttpErrorResponse({ status: 404 }));
+    /** Lanes A and B absent: every new route 404s — the UI must degrade, never error. */
+    const OLD_SERVER: Partial<InvService> = {
+        exclusionLists: notThere,
+        listEntityLists: notThere,
+        previewExpand: notThere,
+        previewNeighbors: notThere,
+    };
+    const drawn = async (opts: Parameters<typeof create>[0] = {}) => {
+        const made = create({ inv: OLD_SERVER, ...opts });
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        made.fixture.detectChanges();
+        const el = made.fixture.nativeElement as HTMLElement;
+        const stub = made.fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
+        return { ...made, c: made.fixture.componentInstance, el, stub };
+    };
+    const press = (el: HTMLElement, init: KeyboardEventInit) =>
+        el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, ...init }));
+    const settle = async (fixture: ReturnType<typeof create>['fixture'], ms = 0) => {
+        await new Promise((r) => setTimeout(r, ms));
+        await fixture.whenStable();
+        fixture.detectChanges();
+    };
+    afterEach(() => {
+        document.querySelectorAll('.cdk-overlay-container').forEach((o) => (o.innerHTML = ''));
+    });
+
+    it('the rail offers Grow and Hidden in plain words; G opens Grow, which degrades to "no preview" without lane B', async () => {
+        const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
+        const { fixture, el } = await drawn({ expand });
+        const grow = el.querySelector('[data-testid="la-grow-button"]') as HTMLButtonElement;
+        expect(grow.textContent).toContain('Grow');
+        expect(grow.getAttribute('aria-keyshortcuts')).toBe('G');
+        expect(el.querySelector('[data-testid="la-exclusions-button"]')?.getAttribute('aria-label')).toBe(
+            'Hidden by lists: 0 hidden',
+        );
+        press(el, { key: 'g' });
+        await settle(fixture);
+        await settle(fixture); // the panel's preview starts on its first render
+        const panel = el.querySelector('[data-testid="la-grow-panel"]') as HTMLElement;
+        expect(panel.closest('[data-testid="la-graph-region"]')).toBeTruthy(); // an overlay on the canvas
+        expect(panel.textContent).toContain('(not recorded)');
+        expect(el.querySelector('[data-testid="la-grow-no-preview"]')).not.toBeNull();
+        expect(grow.getAttribute('aria-expanded')).toBe('true');
+        await expectNoA11yViolations(panel);
+        // typing G in a field never opens it
+        fixture.componentInstance.closeGrow();
+        fixture.detectChanges();
+        const input = document.createElement('input');
+        el.appendChild(input);
+        press(input, { key: 'g' });
+        expect(fixture.componentInstance.growExclude.growOpen()).toBe(false);
+    });
+
+    it('Basic Grow: the explorer grows through neighbours in the chosen direction, says so, and Ctrl+Z undoes it', async () => {
+        const expand = vi.fn(async () => ({
+            nodes: [
+                { id: 'c', data: { label: 'C', kind: 'entity' } },
+                { id: 'f', data: { label: 'F', kind: 'entity' } },
+                { id: 'g', data: { label: 'G', kind: 'entity' } },
+            ],
+            edges: [
+                { id: 'c->f', source: 'c', target: 'f', data: { kind: 'link' } },
+                { id: 'g->c', source: 'g', target: 'c', data: { kind: 'link' } },
+            ],
+        }));
+        const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
+        c.onSelectionChange(['c']);
+        expect(c.growContext()).toMatchObject({ mode: 'basic', frontier: ['c'], from: 'the 1 node you selected', blocked: null });
+        await c.onGrow({ direction: 'out', steps: 1, linkKinds: null, window: 'inherit', hold: true, threshold: 500 });
+        fixture.detectChanges();
+        const ids = () => c.graph()!.nodes.map((n) => n.id).sort();
+        expect(ids()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']); // the incoming g was not kept
+        expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain(
+            'Grew one step: 1 node and 1 link added (not recorded).',
+        );
+        press(el, { key: 'z', ctrlKey: true });
+        fixture.detectChanges();
+        expect(ids()).toEqual(['a', 'b', 'c', 'd', 'e']);
+        expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain('Undone.');
+    });
+
+    it('Basic Grow Undo is withdrawn once the graph changed after it (a later expand is never thrown away)', async () => {
+        const expand = vi.fn(async (id: string) => ({
+            nodes: [{ id, data: { label: id.toUpperCase(), kind: 'entity' } }, { id: id + '2', data: { label: 'X', kind: 'entity' } }],
+            edges: [{ id: id + '->' + id + '2', source: id, target: id + '2', data: { kind: 'link' } }],
+        }));
+        const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
+        c.onSelectionChange(['a']);
+        await c.onGrow({ direction: 'either', steps: 1, linkKinds: null, window: 'inherit', hold: true, threshold: 500 });
+        expect(c.growExclude.undoable()).toBe(true);
+        await c.expandNode('b', 'B'); // another change to the graph
+        fixture.detectChanges();
+        expect(c.growExclude.undoable()).toBe(false);
+        expect(el.querySelector('[data-testid="la-change-undo"]')).toBeNull();
+        expect(el.querySelector('[data-testid="la-change-stale"]')?.textContent).toContain('a later change came after it');
+        press(el, { key: 'z', ctrlKey: true });
+        expect(c.graph()!.nodes.map((n) => n.id)).toContain('b2'); // the later expand survives
+    });
+
+    it('a Basic hide Undo brings back only what it hid', async () => {
+        const { fixture, c } = await drawn({ features: BASIC_EDITION_FEATURES });
+        c.hiddenNodeIds.set(['e']);
+        c.onSelectionChange(['a']);
+        c.openExclude(['a']);
+        await settle(fixture);
+        (document.querySelector('[data-testid="la-exclude-go"]') as HTMLButtonElement).click();
+        await settle(fixture);
+        expect(c.hiddenNodeIds()).toEqual(['e', 'a']);
+        c.hiddenNodeIds.update((h) => [...h, 'd']); // hidden later, elsewhere
+        await c.growExclude.undoLast();
+        expect(c.hiddenNodeIds()).toEqual(['e', 'd']);
+    });
+
+    it('Basic Grow is blocked, with the reason, when the graph source has no neighbours read', async () => {
+        const { c } = await drawn({ features: BASIC_EDITION_FEATURES });
+        expect(c.growContext().blocked).toBe('Grow needs a graph drawn from one Entity/Link mapping (its neighbours read).');
+    });
+
+    it('X with nothing selected says to select first; with a selection it opens Exclude… and a Basic hide is undoable', async () => {
+        const { fixture, c, el } = await drawn({ features: BASIC_EDITION_FEATURES });
+        press(el, { key: 'x' });
+        expect(c.drawAnnouncement()).toContain('Select the nodes to exclude first');
+        c.onSelectionChange(['a', 'b']);
+        press(el, { key: 'x' });
+        await settle(fixture);
+        const dialog = document.querySelector('mat-dialog-container') as HTMLElement;
+        expect(dialog.querySelector('h2')?.textContent).toContain('Exclude 2 nodes');
+        // lane A absent: the list choice says why it is not possible
+        expect(dialog.querySelector('[data-testid="la-exclude-list-hint"]')?.textContent).toContain(
+            'Exclusion lists cannot be read on this server.',
+        );
+        (dialog.querySelector('[data-testid="la-exclude-go"]') as HTMLButtonElement).click();
+        await settle(fixture);
+        expect(c.hiddenNodeIds()).toEqual(['a', 'b']);
+        expect(c.canvasData()!.nodes.map((n) => n.id)).toEqual(['c', 'd', 'e']);
+        expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain('2 nodes hidden (not recorded).');
+        (el.querySelector('[data-testid="la-change-undo"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(c.hiddenNodeIds()).toEqual([]);
+    });
+
+    it('right-click a node: the menu acts on that node, or on the whole selection it belongs to', async () => {
+        const { fixture, c, stub } = await drawn();
+        c.onSelectionChange(['a', 'b']);
+        stub.nodeContextMenu.emit({ id: 'd', x: 40, y: 50 });
+        expect(c.nodeMenuTargets()).toEqual(['d']);
+        expect(c.nodeMenuAt()).toEqual({ x: 40, y: 50 });
+        stub.nodeContextMenu.emit({ id: 'a', x: 1, y: 2 });
+        expect(c.nodeMenuTargets()).toEqual(['a', 'b']);
+        await settle(fixture, 10);
+        const exclude = document.querySelector('[data-testid="la-node-menu-exclude"]') as HTMLButtonElement;
+        expect(exclude.textContent).toContain('Exclude 2…');
+        (document.querySelector('[data-testid="la-node-menu-grow"]') as HTMLButtonElement).click();
+        await settle(fixture);
+        expect(c.growExclude.growOpen()).toBe(true);
+        expect(c.growContext().from).toBe('the 2 nodes you selected');
+    });
+
+    it('Investigation: Grow appends ONE expand from the outer ring; held busy nodes carry the badge; Remove held is one exclude', async () => {
+        const { c } = await drawn();
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({
+            header: { dataset: 'd', sourceCol: 's', targetCol: 't', title: 'Ring' },
+            entries: [],
+        } as never);
+        c.investigation.workingSet.set({
+            entities: [
+                { id: 'ws-a', hop: 0, hidden: false },
+                { id: 'ws-b', hop: 1, hidden: false },
+                { id: 'ws-hub', hop: 1, hidden: false, highConnectivity: true, contacts: 9000 },
+            ],
+            links: [
+                { source: 'ws-a', target: 'ws-b', kind: 'calls', count: 1 },
+                { source: 'ws-a', target: 'ws-hub', kind: 'calls', count: 1 },
+            ],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        expect(c.growContext()).toMatchObject({
+            mode: 'investigation',
+            frontier: ['ws-b'],
+            heldFrontier: ['ws-hub'],
+            from: 'the outer ring (degree 1): 2 nodes',
+            blocked: null,
+        });
+        expect(c.heldItems()).toEqual([{ id: 'ws-hub', label: 'ws-hub', contacts: 9000 }]);
+        const hub = c.canvasData()!.nodes.find((n) => n.data.label === 'ws-hub')!;
+        expect(hub.data.held).toBe(true);
+        expect(c.canvasData()!.nodes.find((n) => n.data.label === 'ws-b')!.data.held).toBeUndefined();
+
+        const ops: unknown[] = [];
+        vi.spyOn(c.investigation, 'apply').mockImplementation(async (op) => {
+            ops.push(op);
+            c.investigation.lastStep.set({ step: ops.length, op: op.op, delta: { admitted: [], excluded: ['ws-hub'], linksAdded: 0 } } as never);
+            return true;
+        });
+        await c.onGrow({ direction: 'either', steps: 1, linkKinds: null, window: 'inherit', hold: true, threshold: 500 });
+        expect(ops).toEqual([{ op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500 }]);
+        await c.removeHeld();
+        expect(ops[1]).toEqual({ op: 'exclude', ids: ['ws-hub'], reason: 'busy node above 500 contacts' });
+        expect(c.growExclude.lastChange()?.text).toBe('Removed 1 busy node.');
+    });
+
+    it('Investigation without Incident management: Grow says why it is not possible', async () => {
+        const { c } = await drawn();
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({ header: { dataset: 'd', sourceCol: 's', targetCol: 't' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'ws-a', hop: 0, hidden: false }],
+            links: [],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set([]);
+        expect(c.growContext().blocked).toBe(
+            'This changes the Investigation log and needs the Incident management capability.',
+        );
+        expect(c.growWriteWhyNot()).toContain('Incident management');
     });
 });

@@ -275,10 +275,9 @@ export class LensService {
         this.identityCapability('canShareInvestigation', 'linkgraph.share-investigation'),
     );
 
-    /** May keep the Space's category exclusion lists - create an admin list, change its members, retire it, and change
-     *  any list's ownership, auto-apply or visibility (LA-GROW-EXCLUDE-1 phase 4, `PUT /entity-lists/{id}/attributes`).
-     *  RBAC: Admin, Super. {@link identityCapability}; no Access-Catalog node carries it yet. A holder also sees the
-     *  members of a restricted list. */
+    /** May create, edit and retire the Space's CATEGORY exclusion lists (admin-owned: VIPs, politicians, defence …;
+     *  LA-GROW-EXCLUDE-1 GE-11). {@link identityCapability}; analyst lists need {@link canManageIncidents} instead. The
+     *  server gates the writes — this only decides whether an admin list is offered as a target. No Access-Catalog node yet. */
     readonly canManageExclusionCategories = computed(() =>
         this.identityCapability('canManageExclusionCategories', 'linkgraph.exclusion-categories'),
     );

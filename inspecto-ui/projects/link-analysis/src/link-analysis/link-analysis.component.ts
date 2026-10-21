@@ -73,6 +73,22 @@ import {
     parseInvestigateParams,
     sameInvestigateRequest,
 } from './investigate-number';
+import { degreeState } from './investigate-number';
+import { GrowExcludeStore } from './grow-exclude.store';
+import {
+    GrowContext,
+    GrowRequest,
+    filterExpansion,
+    growKeepsEdge,
+    hiddenByListsLine,
+    packTerms,
+    removedRows,
+    sumPreviews,
+} from './grow-exclude';
+import { LinkAnalysisGrowComponent } from './link-analysis-grow.component';
+import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
+import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.component';
+import { ExcludeDialogData, ExcludeDialogResult, LinkAnalysisExcludeDialog } from './link-analysis-exclude.dialog';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { G6GraphData, EntityProjection, GraphSourceId, GraphSourceQuery, NodeRule, toGraphml } from '@inspecto/core/graph';
@@ -223,6 +239,10 @@ import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { laLimit } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
+import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
+// eslint-disable-next-line no-restricted-imports -- only `actor`, so the Space-switch notice never names another user's item; LA_FEATURES carries module flags, not identity
+import { SessionService } from '@inspecto/core/api';
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
@@ -352,9 +372,13 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
         LinkAnalysisInvestigationComponent,
+        LinkAnalysisGrowComponent,
+        LinkAnalysisHeldTrayComponent,
+        LinkAnalysisExclusionsComponent,
     ],
     // LA-10: the Investigation session outlives the toolbox dock, which destroys its panel on collapse.
-    providers: [InvestigationSessionStore],
+    // LA-GROW-EXCLUDE-1: Grow / Held / Exclude state sits beside it, for the same reason.
+    providers: [InvestigationSessionStore, GrowExcludeStore],
     templateUrl: './link-analysis.component.html',
     host: {
         '(document:fullscreenchange)': 'onFullscreenChange()',
@@ -384,6 +408,8 @@ export class LinkAnalysisComponent implements OnInit {
     private router = inject(Router);
     private route = inject(ActivatedRoute);
     private destroyRef = inject(DestroyRef);
+    private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+    private readonly confirm = inject(InspectoConfirmService);
     private readonly injector = inject(Injector);
     private datasetRows = inject(DatasetRowsService);
     /**
@@ -906,12 +932,12 @@ export class LinkAnalysisComponent implements OnInit {
             if (keep.some((n) => n.data.unexpanded))
                 for (const n of g.nodes) if (!keep.includes(n)) hidden.add(n.id);
         }
-        if (!g || !hidden.size) return g;
-        return {
+        if (!g || !hidden.size) return this.markHeld(g);
+        return this.markHeld({
             ...g,
             nodes: g.nodes.filter((n) => !hidden.has(n.id)),
             edges: g.edges.filter((e) => !hidden.has(e.source) && !hidden.has(e.target)),
-        };
+        });
     });
     /** The legend's "Only unexpanded" switch: draw just the Working Set's unexpanded frontier. */
     readonly onlyUnexpanded = signal(false);
@@ -1309,7 +1335,20 @@ export class LinkAnalysisComponent implements OnInit {
         // The footer's server ceiling; absent when the server cannot answer. Graph Run is part of the Investigation surface,
         // so Basic (no Investigations) does not ask - its browser algorithms keep their own caps.
         if (this.investigationsEnabled()) this.graphRuns.loadCatalogue();
-        this.pendingPivot = this.pivotService.readIncoming(this.route);
+        if (this.closedBySpaceSwitch) this.toastr.info(closedBySpaceSwitchMessage(this.closedBySpaceSwitch), 'Closed');
+        // A stream, not one read: the page is kept alive (KEEP_ALIVE), so a later pivot lands on it with its graph
+        // already drawn - resolve that at once rather than after the next load.
+        this.route.queryParamMap
+            .pipe(
+                map((p) => `${p.get('pivotType')}:${p.get('pivotId')}`),
+                distinctUntilChanged(),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe(() => {
+                this.pendingPivot = this.pivotService.readIncoming(this.route);
+                const g = this.graph();
+                if (g) this.resolvePendingPivot(g);
+            });
         // DR-U9: `?investigation=<id>` (the Alerts page's link from a fired Investigation rule) opens that Investigation.
         // A stream, not the snapshot: a second Alert's link navigates to this same route with a NEW id, which Angular
         // reuses. The id the store already has open (it writes the param itself) is not adopted again.
@@ -1320,7 +1359,19 @@ export class LinkAnalysisComponent implements OnInit {
                 takeUntilDestroyed(this.destroyRef),
             )
             .subscribe((investigationId) => {
-                if (!investigationId || investigationId === this.investigation.activeId()) return;
+                const open = this.investigation.activeId();
+                if (!investigationId && open) {
+                    // Back on the kept-alive page through a link without the param (the nav rail): the Investigation is
+                    // still open, so put its id back in the URL - a reload then reopens it, as it did before leaving.
+                    void this.router.navigate([], {
+                        relativeTo: this.route,
+                        queryParams: { investigation: open },
+                        queryParamsHandling: 'merge',
+                        replaceUrl: true,
+                    });
+                    return;
+                }
+                if (!investigationId || investigationId === open) return;
                 if (!this.investigationsEnabled()) return; // Basic: no Investigation to open (LA-EDITIONS-1 ED-4)
                 this.openInvestigation();
                 void this.investigation.adopt(investigationId);
@@ -1515,14 +1566,8 @@ export class LinkAnalysisComponent implements OnInit {
         await this.execute(this.sourceId(), q);
     }
 
-    private async execute(sourceId: GraphSourceId, q: GraphSourceQuery): Promise<void> {
-        const source = this.graphSources.byId(sourceId);
-        if (!source) return;
-        const firstDraw = !this.graph();
-        const focusBefore = this.focusHolder();
-        this.loading.set(true);
-        this.loadError.set('');
-        // A fresh graph clears the canvas emphasis + presentation filters and the analysis toolbox's results.
+    /** A fresh graph (or none) clears the canvas emphasis + presentation filters and the analysis toolbox's results. */
+    private clearResults(): void {
         this.emphasis.set(null);
         this.toolbox?.reset();
         this.search.set('');
@@ -1531,7 +1576,6 @@ export class LinkAnalysisComponent implements OnInit {
         this.timeCutoff.set(null);
         this.localFilter.set(null);
         this.latestSnapshot.set(null);
-        this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
         this.serverPaths.set(null);
         this.expandSource.set(null);
@@ -1542,8 +1586,84 @@ export class LinkAnalysisComponent implements OnInit {
         this.temporalSealed.set(null);
         this.temporalSealError.set('');
         this.mappingSummary.set([]);
+    }
+
+    /**
+     * What is open, as the Close action names it: the Investigation (or the Draft of it that is the working scope), an
+     * imported view not saved yet, else the drawn analysis; '' = nothing open (the empty state).
+     */
+    readonly openWorkLabel = computed<string>(() => {
+        const inv = this.investigation;
+        if (inv.active()) {
+            const title = `Investigation ${inv.displayTitle()}`;
+            return inv.activeDraftId() ? `Draft ${inv.activeDraftId()} of ${title}` : title;
+        }
+        if (this.importDraft()) return `unsaved view ${this.importDraft()!.id}`;
+        return this.graph() ? 'the analysis' : '';
+    });
+
+    /**
+     * What a Space switch closed (the switch reloads the app, so it was remembered for the tab); said once on init. Read
+     * as a field, before {@link rememberOpen} first runs and overwrites the record with this page's own state.
+     */
+    private readonly actor = inject(SessionService).actor() ?? '';
+    private readonly closedBySpaceSwitch = takeClosedBySpaceSwitch(this.spaces.currentSpaceId() ?? '', this.actor);
+    /** The Space this page was opened in; everything it holds belongs to it (a Space switch reloads the app). */
+    private readonly pageSpace = this.spaces.currentSpaceId() ?? '';
+    /**
+     * Remember what is open for this tab, so a Space switch (an app reload) can say what it closed. Keyed by
+     * {@link pageSpace}, never the live Space: the switch changes that before the reload, and the record must still
+     * name the Space the item belongs to.
+     */
+    private readonly rememberOpen = effect(() => {
+        const label = this.openWorkLabel();
+        untracked(() => rememberOpenWork(label ? { space: this.pageSpace, actor: this.actor, label } : null));
+    });
+
+    /**
+     * Close what is open (operator 2026-10-21) and go back to the empty state: the Investigation and its Draft scope (the
+     * store drops `?investigation=` from the URL), an imported view, the drawn graph and its results. Nothing is deleted:
+     * an Investigation reopens from the Investigation tab, a saved view from Saved views. An imported view that was never
+     * saved is the one thing Close would lose, so that is asked first.
+     */
+    async closeOpenWork(): Promise<void> {
+        const draft = this.importDraft();
+        if (
+            draft &&
+            !(await this.confirm.confirmDestructive(`The imported view ${draft.id} is not saved. Close it anyway?`, {
+                title: 'Close unsaved view',
+                confirmText: 'Close',
+            }))
+        )
+            return;
+        this.clearDraft();
+        this.investigation.close();
+        this.investigation.clearQueuedSeeds();
+        this.pendingInvestigation.set(null);
+        this.investigateIssue.set('');
+        this.clearResults();
+        this.graph.set(null);
+        this.lastRun.set(null);
+        this.truncated.set(false);
+        this.loadError.set('');
+        this.kindFilter.set([]);
+        this.hiddenNodeIds.set([]);
+        this.queryOpen.set(true);
+        this.growExclude.reset();
+    }
+
+    private async execute(sourceId: GraphSourceId, q: GraphSourceQuery): Promise<void> {
+        const source = this.graphSources.byId(sourceId);
+        if (!source) return;
+        const firstDraw = !this.graph();
+        const focusBefore = this.focusHolder();
+        this.loading.set(true);
+        this.loadError.set('');
+        this.clearResults();
+        this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         try {
             const g = await source.query(q);
+            this.growExclude.reset(); // a new graph: an Undo of the old one's Grow must not bring it back
             this.graph.set(g);
             this.resolvePendingPivot(g);
             this.truncated.set(!!(g as ProjectedGraph).truncated);
@@ -2002,11 +2122,19 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z (or Ctrl+Y) redo — ignored while typing in a form field. */
     onHistoryKeydown(e: KeyboardEvent): void {
+        // Kept alive while another page shows (KEEP_ALIVE): that page's Ctrl+Z is not ours.
+        if (!this.host.nativeElement.isConnected) return;
         const target = e.target as HTMLElement | null;
         if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
+        if (this.onGrowExcludeKey(e, target)) return;
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
             e.preventDefault();
+            // LA-GROW-EXCLUDE-1: the last Grow / Exclude offers its own Undo first (the result line says Ctrl+Z).
+            if (this.growExclude.undoable()) {
+                void this.growExclude.undoLast();
+                return;
+            }
             this.undoPresentation();
         } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
             e.preventDefault();
@@ -2634,12 +2762,19 @@ export class LinkAnalysisComponent implements OnInit {
      * `expand()` and merge it into the loaded graph — filters/analysis state survives (unlike `run()`,
      * which replaces the graph and resets them).
      */
-    async expandNode(id: string, nodeLabel: string, spellings?: string[]): Promise<void> {
+    async expandNode(
+        id: string,
+        nodeLabel: string,
+        spellings?: string[],
+        keep?: (e: G6GraphData['edges'][number]) => boolean,
+    ): Promise<void> {
         const run = this.lastRun();
         const source = this.graphSources.byId(this.sourceId());
         if (!run || !source?.expand) return;
         try {
-            const extra = await source.expand(id, nodeLabel, run.query, spellings);
+            const read = await source.expand(id, nodeLabel, run.query, spellings);
+            // LA-GROW-EXCLUDE-1: a Basic Grow keeps only its direction and link kinds.
+            const extra = keep ? filterExpansion(read, id, keep) : read;
             this.expandSource.set((extra as ProjectedGraph).source ?? null);
             this.graph.update((g) => (g ? mergeGraphs([g, extra]) : extra));
             this.expandedNodeIds.update((ids) => (ids.includes(id) ? ids : [...ids, id]));
@@ -2998,5 +3133,508 @@ export class LinkAnalysisComponent implements OnInit {
     /** Whether a given saved view can be offered — see {@link offer} for why the source matters. */
     shareable(view: LinkAnalysisView): boolean {
         return this.canShare() && view.sourceId === 'entity-projection';
+    }
+
+    // ── LA-GROW-EXCLUDE-1: Grow, the Held tray and Exclude on the graph (plan la-grow-exclude-plan.md §3–§4) ──
+
+    readonly growExclude = inject(GrowExcludeStore);
+    /** The active pack's words for what the canvas draws ("numbers", "calls"). */
+    readonly growTerms = computed(() => packTerms(this.profile()));
+    /** Recorded Investigation steps on its Working Set canvas, else the explorer graph (not recorded). */
+    readonly growMode = computed<'investigation' | 'basic'>(() => (this.investigation.canvas() ? 'investigation' : 'basic'));
+    /** The Space's hub threshold in force — the default "Hold … with more than N contacts". */
+    readonly growThreshold = computed(() => this.limits.limits().hubThresholdInForce ?? 500);
+    /** Why an Investigation action cannot run for this user; empty = it can. */
+    readonly growWriteWhyNot = computed(() =>
+        this.growMode() === 'investigation' && !this.lens.canManageIncidents()
+            ? 'This changes the Investigation log and needs the Incident management capability.'
+            : '',
+    );
+    /** The Entity Type the items on the canvas are (what an exclusion list is typed by); null = unknown. */
+    readonly growEntityType = computed<string | null>(
+        () =>
+            this.investigation.binding()?.entityType ??
+            this.profile().investigate?.entityType ??
+            this.canvasData()?.nodes.find((n) => n.data.entityType)?.data.entityType ??
+            null,
+    );
+
+    /** Canvas nodes → the ids an op names: Working Set ids on an Investigation, node ids on the explorer. */
+    private growIdsOf(nodes: G6GraphData['nodes']): string[] {
+        if (this.growMode() === 'investigation') {
+            const ws = this.investigation.workingSet();
+            return [...new Set(nodes.flatMap((n) => idsInWorkingSet(n, ws)))];
+        }
+        return nodes.map((n) => n.id);
+    }
+
+    /** The canvas node a Working Set id is drawn as (or the id itself on the explorer). */
+    private canvasNodeOf(id: string): G6GraphData['nodes'][number] | undefined {
+        const nodes = this.canvasData()?.nodes ?? [];
+        if (this.growMode() !== 'investigation') return nodes.find((n) => n.id === id);
+        const ws = this.investigation.workingSet();
+        return nodes.find((n) => idsInWorkingSet(n, ws).includes(id));
+    }
+
+    /** What the Grow panel grows from: the selection, else the outer ring (Investigation) / the edge not grown yet (explorer). */
+    readonly growContext = computed<GrowContext>(() => {
+        const t = this.growTerms();
+        const kinds = this.legendLinkKinds();
+        const picked = this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND);
+        const many = (n: number) => `${n.toLocaleString('en')} ${n === 1 ? t.node : t.nodes}`;
+        if (this.growMode() === 'investigation') {
+            const ws = this.investigation.workingSet();
+            const flagged = new Set((ws?.entities ?? []).filter((e) => e.highConnectivity).map((e) => e.id));
+            const overridden = this.investigation.overriddenHubs();
+            const isHeld = (id: string) => flagged.has(id) && !overridden.has(id);
+            let frontier: string[];
+            let heldFrontier: string[];
+            let from: string;
+            let blocked: string | null = this.growWriteWhyNot() || null;
+            if (picked.length) {
+                const ids = this.growIdsOf(picked);
+                frontier = ids.filter((id) => !isHeld(id));
+                heldFrontier = ids.filter(isHeld);
+                from = `the ${many(ids.length)} you selected`;
+                if (!ids.length) blocked ??= 'None of the selected items is in the Working Set.';
+            } else {
+                const s = degreeState(
+                    ws,
+                    this.maxDegree(),
+                    this.investigation.degreeOutcomes(),
+                    false,
+                    this.investigation.overrideSteps(),
+                );
+                frontier = s.frontier;
+                heldFrontier = s.heldHubs;
+                from =
+                    s.current >= 0
+                        ? `the outer ring (degree ${s.current}): ${many(frontier.length + heldFrontier.length)}`
+                        : 'nothing yet';
+                // "every entity at the edge is a hub" is the panel's to say: unticking Hold can still grow
+                if (s.blocked && !(s.frontier.length === 0 && s.heldHubs.length)) blocked ??= s.blocked;
+            }
+            const cap = laLimit('investigation.max_frontier');
+            if (!blocked && frontier.length + heldFrontier.length > cap)
+                blocked = `One Grow names at most ${cap.toLocaleString('en')} ${t.nodes}; select fewer, or remove busy ${t.nodes} first.`;
+            return {
+                mode: 'investigation',
+                frontier,
+                heldFrontier,
+                from,
+                blocked,
+                linkKinds: kinds,
+                hubThreshold: this.growThreshold(),
+                terms: t,
+                secondStepCap: cap,
+                hasWindow: !!this.investigation.header()?.timeCol,
+            };
+        }
+        // Basic / exploration: one neighbours read per node, bounded like "Expand from the selected nodes".
+        const run = this.lastRun();
+        const canExpand = !!this.graphSources.byId(this.sourceId())?.expand && !!run?.query.projection;
+        const held = this.growExclude.basicHeld();
+        const isHeld = (n: G6GraphData['nodes'][number]) => held.has(n.id) || rawIdsOf(n).some((r) => held.has(r));
+        const done = new Set(this.expandedNodeIds());
+        const pool = picked.length
+            ? picked
+            : (this.canvasData()?.nodes ?? []).filter((n) => n.data.kind !== SUPER_NODE_KIND && !done.has(n.id));
+        const capped = pool.slice(0, this.selectionExpandCap);
+        const from = picked.length
+            ? `the ${many(picked.length)} you selected`
+            : pool.length > capped.length
+              ? `the first ${capped.length} of ${many(pool.length)} not grown yet`
+              : `the ${many(pool.length)} not grown yet`;
+        return {
+            mode: 'basic',
+            frontier: capped.filter((n) => !isHeld(n)).map((n) => n.id),
+            heldFrontier: capped.filter(isHeld).map((n) => n.id),
+            from,
+            blocked: !run
+                ? 'Draw a graph first.'
+                : !canExpand
+                  ? 'Grow needs a graph drawn from one Entity/Link mapping (its neighbours read).'
+                  : !pool.length
+                    ? `Every ${t.node} on the graph has been grown already.`
+                    : null,
+            linkKinds: kinds,
+            hubThreshold: this.growThreshold(),
+            terms: t,
+            secondStepCap: this.selectionExpandCap,
+            hasWindow: false,
+        };
+    });
+
+    /** The explorer's preview: one `neighbors/preview` per node, summed ("about"). An absent route → no numbers. */
+    readonly growBasicAdapter = (this.growExclude.basicAdapter = {
+        preview: async (frontier: string[], req: GrowRequest) => {
+            const p = this.lastRun()?.query.projection;
+            if (!p) return null;
+            const nodes = this.canvasData()?.nodes ?? [];
+            const reads = frontier.map((id) =>
+                firstValueFrom(
+                    this.inv.previewNeighbors({
+                        dataset: p.datasetId,
+                        sourceCol: p.sourceCol,
+                        targetCol: p.targetCol,
+                        linkKindCol: p.linkKindCol || undefined,
+                        value: nodes.find((n) => n.id === id)?.data.label ?? id,
+                    }),
+                ),
+            );
+            const sum = sumPreviews(await Promise.all(reads));
+            // held items only mean something while holding
+            return req.hold ? sum : { ...sum, held: [], heldCount: 0 };
+        },
+    });
+
+    /** The Investigation's held busy items, else the explorer's — what the Held tray lists and the canvas badges. */
+    readonly heldItems = computed<HeldItem[]>(() => {
+        if (this.growMode() === 'investigation') {
+            const overridden = this.investigation.overriddenHubs();
+            const sealed = this.investigation.hubContacts();
+            return (this.investigation.workingSet()?.entities ?? [])
+                .filter((e) => e.highConnectivity && !e.hidden && !overridden.has(e.id))
+                .map((e) => ({ id: e.id, label: e.id, contacts: e.contacts ?? sealed.get(e.id) ?? null }));
+        }
+        const held = this.growExclude.basicHeld();
+        if (!held.size) return [];
+        const hidden = new Set(this.hiddenNodeIds());
+        const out: HeldItem[] = [];
+        for (const n of this.canvasSource()?.nodes ?? []) {
+            if (hidden.has(n.id)) continue;
+            const raw = held.has(n.id) ? n.id : rawIdsOf(n).find((r) => held.has(r));
+            if (raw !== undefined) out.push({ id: n.id, label: n.data.label, contacts: held.get(raw) ?? null });
+        }
+        return out;
+    });
+
+    /** The canvas with its held busy nodes marked: the ring a flagged hub already wears, plus the "held" badge. */
+    private markHeld(g: G6GraphData | null): G6GraphData | null {
+        if (!g) return g;
+        const items = this.heldItems();
+        if (!items.length) return g;
+        const held = new Set(items.map((h) => h.id));
+        // DR-D2: the canvas may speak the Space's alias where the Working Set speaks its own (`exploreAliases`)
+        const back = new Map(
+            Object.entries(this.investigation.workingSet()?.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]),
+        );
+        const isHeld =
+            this.growMode() === 'investigation'
+                ? (n: G6GraphData['nodes'][number]) => rawIdsOf(n).some((id) => held.has(back.get(id) ?? id))
+                : (n: G6GraphData['nodes'][number]) => held.has(n.id);
+        return {
+            ...g,
+            nodes: g.nodes.map((n) => (isHeld(n) ? { ...n, data: { ...n.data, held: true, highConnectivity: true } } : n)),
+        };
+    }
+
+    openGrow(): void {
+        if (!this.graph() && !this.workingSetCanvas()) return;
+        this.growExclude.exclusionsOpen.set(false);
+        this.growExclude.growOpen.set(true);
+    }
+
+    closeGrow(): void {
+        this.growExclude.growOpen.set(false);
+        this.growExclude.resetPreview();
+    }
+
+    /** The Grow panel's choice, carried out: recorded `expand` steps, or the explorer's neighbours reads. */
+    async onGrow(req: GrowRequest): Promise<void> {
+        const ctx = this.growContext();
+        this.growExclude.growOpen.set(false);
+        if (ctx.mode === 'investigation') {
+            if (!(await this.growExclude.growInvestigation(ctx, req, this.degreePresets())))
+                this.toastr.error(this.investigation.error() || 'The Grow was refused.');
+            return;
+        }
+        await this.growBasic(ctx, req);
+    }
+
+    /** Basic Grow (§3.5): neighbours reads merged into the explorer graph — not recorded; Undo restores the graph. */
+    private async growBasic(ctx: GrowContext, req: GrowRequest): Promise<void> {
+        const before = {
+            graph: this.graph(),
+            expanded: this.expandedNodeIds(),
+            truncated: this.truncated(),
+            held: this.growExclude.basicHeld(),
+        };
+        const t = ctx.terms;
+        const preview = this.growExclude.preview().preview;
+        if (req.hold && preview?.held.length) {
+            const next = new Map(this.growExclude.basicHeld());
+            for (const h of preview.held) next.set(h.id, h.contacts);
+            this.growExclude.basicHeld.set(next);
+        }
+        let frontier = [...ctx.frontier, ...(req.hold ? [] : ctx.heldFrontier)];
+        const startNodes = this.graph()?.nodes.length ?? 0;
+        const startLinks = this.graph()?.edges.length ?? 0;
+        for (let step = 0; step < req.steps && frontier.length; step++) {
+            const known = new Set((this.graph()?.nodes ?? []).map((n) => n.id));
+            for (const id of frontier.slice(0, this.selectionExpandCap)) {
+                const node = this.graph()?.nodes.find((n) => n.id === id);
+                if (!node) continue;
+                await this.expandNode(id, node.data.label, node.data.spellings, (e) =>
+                    growKeepsEdge(id, req, e, baseEdgeKind(e.data.kind)),
+                );
+            }
+            const held = this.growExclude.basicHeld();
+            frontier = (this.graph()?.nodes ?? [])
+                .filter((n) => !known.has(n.id) && !(req.hold && (held.has(n.id) || rawIdsOf(n).some((r) => held.has(r)))))
+                .map((n) => n.id);
+        }
+        const nodes = (this.graph()?.nodes.length ?? 0) - startNodes;
+        const links = (this.graph()?.edges.length ?? 0) - startLinks;
+        const text =
+            `Grew ${req.steps === 1 ? 'one step' : '2 steps'}: ${nodes.toLocaleString('en')} ${nodes === 1 ? t.node : t.nodes} ` +
+            `and ${links.toLocaleString('en')} ${links === 1 ? t.link : t.links} added (not recorded).`;
+        const after = this.graph();
+        this.growExclude.lastChange.set({
+            text,
+            // only while the graph is still the one this Grow drew: a later expand would be thrown away
+            valid: () => this.graph() === after,
+            undo: () => {
+                this.graph.set(before.graph);
+                this.expandedNodeIds.set(before.expanded);
+                this.truncated.set(before.truncated);
+                this.growExclude.basicHeld.set(before.held);
+                this.growExclude.lastChange.set({ text: 'Undone.' });
+            },
+        });
+        this.drawAnnouncement.set(text);
+    }
+
+    /** The nodes "Exclude…" acts on: the given ones, else the selection, else the picked Investigation entity. */
+    private excludeTargets(ids?: string[]): G6GraphData['nodes'] {
+        const nodes = this.canvasData()?.nodes ?? [];
+        if (ids?.length) return nodes.filter((n) => ids.includes(n.id));
+        const sel = this.selectedNodes();
+        if (sel.length) return sel;
+        const picked = this.investigation.selected();
+        return picked ? nodes.filter((n) => n.id === picked.id) : [];
+    }
+
+    /** "Exclude…" (right-click, X): the two-choice dialog, then the recorded op / the local hide. */
+    openExclude(nodeIds?: string[]): void {
+        const targets = this.excludeTargets(nodeIds).filter((n) => n.data.kind !== SUPER_NODE_KIND);
+        const t = this.growTerms();
+        if (!targets.length) {
+            this.drawAnnouncement.set(`Select the ${t.nodes} to exclude first (click one, or drag a box).`);
+            this.toastr.info(`Select the ${t.nodes} to exclude first.`);
+            return;
+        }
+        const ids = this.growIdsOf(targets);
+        if (!ids.length) {
+            this.toastr.info('None of these nodes is in the Working Set.');
+            return;
+        }
+        const mode = this.growMode();
+        void this.growExclude.loadLists().then(() => {
+            this.dialog
+                .open<LinkAnalysisExcludeDialog, ExcludeDialogData, ExcludeDialogResult | undefined>(
+                    LinkAnalysisExcludeDialog,
+                    {
+                        width: '30rem',
+                        data: {
+                            count: ids.length,
+                            labels: targets.map((n) => n.data.label),
+                            mode,
+                            terms: t,
+                            lists: this.growExclude.lists(),
+                            entityType: this.growEntityType(),
+                            canManageLists: this.lens.canManageIncidents(),
+                            canManageCategories: this.lens.canManageExclusionCategories(),
+                            hereWhyNot: this.growWriteWhyNot(),
+                        },
+                    },
+                )
+                .afterClosed()
+                .subscribe((r) => {
+                    if (r) void this.applyExclude(r, targets, ids);
+                });
+        });
+    }
+
+    private async applyExclude(r: ExcludeDialogResult, targets: G6GraphData['nodes'], ids: string[]): Promise<void> {
+        const t = this.growTerms();
+        if (this.growMode() === 'investigation') {
+            if (r.kind === 'here') {
+                if (await this.growExclude.excludeHere(ids, r.reason, t)) this.clearSelection();
+                else this.toastr.error(this.investigation.error() || 'The exclusion was refused.');
+                return;
+            }
+            const res = await this.growExclude.addToList(
+                { id: r.listId, newTitle: r.newTitle, entityType: this.growEntityType() },
+                ids,
+                r.reason,
+                t,
+                true,
+            );
+            if (res.ok) {
+                this.clearSelection();
+                this.toastr.info(res.message);
+            } else this.toastr.error(res.message);
+            return;
+        }
+        // Basic: a local hide (Undo / Ctrl+Z bring them back), and the list write when asked.
+        if (r.kind === 'list') {
+            const res = await this.growExclude.addToList(
+                { id: r.listId, newTitle: r.newTitle, entityType: this.growEntityType() },
+                targets.map((n) => rawIdsOf(n)[0] ?? n.data.label),
+                r.reason,
+                t,
+                false,
+            );
+            if (!res.ok) {
+                this.toastr.error(res.message);
+                return;
+            }
+            this.toastr.info(res.message);
+        }
+        this.hideLocally(
+            targets.map((n) => n.id),
+            r.kind === 'list' ? 'added to the list and hidden' : 'hidden',
+        );
+    }
+
+    /** Hide explorer nodes (presentation, undoable) and say so with an Undo. */
+    private hideLocally(nodeIds: string[], what: string): void {
+        const t = this.growTerms();
+        const added = nodeIds.filter((id) => !this.hiddenNodeIds().includes(id));
+        this.recordHistory();
+        this.hiddenNodeIds.update((h) => [...h, ...added]);
+        this.clearSelection();
+        this.growExclude.lastChange.set({
+            text: `${nodeIds.length.toLocaleString('en')} ${nodeIds.length === 1 ? t.node : t.nodes} ${what} (not recorded).`,
+            // brings back only what this hide took off, whatever was hidden since
+            undo: () => {
+                this.hiddenNodeIds.update((h) => h.filter((id) => !added.includes(id)));
+                this.growExclude.lastChange.set({ text: 'Undone.' });
+            },
+        });
+    }
+
+    /** The Held tray's "Remove held": one recorded `exclude` with the reason, or (explorer) a local hide. */
+    async removeHeld(): Promise<void> {
+        const items = this.heldItems();
+        if (!items.length) return;
+        if (this.growMode() === 'investigation') {
+            const ok = await this.growExclude.removeHeld(
+                items.map((h) => h.id),
+                this.growThreshold(),
+                this.growTerms(),
+            );
+            if (!ok) this.toastr.error(this.investigation.error() || 'Removing the held items was refused.');
+            return;
+        }
+        this.hideLocally(
+            items.map((h) => h.id),
+            'busy, hidden',
+        );
+    }
+
+    /** The Held tray's "Expand anyway" on one item: the recorded override, or (explorer) a plain neighbours read. */
+    async expandHeldAnyway(id: string): Promise<void> {
+        if (this.growMode() === 'investigation') {
+            if (!(await this.growExclude.expandAnyway(id, this.degreePresets())))
+                this.toastr.error(this.investigation.error() || 'The expand was refused.');
+            return;
+        }
+        const node = this.canvasData()?.nodes.find((n) => n.id === id);
+        if (!node) return;
+        const next = new Map(this.growExclude.basicHeld());
+        for (const r of [...rawIdsOf(node), node.id]) next.delete(r);
+        this.growExclude.basicHeld.set(next);
+        await this.expandNode(id, node.data.label, node.data.spellings);
+    }
+
+    focusHeld(id: string): void {
+        const node = this.canvasNodeOf(id);
+        if (node) this.focusNode(node.id);
+    }
+
+    openExclusions(): void {
+        this.growExclude.growOpen.set(false);
+        this.growExclude.exclusionsOpen.set(!this.growExclude.exclusionsOpen());
+        void this.growExclude.loadLists();
+    }
+
+    readonly exclusionsLine = computed(() => hiddenByListsLine(this.growExclude.inForce(), this.growTerms()));
+    readonly exclusionsRemoved = computed(() =>
+        removedRows(this.investigation.workingSet(), this.growExclude.inForce(), this.growExclude.canSeeRestricted()),
+    );
+    /** The toolbar's count: removed by lists (Investigation) or hidden on the explorer. */
+    readonly hiddenCount = computed(() =>
+        this.growMode() === 'investigation'
+            ? this.growExclude.inForce().reduce((s, l) => s + l.removed, 0)
+            : this.hiddenNodeIds().length,
+    );
+    readonly createListWhyNot = computed(() =>
+        !this.lens.canManageIncidents()
+            ? 'Creating a list needs the Incident management capability.'
+            : !this.growEntityType()
+              ? 'This graph has no Entity Type, so a list cannot be made for it.'
+              : '',
+    );
+
+    async switchListOff(listId: string): Promise<void> {
+        if (!(await this.growExclude.switchOff(listId)))
+            this.toastr.error(this.investigation.error() || 'The list could not be switched off.');
+    }
+
+    async switchListOn(listId: string): Promise<void> {
+        if (!(await this.growExclude.switchOn(listId, this.growTerms())))
+            this.toastr.error(this.investigation.error() || 'The list could not be switched on.');
+    }
+
+    async createExclusionList(title: string): Promise<void> {
+        this.toastr.info(await this.growExclude.createList(title, this.growEntityType()));
+    }
+
+    showHiddenAgain(): void {
+        this.recordHistory();
+        this.hiddenNodeIds.set([]);
+    }
+
+    // ── right-click a node → Exclude… / Grow from here ──
+
+    @ViewChild('nodeMenuTrigger') private nodeMenuTrigger?: MatMenuTrigger;
+    readonly nodeMenuAt = signal({ x: 0, y: 0 });
+    readonly nodeMenuTargets = signal<string[]>([]);
+
+    onNodeContextMenu(e: { id: string; x: number; y: number }): void {
+        const sel = this.selectedOnCanvas();
+        this.nodeMenuTargets.set(sel.includes(e.id) ? sel : [e.id]);
+        this.nodeMenuAt.set({ x: e.x, y: e.y });
+        this.cdr.markForCheck();
+        // the trigger moves first, then the menu opens at it
+        setTimeout(() => this.nodeMenuTrigger?.openMenu());
+    }
+
+    growFromMenu(): void {
+        this.selectedNodeIds.set(this.nodeMenuTargets());
+        this.announceSelection(this.nodeMenuTargets().length);
+        this.openGrow();
+    }
+
+    /** G = Grow, X = Exclude… (outside a text field, a grid, a menu or a dialog). True when the key was ours. */
+    private onGrowExcludeKey(e: KeyboardEvent, target: HTMLElement | null): boolean {
+        if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return false;
+        const key = e.key.toLowerCase();
+        if (key !== 'g' && key !== 'x') return false;
+        if (target?.isContentEditable || target?.tagName === 'SELECT') return false;
+        if (
+            target?.closest?.(
+                '.ag-root-wrapper, [role="menu"], mat-dialog-container, [role="grid"], [role="combobox"], [role="listbox"], mat-select',
+            )
+        )
+            return false;
+        if (this.dialog.openDialogs.length) return false;
+        if (!this.graph() && !this.workingSetCanvas()) return false;
+        e.preventDefault();
+        if (key === 'g') this.openGrow();
+        else this.openExclude();
+        return true;
     }
 }

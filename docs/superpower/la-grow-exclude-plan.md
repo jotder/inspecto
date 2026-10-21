@@ -1,6 +1,6 @@
 # Inspecto LA — grow the graph and exclude noise, made easy for a new analyst (`LA-GROW-EXCLUDE-1`)
 
-**Status: PLAN 2026-10-21 — recommendations written for operator review, nothing built.** Decisions GE-1…GE-12 are
+**Status: PLAN 2026-10-21 — recommendations written for operator review. 2026-10-22: the UI lane (C) of phases 1, 2, 3 and 5 is built (`grow-exclude.ts`, `GrowExcludeStore`, the Grow / Held / Exclusions components and the Exclude dialog; user guide §5.4); backend lanes A (exclusion-list ownership) and B (expand preview) are built in parallel against the route contracts in §8, and the UI degrades without them.** Decisions GE-1…GE-12 are
 the assistant's recommendations (the operator asked for the plan "with your recommendations" and to improve
 intuitiveness for new users); confirm before phase 1 starts. When a phase ships, distil the as-built facts into
 the la-core hub (`docs/okf/product/module/la-core/`), move open items to `docs/BACKLOG.md`, archive this file
@@ -137,6 +137,22 @@ Each new route clears the four endpoint gates; each phase runs the affected-buil
 - **Auto-apply surprises:** an analyst may not realise nodes were removed — the Exclusions panel and the Grow
   preview always show the count, and the Dossier lists which lists were in force.
 - **Preview cost:** a dry-run read per Grow doubles the reads; it runs under the same rate class and limits.
+
+## 8. Route contracts the UI is built against (lanes A and B, 2026-10-22)
+
+- `GET /inv/exclusion-lists` → `{lists:[{id,title,entityType,ownerKind:"admin"|"analyst",autoApply,visibility:"open"|"restricted",size}]}`.
+  Absent → the UI falls back to `GET /entity-lists` (purpose `exclusion`, not retired, read as analyst lists), else
+  shows no list section.
+- `GET /entity-lists/{id}` of a restricted list read by an analyst: `members: null, membersHidden: true`; removed
+  counts rounded to the nearest 5 (at least 5; 0 stays 0) — the UI rounds the same way client-side.
+- `POST /inv/investigations/{id}/expand/preview` (body = the `expand` op body) and `POST /inv/projection/neighbors/preview`
+  (body = the neighbours request, the explorer) → `{addsNodes, addsLinks, held:[{id,contacts}], heldCount,
+  excludedByLists:[{listId,title,removed}], truncated, readPath, needsApproval?, reason?}`. 0/404/405/501/503 → "No
+  preview on this server", Grow still runs; another status → its message in place.
+- Admin lists need `canManageExclusionCategories` (`LensService.canManageExclusionCategories`, no Access-Catalog node
+  yet); admin auto-apply lists are pre-applied as `excludeBy` steps on Investigation create.
+- "Switch off" a list = the `undo` of its `excludeBy` step — only the latest step (GE-12 adds no op); an older one says
+  why. A "skip this list for one Grow" needs an expand parameter no lane has specified — open.
 
 ## References
 
