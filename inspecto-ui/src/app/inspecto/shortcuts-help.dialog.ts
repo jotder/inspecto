@@ -19,6 +19,9 @@ const SHORTCUTS: Shortcut[] = [
     { keys: ['J', 'K'], description: 'Move down / up a list that supports keyboard nav (e.g. incidents)' },
     { keys: ['Enter'], description: 'Open the focused list row' },
     { keys: ['X'], description: 'Select / deselect the focused list row' },
+    { keys: ['G'], description: 'Link Analysis: Grow the graph (opens the Grow panel)' },
+    { keys: ['X'], description: 'Link Analysis: Exclude the selected nodes (outside a list)' },
+    { keys: ['Ctrl', 'Z'], description: 'Link Analysis: Undo the last Grow or Exclude' },
 ];
 
 /**

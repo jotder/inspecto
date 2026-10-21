@@ -97,6 +97,22 @@ is linked to. **Expand next degree** goes one hop further, up to four.
 **Display options** (the brush) switch node and link labels, colours and shapes. A dotted outline in the legend marks
 a node you have not expanded yet. **Undo** and **Redo** step through display and filter changes.
 
+### Grow and clean the graph
+
+* **Grow** (or press **G**) adds the next ring of linked numbers. It opens on safe defaults — both ways, one step,
+  busy numbers held — and tells you what the step would add before anything changes. Press **Grow**, or **Cancel**.
+  After it, one line says what happened, with **Undo** (or **Ctrl+Z**).
+* **Busy numbers** — call centres, switchboards, shops — link to thousands of others and hide the real links. Grow
+  holds them: they stay on the graph with a ring and a *held* badge, listed in the **Held** tray. **Remove held**
+  takes them all out in one step; **Expand anyway** grows through one of them.
+* **Right-click a node** (or press **X** with nodes selected) → **Exclude…**: *From this Investigation only*, or
+  *Add to a list…* so it stays out of every later step too. Some lists are kept by your administrator (VIPs,
+  politicians); you can use them, not change them.
+* **Hidden** (tool rail) shows the lists in force — "41 numbers hidden by 3 lists" — lets you switch one on or off,
+  and shows what was removed.
+
+In an Investigation each of these is a recorded step; without one (Basic) they change only what you see.
+
 ---
 
 ## 6. The analysis tools (Toolbox → Analysis)
@@ -182,6 +198,7 @@ instead, or ask for Reveal rights.
 | You see | It means | Do this |
 |---|---|---|
 | A button is greyed out | You lack the capability named in its tooltip | Ask your administrator |
+| *No preview on this server* in Grow | The server is older than the Grow preview | Grow anyway; the result line says what it added, with Undo |
 | `masked:…` everywhere | Your Space masks sensitive ids | Ask for Reveal rights if you need real ids |
 | *Waiting for approval* | The expand is above the four-eyes limit | Ask a second approver to open the Investigation |
 | A red *Investigation is not available* | It does not exist, is not yours, or its Dataset is no longer shared with you | Ask its owner to add you as a member |
