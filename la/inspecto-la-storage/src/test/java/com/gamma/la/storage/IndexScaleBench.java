@@ -24,7 +24,8 @@ import java.util.function.Function;
  *
  * <p>Needs {@code -Dinspecto.bench.dir=<dir>} (parquet inputs and indexes go there, outside the repo). Knobs
  * {@code inspecto.bench.*}: {@code idxDir} (index parent, default = dir; used by tools/bench-duckdb.ps1 for a per-label index), {@code edges} (10000000), {@code deltaEdges} (100000 per appended file), {@code maxDeltas} (8),
- * {@code buildMemory} (8GB), {@code threads} (DuckDB build threads, default all), {@code samples} (60 keys per series), {@code skipDeltas} (false). Results print as
+ * {@code buildMemory} (8GB), {@code threads} (DuckDB build threads, default all), {@code samples} (60 keys per series), {@code skipDeltas} (false),
+ * {@code buildOnly} (false: stop after the FULL build and its phase timings). Results print as
  * {@code SCALE ...} lines. Run: {@code mvn -o -pl :inspecto-la-storage test -Dtest=IndexScaleBench
  * -Dinspecto.bench.dir=<dir> -Dinspecto.bench.edges=10000000 -Dsurefire.failIfNoSpecifiedTests=false}.
  *
@@ -43,12 +44,12 @@ class IndexScaleBench {
         return Long.parseLong(System.getProperty("inspecto.bench." + k, Long.toString(d)));
     }
 
-    private static String sql(Path p) {
+    static String sql(Path p) {
         return p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''");
     }
 
     /** Writes {@code rows} edges as parquet files [first, ...) under dir, ids offset by {@code seedOffset}; returns the file names. */
-    private static List<String> plant(Path dir, String prefix, long rows, long nodes, long seedOffset) throws Exception {
+    static List<String> plant(Path dir, String prefix, long rows, long nodes, long seedOffset) throws Exception {
         Files.createDirectories(dir);
         List<String> names = new ArrayList<>();
         try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
@@ -67,20 +68,20 @@ class IndexScaleBench {
         return names;
     }
 
-    private static String relation(Path dir, List<String> files) {
+    static String relation(Path dir, List<String> files) {
         StringBuilder sb = new StringBuilder("SELECT * FROM read_parquet([");
         for (int i = 0; i < files.size(); i++) sb.append(i == 0 ? "'" : ", '").append(sql(dir.resolve(files.get(i)))).append('\'');
         return sb.append("])").toString();
     }
 
-    private static List<IndexManifest.InputFile> stamps(Path dir, List<String> files) throws Exception {
+    static List<IndexManifest.InputFile> stamps(Path dir, List<String> files) throws Exception {
         List<IndexManifest.InputFile> out = new ArrayList<>();
         for (String f : files)
             out.add(new IndexManifest.InputFile(f, Files.size(dir.resolve(f)), Files.getLastModifiedTime(dir.resolve(f)).toMillis()));
         return out;
     }
 
-    private static long dirBytes(Path d) throws Exception {
+    static long dirBytes(Path d) throws Exception {
         try (var w = Files.walk(d)) {
             return w.filter(Files::isRegularFile).mapToLong(f -> f.toFile().length()).sum();
         }
@@ -159,13 +160,15 @@ class IndexScaleBench {
         if (store.current().isEmpty()) {
             long b = System.nanoTime();
             base = build(data, store, IndexBuilder.Mode.FULL, files, mem);
-            System.out.printf("SCALE edges=%,d FULL build %.0f s, %d buckets, %.2f GB index, %,d edges kept%n", edges, (System.nanoTime() - b) / 1e9,
-                    base.manifest().buckets(), dirBytes(base.directory()) / 1e9, base.edges());
+            System.out.printf("SCALE edges=%,d FULL build %.0f s, %d buckets, %.2f GB index, %,d edges kept, %,d nodes%n", edges, (System.nanoTime() - b) / 1e9,
+                    base.manifest().buckets(), dirBytes(base.directory()) / 1e9, base.edges(), base.nodes());
+            System.out.println("SCALE edges=" + edges + " phase ms " + base.timingsMs());
         } else {
             Path v = store.current().get();
             base = new IndexBuilder.Result(0, v, IndexManifest.read(v), 0, 0, 0, 0, 0, java.util.Map.of(), 0);
             System.out.println("SCALE edges=" + edges + " index reused " + v);
         }
+        if (Boolean.getBoolean("inspecto.bench.buildOnly")) return;
         latency("N=" + edges + " base (0 deltas)", base, nodes, samples);
         if (Boolean.getBoolean("inspecto.bench.skipDeltas")) return;
 

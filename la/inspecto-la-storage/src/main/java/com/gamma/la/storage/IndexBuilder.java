@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -458,19 +459,19 @@ public final class IndexBuilder {
          * The node table of the edges {@code root} holds, ONE BUCKET AT A TIME, read from {@code root}'s own {@code out} and
          * {@code in} (so it is the fold of exactly the rows just written, and the relation is not read again).
          *
-         * <p>The earlier statement folded the whole EDGES view in one pass - two global {@code GROUP BY}s over every edge, a
-         * {@code FULL JOIN} of them and a global {@code ORDER BY} - whose working set grows with the node count and, with it, the
-         * edge count. At 3x10^8 edges (60 M nodes) it died with DuckDB's {@code Out of Memory Error} at a 6 GB cap
-         * (LA-INDEX-SCALE-MEASURE-1) and at 3x10^7 edges it needed more than 256 MB; DuckDB's spill did not rescue it. Here the
-         * working set is the edges of ONE bucket (the sizing aims at {@link BucketFunction#EDGES_PER_BUCKET}), independent of
-         * the total, and the statements are plain bounded ones that DuckDB spills.
+         * <p>The earlier statement folded the whole EDGES view in one pass - two global {@code GROUP BY}s with
+         * {@code count(DISTINCT (neighbour, kind))}, a {@code FULL JOIN} of them and a global {@code ORDER BY} - whose working set
+         * grows with the number of distinct (node, neighbour, kind) links, that is with the edge count, and not with the node
+         * count. It spilled but did not stay inside its cap: 2x10^8 and 3x10^8 edges died with DuckDB's {@code Out of Memory
+         * Error} at 6 GB and 5x10^8 at 12 GB (LA-INDEX-SCALE-MEASURE-1). Here the working set is the edges of ONE bucket (the
+         * sizing aims at {@link BucketFunction#EDGES_PER_BUCKET}), independent of the total.
          *
          * <p>Same rows as before: a node's out and in edges share its bucket (the bucket is a function of the id alone), so a
          * bucket's nodes are the {@code FULL JOIN} of its {@code out} and {@code in} folds. One {@code data_0.parquet} per
          * non-empty bucket, sorted by id, same row-group size and codec; a bucket with no edge on either side has no directory.
          */
         void copyNodes(Path root) throws SQLException, IOException {
-            java.util.SortedSet<Integer> buckets = new java.util.TreeSet<>(bucketDirs(root.resolve("out")));
+            TreeSet<Integer> buckets = new TreeSet<>(bucketDirs(root.resolve("out")));
             buckets.addAll(bucketDirs(root.resolve("in")));
             for (int b : buckets) {
                 Path file = Files.createDirectories(root.resolve("nodes").resolve("bucket=" + b)).resolve("data_0.parquet");
@@ -582,8 +583,11 @@ public final class IndexBuilder {
             exec("CREATE TEMP TABLE __la_links AS SELECT DISTINCT a, b, kind FROM (SELECT " + (st == null ? "src" : st.keySql().apply("src"))
                     + " AS a, " + (dt == null ? "dst" : dt.keySql().apply("dst")) + " AS b, kind FROM "
                     + SqlViews.parquet(SqlIdent.pathStr(stage.resolve("out"), "/*/*.parquet"), false, SqlViews.Hive.OFF) + ") l WHERE a <> '' AND b <> '' AND a <> b");
-            exec("CREATE TEMP TABLE __la_degree AS SELECT x, count(DISTINCT o) AS d FROM (SELECT a AS x, b AS o FROM __la_links"
-                    + " UNION ALL SELECT b AS x, a AS o FROM __la_links) e GROUP BY x");
+            // Distinct neighbours per key = distinct (key, neighbour) pairs counted per key (o is never NULL: a and b are non-empty above).
+            // Spelled as DISTINCT then count(*) because the grouped count(DISTINCT o) ran out of memory at a 2 GB cap over 10^8 edges
+            // (LA-INDEX-SCALE-MEASURE-1) where this form completed.
+            exec("CREATE TEMP TABLE __la_degree AS SELECT x, count(*) AS d FROM (SELECT DISTINCT x, o FROM (SELECT a AS x, b AS o FROM __la_links"
+                    + " UNION ALL SELECT b AS x, a AS o FROM __la_links) e) GROUP BY x");
             Map<String, Long> kinds = new LinkedHashMap<>();
             if (m.kindColumn() != null)
                 for (Object[] r : rows("SELECT kind, count(*) AS n FROM __la_links WHERE kind IS NOT NULL GROUP BY kind ORDER BY n DESC, kind"))

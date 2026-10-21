@@ -55,6 +55,13 @@ bucket directories; version N+1 hard-links its parent.
 - **One live build per (Dataset, mapping)**; a duplicate is refused. A failed build stores the exception class only.
 - **Disk budget:** with `maxDiskBytes > 0`, rows are counted and an estimate (`rows × 34 B`) above it is refused before
   any write; the count is time-bounded and a timeout refuses.
+- **Build memory is bounded per bucket (`LA-INDEX-SCALE-MEASURE-1`, 2026-10-21):** the `nodes` table is folded ONE BUCKET AT A TIME
+  from the just-written `out` and `in` (`IndexBuilder.copyNodes`, one `COPY` per non-empty bucket), so that phase's working set is
+  a bucket (about `index.edges_per_bucket` edges) and not the whole relation; the link statistics' per-key distinct-neighbour count is
+  `DISTINCT (key, neighbour)` then `count(*)`, not a grouped `count(DISTINCT)`. The files are the same as before (same rows, one
+  `data_0.parquet` per non-empty bucket, same row groups and codec), pinned by `IndexNodesFoldTest` and `IndexLinkStatsParityTest`, which
+  keep the replaced statements as references; the bound by the gated `IndexNodesMemBench`. Still global and unmeasured above 10^8
+  edges: the `out` / `in` sorts and the statistics' distinct-links table and node-sized aggregates (degree table, quantiles).
 - **Caps refuse, never reroute:** `SqlGraphEngine` throws `IndexCapExceeded`, `IndexedTraversal` throws on an
   over-cap frontier; the la-api caller then answers flat.
 - **Parity:** `SqlGraphEngine` returns the same answer as the in-memory engine over the same graph (canonical-v1 order).
@@ -62,4 +69,4 @@ bucket directories; version N+1 hard-links its parent.
 ## Tests
 
 `la/inspecto-la-storage/src/test/`; inventory in [tests-inventory](tests-inventory.md); the gated scale bench
-`la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexScaleBench.java`.
+`la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexScaleBench.java` and the gated memory-bound bench `IndexNodesMemBench.java`.

@@ -34,14 +34,25 @@ class IndexNodesFoldTest {
     private static final String DS = "fold";
     private static final IndexMapping M = new IndexMapping("s", "t", "k", "ts", null, null, List.of());
 
-    /** The pre-change nodes statement, with the edge view named {@code __ref} and the bucket count {@code %2$d}. */
+    /** The pre-change nodes statement over {@code __ref}: {@code %1$s} the bucket expression, {@code %2$s} the output directory. */
     private static final String REFERENCE_NODES = "COPY (SELECT %1$s AS bucket, id, coalesce(o.oe, 0) AS out_edges, coalesce(i.ie, 0) AS in_edges,"
             + " coalesce(o.ol, 0) AS out_links, coalesce(i.il, 0) AS in_links, least(o.f, i.f) AS first_ts, greatest(o.l, i.l) AS last_ts FROM"
             + " (SELECT src AS id, count(*) AS oe, count(DISTINCT struct_pack(n := dst, k := kind)) AS ol, min(ts) AS f, max(ts) AS l FROM __ref GROUP BY src) o"
             + " FULL JOIN (SELECT dst AS id, count(*) AS ie, count(DISTINCT struct_pack(n := src, k := kind)) AS il, min(ts) AS f, max(ts) AS l FROM __ref GROUP BY dst) i USING (id)"
-            + " ORDER BY bucket, id) TO '%3$s' (FORMAT parquet, PARTITION_BY (bucket), ROW_GROUP_SIZE 100000, COMPRESSION zstd)";
+            + " ORDER BY bucket, id) TO '%2$s' (FORMAT parquet, PARTITION_BY (bucket), ROW_GROUP_SIZE 100000, COMPRESSION zstd)";
 
-    private static String sql(Path p) {
+    /** The pre-change nodes statement, writing the node table of {@code __ref} into {@code to}, bucketed {@code buckets} ways. */
+    static String referenceNodes(int buckets, Path to) {
+        return String.format(REFERENCE_NODES, BucketFunction.sql("id", buckets), sql(to));
+    }
+
+    /** {@code __ref}: the builder's EDGES view over a relation with columns {@code s, t, k, ts} (ids as VARCHAR, NULL endpoints dropped). */
+    static String referenceEdgesView(String relationSql) {
+        return "CREATE TEMP VIEW __ref AS SELECT CAST(s AS VARCHAR) AS src, CAST(t AS VARCHAR) AS dst, CAST(k AS VARCHAR) AS kind,"
+                + " CAST(timezone('UTC', timezone('UTC', CAST(ts AS TIMESTAMP))) AS TIMESTAMP) AS ts FROM (" + relationSql + ") WHERE s IS NOT NULL AND t IS NOT NULL";
+    }
+
+    static String sql(Path p) {
         return p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''");
     }
 
@@ -66,13 +77,13 @@ class IndexNodesFoldTest {
         }
     }
 
-    private static String relation(Path dir, List<String> files) {
+    static String relation(Path dir, List<String> files) {
         StringBuilder sb = new StringBuilder("SELECT * FROM read_parquet([");
         for (int i = 0; i < files.size(); i++) sb.append(i == 0 ? "'" : ", '").append(sql(dir.resolve(files.get(i)))).append('\'');
         return sb.append("])").toString();
     }
 
-    private static List<IndexManifest.InputFile> stamps(Path dir, List<String> files) throws Exception {
+    static List<IndexManifest.InputFile> stamps(Path dir, List<String> files) throws Exception {
         List<IndexManifest.InputFile> out = new ArrayList<>();
         for (String f : files) {
             Path p = dir.resolve(f);
@@ -82,7 +93,11 @@ class IndexNodesFoldTest {
     }
 
     private static IndexBuilder.Result build(Path idx, Path data, IndexBuilder.Mode mode, List<String> files, Integer buckets) throws Exception {
-        return IndexBuilder.build(new IndexBuilder.Request(DS, M, relation(data, files), new IndexStore(idx, DS, M.hash()), "fp-" + files.size(),
+        return build(M, idx, data, mode, files, buckets);
+    }
+
+    private static IndexBuilder.Result build(IndexMapping m, Path idx, Path data, IndexBuilder.Mode mode, List<String> files, Integer buckets) throws Exception {
+        return IndexBuilder.build(new IndexBuilder.Request(DS, m, relation(data, files), new IndexStore(idx, DS, m.hash()), "fp-" + files.size(),
                 new IndexBuilder.Options(buckets, null, null, null, null), stamps(data, files), mode, added -> relation(data, added), List.of(data)));
     }
 
@@ -141,9 +156,8 @@ class IndexNodesFoldTest {
 
         Path ref = Files.createDirectories(tmp.resolve("ref"));
         try (Connection c = mem(); Statement st = c.createStatement()) {
-            st.execute("CREATE TEMP VIEW __ref AS SELECT CAST(s AS VARCHAR) AS src, CAST(t AS VARCHAR) AS dst, CAST(k AS VARCHAR) AS kind,"
-                    + " CAST(timezone('UTC', timezone('UTC', CAST(ts AS TIMESTAMP))) AS TIMESTAMP) AS ts FROM (" + relation(data, files) + ") WHERE s IS NOT NULL AND t IS NOT NULL");
-            st.execute(String.format(REFERENCE_NODES, BucketFunction.sql("id", buckets), buckets, sql(ref.resolve("nodes"))));
+            st.execute(referenceEdgesView(relation(data, files)));
+            st.execute(referenceNodes(buckets, ref.resolve("nodes")));
 
             String fresh = nodes(v), old = "read_parquet('" + sql(ref) + "/nodes/*/*.parquet', hive_partitioning = true, filename = true, file_row_number = true)";
             assertSameNodes(c, fresh, old, "folded vs reference");
@@ -171,6 +185,48 @@ class IndexNodesFoldTest {
         try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             rs.next();
             return rs.getObject(1);
+        }
+    }
+
+    /** No kind, no time column: every link folds over a NULL kind and first_ts / last_ts are NULL, as before. */
+    @Test
+    void anIndexWithNeitherKindNorTimeFoldsToTheNodesOfTheReferenceStatement(@TempDir Path tmp) throws Exception {
+        Path data = tmp.resolve("data");
+        plantFile(data, "part0.parquet", 0, 6000, 900);
+        List<String> files = List.of("part0.parquet");
+        IndexBuilder.Result r = build(new IndexMapping("s", "t", null, null, null, null, List.of()), tmp.resolve("idx"), data, IndexBuilder.Mode.FULL, files, 16);
+
+        Path ref = Files.createDirectories(tmp.resolve("ref"));
+        try (Connection c = mem(); Statement st = c.createStatement()) {
+            st.execute(referenceEdgesView("SELECT s, t, CAST(NULL AS VARCHAR) AS k, CAST(NULL AS TIMESTAMP) AS ts FROM (" + relation(data, files) + ")"));
+            st.execute(referenceNodes(16, ref.resolve("nodes")));
+            String old = "read_parquet('" + sql(ref) + "/nodes/*/*.parquet', hive_partitioning = true, filename = true, file_row_number = true)";
+            assertSameNodes(c, nodes(r.directory()), old, "folded vs reference, no kind, no time");
+            assertEquals(0L, ((Number) rs1(c, "SELECT count(*) FROM " + nodes(r.directory()) + " WHERE first_ts IS NOT NULL OR last_ts IS NOT NULL")).longValue());
+        }
+    }
+
+    /** One node whose only edges are links to itself: its out and in sides are the same rows in the same bucket, and one bucket holds the whole table. */
+    @Test
+    void aSingleNodeWithOnlySelfEdgesFoldsToOneNodeRowAsTheReferenceStatementDoes(@TempDir Path tmp) throws Exception {
+        Path data = Files.createDirectories(tmp.resolve("data"));
+        try (Connection c = mem(); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES ('A', 'A', 'call', TIMESTAMP '2026-01-01 10:00:00'), ('A', 'A', 'call', TIMESTAMP '2026-01-02 10:00:00'),"
+                    + " ('A', 'A', 'sms', CAST(NULL AS TIMESTAMP))) v(s, t, k, ts)) TO '" + sql(data.resolve("one.parquet")) + "' (FORMAT parquet)");
+        }
+        List<String> files = List.of("one.parquet");
+        IndexBuilder.Result r = build(tmp.resolve("idx"), data, IndexBuilder.Mode.FULL, files, 16);
+        assertEquals(1, r.nodes());
+        assertEquals(1, bucketDirs(r.directory().resolve("nodes")).size());
+
+        Path ref = Files.createDirectories(tmp.resolve("ref"));
+        try (Connection c = mem(); Statement st = c.createStatement()) {
+            st.execute(referenceEdgesView(relation(data, files)));
+            st.execute(referenceNodes(16, ref.resolve("nodes")));
+            String old = "read_parquet('" + sql(ref) + "/nodes/*/*.parquet', hive_partitioning = true, filename = true, file_row_number = true)";
+            assertSameNodes(c, nodes(r.directory()), old, "folded vs reference, one self-linked node");
+            assertEquals(List.of(List.of("A", "3", "3", "2", "2")),
+                    rows(c, "SELECT id, out_edges, in_edges, out_links, in_links FROM " + nodes(r.directory())), "3 self edges, 2 distinct (A, kind) links each way");
         }
     }
 

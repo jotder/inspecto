@@ -6,6 +6,13 @@ by the author. Derived numbers are marked *derived*; measured ones cite the 2026
 Harness: `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexScaleBench.java` (the only harness needed;
 `DailyIndexScaleBench` and `DraftConcurrencyBench` are separate and not part of this clause).
 
+**Update 2026-10-21 (lane `la-nodes-mem`).** The `nodes` phase that failed every run above 10^8 is now folded one bucket at a time and the link
+statistics' degree statement is bounded (see user guide §*The `nodes` phase and the degree statistics, bounded*): a 10^8-edge FULL build now
+completes at `buildMemory=1GB` (642 s; the unmodified code died in the statistics at 2 GB). **Correction that changes the sizing below:** the
+bench corpus has about 1.8 M distinct node ids at every scale, not `edges / 5` (that is the id domain), so every "per distinct node" memory
+figure in the earlier version of this plan was wrong and is withdrawn; what the old statement held grew with the distinct (node, neighbour, kind)
+links, about one per edge. No build above 10^8 edges has run since the change, so sections 2, 5 and 6 are the plan for the first one, not a result.
+
 ## 1. What is being decided, and what is already known
 
 The edge index (`IndexBuilder`, `IndexReader`, `IndexedTraversal`) is claimed to serve a one-key lookup in about 20 ms and a depth-2
@@ -40,14 +47,16 @@ Per-row costs, all from the measured runs:
 | Parquet corpus | 20 B | 20 GB / 10^9 (measured); 10 GB / 5x10^8 |
 | Index (no weight columns) | 22.3 B | 2.23 GB / 10^8; the documented 34 B/edge is the planning upper bound |
 | Spill + stage peak | 36 B | 18 GB / 5x10^8 (measured); the 10^9 run needed "more than 65 GB working disk" beside the corpus (row) |
-| Build memory | n/a | scales with **distinct nodes** (`edges / 5`), not edges: held at 8 GB for 20 M nodes (10^8), failed at 7.4 GiB for 100 M nodes (5x10^8) |
+| Build memory | n/a | **Before 2026-10-21:** the `nodes` statement died at 6 GB for 2x10^8 and 3x10^8 edges, at 7.4 GiB (8 GB cap) and 11.1 GiB (12 GB cap) for 5x10^8 - about 20 to 30 B of cap per edge, not per node (the corpus has 1.8 M nodes). **After:** completes at 1 GB for 10^8 edges (`out` needs more than 0.5 GB at 8 threads); above 10^8 unmeasured |
 
 **Memory lever.** The build runs inside DuckDB, so the lever is DuckDB's `memory_limit`, set from `-Dinspecto.bench.buildMemory`
 (default `8GB`; `IndexBuilder.open` issues `SET memory_limit`), **not** `-Xmx`. The JVM heap holds only key lists and timings; leave
-it at the default (a quarter of RAM is far more than needed). DuckDB's own allocations sit outside the heap. The 14 GB rerun at
-5x10^8 was abandoned before it finished, so the true working set per distinct node is not known; the OOM only bounds it:
-at least 74 B/node (7.4 GiB / 100 M). Planning figure *derived*: 150 B/node as a safe ceiling for the `nodes` phase, so
-5x10^8 (100 M nodes) needs about 15 GB and 10^9 (200 M nodes) about 30 GB; take x1.5 margin for the unknowns.
+it at the default (a quarter of RAM is far more than needed). DuckDB's own allocations sit outside the heap. The earlier planning
+figure (150 B per distinct node, 15 GB at 5x10^8, 30 GB at 10^9) was derived from a node count the corpus does not have and is
+withdrawn. With the `nodes` phase bounded the lowest cap that completed at 10^8 edges and 8 threads is 1 GB (0.5 GB fails in `out`, the sort
+that writes `out` and `in`, which this change did not touch); nothing above 10^8 edges has run, so how `out`, `in` and the statistics' global
+steps grow with N is the thing the first big run measures. The 24 GB / 48 GB rows below are therefore generous first attempts, not
+requirements: start at the 12 GB the 5x10^8 lane had, and raise it only if the build dies in `out`, `in` or the statistics.
 
 | Run | `buildMemory` | Machine RAM, minimum | RAM, comfortable | Free disk, minimum | Free disk, comfortable | Wall time (derived) |
 |---|---|---|---|---|---|---|
@@ -91,6 +100,7 @@ Every property the bench reads (all `-Dinspecto.bench.*`; `IndexScaleBench.java`
 | `maxDeltas` | 8 | deltas appended (series measured at 1, 2, 4, 6 and `maxDeltas`) |
 | `skipDeltas` | false | stop after the base series (`-Dinspecto.bench.skipDeltas=true`) |
 | `skipCompact` | false | stop after the delta series |
+| `buildOnly` | false | stop after the FULL build and the `SCALE edges=N phase ms {...}` line (phase timings), before the latency series |
 
 Also readable by the build (not by the bench): `-Dprocessing.duckdb.max_temp_directory_size=<e.g. 200GB>` (spill cap; see
 `DuckDbUtil.PROP_MAX_TEMP_DIRECTORY_SIZE`).
@@ -171,7 +181,9 @@ maximum down (see follow-up 1). Compare against the 10^8 row; the pass criteria 
 | Seen | Cause | Do |
 |---|---|---|
 | 10^9 FULL build stopped in `out` at 21.8 GB written | free disk hit the floor; working disk exceeds 65 GB beside the corpus | the disk in section 2 (250 GB free); put `idxDir` on its own volume; check `df` before starting |
-| `Out of Memory Error (7.4 GiB/7.4 GiB used)` in `nodes` at 5x10^8 | `buildMemory=8GB` too small for 100 M distinct nodes | raise `buildMemory` to 24GB (5x10^8) / 48GB (10^9); if it still fails in `nodes`, raise by 50 % and record the figure that worked: that is the result |
+| `Out of Memory Error` in `nodes` (progress stops at `nodes 4/6`) | the unmodified statement (one global fold of all edges), fixed 2026-10-21 | only on a checkout older than the fix: update. On a current one, a failure after `nodes 4/6` and before `verify 6/6` is a bucket that does not fit: report the bucket size (`index.edges_per_bucket`) and the cap |
+| `Out of Memory Error` after `verify 6/6` and before `publish` | the link statistics (`linkStats`: distinct-links table, degree table, quantiles); the grouped `count(DISTINCT)` of the degree died at 2 GB over 10^8 edges and was replaced | raise `buildMemory` and record the figure; the statistics have no progress step, so this window is the only sign |
+| `Out of Memory Error` in `out` or `in` (progress stops at `out 2/6` or `in 3/6`) | the sort that writes the table needs about 0.5 GB or more at 8 threads; at 10^8 edges 512 MB failed after 88 s | raise `buildMemory`, or lower `-Dinspecto.bench.threads` |
 | `index build failed: null` after a long build | the (fixed) relation-hash regex `StackOverflowError`; pinned by `IndexBuilderTest.theRelationHashSurvivesALongPinnedFileList` | only if the repo is older than the fix: update |
 | Interrupted corpus generation, then rerun | the bench treats an existing `data-N` directory as complete (`fresh = !isDirectory`), so a half-written corpus is reused | delete `data-N` before rerunning after any interruption in the corpus phase; the file count must be N / 5 M |
 | Failed or killed build leaves tens of GB | `idx-N/vNNNNNN.tmp/.spill` and the stage stay; `IndexStore.stage()` removes crashed stages only after one hour | `rm -rf idx-N/v*.tmp` before the retry; never delete a published `vNNNNNN` |

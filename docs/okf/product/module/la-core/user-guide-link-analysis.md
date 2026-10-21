@@ -1516,7 +1516,7 @@ measured, see *Index scale measurements*); cross-Dataset graphs. Filed: `LA-INDE
 ## Index scale measurements (LA-INDEX-SCALE-MEASURE-1, 2026-10-05)
 
 Harness: `IndexScaleBench` in `inspecto-la-storage` tests (`-Dinspecto.bench.dir=<dir> -Dinspecto.bench.edges=N`; knobs `deltaEdges`,
-`maxDeltas`, `skipDeltas`, `skipCompact`, `buildMemory`, `samples`; never in the default suite). Method: D-S5 skew corpus (source ~
+`maxDeltas`, `skipDeltas`, `skipCompact`, `buildOnly`, `buildMemory`, `threads`, `samples`; never in the default suite). Method: D-S5 skew corpus (source ~
 nodes x u^3, target ~ nodes x u^2, nodes = edges / 5) written as real parquet files, a real `IndexBuilder` FULL build, then 1-8 appended
 delta files of 100,000 edges each (`IndexBuilder.Mode.APPEND`), then `COMPACT`; reads through `IndexReader.edges` and
 `IndexedTraversal.walk` (undirected, depth 2) over 60 random keys per series after one warm-up. Windows laptop, 12 hardware threads, warm.
@@ -1539,11 +1539,74 @@ delta files of 100,000 edges each (`IndexBuilder.Mode.APPEND`), then `COMPACT`; 
   10x (4 s, 22 s, 447 s), so about 2.5 h, over the 20-minute limit per measurement; the 34 GB, 2x rebuild peak and the 10^9
   `DraftConcurrencyBench` re-run remain extrapolations (backlog row `LA-INDEX-SCALE-MEASURE-1`).
 * **2026-10-13 attempt at 10^9 (not completed).** 10^9 corpus: 1519 s, 20 GB. The FULL build was stopped in its `out` phase when free disk hit the 30 % floor (21.8 GB of index and spill written): it needs more than about 65 GB of working disk beside the corpus, so a 10^9 run needs a host with about 250 GB free and at least 16 GB for the build. 5x10^8 (corpus 341 s, 10 GB): `out` 36 min, `in` 42 min, then `nodes` failed `Out of Memory Error (7.4 GiB/7.4 GiB used)` at the 8 GB cap after 91 min, so the cap that sufficed at 10^8 does NOT suffice at 5x10^8; spill peaked near 18 GB. Time stays superlinear. No 5x10^8 or 10^9 latency or K = 8 figure exists yet. The harness now takes `-Dinspecto.bench.threads` and prints build progress. Open in `LA-INDEX-SCALE-MEASURE-1`.
-* **2026-10-21 attempts at 3x10^8 and 2x10^8 (both failed; no new latency or size figure).** Same laptop (12 hw threads, 31.7 GB RAM, 131 GB free), 8 build threads, `buildMemory=6GB` (the lane's cap); feasibility: 10^9 needs about 250 GB disk and 16 GB or more build memory, 5x10^8 already OOMed at 8 GB, so the largest scale that could honestly fit under 6 GB was probed. 3x10^8 (60 M nodes): corpus 235 s, `out` 19 min, `in` 29 min, then `nodes` failed after 64 min with `Out of Memory Error (5.5 GiB/5.5 GiB used)`. 2x10^8 (40 M nodes): corpus 159 s, `out` 9 min, `in` 14 min, `nodes` failed after 39 min with the same error. The build memory of the `nodes` phase therefore exceeds 5.5 GiB at 40 M distinct nodes (10^8 / 20 M nodes held within 8 GB, peak 3.6 GB): at least 140 B/node and likely superlinear. 10^9 stays open; it needs the `nodes` memory bounded or a host with 64 GB RAM and 250 GB NVMe (`tests-index-scale-run.md`). Peak RSS and spill were not sampled (the watchdog script failed).
-* **2026-10-21 run at 5x10^8 (failed in `nodes`; no new latency or size figure).** Same laptop (12 hw threads, 31.7 GB RAM with 18.5 GB free at the start, 229 GB free disk), 8 build threads, `buildMemory=12GB` (free RAM less 6 GB headroom), unmodified code. Corpus 240 s (100 files, 100 M distinct nodes); `out` 24.5 min; `in` 52.5 min; the `nodes` phase began at 13:25 and failed by 13:40 with `Out of Memory Error: could not allocate block of size 256.0 KiB (11.1 GiB/11.1 GiB used)`, about 97 min after the start. Sampled peak working set of the bench JVM 11.77 GB; bench directory peak 22.8 GB; free disk fell to 116 GB. The `nodes` phase therefore needs more than 11.1 GiB for 100 M distinct nodes (at least 119 B/node); together with the 2x10^8 result (more than 5.5 GiB for 40 M nodes) memory is at least linear in distinct nodes and a 5x10^8 build needs more than 12 GB of `buildMemory` (the amount is unmeasured). 10^9 stays open: bound or stream the `nodes` phase first, then re-run 5x10^8, on a host with 64 GB RAM and 250 GB NVMe (`tests-index-scale-run.md`).
+* **2026-10-21 attempts at 3x10^8 and 2x10^8 (both failed; no new latency or size figure).** Same laptop (12 hw threads, 31.7 GB RAM, 131 GB free), 8 build threads, `buildMemory=6GB` (the lane's cap); feasibility: 10^9 needs about 250 GB disk and 16 GB or more build memory, 5x10^8 already OOMed at 8 GB, so the largest scale that could honestly fit under 6 GB was probed. 3x10^8 (60 M nodes): corpus 235 s, `out` 19 min, `in` 29 min, then `nodes` failed after 64 min with `Out of Memory Error (5.5 GiB/5.5 GiB used)`. 2x10^8 (40 M nodes): corpus 159 s, `out` 9 min, `in` 14 min, `nodes` failed after 39 min with the same error. The build memory of the `nodes` phase therefore exceeds 5.5 GiB at 40 M distinct nodes (10^8 / 20 M nodes held within 8 GB, peak 3.6 GB): at least 140 B/node and likely superlinear. 10^9 stays open; it needs the `nodes` memory bounded or a host with 64 GB RAM and 250 GB NVMe (`tests-index-scale-run.md`). Peak RSS and spill were not sampled (the watchdog script failed). *Corrected 2026-10-21: "40 M / 60 M nodes" is the generator's id domain, not distinct nodes; see the section after this list.*
+* **2026-10-21 run at 5x10^8 (failed in `nodes`; no new latency or size figure).** Same laptop (12 hw threads, 31.7 GB RAM with 18.5 GB free at the start, 229 GB free disk), 8 build threads, `buildMemory=12GB` (free RAM less 6 GB headroom), unmodified code. Corpus 240 s (100 files, 100 M distinct nodes); `out` 24.5 min; `in` 52.5 min; the `nodes` phase began at 13:25 and failed by 13:40 with `Out of Memory Error: could not allocate block of size 256.0 KiB (11.1 GiB/11.1 GiB used)`, about 97 min after the start. Sampled peak working set of the bench JVM 11.77 GB; bench directory peak 22.8 GB; free disk fell to 116 GB. The `nodes` phase therefore needs more than 11.1 GiB for 100 M distinct nodes (at least 119 B/node); together with the 2x10^8 result (more than 5.5 GiB for 40 M nodes) memory is at least linear in distinct nodes and a 5x10^8 build needs more than 12 GB of `buildMemory` (the amount is unmeasured). 10^9 stays open: bound or stream the `nodes` phase first, then re-run 5x10^8, on a host with 64 GB RAM and 250 GB NVMe (`tests-index-scale-run.md`). *Corrected 2026-10-21: "100 M distinct nodes" and "B/node" are the generator's id domain, not distinct nodes; the `nodes` phase is now bounded, see the section after this list.*
 * **Defect found by the 10^8 build.** The pinned-file-list regex in `IndexBuilder.relationSqlHash` recursed per character and threw
   `StackOverflowError` (surfaced as `index build failed: null`, after the whole build ran) for a list of about 20 long paths; fixed with
   possessive quantifiers, pinned by `IndexBuilderTest.theRelationHashSurvivesALongPinnedFileList`.
+
+### The `nodes` phase and the degree statistics, bounded (2026-10-21, lane `la-nodes-mem`, `LA-INDEX-SCALE-MEASURE-1`)
+
+**What was wrong, and a correction to the bullets above.** `nodes` was one statement over the whole edge relation: two global `GROUP BY`s
+each holding `count(DISTINCT (neighbour, kind))` per node, a `FULL JOIN` of them and a global `ORDER BY`. Its state is the set of distinct
+(node, neighbour, kind) links, about one per edge in this corpus, so it grows with the **edge** count. It is **not** the node count: the corpus
+has about 1.8 M distinct ids at every scale (1,551,076 at 3x10^7 edges, 1,778,237 at 10^8; at most about 2x10^6 by construction, because each
+endpoint column draws from 10^6 hash values). `nodes = edges / 5` is the id domain the generator draws from, so the "20 M / 40 M / 60 M / 100 M
+distinct nodes" and the "B/node" figures in the bullets above are withdrawn. DuckDB spilled the statement (1 to 4 GB of temporary files at 10^7 to
+3x10^7 edges) but not enough to stay inside the cap: with the spill directory set it died with `Out of Memory Error ... failed to pin block` at 256 MB for
+3x10^7 edges (it completed at 512 MB) with 8 threads, at 64 MB for 3x10^6 edges (96 MB completed) with 1 thread, and at 128 MB for 10^7 edges with 2
+threads. A global rewrite of the same statement (`GROUP BY src, dst, kind` first, then count) died at the same 256 MB, so the structure, not the
+spelling, was the problem. The failure is not monotone in the cap (DuckDB sizes its partitions from it): at 10^8 edges, the largest scale this
+lane may run, the unmodified code completed the `nodes` phase at 8, 2 and 1 GB (420, 547 and 695 s), so the 2x10^8-and-above failures above
+could not be re-run and stand as measured by those lanes. The link statistics' per-key `count(DISTINCT)` (the degree table) had the same flaw: it
+died at 2 GB over 10^8 edges in two builds (and standalone), where `DISTINCT (key, neighbour)` then `count(*)` completed; at 1 GB the old form
+happened to complete.
+
+**The change (`IndexBuilder.copyNodes`, `linkStats`).** `out` and `in` are written first, as before. `nodes` is then folded one bucket at a time
+from those two written tables: per non-empty bucket one `COPY` of the `FULL JOIN` of that bucket's `out` fold and `in` fold (a node's two sides share
+its bucket, a function of the id), sorted by id, into `nodes/bucket=B/data_0.parquet` with the same row group and codec. The working set is a bucket
+(about 4x10^6 edges), whatever the total; the relation is no longer scanned for `nodes` (the old statement scanned it twice). The degree table is
+`SELECT x, count(*) FROM (SELECT DISTINCT x, o FROM ...) GROUP BY x`.
+
+**The index is the same.** `IndexNodesFoldTest` (9 cases) compares the new node table with the replaced statement, kept verbatim as the reference, both ways with
+`EXCEPT ALL`, plus column types, bucket placement, id order within a file, one file per non-empty bucket, no directory for an empty bucket and
+`IndexBuilder.verify`: 1 edge and 5 edges over 64 buckets (empty and one-sided buckets), 400 edges over 1 and over 7 buckets, 5,000 and 40,000
+edges over skewed ids with NULL kinds, times and endpoints, parallel and self edges; one node with only self edges; a mapping with neither kind nor time; a FULL, two APPENDs and a
+COMPACT against one FULL build of the same files. `IndexLinkStatsParityTest` (4 build cases and a check of the corpus) keeps the replaced degree statements and checks the manifest of a real
+build (kind counts and order, degree quantiles, histogram, node counts per type) for untyped, typed, many-ids-fold-to-one-key and two-type endpoints.
+At scale: two real FULL builds of 3x10^7 edges (unmodified code, new code; 16 buckets, 4 GB, 8 threads): `nodes` (1,551,076 rows), `out` and `in`
+(30 M rows each) are multiset-identical including the bucket, the column types and the file counts agree, and the manifests differ only in
+the byte counts (`out` and `in` are written by unchanged code and their sizes differ too). At 10^8 edges, 4 of the 32 buckets (221,912 nodes) of
+the new index equal the replaced statement run over the relation restricted to those buckets.
+
+**The bound, reproduced at small scale with a lowered cap** (gated `IndexNodesMemBench`, run from `la/inspecto-la-storage`): at 3x10^6 edges, 64 MB, 1
+thread the FULL build completes (73 s: out 24, in 25, nodes 9.7, statistics 13) and the replaced `nodes` statement dies after 30 s with `Out of Memory
+Error (60.9 MiB/61.0 MiB used)`; with the old `IndexBuilder` restored the build test goes red at `nodes` with the same error. At 3x10^7 edges, 512 MB, 2
+threads the FULL build completes (214 s: out 63, in 62, nodes 14.5, statistics 69.7), the replaced degree statement dies, and with the old degree statement put
+back the build dies in the statistics (`failed to allocate data of size 8.0 MiB (480.5 MiB/488.2 MiB used)`).
+
+**Whole FULL builds at 10^8 edges** (D-S5 corpus, 32 buckets, 8 build threads, same laptop; seconds; the host is shared and noisy: one early run of the
+same code at the same cap was 1.5 to 2x slower in every phase, `nodes` 211 s instead of 35 s, so read the phase times as indicative):
+
+| `buildMemory` | code | out | in | nodes | statistics | total | result |
+|---|---|---|---|---|---|---|---|
+| 8 GB | unmodified | 115 | 212 | 420 | 270 | 1024 | completes |
+| 8 GB | new | 117 | 235 | 36 | 180 | 575 | completes |
+| 2 GB | unmodified | 161 | 179 | 547 | - | - | **OOM in the statistics** (1.8 GiB) |
+| 2 GB | new | 146 | 167 | 35 | 235 | 590 | completes |
+| 1 GB | unmodified | 153 | 163 | 695 | 316 | 1334 | completes |
+| 1 GB | new | 157 | 160 | 38 | 280 | 642 | completes |
+| 512 MB | new | OOM in `out` after 88 s | | | | | `out` (unchanged) needs more than 0.5 GB with 8 threads |
+
+At 3x10^7 edges (4 GB, 8 threads, unmodified against the `nodes` change alone): 276 s (nodes 112, statistics 66) against 153 s (nodes 14.8, statistics 40).
+The `nodes` phase now costs about 0.35 to 0.5 microseconds per edge at every scale measured; the unmodified one cost 3.7 to 7 microseconds per edge at 10^8.
+Peak working set of the bench JVM follows the cap (1.4 GB at 1 GB, 2.4 GB at 2 GB, 8.1 GB at 8 GB: DuckDB fills what it is given), so it is no
+measure of need; the lowest cap that completed is.
+
+**Not measured.** Any build above 10^8 edges (this lane's limit), so no completed 2x10^8, 3x10^8 or 5x10^8 build and no check that the 12 GB cap that
+died at 5x10^8 now holds; the `out` / `in` sorts (they spill, but need more than 0.5 GB at 8 threads) and the statistics' other global steps (the
+distinct-links table, the quantiles, the distinct endpoint counts) beyond 10^8; a corpus with a realistic node count (this one has 1.8 M ids, so
+node-sized structures are small here); APPEND, COMPACT and read latency at any of these caps.
 
 ## SPA separation record (D-5: library, second shell, packaging)
 

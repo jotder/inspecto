@@ -468,6 +468,13 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
   renderings, both the Analytics Kernel's `Md5Bucket` — the one definition, shared with the holdout split), `N = clamp(pow2(ceil(edges / 4e6)), 16, 1024)`. DuckDB cannot derive the partition from a key
   equality, so **the reader computes the bucket in Java and writes it as a literal** — without that the layout does
   not prune.
+* **Build memory (`LA-INDEX-SCALE-MEASURE-1`, 2026-10-21):** `out` and `in` are written first (sorted, bucketed); `nodes` is then
+  folded ONE BUCKET AT A TIME from those two written tables (`IndexBuilder.copyNodes`: per bucket, the `FULL JOIN` of the bucket's
+  `out` fold and `in` fold - a node's two sides share its bucket), where it was one statement over the whole edge relation (two
+  global grouped `count(DISTINCT (neighbour, kind))`, a join, a global sort) that ran out of memory at 2x10^8 edges and above. The
+  link statistics' degree is `DISTINCT (key, neighbour)` then `count(*)`. Same rows in every table (`IndexNodesFoldTest`, `IndexLinkStatsParityTest`); the
+  relation is no longer scanned for `nodes` (the old statement scanned it twice). Not changed, global, unmeasured above 10^8: the `out` / `in` sorts and the statistics' distinct-links
+  table and node-sized aggregates.
 * **Modes** (`IndexPlan.classify`, shared by `GET /inv/index`, the submit gate and the builder's own defence):
   `full` from the relation SQL; `append` = a delta (`dNNN` files in the same bucket dirs, version N+1 hard-links its
   parent) only when the manifest's input files are an unchanged subset of today's and one is new; `compact` merges
@@ -1030,7 +1037,9 @@ lane record: [`archived plan`](../../../../archived-documents/plans-archive/la-c
   were measured on a laptop, not a server-class host (`LA-CONFIG-LIMITS-RESIDUALS-1`).
 * Index scale is proven to 10^8 edges; 10^9 is extrapolation (`LA-INDEX-SCALE-MEASURE-1`). Entity cardinality measured
   2026-10-20 (`IndexCardinalityBench`, 10^7 edges in one file): 4.85 M nodes FULL 38 s, 12.1 M nodes FULL 48 s, peak 3.5-3.6 GB
-  (1.8 M nodes: 31 s, 3.3 GB), so cardinality costs time in the nodes step, not memory.
+  (1.8 M nodes: 31 s, 3.3 GB), so cardinality costs time in the nodes step, not memory. *Qualified 2026-10-21:* a peak working set
+  under a generous cap is what DuckDB chose to use of it, not what the build needs (a 10^8-edge FULL build completes at 1 GB); build
+  memory follows the number of distinct (node, neighbour, kind) links, see §4 *Build memory*.
 * **A day that lands while a FULL runs (2026-10-20, `IndexFullPinTest`, `ScheduledIndexBuildTest`).** The scheduled run renders
   the relation, the service lists the inputs at submit, and the build reads the relation later: three moments. A store with a
   Consignment registry renders a pinned file list (a landing day never reaches that read), but the relation and the
