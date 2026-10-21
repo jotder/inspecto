@@ -33,7 +33,7 @@ explorer* below.
 | | Export (PNG, CSV), snapshots (not evidence-grade) | ✅ | ✅ | ✅ | ✅ |
 | | Link Analysis widgets on dashboards (offer hidden on Basic; routes stay open) | — | ✅ | ✅ | ✅ |
 | | Industry packs (Telecom, Mobile Money) | ✅ | ✅ | ✅ | ✅ |
-| | Masking | display only (no sign-in: anyone may reveal) | ✅ enforced | ✅ | ✅ |
+| | Masking | off by default (`none`); a mode the Space states is display only (no sign-in: anyone may reveal) | ✅ enforced, default `typed` | ✅ | ✅ |
 | Investigate | Investigations: sealed op log, replay, compare, temporal findings | — | ✅ | ✅ | ✅ |
 | | Dossier and Dossier bundle with verification | — | ✅ | ✅ | ✅ |
 | | Templates, external references | — | ✅ | ✅ | ✅ |
@@ -44,7 +44,7 @@ explorer* below.
 | | Case linking, Case history beside a node | — | ✅ | ✅ | ✅ |
 | Scale | Server Graph Run (29 algorithms) | — | ✅ | ✅ | ✅ |
 | | Link index, daily ingestion | — | ✅ | ✅ | ✅ |
-| Operate | Alert Rules on Investigations, standing detection | — | ✅ | ✅ | ✅ |
+| Operate | Alert Rules on Investigations, standing detection (Basic: the LA app's Alerts area is hidden) | — | ✅ | ✅ | ✅ |
 | | Assistant: AI-proposed column mappings | — | ✅ | ✅ | ✅ |
 | Integrate | Third-party integration (case managers, fraud products) | — | ✅ | ✅ | ✅ |
 | Govern | Investigations on Postgres (multi-node, HA) | — | — | ✅ | ✅ |
@@ -271,12 +271,20 @@ edition does not bundle* — still holds: Basic lacks the Investigation surface 
 `/bootstrap` reports `features.geoLink: true, investigations: false` on Basic, and the SPA (`LA_FEATURES.investigations`,
 from `SessionService.investigationsEnabled`) hides the Investigation tab and buttons, the `?investigation=` and `?seed=`
 openers, "start an Investigation from the top results", every Run-on-server control and the edge-index and
-server-algorithm tools, so nothing offered can only 503. Pinned by `ControlApiBasicEditionLinkAnalysisTest`
+server-algorithm tools, so nothing offered can only 503. The standalone Inspecto LA app also hides its **Alerts** area on
+Basic (operator 2026-10-21): those are the standing-detection Alerts behind Investigations, so the rail and landing page
+omit it (`la-nav.ts` `feature: 'investigations'`) and a typed `/alerts` lands on the landing page (`investigationsGuard`). Pinned by `ControlApiBasicEditionLinkAnalysisTest`
 (`la/inspecto-geo-link`: Basic answers an explorer route 200 with no sign-in and refuses one route per Investigation
 module; Standard answers both) and the Basic specs in `link-analysis.component.spec.ts` /
 `link-analysis-toolbox.server-run.spec.ts`.
 
-**Masking on Basic is display-only.** The Space's `maskingMode` still masks entity ids in explorer answers, but with no
+**Masking on Basic is off by default, and display-only when on** (operator 2026-10-21). A Basic Space that states no
+`masking_mode` masks nothing: the in-force mode is `none` (Standard, Advanced and Preview keep the shipped `typed`). The
+seam is `LinkAnalysisSettings.effectiveMaskingMode`, which every masking reader and `GET /settings/link-analysis`
+`maskingModeInForce` go through; it asks the `MaskingDefault` provider the control plane ships (`EditionMaskingDefault`:
+`none` when `investigations` is absent), so the API and the SPA agree. Pinned by `ControlApiBasicEditionMaskingDefaultTest`.
+⚠ It is the Space's ONE masking mode, so on Basic the BI reads (`BiResultMasking`: queries, KPIs, the DB browser, public
+dashboard shares and Report Job exports) are unmasked by default too. A Space that STATES a mode keeps it in every edition. Such a mode still masks entity ids in explorer answers, but with no
 sign-in there is no Subject, so the capability an audited reveal needs (`canRevealLinkEntities`) is never checked and
 anyone may reveal. Masking on Basic stops a casual glance; it is not access control. Enforced masking (and the audited
 reveal on an Investigation) starts in Standard.

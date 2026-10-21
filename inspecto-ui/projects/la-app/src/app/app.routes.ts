@@ -1,8 +1,17 @@
-import { Route, UrlSegment } from '@angular/router';
+import { inject } from '@angular/core';
+import { CanActivateFn, Route, Router, UrlSegment } from '@angular/router';
 import { authGuard } from '@inspecto/core/auth/auth.guard';
+import { SessionService } from '@inspecto/core/auth/session.service';
 import { ALERTS_INVESTIGATION_ROUTE } from 'app/modules/admin/alerts/alerts.component';
 import { LaShellComponent } from './la-shell.component';
 import { LandingComponent } from './landing.component';
+
+/**
+ * Basic has no Investigations, so no Alerts (operator 2026-10-21): a typed or bookmarked /alerts lands on the landing page.
+ * `/bootstrap` is read by an app initializer before routing, so the features are known here.
+ */
+export const investigationsGuard: CanActivateFn = () =>
+    inject(SessionService).features()['investigations'] === true || inject(Router).createUrlTree(['/']);
 
 export const laAppRoutes: Route[] = [
     // OIDC guest routes: the sign-in and callback pages are the core's, shared with the gamma host.
@@ -43,6 +52,7 @@ export const laAppRoutes: Route[] = [
             {
                 // The console's Alerts page, reused whole; *Open Investigation* stays inside this app.
                 path: 'alerts',
+                canActivate: [investigationsGuard],
                 loadComponent: () => import('app/modules/admin/alerts/alerts.component').then((m) => m.AlertsComponent),
                 providers: [{ provide: ALERTS_INVESTIGATION_ROUTE, useValue: '/link-analysis' }],
             },

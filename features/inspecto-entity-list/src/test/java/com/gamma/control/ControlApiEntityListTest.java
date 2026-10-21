@@ -120,6 +120,17 @@ class ControlApiEntityListTest {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));
     }
 
+    /** These tests are about masking by default, which is Standard: this module's own classpath is Basic, where it is off. */
+    @org.junit.jupiter.api.BeforeEach
+    void standardEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.INVESTIGATIONS));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void restoreEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    }
+
     // ── 503 ────────────────────────────────────────────────────────────────────────────────────────────
 
     @Test

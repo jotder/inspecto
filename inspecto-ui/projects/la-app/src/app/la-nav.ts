@@ -28,6 +28,8 @@ export const LA_APP_NAV = [
     },
     {
         path: 'alerts',
+        /** Alerts here are the standing-detection Alerts behind Investigations, so Basic (no Investigations) has none (operator 2026-10-21). */
+        feature: 'investigations',
         label: 'Alerts',
         icon: 'heroicons_outline:bell-alert',
         blurb: 'See fired Alerts, and open the Investigation behind a standing detection.',

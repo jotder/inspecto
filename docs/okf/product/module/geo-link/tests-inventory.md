@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-108 test class(es): 18 unit, 90 real-HTTP control-plane, 0 IT.
+109 test class(es): 18 unit, 91 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -27,6 +27,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 |---|---|---|---|---|
 | `ControlApiAnalystUploadTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAnalystUploadTest.java` | LA-ANALYST-UPLOAD-1 (D4, i2-gap 2) - {@code POST /inv/uploads/{collector}} over real HTTP with a REAL Subject on every |
 | `ControlApiBasicEditionLinkAnalysisTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiBasicEditionLinkAnalysisTest.java` | LA-EDITIONS-1 phase 3 (ED-4): the <b>Basic</b> edition is the Link Analysis EXPLORER. The Link Analysis modules are |
+| `ControlApiBasicEditionMaskingDefaultTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiBasicEditionMaskingDefaultTest.java` | Operator 2026-10-21: in <b>Basic</b> (no {@link EditionFeatures#INVESTIGATIONS}) a Space that states no {@code masking_mode} |
 | `ControlApiCoverageCacheTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiCoverageCacheTest.java` | LA-DATA-TRUST-POLISH-1 (6) - the coverage read is cached per Dataset input-file stamp, over REAL HTTP with an ARMED |
 | `ControlApiDatasetFilesTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiDatasetFilesTest.java` | LA-DATA-TRUST-1 S1 - {@code GET /inv/datasets/{id}/files} over REAL HTTP with an ARMED Authenticator throughout (with no |
 | `ControlApiDatasetNoDataTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiDatasetNoDataTest.java` | A Link Analysis read over a file-backed Dataset whose store holds nothing yet answers a CLOSED 409 naming the |

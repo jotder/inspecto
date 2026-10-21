@@ -948,8 +948,17 @@ answers each of them `503 CAPABILITY_UNAVAILABLE` "… available in Standard and
 `geoLink` only and answer with no sign-in. `/bootstrap` reports `features.investigations` (false on Basic); the SPA's
 `LA_FEATURES.investigations` hides the Investigation tab and buttons, the deep-link openers, Graph Run controls and the
 edge-index tool. Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
-⚠ **Masking on Basic is display-only:** with no sign-in there is no Subject, so the capability behind an audited reveal
-is never checked and anyone may reveal; masking stops a casual glance, not a user. Enforced masking starts in Standard.
+⚠ **Masking on Basic is off by default, and display-only when on** (operator 2026-10-21). The in-force mode of a Space that
+states none is `none` on Basic and `typed` elsewhere: `LinkAnalysisSettings.effectiveMaskingMode` (entity-store, the one seam
+every masking reader and `GET /settings/link-analysis` `maskingModeInForce` share) asks the `MaskingDefault` ServiceLoader
+provider; the control plane ships `EditionMaskingDefault` (`none` when `investigations` is absent, read live), and with no
+provider on the classpath (entity-store / la-api unit tests) the shipped `typed` holds. A stated mode always wins. It is the
+Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, public dashboard shares, Report Job exports) follows it too.
+⚠ The `inspecto` module's own test classpath declares no `investigations`, so it runs as Basic: a test there that relies on
+the `typed` default must pin Standard (`EditionFeatures.overrideForTest`). Pinned by `ControlApiBasicEditionMaskingDefaultTest`
+(geo-link, real HTTP). With no sign-in there is no Subject, so the capability behind an audited reveal is never checked and
+anyone may reveal; a stated mode stops a casual glance, not a user. Enforced masking starts in Standard. The standalone LA app
+also hides its Alerts area on Basic (`la-nav.ts` `feature: 'investigations'`, `investigationsGuard` on `/alerts`).
 ⚠ `POST /inv/case-history` (Case history beside a node) is Standard and up by an explicit gate since 2026-10-20 (D-LAE1): it
 moved out of `InvRoutes` into its own route module `CaseHistoryRoutes` (an edition gate is per `RouteModule`) naming
 `geoLink` and `investigations`, so Basic answers 503 "available in Standard and above" at dispatch and the node dialog hides

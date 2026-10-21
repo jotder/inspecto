@@ -1,6 +1,9 @@
-import { Route, UrlSegment } from '@angular/router';
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { ActivatedRouteSnapshot, Route, Router, RouterStateSnapshot, UrlSegment, UrlTree, provideRouter } from '@angular/router';
 import { describe, expect, it } from 'vitest';
-import { laAppRoutes } from './app.routes';
+import { SessionService } from '@inspecto/core/auth/session.service';
+import { investigationsGuard, laAppRoutes } from './app.routes';
 import { LA_APP_NAV } from './la-nav';
 
 const shell = laAppRoutes.find((r) => r.path === '' && r.children) as Route;
@@ -61,6 +64,24 @@ describe('la-app routes', () => {
     it('resolves the Settings page', async () => {
         expect(await settings.loadComponent!()).toBeTruthy();
     }, 60_000);
+
+    // Operator 2026-10-21: Basic (investigations false) has no Alerts, so /alerts is not reachable there; Standard opens it.
+    it('lets /alerts through only when the edition has Investigations', () => {
+        expect(child('alerts').canActivate).toEqual([investigationsGuard]);
+        const features = signal<Record<string, boolean>>({ investigations: false });
+        TestBed.configureTestingModule({
+            providers: [provideRouter([]), { provide: SessionService, useValue: { features } }],
+        });
+        const run = () =>
+            TestBed.runInInjectionContext(() =>
+                investigationsGuard({} as ActivatedRouteSnapshot, { url: '/alerts' } as RouterStateSnapshot),
+            );
+        const basic = run();
+        expect(basic).toBeInstanceOf(UrlTree);
+        expect(TestBed.inject(Router).serializeUrl(basic as UrlTree)).toBe('/');
+        features.set({ investigations: true });
+        expect(run()).toBe(true);
+    });
 
     it('matches /settings and /settings/<section> with one route, and nothing deeper', () => {
         const seg = (...p: string[]) => p.map((x) => new UrlSegment(x, {}));

@@ -72,7 +72,7 @@ Inspecto LA is sold in the same editions as the rest of Inspecto (names fixed by
 | Geo map, routes and co-location (decision `D-LAE5`, 2026-10-20) | — | yes | yes | yes |
 | Browser graph algorithms (28 of the 29) | yes | yes | yes | yes |
 | Industry packs (Telecom, Mobile Money) and the Domain Profile | yes | yes | yes | yes |
-| Masking | display only (no sign-in, so anyone may reveal) | enforced | enforced | enforced |
+| Masking | off by default; a mode the Space sets is display only (no sign-in, so anyone may reveal) | enforced, `typed` by default | enforced | enforced |
 | Sign-in | none | OIDC | OIDC | demo sign-in |
 | Investigations: sealed op log, replay, compare, Dossier and bundle, Drafts, templates, external references | — | yes | yes | yes |
 | Four-eyes approval, audited reveal, members and roles, embed links, Case linking | — | yes | yes | yes |
@@ -88,7 +88,7 @@ Inspecto LA is sold in the same editions as the rest of Inspecto (names fixed by
 
 How the explorer is separated from the Investigation surface: the five Link Analysis modules ship in every edition, and one edition feature, `investigations`, gates the Investigation routes, Graph Run, the index and the integration routes. On Basic those routes answer `503 CAPABILITY_UNAVAILABLE` ("available in Standard and above") and the single-page application hides the matching controls, so nothing offered can only fail. A second edition feature, `geoMap`, withholds the Geo map routes (`POST /geo/projection`, `POST /geo/routes`) on Basic in the same way. The separation is pinned over real HTTP by `ControlApiBasicEditionLinkAnalysisTest`. The Postgres store is built into Advanced and Preview and stays inert until `-Dinvestigations.backend=db` is set with a `jdbc:postgresql:` URL; every edition, Advanced included, defaults to the filesystem store. Two items are decided but not in the build: retention, legal hold and residency controls (the `docs/EDITIONS.md` row says "not built yet"), and machine-to-machine client-credentials trust for third-party callers, which awaits a security review (Section 5.7). Named adapters for specific case managers or fraud products do not exist: only a generic connector is built, and a named adapter is built only on a customer's request.
 
-Who each edition is for: **Basic** is one analyst exploring, with nothing evidence-grade (its masking tidies the display but is not a security control); **Standard** is for investigation teams; **Advanced** adds scale and policy for regulated organisations; **Preview** is for trials only.
+Who each edition is for: **Basic** is one analyst exploring, with nothing evidence-grade (masking is off unless the Space turns it on, and then it tidies the display but is not a security control); **Standard** is for investigation teams; **Advanced** adds scale and policy for regulated organisations; **Preview** is for trials only.
 
 ### Capabilities at a glance
 
@@ -623,7 +623,7 @@ Inspecto LA accommodates different personas through two Angular shells that shar
 ```
 
 1. **Embedded Studio Lens (`/studio/link-analysis`)**: Integrated into the Inspecto console for data engineers and authors who build and test graph views alongside dashboards and Pipelines.
-2. **Standalone `la-app` shell**: A dedicated bundle (`package.ps1 -Ui la-app`; it swaps the bundled application, not the edition). It has a left navigation rail (Link Analysis, Geo, Entities, Entity Lists, Alerts, Settings), no header chrome, and OIDC sign-in in Standard and above. Its **Settings** page is a master-detail split by audience: *My settings*, *This Space* (Link Analysis settings, analysis limits and an **Access** section with the console's roles editor), and *This server* (host resources); a section the user may not change opens read-only and says so, and the server remains the judge. The footer status bar carries the node and link counts, the caps in force and the installed modules. Working Set tiles never sum an identifier column.
+2. **Standalone `la-app` shell**: A dedicated bundle (`package.ps1 -Ui la-app`; it swaps the bundled application, not the edition). It has a left navigation rail (Link Analysis, Geo, Entities, Entity Lists, Alerts, Settings; Basic omits Geo and Alerts), no header chrome, and OIDC sign-in in Standard and above. Its **Settings** page is a master-detail split by audience: *My settings*, *This Space* (Link Analysis settings, analysis limits and an **Access** section with the console's roles editor), and *This server* (host resources); a section the user may not change opens read-only and says so, and the server remains the judge. The footer status bar carries the node and link counts, the caps in force and the installed modules. Working Set tiles never sum an identifier column.
 
 Both shells talk to the same server and, in Standard and above, sign in through the deployment's OpenID Connect provider. Deployment follows the platform:
 - **Per Space**: each Space switches Link Analysis on or off (the module gate, Section 5.1) and keeps its own Investigations, Entity Lists, link index and masking keys.
@@ -681,7 +681,7 @@ Fraud and national security threats rarely occur in a topological vacuum; they e
 
 # 5 · Enterprise governance, security & access control
 
-Link analysis often exposes highly sensitive personal data, communication records (CDRs), and financial histories. Inspecto enforces a defense-in-depth perimeter. **Sign-in, enforced masking, four-eyes approval, audited reveal, embed links and the Investigation-scoped controls of this section are Standard and above**; on Basic there is no sign-in, masking is display-only (anyone may reveal) and the Investigation surface answers 503 (Section 1).
+Link analysis often exposes highly sensitive personal data, communication records (CDRs), and financial histories. Inspecto enforces a defense-in-depth perimeter. **Sign-in, enforced masking, four-eyes approval, audited reveal, embed links and the Investigation-scoped controls of this section are Standard and above**; on Basic there is no sign-in, masking is off by default and display-only when a Space turns it on (anyone may reveal) and the Investigation surface answers 503 (Section 1).
 
 ### 5.1 The seven-gate request pipeline
 
@@ -739,7 +739,7 @@ Every HTTP request reaching Link Analysis routes (`/inv/*`, `/geo/*`) is decided
 To comply with data-privacy frameworks while allowing analysts to discover structural patterns, Inspecto masks entity identifiers on the way **out** of every Link Analysis answer; engine results and caches stay raw.
 
 - **Masking Modes** (a Space setting, `maskingMode`):
-  - `typed` (default, fails closed): only columns whose classification is claimed by a masked Entity Type (e.g., MSISDN, IMSI, IBAN) are tokenised; a masked type's seed, endpoint and unknown types are masked.
+  - `typed` (the default in Standard, Advanced and Preview; fails closed; in Basic the default is `none`): only columns whose classification is claimed by a masked Entity Type (e.g., MSISDN, IMSI, IBAN) are tokenised; a masked type's seed, endpoint and unknown types are masked.
   - `all`: every node identifier and label is tokenised.
   - `none`: raw identifiers are shown. It is a Space setting, not a personal privilege.
 - **Keyed Aliases**: An identifier becomes `masked:` plus the first 16 hexadecimal characters of an HMAC-SHA256 under a 32-byte key. There are two keys: **one per Investigation** (kept with it) and **one per Space** (shared by exploration reads, Entity Lists, Screening, BI and risk scores; stored outside every exported, imported and backed-up tree). An alias is deterministic under its key, so clustering, counting and path-finding still work; the same identifier therefore carries a different alias in an Investigation than in a Space-level read, and the Working Set carries a map between them. Basic (no sign-in) renders aliases but cannot enforce them.

@@ -66,7 +66,7 @@ It embeds vectorised processing engine over an open Parquet lakehouse, and colla
    lineage, run-level conservation invariants ($N_{\text{in}} = N_{\text{out}} + N_{\text{quarantined}} + N_{\text{filtered}}$),
    and deterministic causation chaining (`causationId`) from raw consignment to visual KPI tile.
 3. **Radical maintainability.** A single ~90 MB self-contained binary, declarative `.toon` configuration
-   with GitOps promotion and schema-drift tolerance, crash-isolated execution, self-healing breaks, and **44**<!--count:spi-extension-points-->
+   with GitOps promotion and schema-drift tolerance, crash-isolated execution, self-healing breaks, and **45**<!--count:spi-extension-points-->
    clean extension points that eliminate custom fork debt.
 4. **Rapid, air-gapped deployment.** Production-ready in 5 minutes via bundled `systemd` and Windows
    Service wrappers (`DEPLOY-SERVICE-WRAPPER-1`), turnkey vertical Space Templates, and 100 % sovereign
@@ -563,7 +563,7 @@ A structural comparison. Put your own figures against each line — the shape is
 | Engineering | platform/DevOps engineers to keep the seams alive | a fraction of one data-operations role |
 | Compliance | one review, pen-test and SBOM per vendor | one artifact, one SBOM, one review |
 | Time to first feed | a sprint of integration | one configuration file |
-| Extension | bespoke code at every seam | **44**<!--count:spi-extension-points--> **extension points** plus a services model |
+| Extension | bespoke code at every seam | **45**<!--count:spi-extension-points--> **extension points** plus a services model |
 
 ### 10.2 Editions — one codebase, three build flavours
 
@@ -626,7 +626,7 @@ insights. Inspecto is designed from first principles for radical operational sim
   that auto-close the moment subsequent runs reconcile the variance. Downstream stale badges automatically clear
   when fresh data commits. Operators focus exclusively on genuine business discrepancies rather than routine
   alert noise.
-* **44**<!--count:spi-extension-points--> **clean extension points.** Custom connectors, proprietary parsers, bespoke transforms, and vault
+* **45**<!--count:spi-extension-points--> **clean extension points.** Custom connectors, proprietary parsers, bespoke transforms, and vault
   integrations plug into formal Java SPIs discovered at startup. Extensions live as separate JARs on the classpath
   — guaranteeing zero codebase fork debt, smooth version upgrades, and identical security and audit enforcement
   for all plugins.
@@ -674,7 +674,7 @@ reached through **one of three lanes, in order of cost**, with no fork and no in
 is a query in the Query Library; a new department is a Space started from a template; a system that needs the
 data pulls it over the versioned `/api/v1`. Nothing is compiled.
 
-**Lane 2 — the 44**<!--count:spi-extension-points--> **extension points.** Every seam where estates differ is a
+**Lane 2 — the 45**<!--count:spi-extension-points--> **extension points.** Every seam where estates differ is a
 Java interface the platform discovers on the classpath at start-up. A plugin jar dropped beside the artifact
 is live on the next start, versioned and audited like the product itself. Grouped by what you would need:
 

@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Per-space Link Analysis settings — the three node caps the Link Analysis studio applies before it
@@ -34,13 +35,14 @@ import java.util.Map;
  * space that stores nothing must keep tracking whatever the client ships, not fall off a cliff into an
  * unbounded run. A key is written only when stated, so an absent key stays distinguishable from a stated
  * value and a save that never mentioned a cap cannot seize its provenance from the default. The shipped
- * default of {@code maskingMode} is {@code typed}; of each four-eyes threshold, "no threshold".
+ * default of {@code maskingMode} is {@code typed} (in Basic {@code none}: {@link MaskingDefault}); of each four-eyes
+ * threshold, "no threshold".
  *
  * <p>Like {@code branding.toon}, the filename is deliberately not a {@code *_pipeline.toon}-style suffix,
  * so recursive config discovery never mistakes it for a runnable config. A missing or unreadable file
  * reads as {@link #EMPTY} (the {@code BrandingSettings} posture — settings never fail a boot). ⚠ A stored
- * masking mode that is not one of the declared modes also reads as {@code null} — i.e. the {@code typed}
- * default, the masking side, never {@code none}. Likewise a stored {@code entity_types} list that fails
+ * masking mode that is not one of the declared modes also reads as {@code null} — i.e. the in-force default
+ * ({@code typed}, the masking side; {@code none} only in Basic, whose default it is anyway). Likewise a stored {@code entity_types} list that fails
  * {@link EntityTypes#parse} reads as {@code null} — the seeded {@link EntityTypes#DEFAULTS} — without costing
  * the other keys.
  */
@@ -332,9 +334,16 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         return drafts != null ? drafts : Drafts.NONE;
     }
 
-    /** The masking mode in force: the stated one, else the declared default ({@code typed}). */
+    /** The edition's {@link MaskingDefault}, looked up once; empty = the shipped default holds. */
+    private static final Optional<MaskingDefault> MASKING_DEFAULT = MaskingDefault.provider();
+
+    /**
+     * The masking mode in force: the stated one, else the edition's default ({@link MaskingDefault}: {@code none} in Basic),
+     * else the declared default ({@code typed}).
+     */
     public String effectiveMaskingMode() {
-        return maskingMode != null ? maskingMode : ConfigSpecs.LINK_ANALYSIS_MASKING_MODES.get(0);
+        if (maskingMode != null) return maskingMode;
+        return MASKING_DEFAULT.map(MaskingDefault::mode).orElse(ConfigSpecs.LINK_ANALYSIS_MASKING_MODES.get(0));
     }
 
     /**

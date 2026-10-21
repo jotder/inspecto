@@ -93,8 +93,10 @@ class TelcoFraudTemplateGoldenTest {
 
     @BeforeEach
     void arm() {
-        // Alert Rules are Professional+: a Personal build refuses the whole template at seed time (G9).
-        com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+        // Alert Rules are Professional+: a Personal build refuses the whole template at seed time (G9). Investigations: the
+        // viewer's tiles are masked by default, which is Standard (in Basic a Space stating no masking_mode masks nothing).
+        com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH,
+                com.gamma.etl.EditionFeatures.INVESTIGATIONS));
         Authenticators.forTest(ex -> Optional.of(new Subject("admin-1",
                 Set.of(Roles.CAN_ADMINISTER, Roles.CAN_AUTHOR_WORKBENCH,
                 // the template carries Alert Rules: creating it runs each carried kind's own gate (TEMPLATE-RECOVERY-IMPORT-GATE-1)

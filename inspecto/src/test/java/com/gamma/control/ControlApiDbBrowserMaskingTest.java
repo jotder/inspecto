@@ -51,6 +51,17 @@ class ControlApiDbBrowserMaskingTest {
         return Optional.empty();
     };
 
+    /** These tests are about masking by default, which is Standard: this module's own classpath is Basic, where it is off. */
+    @org.junit.jupiter.api.BeforeEach
+    void standardEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.INVESTIGATIONS));
+    }
+
+    @AfterEach
+    void restoreEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    }
+
     @AfterEach
     void clearAuthenticator() { Authenticators.forTest(null); }
 

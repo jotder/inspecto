@@ -16,7 +16,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 import { LinkAnalysisLimitsComponent } from './link-analysis-limits.component';
 import { LinkAnalysisDomainProfileComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-domain-profile.component';
 
-/** `ConfigSpecs.LINK_ANALYSIS_MASKING_MODES`; blank = inherit (`typed`). */
+/** `ConfigSpecs.LINK_ANALYSIS_MASKING_MODES`; blank = inherit the edition's default (`typed`; `none` in Basic), read back as `maskingModeInForce`. */
 const MASKING_MODES: { value: string; label: string; hint: string }[] = [
     {
         value: 'typed',
@@ -127,7 +127,9 @@ function embedClassesValid(c: AbstractControl): ValidationErrors | null {
                                     [options]="maskingOptions"
                                     [readOnly]="!canEdit()"
                                 />
-                                <p class="text-secondary m-0 text-xs">In force: {{ maskingInForce() }}.</p>
+                                @if (maskingInForce()) {
+                                    <p class="text-secondary m-0 text-xs">In force: {{ maskingInForce() }}.</p>
+                                }
                                 <ul class="text-secondary list-disc pl-5 text-sm">
                                     @for (m of maskingModes; track m.value) {
                                         <li>
@@ -298,7 +300,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
 
     readonly maskingModes = MASKING_MODES;
     readonly maskingOptions: PickerOption[] = [
-        { value: '', label: 'Inherit the default (typed)' },
+        { value: '', label: 'Inherit the default' },
         ...MASKING_MODES.map((m) => ({ value: m.value, label: m.label })),
     ];
     readonly indexOptions: PickerOption[] = [
@@ -316,7 +318,8 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     readonly saveError = signal<string | null>(null);
     readonly writesDisabled = signal<string | null>(null);
     private readonly served = signal<LinkAnalysisLimits | null>(null);
-    readonly maskingInForce = computed(() => this.served()?.maskingModeInForce ?? 'typed');
+    /** The server's answer only: the default depends on the edition (Basic: none), so the SPA never assumes one. */
+    readonly maskingInForce = computed(() => this.served()?.maskingModeInForce ?? '');
     readonly entityTypes = computed(() => this.served()?.entityTypesInForce ?? []);
     readonly indexInForce = computed(() => this.served()?.indexInForce ?? null);
     private readonly embedInForce = computed(() => this.served()?.embedInForce ?? null);

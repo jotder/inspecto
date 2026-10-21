@@ -23,6 +23,17 @@ class BiResultMaskingSharedRefTest {
 
     private static final Map<String, Object> DS = Map.of("physicalRef", "shared/finance/calls", "columns", List.of());
 
+    /** These tests are about masking by default, which is Standard: this module's own classpath is Basic, where it is off. */
+    @org.junit.jupiter.api.BeforeEach
+    void standardEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.INVESTIGATIONS));
+    }
+
+    @AfterEach
+    void restoreEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    }
+
     @AfterEach
     void reset() { SharedRefResolver.install(null); }
 

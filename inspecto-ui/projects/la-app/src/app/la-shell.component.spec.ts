@@ -20,7 +20,7 @@ describe('la-app shell and landing page', () => {
 
     let harness: RouterTestingHarness;
 
-    async function render(features: Record<string, boolean> = { geoMap: true }) {
+    async function render(features: Record<string, boolean> = { geoMap: true, investigations: true }) {
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(),
@@ -72,17 +72,22 @@ describe('la-app shell and landing page', () => {
         await expectNoA11yViolations(el);
     });
 
-    it('offers Alerts in the rail and on the landing page (reading Alerts is ungated, as in the console)', async () => {
+    it('offers Geo and Alerts in the rail and on the landing page in Standard', async () => {
         const el = await render();
-        expect(el.querySelector('nav[aria-label="Areas"] a[href="/alerts"]')).toBeTruthy();
-        expect(el.querySelector('ul a[href="/alerts"]')).toBeTruthy();
+        for (const path of ['/geo-map', '/alerts']) {
+            expect(el.querySelector(`nav[aria-label="Areas"] a[href="${path}"]`), path).toBeTruthy();
+            expect(el.querySelector(`ul a[href="${path}"]`), path).toBeTruthy();
+        }
     });
 
     // D-LAE5 (operator 2026-10-20): the Geo map is Standard and up, so Basic's `/bootstrap` says geoMap false and the area is not offered.
-    it('does not offer Geo in the rail or on the landing page when the edition withholds the Geo map (Basic)', async () => {
-        const el = await render({ geoMap: false });
-        expect(el.querySelector('nav[aria-label="Areas"] a[href="/geo-map"]')).toBeNull();
-        expect(el.querySelector('ul a[href="/geo-map"]')).toBeNull();
+    // Operator 2026-10-21: the Alerts here are the standing-detection Alerts behind Investigations, so Basic (investigations false) hides them too.
+    it('does not offer Geo or Alerts in the rail or on the landing page in Basic', async () => {
+        const el = await render({ geoMap: false, investigations: false });
+        for (const path of ['/geo-map', '/alerts']) {
+            expect(el.querySelector(`nav[aria-label="Areas"] a[href="${path}"]`), path).toBeNull();
+            expect(el.querySelector(`ul a[href="${path}"]`), path).toBeNull();
+        }
         // the other areas stay
         expect(el.querySelector('nav[aria-label="Areas"] a[href="/link-analysis"]')).toBeTruthy();
         expect(el.querySelector('nav[aria-label="Areas"] a[href="/entities"]')).toBeTruthy();

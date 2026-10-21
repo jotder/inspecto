@@ -354,7 +354,9 @@ class ControlApiSettingsTest {
             String url = "/spaces/acme/settings/link-analysis";
             System.clearProperty("investigations.backend");
             JsonNode def = json(send(c.port, "GET", url, null));
-            assertEquals("typed", def.get("maskingModeInForce").asText());
+            assertEquals("none", def.get("maskingModeInForce").asText(), "this module's classpath is Basic: masking off by default");
+            com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.INVESTIGATIONS));   // Standard
+            assertEquals("typed", json(send(c.port, "GET", url, null)).get("maskingModeInForce").asText());
             assertEquals("fs", def.get("investigationStoreInForce").asText(), "default backend is the filesystem");
             assertFalse(def.get("indexInForce").has("threads"), "the build pool is install-wide (GET /settings/link-analysis/limits)");
             assertFalse(def.get("indexInForce").has("queue"));
@@ -382,6 +384,7 @@ class ControlApiSettingsTest {
             assertEquals(1048576, after.get("index").get("maxDiskBytes").asLong());
             assertEquals(77, after.get("fourEyesBudgetAbove").asInt());
         } finally {
+            com.gamma.etl.EditionFeatures.overrideForTest(null);
             if (prior == null) System.clearProperty("investigations.backend"); else System.setProperty("investigations.backend", prior);
         }
     }

@@ -28,6 +28,17 @@ class ReportJobMaskingTest {
 
     private static final String A = "441700900101", B = "441700900202";
 
+    /** These tests are about masking by default, which is Standard: this module's own classpath is Basic, where it is off. */
+    @org.junit.jupiter.api.BeforeEach
+    void standardEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.INVESTIGATIONS));
+    }
+
+    @AfterEach
+    void restoreEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    }
+
     @AfterEach
     void clearRoot() { System.clearProperty("assist.write.root"); }
 
