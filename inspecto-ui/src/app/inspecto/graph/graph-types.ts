@@ -25,6 +25,8 @@ export interface G6Node {
         /** Link Analysis: an Investigation's Working Set has this entity but no effective expand has followed its links
          *  yet (a flagged hub is excluded: its halo already says "not expanded"). Drawn with a dashed outline; absent otherwise. */
         unexpanded?: boolean;
+        /** Link Analysis Grow (LA-GROW-EXCLUDE-1): a busy entity held back from growing — drawn with a "held" badge. */
+        held?: boolean;
         /** The Incident/Case this node represents, when the source could resolve one — lights the
          *  detail dialog's "Open record" pivot (ui-design-review R8). Structurally = `ElementObjectRef`. */
         objectRef?: { id: string; type: 'INCIDENT' | 'CASE' };

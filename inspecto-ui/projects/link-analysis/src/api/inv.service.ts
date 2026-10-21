@@ -1476,6 +1476,10 @@ export interface EntityListSummary {
     createdBy: string | null;
     /** The fact-log sequence of this list's latest change. */
     lastSeq: number;
+    /** LA-GROW-EXCLUDE-1 (absent on an older server): who keeps the list, whether it auto-applies, who sees its members. */
+    ownerKind?: 'admin' | 'analyst';
+    autoApply?: boolean;
+    visibility?: 'open' | 'restricted';
 }
 
 export interface EntityListIndex {
@@ -1487,7 +1491,9 @@ export interface EntityListIndex {
 /** `GET /entity-lists/{id}` — the list as of `atSeq`. `members` are normalised keys, sorted, and MASKED per the
  *  Space's `maskingMode` (reveal is not in this slice) — never treat them as raw values to send back. */
 export interface EntityListDetail extends EntityListSummary {
-    members: string[];
+    /** LA-GROW-EXCLUDE-1: `null` for a `restricted` list read by someone who may not see its members (`membersHidden`). */
+    members: string[] | null;
+    membersHidden?: boolean;
     /** ASSURE-ENTITY-LISTS-1: canonical range entries (`prefix:…`, `range:lo..hi`, `cidr:…`), masked like members. */
     ranges?: string[];
     /** Every entry carrying an expiry; an expired one is kept (as-of reads) but no longer matches. */
@@ -1550,6 +1556,46 @@ export interface EntityListDatasetRegistration {
     /** `entity_list_<listId>` — also the `physicalRef`. */
     datasetId: string;
     physicalRef: string;
+}
+
+// ── LA-GROW-EXCLUDE-1: exclusion lists in force and the Grow preview (dry run, nothing sealed) ─────────
+
+/** Who keeps a list: a Space administrator (a category list) or any analyst (e.g. call centres). */
+export type ExclusionListOwnerKind = 'admin' | 'analyst';
+
+/** One exclusion list as `GET /inv/exclusion-lists` lists it. A `restricted` list never shows its members to an analyst. */
+export interface ExclusionListSummary {
+    id: string;
+    title: string;
+    entityType: string;
+    ownerKind: ExclusionListOwnerKind;
+    /** An admin list applied to every new Investigation of the Space (pre-applied as an `excludeBy` step). */
+    autoApply: boolean;
+    visibility: 'open' | 'restricted';
+    size: number;
+}
+
+export interface ExclusionListIndex {
+    lists: ExclusionListSummary[];
+}
+
+/**
+ * What a Grow step WOULD do (`POST /inv/investigations/{id}/expand/preview`, or `/inv/projection/neighbors/preview` on the
+ * explorer): a dry run, nothing sealed. `removed` of a restricted list is rounded by the server (nearest 5, at least 5).
+ */
+export interface GrowPreview {
+    addsNodes: number;
+    addsLinks: number;
+    /** Busy entities above the hub threshold: shown, not grown further. */
+    held: { id: string; contacts: number }[];
+    heldCount: number;
+    excludedByLists: { listId: string; title: string; removed: number }[];
+    truncated: boolean;
+    /** Where the read would come from (`index` / `dataset`). */
+    readPath: string;
+    /** The step would be held for a second person's approval (four-eyes). */
+    needsApproval?: boolean;
+    reason?: string;
 }
 
 // ── LA-17 slice 2: analyst identity resolution (`EntityIdentityRoutes`, entity-model design §8.2) ───────
@@ -2021,6 +2067,23 @@ export class InvService {
      */
     registerEntityListDataset(id: string): Observable<EntityListDatasetRegistration> {
         return this.http.post<EntityListDatasetRegistration>(entityListPath(id, '/register-dataset'), {});
+    }
+
+    // ── LA-GROW-EXCLUDE-1. Absent on an older server (404) — callers degrade, never error. ──
+
+    /** The exclusion lists of the Space with their owner kind, auto-apply and visibility. */
+    exclusionLists(): Observable<ExclusionListIndex> {
+        return this.http.get<ExclusionListIndex>(apiUrl('/inv/exclusion-lists'));
+    }
+
+    /** A dry run of one `expand` body over the Investigation (nothing sealed, no step). */
+    previewExpand(id: string, body: Extract<InvestigationOpRequest, { op: 'expand' }>): Observable<GrowPreview> {
+        return this.http.post<GrowPreview>(invPath(id, 'expand/preview'), body);
+    }
+
+    /** The explorer's (Basic) dry run: what a neighbours read of `req.value` would add. */
+    previewNeighbors(req: NeighborsRequest): Observable<GrowPreview> {
+        return this.http.post<GrowPreview>(apiUrl('/inv/projection/neighbors/preview'), req);
     }
 
     // ── LA-17 slice 2 identity resolution. Reads AND writes need `canManageIncidents`; no write root → 503. ──

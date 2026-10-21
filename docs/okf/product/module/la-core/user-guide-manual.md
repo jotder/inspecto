@@ -116,6 +116,20 @@ left edge (with the Space switcher and your user menu). A user who may change Li
 * **Data strip** (bottom): the rows behind the graph as a table, with a SQL editor for questions the graph cannot
   ask. *Project result as graph* turns a query's rows back into a graph.
 * **Undo / Redo** step through display and filter changes.
+* **Close** (the **×** at the right end of the title row, and the last item of **Open saved views**) closes what is
+  open and goes back to the empty start page. Its label names what that is: *Close Investigation Mule hub*, *Close
+  Draft d-7 of Investigation Mule hub*, *Close unsaved view mule_ring* (an imported view not saved yet) or *Close the
+  analysis* (a drawn graph). It shows only while something is open. Closing an Investigation also takes
+  `?investigation=` out of the address bar. Nothing is deleted: reopen an Investigation from the Investigation tab
+  (**List Investigations**) and a view from **Open saved views**. An imported view you have not saved is asked about
+  first, because Close would lose it.
+* **What you have open stays open while you work elsewhere in the Space.** Go to Settings, Entities, Entity Lists or
+  Alerts and come back, by the menu or by Back: the graph as you left it, its selection, search and filters, the
+  panels and the open Investigation are all still there. Saving a setting, a *My browser* limit for example, closes
+  nothing; the new value applies to what you draw next. A reload reopens only the open Investigation (its id is in the
+  address bar); a drawn query graph does not survive a reload. **Switching Space closes everything that belongs to the
+  old Space**, because the app reloads in the new one. The next time you open Link Analysis it says what was closed
+  and the Space where it stays.
 
 ---
 
@@ -249,6 +263,56 @@ flagged, and Compute risk is then held - an incomplete score map would understat
 
 A profile (*Generic graph, Financial crime, Telecom, Supply chain, Cyber*) renames things in domain words and
 **suggests** the tools that matter, marked with a badge. It changes emphasis only, never the data.
+
+### 5.4 Grow and clean a graph
+
+`LA-GROW-EXCLUDE-1` (UI, phases 1–3 and 5). Three controls on the graph, worded in the active pack's terms (Telecom:
+*numbers* and *calls*; Mobile Money: *wallets* and *transfers*). On an open Investigation's canvas every change is one
+**recorded** step of the log (an existing op — `expand`, `exclude`, `excludeBy` or `undo` — so replay and the Dossier
+are unchanged); on the explorer graph (Basic, or the query graph) it is **not recorded**. Every change ends with a
+one-line result and **Undo** (also **Ctrl+Z**).
+
+**Grow** (tool rail, or **G**) adds the next ring of linked items — the *expand* op. It grows from the selection, else
+from the Investigation's outer ring (the explorer: the nodes not grown yet, the first 25).
+
+* **Direction**: *Both ways* (default), *Outgoing* or *Incoming* — an icon and a word each.
+* **How far**: *1 step* (default). *2 steps* is offered only when the preview says the first step stays under the
+  frontier cap (`investigation.max_frontier`; the explorer: 25); otherwise the panel says why. Two steps are two
+  recorded expands; Undo reverts both.
+* **Hold busy numbers with more than N contacts** — on by default, N = the Space's hub threshold (`hub_threshold`,
+  editable per Grow). Unticking it grows through the busy items too; that is the sealed *include hubs* override.
+* **More options**: the link kinds to follow, and (an Investigation with a time column) the window — the
+  Investigation's own, or all available data.
+* **Preview before the change**: "This step adds about 342 numbers and 1,210 calls; 3 busy numbers will be held; 41
+  numbers are removed by your exclusion lists", with the lists in force as chips and their counts. A step that would
+  need four-eyes approval says so. The preview is a dry run (`POST /inv/investigations/{id}/expand/preview`; the
+  explorer: `POST /inv/projection/neighbors/preview` per node, summed — "about"). A server without these routes
+  shows *No preview on this server* and Grow still runs; the result line then says what it did.
+
+**Held — busy numbers** (super nodes). Items above the threshold stay on the graph with a ring and a **held** badge
+and are listed in the Held tray (bottom left) with their contact count. **Remove held** excludes all of them in one
+recorded `exclude` step with the reason *busy number above N contacts*; **Expand anyway** grows through one item (the
+recorded override). On the explorer, Remove held hides them locally. A first-time hint explains busy numbers.
+
+**Exclude…** — right-click a node (or a selection), or press **X**:
+
+* *From this Investigation only* — one `exclude` step with your reason (the explorer: *Hide from this graph*).
+* *Add to a list…* — pick an analyst exclusion list of the items' Entity Type, or create one; the items are added to
+  it (a list write, four-eyes where the list is governed) and the list is applied (`excludeBy`), so they stay out in
+  every later step. A **category list** (kept by an administrator — VIPs, politicians, defence) is offered only to a
+  holder of *Manage exclusion categories*; otherwise the dialog says how many category lists it left out. On the
+  explorer the items are also hidden locally.
+
+**Hidden by lists** (tool rail) — the exclusion panel: "41 numbers hidden by 3 lists"; each list in force as a chip
+with who keeps it (*Category* / *Analyst*) and how many it removed; **Switch off** undoes a list's step (only the
+latest step can be; on an older one the button says why) and **Switch on** applies a list that is
+not in force. **Show what was removed** lists the excluded items with why and the step; a **restricted** list's
+members are never listed to an analyst — its count is rounded (nearest 5, at least 5). With no list yet the panel
+offers *Create your first list* and names the category lists the administrator set up. Without *Manage incidents*
+every switch says why it is held.
+
+Keyboard: **G** Grow, **X** Exclude…, **Ctrl+Z** undoes the last Grow or Exclude (then the display undo). Not in a text
+field, a grid, a menu or a dialog.
 
 ---
 

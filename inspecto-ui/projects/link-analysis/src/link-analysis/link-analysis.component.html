@@ -213,6 +213,38 @@
             }
             <!-- outside @if (graph()): an Investigation canvas alone has something to seal too -->
             @if (graph() || workingSetCanvas()) {
+                <!-- LA-GROW-EXCLUDE-1: Grow (G) and Hidden by lists — plain words first, the term in the tooltip -->
+                <button
+                    mat-button
+                    type="button"
+                    (click)="growExclude.growOpen() ? closeGrow() : openGrow()"
+                    [color]="growExclude.growOpen() ? 'primary' : undefined"
+                    [attr.aria-expanded]="growExclude.growOpen()"
+                    [matTooltip]="
+                        growMode() === 'investigation'
+                            ? 'Grow: add the next ring of linked items — one recorded expand step (G)'
+                            : 'Grow: add the next ring of linked items to this graph — not recorded (G)'
+                    "
+                    aria-label="Grow"
+                    aria-keyshortcuts="G"
+                    data-testid="la-grow-button"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
+                    Grow
+                </button>
+                <button
+                    mat-button
+                    type="button"
+                    (click)="openExclusions()"
+                    [color]="growExclude.exclusionsOpen() ? 'primary' : undefined"
+                    [attr.aria-expanded]="growExclude.exclusionsOpen()"
+                    matTooltip="Hidden by lists: exclusion lists in force and what they removed (X excludes the selection)"
+                    [attr.aria-label]="'Hidden by lists: ' + hiddenCount() + ' hidden'"
+                    data-testid="la-exclusions-button"
+                >
+                    <mat-icon svgIcon="heroicons_outline:no-symbol" aria-hidden="true"></mat-icon>
+                    {{ hiddenCount() ? hiddenCount().toLocaleString('en') + ' hidden' : 'Hidden' }}
+                </button>
                 <!-- one step: seal what is on screen (the query graph OR the Investigation Working Set) and attach it; disabled with the reason when not permitted -->
                 <span class="inline-flex" [matTooltip]="attachUnavailable() || 'Seal this analysis and attach it to a Case'">
                 <button
@@ -269,6 +301,17 @@
                     }
                 } @else {
                     <button mat-menu-item disabled>Nothing saved yet.</button>
+                }
+                @if (openWorkLabel(); as open) {
+                    <button
+                        mat-menu-item
+                        (click)="closeOpenWork()"
+                        [disabled]="investigation.busy()"
+                        data-testid="la-close-menu-item"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        <span>Close {{ open }}</span>
+                    </button>
                 }
             </mat-menu>
 
@@ -660,6 +703,19 @@
                     "
                 ></mat-icon>
             </button>
+            <!-- Close what is open (Investigation, Draft, imported view, drawn analysis): back to the empty state -->
+            @if (openWorkLabel(); as open) {
+                <button
+                    mat-icon-button
+                    (click)="closeOpenWork()"
+                    [disabled]="investigation.busy()"
+                    [matTooltip]="'Close ' + open"
+                    [attr.aria-label]="'Close ' + open"
+                    data-testid="la-close"
+                >
+                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                </button>
+            }
         </div>
     </header>
 
@@ -837,7 +893,104 @@
                             (nodeDblClick)="onNodeDblClick($event)"
                             (selectionChange)="onSelectionChange($event)"
                             (edgeClick)="onEdgeClick($event)"
+                            (nodeContextMenu)="onNodeContextMenu($event)"
                         ></inspecto-graph-view>
+                        <!-- LA-GROW-EXCLUDE-1: the right-click menu, opened at the pointer (Exclude… is also X; Grow is G) -->
+                        <div
+                            class="pointer-events-none fixed h-0 w-0"
+                            [style.left.px]="nodeMenuAt().x"
+                            [style.top.px]="nodeMenuAt().y"
+                            [matMenuTriggerFor]="nodeMenu"
+                            #nodeMenuTrigger="matMenuTrigger"
+                            aria-hidden="true"
+                        ></div>
+                        <mat-menu #nodeMenu="matMenu" aria-label="Node actions">
+                            <button mat-menu-item type="button" (click)="openExclude(nodeMenuTargets())" data-testid="la-node-menu-exclude">
+                                <mat-icon svgIcon="heroicons_outline:no-symbol" aria-hidden="true"></mat-icon>
+                                <span>Exclude{{ nodeMenuTargets().length > 1 ? ' ' + nodeMenuTargets().length : '' }}…</span>
+                                <span class="text-secondary ml-3 text-xs" aria-hidden="true">X</span>
+                            </button>
+                            <button mat-menu-item type="button" (click)="growFromMenu()" data-testid="la-node-menu-grow">
+                                <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
+                                <span>Grow from here…</span>
+                                <span class="text-secondary ml-3 text-xs" aria-hidden="true">G</span>
+                            </button>
+                        </mat-menu>
+                        @if (growExclude.growOpen()) {
+                            <inspecto-link-analysis-grow
+                                class="absolute left-2 top-12 z-30"
+                                [ctx]="growContext()"
+                                [presets]="degreePresets()"
+                                (grow)="onGrow($event)"
+                                (closed)="closeGrow()"
+                            ></inspecto-link-analysis-grow>
+                        }
+                        @if (growExclude.exclusionsOpen()) {
+                            <inspecto-link-analysis-exclusions
+                                class="absolute right-2 top-12 z-30"
+                                [mode]="growMode()"
+                                [inForce]="growExclude.inForce()"
+                                [line]="exclusionsLine()"
+                                [removed]="exclusionsRemoved()"
+                                [lists]="growExclude.lists()"
+                                [basicHidden]="hiddenNodeIds().length"
+                                [terms]="growTerms()"
+                                [whyNot]="growWriteWhyNot()"
+                                [createWhyNot]="createListWhyNot()"
+                                (switchOff)="switchListOff($event)"
+                                (switchOn)="switchListOn($event)"
+                                (showAgain)="showHiddenAgain()"
+                                (createList)="createExclusionList($event)"
+                                (closed)="growExclude.exclusionsOpen.set(false)"
+                            ></inspecto-link-analysis-exclusions>
+                        }
+                        @if (heldItems().length) {
+                            <inspecto-link-analysis-held-tray
+                                class="absolute bottom-8 left-2 z-20"
+                                [held]="heldItems()"
+                                [threshold]="growThreshold()"
+                                [terms]="growTerms()"
+                                [mode]="growMode()"
+                                [whyNot]="growWriteWhyNot()"
+                                (removeAll)="removeHeld()"
+                                (expandAnyway)="expandHeldAnyway($event)"
+                                (focusItem)="focusHeld($event)"
+                            ></inspecto-link-analysis-held-tray>
+                        }
+                        @if (growExclude.lastChange(); as change) {
+                            <div
+                                class="absolute bottom-8 right-2 z-30 flex max-w-[28rem] items-center gap-2 rounded-lg border px-2 py-1 text-xs shadow"
+                                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                                role="status"
+                                data-testid="la-change-line"
+                            >
+                                <span>{{ change.text }}</span>
+                                @if (growExclude.undoable()) {
+                                    <button
+                                        mat-button
+                                        type="button"
+                                        (click)="growExclude.undoLast()"
+                                        matTooltip="Undo this change (Ctrl+Z)"
+                                        aria-keyshortcuts="Control+Z"
+                                        data-testid="la-change-undo"
+                                    >
+                                        Undo
+                                    </button>
+                                } @else if (change.undo) {
+                                    <span class="text-secondary" data-testid="la-change-stale"
+                                        >Undo is no longer offered here: a later change came after it.</span
+                                    >
+                                }
+                                <button
+                                    mat-icon-button
+                                    type="button"
+                                    aria-label="Dismiss"
+                                    (click)="growExclude.lastChange.set(null)"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                </button>
+                            </div>
+                        }
                         <!-- the box selection: what it does. An OVERLAY, so selecting never changes the layout or resizes the canvas -->
                         @if (selectedOnCanvas().length) {
                             <div
