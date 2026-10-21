@@ -1,7 +1,7 @@
 # Inspecto — Enterprise Product & Solutions Whitepaper
 > **Sovereign Data Operations: the end-to-end platform for environments where data cannot leave**
 > *Audience: CIOs, CTOs, Enterprise Data Architects, Heads of Revenue Assurance and Fraud, Compliance Officers*
-> *Publication: October 2026 · Document version **1.3** of 2026-10-21*
+> *Publication: October 2026 · Document version **1.4** of 2026-10-21*
 
 > **Release basis.** This edition describes Inspecto **as of 2026-10-21** — the Sprint 8 rows
 > (`EVENTS-DURABLE-1`, `AIRGAP-EXTENSIONS-1`, `DEPLOY-SERVICE-WRAPPER-1`, `BREAK-INCIDENT-1`, `BREAK-AGING-1`,
@@ -144,10 +144,8 @@ substrate:
 6. **Dashboard Studio & visual analytics.** An integrated self-service BI Studio with parameterized queries,
    live KPI cards, and dashboard tiles bound directly to Datasets. Eliminates external BI platforms (Tableau,
    Superset) and guarantees that dashboard queries execute against warm columnar Parquet without pre-computed cubes.
-7. **Forensic Link Analysis & offline Geo.** **Inspecto LA** (the product name for Link Analysis): entity and
-   link projection over Datasets, 29 in-process graph algorithms (PageRank, Louvain community detection and
-   more), fraud pattern packs and sealed Investigations, paired with a 100 % offline MapLibre vector Geo
-   studio — replacing separate graph databases (Neo4j) and GIS servers.
+7. **Forensic Link Analysis & offline Geo.** **Inspecto LA** (the product name for Link Analysis) with an
+   offline Geo map — replacing separate graph databases (Neo4j) and GIS servers (Section 5).
 8. **Security, identity & audit governance.** Delegated OIDC/PKCE authentication against enterprise IAM
    (Keycloak, Okta, Entra, WSO2), with fine-grained RBAC and Advanced ABAC tenant isolation. Single-dispatch,
    append-only, actor-attributed audit logging, path jail containment, and cryptographic SBOMs provide compliance
@@ -275,56 +273,11 @@ Unlike BI tools that chart a variance, Inspecto manages each discrepancy as a st
 
 # 5 · Forensic investigation — Inspecto LA (Link Analysis) and offline Geo
 
-```
-  ┌────────────────────────────────────┐   ┌────────────────────────────────────┐
-  │   INSPECTO LA (LINK ANALYSIS)      │   │          GEO MAP STUDIO            │
-  │ server-side entity/link projection │   │ offline MapLibre basemap + vectors │
-  │ 29 graph algorithms: centrality ·  │   │ heatmaps · origin-destination     │
-  │ communities · paths · similarity   │   │ routes · time slider + playback   │
-  │ pattern packs · suspicion score    │   │ measure · radius · polygon · notes│
-  │ sealed Investigations · Dossier    │   │ layer manager · GeoJSON overlays  │
-  │ industry packs · integration       │   │ saved Geo Views                   │
-  └────────────────────────────────────┘   └────────────────────────────────────┘
-```
-
-### 5.1 Inspecto LA (Link Analysis)
-**Inspecto LA** is the product name for Link Analysis; inside the console the capability, its routes and its
-settings keep the name *Link Analysis*. It uncovers fraud rings, laundering networks and coordinated behaviour
-without a separate graph database:
-* **Server-side projection.** Relational Datasets are projected into entity/link graphs by DuckDB
-  aggregation on the server; the browser receives a graph, not a table.
-* **29 in-process graph algorithms** — centrality (PageRank, betweenness, closeness, eigenvector, degree
-  and others), communities (Louvain, label propagation, connected components), paths and maximum flow,
-  similarity and forensic scoring. The browser runs 28 of them in every edition; a server Graph Run runs
-  all 29 (Standard and above).
-* **Pattern packs** for common topologies — layering chain, pass-through intermediary, inbound collector,
-  relay chain, structuring and circular financing among them — as reviewable starting points, not
-  detection rules.
-* **Suspicion scoring** from five structural factors, each shown beside the score, so a ranked list of
-  nodes to look at first can be explained; plus saved Views so an exploration resumes where it stopped.
-* **Investigations (Standard and above).** An append-only, hash-sealed op log with deterministic replay and
-  a SHA-256 Dossier that a route verifies. **Basic is the explorer**: no sign-in and no Investigations.
-* **Industry packs.** A pack lays an industry's terminology over the neutral concepts and never adds a
-  concept: **Telecom** (MSISDN, IMSI, IMEI, cell) and **Mobile Money** (wallet, agent, cash-in, cash-out)
-  ship bundled in every edition, Basic included, and a Space picks its pack as its Domain Profile.
-* **Third-party integration (Standard and above).** Inbound, a fraud product or case manager posts an alert
-  and its entities to an API that opens a seeded Investigation, with an "Open in Inspecto LA" deep link;
-  outbound, an Investigation is handed off to the configured case manager, and signed webhooks (HMAC-SHA256,
-  no entity ids) announce its events. Machine-to-machine client-credentials trust is not enabled: it waits
-  on a security review.
-* **Every limit configurable.** Each Link Analysis limit is a validated catalogue item set in one of three
-  layers — the Space (analysis and policy), the install (host ceilings) and the analyst (browser rendering
-  caps, which can only lower the Space value).
-* **Measured scale.** The link index is measured to $10^8$ edges (one-key lookups of about 21 ms); larger
-  builds are not yet proven. Figures, editions and limits in full: the Inspecto LA whitepaper,
-  `docs/okf/product/module/la-core/brochure-whitepaper.md`.
-
-### 5.2 Geo Map Analysis (Standard and above)
-* **100 % offline.** A bundled MapLibre basemap with vector land, boundaries and places — no tile server,
-  no internet.
-* **Origin-destination routes**, **heatmaps**, a **time slider with playback**, and an intelligence
-  toolbox — measure, radius, polygon and notes — over a layer manager with GeoJSON overlays.
-* **Saved Geo Views** for repeatable analysis.
+**Inspecto LA (Link Analysis)** is Inspecto's forensic link-analysis product: it projects Datasets into
+entity-and-link graphs and runs sealed, replayable Investigations over them without a separate graph database,
+paired with an offline Geo map. Its explorer ships in every edition; Investigations, the server Graph Run, the
+link index and the Geo map are Standard and above. Capabilities, architecture, measured scale, limits and the
+claims register are in the [Inspecto LA whitepaper](../../module/la-core/brochure-inspecto-la-whitepaper.md).
 
 ---
 
@@ -764,6 +717,9 @@ explore the result in a dashboard — and ask the offline assistant why a row wa
 * **Vocabulary of record:** `docs/GLOSSARY.md`
 
 ---
+
+*Version 1.4 (2026-10-21) supersedes 1.3. Changes: Inspecto LA detail moved to the LA whitepaper; Section 5
+keeps a short reference.*
 
 *Version 1.3 (2026-10-21) supersedes 1.2. Changes: editions renamed Basic / Standard / Advanced (Preview never
 sold) and the edition ladder re-aligned to `docs/EDITIONS.md` (Reconciliation, Incidents, the assistant and the

@@ -933,11 +933,11 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** An investigation studio that projects any Dataset into a graph to explore, run 29 graph algorithms, map geo activity and resolve identities. It records every step in a hash-sealed Investigation that can be replayed, forked, approved under four-eyes and handed on as a sealed Dossier, a Case link or a standing detection.
 - **Scores:** F 4 · B 4 · Q 5 · E 4 · R 4 → **Level L3 (Pilot-ready)** — module scores at L4, single-host. *(Calibrated 2026-10-20 to **L3**: the platform enterprise baseline is L3 and no item can exceed it — this item's own scores support **L4 once the platform gaps in §4.1 close**.)*
 - **Evidence:**
-  - Basic ships `la-storage`, `la-core`, `la-api` and `geo-link`; Advanced adds `la-store-pg` (`offerings/basic.toon`, `offerings/advanced.toon`). Basic is the explorer and the Investigation surface needs Standard (`ControlApiBasicEditionLinkAnalysisTest`, cited in `module/la-core/brochure-whitepaper.md` §7). `la/inspecto-la-graph/` is untracked work in flight and not in any offering.
+  - Basic ships `la-storage`, `la-core`, `la-api` and `geo-link`; Advanced adds `la-store-pg` (`offerings/basic.toon`, `offerings/advanced.toon`). Basic is the explorer and the Investigation surface needs Standard (`ControlApiBasicEditionLinkAnalysisTest`, cited in `module/la-core/brochure-inspecto-la-whitepaper.md` §7). `la/inspecto-la-graph/` is untracked work in flight and not in any offering.
   - There are 29 algorithms, verified in code: 29 enum constants in `la/inspecto-la-core/src/main/java/com/gamma/la/core/Algorithm.java`, including PageRank, betweenness, Louvain, max-flow, link prediction and `PROPAGATED_RISK`.
   - Routes: `la-api` 90 and `geo-link` 7, so 97 registered, all in the OpenAPI contract (generated `api-routes.md`). Docs drift: the whitepaper says 93 (86+7), `features-link-analysis.md` says 87 and the add-on features say 94. 101 feature-db rows.
   - Tests: 186 classes across la-core (23), la-api (40), la-storage (12), la-store-pg (3) and geo-link (108). 90 are real-HTTP control-plane tests, held in `la/inspecto-geo-link/src/test`. Golden showcase tests (`ControlApiLaShowcaseFiguresTest`, `LaShowcaseGoldenTest`) and the acceptance test `LaDailyIngestAcceptanceTest` are among them.
-  - Live and measured evidence (`brochure-whitepaper.md` §6–§7):
+  - Live and measured evidence (`brochure-inspecto-la-whitepaper.md` §6–§7):
     - `IndexScaleBench`: about 21 ms one-key p50 from 10^6 to 10^8 edges.
     - Daily append at 10^8 takes 30.6 s against 929 s for a full rebuild.
     - A production-scale day (132M records, 39.4M links) was indexed in 5.3 min. This is a single run on private data.

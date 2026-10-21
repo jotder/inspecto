@@ -39,7 +39,7 @@ Every current doc lives in **one hub per Product Map Item**: `docs/okf/product/<
 | `admin-guide` | operate, configure, deploy, flags | `docs/okf/product/layer/platform/admin-guide-launch-flags.md` |
 | `api` | HTTP / integration surface | `docs/okf/product/layer/platform/api-integrations-ducklake.md` |
 | `tests` | test strategy, coverage, QA scripts | `docs/okf/product/layer/platform/tests-testing-guide.md` |
-| `brochure` | sales / whitepaper text | `docs/okf/product/module/la-core/brochure-whitepaper.md` |
+| `brochure` | sales / whitepaper text | `docs/okf/product/module/la-core/brochure-inspecto-la-whitepaper.md` |
 
 ## Which layer hub?
 

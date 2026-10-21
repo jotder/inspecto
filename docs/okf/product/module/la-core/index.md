@@ -24,7 +24,7 @@ tags: [product-item, module]
 | admin-guide | current | [Inspecto LA (Link Analysis) demo runbook (rehearsable, stakeholder presentation)](admin-guide-demo.md) · [Inspecto LA (Link Analysis) real OIDC sign-in runbook (`la-app`, local WSO2 Identity Server)](admin-guide-real-signin.md) |
 | api | current | [Link Analysis — API](api-link-analysis.md) |
 | tests | current | [Link Analysis analyst coverage test (UI-only, impersonated analyst)](tests-analyst-coverage.md) · [Link Analysis data trust: live drive (S10 of `LA-DATA-TRUST-1`)](tests-data-trust-live-drive.md) · [Link analysis core and ports — tests inventory](tests-inventory.md) · [Link Analysis stakeholder Q&A (presenter prep and leave-behind)](tests-stakeholder-qa.md) · [D6 think-aloud session script — a real Case-desk lead](tests-think-aloud-script.md) |
-| brochure | current | [Inspecto LA (Link Analysis) — Graph Intelligence Whitepaper](brochure-whitepaper.md) |
+| brochure | current | [Inspecto LA whitepaper](brochure-inspecto-la-whitepaper.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 
