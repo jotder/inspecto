@@ -7,8 +7,9 @@
 > ➡ **Edition plan: [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`).** This doc was
 > written for the draft `PIPELINE-EDITIONS-1`, which was merged into `DATA-TIERS-1` on 2026-10-22 and never
 > published on its own. Its decision numbers map as: D-PE1 → DT-5 and DT-17 · D-PE2, D-PE3, D-PE4 → DT-16 ·
-> D-PE5 → DT-7 (and DT-6 for lookups) · D-PE6 → DT-4 (**reversed**: Basic keeps a one-off Postgres snapshot; the
-> other remote adapters are Standard) · D-PE7 → DT-12 · D-PE8 → DT-19 · D-PE10 → DT-18. The onboarding experience is
+> D-PE5 → DT-7 (shaping), DT-15 (Expectations, quarantine and dedupe stay on Basic, decided) and DT-6 (lookups) ·
+> D-PE6 → DT-4 (decided: files only on Basic, every remote adapter Standard) · D-PE7 → DT-12 · D-PE8 → DT-19 ·
+> D-PE9 → the Outputs row and the `pipeline.egress` gate · D-PE10 → DT-18 · D-PE11 → DT-9. The onboarding experience is
 > [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`). The Inspecto LA side of
 > the same journey: `docs/okf/product/module/la-core/spec-first-time-user-use-cases.md` (drafted in parallel).
 >

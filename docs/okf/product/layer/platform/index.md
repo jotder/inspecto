@@ -34,7 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a one-off "Add data" import (CSV / Parquet upload, Postgres… | operator |
+| `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | Linux / macOS native licences are checked by hash, but not exercised or fully verified. | — |
 | `ASSURE-OPERABILITY-1` | P2 | feature | the generic operability half (WS-01/02/04/26, wave 4.5 of superpower/assurance-capability-plan.md). | operator |
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
