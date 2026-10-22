@@ -187,6 +187,25 @@ $dark-base: (
     )
 );
 
+/* Filled-button fill per palette (2026-10-22). Material's M2 token functions read the theme's `_mat-system` map, and
+   the base-colour merge in the loop below rebuilds the theme without it, so `all-component-colors` declares NO
+   `--mat-button-filled-container-color` and the component's fallback `--mat-sys-primary` is defined nowhere: every
+   `mat-flat-button color="primary|accent|warn"` rendered with a transparent background, in light and dark, in the
+   console and la-app alike. Keeping `_mat-system` would instead re-colour every Material component, so only the
+   fill and its label are restored, from the palette's own default/contrast. Guard: tools/check-theme-tokens.mjs. */
+@mixin filled-button-fills($palettes) {
+    @each $variant in (primary, accent, warn) {
+        .mat-mdc-unelevated-button.mat-#{$variant} {
+            @include mat.button-overrides(
+                (
+                    filled-container-color: map.get($palettes, $variant, default),
+                    filled-label-text-color: map.get($palettes, $variant, default-contrast),
+                )
+            );
+        }
+    }
+}
+
 /* Loop through user themes and generate Angular Material themes */
 @each $name, $theme in userThemes.$user-themes {
     /* Generate the palettes */
@@ -249,10 +268,12 @@ $dark-base: (
     #{map.get($theme, selector)} .light,
     #{map.get($theme, selector)}.light {
         @include mat.all-component-colors($light-theme);
+        @include filled-button-fills($palettes);
     }
 
     #{map.get($theme, selector)} .dark,
     #{map.get($theme, selector)}.dark {
         @include mat.all-component-colors($dark-theme);
+        @include filled-button-fills($palettes);
     }
 }

@@ -128,3 +128,10 @@ jobs:
       # ceiling, the link-analysis routes stop being a lazy chunk, or the chunk counts drift. Re-baseline: see the JSON's _doc.
       - name: Bundle-shape guard
         run: npm run check:bundle-shape
+
+      # Theme-token guard (inspecto-ui/tools/check-theme-tokens.mjs, 2026-10-22). Reads the BUILT styles-*.css of both apps
+      # and fails when any theme, light or dark, leaves a filled button (mat-flat-button color=primary|accent|warn) without a
+      # concrete --mat-button-filled-container-color / label colour. That is what shipped: the theme merge dropped Material's
+      # `_mat-system` map, every filled button rendered transparent, and every build stayed green. The test falsifies it.
+      - name: Theme-token guard
+        run: npm run check:theme-tokens && node --test tools/check-theme-tokens.test.mjs
