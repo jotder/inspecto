@@ -7,6 +7,12 @@ distil the as-built facts into the product hubs (`edition/basic`, `module/etl`, 
 `layer/platform`), update `docs/EDITIONS.md`, move open items to `docs/BACKLOG.md`, and archive this file when the
 last phase ships.
 
+**Revised 2026-10-22 (operator, in the Inspecto LA first-time use cases,
+[`spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md) §8):** DT-4 is
+reversed - Basic takes files only (CSV / TSV, Parquet, JSON / NDJSON) and a database is shown locked, matching
+`PIPELINE-EDITIONS-1` D-PE6 (A-12). Basic keeps Expectations, quarantine and dedupe instead of "import checks only",
+matching D-PE5 (A-13). Edition gates show the control locked with a reason inside screens (A-11).
+
 ## 1. Why
 
 The data layer — getting data in, shaping it and keeping it fresh — is the platform's core; the applications on
@@ -35,11 +41,11 @@ business pays for. Two problems today:
 
 | Capability | Basic (free) | Standard | Advanced |
 |---|---|---|---|
-| Ways in (Collectors) | One-off import: upload CSV or Parquet; a file on this machine; one-off Postgres snapshot | Every Collector: inbox, SFTP, HTTP, database with incremental watermark, Kafka; industry formats (ASN.1 call records) | Same, plus object storage at scale and premium connectors |
+| Ways in (Collectors) | One-off import: upload CSV / TSV, Parquet, JSON / NDJSON; a file on this machine (no database: DT-4 revised 2026-10-22) | Every Collector: inbox, SFTP, HTTP, database with incremental watermark, Kafka; industry formats (ASN.1 call records) | Same, plus object storage at scale and premium connectors |
 | Arrival | Manual only; re-import replaces, and says so | Scheduled and continuous; late, duplicate and renamed-correction detection | Same, plus multi-node scale-out |
 | Shaping | No-code: column types, rename, choose columns, filter rows | Full Pipeline: Step Processors, SQL steps, schemas, parsing grammars | Same |
 | Lookup and join across Datasets | No | Reference Datasets, enrichment, joins | Plus SCD2 history (when built) |
-| Data quality | Import checks only: required columns, type errors counted and shown | Expectations, quarantine, delivery Alerts, data trust | Plus maker-checker on configuration changes |
+| Data quality | Expectations, quarantine and dedupe, explained in plain words (revised 2026-10-22, D-PE5) | Expectations, quarantine, delivery Alerts, data trust | Plus maker-checker on configuration changes |
 | Run history and statistics | Last import summary (rows in, rows rejected) | Run history, processing statistics, lineage and provenance, Analytics kernel statistics | Plus long-retention operational stores on Postgres |
 | Outputs | Used inside Inspecto only | Publish and export sinks, Postgres publish, object-storage export | Plus regulated publishing (four-eyes) |
 | Jobs and orchestration | None | Jobs, schedules, Signals, retries | Plus distributed coordination |
@@ -51,7 +57,7 @@ business pays for. Two problems today:
 | DT-1 | Basic's way in is **"Add data"**: upload a file or import from Postgres, one column-review step, then a Dataset. The empty "Explore a Dataset" card in Inspecto LA becomes this entry point. |
 | DT-2 | A Basic import runs on a **hidden one-step Collector and Pipeline** per import (no transforms beyond the no-code shaping), so an upgrade to Standard shows it as an ordinary, editable Pipeline. No parallel ingest path. |
 | DT-3 | **"Point at a file in place" (no copy) is NOT offered** for now: a Dataset whose file changes underneath gives answers that move, which undercuts the evidence story even in the free tier. Revisit on demand for very large files. |
-| DT-4 | **Postgres one-off snapshot is in Basic**, read-only account, with the password stored as a Space secret reference (never in config). If the DuckDB Postgres extension is not available offline in a bundle, it falls back to the JDBC `db` Collector run once. |
+| DT-4 | ⛔ **Reversed 2026-10-22 (operator, A-12): no database on Basic**; a database snapshot is Standard and above, shown locked on Basic. Original recommendation: Postgres one-off snapshot in Basic, read-only account, with the password stored as a Space secret reference (never in config). If the DuckDB Postgres extension is not available offline in a bundle, it falls back to the JDBC `db` Collector run once. |
 | DT-5 | **No scheduling of any kind in Basic** — not even a daily re-import. Manual re-import only. |
 | DT-6 | **No joins or lookups in Basic.** Reference Datasets, enrichment and joins are Standard. |
 | DT-7 | **No-code shaping is in Basic** (types, rename, choose columns, filter rows); anything that needs a Step Processor or SQL is Standard. |
