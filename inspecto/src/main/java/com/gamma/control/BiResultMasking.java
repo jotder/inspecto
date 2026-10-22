@@ -335,9 +335,19 @@ final class BiResultMasking {
         return out;
     }
 
-    /** Every argument of the aggregate is a bare column reference (or a star): nothing is computed from a key's value. */
+    /**
+     * Every argument of the aggregate is a bare column reference (or a star): nothing is computed from a key's value.
+     * DuckDB 1.5 serialises the operands as {@code children: [expr]}, 2.0 as {@code arguments: [{name, expression}]};
+     * both lists are read (so neither can hide the other); an aggregate carrying neither is an AST shape this code does
+     * not know, so it is NOT plain (fail closed).
+     */
     private static boolean barePlainArguments(JsonNode fn) {
-        for (JsonNode a : fn.path("children"))
+        List<JsonNode> operands = new ArrayList<>();
+        boolean known = fn.path("children").isArray() || fn.path("arguments").isArray();
+        if (!known) return false;
+        fn.path("children").forEach(operands::add);
+        fn.path("arguments").forEach(a -> operands.add(a.path("expression")));
+        for (JsonNode a : operands)
             if (!"COLUMN_REF".equals(a.path("type").asText()) && !"STAR".equals(a.path("type").asText())) return false;
         JsonNode order = fn.path("order_bys").path("orders");
         return order.isMissingNode() || order.size() == 0;
