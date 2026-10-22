@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-343 route(s) registered; 343 in the OpenAPI contract, 0 not.
+351 route(s) registered; 351 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -142,9 +142,12 @@ tags: [api, routes, generated]
 | POST | `/connections/{id}/test` | Test a Connection's reachability | Acquisition | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java` |
 | POST | `/connections/test` | POST /connections/test (generated skeleton) | connections | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java` |
 | POST | `/dashboards/{dashboardId}/share` | POST /dashboards/{dashboardId}/share (generated skeleton) | dashboards | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java` |
+| PUT | `/datasets/{datasetId}/columns/{columnId}` | Change which Entity Type one Dataset column holds | datasets | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
+| POST | `/datasets/{datasetId}/files` | Add a file to an imported Dataset and run it | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | GET | `/datasets/{datasetId}/freshness` | GET /datasets/{datasetId}/freshness (generated skeleton) | datasets | — | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
 | POST | `/datasets/{datasetId}/materialize` | POST /datasets/{datasetId}/materialize (generated skeleton) | datasets | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
 | GET | `/datasets/{datasetId}/rows` | GET /datasets/{datasetId}/rows | datasets | — | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
+| POST | `/datasets/{datasetId}/run` | Run now: run an imported Dataset's Pipeline over what waits in its inbox | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | GET | `/datasources` | GET /datasources (generated skeleton) | datasources | — | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java` |
 | GET | `/datasources/{datasourceId}/export` | GET /datasources/{datasourceId}/export (generated skeleton) | datasources | — | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java` |
 | GET | `/db/catalog` | GET /db/catalog (generated skeleton) | db | — | `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java` |
@@ -230,6 +233,9 @@ tags: [api, routes, generated]
 | DELETE | `/notifications/suppressions` | DELETE /notifications/suppressions (generated skeleton) | notifications | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DeliveryStatusRoutes.java` |
 | GET | `/notifications/suppressions` | GET /notifications/suppressions (generated skeleton) | notifications | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DeliveryStatusRoutes.java` |
 | GET | `/notifications/unread-count` | GET /notifications/unread-count (generated skeleton) | notifications | — | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java` |
+| POST | `/onboard/files` | Add data: upload a file and get a draft of how to import it | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
+| POST | `/onboard/files/{fileId}/commit` | Add data: one confirm - write the import Pipeline, run it once, register the Dataset | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
+| GET | `/onboard/runs/{runId}` | Follow an import run answered with 202 | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | GET | `/parsers` | GET /parsers (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | POST | `/parsers/{parserId}/preview` | POST /parsers/{parserId}/preview (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | GET | `/parsers/asn1/profile` | GET /parsers/asn1/profile (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
@@ -310,6 +316,8 @@ tags: [api, routes, generated]
 | PUT | `/settings/approvers` | PUT /settings/approvers (generated skeleton) | settings | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ApproverRosterRoutes.java` |
 | GET | `/settings/branding` | GET /settings/branding (generated skeleton) | settings | — | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java` |
 | PUT | `/settings/branding` | PUT /settings/branding (generated skeleton) | settings | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java` |
+| GET | `/settings/data` | Read the Space's data settings (data.self_import) | settings | — | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java` |
+| PUT | `/settings/data` | Turn Add data on or off for the Space | settings | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java` |
 | GET | `/settings/egress` | GET /settings/egress (generated skeleton) | settings | — | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java` |
 | PUT | `/settings/egress` | PUT /settings/egress (generated skeleton) | settings | `canAdminister` | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java` |
 | GET | `/settings/geo` | GET /settings/geo (generated skeleton) | settings | — | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java` |

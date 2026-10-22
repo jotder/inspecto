@@ -198,6 +198,15 @@ public final class CapabilityManifest {
             // authoring write: the same capability as any job trigger, and the same effect was already
             // reachable by triggering a `maintenance` job with `task: materialize`.
             new Entry("POST", "/datasets/([^/]+)/materialize", Roles.CAN_OPERATE_RUNS),
+            // OnboardRoutes (LA-ONBOARD-1 OB-2, OB-7) - Add data lands a person's own file and makes a Dataset of it, so the
+            // upload verb (and, read by the handler, the Space's data.self_import switch); which Entity Type a Dataset column
+            // holds is a Dataset authoring write.
+            new Entry("POST", "/onboard/files", Roles.CAN_UPLOAD_DATA),
+            new Entry("POST", "/onboard/files/([^/]+)/commit", Roles.CAN_UPLOAD_DATA),
+            new Entry("GET", "/onboard/runs/([^/]+)", Roles.CAN_UPLOAD_DATA),
+            new Entry("POST", "/datasets/([^/]+)/files", Roles.CAN_UPLOAD_DATA),
+            new Entry("POST", "/datasets/([^/]+)/run", Roles.CAN_UPLOAD_DATA),
+            new Entry("PUT", "/datasets/([^/]+)/columns/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             // DecisionRoutes
             new Entry("POST", "/decision-rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/decision-rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
@@ -427,6 +436,8 @@ public final class CapabilityManifest {
             new Entry("PUT", "/settings/link-analysis", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/pipeline-history", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/timezone", Roles.CAN_AUTHOR_WORKBENCH),
+            // LA-ONBOARD-1 OB-7: whether people may Add data in a Space is the administrator's decision.
+            new Entry("PUT", "/settings/data", Roles.CAN_ADMINISTER),
             // LinkAnalysisLimitsRoutes (LA-CONFIG-LIMITS-1) — a Space's Link Analysis limits are authored like its other
             // Link Analysis settings; the install-wide (host resource) limits are administration.
             new Entry("PUT", "/settings/link-analysis/limits", Roles.CAN_AUTHOR_WORKBENCH),

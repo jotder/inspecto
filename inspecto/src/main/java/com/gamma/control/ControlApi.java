@@ -639,7 +639,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new RunRoutes(),
                 new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineInboxRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineHistoryRoutes(), new PipelineRelatedRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
                 new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-observability (cell 6); Object/Note/TagRoutes -> inspecto-ops (cell 7; QueueRoutes retired by RETIRE-HALVES-1)
-                new QueryRoutes(), new DatasetRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)
+                new QueryRoutes(), new DatasetRoutes(), new OnboardRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
                 new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new LinkAnalysisLimitsRoutes(), new DomainProfileRoutes(), new PendingChangeRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
@@ -1246,6 +1246,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 || path.startsWith("/public/delivery-status/")
                 || isEmbedPath(path)
                 || StreamPushRoutes.isPushPath(path)
+                // LA-ONBOARD-1: Add data reads (and runs) a whole file per call - the standard bucket.
+                || OnboardRoutes.isRateLimited(method, path)
                 // An Entity's case history scans the un-indexed object attribute bag (bounded, but a full-table
                 // LIKE) — throttled on the standard bucket like the other scan routes.
                 || (method.equals("GET") && path.equals("/objects/by-entity"));

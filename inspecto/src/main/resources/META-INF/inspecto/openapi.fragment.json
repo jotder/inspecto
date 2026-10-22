@@ -8282,6 +8282,289 @@
         },
         "x-generated" : true
       }
+    },
+    "/onboard/files" : {
+      "post" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Add data: upload a file and get a draft of how to import it",
+        "operationId" : "postOnboardFiles",
+        "description" : "LA-ONBOARD-1 OB-2. Raw file body; stored in the Space's draft area (data root, _onboard/), never in config. Answers the DRAFT: {draftId, kind, file:{name, bytes, rows}, format:{type, delimiter?, header?, quote?}, columns:[{name, header, type:{value, format, evidence, confidence}, sample}], rows (first 20), entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence}}], primary, link:{from, to, kind, time, amount, details} (stream) | identifying (reference)}, limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel}}. Every proposed choice is {value, evidence, confidence: high|low}; OF-2: high when every sampled value agrees and the sample has at least 50 non-blank values. Formats (DT-8): CSV, TSV, Parquet, JSON (array), NDJSON; Excel (.xlsx) only when the bundle carries the DuckDB excel extension, else 422 'save as CSV'. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 422 name missing/unusable; 403 a path-shaped name; 413 over import.max_bytes (streamed, never buffered) or more rows than import.max_rows; 422 empty, unreadable or unsupported file. Drafts expire after 24 hours.",
+        "parameters" : [
+          {
+            "name" : "name",
+            "in" : "query",
+            "required" : true,
+            "description" : "The file's name (bare; its extension selects the reader)",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "kind",
+            "in" : "query",
+            "required" : false,
+            "description" : "stream (events, links; default) or reference (details about entities)",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "delimiter",
+            "in" : "query",
+            "required" : false,
+            "description" : "Delimited text only: the user's own delimiter (re-draft after a low-confidence proposal)",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "header",
+            "in" : "query",
+            "required" : false,
+            "description" : "Delimited text only: true or false",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "quote",
+            "in" : "query",
+            "required" : false,
+            "description" : "Delimited text only: one character, or empty for none",
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/octet-stream" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped draft (see description)."
+          }
+        }
+      }
+    },
+    "/onboard/files/{fileId}/commit" : {
+      "post" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Add data: one confirm - write the import Pipeline, run it once, register the Dataset",
+        "operationId" : "postOnboardFilesByFileIdCommit",
+        "description" : "LA-ONBOARD-1 OB-2/OB-3/OB-4/OB-8. {fileId} is the draftId. Body (every key optional; absent = the draft's proposal): {name (Dataset and Pipeline id, lower-case), description, columns:[{name (the draft column), type?, format?, entityType? (id or null), rename?, drop?}], primaryEntityType?, link?:{from, to, kind?, time?, amount?, details?[]} | null (stream), identifyingColumn? (reference), format? (must equal the draft's: re-draft to change it)}. Writes imports/<id>_schema.toon (index selectors for delimited files) and imports/<id>_pipeline.toon (an ordinary Pipeline, origin: import, trigger {type: manual}, local inbox, accepts_upload, PARQUET), both through the save gate; registers it, lands the file, runs it once, registers the Dataset {physicalRef <id>/database, origin import, kind, columns[].classification, primaryEntityType, defaultLinkMapping, eventDate, identifyingColumn}, then - inside the same run (DT-16) unless pipeline.automation is present - builds the link index and evaluates the Expectations targeting the Pipeline. Answers the run summary {dataset, pipeline, kind, file, rowsIn, rowsRejected, rejectedDetail?, quarantined:[{file, reason}], rowsBefore, rowsAfter, rowsChanged, replaced, followOnInRun, index:{result, message, code?, edges?, nodes?}, expectations:[{name, status, violations}]}; above import.inline_max_bytes 202 {runId, dataset, action, state, startedAt, poll}. A failed commit leaves nothing behind (config files, registration, data and inbox directories, Dataset entry); the draft keeps its file. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 404 unknown/expired draft (or another person's); 409 the name is taken (Dataset, Pipeline, config files or data directory), an approval policy holds Datasets, the same import is in flight, or import.max_datasets is reached; 422 a choice naming nothing real, a save-gate refusal, or a run that imported nothing.",
+        "parameters" : [
+          {
+            "name" : "fileId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped run summary (200) or followed-run record (202)."
+          }
+        }
+      }
+    },
+    "/onboard/runs/{runId}" : {
+      "get" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Follow an import run answered with 202",
+        "operationId" : "getOnboardRunsByRunId",
+        "description" : "canUploadData. {runId, dataset, action (commit|add-file), state (running|succeeded|failed), startedAt, finishedAt?, summary? (as the 200 commit), message? (why it failed - everything was undone)}. In memory, the last 200 runs; 404 unknown, evicted, or another person's run (unless canAdminister).",
+        "parameters" : [
+          {
+            "name" : "runId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped followed-run record."
+          }
+        }
+      }
+    },
+    "/datasets/{datasetId}/files" : {
+      "post" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Add a file to an imported Dataset and run it",
+        "operationId" : "postDatasetsByDatasetIdFiles",
+        "description" : "LA-ONBOARD-1 OB-2, DT-5. Raw file body, ?name=, ?mode=replace (default: the Dataset becomes this file's rows; the old data is restored if the run fails) or append (stream imports only). The file must be the import's format and carry the columns it reads. Lands the file, runs the import Pipeline, then the in-run link index and Expectations (DT-16); answers the run summary with rowsBefore, rowsAfter, rowsChanged and replaced, or 202 above import.inline_max_bytes. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 404 unknown Dataset or one the caller cannot see; 403 view-only; 409 not an import Dataset, or an import of it is in flight; 422 name, mode, format or columns; 413 over import.max_bytes.",
+        "parameters" : [
+          {
+            "name" : "datasetId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "name",
+            "in" : "query",
+            "required" : true,
+            "description" : "The file's name (bare)",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "mode",
+            "in" : "query",
+            "required" : false,
+            "description" : "replace (default) or append",
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/octet-stream" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped run summary (200) or followed-run record (202)."
+          }
+        }
+      }
+    },
+    "/datasets/{datasetId}/run" : {
+      "post" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Run now: run an imported Dataset's Pipeline over what waits in its inbox",
+        "operationId" : "postDatasetsByDatasetIdRun",
+        "description" : "LA-ONBOARD-1 OB-2, DT-5/DT-16. Runs the import Pipeline once, then builds the link index and evaluates its Expectations inside the same run; answers the run summary. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 404 unknown Dataset or one the caller cannot see; 403 view-only; 409 not an import Dataset, or an import of it is in flight.",
+        "parameters" : [
+          {
+            "name" : "datasetId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped run summary."
+          }
+        }
+      }
+    },
+    "/datasets/{datasetId}/columns/{columnId}" : {
+      "put" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Change which Entity Type one Dataset column holds",
+        "operationId" : "putDatasetsByDatasetIdColumnsByColumnId",
+        "description" : "LA-ONBOARD-1 UC-07. canAuthorWorkbench. Body exactly one of {entityType: '<id>' | null} or {classification: '<X>' | null} (null clears it). The Dataset is re-assessed on the next Entity profile read. Gates: 401/403; 503 no write root; 404 unknown Dataset or one the caller cannot see; 403 view-only; 409 an approval policy holds Datasets; 422 unknown column or Entity Type, or the entry then breaks the Dataset rules. Answers {dataset, column, classification, entityType?, columns}.",
+        "parameters" : [
+          {
+            "name" : "datasetId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "columnId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {dataset, column, classification, entityType?, columns}."
+          }
+        }
+      }
+    },
+    "/settings/data" : {
+      "get" : {
+        "tags" : [
+          "settings"
+        ],
+        "summary" : "Read the Space's data settings (data.self_import)",
+        "operationId" : "getSettingsData",
+        "description" : "LA-ONBOARD-1 OB-7. {selfImport (stated: true|false|null), selfImportDefault (true with no sign-in, false with sign-in), selfImportInForce}. When in force, Add data (/onboard/files, Add a file, Run now) is open to canUploadData; off, it answers 403. /bootstrap carries selfImport (in force).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {selfImport, selfImportDefault, selfImportInForce}."
+          }
+        }
+      },
+      "put" : {
+        "tags" : [
+          "settings"
+        ],
+        "summary" : "Turn Add data on or off for the Space",
+        "operationId" : "putSettingsData",
+        "description" : "LA-ONBOARD-1 OB-7. canAdminister. Body {selfImport: true|false|null} (null = the default for who the user is); anything else is 422. Stored as data.toon in the Space's config root (reserved: no import may write it); 503 when writes are disabled.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {selfImport, selfImportDefault, selfImportInForce}."
+          }
+        }
+      }
     }
   },
   "components" : {

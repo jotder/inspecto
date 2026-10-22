@@ -86,6 +86,9 @@ public final class ConfigSpecs {
                         "Logical Catalog Stream this pipeline is a member of (GLOSSARY §3 grouping); default = "
                                 + "the pipeline's own name (strict 1:1). Pipelines sharing one name group under a "
                                 + "single Stream in the catalog graph."),
+                FieldSpec.enumField("origin", "Origin", List.of("import"), null,
+                        "Who made this pipeline: `import` = written by Add data (`POST /onboard/files/{draftId}/commit`, "
+                                + "LA-ONBOARD-1 OB-3). An ordinary Pipeline otherwise; read by no engine code."),
                 FieldSpec.enumField("reference.load", "Reference load mode",
                         List.of("replace", "upsert", "scd2"), "replace",
                         "How a produces:reference dataset is loaded: replace (full-replace, today's default), "
@@ -1285,7 +1288,7 @@ public final class ConfigSpecs {
     /** The top-level blocks of {@code link-analysis.toon} that hold only {@code LaLimit} catalogue items (LA-CONFIG-LIMITS-1). */
     public static final List<String> LINK_ANALYSIS_LIMIT_GROUPS = List.of("browser_algorithms", "display", "investigation",
             "connect", "traversal", "neighbours", "snapshots", "files", "working_set", "pattern", "measures", "comparison",
-            "reference", "case_history", "dossier", "identity", "input", "entity_profile", "upload");
+            "reference", "case_history", "dossier", "identity", "input", "entity_profile", "upload", "import");
 
     public static ConfigSpec linkAnalysisSettings() {
         List<FieldSpec> fields = List.of(

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-354 test class(es): 131 unit, 223 real-HTTP control-plane, 0 IT.
+355 test class(es): 131 unit, 224 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -171,6 +171,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiNotificationRulesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationRulesTest.java` | {@code /notifications/rules*} admin CRUD over real HTTP: the empty default, create with defaulted |
 | `ControlApiNotificationsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationsTest.java` | Integration tests for the in-app notification feed routes ({@code /notifications*}) over real HTTP. |
 | `ControlApiNotificationStreamTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationStreamTest.java` | Integration test for the SSE real-time stream ({@code GET /notifications/stream}): a notification |
+| `ControlApiOnboardFilesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardFilesTest.java` | Add data over real HTTP ({@code LA-ONBOARD-1} phase 2, OB-2/OB-3/OB-4/OB-7/OB-8): {@code POST /onboard/files} answers a |
 | `ControlApiOnboardingLifecycleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardingLifecycleTest.java` | Integration tests for the stream-onboarding draft lifecycle (v5.1.0) over real HTTP: |
 | `ControlApiPackParserPreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPackParserPreviewTest.java` | Real-HTTP proof of operator decision D4 (parser-plugins-trust-design.md slice P4, 2026-09-25): |
 | `ControlApiParsersTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiParsersTest.java` | Real-HTTP tests for the parser-catalog routes: {@code GET /parsers} (the self-describing |

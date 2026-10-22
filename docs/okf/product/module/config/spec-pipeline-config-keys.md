@@ -72,6 +72,7 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `produces` | spec | catalog registration: `REFERENCE_DATASET` origin vs Stream | Settings dialog (`GET/POST /pipelines/{n}/settings`) |
 | `reference` | spec (`load`/`key`/`refresh_seconds`/`delete`/`order_by`) | `ConsignmentIngestStrategy.stampReferenceVersions`, `EnrichmentEngine.versionedView`, `ReferenceCompactor`, `CollectorService.armReferenceRefresh` | Settings dialog |
 | `stream` | spec | `MetadataGraphBuilder` Stream grouping | hand-authored (default = pipeline name) |
+| `origin` | spec (enum `import`) | no engine code — marks a Pipeline written by Add data (`LA-ONBOARD-1` OB-3) | `POST /onboard/files/{draftId}/commit` |
 | `dirs` | spec block (5 of 9 leaves — see census caveat) | `CollectorProcessor`; `dirs.backup` doubles as the park home (`StepDisableArming`) | create scaffold derives the convention set; hand after |
 | `collector` | spec block (a few leaves only — `collector.consignment.max_files`, and since 2026-09-23 `collector.fetch.rate_limit`, `collector.retry.*`, `collector.circuit_breaker.*`, and since 2026-09-24 `collector.post_action.*`; see the census caveat) | `parseCollector` → `Collector` → acquisition framework (connectors, stability gate, dedup ledger, gap detection, `connector: dataset`) | collector drawer (one component, one write route) |
 | `parsing` | spec, partially (`parsing.grammar` is the canonical grammar ref; `source_timezone` / `delimited.*` are rule-only) | `mergeParsing` / `resolveGrammarRef` → format frontends | Parse drawer; New-pipeline writes `parsing.frontend` (D3) |
@@ -256,6 +257,7 @@ against, round-tripped untouched.
 | `excel.sheets` | spec |
 | `id` | spec |
 | `name` | spec |
+| `origin` | spec |
 | `output` | spec |
 | `output.compression` | spec |
 | `output.ducklake` | spec |

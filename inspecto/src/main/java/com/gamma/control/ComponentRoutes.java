@@ -815,6 +815,8 @@ final class ComponentRoutes implements RouteModule {
     static void validateKind(String type, String id, Map<String, Object> content) {
         for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.all(ComponentKindValidator.class))
             if (v.type().equals(type)) v.validate(id, content);
+        // LA-ONBOARD-1 OB-8: primaryEntityType + defaultLinkMapping on a Dataset entry.
+        if ("dataset".equals(type)) DatasetEntryRules.validate(content);
         if ("findings-spec".equals(type)) {
             // The store stamps name=id, and GET /findings/{type} resolves by that id, so validate the
             // content as it will be persisted and refuse a spec whose objectType/caseType disagrees with

@@ -24,7 +24,7 @@ import java.util.Set;
  *       Exchange {@code offers.toon} / {@code grants.toon};</li>
  *   <li>Space settings documents — {@code branding.toon}, {@code geo.toon}, {@code link-analysis.toon},
  *       {@code pipeline-history.toon}, {@code timezone.toon}, {@code icon-map.toon}, {@code scheduler.toon}, {@code nav-menus.toon},
- *       {@code notification-preferences.toon}, {@code partition.toon}, {@code space.toon}, and the install-wide Link Analysis
+ *       {@code notification-preferences.toon}, {@code partition.toon}, {@code space.toon}, {@code data.toon}, and the install-wide Link Analysis
  *       limits {@code la-limits.toon} (it lives beside the server-wide {@code scheduler.toon});</li>
  *   <li>operational state — {@code rename.journal} (what {@code /pipelines/rename/resume} acts on),
  *       {@code recon-state/}, {@code expectation-baselines/} (audited accept/clear ops), the config history
@@ -46,6 +46,7 @@ public final class ReservedConfigPaths {
             "roles.toon", "demo-users.toon", "access-policies.toon", "approval.toon", "egress.toon", "modules.toon", "approvers.toon", "publication-destinations.toon", "mail-attachments.toon", "attach-approvals.json", "offers.toon", "grants.toon",
             "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "timezone.toon", "icon-map.toon",
             "scheduler.toon", "nav-menus.toon", "notification-preferences.toon", "partition.toon", "space.toon",
+            "data.toon",   // LA-ONBOARD-1 OB-7 data.self_import: an import must not turn Add data on (canAdminister decides)
             "la-limits.toon",   // LA-CONFIG-LIMITS-1 install-wide Link Analysis limits, beside scheduler.toon (may be the sole Space's write root)
             "rename.journal", "dataset-publications.tsv",
             "day-manifest.tsv",   // LA-DAILY-INGEST-1 T8 per-day delivery manifest; a forged copy could fake or hide re-delivery/gap signals (operator, 2026-10-06)

@@ -94,7 +94,7 @@ public final class TypedRecordIngester implements StreamingFileIngester {
             declaredByKey.put(key, fields.size());
         }
 
-        String delimiter = cfg.csv().delimiter() != null && !cfg.csv().delimiter().isBlank()
+        String delimiter = cfg.csv().delimiter() != null && !cfg.csv().delimiter().isEmpty()
                 ? cfg.csv().delimiter() : ",";
 
         try (BufferedReader rd = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {

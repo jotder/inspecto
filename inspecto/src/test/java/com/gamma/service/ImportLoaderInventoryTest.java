@@ -80,7 +80,11 @@ class ImportLoaderInventoryTest {
             ALLOWED.put(p, REPO);
         for (String p : List.of("registry", "registry/datasets", "jobs", "views", "schemas", "mappings"))
             ALLOWED.put(p, IMPORTABLE);
-        ALLOWED.put("parked", "backup/parked/ (RawCopyRetention) - unprocessed raw copies under the DATA backup root, "
+        // LA-ONBOARD-1 phase 2: Add data keeps its drafts and its Pipelines' inboxes under the Space's DATA root
+        ALLOWED.put("draft.json", "an Add data draft record under <data root>/_onboard/<draftId>/ - the DATA root, never "
+                + "the config root an import writes");
+        ALLOWED.put("inbox", "<data root>/inbox/<id>, an Add data Pipeline's poll directory under the DATA root - not config");
+        ALLOWED.put("parked","backup/parked/ (RawCopyRetention) - unprocessed raw copies under the DATA backup root, "
                 + "outside the config tree; the sweep skips it and no import lands outside <config>");
         ALLOWED.put("archived-config", "ConfigMigrator's backup of a migrated config — written, never read back as "
                 + "live config, so a planted file there changes nothing");

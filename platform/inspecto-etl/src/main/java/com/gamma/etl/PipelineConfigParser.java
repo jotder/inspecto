@@ -1082,7 +1082,10 @@ final class PipelineConfigParser {
             if ((frontend.equals("json") || frontend.equals("text_regex"))
                     && !csv.containsKey("has_header"))
                 csv.put("has_header", "false");
-            b.delimiter       = opt(csv, "delimiter", ",");
+            // NOT opt(): its isBlank() turned a TAB delimiter into ',' - every TSV quarantined as field_mismatch
+            // (found by LA-ONBOARD-1's TSV import). Empty or absent is still the default.
+            Object delimiter  = csv.get("delimiter");
+            b.delimiter       = delimiter != null && !delimiter.toString().isEmpty() ? delimiter.toString() : ",";
             // 5.2 additive dialect chars — validated fail-closed: a key the engine cannot honor
             // must never load looking honored (docs/parsing-options-reference.md §5).
             b.quote           = singleChar(csv.get("quote"),   "quote");

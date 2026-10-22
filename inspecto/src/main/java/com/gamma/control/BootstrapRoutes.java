@@ -83,6 +83,8 @@ final class BootstrapRoutes implements RouteModule {
             data.put("configSpecs", configSpecs());
             data.put("enumerations", enumerations());
             data.put("spaces", spaces(api));
+            // LA-ONBOARD-1 OB-7: whether this Space lets people Add data (`data.self_import` in force); both apps lock on it.
+            data.put("selfImport", DataSettings.forRoot(writeRootOrNull(api)).selfImportInForce());
         }
         data.put("session", session(ex));
 

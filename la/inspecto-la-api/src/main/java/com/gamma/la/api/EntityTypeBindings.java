@@ -21,7 +21,8 @@ import java.util.Optional;
  * registered Dataset column whose {@code columns[].classification} it claims (trimmed, case-insensitive - the rule
  * {@link InvRoutes#columnTypes} and {@code EntityMasking} already apply). A binding's {@code role} is {@code source} /
  * {@code target} when the column is a link end of a mapping the Space knows - a saved Link Analysis view
- * ({@code query.projection}, {@code query.projections[]}, {@code query.multi.edges[]}) or a published index mapping - else
+ * ({@code query.projection}, {@code query.projections[]}, {@code query.multi.edges[]}), a published index mapping or the
+ * Dataset's own {@code defaultLinkMapping} (LA-ONBOARD-1 OB-8) - else
  * {@code attribute}. Its {@code timeColumn} is the Dataset's {@code eventDate} column, else the time column of an index mapping
  * over the Dataset, else none.
  *
@@ -97,6 +98,7 @@ final class EntityTypeBindings {
         for (DatasetProvider.Entry v : provider.linkAnalysisViews(writeRoot))
             if (ComponentAccess.canView(ex, v.content())) viewMappings(v.content(), mappings);
         for (String ds : datasets.keySet()) indexMappings(writeRoot, ds, mappings);
+        for (var d : datasets.entrySet()) defaultMapping(d.getKey(), d.getValue(), mappings);
         mappings.removeIf(m -> !datasets.containsKey(m.dataset()));
 
         Map<String, List<Binding>> byType = new LinkedHashMap<>();
@@ -148,6 +150,19 @@ final class EntityTypeBindings {
     private static void add(List<LinkMapping> out, Object ds, Object src, Object dst, Object kind) {
         if (ds == null || src == null || dst == null) return;
         out.add(new LinkMapping(String.valueOf(ds), String.valueOf(src), String.valueOf(dst), kind == null ? null : String.valueOf(kind), null));
+    }
+
+    /**
+     * LA-ONBOARD-1 OB-8 (F-9): the Dataset's own {@code defaultLinkMapping {from, to, kind?, time?}}, so its links are
+     * assessed before anyone saves a view or builds an index. Skipped when a view or index already names the same two ends.
+     */
+    static void defaultMapping(String dataset, Map<String, Object> content, List<LinkMapping> out) {
+        if (!(content.get("defaultLinkMapping") instanceof Map<?, ?> m) || !(m.get("from") instanceof String from)
+                || !(m.get("to") instanceof String to) || from.isBlank() || to.isBlank()) return;
+        for (LinkMapping x : out)
+            if (x.dataset().equals(dataset) && x.source().equalsIgnoreCase(from.trim()) && x.target().equalsIgnoreCase(to.trim())) return;
+        out.add(new LinkMapping(dataset, from.trim(), to.trim(), m.get("kind") instanceof String k && !k.isBlank() ? k.trim() : null,
+                m.get("time") instanceof String t && !t.isBlank() ? t.trim() : null));
     }
 
     /** The mapping of every published index over {@code dataset} (an unreadable manifest is no mapping). */

@@ -320,3 +320,123 @@ note called out as a rule, while the code was already doing it.
   defect, not the remedy. The producer's partition columns and the job's `input.partitions` must agree.
 * Pinned by `EnrichmentServiceTest.eventWhosePartitionsMatchNoJobColumnIsRefusedNotWidenedToFull`
   (mutation-verified: disabling the guard makes it fail on "a refused recompute announces no commit").
+
+## Add data: `/onboard/files` (file in → Dataset out; `LA-ONBOARD-1` phase 2, 2026-10-22)
+
+One server route family turns a person's file into a Dataset in two calls, on every edition (Basic included), in
+the core module (`OnboardRoutes`, `OnboardDraft`, `EntityShapes`, `OnboardImport`; not under `/inv`). It replaces
+the nine-call walkthrough (parse preview → suggest → two `/config/write` → `/runs` → copy → trigger →
+`/components/dataset` → view). The console's guided Onboard Stream / Reference keeps working beside it.
+
+| Route | Capability | What it does |
+|---|---|---|
+| `POST /onboard/files?name=&kind=stream\|reference[&delimiter=&header=&quote=]` | `canUploadData` | raw body, streamed to `<data root>/_onboard/<draftId>/`; answers the draft |
+| `POST /onboard/files/{draftId}/commit` | `canUploadData` | one confirm: writes, registers, lands, runs once, registers the Dataset; 200 run summary, or 202 above `import.inline_max_bytes` |
+| `GET /onboard/runs/{runId}` | `canUploadData` | follows a 202 run (`running` / `succeeded` / `failed`): the caller's own, or any with `canAdminister` |
+| `POST /datasets/{id}/files?name=[&mode=replace\|append]` | `canUploadData` | **Add a file** to an imported Dataset and run it (replace is the default; append for a Stream only) |
+| `POST /datasets/{id}/run` | `canUploadData` | **Run now**: runs the import Pipeline over what waits in its inbox |
+| `PUT /datasets/{id}/columns/{column}` | `canAuthorWorkbench` | one column's Entity Type: `{entityType: id\|null}` or `{classification: X\|null}` |
+| `GET` / `PUT /settings/data` | open / `canAdminister` | the Space's `data.self_import`: `{selfImport, selfImportDefault, selfImportInForce}` |
+
+**Gate order** for the Add data routes: capability 401/403 → no write root 503 → `data.self_import` off 403 ("Add
+data is turned off in this Space: its data comes from Pipelines - ask an administrator to turn it on") → the route's
+own checks. `data.self_import` lives in `data.toon` (a reserved config path: no import may write it); unset = on
+with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carries the value in force as
+`selfImport`. Rate class: the standard bucket (`OnboardRoutes.isRateLimited`).
+
+### The draft (the contract shared with `ONBOARDING-FIRST-RUN-1`)
+
+```
+{draftId, kind, file:{name, bytes, rows},
+ format:{type, delimiter?, header?, quote?},                    // delimiter/header/quote for CSV / TSV only
+ columns:[{name, header, type:{value, format, evidence, confidence}, sample:[up to 3]}],
+ rows:[up to 20 preview rows],
+ entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence}}],
+              primary, link:{from, to, kind, time, amount, details} (stream) | identifying (reference)},
+ limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel}}
+```
+
+* **Every proposed choice is `{value, evidence, confidence}`**. OF-2: `high` when every sampled value agrees and
+  the sample has at least 50 non-blank values (`OnboardDraft.MIN_SAMPLE`), `low` otherwise. A choice the user
+  stated (`?delimiter=` on a re-draft) is `high` by definition. The sample is the first 1,000 rows.
+* `format` is the extension point of slice C1 (file-name dates, decimal mark, nested-JSON record path): add a key
+  and keep the choice shape. A column's date or time format rides its `type` choice (`format`, the strptime
+  pattern every sampled value parsed with: DATE through `SchemaSuggest`, TIMESTAMP from a fixed candidate list).
+* Reading uses a sealed in-memory DuckDB allowed only the draft directory. Delimited text: `sniff_csv` (it spells
+  "no quote found" as `(empty)`, and fails on mixed line endings; then the delimiter is guessed from field counts
+  and every format choice is `low`), field-count evidence from a quote-aware split of the first lines, and types by
+  `SchemaSuggest` voting. Parquet: the file's declared types ("the file declares …"). JSON (array) and NDJSON:
+  `read_json`. Excel (`.xlsx`): only when the DuckDB `excel` extension loads from the bundle (the staged
+  `-Dduckdb.extension.dir`, else DuckDB's local cache; this route never runs an `INSTALL`); otherwise 422 "save
+  '<file>' as CSV". `.xls`, zip archives and other types are 422 naming the formats that are read.
+* **Value shapes** (`EntityShapes`): IMEI (15 digits with a valid Luhn check digit), IBAN (mod-97; maps to the type
+  claiming `IBAN`, else `ACCOUNT`), e-mail (no seeded type claims it, so the column stays a detail and the evidence
+  says so), `+` and 8 to 15 digits (MSISDN; bare 8 to 15 digits is a weak, `low` guess). Names: a token equal to an
+  Entity Type id or classification, plus hint words (account/acct/iban, msisdn/phone/caller/called/a_number, imei,
+  imsi, wallet, agent/till, cell). Only VARCHAR and BIGINT columns can hold identifiers. **From/to:** two columns
+  of one Entity Type whose names say direction (from/to, payer/payee, sender/receiver, caller/called, debit/credit,
+  src/dst) is `high`; the same type without direction words, or two different types, is `low`. Kind: a text column
+  named type/kind/channel/… with at most 50 distinct sampled values. Time: the TIMESTAMP (else DATE) column.
+  Amount: a numeric column named amount/value/sum/…. Details: the rest. Primary: the Entity Type most columns
+  hold (a tie is `low`). Reference: the identifying column is the Entity Type column whose sampled values are all
+  distinct (an `id` or `key` name wins).
+* Limits come from the configurable-limits catalogue (`LaLimit`, Space layer, `PUT /settings/link-analysis/limits`):
+  `import.max_bytes` 500 MiB (streamed; a declared length is refused before reading), `import.max_rows` 10 M
+  (counted at draft), `import.max_datasets` 20 (at commit), `import.inline_max_bytes` 64 MiB. Measured 2026-10-22
+  on a laptop, 7-column CSV, no index: 65 MB / 1 M rows took 1.5 s to draft and 4.5 s to commit; 264 MB / 4 M rows
+  took 3.2 s and 20 s. A 500 MB file would hold a request for about 40 s plus the index build, hence the 202
+  threshold.
+* Drafts expire after 24 hours (pruned on the next upload); a signed-in caller sees only their own (404 otherwise).
+
+### The commit
+
+Body (every key optional; absent = the draft's proposal): `{name, description, columns:[{name, type?, format?,
+entityType? (id|null), rename?, drop?}], primaryEntityType?, link?: {from, to, kind?, time?, amount?, details?} |
+null, identifyingColumn?}`. Columns are named by their **draft** name. `format.*` cannot change at commit (422:
+re-draft with `?delimiter=…`), because the columns were read with it. Order:
+
+1. Decide everything first: 422 for a choice naming nothing real; 409 for a taken name (Dataset, Pipeline, config
+   files or `<data root>/<id>`), an approval policy over Datasets, Pipelines or schemas, an import of that id in
+   flight (the id is claimed before these checks), or
+   `import.max_datasets`. The Dataset entry passes `ComponentRoutes.validateKind` before anything is written.
+2. `imports/<id>_schema.toon` (raw fields = every draft column, **index selectors for delimited files** (OB-4) and
+   key names otherwise; a dropped column stays a raw field and leaves the mapping; a rename is the mapping's `name`)
+   and `imports/<id>_pipeline.toon`, each through `SaveGate.check` (any ERROR refuses with its findings). The
+   Pipeline: `origin: import` (OB-3; a spec key read by no engine code), `trigger: {type: manual}` (it never polls,
+   on any edition), the local inbox `<data root>/inbox/<id>`, `accepts_upload: true`, `duplicate_check`, PARQUET
+   into `<data root>/<id>/database`, and `produces: reference` for a Reference.
+3. `registerPipeline`, then the file is **copied** into the inbox as `add_<letters>_<stem>.<ext>`, `<ext>` being the
+   import's own lower-case extension that its `file_pattern` globs (so `.txt`, `.tab`, `.jsonl`, `.xlsm` and `T.CSV`
+   land; letters only in the stamp: a long digit run in a file name is fingerprinted `<fp:…>` in the run ledgers) and the Pipeline runs once
+   (`runPipeline`, synchronous). The summary counts the ledger batches and quarantine entries the run added:
+   `rowsIn` (`total_input_rows`, rejected rows included), `rowsRejected`, `quarantined:[{file, reason}]`,
+   `rowsBefore`, `rowsAfter`, `rowsChanged`, `replaced`. A run that quarantined the file or loaded no row **fails**
+   (422 "nothing was imported … nothing was kept").
+4. The Dataset entry: `{physicalRef: <id>/database, description, origin: import, kind, importPipeline, importFormat,
+   eventDate (= the link's time), columns:[{name, type: string|number|date|timestamp|boolean, classification?}],
+   primaryEntityType, defaultLinkMapping, identifyingColumn}`; with sign-in `owner` is the importer and `shares: []`.
+5. Follow-on work **inside the same run** (DT-16) unless `pipeline.automation` is present (a Space whose Jobs do it;
+   that feature does not exist yet, so every edition does it in-run today): the link index through the
+   `LinkIndexBuilder` SPI (`index:{result: BUILT|UP_TO_DATE|REFUSED|FAILED|SKIPPED|NOT_AVAILABLE, …}`; the owner
+   is the importer, a full build is allowed) and every enabled Expectation whose target is the Pipeline
+   (`expectations:[{name, status, violations}]`). Neither failing undoes the import; both are reported.
+
+**A failed commit leaves nothing behind**: every write is undone in reverse (Dataset entry, data and inbox
+directories, registration, Pipeline file, schema file), and the draft keeps its file, so the same draft commits once
+the cause is fixed (`ControlApiOnboardFilesTest.aFailedCommitLeavesNothingBehind`, falsified by removing the
+rollback). A 202 run is undone the same way in the background and records `failed` with the reason. The background
+run uses the Space roots and service captured on the request thread, never "the current Space".
+
+**Add a file** acts only on the Pipeline Add data wrote for that Dataset (`importPipeline` equal to the id and registered
+from `imports/<id>_pipeline.toon`; the registry fields alone are editable, so a forged entry is 409), checks the file
+has the import's format and carries the columns the schema reads (column count for delimited text, names otherwise;
+an unreadable schema is 409). With `replace` it moves `database/` aside, lands, runs,
+and drops the old data on success or restores it on failure; `append` adds rows. **Run now** runs whatever waits in
+the inbox. Both answer the run summary with the in-run index and Expectations.
+
+Tests: `inspecto/.../ControlApiOnboardFilesTest` (draft evidence and confidence, value shapes, commit, overrides,
+Reference, failed commit, 202 and a failed 202, Add a file and Run now, the column route, limits, the Excel
+refusal, NDJSON and Parquet, `data.self_import` without and with sign-in, armed 401/403/200) and
+`la/inspecto-geo-link/.../ControlApiOnboardLinkAnalysisTest` (index BUILT in the run, `/inv/projection` with no
+saved view, Entity profile links assessed from `defaultLinkMapping` and not without it, falsified by removing the
+fallback in `EntityTypeBindings`).

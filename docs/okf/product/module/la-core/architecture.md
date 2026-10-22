@@ -1032,6 +1032,37 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   blocked storage), and `link-analysis.component.spec.ts` "Grow, Held and Exclude on the graph" (one explorer preview
   with its body; a 403 shown in the panel; the rail, Basic Grow, Undo, Ctrl+Z, degrading without the routes).
 
+### 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
+
+The route family lives in the **core** (every edition, Basic included, not under `/inv`); its contract, gates,
+limits and the commit's write order are in
+[`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md) ("Add data"). What Link Analysis relies on:
+
+- **The draft's `entityTypes` block** proposes, per column, the Entity Type of the Space
+  (`LinkAnalysisSettings.effectiveEntityTypes()`) from value shapes and names, the link's from / to / kind / time /
+  amount / details, the primary Entity Type, and for a Reference the identifying column. Every proposal is
+  `{value, evidence, confidence}` (OF-2); a column whose values fit no Entity Type stays a detail and says why.
+- **The registry entry carries the link (OB-8).** A committed Dataset has `columns[].classification`,
+  `primaryEntityType` and `defaultLinkMapping {from, to, kind?, time?, amount?, details?[]}`.
+  `DatasetEntryRules` (run by `ComponentRoutes.validateKind` on every Dataset write, so the generic component
+  routes refuse the same) checks the shape: from and to required and different, every named column one of the
+  entry's `columns[]` when it lists any, `primaryEntityType` a non-blank id.
+- **Entity profiles read `defaultLinkMapping` (F-9).** `EntityTypeBindings.resolve` adds the Dataset's own default
+  mapping after saved views and published index manifests (skipped when one of those already names the same two
+  ends), so link roles and the `links` section are assessed with no saved view. Pinned by
+  `ControlApiOnboardLinkAnalysisTest`: wallets registered with a default mapping are assessed, agents without one
+  are "not assessed"; red with the fallback removed.
+- **The index is built in the user's run on Basic (DT-16).** The commit, Add a file and Run now call the
+  `LinkIndexBuilder` SPI (the geo-link bridge, `ScheduledIndexBuild`) for the default mapping (source = from,
+  target = to, kind, time, weight = amount; no attribute columns; owner = the importer; a first build is FULL),
+  not a signal-driven `la.index.build` Job. Skipped (and said so) where `pipeline.automation` is present; that
+  feature is declared by no module yet, so today every edition builds in-run. The summary reports
+  `index:{result, edges, nodes}`.
+- **Change a column's Entity Type later:** `PUT /datasets/{id}/columns/{column}` (`canAuthorWorkbench`, edit access
+  to the Dataset). The profile cache keys on the binding signature, so the next read re-assesses.
+- **Not built here:** the screens (phase 4), the Start box reading `primaryEntityType` (phase 6), Reference details
+  on nodes (phase 5), and the C1 format detections (another session).
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (21); geo-link → `RouteModule`, `InvestigationMeasureProbe`,

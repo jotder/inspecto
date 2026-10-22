@@ -600,7 +600,7 @@ final class EntityProfiles {
                 return m;
             }
         }
-        Map<String, Object> m = notAssessed("the type is a link end of no saved view or index mapping over a Dataset you can view");
+        Map<String, Object> m = notAssessed("the type is a link end of no saved view, index mapping or default link mapping over a Dataset you can view");
         m.put("from", null);
         return m;
     }
@@ -893,7 +893,7 @@ final class EntityProfiles {
                 return m;
             }
         }
-        Map<String, Object> m = notAssessed("the type is a link end of no saved view or index mapping over a Dataset you can view");
+        Map<String, Object> m = notAssessed("the type is a link end of no saved view, index mapping or default link mapping over a Dataset you can view");
         m.put("from", null);
         return m;
     }

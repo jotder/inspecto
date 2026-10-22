@@ -61,6 +61,7 @@ class DecisionRuleWritersTest {
                     + "request body supplies only the KPI's content and id, never the kind)"),
             Map.entry("PipelineListRoutes#deletePipeline", FIXED_KIND + " (authored-pipeline)"),
             Map.entry("PipelineRenameRoutes#rewriteDatasetRefs", FIXED_KIND + " (dataset)"),
+            Map.entry("OnboardImport#setColumn", FIXED_KIND + " (dataset: one column's classification, LA-ONBOARD-1)"),
             Map.entry("PipelineRenameRoutes#rewriteAlertRules", FIXED_KIND + " (alert-rule)"),
             Map.entry("WidgetTags#reproject", FIXED_KIND + " (widget)"),
             Map.entry("ObjectService#discard", NOT_CONFIG), Map.entry("ObjectService#purge", NOT_CONFIG),
