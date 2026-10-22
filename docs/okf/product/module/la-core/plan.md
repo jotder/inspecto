@@ -39,6 +39,7 @@ Design: [architecture](architecture.md) §3 and §5. Layer overview: [layer/la a
 | Ports for the host bridge | `DatasetProvider`, `CasePort`, `CollectorCoveragePort`, `OutboundPort`, `UploadLandingPort` | implemented in [geo-link](../geo-link/index.md) |
 | `threshold` and `snapshot` ops, `threshold` `measure` | evaluator | `LA-INVESTIGATION-OPS-DEFERRED-1` (partly built) |
 | Every limit a configuration item, passed in by la-api | — | [la-configurable-limits-plan](../../../../archived-documents/plans-archive/la-configurable-limits-plan.md) |
+| Inspecto LA onboarding, blank install to a first finding (`LA-ONBOARD-1`, phases 0-8, closed 2026-10-22): Investigations add-on at runtime, masking by sign-in, locked-with-reason, `/onboard/files`, Getting started and the Space guide, Add data, Entity Types per column, Start from..., My work, help on every screen, onboarding counters | `EditionFeatures.holdsInvestigationsAddon`, `OnboardRoutes`, `OnboardImport`, `OnboardingRoutes`, `OnboardingCounters`; SPA `la-app`, `inspecto-add-data`, `start-from.ts`, `next-steps.ts`, `term-help.ts` | [architecture](architecture.md) §3.4, §6.10, §6.11, §8; archived [plan](../../../../archived-documents/plans-archive/la-onboarding-plan.md); acceptance [tests-onboarding-live-drive](tests-onboarding-live-drive.md) |
 
 ## Left
 

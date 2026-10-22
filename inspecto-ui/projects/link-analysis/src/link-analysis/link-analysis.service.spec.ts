@@ -42,3 +42,18 @@ describe('LinkAnalysisService - a case is a view plus the Entity Lists it uses (
         expect(odd.start).toBeUndefined(); // a start with nothing to draw is no start
     });
 });
+
+describe('LinkAnalysisService - a case keeps its own name (LA-ONBOARD-1 phase 8)', () => {
+    it('reads the name back after the registry stamps `name` with the id, as ComponentStore.write does', () => {
+        const s = service();
+        const stored = { ...s.toContent(VIEW), name: 'ring-one' }; // the server's write: in-file identity == URL id
+        expect(s.fromContent('ring-one', stored).name).toBe('Ring one');
+    });
+
+    it('an older view saved without a title still reads its stored name, else its id', () => {
+        const s = service();
+        expect(s.fromContent('v1', { name: 'v1' }).name).toBe('v1');
+        expect(s.fromContent('v2', { title: '  ', name: 'v2' }).name).toBe('v2');
+        expect(s.fromContent('v3', {}).name).toBe('v3');
+    });
+});

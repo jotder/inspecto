@@ -118,7 +118,10 @@ export class LinkAnalysisService {
 
 function toContent(v: LinkAnalysisView): Record<string, unknown> {
     return {
+        // The registry stamps `name` with the id on every write (ComponentStore.write: in-file identity == URL id), so
+        // the case's own name travels as `title`; `name` stays for older readers and is overwritten by the server.
         name: v.name,
+        title: v.name,
         description: v.description,
         sourceId: v.sourceId,
         query: v.query,
@@ -134,6 +137,7 @@ function toContent(v: LinkAnalysisView): Record<string, unknown> {
 
 function fromContent(id: string, content: Record<string, unknown>): LinkAnalysisView {
     const c = content as {
+        title?: string;
         name?: string;
         description?: string;
         sourceId?: GraphSourceId;
@@ -148,7 +152,7 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
     };
     return {
         id,
-        name: c.name ?? id,
+        name: (typeof c.title === 'string' && c.title.trim()) || c.name || id,
         description: c.description,
         sourceId: c.sourceId ?? 'lineage',
         query: c.query ?? {},

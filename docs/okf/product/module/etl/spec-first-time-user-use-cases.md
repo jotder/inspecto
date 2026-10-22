@@ -17,7 +17,7 @@ plan itself.
 **Owners.** The edition gates are [`data-tier-editions-plan.md`](../../../../superpower/data-tier-editions-plan.md)
 (`DATA-TIERS-1`, DT-13 and DT-14); the onboarding experience is
 [`first-run-onboarding-plan.md`](../../../../superpower/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the
-console) on the shared import route of [`la-onboarding-plan.md`](../../../../superpower/la-onboarding-plan.md)
+console) on the shared import route of [`la-onboarding-plan.md`](../../../../archived-documents/plans-archive/la-onboarding-plan.md)
 (`LA-ONBOARD-1`, Inspecto LA). The Inspecto LA side of the same journey:
 [`spec-first-time-user-use-cases.md`](../la-core/spec-first-time-user-use-cases.md).
 

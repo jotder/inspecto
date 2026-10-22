@@ -19,19 +19,67 @@ Two modes, and the difference matters:
 | | **Exploring** | **Investigation** |
 |---|---|---|
 | What it is | Query panel, canvas, toolbox over live data | A recorded op log over a *Working Set* of entities |
-| Is it evidence? | **No.** Re-running it later may show something different. | **Yes**, once you build a Dossier (section 7). |
+| Is it evidence? | **No.** Re-running it later may show something different. | **Yes**, once you build a Dossier (section 8). |
 | Use it to | Look around, try ideas, find leads | Work a case you may have to defend |
 
 ---
 
-## 2. Signing in and finding your way
+## 2. Getting started: from a blank install to a first finding
+
+About ten minutes, with the screens alone. The example is the one the product is tested with (see the
+[onboarding live drive](tests-onboarding-live-drive.md)): a file of money transfers (`transfers.csv`) in which a
+few accounts pass money along a chain, a file describing the accounts (`accounts.csv`), and one very busy merchant
+that would otherwise hide everything.
+
+1. **Open Inspecto LA.** On a new installation there is nothing yet, so the front page is **Getting started**
+   (below). To look around first, **Try the sample** loads invented transfers and opens a ready graph. For your own
+   data, **Create a Space**: name it after the data (*Mobile money*) and choose what kind of data it is.
+2. **Add data.** You land on **Onboard a file**. Choose *Events between entities* and drop `transfers.csv`. The
+   screen applies what it detected and says why; a choice that was only a guess is marked **A guess** - press
+   **Confirm** or change it.
+3. **Say what the columns hold.** `from_account` and `to_account` hold an **Account**; a link goes **From**
+   `from_account` **To** `to_account`; pick the time and amount columns if the screen did not. Press **Create and
+   run**. The result says how many transfers between how many accounts were kept, and anything set aside.
+4. **Add details (optional).** **Add details about these entities** brings in `accounts.csv`; say which column
+   identifies each account (`account_id`). Names and segments then show on the graph.
+5. **Start from one account.** **Explore in Link Analysis** opens **Start from...** with your Dataset picked.
+   Keep **One entity** and **Account**, type the first letters of the account you are worried about (`MULE`) and pick
+   it from the list, which shows how busy each match is. **Start** draws it and everyone it is linked to.
+6. **Grow and clean.** **Grow** (or **G**) shows what the next step adds before it adds it; very busy accounts are
+   held, not drawn. An account that links to almost everyone (a big merchant) only hides the pattern: right-click it,
+   **Exclude…**, and add it to a list whose purpose is *Never follow these (exclusion)*, so it stays out of every
+   later step too.
+7. **Find something interesting.** In the toolbox, **Analysis** offers three plain questions: **Who is busiest**,
+   **Which groups stick together** (the chain shows as one group) and **How does A reach B** (from the victim's
+   account to the cash-out account, the path the money took). Each answer is one sentence, with **Show on graph**,
+   **Start from these** and **Add to a list**.
+8. **Save as a case.** **Save as a case** (the bookmark) asks a name, *Mule ring*. A case keeps the graph's start and
+   the lists it uses; it re-reads your data when it opens, so it is not evidence.
+9. **Come back.** The front page now shows **My work**: open *Mule ring* to draw it again over the data as it is
+   then. **What changed in your data** says when each file was last brought in; **Add a file** on the Dataset card
+   brings in next month's file.
+
+**When you are stuck.** **What can I do next?** (the light bulb in the left menu) is on every screen: it reads what
+your Space already holds and offers the next step, with one line saying why, and the Space guide. A word with a
+**?** beside it (*Dataset*, *Entity Type*, *Entity List*, *case*) explains itself in one sentence when you press the
+**?**. An empty page always says why it is empty and offers the one thing that fills it. Something your edition or
+your role does not include is shown greyed out with one line naming what has it; it is never a button that fails.
+
+**Beginner counters.** Inspecto counts, on this server only, how far first-time users get: when it was first started,
+when the first Space, the first Dataset and the first graph appeared, when the Space guide was finished, and at which
+step people stopped. Nothing else is kept (no names, no values) and nothing is sent anywhere. Administrators see it
+in **Settings → Getting started counters**.
+
+---
+
+## 3. Signing in and finding your way
 
 1. Open the application and pick yourself on the sign-in page. A demonstration install lists Demo Users with no
    password; a secured install shows **Sign in with SSO**.
 2. The front page offers **Link Analysis**, **Geo**, **Entity Lists** and **Alerts** (and **Settings** if you may
    change them). The same areas sit in the slim menu down the left edge, with the Space switcher and your user menu.
 
-### Getting started (a new install)
+### The Getting started page (a new install)
 
 Until your Space holds data, the front page is **Getting started** instead of the area cards. It appears while
 there is no Space yet, or the current Space has no Dataset yet (a table Inspecto keeps). Three ways in:
@@ -62,7 +110,7 @@ are ticked.
 
 **My work.** Once the Space holds data, the front page shows **My work** under the Space guide:
 
-* **Cases** - every case saved in the Space (section 5, *Save as a case*), the most recent first, with when it was
+* **Cases** - every case saved in the Space (section 6, *Save as a case*), the most recent first, with when it was
   saved and the Entity Lists it uses (*Lists: started from Suspects; leaves out Busy merchants*). Click one to open
   its graph. A case re-reads your data each time it opens: it is not evidence.
 * **What changed in your data** - one line per Dataset you brought in with **Add data**, its last import first:
@@ -97,7 +145,7 @@ draw, on one screen, in four steps:
 The result says what happened in plain words: how many rows were read and kept, rows set aside and why, whether the
 link index was built, and each check (Expectation) on the data. Then:
 
-* **Explore in Link Analysis** opens Link Analysis with the new Dataset picked in **Start from...** (section 4), so you
+* **Explore in Link Analysis** opens Link Analysis with the new Dataset picked in **Start from...** (section 5), so you
   start from one entity, a list or the whole Dataset.
 * **Add details about these entities** starts again for a file that describes them (such as `accounts.csv`).
 * **Add another file** starts again.
@@ -110,8 +158,8 @@ or press Run now. On a secured installation it says *Ask an administrator to kee
 
 If adding data is not allowed in this Space, the screen says why instead (for example *Add data is turned off in
 this Space: its data comes from Pipelines - ask an administrator to turn it on*). With no sign-in it is allowed
-unless someone turned it off for the Space; with sign-in an administrator turns it on per Space, and you need the
-right to upload data.
+unless someone turned it off for the Space; with sign-in an administrator turns it on per Space (**Settings → Add data**, *People may add data in this Space*; the
+locked screen points an administrator there), and you need the right to upload data.
 
 **Entities: what your data holds.** The **Entities** page shows the kinds of thing your data holds (accounts, phone
 numbers, devices…), called **Entity Types**: only the ones some column of your data holds, the main one of each
@@ -134,7 +182,7 @@ need the right to edit Datasets when you sign in; without it they are greyed out
 
 ---
 
-## 3. The screen
+## 4. The screen
 
 * **Left panel, Query:** which Dataset to draw, and which columns are the two ends of a link.
 * **Middle, Canvas:** the graph. Drag to pan, scroll to zoom, click a node for its details, drag a node to move it.
@@ -154,7 +202,7 @@ stands for the same account, so you can still group, count, search and follow it
 
 ---
 
-## 4. Start here: Start from...
+## 5. Start here: Start from...
 
 The first screen is one **Start from...** box. Pick the **Dataset** first (the one you just added is already
 picked when you come from *Explore in Link Analysis*), then what to start from:
@@ -167,7 +215,7 @@ picked when you come from *Explore in Link Analysis*), then what to start from:
 * **A paste** - paste values, one per line (commas and semicolons work too).
 * **The whole Dataset** - draws every link at once. When the Dataset holds more entities than the node cap, the
   box warns you first: the graph is cut to the busiest, and starting from one entity is usually clearer.
-* **The busiest, or a group** - once a graph is drawn, *Find something interesting* (section 6) answers who is
+* **The busiest, or a group** - once a graph is drawn, *Find something interesting* (section 7) answers who is
   busiest and which groups stick together; **Start from these** on a result starts a new graph from those entities.
 
 **Start** draws what you chose and everything linked to it - **one ring** - with busy numbers held (see *Grow and
@@ -197,7 +245,7 @@ brings a file into the Space.
 
 ---
 
-## 5. Looking at the graph
+## 6. Looking at the graph
 
 | To find | Use |
 |---|---|
@@ -238,11 +286,11 @@ whatever its exclusion lists hold now is hidden again. A case saved from **Explo
 
 Without Investigations (Basic, or a signed-in install without the Investigations add-on), the menu also shows
 **Start an Investigation from this** locked, with one line naming what has it. With Investigations, the
-Investigation tab starts one as before. To keep a frozen copy, use **Save this analysis** (section 7).
+Investigation tab starts one as before. To keep a frozen copy, use **Save this analysis** (section 8).
 
 ---
 
-## 6. The analysis tools (Toolbox → Analysis)
+## 7. The analysis tools (Toolbox → Analysis)
 
 **Find something interesting** sits at the top of the Analysis tab: three plain questions about the graph on screen.
 
@@ -285,10 +333,10 @@ Investigation the Dataset and columns are filled in from it; you choose the Meas
 
 ---
 
-## 7. Working a case: Investigations
+## 8. Working a case: Investigations
 
 Open an Investigation when a lead is worth defending. From a ranking, **Start an Investigation from the top
-results** queues the top five nodes as seeds; from a number, use section 4.3; or use the **Investigation** tab.
+results** queues the top five nodes as seeds; from a number, use section 5.3; or use the **Investigation** tab.
 
 **What you do inside it.** Each of these is recorded as a numbered step with who, when and why:
 * **Seed** entities, then **Expand next degree** (one hop) or **Expand the whole Working Set**.
@@ -317,7 +365,7 @@ instead, or ask for Reveal rights.
 
 ---
 
-## 8. Entity Lists, Alerts and Geo
+## 9. Entity Lists, Alerts and Geo
 
 * **Entity Lists:** named watch lists of accounts or numbers, with every change on the record. With an Investigation
   open, click an entity on the canvas and **Add selection** to a list; without one, use **Add to a list** on a *Find
@@ -329,7 +377,7 @@ instead, or ask for Reveal rights.
 
 ---
 
-## 9. Worked example: a money-mule ring
+## 10. Worked example: a money-mule ring
 
 1. Press **Follow the money (example)**. About 112 accounts are drawn.
 2. Toolbox → **Suspicion score** → **Score nodes**. The hub and its relays sit at the top.
@@ -339,7 +387,7 @@ instead, or ask for Reveal rights.
 
 ---
 
-## 10. When something looks wrong
+## 11. When something looks wrong
 
 | You see | It means | Do this |
 |---|---|---|
@@ -349,13 +397,13 @@ instead, or ask for Reveal rights.
 | *Waiting for approval* | The expand is above the four-eyes limit | Ask a second approver to open the Investigation |
 | A red *Investigation is not available* | It does not exist, is not yours, or its Dataset is no longer shared with you | Ask its owner to add you as a member |
 | *No node on this graph can become a Case member* | The entities are masked | Link an Investigation to the Case, or ask for Reveal rights |
-| A tool says it needs a time column | The pattern is time-ordered | See the tip in section 6 |
+| A tool says it needs a time column | The pattern is time-ordered | See the tip in section 7 |
 | *The analysis was not saved* with a reason | The server refused it; the reason is shown | Read the reason; usually a missing capability |
 | The graph stops at a node limit | A cap protects the browser | Narrow the query, or use the *(server)* variant of the tool |
 
 ---
 
-## 11. Words you will meet
+## 12. Words you will meet
 
 | Word | Meaning |
 |---|---|

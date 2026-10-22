@@ -1127,6 +1127,79 @@ limits and the commit's write order are in
 - **Not built here:** the screens (phase 4), the Start box reading `primaryEntityType` (phase 6), Reference details
   on nodes (phase 5), and the C1 format detections (another session).
 
+### 6.11 Help on every screen and the onboarding counters (LA-ONBOARD-1 phase 8, as built 2026-10-22; UC-15, A-9, A-10, OB-13)
+
+`LA-ONBOARD-1` closed with this phase; the plan is archived
+(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in §3.4 (*Start from...*,
+*My work*), §6.10 and §8 (*Trust vs level*); the acceptance drive is
+[`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md).
+
+* **Onboarding counters (OB-13).** `com.gamma.util.OnboardingCounters` (inspecto-util, below both the host and la-api,
+  like `IngestActivity`): a process-wide static holder of ONE append-only file per installation,
+  `onboarding-counters.tsv`, one line per event, `<ISO instant>\t<event>[\t<step>]`. The closed vocabulary is the enum
+  `Event` (`launch`, `space_created`, `first_dataset`, `first_graph`, `guide_completed`, `step_abandoned`) and the set
+  `STEPS` (`space`, `data`, `columns`, `graph`, `list`, `add_data:file`, `add_data:columns`, `add_data:create`); a step
+  word outside it is dropped, so nothing a person typed can reach the file. `first_*` and `guide_completed` are written
+  once per installation (`install` reads the file, so a restart does not repeat them). `record` never throws: a full
+  disk loses the count, never the action. With no file installed every call is a no-op.
+  * **Where the file lives** (decided here): the server-wide document home, the same resolution as `scheduler.toon` and
+    `la-limits.toon` (`SchedulerRoutes.systemDocPath`: `-Dsystem.config.dir`, else the spaces container root, else the
+    sole Space's write root), not `-Ddata.dir`, which is per Space. Reserved in `ReservedConfigPaths` (an import must
+    not forge it). No home = `recording: false`.
+  * **Who records what.** `OnboardingRoutes.register` installs the file at boot and records `launch` (so "first launch"
+    = the first server start of this installation, the drive's clock start). `SpaceRoutes.createSpace` records
+    `space_created` (template, sample or bare); `OnboardImport.Job.finishCommit` records `first_dataset` after the undo
+    stack is cleared (inline and 202 commits alike); `InvRoutes.project` (projection AND the Start box's neighbours read)
+    records `first_graph` when the answer holds a link. The browser reports only what it alone sees through
+    `POST /onboarding/events {event, step?}`: `guide_completed` (the home page, once per app load) and `step_abandoned`
+    (Create Space dialog closed without a Space; Add data left with a file chosen - `add_data:file`, a draft -
+    `add_data:columns`, or a run in flight - `add_data:create`). Any other event, including `first_graph`, is 422: a
+    browser cannot claim a milestone.
+  * **Routes** (`OnboardingRoutes`, core, every edition): `GET /onboarding/metrics` (`canAdminister` in the manifest;
+    with no sign-in anyone) answers `{recording, firstLaunch, launches, spacesCreated, firstSpace/Dataset/Graph,
+    guideCompleted, each with *Seconds from the first launch, abandoned {step: n}}`; `POST /onboarding/events` is a
+    `self-limiting` exemption (open to any signed-in caller: a beginner is who reports it) on the standard rate bucket
+    (`ControlApi.isRateLimited`). Pinned by `ControlApiOnboardingCountersTest` (file, vocabulary, 401/403/200, 429),
+    `OnboardingCountersTest`, and the milestone assertions in `ControlApiSpaceSamplesTest` and
+    `ControlApiOnboardLinkAnalysisTest` (falsified: without the `InvRoutes` record the first graph stays null).
+  * **SPA**: `OnboardingEventsService` (`src/app/inspecto/onboarding/`, fire-and-forget, a failure is silent) and the
+    la-app **Settings → Getting started counters** section (server audience, read-only, listed when there is no sign-in
+    or the person holds `canAdminister`).
+* **Help rules (UC-15), all deterministic (A-9).**
+  * **What can I do next?** - a button in the la-app rail (`la-shell.component.ts`), so on every screen.
+    `next-steps.ts` (pure) turns the Space guide's `SpaceGuideState` plus *may create a Space* (`FirstRun.canCreate`) and
+    *why Add data is locked* (`AddDataAccess.lockReason`) into at most three steps, the recommended one first, each with
+    one line of why; `NextStepsDialog` draws them (a step the person may not take is an `inspecto-locked-action`) above
+    the Space guide.
+  * **Terms on first use** - `<inspecto-term term="...">` (`src/app/inspecto/onboarding/term-help.component.ts`, shared,
+    usable by the console): the word, a **?** button (tooltip and accessible name carry the explanation, `aria-expanded`
+    discloses it inline). `TERM_HELP` holds the sentences; a spec keeps them short and free of Pipeline words. Placed at
+    the first mention on Entities, Columns, Entity Lists, Start from..., My work and Save as a case. ⚠ The input is `term`,
+    not `id`: a static `id="..."` would also set the host's DOM id and duplicate it.
+  * **Empty states** now name a reason and one action: Entities → *Open Columns* (switches the tab), Columns → *Add
+    data*, Entity Lists → *New list* (for someone who may write lists; otherwise the existing line says why not), the
+    Start box's no-Dataset line points at the *Add data* / *Explore a Dataset* cards under it, the saved-views menu
+    says how to fill it, and My work says when the cases could not be read (*Try again*) instead of "No case yet".
+* **Found by the acceptance drive and fixed here** ([`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md)):
+  * **Add to a list was a dead end on the explorer.** `growEntityType` (used by *Add to a list* from Find something
+    interesting and by Exclude → Add to a list) knew only the Investigation binding, the Domain Profile's `investigate`
+    type and typed canvas nodes; a graph drawn by a Start box start has none, so the dialog offered no list and no *Create
+    a new list…*. It now falls back to the start Dataset's `primaryEntityType` (`discoverDataset()`), and the dialog says
+    why and where to make a list when nothing can take the entities.
+  * **No screen turned Add data on.** With sign-in `data.self_import` is off until an administrator turns it on, and the
+    locked screen says "ask an administrator" - who had only `PUT /settings/data`. la-app **Settings → This Space → Add
+    data** (`AddDataSettingsComponent`, `OnboardService.setDataSettings`) is that switch (editable with no sign-in or with
+    `canAdminister`, read-only otherwise), and the Add data page shows "You may turn it on: Settings, Add data" to the
+    person who may.
+  * The Link Analysis footer no longer says "pipeline planes" with no graph drawn (no Pipeline word on a Basic screen).
+* **Two phase 7 leftovers fixed.** (1) **A case's name came back as its id in My work**: `ComponentStore.write` stamps
+  the content's `name` with the id (in-file identity = URL id), so the display name a save wrote under `name` was
+  overwritten on every save. The view codec (`link-analysis.service.ts`) now also writes `title` and reads
+  `title ?? name ?? id`; older views read as before. ⚠ The Geo map's saved views use the same `SavedViewStore` pattern
+  and keep the defect (`LA-ONBOARD-DEFECTS-1`). (2) **One purpose vocabulary**: `ENTITY_LIST_PURPOSES` now carries the
+  plain words (*Watch these* · *Never follow these (exclusion)* · *Known good* · *Block*) and `purposeWords()` reads
+  them; the Entity Lists page, New list and Add to a list all say it that way (`PURPOSE_WORDS` is gone).
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (21); geo-link → `RouteModule`, `InvestigationMeasureProbe`,

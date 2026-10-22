@@ -1,3 +1,4 @@
+import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import {
     ChangeDetectionStrategy,
     ChangeDetectorRef,
@@ -364,6 +365,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        TermHelpComponent,
         FormMenuDirective,
         LinkAnalysisDiscoverComponent,
         LinkAnalysisGlossaryComponent,
@@ -3563,6 +3565,8 @@ export class LinkAnalysisComponent implements OnInit {
             this.investigation.binding()?.entityType ??
             this.profile().investigate?.entityType ??
             this.canvasData()?.nodes.find((n) => n.data.entityType)?.data.entityType ??
+            // the explorer graph drawn by a start: the primary Entity Type of the Dataset it came from (LA-ONBOARD-1 phase 8)
+            this.discoverDataset()?.primaryEntityType ??
             null,
     );
 

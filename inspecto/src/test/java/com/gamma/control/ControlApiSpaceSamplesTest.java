@@ -114,6 +114,12 @@ class ControlApiSpaceSamplesTest {
             assertEquals(3, p.get("filesLoaded").asInt(), p.toString());
             assertEquals(0, p.get("filesQuarantined").asInt());
             assertFalse(p.has("error"), p.toString());
+            // LA-ONBOARD-1 OB-13: the Space created is counted where it happens, in the installation's counters, which
+            // live in the server-wide document home (here the spaces container root)
+            JsonNode m = json(send(c, "GET", "/onboarding/metrics", null, null));
+            assertEquals(1, m.get("spacesCreated").asInt(), m.toString());
+            assertTrue(m.get("firstSpaceSeconds").isNumber() && m.get("firstSpaceSeconds").asLong() >= 0, m.toString());
+            assertTrue(Files.readString(root.resolve(OnboardingRoutes.FILE)).contains("\tspace_created\n"));
             // the run landed the rows: the Dataset's store is queryable in the new Space
             JsonNode table = json(send(c, "GET", "/spaces/sample/db/table?name=mule_transfers&limit=1000", null, null));
             assertTrue(table.toString().contains("MULE-HUB-01"), "the planted hub is in the loaded rows");

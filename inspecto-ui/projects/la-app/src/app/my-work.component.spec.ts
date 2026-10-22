@@ -65,15 +65,34 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
         await expectNoA11yViolations(el);
     });
 
-    it('nothing yet: each half says what to do next; a failed read shows as nothing, never as an error (no violations)', async () => {
+    it('nothing yet: each half says what to do next (no violations)', async () => {
         const { el } = create({
-            views: throwError(() => new Error('down')),
+            views: of([]),
             datasets: of([{ type: 'dataset', name: 't', ref: '', content: { origin: 'import', importPipeline: 't' } }]),
             batches: () => throwError(() => new Error('no ledger')),
         });
         expect(el.querySelector('[data-testid="la-cases-empty"]')?.textContent).toContain('Save as a case');
+        expect(el.querySelector('[data-testid="la-cases-failed"]')).toBeNull();
         expect(el.querySelector('[data-testid="la-changes-empty"]')?.textContent).toContain('Nothing imported with');
         expect(el.querySelector('[role="alert"]')).toBeNull();
         await expectNoA11yViolations(el);
+    });
+
+    it('cases that could not be read say so with Try again, not "No case yet" and not an error (LA-ONBOARD-1 phase 8)', async () => {
+        const { el } = create({ views: throwError(() => new Error('down')) });
+        const failed = el.querySelector('[data-testid="la-cases-failed"]');
+        expect(failed?.textContent).toContain('could not be read');
+        expect(failed?.querySelector('button')?.textContent).toContain('Try again');
+        expect(el.querySelector('[data-testid="la-cases-empty"]')).toBeNull();
+        expect(el.querySelector('[role="alert"]')).toBeNull();
+        await expectNoA11yViolations(el);
+    });
+
+    it('explains what a case and an Entity List are, one click away', () => {
+        const { el } = create();
+        const terms = Array.from(el.querySelectorAll('[data-testid="term-help"]')).map((b) =>
+            b.getAttribute('aria-label'),
+        );
+        expect(terms).toEqual(['What is a case?', 'What is an Entity List?']);
     });
 });

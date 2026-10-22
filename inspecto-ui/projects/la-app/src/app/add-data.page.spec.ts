@@ -87,6 +87,15 @@ describe('AddDataPageComponent (/add-data, LA-ONBOARD-1 phase 4)', () => {
         const { el } = create(false);
         expect(el.querySelector('[data-testid="add-data-locked"]')!.textContent).toContain(SELF_IMPORT_OFF);
         expect(el.querySelector('[data-testid="imported-datasets"]')).toBeNull();
+        // the person the lock sends people to (no sign-in: everyone) is pointed at the switch (phase 8, OB-7)
+        expect(el.querySelector('[data-testid="la-self-import-hint"] a')?.getAttribute('href')).toBe(
+            '/settings/add-data',
+        );
         await expectNoA11yViolations(el);
+    });
+
+    it('with Add data on, no switch hint is shown', () => {
+        const { el } = create(true);
+        expect(el.querySelector('[data-testid="la-self-import-hint"]')).toBeNull();
     });
 });

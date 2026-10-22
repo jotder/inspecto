@@ -1023,6 +1023,7 @@ public final class InvRoutes implements RouteModule {
                 out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
                 out.put("source", indexed.source());
                 audit(ex, datasetId, neighborsOf, rows.size(), indexed.result().truncated(), indexed);
+                if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13
                 return out;
             }
         }
@@ -1057,6 +1058,7 @@ public final class InvRoutes implements RouteModule {
             out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
             if (indexed != null) out.put("source", indexed.source());
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated(), indexed);
+            if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13: a graph was drawn
             return out;
         } catch (SQLException e) {
             throw DatasetReadFault.of("projection failed", datasetId, writeRoot, e);

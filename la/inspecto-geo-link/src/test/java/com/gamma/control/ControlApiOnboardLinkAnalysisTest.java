@@ -117,10 +117,18 @@ class ControlApiOnboardLinkAnalysisTest {
                 if (id.equals(ix.get("dataset").asText())) indexed = true;
             assertTrue(indexed, "the index is published for the Dataset");
 
+            // LA-ONBOARD-1 OB-13: the commit counted the first Dataset where it happened; no graph is drawn yet
+            JsonNode m = data(send(c, "GET", "/onboarding/metrics", null), 200);
+            assertTrue(m.get("firstDatasetSeconds").isNumber() && m.get("firstDatasetSeconds").asLong() >= 0, m.toString());
+            assertTrue(m.get("firstGraph").isNull(), m.toString());
+
             // the Dataset draws with no saved view
             JsonNode g = data(send(c, "POST", "/inv/projection", ("{\"dataset\":\"" + id
                     + "\",\"sourceCol\":\"from_account\",\"targetCol\":\"to_account\",\"linkKindCol\":\"channel\"}").getBytes(StandardCharsets.UTF_8)), 200);
             assertTrue(g.get("rows").size() > 0, "links are drawn (ids masked or not, per the Space's masking mode): " + g);
+            // ... and the first graph is counted by the projection route itself (OB-13)
+            m = data(send(c, "GET", "/onboarding/metrics", null), 200);
+            assertTrue(m.get("firstGraphSeconds").isNumber() && m.get("firstGraphSeconds").asLong() >= 0, m.toString());
             assertTrue(g.toString().contains("\"kind\":\"mobile\""), "the kind column the draft proposed rides the links");
 
             // F-9: the account links are assessed from the Dataset's defaultLinkMapping - no view, no request mapping

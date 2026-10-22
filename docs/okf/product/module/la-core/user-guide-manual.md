@@ -112,6 +112,36 @@ left edge (with the Space switcher and your user menu). A user who may change Li
   second approver for four-eyes), *Demo RA Analyst* and *Demo Manager* (both view-only, §11).
 * **When sign-in cannot start**, the page says so instead of showing a picker — see §13.
 
+### Getting started, help and the beginner counters
+
+The beginner's path from a blank install to a first finding (sample or own data → Add data → what the columns hold →
+Start from one entity → Grow and Exclude → Find something interesting → Save as a case → come back through My work)
+is walked through step by step in the [end user guide](user-guide-end-user.md) §2 *Getting started*, and scripted
+as the acceptance drive in [tests-onboarding-live-drive.md](tests-onboarding-live-drive.md). Help on every screen of
+Inspecto LA (`LA-ONBOARD-1` phase 8, UC-15), all deterministic (no assistant) on every edition:
+
+* **What can I do next?** - the light bulb in the left menu, on every screen. It reads the current Space from the
+  server (the same state as the Space guide: Space, Datasets, a column that says what it holds, saved cases, Entity
+  Lists) and offers at most three next actions, the recommended one first, each with one line of why; the Space guide
+  is underneath while it is not done. An action this person may not take (Create a Space without `canAdminister`, Add
+  data when the Space's self-import is off or without `canUploadData`) is shown locked with the reason.
+* **Terms explained on first use** - *Dataset*, *Entity Type*, *Entity*, *Entity List* and *case* carry a **?**
+  button the first time a screen names them (Entities, Columns, Entity Lists, Start from..., My work, Save as a case);
+  it shows one plain sentence (`TERM_HELP`, `inspecto-ui/src/app/inspecto/onboarding/term-help.ts`).
+* **Empty states** name their reason and offer the one action that fills them (Entities → *Open Columns*; Columns →
+  *Add data*; Entity Lists → *New list*; My work → *Save as a case*, or *Try again* when the cases could not be read).
+* **Beginner counters** (OB-13, A-10). Always on, local, never sent anywhere: one append-only file per installation,
+  `onboarding-counters.tsv` in the server-wide settings home (`-Dsystem.config.dir`, else the spaces folder, else the
+  single Space's config folder), one line per event - a timestamp and a word: `launch` (each server start),
+  `space_created`, `first_dataset` (the first Add data commit), `first_graph` (the first projection or neighbours read
+  that drew links), `guide_completed` and `step_abandoned` with the step (`space`, `add_data:file`,
+  `add_data:columns`, `add_data:create`, ...). No ids, names or values. `GET /onboarding/metrics` (`canAdminister`;
+  anyone with no sign-in) answers when each milestone first happened and the seconds from the first launch;
+  **Settings → Getting started counters** shows it to administrators, read-only.
+* **Settings → Add data** (This Space): *People may add data in this Space*, the Space's `data.self_import`
+  (`GET|PUT /settings/data`). Editable with no sign-in or with `canAdminister`, read-only otherwise; with sign-in it is
+  off until an administrator turns it on, and the locked Add data screen points that administrator here.
+
 ### Add data — Onboard a file
 
 **Add data** (`/add-data` in Inspecto LA) is the one screen both applications use to turn a file into a Dataset

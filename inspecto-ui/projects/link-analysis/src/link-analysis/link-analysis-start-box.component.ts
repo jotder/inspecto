@@ -1,3 +1,4 @@
+import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import {
     ChangeDetectionStrategy,
     Component,
@@ -73,12 +74,15 @@ const KINDS: { value: StartKind; label: string }[] = [
         ReactiveFormsModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        TermHelpComponent,
     ],
     host: { class: 'block w-full max-w-3xl p-4' },
     template: `
         <h2 class="m-0 text-lg font-semibold" id="la-start-title">Start from...</h2>
         <p class="text-secondary mb-3 mt-1 text-sm">
-            Draw a few entities and who they are linked to, then Grow one step at a time - not the whole hairball.
+            Draw a few entities and who they are linked to, then Grow one step at a time - not the whole hairball. Pick
+            a <inspecto-term term="dataset"></inspecto-term>, then an
+            <inspecto-term term="entity-type"></inspecto-term> and one of its values.
         </p>
         @if (catalogue().datasets.length) {
             <form
@@ -213,8 +217,9 @@ const KINDS: { value: StartKind; label: string }[] = [
             </form>
         } @else {
             <p class="m-0 text-sm" data-testid="start-no-dataset">
-                No Dataset in this Space has a link yet, so there is nothing to start from. Add a file of events, or
-                explore a Dataset and choose its from and to columns yourself.
+                No Dataset in this Space has a link yet, so there is nothing to start from. Choose
+                <em>Add data</em> below to bring in a file of events, or <em>Explore a Dataset</em> to choose its from
+                and to columns yourself.
             </p>
         }
         @if (notice(); as n) {

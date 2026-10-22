@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import { Subscription } from 'rxjs';
 import { ComponentsService, LensService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -54,6 +55,7 @@ const TABS = ['types', 'columns'] as const;
         StatusBadgeComponent,
         EntityColumnsComponent,
         NewEntityTypeComponent,
+        TermHelpComponent,
     ],
     template: `
         <inspecto-page-header
@@ -96,6 +98,11 @@ const TABS = ['types', 'columns'] as const;
             >
                 <mat-tab label="Entity Types">
                     <div class="flex flex-col gap-4 pt-4">
+                        <p class="text-secondary m-0 text-sm" data-testid="types-about">
+                            Each card is an <inspecto-term term="entity-type"></inspecto-term> your data holds; open one
+                            to see its <inspecto-term term="entity" label="Entities"></inspecto-term> and where they
+                            appear.
+                        </p>
                         <p class="m-0 text-sm" role="status" data-testid="types-result">{{ typeResult() }}</p>
                         @if (error(); as e) {
                             <inspecto-alert variant="error" data-testid="entities-error">{{ e }}</inspecto-alert>
@@ -119,7 +126,10 @@ const TABS = ['types', 'columns'] as const;
                                 <inspecto-empty-state
                                     icon="heroicons_outline:identification"
                                     title="No Entity Type in your data yet"
-                                    message="Say what your identifier columns hold under Columns; each Entity Type a column holds shows here."
+                                    message="No column of your Datasets is tied to an Entity Type yet. Say what your identifier columns hold under Columns; each Entity Type a column holds shows here."
+                                    actionLabel="Open Columns"
+                                    data-testid="types-empty"
+                                    (action)="selectTab(1)"
                                 ></inspecto-empty-state>
                             }
                             @if (s.absent.length) {

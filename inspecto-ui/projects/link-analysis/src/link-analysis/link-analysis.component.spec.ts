@@ -1754,7 +1754,7 @@ describe('LinkAnalysisComponent', () => {
         const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
         expect(panel.getAttribute('role')).toBe('menu');
         const item = panel.querySelector('[role="menuitem"]') as HTMLElement;
-        expect(item.textContent).toContain('Nothing saved yet.');
+        expect(item.textContent).toContain('Nothing saved yet: draw a graph, then Save as a case.');
         expect(item.hasAttribute('disabled')).toBe(true);
     });
     describe('toolbox tablist (LA-A11Y-AUDIT-1: the Analysis / View / Investigation switch)', () => {
@@ -2606,7 +2606,8 @@ describe('LinkAnalysisComponent - header is the toolbar, the footer carries the 
         expect(header.querySelector('nav[data-testid="la-tool-rail"]')).toBeTruthy(); // only the toolbar
         expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
         expect(status.querySelector('inspecto-ai-explain')).toBeTruthy();
-        expect(status.textContent).toContain('Project a Dataset'); // the page info shows until a graph is drawn
+        expect(status.textContent).toContain('Draw a Dataset'); // the page info shows until a graph is drawn
+        expect(status.textContent).not.toMatch(/pipeline/i); // no Pipeline word on an Inspecto LA screen (LA-ONBOARD-1 acceptance)
         expect(el.querySelectorAll('h1')).toHaveLength(1);
         expect(header.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
@@ -2619,7 +2620,7 @@ describe('LinkAnalysisComponent - header is the toolbar, the footer carries the 
         const status = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-status"]') as HTMLElement;
         expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
         expect(status.textContent).toContain('5 nodes');
-        expect(status.textContent).not.toContain('Project a Dataset');
+        expect(status.textContent).not.toContain('Draw a Dataset');
     });
 
     it('states the counts once in the footer, with Caps at its left edge and Installed modules at its right (operator 2026-10-16)', async () => {
@@ -3628,7 +3629,7 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         const c = await ready(made);
         await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'suspects' });
         // *Add to a list* from a result, as an exclusion list: the case now uses it
-        vi.spyOn((c as unknown as { dialog: MatDialog }).dialog, 'open').mockReturnValue({
+        const open = vi.spyOn((c as unknown as { dialog: MatDialog }).dialog, 'open').mockReturnValue({
             afterClosed: () => of({ listId: 'noisy', title: 'Noisy', purpose: 'exclusion', message: 'Added.' }),
         } as never);
         c.addFoundToList({
@@ -3636,6 +3637,9 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
             what: 'S-1-R1',
             purpose: 'exclusion',
         });
+        // phase 8 live drive: untyped explorer nodes take the start Dataset's primary Entity Type, so the dialog can
+        // offer "Create a new list…" instead of an empty choice
+        expect((open.mock.calls[0][1] as { data: { entityType: string | null } }).data.entityType).toBe('account');
         expect(c.caseLists()).toEqual({ start: 'suspects', exclusions: ['noisy'] });
         expect(c.hiddenNodeIds()).toEqual(['S-1-R1']); // out of sight now, as Exclude → Add to a list does
         c.saveForm.setValue({ name: 'Ring one', description: '' });

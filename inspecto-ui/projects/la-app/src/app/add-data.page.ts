@@ -1,4 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { LensService } from '@inspecto/core/api';
+import { SessionService } from '@inspecto/core/auth/session.service';
 import { ComponentsService } from '@inspecto/core/api/components.service';
 import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
 import { AddDataComponent } from '@inspecto/link-analysis/add-data/add-data.component';
@@ -15,7 +18,7 @@ import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/imp
     selector: 'la-app-add-data',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [AddDataComponent, ImportDatasetCardComponent],
+    imports: [AddDataComponent, ImportDatasetCardComponent, RouterLink],
     template: `
         <section class="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6" aria-labelledby="la-add-data-title">
             <header class="flex flex-col gap-1">
@@ -25,6 +28,11 @@ import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/imp
                     graph.
                 </p>
             </header>
+            @if (access.selfImport() === false && mayAdminister()) {
+                <p class="m-0 text-sm" data-testid="la-self-import-hint">
+                    You may turn it on: <a routerLink="/settings/add-data">Settings, Add data</a>.
+                </p>
+            }
             <inspecto-add-data exploreRoute="/link-analysis" (imported)="onImported($event)"></inspecto-add-data>
             @if (!access.lockReason() && others().length) {
                 <section class="flex flex-col gap-3" aria-labelledby="la-imports-title" data-testid="imported-datasets">
@@ -40,6 +48,10 @@ import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/imp
 })
 export class AddDataPageComponent implements OnInit {
     protected readonly access = inject(AddDataAccess);
+    private readonly session = inject(SessionService);
+    private readonly lens = inject(LensService);
+    /** The person is the administrator the locked screen sends people to (OB-7): point at the switch. */
+    protected readonly mayAdminister = computed(() => this.session.authMode() !== 'oidc' || this.lens.canAdminister());
     private readonly components = inject(ComponentsService);
 
     /** The Datasets Add data made in this Space (`origin: import`). */

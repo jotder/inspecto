@@ -1,7 +1,7 @@
 # Inspecto LA onboarding: from a blank install to a first finding (`LA-ONBOARD-1`)
 
-**Status: PLAN 2026-10-22 — recommendations for operator review, nothing built.** Derived from the agreed use
-cases [`spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md)
+**Status: CLOSED 2026-10-22 — phases 0-8 shipped; archived.** As-built facts: la-core [architecture](../../okf/product/module/la-core/architecture.md) §3.4, §6.10, §6.11, §8 and processor [api-onboarding-authoring](../../okf/product/module/processor/api-onboarding-authoring.md); acceptance drive [tests-onboarding-live-drive](../../okf/product/module/la-core/tests-onboarding-live-drive.md); open leftovers in [BACKLOG](../../BACKLOG.md) `LA-ONBOARD-RESIDUALS-1`, `LA-ONBOARD-DEFECTS-1`, `LA-ONBOARD-ORPHAN-PIPELINE-1`. Original header: PLAN 2026-10-22 — recommendations for operator review. Derived from the agreed use
+cases [`spec-first-time-user-use-cases.md`](../../okf/product/module/la-core/spec-first-time-user-use-cases.md)
 (UC-01…UC-15, findings F-1…F-13, operator answers A-1…A-16). Decisions OB-1…OB-14 below are the assistant's
 recommendations; each needs operator confirmation before its phase starts. Seams were located on origin/master
 `aa2374130` by two read-only surveys (backend and UI) on 2026-10-22; treat a file reference as a pointer to read,
@@ -68,7 +68,7 @@ a first-run page, an "Add data" screen, a Start box, *My work*, and the help rul
 
 | # | Decision |
 |---|---|
-| OB-1 | **Scope.** This plan builds the Inspecto LA screens and the **shared pieces**: the `/onboard/files` route (OB-2), sample loading (OB-12), `inspecto-locked-action` and the `/bootstrap` `featureReasons` field (OB-10), onboarding counters (OB-13), the walkthrough fixes (`LA-ONBOARD-FIXES-1`) and **the one Add data component both apps use** (phase 4, OF-1). The console companion is [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`); edition rules for the data layer are owned by [`DATA-TIERS-1`](data-tier-editions-plan.md). |
+| OB-1 | **Scope.** This plan builds the Inspecto LA screens and the **shared pieces**: the `/onboard/files` route (OB-2), sample loading (OB-12), `inspecto-locked-action` and the `/bootstrap` `featureReasons` field (OB-10), onboarding counters (OB-13), the walkthrough fixes (`LA-ONBOARD-FIXES-1`) and **the one Add data component both apps use** (phase 4, OF-1). The console companion is [`first-run-onboarding-plan.md`](../../superpower/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`); edition rules for the data layer are owned by [`DATA-TIERS-1`](data-tier-editions-plan.md). |
 | OB-2 | **One import route family, core, every edition, not under `/inv`:** `POST /onboard/files` (upload + infer → a draft with evidence), `POST /onboard/files/{draft}/commit` (confirmed columns, Entity Types, link mapping → writes schema and Pipeline, registers, lands the file, runs once, registers the Dataset, returns the run summary), `POST /datasets/{id}/files` + `POST /datasets/{id}/run` (Add a file, Run now). One verb with the GLOSSARY: **Onboard**. A failed commit leaves nothing behind. **Draft contract (agreed with `ONBOARDING-FIRST-RUN-1`):** every proposed choice is `{value, evidence, confidence: high \| low}`; a `format` block (delimiter, header, quoting, date formats, file-name dates, decimal mark, nested-JSON record path; filled by that plan's slice C1) and an `entityTypes` block (column → Entity Type, from / to, primary; this plan). **Confidence rule (OF-2):** high when every sampled value agrees and the sample has at least 50 non-blank values, low otherwise; low is highlighted and confirm-gated, in both UIs. **On Basic the commit, Add a file and Run now also build the Dataset's link index and evaluate its Expectations inside the same user-started run** (manual work, not automation; DT-16): they are not dispatched as signal-driven Jobs. |
 | OB-3 | **The Pipeline behind an import is an ordinary Pipeline** marked `origin: import` (DT-2). Basic screens never show it; the Standard+ console shows and edits it like any other. |
 | OB-4 | **Suggested selectors are column indexes for delimited files** (fixes F-4 for the console too), and the commit path never writes a selector registration would refuse. |
@@ -141,8 +141,8 @@ Agreed point by point with the session that owns those two plans:
 
 ## References
 
-- Use cases and operator answers: [`spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md).
-- [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`: owns the data layer's edition rules; DT-2, DT-4, DT-8, DT-11, DT-13, DT-16 used here).
-- [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the console companion; OF-1, OF-2, slices C1–C4).
+- Use cases and operator answers: [`spec-first-time-user-use-cases.md`](../../okf/product/module/la-core/spec-first-time-user-use-cases.md).
+- [`data-tier-editions-plan.md`](../../superpower/data-tier-editions-plan.md) (`DATA-TIERS-1`: owns the data layer's edition rules; DT-2, DT-4, DT-8, DT-11, DT-13, DT-16 used here).
+- [`first-run-onboarding-plan.md`](../../superpower/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the console companion; OF-1, OF-2, slices C1–C4).
 - GLOSSARY: Onboard, Stream, Reference, Dataset, Entity Type, Collector, Pipeline.
-- [`docs/EDITIONS.md`](../EDITIONS.md): Basic ships no authenticator; masking on Basic is display-only.
+- [`docs/EDITIONS.md`](../../EDITIONS.md): Basic ships no authenticator; masking on Basic is display-only.

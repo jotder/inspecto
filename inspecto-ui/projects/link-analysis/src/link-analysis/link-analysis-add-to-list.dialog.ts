@@ -17,7 +17,7 @@ import {
 } from '@inspecto/link-analysis/api/inv.service';
 import type { PackTerms } from './grow-exclude';
 import { entityListErrorMessage } from './investigation-state';
-import { ENTITY_LIST_PURPOSES } from './link-analysis-entity-lists.dialogs';
+import { ENTITY_LIST_PURPOSES, purposeWords } from './link-analysis-entity-lists.dialogs';
 
 export interface AddToListData {
     /** The entities' labels, to say what is being added. */
@@ -77,6 +77,12 @@ const NOT_BLANK = /\S/;
                     formControlName="listId"
                     data-testid="la-add-list-pick"
                 ></inspecto-option-picker>
+                @if (!listOptions().length) {
+                    <p class="text-secondary m-0 text-xs" data-testid="la-add-list-none">
+                        No list can take these yet, and their Entity Type is not known here, so a new list cannot be made
+                        from this dialog. Create one on the Entity Lists page, then add them.
+                    </p>
+                }
                 @if (listMissing()) {
                     <p class="text-warn m-0 text-xs" role="alert">Choose a list, or create a new one.</p>
                 }
@@ -127,11 +133,7 @@ export class LinkAnalysisAddToListDialog {
     readonly NEW_LIST = NEW_LIST;
 
     /** Plain words for a purpose (UC-10 step 2). */
-    readonly purposeOptions: PickerOption[] = ENTITY_LIST_PURPOSES.map((p) => ({
-        value: p.value,
-        label: PURPOSE_WORDS[p.value],
-        hint: p.hint,
-    }));
+    readonly purposeOptions: PickerOption[] = ENTITY_LIST_PURPOSES.map((p) => ({ ...p }));
     private readonly targets = this.data.lists.filter(
         (l) => !l.retired && (!this.data.entityType || l.entityType === this.data.entityType),
     );
@@ -139,7 +141,7 @@ export class LinkAnalysisAddToListDialog {
         ...this.targets.map((l) => ({
             value: l.id,
             label: l.title,
-            hint: `${PURPOSE_WORDS[l.purpose] ?? l.purpose} · ${l.size.toLocaleString('en')} ${l.size === 1 ? 'member' : 'members'}`,
+            hint: `${purposeWords(l.purpose)} · ${l.size.toLocaleString('en')} ${l.size === 1 ? 'member' : 'members'}`,
         })),
         ...(this.data.entityType ? [{ value: NEW_LIST, label: 'Create a new list…', hint: 'A list you keep' }] : []),
     ]);
@@ -212,11 +214,3 @@ export class LinkAnalysisAddToListDialog {
         }
     }
 }
-
-/** A list's purpose in plain words (UC-10): *Watch these* · *Never follow these* · *Known good* · *Block*. */
-export const PURPOSE_WORDS: Record<EntityListPurpose, string> = {
-    watch: 'Watch these',
-    exclusion: 'Never follow these (exclusion)',
-    allow: 'Known good',
-    block: 'Block',
-};

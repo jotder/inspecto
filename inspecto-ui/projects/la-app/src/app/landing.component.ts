@@ -3,7 +3,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { SpaceGuideComponent } from '@inspecto/core/onboarding/space-guide.component';
-import { setupIncomplete, SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
+import { guideDone, setupIncomplete, SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
+import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
 import { LA_PRODUCT_NAME } from './la-brand';
 import { SessionService } from '@inspecto/core/auth/session.service';
@@ -72,6 +73,7 @@ export class LandingComponent implements OnInit {
     protected readonly product = LA_PRODUCT_NAME;
     private readonly session = inject(SessionService);
     private readonly guide = inject(SpaceGuideService);
+    private readonly events = inject(OnboardingEventsService);
     protected readonly firstRun = inject(FirstRun);
     protected readonly nav = computed(() => visibleLaNav(this.session.features()));
     /** The current Space's setup, from the server; null while it loads. */
@@ -82,6 +84,9 @@ export class LandingComponent implements OnInit {
     });
 
     ngOnInit(): void {
-        this.guide.load().subscribe((s) => this.state.set(s));
+        this.guide.load().subscribe((s) => {
+            this.state.set(s);
+            if (guideDone(s)) this.events.guideCompleted(); // OB-13
+        });
     }
 }

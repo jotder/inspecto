@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { ComponentDef, ComponentsService, RunsService } from '@inspecto/core/api';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
+import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import { EntityListSummary, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisService, SAVED_VIEW_NOT_EVIDENCE } from '@inspecto/link-analysis/link-analysis/link-analysis.service';
 import { ADD_DATA_ROUTE } from './first-run';
@@ -18,7 +19,7 @@ import { CaseRow, caseRows, importedDatasets, lastImportLine } from './my-work';
     selector: 'la-app-my-work',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, InspectoSkeletonComponent],
+    imports: [RouterLink, InspectoSkeletonComponent, TermHelpComponent],
     host: { class: 'block' },
     template: `
         <section class="flex flex-col gap-4" aria-labelledby="la-my-work-title" data-testid="la-my-work">
@@ -27,7 +28,8 @@ import { CaseRow, caseRows, importedDatasets, lastImportLine } from './my-work';
                 <section class="bg-card flex flex-col gap-2 rounded-2xl border p-4" aria-labelledby="la-cases-title">
                     <h3 id="la-cases-title" class="m-0 text-sm font-semibold">Cases</h3>
                     <p class="text-secondary m-0 text-xs">
-                        A case is a saved graph and the Entity Lists it uses. {{ notEvidence }}
+                        A <inspecto-term term="case"></inspecto-term> is a saved graph and the
+                        <inspecto-term term="entity-list" label="Entity Lists"></inspecto-term> it uses. {{ notEvidence }}
                     </p>
                     @if (cases(); as cs) {
                         @if (cs.length) {
@@ -50,6 +52,13 @@ import { CaseRow, caseRows, importedDatasets, lastImportLine } from './my-work';
                                     </li>
                                 }
                             </ul>
+                        } @else if (casesFailed()) {
+                            <p class="m-0 text-sm" role="status" data-testid="la-cases-failed">
+                                The cases could not be read just now.
+                                <button type="button" class="text-primary underline" (click)="ngOnInit()">
+                                    Try again
+                                </button>
+                            </p>
                         } @else {
                             <p class="m-0 text-sm" data-testid="la-cases-empty">
                                 No case yet. Draw a graph in
@@ -94,12 +103,21 @@ export class MyWorkComponent implements OnInit {
     protected readonly nonBlank = (s: string): boolean => !!s;
     /** The cases, most recent first; null while they load. */
     readonly cases = signal<CaseRow[] | null>(null);
+    /** The saved views could not be read (the empty state then says so instead of "No case yet"). */
+    readonly casesFailed = signal(false);
     /** One line per imported Dataset, the latest import first; null while they load. */
     readonly changes = signal<string[] | null>(null);
 
     ngOnInit(): void {
+        this.cases.set(null);
+        this.casesFailed.set(false);
         forkJoin({
-            defs: this.components.list('link-analysis-view').pipe(catchError(() => of([] as ComponentDef[]))),
+            defs: this.components.list('link-analysis-view').pipe(
+                catchError(() => {
+                    this.casesFailed.set(true);
+                    return of([] as ComponentDef[]);
+                }),
+            ),
             lists: this.inv.listEntityLists().pipe(
                 map((i) => i?.lists ?? []),
                 catchError(() => of([] as EntityListSummary[])),

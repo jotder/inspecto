@@ -25,13 +25,22 @@ import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 import { entityListErrorMessage } from './investigation-state';
 import { isUnavailable } from './link-analysis-template.dialogs';
 
-/** D-P10's four purposes, in the analyst's words. */
+/**
+ * D-P10's four purposes in plain words (UC-10 step 2): *Watch these* · *Never follow these* · *Known good* · *Block*. The ONE
+ * vocabulary for a purpose: the Entity Lists page, New Entity List and Add to a list all say it this way (LA-ONBOARD-1
+ * phase 8; before, the page said "Exclusion" where the dialog said "Never follow these").
+ */
 export const ENTITY_LIST_PURPOSES: readonly { value: EntityListPurpose; label: string; hint: string }[] = [
-    { value: 'allow', label: 'Allow', hint: 'Entities known to be legitimate' },
+    { value: 'watch', label: 'Watch these', hint: 'Entities to keep an eye on' },
+    { value: 'exclusion', label: 'Never follow these (exclusion)', hint: 'Entities to leave out of an analysis' },
+    { value: 'allow', label: 'Known good', hint: 'Entities known to be legitimate' },
     { value: 'block', label: 'Block', hint: 'Entities to block' },
-    { value: 'watch', label: 'Watch', hint: 'Entities to keep an eye on' },
-    { value: 'exclusion', label: 'Exclusion', hint: 'Entities to leave out of an analysis' },
 ];
+
+/** A purpose in those words; an unknown purpose is shown as stored. */
+export function purposeWords(purpose: string): string {
+    return ENTITY_LIST_PURPOSES.find((p) => p.value === purpose)?.label ?? purpose;
+}
 
 const NOT_BLANK = /\S/;
 

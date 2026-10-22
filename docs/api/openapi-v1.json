@@ -13394,6 +13394,39 @@
         }
       }
     },
+    "/onboarding/events" : {
+      "post" : {
+        "summary" : "Report a step only the browser sees (LA-ONBOARD-1 OB-13)",
+        "operationId" : "postOnboardingEvents",
+        "description" : "Open to any caller, rate-limited (standard bucket). Body {event: guide_completed | step_abandoned, step?} with step one of space, data, columns, graph, list, add_data:file, add_data:columns, add_data:create (required for step_abandoned). 422 for any other word; only the two words and a timestamp are kept. guide_completed is written once per installation.",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {recorded}."
+          }
+        }
+      }
+    },
+    "/onboarding/metrics" : {
+      "get" : {
+        "summary" : "What the onboarding counters say (LA-ONBOARD-1 OB-13)",
+        "operationId" : "getOnboardingMetrics",
+        "description" : "canAdminister; with no sign-in anyone. Always on, local, never sent anywhere: {recording, firstLaunch, launches, spacesCreated, firstSpace, firstSpaceSeconds, firstDataset, firstDatasetSeconds, firstGraph, firstGraphSeconds, guideCompleted, guideCompletedSeconds, abandoned {step: count}}. Times are ISO instants, *Seconds count from the first launch; null when it has not happened. recording is false when the server has no document home.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped onboarding metrics."
+          }
+        }
+      }
+    },
     "/public/investigations/{token}" : {
       "get" : {
         "tags" : [ "inv" ],

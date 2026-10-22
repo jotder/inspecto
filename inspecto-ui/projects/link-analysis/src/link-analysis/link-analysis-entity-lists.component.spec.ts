@@ -161,9 +161,9 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         const items = Array.from(el.querySelectorAll('[aria-label="Entity Lists of this Space"] li'));
         expect(items).toHaveLength(2);
         expect(items[0].textContent).toContain('Known mules');
-        expect(items[0].textContent).toContain('Exclusion · MSISDN · 40 members');
+        expect(items[0].textContent).toContain('Never follow these (exclusion) · MSISDN · 40 members');
         expect(items[0].querySelector('inspecto-status-badge')).toBeNull();
-        expect(items[1].textContent).toContain('Watch · MSISDN · 1 member');
+        expect(items[1].textContent).toContain('Watch these · MSISDN · 1 member');
         expect(items[1].querySelector('inspecto-status-badge')?.textContent).toContain('Retired');
         // A retired list offers no writes.
         expect(button('Retire Old watch')).toBeNull();
@@ -446,7 +446,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
                 await settle();
                 const offered = el.querySelector('[data-testid="la-suggested-lists"]') as HTMLElement;
                 expect(offered.textContent).toContain('Call centres');
-                expect(offered.textContent).toContain('Exclusion');
+                expect(offered.textContent).toContain('Never follow these (exclusion)');
                 expect(offered.textContent).toContain('Busy numbers call almost everyone.');
                 await expectNoA11yViolations(el);
                 (el.querySelector('button[aria-label="Create the list Call centres"]') as HTMLButtonElement).click();

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import { InvestigationSessionStore } from '@inspecto/link-analysis/link-analysis/link-analysis-investigation.store';
 import { LinkAnalysisEntityListsComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-entity-lists.component';
 import { LinkAnalysisIdentityComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-identity.component';
@@ -12,11 +13,15 @@ import { LinkAnalysisIdentityComponent } from '@inspecto/link-analysis/link-anal
     selector: 'la-app-entity-lists-page',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [LinkAnalysisEntityListsComponent, LinkAnalysisIdentityComponent],
+    imports: [LinkAnalysisEntityListsComponent, LinkAnalysisIdentityComponent, TermHelpComponent],
     providers: [InvestigationSessionStore],
     template: `
         <div class="mx-auto flex w-full max-w-4xl flex-col gap-4 p-6">
             <h1 id="la-entity-lists-title" class="text-title m-0 font-semibold">Entity Lists</h1>
+            <p class="text-secondary m-0 text-sm" data-testid="la-lists-about">
+                Each <inspecto-term term="entity-list"></inspecto-term> keeps entities that matter. Start a graph from a
+                list in Link Analysis, or leave a list's members out while you grow it.
+            </p>
             <h2 class="sr-only">Lists and identity</h2>
             <inspecto-link-analysis-entity-lists></inspecto-link-analysis-entity-lists>
             <inspecto-link-analysis-identity></inspecto-link-analysis-identity>

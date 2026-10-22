@@ -4,13 +4,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LensService } from 'app/inspecto/api';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { AccessPageComponent } from './access.page';
 import {
+    AddDataSettingsComponent,
     AnalysisLimitsSettingsComponent,
     HostResourcesSettingsComponent,
     MyBrowserSettingsComponent,
+    OnboardingCountersSettingsComponent,
     SpaceSettingsComponent,
 } from './settings-sections';
 
@@ -26,6 +29,8 @@ interface SettingsDrawer {
     readonly component: Type<unknown>;
     /** Whether THIS user may change the section; without it the section is shown read-only. */
     readonly canChange: () => boolean;
+    /** Whether the section is listed for THIS user at all (default: always). */
+    readonly visible?: () => boolean;
 }
 
 const AUDIENCES: readonly { id: Audience; label: string }[] = [
@@ -96,6 +101,7 @@ const AUDIENCES: readonly { id: Audience; label: string }[] = [
 })
 export class SettingsPageComponent {
     private readonly lens = inject(LensService);
+    private readonly session = inject(SessionService);
     private readonly limits = inject(LaLimitsService);
     private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
@@ -133,6 +139,16 @@ export class SettingsPageComponent {
             canChange: this.mayChangeLimits('space'),
         },
         {
+            id: 'add-data',
+            title: 'Add data',
+            icon: 'heroicons_outline:arrow-up-tray',
+            description: 'Whether people may add files here.',
+            audience: 'space',
+            component: AddDataSettingsComponent,
+            // OB-7: the administrator's switch (the server gates PUT /settings/data on canAdminister)
+            canChange: () => this.session.authMode() !== 'oidc' || this.lens.canAdminister(),
+        },
+        {
             id: 'access',
             title: 'Access',
             icon: 'heroicons_outline:key',
@@ -150,12 +166,24 @@ export class SettingsPageComponent {
             component: HostResourcesSettingsComponent,
             canChange: this.mayChangeLimits('install'),
         },
+        {
+            id: 'getting-started-counters',
+            title: 'Getting started counters',
+            icon: 'heroicons_outline:chart-bar',
+            description: 'How first-time users fare here.',
+            audience: 'server',
+            component: OnboardingCountersSettingsComponent,
+            canChange: () => false,
+            // OB-13: an administrator's read (the server answers canAdminister; anyone with no sign-in).
+            visible: () => this.session.authMode() !== 'oidc' || this.lens.canAdminister(),
+        },
     ];
 
     readonly groups = computed(() =>
-        AUDIENCES.map((a) => ({ ...a, drawers: this.drawers.filter((d) => d.audience === a.id) })).filter(
-            (g) => g.drawers.length > 0,
-        ),
+        AUDIENCES.map((a) => ({
+            ...a,
+            drawers: this.drawers.filter((d) => d.audience === a.id && (d.visible?.() ?? true)),
+        })).filter((g) => g.drawers.length > 0),
     );
 
     /** From the `:section` route param (deep-linkable, Back works); the first section when none or an unknown one is named. */

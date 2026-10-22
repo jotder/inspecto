@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { LensService, SampleSpace, Space, SpacesService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { SpaceFormDialog } from '@inspecto/core/spaces/space-form.dialog';
+import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { FirstRun } from './first-run';
 
 const MADE: SampleSpace = {
@@ -25,6 +26,7 @@ function create(o: { authMode?: 'none' | 'oidc'; canAdminister?: boolean; made?:
     const selectSpace = vi.fn();
     const createSample = vi.fn(() => of(o.made ?? MADE));
     const open = vi.fn(() => ({ afterClosed: () => of(o.created) }));
+    const stepAbandoned = vi.fn();
     TestBed.configureTestingModule({
         providers: [
             provideRouter([]),
@@ -32,12 +34,13 @@ function create(o: { authMode?: 'none' | 'oidc'; canAdminister?: boolean; made?:
             { provide: SessionService, useValue: { authMode: signal(o.authMode ?? 'none') } },
             { provide: LensService, useValue: { canAdminister: signal(o.canAdminister ?? false) } },
             { provide: MatDialog, useValue: { open } },
+            { provide: OnboardingEventsService, useValue: { stepAbandoned } },
         ],
     });
     const run = TestBed.inject(FirstRun);
     const reload = vi.spyOn(run, 'reload').mockImplementation(() => undefined);
     const nav = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
-    return { run, selectSpace, createSample, open, reload, nav };
+    return { run, selectSpace, createSample, open, reload, nav, stepAbandoned };
 }
 
 describe('FirstRun', () => {
@@ -92,5 +95,12 @@ describe('FirstRun', () => {
         }
         run.openStep('space');
         expect(open).toHaveBeenCalled();
+    });
+
+    it('closing Create a Space without a Space counts the step where the person stopped (OB-13)', () => {
+        const { run, stepAbandoned, selectSpace } = create({ created: undefined });
+        run.createSpace();
+        expect(selectSpace).not.toHaveBeenCalled();
+        expect(stepAbandoned).toHaveBeenCalledWith('space');
     });
 });

@@ -115,6 +115,11 @@ export class OnboardService {
         return this.http.get<DataSettings>(apiUrl('/settings/data'));
     }
 
+    /** Turn Add data on or off in this Space (`canAdminister`); null = back to the default. Answers the settings in force. */
+    setDataSettings(selfImport: boolean | null): Observable<DataSettings> {
+        return this.http.put<DataSettings>(apiUrl('/settings/data'), { selfImport });
+    }
+
     /** 200 = the summary; 202 = a run to follow (the caller is told, so it can say the run continues on the server). */
     private settle(
         res: Observable<HttpResponse<ImportSummary | ImportRun>>,

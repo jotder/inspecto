@@ -24,7 +24,7 @@ import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import {
     CreateEntityListDialog,
     CreateEntityListData,
-    ENTITY_LIST_PURPOSES,
+    purposeWords,
     EntityListEntriesData,
     EntityListEntriesDialog,
     EntityListEntriesResult,
@@ -185,7 +185,10 @@ import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/l
                     } @else {
                         <inspecto-empty-state
                             title="No Entity Lists"
-                            message="This Space has no Entity Lists yet. A list is a named set of Entity keys — allow, block, watch or exclusion — that an Investigation can exclude or seed by."
+                            message="This Space has no Entity Lists yet. A list is a set of entities you keep: ones to watch, to never follow (exclusion), known good, or to block. A graph can start from a list, or leave its members out."
+                            data-testid="la-lists-empty"
+                            [actionLabel]="canWrite() ? 'New list' : ''"
+                            (action)="create()"
                         ></inspecto-empty-state>
                         @if (canWrite() && suggestions().length) {
                             <section class="flex flex-col gap-1" aria-labelledby="la-suggested-lists" data-testid="la-suggested-lists">
@@ -281,7 +284,7 @@ export class LinkAnalysisEntityListsComponent {
     }
 
     purposeLabel(purpose: string): string {
-        return ENTITY_LIST_PURPOSES.find((p) => p.value === purpose)?.label ?? purpose;
+        return purposeWords(purpose);
     }
 
     /** The Entity Type's label from `entityTypesInForce`; a type no longer in force says so (member writes 409). */

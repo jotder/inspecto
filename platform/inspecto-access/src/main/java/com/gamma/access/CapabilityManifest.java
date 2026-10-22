@@ -438,6 +438,8 @@ public final class CapabilityManifest {
             new Entry("PUT", "/settings/timezone", Roles.CAN_AUTHOR_WORKBENCH),
             // LA-ONBOARD-1 OB-7: whether people may Add data in a Space is the administrator's decision.
             new Entry("PUT", "/settings/data", Roles.CAN_ADMINISTER),
+            // OnboardingRoutes (LA-ONBOARD-1 OB-13) — how beginners fare on this installation is an administrator's read.
+            new Entry("GET", "/onboarding/metrics", Roles.CAN_ADMINISTER),
             // LinkAnalysisLimitsRoutes (LA-CONFIG-LIMITS-1) — a Space's Link Analysis limits are authored like its other
             // Link Analysis settings; the install-wide (host resource) limits are administration.
             new Entry("PUT", "/settings/link-analysis/limits", Roles.CAN_AUTHOR_WORKBENCH),
@@ -582,6 +584,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/agent/sessions", "self-limiting", "opens a conversation; no tool runs without its own gate"),
             new Exemption("POST", "/agent/sessions/(.+)/ask", "self-limiting", "a question to the assistant; tools self-gate"),
             new Exemption("POST", "/agent/sessions/(.+)/ask/stream", "self-limiting", "streaming form of /ask"),
+            new Exemption("POST", "/onboarding/events", "self-limiting", "LA-ONBOARD-1 OB-13: appends one word of a closed vocabulary (guide_completed, or step_abandoned with a closed step word) and a timestamp to the installation's onboarding counters - nothing the caller types is kept, guide_completed is written once, the standard rate bucket bounds the rest; a beginner is who reports it, so no capability fits - pinned by ControlApiOnboardingCountersTest"),
             new Exemption("POST", "/agent/tools/(.+)", "self-limiting", "a tool call, gated per tool by the capability the tool declares (IntelligenceAgent.toolCapability)"),
             new Exemption("POST", "/agent/tools/(.+)/derive", "self-limiting", "derives tool arguments, gated per tool like /agent/tools/(.+)"),
             new Exemption("POST", "/assist/(.+)", "self-limiting", "the skill-intent catch-all; dispatch only, the skill's own tools gate"),

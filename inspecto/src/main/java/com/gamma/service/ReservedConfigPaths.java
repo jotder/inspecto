@@ -49,6 +49,7 @@ public final class ReservedConfigPaths {
             "data.toon",   // LA-ONBOARD-1 OB-7 data.self_import: an import must not turn Add data on (canAdminister decides)
             "la-limits.toon",   // LA-CONFIG-LIMITS-1 install-wide Link Analysis limits, beside scheduler.toon (may be the sole Space's write root)
             "rename.journal", "dataset-publications.tsv",
+            "onboarding-counters.tsv",   // LA-ONBOARD-1 OB-13 install-wide onboarding counters, beside scheduler.toon (may be the sole Space's write root)
             "day-manifest.tsv",   // LA-DAILY-INGEST-1 T8 per-day delivery manifest; a forged copy could fake or hide re-delivery/gap signals (operator, 2026-10-06)
             "safety-policy.toon",   // DUCKLE-C6 Space Safety Policy tier: an import must not narrow, brick or re-moded it
             "case-link.json",   // LA-24: an imported copy would grant a Case team access (operator 2026-09-30)

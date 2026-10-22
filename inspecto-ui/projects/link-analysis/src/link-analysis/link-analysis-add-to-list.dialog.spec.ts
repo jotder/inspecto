@@ -8,6 +8,7 @@ import { EntityListSummary, InvService } from '@inspecto/link-analysis/api/inv.s
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { penByLabel, penEdit, penError, pickerSet } from '@inspecto/core/testing/pen-field';
 import { AddToListData, LinkAnalysisAddToListDialog } from './link-analysis-add-to-list.dialog';
+import { ENTITY_LIST_PURPOSES, purposeWords } from './link-analysis-entity-lists.dialogs';
 
 const list = (id: string, title: string, entityType: string, extra: Partial<EntityListSummary> = {}): EntityListSummary => ({
     id,
@@ -74,6 +75,14 @@ describe('LinkAnalysisAddToListDialog - Add to a list (LA-ONBOARD-1 phase 7, UC-
         await expectNoA11yViolations(el);
     });
 
+    it('says a purpose in the same plain words as the Entity Lists page (LA-ONBOARD-1 phase 8)', () => {
+        const { c } = create();
+        const offered = Object.fromEntries(c.purposeOptions.map((o) => [o.value, o.label]));
+        for (const p of ENTITY_LIST_PURPOSES) expect(offered[p.value]).toBe(purposeWords(p.value));
+        expect(offered['exclusion']).toBe('Never follow these (exclusion)');
+        expect(offered['watch']).toBe('Watch these');
+    });
+
     it('adds to a chosen list with the reason and closes with what it wrote', async () => {
         const { f, close, go, changeEntityListMembers, createEntityList } = create();
         pickerSet(f, '[data-testid="la-add-list-pick"]', 'suspects');
@@ -131,5 +140,11 @@ describe('LinkAnalysisAddToListDialog - Add to a list (LA-ONBOARD-1 phase 7, UC-
     it('entities with no Entity Type can only join an existing list', () => {
         const { c } = create({ entityType: null });
         expect(c.listOptions().map((o) => o.value)).toEqual(['suspects', 'phones']);
+    });
+
+    it('no list can take them and no Entity Type: says why and where to make one, never an empty choice alone', async () => {
+        const { el } = create({ entityType: null, lists: [] });
+        expect(el.querySelector('[data-testid="la-add-list-none"]')?.textContent).toContain('Entity Lists page');
+        await expectNoA11yViolations(el);
     });
 });

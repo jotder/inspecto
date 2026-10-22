@@ -1,3 +1,5 @@
+import { Router } from '@angular/router';
+import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import {
     ChangeDetectionStrategy,
     Component,
@@ -69,11 +71,13 @@ interface DatasetView {
         InspectoOptionPickerComponent,
         InspectoSkeletonComponent,
         LockedActionComponent,
+        TermHelpComponent,
     ],
     template: `
         <div class="flex flex-col gap-4">
             <p class="text-secondary m-0 text-sm">
-                Say which Entity Type each identifier column holds. Columns that hold the same Entity Type join up in
+                Say which <inspecto-term term="entity-type"></inspecto-term> each identifier column of a
+                <inspecto-term term="dataset"></inspecto-term> holds. Columns that hold the same Entity Type join up in
                 the graph and share one profile.
             </p>
             @if (!canEdit()) {
@@ -179,7 +183,10 @@ interface DatasetView {
                     <inspecto-empty-state
                         icon="heroicons_outline:table-cells"
                         title="No Dataset yet"
-                        message="Add data first; its identifier columns are listed here."
+                        message="This Space holds no Dataset, so there is no column to describe. Add a file first; its identifier columns are listed here."
+                        actionLabel="Add data"
+                        data-testid="columns-no-dataset"
+                        (action)="addData()"
                     ></inspecto-empty-state>
                 }
             } @else {
@@ -190,6 +197,7 @@ interface DatasetView {
 })
 export class EntityColumnsComponent {
     private readonly columnsApi = inject(DatasetColumnsService);
+    private readonly router = inject(Router);
     private readonly components = inject(ComponentsService);
 
     /** The Entity Types in force (the host's `GET /inv/entity-types` read). */
@@ -286,5 +294,10 @@ export class EntityColumnsComponent {
                 this.writeError.set(apiErrorMessage(e, `The primary Entity Type of ${entry.id} could not be changed.`));
             },
         });
+    }
+
+    /** The empty state's next action: the Add data screen. */
+    addData(): void {
+        void this.router.navigateByUrl('/add-data');
     }
 }

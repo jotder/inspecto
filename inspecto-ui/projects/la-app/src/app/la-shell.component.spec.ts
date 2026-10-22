@@ -1,3 +1,5 @@
+import { NextStepsDialog } from './next-steps.dialog';
+import { MatDialog } from '@angular/material/dialog';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
@@ -5,7 +7,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -160,4 +162,13 @@ describe('la-app shell and landing page', () => {
     it('has no axe violations', async () => {
         await expectNoA11yViolations(await render());
     }, 30_000);
+
+    it('offers What can I do next? in the rail on every screen; it opens the next-steps dialog (UC-15 rule 4)', async () => {
+        const el = await render();
+        const open = vi.spyOn(TestBed.inject(MatDialog), 'open').mockReturnValue({} as never);
+        const button = el.querySelector('[data-testid="la-next-steps-open"]') as HTMLButtonElement;
+        expect(button.getAttribute('aria-label')).toBe('What can I do next?');
+        button.click();
+        expect(open).toHaveBeenCalledWith(NextStepsDialog, expect.anything());
+    });
 });

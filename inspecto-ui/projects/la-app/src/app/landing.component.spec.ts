@@ -7,13 +7,17 @@ import { SessionService } from '@inspecto/core/auth/session.service';
 import { NO_SPACE, SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
 import { SPACE_GUIDE_COLLAPSED_KEY } from '@inspecto/core/onboarding/space-guide.component';
 import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
+import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { FirstRun } from './first-run';
 import { GettingStartedComponent } from './getting-started.component';
 import { LandingComponent } from './landing.component';
 import { MyWorkComponent } from './my-work.component';
 
+const guideCompleted = vi.fn();
+
 function create(load: Observable<SpaceGuideState>) {
+    guideCompleted.mockClear();
     TestBed.configureTestingModule({
         imports: [LandingComponent],
         providers: [
@@ -21,6 +25,7 @@ function create(load: Observable<SpaceGuideState>) {
             { provide: SpaceGuideService, useValue: { load: () => load } },
             { provide: SessionService, useValue: { features: signal({}) } },
             { provide: FirstRun, useValue: { openStep: vi.fn() } },
+            { provide: OnboardingEventsService, useValue: { guideCompleted } },
         ],
     });
     // The Getting started page is covered by its own spec; here only WHICH page renders matters.
@@ -75,5 +80,13 @@ describe('LandingComponent', () => {
         expect(el.querySelector('inspecto-space-guide section')).toBeNull();
         expect(el.querySelector('la-app-my-work')).not.toBeNull();
         expect(el.querySelectorAll('ul a').length).toBeGreaterThan(0);
+    });
+
+    it('reports the Space guide done to the onboarding counters, and nothing before (OB-13)', () => {
+        create(of({ hasSpace: true, datasets: 1, columnsDescribed: true, views: 0, lists: 0 }));
+        expect(guideCompleted).not.toHaveBeenCalled();
+        TestBed.resetTestingModule();
+        create(of({ hasSpace: true, datasets: 1, columnsDescribed: true, views: 1, lists: 0 }));
+        expect(guideCompleted).toHaveBeenCalledTimes(1);
     });
 });
