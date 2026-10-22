@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `e
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DATA-TIERS-1` | P2 | feature | the data layer by edition: Basic gets a one-off "Add data" import (CSV / Parquet upload, Postgres snapshot, no-code shaping) and no sched… | operator |
+| `ONBOARDING-FIRST-RUN-1` | P2 | feature | first-run onboarding: from a blank install to a Dataset an application can use, in every edition. | operator |
+| `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a one-off "Add data" import (CSV / Parquet upload, Postgres… | operator |
