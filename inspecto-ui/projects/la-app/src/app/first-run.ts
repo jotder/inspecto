@@ -18,7 +18,7 @@ export const ADD_DATA_ROUTE = '/add-data';
 /** Where each Space guide line leads in this app (`space` opens the Create Space dialog instead). */
 const STEP_ROUTES: Record<Exclude<SpaceGuideStepId, 'space'>, string> = {
     data: ADD_DATA_ROUTE,
-    columns: '/entities',
+    columns: '/entities?tab=columns',
     graph: '/link-analysis',
     list: '/entity-lists',
 };

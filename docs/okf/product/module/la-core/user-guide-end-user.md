@@ -61,6 +61,15 @@ saved in the Space) and, optional, **A list** (an Entity List exists). Click a l
 the guide with the arrow (the choice is remembered in this browser). It disappears once the four required steps
 are ticked.
 
+**Entities: what your data holds.** The **Entities** page shows the kinds of thing your data holds (accounts, phone
+numbers, devices…), called **Entity Types**: only the ones some column of your data holds, the main one of each
+Dataset first. The others wait, folded, under **Not in your data**. Its **Columns** tab (where the guide's *What the
+columns hold* step takes you) lists each column that looks like an identifier with what it holds or **Not set**:
+pick an Entity Type to set it (two columns holding the same type join up in the graph) and the page says what
+changed. The picker beside each Dataset name is its **primary** Entity Type. **New Entity Type** adds one your data
+needs: a name, an example value (the page shows how it will be compared) and how to compare values. These changes
+need the right to edit Datasets when you sign in; without it they are greyed out with the reason.
+
 **What you can do depends on your role.** If a button is greyed out, hover it: it says which capability is missing.
 
 | You want to | You need |

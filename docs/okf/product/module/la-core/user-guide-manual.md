@@ -197,6 +197,38 @@ condition*).
 * Very busy hub nodes are folded into a **super-node** so they do not hide everything else.
 * Above 20 links on the canvas, link labels are hidden (shown on hover or click) to keep the picture readable; *All link labels* in the Display menu overrides it.
 
+### 4.5 Entities: what the columns hold
+
+Two columns join up in the graph and share one profile only when they hold the same **Entity Type**: a column holds a
+type when its classification is one the type claims. The **Entities** page (left rail) is where you see and set this
+(LA-ONBOARD-1 phase 5).
+
+* **Entity Types** tab — one card per Entity Type that **occurs in this Space's data** (some Dataset column holds it),
+  with its distinct count, Datasets and data-as-of date. Types a Dataset names as its **primary** Entity Type come
+  first and carry *Primary in &lt;Dataset&gt;*. Types no column holds sit collapsed under **Not in your data (n)**;
+  open it to see them. A type a Dataset names as primary but no column holds stays there: nothing would be drawn.
+* **Columns** tab (also `?tab=columns`, where the Space guide's *What the columns hold* step lands) — per Dataset,
+  each column that looks like an identifier: one already classified, a link end of the Dataset's default link
+  mapping (*Links start here* / *Links end here*), or a name that suggests an Entity Type (*Looks like Account* for
+  `from_account`) or ends in `id`. **Show every column** lists the rest. **Holds** sets the column's Entity Type at
+  once, or *Not set* clears it; the change is written to the Dataset and the page reads the Entity Types again and
+  says the result (*"to_account" in transfers now holds Account. Account is in 2 columns of 1 Dataset.*). A column
+  classified with something no Entity Type claims says so in its note. The picker beside the Dataset name sets the
+  Dataset's **primary Entity Type** (the type its graph leads with); *None* removes it. A Dataset that lists no
+  columns says so; its columns cannot be set here.
+* **New Entity Type** (top right) — for a kind of thing your pack does not know: a **Name**, an **Example value**
+  (not stored: it shows *Kept as …*, how a value is compared) and **Compare values as**: *Upper case, spaces
+  trimmed*, *Digits only*, *Phone number* or *Case ignored*. Its id is the name in lower case with `_` between words,
+  and it claims the classification of the id in upper case (*Vehicle plate* → `vehicle_plate`, `VEHICLE_PLATE`). It
+  is added to the Space's Link Analysis settings: the first one turns the inherited types into a stated list (the
+  types in force plus the new one), so later pack relabels no longer apply to it. A new type is not masked; a name
+  the Space already has, or a classification another type claims, is refused before anything is written. It shows
+  under *Not in your data* until a column holds it.
+
+All three changes need `canAuthorWorkbench` with sign-in (everyone may without sign-in). Without it the values read
+as text and the action is shown locked with the reason (*Changing what a column holds needs permission to edit
+Datasets in this Space*).
+
 ---
 
 ## 5. Exploring the graph
@@ -638,6 +670,7 @@ announces a count of possible split identities.)*
 | Bind an Alert Rule to a Measure | `canAuthorAlertRules` |
 | See entity keys unmasked | `canRevealLinkEntities` (otherwise masked per the Space's setting) |
 | Change Link Analysis settings (and see **Settings** in the standalone app) | `canAuthorWorkbench` |
+| Set what a Dataset column holds, a Dataset's primary Entity Type, add an Entity Type (Entities page, §4.5) | `canAuthorWorkbench` |
 
 **Read-only access.** Without `canManageIncidents` you can still read: the Investigation tab says *Changing an
 Investigation needs the Incident management capability - you can read it*, and Seed, Expand, Undo, marks and the Draft

@@ -81,6 +81,12 @@ export interface Dataset extends DatasetConfig {
     name: string;
     /** The stored business description, read-only here (R2-16: a Reconciliation side's readable label). */
     description?: string;
+    /**
+     * Every stored key Studio does not edit (`description`, `origin`, `primaryEntityType`, `defaultLinkMapping`,
+     * `importPipeline`, the sharing envelope, keys a later feature adds, ...), carried as read so a save writes them
+     * back: the registry PUT replaces the whole entry, so a key left out is a key deleted.
+     */
+    extra?: Record<string, unknown>;
 }
 
 /**

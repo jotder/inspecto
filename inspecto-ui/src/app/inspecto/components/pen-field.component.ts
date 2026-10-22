@@ -88,6 +88,7 @@ import { MatIconModule } from '@angular/material/icon';
                     [disabled]="disabled()"
                     [attr.aria-label]="'Edit ' + (ariaLabel() || label())"
                     (click)="startEditing()"
+                    (keydown)="typeToEdit($event)"
                 >
                     @if (text() !== '') {
                         {{ text() }}
@@ -103,6 +104,7 @@ import { MatIconModule } from '@angular/material/icon';
                         class="pen-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
                         [attr.aria-label]="'Edit ' + (ariaLabel() || label())"
                         (click)="startEditing()"
+                        (keydown)="typeToEdit($event)"
                     >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil"></mat-icon>
                     </button>
@@ -164,12 +166,37 @@ export class PenFieldComponent implements ControlValueAccessor {
         this.startEditing();
     }
 
-    protected startEditing(): void {
+    protected startEditing(initial?: string): void {
         if (this.readOnly() || this.disabled()) return;
-        this.draft.set(this.text());
+        this.draft.set(initial ?? this.text());
         this.editing.set(true);
         // The input exists only after the next render: a microtask runs BEFORE it, so the caret was never placed.
-        afterNextRender(() => this.box()?.nativeElement.focus(), { injector: this.injector });
+        afterNextRender(
+            () => {
+                const el = this.box()?.nativeElement;
+                el?.focus();
+                // A typed first key starts the value: the caret goes after it (a number input has no caret to place).
+                if (el && initial !== undefined && el.type !== 'number')
+                    el.setSelectionRange(el.value.length, el.value.length);
+            },
+            { injector: this.injector },
+        );
+    }
+
+    /**
+     * Typing on the closed row edits it (LA-ONBOARD-1 phase 0 follow-up): a keyboard user who tabs to the row and types
+     * gets an open editor holding that key, as a spreadsheet cell does (the key REPLACES the value; Enter, Space or the
+     * pencil open it keeping the value). Only a printable key with no Ctrl / Alt / Meta: shortcuts, Tab, arrows and the
+     * activation keys keep their meaning. A number field takes only a key a number can start with; a date field opens
+     * through its picker, never from one key.
+     */
+    protected typeToEdit(e: KeyboardEvent): void {
+        if (e.key.length !== 1 || e.key === ' ' || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+        if (this.type() === 'date') return;
+        if (this.type() === 'number' && !/[0-9.+-]/.test(e.key)) return;
+        if (this.readOnly() || this.disabled()) return;
+        e.preventDefault();
+        this.startEditing(e.key);
     }
 
     protected onKey(e: KeyboardEvent): void {
