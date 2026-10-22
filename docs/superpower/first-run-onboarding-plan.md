@@ -65,7 +65,8 @@ Counted by `LA-ONBOARD-1`'s onboarding counters (its OB-13): always on, local, n
 | Help rules (empty-state reason + next action, plain terms, *What can I do next?*) | `LA-ONBOARD-1` phase 8, adopted here | all |
 | **Format evidence in the draft**: delimiter, header, quoting, date formats, file-name dates, the record path and fields to flatten for nested JSON, with confidence (B2) | **this plan**, contributed to the `/onboard/files` draft | UC-2, UC-3 |
 | **Fix catalogue** behind "problems in plain words" (B3) | **this plan**, server side, used by both UIs | UC-7 |
-| **Console entry points, Add data in the console, the console Space guide** (B1) | **this plan** | UC-1, UC-2, UC-9 |
+| **Console entry points, Add data in the console, the console Space guide** (B1) | **this plan** | UC-1, UC-2 |
+| "Start from my app" (UC-9): Add data inside Inspecto LA | `LA-ONBOARD-1` phase 4 | UC-9 |
 | **Console Dataset page** (B4) | **this plan** | UC-5, UC-8 |
 | **Console lookups** (B5) and **remote systems** (B6, Standard) | **this plan** | UC-4, UC-6 |
 | Edition gates, Activate copy, the manual-run gesture placement | `DATA-TIERS-1` (DT-13, DT-14) | UC-5 |
@@ -80,8 +81,8 @@ Counted by `LA-ONBOARD-1`'s onboarding counters (its OB-13): always on, local, n
 - **Drop a file** on Home, on the Catalog, or on an empty Datasets pane (H8) opens **Add data** inline.
 - **Add data** is the same screen as Inspecto LA's (`LA-ONBOARD-1` phase 4): choose the file → check the columns
   (pre-applied, with evidence; no-code shaping, DT-7) → what the columns hold (optional in the console; the
-  primary entity per A-7) → name and create (runs once) → land on the Dataset page (B4). One component, shared by
-  both apps (OF-1).
+  primary entity per A-7) → name and create (runs once) → land on the Dataset page (B4). Whether this is one
+  component shared by both apps is OF-1 (recommended: yes).
 - **Expert path.** *Open in editor* on the review screen and on the Dataset page opens the import's Pipeline in the
   guided editor (an ordinary Pipeline marked `origin: import`, `LA-ONBOARD-1` OB-3). The Catalog's *Onboard
   Stream / Reference* dialog stays as the advanced start (OF-3).
@@ -161,6 +162,11 @@ skill (design system, WCAG 2.2 AA, axe gate).
 
 C1 and C2 are server work that `LA-ONBOARD-1` phase 4 also benefits from; they can start as soon as its phase 2
 contract is fixed.
+
+**Cross-plan dependencies to agree with `LA-ONBOARD-1`** (another session's plan; this plan does not edit it): its
+phase 4 "evidence, low confidence flagged" reads C1's format evidence and the OF-2 confidence rule, and OF-1 asks
+its phase 4 to build the Add data screen as one shared component. Until that plan records both, they are this
+plan's proposals.
 
 ## 7. Open decisions
 

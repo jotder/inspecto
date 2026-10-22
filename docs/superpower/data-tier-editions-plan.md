@@ -109,7 +109,7 @@ protocols, masking, scale and organisational control.
 | DT-11 | **One product-wide edition switch** (Basic / Standard / Advanced); no per-application capability sets. DT-10's per-application Basic forms are placements under this one switch. |
 | DT-12 | **ASN.1 and the telecom decoders move to Advanced** (module `telecom-asn1` and add-on `telecomIndustryPack` from `offerings/standard.toon` to `advanced.toon`). Overrides this plan's 2026-10-21 placement (Standard). |
 | DT-13 | **Locked with a reason inside screens; the navigation stays lean**, on every gate this plan adds: inside a screen the control is disabled, with one line saying why and which edition has it, using the server's `refusal()` wording; whole Standard+ pages (such as Alerts) stay out of the Basic navigation (refined by LA A-11). Overrides the 2026-10-21 phase 2 text ("the SPA hides the affordances"). |
-| DT-14 | **The console work the gates need is part of this plan** (console use cases §6 Q3, Q4): *Add a file* and *Run now* together as one gesture on Basic (today upload is only in the Run-to-here test dialog and *Run now* only on the Collectors pane); Activate copy that follows the edition ("next poll cycle" is wrong on Basic); the `orders-starter` load-and-run sample button. The rest of the onboarding experience is `ONBOARDING-FIRST-RUN-1`. |
+| DT-14 | **The console work the gates need is part of this plan** (console use cases §6 Q3, Q4): *Add a file* and *Run now* together as one gesture on Basic (today upload is only in the Run-to-here test dialog and *Run now* only on the Collectors pane); Activate copy that follows the edition ("next poll cycle" is wrong on Basic). The `orders-starter` load-and-run sample button is required by this decision but **built elsewhere**: `LA-ONBOARD-1` OB-12 (`loadSamples`) and `ONBOARDING-FIRST-RUN-1` slice C4. The rest of the onboarding experience is `ONBOARDING-FIRST-RUN-1` and `LA-ONBOARD-1`. |
 | DT-1 | **Basic's way in is "Add data"**: upload a file, one column-review step, then a Dataset; the empty "Explore a Dataset" card in Inspecto LA becomes this entry point (LA A-6). One server route (`/onboard/files`, `LA-ONBOARD-1` OB-2) and one screen for both apps (`LA-ONBOARD-1` phase 4; the console's entry points in `ONBOARDING-FIRST-RUN-1`). The 2026-10-21 wording also offered "import from Postgres"; DT-4 removes it. |
 | DT-2 | **A Basic import runs on a hidden one-step Collector and Pipeline** per import, created and run behind the scenes; an upgrade to Standard shows it as an ordinary, editable Pipeline. No parallel ingest path (LA A-6). |
 | DT-4 | **Files only on Basic; a database is shown locked** (LA A-12: "D-PE6 wins"). **Reverses** the 2026-10-21 DT-4 (a one-off Postgres snapshot in Basic). Every remote adapter, the `db` Collector included, is Standard and up, so the gate is **module absence**: `inspecto-connectors` leaves `offerings/basic.toon`. |
@@ -174,7 +174,8 @@ Line numbers are from the 2026-10-20 survey (Link Analysis plan §4.3), not re-r
 - **ASN.1.** `offerings/standard.toon` → `advanced.toon`, the add-on entry. For both Offering moves:
   `node tools/render-offerings-matrix.mjs --check`, `node tools/check-offerings.mjs`, the product map edition items.
 - **`/bootstrap` and the console.** `features.pipelineAutomation`, `pipelineTransform`, `pipelineEgress`,
-  `remoteSystems`; one shared locked-with-reason component; the editor, Jobs pane, step palette,
+  `remoteSystems`, each also feeding `/bootstrap` `featureReasons` for the shared locked-with-reason component
+  (`inspecto-locked-action`, built by `LA-ONBOARD-1` OB-10, not by this plan); the editor, Jobs pane, step palette,
   Collect stage and Dataset offers key on them. Plus the DT-14 console work.
 
 ## 8. Phases
@@ -186,7 +187,7 @@ lane per push.
 | Phase | Content | Depends on | Effort |
 |---|---|---|---|
 | 1 | **"Add data" import (Basic and up)** — delivered by `LA-ONBOARD-1` (phase 2 route, phase 4 screen) and `ONBOARDING-FIRST-RUN-1` (console entry points); this plan owns its edition rules: hidden Collector + Pipeline (DT-2), files only (DT-4), formats, the Excel extension check and limits (DT-8) | decided | see that plan |
-| 2 | Groundwork: feature constants, `refusal()` texts, `OpsEditionFeatures` declarations, `/bootstrap` flags, the shared locked-with-reason component | §5.2 answered | 1 day |
+| 2 | Groundwork: feature constants, `refusal()` texts, `OpsEditionFeatures` declarations, `/bootstrap` flags and their `featureReasons` entries (the locked-with-reason component itself is `LA-ONBOARD-1` OB-10) | §5.2 answered; `LA-ONBOARD-1` phase 1 | 1 day |
 | 3 | Automation gate: save and load refusals, scheduler and acquire driver, Job save, Job scheduler and signal dispatcher, enrichment wiring; Activate copy and the manual-run gesture (DT-14) | 2 | 4 to 5 days |
 | 4 | Reach: both Offering moves (`connectors` out of Basic, `telecom-asn1` to Advanced), feature-naming refusals for remote kinds, the Collect stage's locked remote systems | 2 | 1.5 days |
 | 5 | Egress gate and its console locks | 2 | 1 day |
