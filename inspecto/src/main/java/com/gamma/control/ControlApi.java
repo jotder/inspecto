@@ -644,7 +644,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
                 new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new LinkAnalysisLimitsRoutes(), new DomainProfileRoutes(), new PendingChangeRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
-                new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes(), new AnalyticsCatalogueRoutes(),
+                new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes(), new OnboardingRoutes(), new AnalyticsCatalogueRoutes(),
                 new ModulesRoutes(), new ModuleSettingsRoutes()))   // MODULE-REORG-1 P2a/P2b: GET /modules, /settings/modules — appended LAST (order is load-bearing)
             module.register(this);
         applyInstallRateLimits();   // SchedulerRoutes installed the server-wide la-limits.toon home: its rate.* values apply from boot
@@ -1248,6 +1248,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 || StreamPushRoutes.isPushPath(path)
                 // LA-ONBOARD-1: Add data reads (and runs) a whole file per call - the standard bucket.
                 || OnboardRoutes.isRateLimited(method, path)
+                // LA-ONBOARD-1 OB-13: the browser's onboarding reports (open to any caller) - the standard bucket.
+                || OnboardingRoutes.isRateLimited(method, path)
                 // An Entity's case history scans the un-indexed object attribute bag (bounded, but a full-table
                 // LIKE) — throttled on the standard bucket like the other scan routes.
                 || (method.equals("GET") && path.equals("/objects/by-entity"));

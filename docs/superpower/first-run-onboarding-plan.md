@@ -5,7 +5,7 @@
 the as-built facts into the product hubs (`layer/product`, `module/etl`, `module/processor`), close its board rows,
 and archive this file when the last slice ships.
 
-**What this plan is.** The **console companion** that [`la-onboarding-plan.md`](la-onboarding-plan.md)
+**What this plan is.** The **console companion** that [`la-onboarding-plan.md`](../archived-documents/plans-archive/la-onboarding-plan.md)
 (`LA-ONBOARD-1`) expects in its OB-1: `LA-ONBOARD-1` builds the Inspecto LA screens **and the shared server pieces**
 (the `/onboard/files` import route, sample loading, the locked-with-reason component, local counters, the
 walkthrough fixes); this plan puts the **console** on those pieces and adds what only the console needs. Decision

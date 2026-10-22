@@ -7,6 +7,9 @@ profile:
   measure_hints[3]: duration,seconds,minutes
   time_hints[4]: start,_at$,time,date
   suggested_tools[3]: communities,explain,cohesion
+  suggested_lists[2]{title,purpose,entity_type,why}:
+    Call centres,exclusion,msisdn,"Call centres and other busy numbers call almost everyone; leaving them out keeps the graph readable."
+    Lines to watch,watch,msisdn,"Lines you want to see again whenever they show up in new call records."
   investigate:
     entity_type: msisdn
     dataset: telecom_links_dataset

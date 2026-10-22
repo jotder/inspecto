@@ -5,6 +5,7 @@ import { Observable, tap } from 'rxjs';
 import { LensService, SampleSpace, Space, SpacesService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { SpaceGuideStepId } from '@inspecto/core/onboarding/space-guide';
+import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { failedSampleRuns } from '@inspecto/core/spaces/sample-space.dialog';
 import { SpaceFormDialog } from '@inspecto/core/spaces/space-form.dialog';
 
@@ -35,6 +36,7 @@ export class FirstRun {
     private readonly lens = inject(LensService);
     private readonly dialog = inject(MatDialog);
     private readonly router = inject(Router);
+    private readonly events = inject(OnboardingEventsService);
 
     /** May create a Space: no sign-in, or `canAdminister` (OB-11; the server gates `POST /spaces` the same way). */
     readonly canCreate = computed(() => this.session.authMode() !== 'oidc' || this.lens.canAdminister());
@@ -46,6 +48,7 @@ export class FirstRun {
             .afterClosed()
             .subscribe((created?: Space) => {
                 if (created) this.enter(created.id, then);
+                else this.events.stepAbandoned('space'); // OB-13: the step where people stop
             });
     }
 

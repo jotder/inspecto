@@ -20,7 +20,9 @@ export type StartRequest =
     | { kind: 'entity'; datasetId: string; entityType: string; value: string }
     | { kind: 'list'; datasetId: string; listId: string }
     | { kind: 'paste'; datasetId: string; entityType: string; values: string[] }
-    | { kind: 'dataset'; datasetId: string };
+    | { kind: 'dataset'; datasetId: string }
+    /** Phase 7 (UC-09 "the busiest / a community"): a *Find something interesting* result's entities; `what` names it. */
+    | { kind: 'found'; datasetId: string; values: string[]; what: string };
 
 /** One Dataset a start can draw: the mapping every start over it uses, and the Entity Types its link ends hold. */
 export interface StartDataset {

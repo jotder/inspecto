@@ -1,3 +1,4 @@
+import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import {
     ChangeDetectionStrategy,
     ChangeDetectorRef,
@@ -123,6 +124,7 @@ import {
     mergeGraphs,
     searchNodes,
     aggregateSuperNodes,
+    GraphSelection,
     SUPER_NODE_KIND,
 } from '@inspecto/link-analysis/graph/graph-analysis';
 import {
@@ -237,11 +239,14 @@ import {
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
 import {
+    CaseStart,
     LinkAnalysisService,
     LinkAnalysisView,
     LinkAnalysisViewOptions,
     SAVED_VIEW_NOT_EVIDENCE,
 } from './link-analysis.service';
+import { FoundAction, LinkAnalysisDiscoverComponent } from './link-analysis-discover.component';
+import { AddToListData, AddToListResult, LinkAnalysisAddToListDialog } from './link-analysis-add-to-list.dialog';
 import { LinkAnalysisTemporalFindingsComponent, TemporalRunRequest } from './link-analysis-temporal-findings.component';
 import { LinkAnalysisTimelinePlaybackComponent } from './link-analysis-timeline-playback.component';
 import { TemporalFindingsState, allTemporalSelection, temporalResultToState } from './temporal-findings';
@@ -360,7 +365,9 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        TermHelpComponent,
         FormMenuDirective,
+        LinkAnalysisDiscoverComponent,
         LinkAnalysisGlossaryComponent,
         LinkAnalysisDisplayRulesComponent,
         LinkAnalysisCapsComponent,
@@ -483,6 +490,7 @@ export class LinkAnalysisComponent implements OnInit {
 
     @ViewChild(GraphViewComponent) private graphView?: GraphViewComponent;
     @ViewChild(LinkAnalysisToolboxComponent) private toolbox?: LinkAnalysisToolboxComponent;
+    @ViewChild(LinkAnalysisDiscoverComponent) private discover?: LinkAnalysisDiscoverComponent;
     @ViewChild(LinkAnalysisQueryPanelComponent) private queryPanel?: LinkAnalysisQueryPanelComponent;
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
@@ -1371,6 +1379,21 @@ export class LinkAnalysisComponent implements OnInit {
         this.views().map((v) => ({ kind: 'link-analysis-view' as const, id: v.id })),
     );
 
+    /** The start the graph on screen was drawn from (phase 6); a case saves it so reopening draws it again. Null = none. */
+    readonly caseStart = signal<CaseStart | null>(null);
+    /** The Entity Lists the graph on screen uses (A-1b): the list it started from, the exclusion lists written from it. */
+    readonly caseLists = signal<{ start?: string; exclusions: string[] }>({ exclusions: [] });
+    /** The lists a case would save, with their titles, said in the *Save as a case* menu. */
+    readonly caseListsLine = computed(() => {
+        const { start, exclusions } = this.caseLists();
+        const title = (id: string) => this.entityLists().find((l) => l.id === id)?.title ?? id;
+        const parts = [
+            ...(start ? [`started from ${title(start)}`] : []),
+            ...(exclusions.length ? [`leaves out ${exclusions.map(title).join(', ')}`] : []),
+        ];
+        return parts.length ? `Lists it uses: ${parts.join('; ')}.` : 'It uses no Entity List yet.';
+    });
+
     readonly saveForm = this.fb.nonNullable.group({
         name: ['', [Validators.required, uniqueNameValidator(() => this.views().map((v) => v.name))]],
         description: [''],
@@ -1607,6 +1630,13 @@ export class LinkAnalysisComponent implements OnInit {
             }
         } else values = req.values;
         const found = await this.drawStart(ds, values);
+        if (found.length) {
+            // a case remembers its start (A-1b): reopening draws it again over the data as it is then
+            this.caseStart.set({ datasetId: ds.id, values: found, ...(req.kind === 'list' ? { listId: req.listId } : {}) });
+            if (req.kind === 'list') this.caseLists.set({ start: req.listId, exclusions: [] });
+            if (req.kind === 'found')
+                this.startNotice.update((n) => (n ? { ...n, text: `Started from ${req.what}. ${n.text}` } : n));
+        }
         // Investigations level: the drawn start is also queued as the first seeds of the Investigation (as "top results" are).
         if (found.length && this.investigationsEnabled())
             this.queueSeedsAndOpen(found.map((v) => ({ id: v, label: v, ids: [v] })));
@@ -1633,7 +1663,8 @@ export class LinkAnalysisComponent implements OnInit {
             });
             return;
         }
-        await this.drawStart(ds, [req.seed]);
+        const found = await this.drawStart(ds, [req.seed]);
+        if (found.length) this.caseStart.set({ datasetId: ds.id, values: found });
     }
 
     /**
@@ -1888,6 +1919,9 @@ export class LinkAnalysisComponent implements OnInit {
         this.temporalSealed.set(null);
         this.temporalSealError.set('');
         this.mappingSummary.set([]);
+        this.caseStart.set(null);
+        this.caseLists.set({ exclusions: [] });
+        this.discover?.reset();
     }
 
     /**
@@ -3263,7 +3297,7 @@ export class LinkAnalysisComponent implements OnInit {
             this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
             this.saveForm.reset({ name: '', description: '' });
             this.saveTrigger?.closeMenu();
-            this.toastr.success(`Saved “${view.name}”.`);
+            this.toastr.success(`Saved the case “${view.name}”.`);
         } catch (err) {
             this.toastr.error(apiErrorMessage(err, 'Saving the view failed.'));
         } finally {
@@ -3291,6 +3325,32 @@ export class LinkAnalysisComponent implements OnInit {
             view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
             // LA-10: no server list exists — the view is where this screen remembers its Investigation ids.
             investigations: this.investigation.refs().length ? this.investigation.refs() : undefined,
+            ...this.caseOfState(),
+        };
+    }
+
+    /**
+     * A case's lists and start (A-1b): the list the graph started from and the exclusion lists written from it, and the
+     * start with every entity grown since (each re-drawn with its ring on open, at most {@link START_MAX_SEEDS}).
+     */
+    private caseOfState(): Pick<LinkAnalysisView, 'lists' | 'start'> {
+        const { start: startList, exclusions } = this.caseLists();
+        const lists = startList || exclusions.length ? { ...(startList ? { start: startList } : {}), ...(exclusions.length ? { exclusions } : {}) } : undefined;
+        const s = this.caseStart();
+        if (!s) return lists ? { lists } : {};
+        const nodes = this.graph()?.nodes ?? [];
+        const grown = this.expandedNodeIds()
+            .map((id) => nodes.find((n) => n.id === id))
+            .map((n) => (n ? rawIdsOf(n)[0] : undefined))
+            .filter((v): v is string => !!v);
+        // A list start re-reads the list's members as they are then: only what was grown beyond them is kept as values.
+        const drawn = new Set(s.values ?? []);
+        const values = s.listId
+            ? [...new Set(grown.filter((v) => !drawn.has(v)))].slice(0, START_MAX_SEEDS)
+            : [...new Set([...drawn, ...grown])].slice(0, START_MAX_SEEDS);
+        return {
+            ...(lists ? { lists } : {}),
+            start: { datasetId: s.datasetId, ...(s.listId ? { listId: s.listId } : {}), ...(values.length ? { values } : {}) },
         };
     }
 
@@ -3385,7 +3445,53 @@ export class LinkAnalysisComponent implements OnInit {
         this.applyOverlayStart();
         this.queryPanel?.patchFormFromView(view);
         this.investigation.restore(view.investigations ?? []);
+        if (view.start && (await this.drawCaseStart(view))) return;
         await this.execute(view.sourceId, view.query);
+        if (view.lists) this.caseLists.set({ start: view.lists.start, exclusions: view.lists.exclusions ?? [] });
+    }
+
+    /**
+     * Open a case drawn from a Start (phase 7): its list's members as they are now plus the values it saved, each with one
+     * ring, then its exclusion lists' members hidden again. False = the start cannot be drawn here (its Dataset no longer
+     * starts a graph, or nothing was found): the caller reruns the view's query instead.
+     */
+    private async drawCaseStart(view: LinkAnalysisView): Promise<boolean> {
+        const start = view.start!;
+        await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+        const ds = this.startCatalogue().datasets.find((d) => d.id === start.datasetId);
+        if (!ds) return false;
+        let values = start.values ?? [];
+        if (start.listId) {
+            try {
+                const list = await firstValueFrom(this.inv.getEntityList(start.listId));
+                values = [...new Set([...(list.members ?? []), ...values])];
+            } catch {
+                // the list is gone or unreadable: draw what the case saved
+            }
+        }
+        const found = await this.drawStart(ds, values);
+        if (!found.length) return false;
+        this.caseStart.set({ datasetId: ds.id, values: found, ...(start.listId ? { listId: start.listId } : {}) });
+        this.caseLists.set({ start: view.lists?.start, exclusions: view.lists?.exclusions ?? [] });
+        await this.hideExcludedByCase(view.lists?.exclusions ?? []);
+        return true;
+    }
+
+    /** Hide the drawn entities a case's exclusion lists hold now (as Exclude → Add to a list did when it was saved). */
+    private async hideExcludedByCase(listIds: readonly string[]): Promise<void> {
+        const members = new Set<string>();
+        for (const id of listIds) {
+            try {
+                for (const m of (await firstValueFrom(this.inv.getEntityList(id))).members ?? []) members.add(m.trim().toUpperCase());
+            } catch {
+                // an unreadable list hides nothing
+            }
+        }
+        if (!members.size) return;
+        const hide = (this.graph()?.nodes ?? [])
+            .filter((n) => rawIdsOf(n).some((v) => members.has(v.trim().toUpperCase())))
+            .map((n) => n.id);
+        if (hide.length) this.hideLocally(hide, 'on the case’s exclusion lists, hidden');
     }
 
     /** Prior saved copies of a view — a Component like any other, so the shared history dialog works
@@ -3459,6 +3565,8 @@ export class LinkAnalysisComponent implements OnInit {
             this.investigation.binding()?.entityType ??
             this.profile().investigate?.entityType ??
             this.canvasData()?.nodes.find((n) => n.data.entityType)?.data.entityType ??
+            // the explorer graph drawn by a start: the primary Entity Type of the Dataset it came from (LA-ONBOARD-1 phase 8)
+            this.discoverDataset()?.primaryEntityType ??
             null,
     );
 
@@ -3783,6 +3891,7 @@ export class LinkAnalysisComponent implements OnInit {
             if (res.ok) {
                 this.clearSelection();
                 this.toastr.info(res.message);
+                this.noteCaseExclusion(res.listId);
             } else this.toastr.error(res.message);
             return;
         }
@@ -3800,11 +3909,89 @@ export class LinkAnalysisComponent implements OnInit {
                 return;
             }
             this.toastr.info(res.message);
+            this.noteCaseExclusion(res.listId);
         }
         this.hideLocally(
             targets.map((n) => n.id),
             r.kind === 'list' ? 'added to the list and hidden' : 'hidden',
         );
+    }
+
+    /** An exclusion list written from this graph is one the case uses (A-1b). */
+    private noteCaseExclusion(listId: string | undefined): void {
+        if (!listId) return;
+        this.caseLists.update((c) => (c.exclusions.includes(listId) ? c : { ...c, exclusions: [...c.exclusions, listId] }));
+        this.refreshEntityLists();
+    }
+
+    /** Re-read the Space's Entity Lists (the Start box and the case's list titles read them). */
+    private refreshEntityLists(): void {
+        this.inv
+            .listEntityLists()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({ next: (l) => this.entityLists.set(l?.lists ?? []), error: () => undefined });
+    }
+
+    // ── LA-ONBOARD-1 phase 7 (UC-12): Find something interesting ──
+
+    /** Why *Start from these* cannot run: it draws over the Dataset the graph came from, which must start a graph. */
+    readonly discoverStartWhyNot = computed(() =>
+        this.investigation.canvas()
+            ? 'Starting again from these would leave the Investigation: close it first.'
+            : this.discoverDataset()
+              ? ''
+              : 'This graph was not drawn from a Dataset with a link, so nothing can start from it.',
+    );
+    /** Why *Add to a list* cannot run (list writes need the Incident management capability; the server asks the same). */
+    readonly discoverListWhyNot = computed(() =>
+        this.lens.canManageIncidents() ? '' : 'Adding to a list needs the Incident management capability.',
+    );
+
+    /** The Dataset the graph on screen was drawn from, when a start can draw over it. */
+    private discoverDataset(): StartDataset | null {
+        const id = this.lastRun()?.query?.projection?.datasetId;
+        return (id && this.startCatalogue().datasets.find((d) => d.id === id)) || null;
+    }
+
+    /** *Show on graph*: emphasise the result and bring its first entity into view. */
+    showFound(sel: GraphSelection): void {
+        this.emphasis.set(sel);
+        if (sel.nodeIds[0]) this.focusNode(sel.nodeIds[0]);
+    }
+
+    /** *Start from these*: the Start box's path (phase 6) over the graph's Dataset - "the busiest / a community". */
+    async startFromFound(a: FoundAction): Promise<void> {
+        const ds = this.discoverDataset();
+        if (!ds) return;
+        await this.startFrom({ kind: 'found', datasetId: ds.id, values: a.row.values, what: a.what });
+    }
+
+    /** *Add to a list* (UC-10): the dialog picks or creates the list and writes; an exclusion list becomes the case's. */
+    addFoundToList(a: FoundAction): void {
+        const data: AddToListData = {
+            labels: a.row.nodeIds.map((id) => this.labelOf(id)),
+            values: a.row.values,
+            entityType: this.growEntityType(),
+            lists: this.entityLists(),
+            purpose: a.purpose,
+            terms: this.growTerms(),
+        };
+        this.dialog
+            .open<LinkAnalysisAddToListDialog, AddToListData, AddToListResult | undefined>(LinkAnalysisAddToListDialog, {
+                width: '30rem',
+                data,
+            })
+            .afterClosed()
+            .subscribe((r) => {
+                if (!r) return;
+                this.toastr.info(r.message);
+                if (r.purpose === 'exclusion') {
+                    this.noteCaseExclusion(r.listId);
+                    // as Exclude → Add to a list does on the explorer graph: out of sight now, not only when the case reopens
+                    if (this.growMode() === 'basic') this.hideLocally(a.row.nodeIds, 'added to the list and hidden');
+                } else this.refreshEntityLists();
+                this.investigation.entityListsChanged.update((n) => n + 1);
+            });
     }
 
     /** Hide explorer nodes (presentation, undoable) and say so with an Undo. */

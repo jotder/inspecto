@@ -440,3 +440,11 @@ refusal, NDJSON and Parquet, `data.self_import` without and with sign-in, armed 
 `la/inspecto-geo-link/.../ControlApiOnboardLinkAnalysisTest` (index BUILT in the run, `/inv/projection` with no
 saved view, Entity profile links assessed from `defaultLinkMapping` and not without it, falsified by removing the
 fallback in `EntityTypeBindings`).
+
+### Onboarding counters (`OnboardingRoutes`; `LA-ONBOARD-1` OB-13, 2026-10-22)
+
+A successful commit (inline or 202) records `first_dataset` once per installation in the onboarding counters, after
+the undo stack is cleared, so a rolled-back commit counts nothing. The counters themselves - the file in the
+server-wide document home, the closed vocabulary, `GET /onboarding/metrics` (`canAdminister`) and
+`POST /onboarding/events` (open, rate-limited) - are described in the la-core
+[architecture](../la-core/architecture.md) §6.11. `POST /spaces` records `space_created` the same way.

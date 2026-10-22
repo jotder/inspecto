@@ -18,7 +18,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (82 open rows
 # Editions
 
 * [Advanced](edition/advanced/index.md) - `edition.advanced` · 2 doc(s) · 0 open row(s)
-* [Basic](edition/basic/index.md) - `edition.basic` · 2 doc(s) · 3 open row(s)
+* [Basic](edition/basic/index.md) - `edition.basic` · 2 doc(s) · 2 open row(s)
 * [Preview](edition/preview/index.md) - `edition.preview` · 2 doc(s) · 0 open row(s)
 * [Standard](edition/standard/index.md) - `edition.standard` · 2 doc(s) · 0 open row(s)
 
@@ -93,7 +93,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (82 open rows
 * [Demo authenticator](module/demo-auth/index.md) - `module.demo-auth` · 7 doc(s) · 0 open row(s)
 * [Execution engine](module/engine/index.md) - `module.engine` · 33 doc(s) · 7 open row(s)
 * [Entity lists](module/entity-list/index.md) - `module.entity-list` · 9 doc(s) · 2 open row(s)
-* [Entity store](module/entity-store/index.md) - `module.entity-store` · 8 doc(s) · 1 open row(s)
+* [Entity store](module/entity-store/index.md) - `module.entity-store` · 8 doc(s) · 0 open row(s)
 * [ETL model and step registry](module/etl/index.md) - `module.etl` · 18 doc(s) · 9 open row(s)
 * [Event model and log](module/event/index.md) - `module.event` · 9 doc(s) · 1 open row(s)
 * [Exchange (publication and ingestion contracts)](module/exchange/index.md) - `module.exchange` · 10 doc(s) · 2 open row(s)
@@ -102,8 +102,8 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (82 open rows
 * [Graph algorithms](module/graph/index.md) - `module.graph` · 7 doc(s) · 2 open row(s)
 * [Route module contract](module/http-spi/index.md) - `module.http-spi` · 3 doc(s) · 0 open row(s)
 * [AI assist and intelligence](module/intelligence/index.md) - `module.intelligence` · 12 doc(s) · 1 open row(s)
-* [Link analysis and geo routes](module/la-api/index.md) - `module.la-api` · 8 doc(s) · 1 open row(s)
-* [Link analysis core and ports](module/la-core/index.md) - `module.la-core` · 20 doc(s) · 15 open row(s)
+* [Link analysis and geo routes](module/la-api/index.md) - `module.la-api` · 8 doc(s) · 2 open row(s)
+* [Link analysis core and ports](module/la-core/index.md) - `module.la-core` · 21 doc(s) · 15 open row(s)
 * [Link analysis storage](module/la-storage/index.md) - `module.la-storage` · 7 doc(s) · 2 open row(s)
 * [Link analysis PostgreSQL store](module/la-store-pg/index.md) - `module.la-store-pg` · 6 doc(s) · 1 open row(s)
 * [Notification channels](module/notify-channels/index.md) - `module.notify-channels` · 8 doc(s) · 0 open row(s)

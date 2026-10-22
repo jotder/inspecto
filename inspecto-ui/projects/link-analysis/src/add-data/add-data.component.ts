@@ -30,6 +30,7 @@ import { statusEdgeClasses, statusRowClasses } from '@inspecto/core/components/s
 import { DataTableComponent } from '@inspecto/core/data-table/data-table.component';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
+import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { AddDataAccess } from './add-data-access';
 import {
     ACCEPTED_EXTENSIONS,
@@ -122,6 +123,7 @@ export class AddDataComponent implements OnInit {
     private readonly limitsService = inject(LaLimitsService);
     private readonly router = inject(Router);
     private readonly destroyRef = inject(DestroyRef);
+    private readonly events = inject(OnboardingEventsService);
     private readonly fb = inject(FormBuilder);
 
     /** `ask` (Inspecto LA): step 3 is part of the screen. `optional` (the console): it starts closed, one click opens it. */
@@ -343,6 +345,13 @@ export class AddDataComponent implements OnInit {
         this.kind.setValue(this.initialKind());
         this.whatOpen.set(this.whatColumnsHold() === 'ask');
         this.access.load();
+        // OB-13: leaving with a file chosen but no Dataset made counts the stage where the person stopped.
+        this.destroyRef.onDestroy(() => {
+            if (this.summary()) return;
+            if (this.running() || this.following()) this.events.stepAbandoned('add_data:create');
+            else if (this.draft()) this.events.stepAbandoned('add_data:columns');
+            else if (this.file()) this.events.stepAbandoned('add_data:file');
+        });
         this.entityProfiles
             .entityTypes()
             .pipe(takeUntilDestroyed(this.destroyRef))

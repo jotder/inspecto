@@ -298,7 +298,7 @@
                         </button>
                     }
                 } @else {
-                    <button mat-menu-item disabled>Nothing saved yet.</button>
+                    <button mat-menu-item disabled>Nothing saved yet: draw a graph, then Save as a case.</button>
                 }
                 @if (openWorkLabel(); as open) {
                     <button
@@ -368,14 +368,15 @@
                 [outputs]="transferMenuOutputs"
             />
 
-            <!-- save view — needs a rendered graph -->
+            <!-- save as a case (A-1b: a named view plus the Entity Lists it uses) — needs a rendered graph -->
             <button
                 mat-icon-button
                 #saveTrigger="matMenuTrigger"
                 [matMenuTriggerFor]="saveMenu" laFormMenu
                 [disabled]="!graph()"
-                matTooltip="Save view"
-                aria-label="Save the current view"
+                matTooltip="Save as a case"
+                aria-label="Save as a case"
+                data-testid="la-save-case"
             >
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
             </button>
@@ -386,8 +387,11 @@
                     (ngSubmit)="saveView()"
                     class="flex w-72 max-w-full flex-col p-3"
                     (click)="$event.stopPropagation()"
-                    aria-label="Save this view"
+                    aria-label="Save as a case"
                 >
+                    <p class="m-0 mb-2 text-sm font-semibold">
+                        Save as a <inspecto-term term="case"></inspecto-term>
+                    </p>
                     <mat-form-field>
                         <mat-label>Name</mat-label>
                         <input matInput formControlName="name" />
@@ -395,17 +399,28 @@
                             <mat-error>A name is required.</mat-error>
                         }
                         @if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>A view with this name already exists.</mat-error>
+                            <mat-error>A case with this name already exists.</mat-error>
                         }
                     </mat-form-field>
                     <mat-form-field>
                         <mat-label>Description (optional)</mat-label>
                         <input matInput formControlName="description" />
                     </mat-form-field>
+                    <p class="text-secondary m-0 mb-1 text-xs" data-testid="la-case-lists">{{ caseListsLine() }}</p>
+                    <p class="text-secondary m-0 mb-2 text-xs leading-snug" data-testid="la-case-not-evidence">
+                        <span class="text-warn font-semibold">Not evidence</span> — {{ savedViewNotice }}
+                    </p>
                     <button mat-stroked-button type="submit" [disabled]="saving() || !graph()">
                         <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-                        Save view
+                        Save as a case
                     </button>
+                    @if (!investigationsEnabled()) {
+                        <inspecto-locked-action
+                            class="mt-2"
+                            label="Start an Investigation from this"
+                            [reason]="investigationsLockedReason()"
+                        />
+                    }
                 </form>
             </mat-menu>
 
@@ -1231,6 +1246,20 @@
                         </button>
                     </div>
                     <div #toolboxScroll data-testid="toolbox-scroll" class="min-h-0 flex-auto overflow-y-auto p-3">
+                        <!-- LA-ONBOARD-1 phase 7 (UC-12): three plain questions first; the full toolbox below. -->
+                        <inspecto-link-analysis-discover
+                            class="mb-3"
+                            [class.hidden]="toolboxTab() !== 'analysis'"
+                            [graph]="canvasData()"
+                            [terms]="growTerms()"
+                            [timeAttr]="timeColumn()"
+                            [nodeOptions]="nodeOptions()"
+                            [startWhyNot]="discoverStartWhyNot()"
+                            [listWhyNot]="discoverListWhyNot()"
+                            (show)="showFound($event)"
+                            (startFrom)="startFromFound($event)"
+                            (addToList)="addFoundToList($event)"
+                        ></inspecto-link-analysis-discover>
                         <!-- Analysis (the graph-algorithms toolbox). Kept mounted via `[hidden]` so its results
                              survive tab switches; emits emphasis for the canvas. -->
                         <inspecto-link-analysis-toolbox
@@ -1606,7 +1635,7 @@
             />
             @if (!graph()) {
                 <span class="text-secondary hidden min-w-0 truncate text-xs md:inline">
-                    Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it.
+                    Draw a Dataset, or another graph source, as entities and links, then analyse it.
                 </span>
             }
             @if (selectedOnCanvas().length) {

@@ -449,6 +449,45 @@ same picker drew the whole Dataset with the seed merely queued. Both now draw / 
 Link Analysis*, phase 4) preselects the Dataset in the Start box when it can start a graph, else picks it in the Query panel
 as *Explore a Dataset* does.
 
+**My work and discovery (LA-ONBOARD-1 phase 7, as built 2026-10-22; UC-10, UC-12, UC-13, UC-14, A-1b).** SPA only, plus one
+optional pack field; no route was added.
+* **A case = a saved view + the Entity Lists it uses.** `LinkAnalysisView` (the `link-analysis-view` content) gained two
+  optional keys, read defensively (`listsOf` / `startOf` drop a wrong shape): `lists {start?, exclusions?[]}` (Entity List
+  ids) and `start {datasetId, values?[], listId?}`. The page keeps `caseStart` / `caseLists` signals: a Start box start sets
+  them (`startFrom`, `startFromEntity`), an exclusion written from this graph adds to `exclusions` (Exclude → Add to a list,
+  on either level, and *Add to a list* with purpose exclusion), `clearResults` (any new graph) forgets both. *Save as a case*
+  (the former *Save view* menu, same `saveView()`) writes them with the view: `start.values` = the drawn values plus every
+  grown node's first raw id (at most 25); for a list start only what was grown beyond the members, because opening re-reads
+  the list. **Opening a case with `start`** (`loadView` → `drawCaseStart`) draws `drawStart` over the start Dataset (live
+  list members + values), then hides the drawn nodes whose raw id is a member of an `exclusions` list now (case-insensitive,
+  `hideLocally`, undoable); when the Dataset no longer starts a graph or nothing is found it reruns `query`, as every older
+  view does. Specs `link-analysis.component.spec.ts` "a case, and Find something interesting" (falsified: without
+  `drawCaseStart` the whole-Dataset projection runs; without `caseOfState` nothing is saved) and `link-analysis.service.spec.ts`.
+* **My work** (`la-app` `my-work.ts` + `my-work.component.ts`, on the home page after the Space guide): cases from
+  `GET /components/link-analysis-view` (the list carries `modified`, now on `ComponentDef`), most recent first, list titles
+  from `GET /entity-lists`, each a link to `/link-analysis?view=<id>` (phase 3's param). **What changed in your data** reads
+  no new route: the registry's `dataset` entries with `origin: import` + `importPipeline`, then `GET /runs/{pipeline}/batches`
+  (the ingest audit ledger, ungated, Basic) - the last `SUCCESS` batch's `end_time`, `total_output_rows`, `rejected_rows`. The
+  run summary itself is persisted nowhere, and the ledger does not say whether a re-import replaced or appended, so the first
+  import reads `+N rows` and a re-import `N rows loaded`, never a net change.
+* **Find something interesting** (`discover.ts` pure, `link-analysis-discover.component.ts`, top of the Analysis tab):
+  *Who is busiest* = `degreeCentrality` top 5 (super nodes skipped; the hint "X has N links. Add it to an exclusion list?" on
+  the top row when it has at least 5 links and twice the next one's); *Which groups stick together* = `louvainCommunities`, groups
+  of 3+, largest 5, links among them and the days their links span when a time column is chosen; *How does A reach B* =
+  `shortestPath` direction `out`, else `both` (said so). Every reading is one sentence in `packTerms`. Row actions: *Show on
+  graph* (emphasis + focus), *Start from these* = the new `StartRequest` kind `found` over the graph's Dataset (delivers phase
+  6's "the busiest / a community" start), *Add to a list* = `LinkAnalysisAddToListDialog` (pick a list of the same Entity
+  Type or create one with a purpose in plain words; it writes `POST /entity-lists` + `/members` and closes with the list).
+* **First lists from the pack**: `IndustryPack.Profile.suggestedLists` from the manifest's optional
+  `profile.suggested_lists[n]{title,purpose,entity_type,why}` (at most 10; purpose one of allow / block / watch / exclusion;
+  a core Entity Type; a bad entry refuses the pack whole), served as `profile.suggestedLists`; the neutral profile suggests
+  *Busy entities to leave out* and *Entities to watch* with no Entity Type. The Entity Lists page offers them while the Space
+  has no list and the person may write lists; *Create* opens `CreateEntityListDialog` with `initial`. Telecom ships *Call
+  centres* / *Lines to watch*, mobile money *Merchants* / *Wallets to watch* (`IndustryPacksTest`).
+* **Levels.** Everything works on Explorer. *Start an Investigation from this* is shown locked in the *Save as a case* menu
+  on Explorer (`inspecto-locked-action`, `featureReasons.investigations`); with Investigations the Investigation tab is
+  unchanged.
+
 ### 3.5 Entity store (identity data)
 
 * **Identity Fact log** (`EntityFactLog`): `<Space config root>/audit/entity-facts/`, one file per fact
@@ -477,7 +516,7 @@ as *Explore a Dataset* does.
   packs, Basic included, ED-5). Each jar may carry an index `META-INF/inspecto/industry-packs.toon`
   (`packs[n]: a,b`); each pack is four files under `META-INF/inspecto/industry-packs/<id>/`: `industry-pack.toon`
   (id, name, description, `space_templates`, `pattern_packs`, `profile` = measure / time column hints, suggested tool
-  groups and the optional "Investigate a number" binding), `industry-pack-terms.toon`
+  groups, the optional "Investigate a number" binding and the optional `suggested_lists`, LA-ONBOARD-1 phase 7), `industry-pack-terms.toon`
   (`terms[n]{key,label,abbreviation,definition}`), `industry-pack-entity-types.toon` (core Entity Types restated:
   normaliser from the closed set, masked, classifications; an id the core lacks is refused) and
   `industry-pack-link-kinds.toon`. Normalisers stay the closed set: a pack picks one per type, it never ships code.
@@ -1087,6 +1126,79 @@ limits and the commit's write order are in
   to the Dataset). The profile cache keys on the binding signature, so the next read re-assesses.
 - **Not built here:** the screens (phase 4), the Start box reading `primaryEntityType` (phase 6), Reference details
   on nodes (phase 5), and the C1 format detections (another session).
+
+### 6.11 Help on every screen and the onboarding counters (LA-ONBOARD-1 phase 8, as built 2026-10-22; UC-15, A-9, A-10, OB-13)
+
+`LA-ONBOARD-1` closed with this phase; the plan is archived
+(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in §3.4 (*Start from...*,
+*My work*), §6.10 and §8 (*Trust vs level*); the acceptance drive is
+[`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md).
+
+* **Onboarding counters (OB-13).** `com.gamma.util.OnboardingCounters` (inspecto-util, below both the host and la-api,
+  like `IngestActivity`): a process-wide static holder of ONE append-only file per installation,
+  `onboarding-counters.tsv`, one line per event, `<ISO instant>\t<event>[\t<step>]`. The closed vocabulary is the enum
+  `Event` (`launch`, `space_created`, `first_dataset`, `first_graph`, `guide_completed`, `step_abandoned`) and the set
+  `STEPS` (`space`, `data`, `columns`, `graph`, `list`, `add_data:file`, `add_data:columns`, `add_data:create`); a step
+  word outside it is dropped, so nothing a person typed can reach the file. `first_*` and `guide_completed` are written
+  once per installation (`install` reads the file, so a restart does not repeat them). `record` never throws: a full
+  disk loses the count, never the action. With no file installed every call is a no-op.
+  * **Where the file lives** (decided here): the server-wide document home, the same resolution as `scheduler.toon` and
+    `la-limits.toon` (`SchedulerRoutes.systemDocPath`: `-Dsystem.config.dir`, else the spaces container root, else the
+    sole Space's write root), not `-Ddata.dir`, which is per Space. Reserved in `ReservedConfigPaths` (an import must
+    not forge it). No home = `recording: false`.
+  * **Who records what.** `OnboardingRoutes.register` installs the file at boot and records `launch` (so "first launch"
+    = the first server start of this installation, the drive's clock start). `SpaceRoutes.createSpace` records
+    `space_created` (template, sample or bare); `OnboardImport.Job.finishCommit` records `first_dataset` after the undo
+    stack is cleared (inline and 202 commits alike); `InvRoutes.project` (projection AND the Start box's neighbours read)
+    records `first_graph` when the answer holds a link. The browser reports only what it alone sees through
+    `POST /onboarding/events {event, step?}`: `guide_completed` (the home page, once per app load) and `step_abandoned`
+    (Create Space dialog closed without a Space; Add data left with a file chosen - `add_data:file`, a draft -
+    `add_data:columns`, or a run in flight - `add_data:create`). Any other event, including `first_graph`, is 422: a
+    browser cannot claim a milestone.
+  * **Routes** (`OnboardingRoutes`, core, every edition): `GET /onboarding/metrics` (`canAdminister` in the manifest;
+    with no sign-in anyone) answers `{recording, firstLaunch, launches, spacesCreated, firstSpace/Dataset/Graph,
+    guideCompleted, each with *Seconds from the first launch, abandoned {step: n}}`; `POST /onboarding/events` is a
+    `self-limiting` exemption (open to any signed-in caller: a beginner is who reports it) on the standard rate bucket
+    (`ControlApi.isRateLimited`). Pinned by `ControlApiOnboardingCountersTest` (file, vocabulary, 401/403/200, 429),
+    `OnboardingCountersTest`, and the milestone assertions in `ControlApiSpaceSamplesTest` and
+    `ControlApiOnboardLinkAnalysisTest` (falsified: without the `InvRoutes` record the first graph stays null).
+  * **SPA**: `OnboardingEventsService` (`src/app/inspecto/onboarding/`, fire-and-forget, a failure is silent) and the
+    la-app **Settings → Getting started counters** section (server audience, read-only, listed when there is no sign-in
+    or the person holds `canAdminister`).
+* **Help rules (UC-15), all deterministic (A-9).**
+  * **What can I do next?** - a button in the la-app rail (`la-shell.component.ts`), so on every screen.
+    `next-steps.ts` (pure) turns the Space guide's `SpaceGuideState` plus *may create a Space* (`FirstRun.canCreate`) and
+    *why Add data is locked* (`AddDataAccess.lockReason`) into at most three steps, the recommended one first, each with
+    one line of why; `NextStepsDialog` draws them (a step the person may not take is an `inspecto-locked-action`) above
+    the Space guide.
+  * **Terms on first use** - `<inspecto-term term="...">` (`src/app/inspecto/onboarding/term-help.component.ts`, shared,
+    usable by the console): the word, a **?** button (tooltip and accessible name carry the explanation, `aria-expanded`
+    discloses it inline). `TERM_HELP` holds the sentences; a spec keeps them short and free of Pipeline words. Placed at
+    the first mention on Entities, Columns, Entity Lists, Start from..., My work and Save as a case. ⚠ The input is `term`,
+    not `id`: a static `id="..."` would also set the host's DOM id and duplicate it.
+  * **Empty states** now name a reason and one action: Entities → *Open Columns* (switches the tab), Columns → *Add
+    data*, Entity Lists → *New list* (for someone who may write lists; otherwise the existing line says why not), the
+    Start box's no-Dataset line points at the *Add data* / *Explore a Dataset* cards under it, the saved-views menu
+    says how to fill it, and My work says when the cases could not be read (*Try again*) instead of "No case yet".
+* **Found by the acceptance drive and fixed here** ([`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md)):
+  * **Add to a list was a dead end on the explorer.** `growEntityType` (used by *Add to a list* from Find something
+    interesting and by Exclude → Add to a list) knew only the Investigation binding, the Domain Profile's `investigate`
+    type and typed canvas nodes; a graph drawn by a Start box start has none, so the dialog offered no list and no *Create
+    a new list…*. It now falls back to the start Dataset's `primaryEntityType` (`discoverDataset()`), and the dialog says
+    why and where to make a list when nothing can take the entities.
+  * **No screen turned Add data on.** With sign-in `data.self_import` is off until an administrator turns it on, and the
+    locked screen says "ask an administrator" - who had only `PUT /settings/data`. la-app **Settings → This Space → Add
+    data** (`AddDataSettingsComponent`, `OnboardService.setDataSettings`) is that switch (editable with no sign-in or with
+    `canAdminister`, read-only otherwise), and the Add data page shows "You may turn it on: Settings, Add data" to the
+    person who may.
+  * The Link Analysis footer no longer says "pipeline planes" with no graph drawn (no Pipeline word on a Basic screen).
+* **Two phase 7 leftovers fixed.** (1) **A case's name came back as its id in My work**: `ComponentStore.write` stamps
+  the content's `name` with the id (in-file identity = URL id), so the display name a save wrote under `name` was
+  overwritten on every save. The view codec (`link-analysis.service.ts`) now also writes `title` and reads
+  `title ?? name ?? id`; older views read as before. ⚠ The Geo map's saved views use the same `SavedViewStore` pattern
+  and keep the defect (`LA-ONBOARD-DEFECTS-1`). (2) **One purpose vocabulary**: `ENTITY_LIST_PURPOSES` now carries the
+  plain words (*Watch these* · *Never follow these (exclusion)* · *Known good* · *Block*) and `purposeWords()` reads
+  them; the Entity Lists page, New list and Add to a list all say it that way (`PURPOSE_WORDS` is gone).
 
 ## 7. Host registration, Jobs and live detection
 

@@ -3,23 +3,33 @@ import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { SpaceGuideComponent } from '@inspecto/core/onboarding/space-guide.component';
-import { setupIncomplete, SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
+import { guideDone, setupIncomplete, SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
+import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
 import { LA_PRODUCT_NAME } from './la-brand';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { FirstRun } from './first-run';
 import { GettingStartedComponent } from './getting-started.component';
+import { MyWorkComponent } from './my-work.component';
 import { visibleLaNav } from './la-nav';
 
 /**
  * The front door: **Getting started** while setup is incomplete (no Space, or no Dataset yet; LA-ONBOARD-1 UC-01),
- * otherwise one card per area of the application, with the Space guide above them until it is done.
+ * otherwise the Space guide until it is done, then **My work** (cases and what changed in the data, LA-ONBOARD-1 phase 7),
+ * then one card per area of the application.
  */
 @Component({
     selector: 'la-app-landing',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatIconModule, RouterLink, InspectoSkeletonComponent, GettingStartedComponent, SpaceGuideComponent],
+    imports: [
+        MatIconModule,
+        RouterLink,
+        InspectoSkeletonComponent,
+        GettingStartedComponent,
+        SpaceGuideComponent,
+        MyWorkComponent,
+    ],
     template: `
         @if (state(); as s) {
             @if (firstRunPage()) {
@@ -34,6 +44,7 @@ import { visibleLaNav } from './la-nav';
                         </p>
                     </header>
                     <inspecto-space-guide [state]="s" (stepOpen)="firstRun.openStep($event)"></inspecto-space-guide>
+                    <la-app-my-work></la-app-my-work>
                     <ul class="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
                         @for (item of nav(); track item.path) {
                             <li>
@@ -62,6 +73,7 @@ export class LandingComponent implements OnInit {
     protected readonly product = LA_PRODUCT_NAME;
     private readonly session = inject(SessionService);
     private readonly guide = inject(SpaceGuideService);
+    private readonly events = inject(OnboardingEventsService);
     protected readonly firstRun = inject(FirstRun);
     protected readonly nav = computed(() => visibleLaNav(this.session.features()));
     /** The current Space's setup, from the server; null while it loads. */
@@ -72,6 +84,9 @@ export class LandingComponent implements OnInit {
     });
 
     ngOnInit(): void {
-        this.guide.load().subscribe((s) => this.state.set(s));
+        this.guide.load().subscribe((s) => {
+            this.state.set(s);
+            if (guideDone(s)) this.events.guideCompleted(); // OB-13
+        });
     }
 }

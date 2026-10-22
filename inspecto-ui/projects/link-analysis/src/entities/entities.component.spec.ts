@@ -273,4 +273,18 @@ describe('EntitiesComponent', () => {
         expect(el.querySelectorAll('h1')).toHaveLength(1);
         await expectNoA11yViolations(el);
     }, 30_000);
+
+    it('no Entity Type in the data: the empty state says why and opens Columns, its one next action (LA-ONBOARD-1 phase 8)', async () => {
+        const { fixture, el } = make(of({ items: [CELL] }));
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        const empty = el.querySelector('[data-testid=types-empty]') as HTMLElement;
+        expect(empty.textContent).toContain('No column of your Datasets is tied to an Entity Type yet');
+        (empty.querySelector('button') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { tab: 'columns' } }));
+        expect(el.querySelector('[data-testid=types-about] [data-testid=term-help]')?.getAttribute('aria-label')).toBe(
+            'What is an Entity Type?',
+        );
+        await expectNoA11yViolations(el);
+    });
 });

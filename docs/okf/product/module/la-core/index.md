@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | current | [Inspecto LA (Link Analysis) — End User Guide](user-guide-end-user.md) · [Investigation Pivot](user-guide-investigation-pivot.md) · [Link Analysis](user-guide-link-analysis.md) · [Inspecto LA (Link Analysis) — User Manual](user-guide-manual.md) |
 | admin-guide | current | [Inspecto LA (Link Analysis) demo runbook (rehearsable, stakeholder presentation)](admin-guide-demo.md) · [Inspecto LA - the Link Analysis level, the Investigations add-on and the masking default](admin-guide-la-level.md) · [Inspecto LA (Link Analysis) real OIDC sign-in runbook (`la-app`, local WSO2 Identity Server)](admin-guide-real-signin.md) |
 | api | current | [Link Analysis — API](api-link-analysis.md) |
-| tests | current | [Link Analysis analyst coverage test (UI-only, impersonated analyst)](tests-analyst-coverage.md) · [Link Analysis data trust: live drive (S10 of `LA-DATA-TRUST-1`)](tests-data-trust-live-drive.md) · [Link analysis core and ports — tests inventory](tests-inventory.md) · [Link Analysis stakeholder Q&A (presenter prep and leave-behind)](tests-stakeholder-qa.md) · [D6 think-aloud session script — a real Case-desk lead](tests-think-aloud-script.md) |
+| tests | current | [Link Analysis analyst coverage test (UI-only, impersonated analyst)](tests-analyst-coverage.md) · [Link Analysis data trust: live drive (S10 of `LA-DATA-TRUST-1`)](tests-data-trust-live-drive.md) · [Link analysis core and ports — tests inventory](tests-inventory.md) · [Inspecto LA onboarding - acceptance live drive (`LA-ONBOARD-1` §1)](tests-onboarding-live-drive.md) · [Link Analysis stakeholder Q&A (presenter prep and leave-behind)](tests-stakeholder-qa.md) · [D6 think-aloud session script — a real Case-desk lead](tests-think-aloud-script.md) |
 | brochure | current | [Inspecto LA whitepaper](brochure-inspecto-la-whitepaper.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
@@ -35,7 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) *Find paths (server)* stays unlocked on Basic (open explorer route, a Basic feature in… | — |
-| `LA-ONBOARD-1` | P2 | feature | Inspecto LA onboarding, blank install to a first finding with the screens alone: LA level (Explorer / Investigations) as an install setti… | operator |
+| `LA-ONBOARD-DEFECTS-1` | P3 | defect | Inspecto LA explorer defects found by LA-ONBOARD-1 phases 6-8 (2026-10-22): (1) after Add a file in append mode the link index summary co… | — |
 | `LA-GROW-EXCLUDE-RESIDUALS-1` | P3 | feature | what LA-GROW-EXCLUDE-1 left after it shipped (2026-10-22; as-built in okf/product/module/la-core/architecture.md §6.8–§6.9). | — |
 | `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1` | P3 | defect | the Dossier still shows a restricted exclusion list's removed ids and true counts to an analyst who may not see its members. | — |
 | `LA-GROW-EXCLUDE-UNDO-RACE-1` | P3 | defect | in a shared Investigation, a Grow / Exclude Undo can take back a team member's step. | — |

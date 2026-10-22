@@ -603,6 +603,7 @@ final class OnboardImport {
             followOn(summary);
             OnboardRoutes.deleteTree(draftDir);
             undo.clear();
+            com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_DATASET);   // OB-13
             return summary;
         }
 

@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
@@ -205,6 +206,10 @@ describe('EntityColumnsComponent', () => {
         host.datasets.set([]);
         fixture.detectChanges();
         expect(el.querySelector('inspecto-empty-state')!.textContent).toContain('No Dataset yet');
+        // its one next action: the Add data screen (LA-ONBOARD-1 phase 8)
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        (el.querySelector('[data-testid=columns-no-dataset] button') as HTMLButtonElement).click();
+        expect(navigate).toHaveBeenCalledWith('/add-data');
         host.datasets.set(null);
         fixture.detectChanges();
         expect(el.querySelector('inspecto-skeleton')).toBeTruthy();

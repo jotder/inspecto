@@ -1754,7 +1754,7 @@ describe('LinkAnalysisComponent', () => {
         const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
         expect(panel.getAttribute('role')).toBe('menu');
         const item = panel.querySelector('[role="menuitem"]') as HTMLElement;
-        expect(item.textContent).toContain('Nothing saved yet.');
+        expect(item.textContent).toContain('Nothing saved yet: draw a graph, then Save as a case.');
         expect(item.hasAttribute('disabled')).toBe(true);
     });
     describe('toolbox tablist (LA-A11Y-AUDIT-1: the Analysis / View / Investigation switch)', () => {
@@ -1906,7 +1906,7 @@ describe('LinkAnalysisComponent', () => {
                 'Open the graph-algorithms toolbox',
                 'Open the Investigation',
                 'Open saved views',
-                'Save the current view',
+                'Save as a case',
                 'Undo the last display/filter change',
                 'Redo the last undone display/filter change',
                 'Fit the graph to the screen',
@@ -2606,7 +2606,8 @@ describe('LinkAnalysisComponent - header is the toolbar, the footer carries the 
         expect(header.querySelector('nav[data-testid="la-tool-rail"]')).toBeTruthy(); // only the toolbar
         expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
         expect(status.querySelector('inspecto-ai-explain')).toBeTruthy();
-        expect(status.textContent).toContain('Project a Dataset'); // the page info shows until a graph is drawn
+        expect(status.textContent).toContain('Draw a Dataset'); // the page info shows until a graph is drawn
+        expect(status.textContent).not.toMatch(/pipeline/i); // no Pipeline word on an Inspecto LA screen (LA-ONBOARD-1 acceptance)
         expect(el.querySelectorAll('h1')).toHaveLength(1);
         expect(header.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
@@ -2619,7 +2620,7 @@ describe('LinkAnalysisComponent - header is the toolbar, the footer carries the 
         const status = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-status"]') as HTMLElement;
         expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
         expect(status.textContent).toContain('5 nodes');
-        expect(status.textContent).not.toContain('Project a Dataset');
+        expect(status.textContent).not.toContain('Draw a Dataset');
     });
 
     it('states the counts once in the footer, with Caps at its left edge and Installed modules at its right (operator 2026-10-16)', async () => {
@@ -3590,5 +3591,177 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(c.investigation.queuedSeeds().map((s) => s.id)).toEqual(['A-1', 'A-2']);
         expect(c.toolboxTab()).toBe('investigation');
         expect(c.graph()).not.toBeNull();
+    });
+});
+
+describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONBOARD-1 phase 7)', () => {
+    const BASIC: LaFeatures = { ...STANDARD_EDITION_FEATURES, investigations: signal(false) };
+    const TRANSFERS: Dataset = {
+        ...DS,
+        id: 'transfers',
+        name: 'Transfers',
+        sourceName: 'transfers',
+        primaryEntityType: 'account',
+        defaultLinkMapping: { from: 'from_account', to: 'to_account' },
+    };
+    const ring = (v: string): G6GraphData => ({
+        nodes: [v, `${v}-R1`, `${v}-R2`].map((id) => ({ id, data: { label: id, kind: 'entity' } })),
+        edges: [`${v}-R1`, `${v}-R2`].map((r) => ({ id: `${v}->${r}`, source: v, target: r, data: { kind: 'transfer' } })),
+    });
+    const noPreview = () => throwError(() => new HttpErrorResponse({ status: 404 }));
+    async function ready(made: ReturnType<typeof create>) {
+        made.fixture.detectChanges(); // ngOnInit, and the query panel a saved view's query is built from
+        for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r));
+        made.fixture.detectChanges();
+        return made.fixture.componentInstance;
+    }
+    afterEach(() => document.querySelectorAll('.cdk-overlay-container').forEach((o) => (o.innerHTML = '')));
+
+    it('Save as a case keeps the list it started from, the exclusion list written from it, and its start (A-1b)', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', members: ['S-1'] }));
+        const made = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: noPreview, getEntityList } as unknown as Partial<InvService>,
+        });
+        const c = await ready(made);
+        await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'suspects' });
+        // *Add to a list* from a result, as an exclusion list: the case now uses it
+        const open = vi.spyOn((c as unknown as { dialog: MatDialog }).dialog, 'open').mockReturnValue({
+            afterClosed: () => of({ listId: 'noisy', title: 'Noisy', purpose: 'exclusion', message: 'Added.' }),
+        } as never);
+        c.addFoundToList({
+            row: { key: 'S-1-R1', title: 'S-1-R1', reading: '', nodeIds: ['S-1-R1'], edgeIds: [], values: ['S-1-R1'], what: 'S-1-R1' },
+            what: 'S-1-R1',
+            purpose: 'exclusion',
+        });
+        // phase 8 live drive: untyped explorer nodes take the start Dataset's primary Entity Type, so the dialog can
+        // offer "Create a new list…" instead of an empty choice
+        expect((open.mock.calls[0][1] as { data: { entityType: string | null } }).data.entityType).toBe('account');
+        expect(c.caseLists()).toEqual({ start: 'suspects', exclusions: ['noisy'] });
+        expect(c.hiddenNodeIds()).toEqual(['S-1-R1']); // out of sight now, as Exclude → Add to a list does
+        c.saveForm.setValue({ name: 'Ring one', description: '' });
+        await c.saveView();
+        expect(made.save).toHaveBeenCalledTimes(1);
+        const saved = made.save.mock.calls[0][0] as LinkAnalysisView;
+        expect(saved.lists).toEqual({ start: 'suspects', exclusions: ['noisy'] });
+        // a list start re-reads the list when the case opens: nothing beyond its members was grown, so no values
+        expect(saved.start).toEqual({ datasetId: 'transfers', listId: 'suspects' });
+    });
+
+    it('a pasted start is saved with its values; a fresh graph from the whole Dataset forgets the start', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const made = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: noPreview } as Partial<InvService>,
+        });
+        const c = await ready(made);
+        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'A-2'] });
+        expect(c.caseStart()).toEqual({ datasetId: 'transfers', values: ['A-1', 'A-2'] });
+        await c.startFrom({ kind: 'dataset', datasetId: 'transfers' });
+        expect(c.caseStart()).toBeNull();
+        expect(c.caseLists()).toEqual({ exclusions: [] });
+    });
+
+    it('opening a case draws its start again (never the whole Dataset) and hides what its exclusion list holds now', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const getEntityList = vi.fn((id: string) => of({ id, title: 'Noisy', members: ['a-1-r2'] }));
+        const made = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: noPreview, getEntityList } as unknown as Partial<InvService>,
+        });
+        const c = await ready(made);
+        await c.loadView({
+            id: 'ring-one',
+            name: 'Ring one',
+            sourceId: 'entity-projection',
+            query: { projection: { datasetId: 'transfers', sourceCol: 'from_account', targetCol: 'to_account' } },
+            start: { datasetId: 'transfers', values: ['A-1'] },
+            lists: { exclusions: ['noisy'] },
+        });
+        expect(made.queried).toEqual([]); // the whole-Dataset projection never ran
+        expect(expand).toHaveBeenCalledWith('A-1', 'A-1', expect.anything());
+        expect(c.hiddenNodeIds()).toEqual(['A-1-R2']);
+        expect(c.caseLists()).toEqual({ start: undefined, exclusions: ['noisy'] });
+        expect(c.caseStart()).toEqual({ datasetId: 'transfers', values: ['A-1'] });
+    });
+
+    it('a case whose Dataset no longer starts a graph reruns its saved query instead', async () => {
+        const made = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            inv: { previewNeighbors: noPreview } as Partial<InvService>,
+        });
+        const c = await ready(made);
+        const query = { projection: { datasetId: 'gone', sourceCol: 'a', targetCol: 'b' } };
+        await c.loadView({
+            id: 'old',
+            name: 'Old',
+            sourceId: 'entity-projection',
+            query,
+            start: { datasetId: 'gone', values: ['X'] },
+        });
+        expect(made.queried).toEqual([query]);
+    });
+
+    it('Start from these draws a result over the graph Dataset (the "busiest / a community" start kind)', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const made = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: noPreview } as Partial<InvService>,
+        });
+        const c = await ready(made);
+        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1'] });
+        expect(c.discoverStartWhyNot()).toBe('');
+        expand.mockClear();
+        await c.startFromFound({
+            row: { key: 'A-1-R1', title: 'A-1-R1', reading: '', nodeIds: ['A-1-R1'], edgeIds: [], values: ['A-1-R1'], what: '' },
+            what: 'A-1-R1, the busiest account',
+        });
+        expect(expand).toHaveBeenCalledWith('A-1-R1', 'A-1-R1', expect.anything());
+        expect(c.startNotice()?.text).toMatch(/^Started from A-1-R1, the busiest account\. Drew 1 start/);
+    });
+
+    it('Analysis leads with Find something interesting; Save as a case states not-evidence, the lists, the locked Investigation', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const made = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: noPreview } as Partial<InvService>,
+        });
+        const c = await ready(made);
+        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1'] });
+        c.toolboxDockOpen.set(true);
+        made.fixture.detectChanges();
+        const el = made.fixture.nativeElement as HTMLElement;
+        const discover = el.querySelector('[data-testid="la-discover"]') as HTMLElement;
+        expect(discover.textContent).toContain('Who is busiest');
+        (el.querySelector('[data-testid="la-discover-busiest"]') as HTMLButtonElement).click();
+        made.fixture.detectChanges();
+        expect(discover.querySelector('[data-testid="la-discover-reading"]')?.textContent).toContain(
+            'A-1 takes part in 2 links, the most on this graph.',
+        );
+        const trigger = made.fixture.debugElement
+            .queryAll(By.directive(MatMenuTrigger))
+            .find((d) => (d.nativeElement as HTMLElement).dataset['testid'] === 'la-save-case')!
+            .injector.get(MatMenuTrigger);
+        trigger.openMenu();
+        made.fixture.detectChanges();
+        const menu = document.querySelector('.cdk-overlay-container form[aria-label="Save as a case"]') as HTMLElement;
+        expect(menu.querySelector('[data-testid="la-case-not-evidence"]')?.textContent).toContain('Not evidence');
+        expect(menu.querySelector('[data-testid="la-case-lists"]')?.textContent).toContain('It uses no Entity List yet.');
+        expect(menu.querySelector('[data-testid="locked-action"]')?.textContent).toContain(
+            'Start an Investigation from this',
+        );
+        await expectNoA11yViolations(discover);
     });
 });

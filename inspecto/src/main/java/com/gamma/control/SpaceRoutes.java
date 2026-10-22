@@ -121,6 +121,7 @@ final class SpaceRoutes implements RouteModule {
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template,
                             base -> TemplateSeedGate.require(e, base));   // every seeded kind meets its own route
             Map<String, Object> out = manifest(ctx);
+            com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.SPACE_CREATED);   // OB-13
             // OB-12: load the template's samples and run each Pipeline that received files, once. The Space stays
             // created whatever a run answers; each Pipeline's outcome is reported.
             if (loadSamples)

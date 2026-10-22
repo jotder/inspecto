@@ -451,4 +451,19 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         const { el } = create({ authMode: 'none', canUpload: false });
         expect(q(el, 'add-data-locked')).toBeNull();
     });
+
+    it('leaving with a file read but no Dataset made counts the step where the person stopped (OB-13)', () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft());
+        fixture.destroy();
+        const r = http.expectOne((q) => q.url.endsWith('/onboarding/events'));
+        expect(r.request.body).toEqual({ event: 'step_abandoned', step: 'add_data:columns' });
+        r.flush({ recorded: 'step_abandoned' });
+    });
+
+    it('leaving before choosing a file reports nothing', () => {
+        const { fixture } = create();
+        fixture.destroy();
+        http.expectNone((q) => q.url.endsWith('/onboarding/events'));
+    });
 });

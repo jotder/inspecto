@@ -21,7 +21,7 @@ tier. When a phase ships, distil the as-built facts into the product hubs (`edit
 - [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md):
   the same journey in Inspecto LA, from a live blank-slate walkthrough (findings F-1…F-13), with the operator's
   answers A-1…A-16 (§8).
-- [`la-onboarding-plan.md`](la-onboarding-plan.md) (`LA-ONBOARD-1`): Inspecto LA onboarding and the **shared
+- [`la-onboarding-plan.md`](../archived-documents/plans-archive/la-onboarding-plan.md) (`LA-ONBOARD-1`): Inspecto LA onboarding and the **shared
   `/onboard/files` import route** this plan's phase 1 needs.
 - [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`): the console on that
   route (entry points, format evidence, fix catalogue, Dataset page, lookups, remote systems).

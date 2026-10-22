@@ -42,6 +42,37 @@ export interface LinkAnalysisView {
      * where their ids are remembered; the log and Working Set stay server-side (owner-only). Absent = none.
      */
     investigations?: InvestigationRef[];
+    /**
+     * LA-ONBOARD-1 A-1b: a **case** on the Explorer level is this named view plus the Entity Lists it uses - the list the
+     * graph started from and the exclusion lists written from it. Ids only; absent = it uses none.
+     */
+    lists?: CaseLists;
+    /**
+     * LA-ONBOARD-1 phase 7: the Start the graph was drawn from (phase 6), so reopening draws that start and its ring
+     * again over the data as it is now, instead of the whole Dataset `query` names. `values` are the drawn and grown
+     * entities; `listId` re-reads that list's members. Absent = the view reruns `query`.
+     */
+    start?: CaseStart;
+}
+
+/** The Entity Lists a case uses (A-1b). */
+export interface CaseLists {
+    /** The list the graph started from. */
+    start?: string;
+    /** Exclusion lists the analyst wrote to from this graph. */
+    exclusions?: string[];
+}
+
+/** The start a case re-draws when it opens. */
+export interface CaseStart {
+    datasetId: string;
+    values?: string[];
+    listId?: string;
+}
+
+/** Every Entity List id a view uses, start first, without repeats. */
+export function caseListIds(view: Pick<LinkAnalysisView, 'lists'>): string[] {
+    return [...new Set([...(view.lists?.start ? [view.lists.start] : []), ...(view.lists?.exclusions ?? [])])];
 }
 
 export interface LinkAnalysisViewOptions {
@@ -87,7 +118,10 @@ export class LinkAnalysisService {
 
 function toContent(v: LinkAnalysisView): Record<string, unknown> {
     return {
+        // The registry stamps `name` with the id on every write (ComponentStore.write: in-file identity == URL id), so
+        // the case's own name travels as `title`; `name` stays for older readers and is overwritten by the server.
         name: v.name,
+        title: v.name,
         description: v.description,
         sourceId: v.sourceId,
         query: v.query,
@@ -96,11 +130,14 @@ function toContent(v: LinkAnalysisView): Record<string, unknown> {
         profile: v.profile,
         view: v.view,
         investigations: v.investigations,
+        lists: v.lists,
+        start: v.start,
     };
 }
 
 function fromContent(id: string, content: Record<string, unknown>): LinkAnalysisView {
     const c = content as {
+        title?: string;
         name?: string;
         description?: string;
         sourceId?: GraphSourceId;
@@ -110,10 +147,12 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         profile?: DomainProfileId;
         view?: LinkAnalysisViewOptions;
         investigations?: InvestigationRef[];
+        lists?: unknown;
+        start?: unknown;
     };
     return {
         id,
-        name: c.name ?? id,
+        name: (typeof c.title === 'string' && c.title.trim()) || c.name || id,
         description: c.description,
         sourceId: c.sourceId ?? 'lineage',
         query: c.query ?? {},
@@ -122,5 +161,28 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         profile: c.profile,
         view: c.view,
         investigations: Array.isArray(c.investigations) ? c.investigations : undefined,
+        lists: listsOf(c.lists),
+        start: startOf(c.start),
     };
+}
+
+const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '') : []);
+
+/** A stored `lists` read defensively: an older view, or a hand-edited one, carries none or a wrong shape. */
+function listsOf(v: unknown): CaseLists | undefined {
+    if (!v || typeof v !== 'object') return undefined;
+    const r = v as Record<string, unknown>;
+    const start = typeof r['start'] === 'string' && r['start'] ? r['start'] : undefined;
+    const exclusions = ids(r['exclusions']);
+    return start || exclusions.length ? { ...(start ? { start } : {}), ...(exclusions.length ? { exclusions } : {}) } : undefined;
+}
+
+function startOf(v: unknown): CaseStart | undefined {
+    if (!v || typeof v !== 'object') return undefined;
+    const r = v as Record<string, unknown>;
+    if (typeof r['datasetId'] !== 'string' || !r['datasetId']) return undefined;
+    const values = ids(r['values']);
+    const listId = typeof r['listId'] === 'string' && r['listId'] ? r['listId'] : undefined;
+    if (!values.length && !listId) return undefined;
+    return { datasetId: r['datasetId'], ...(values.length ? { values } : {}), ...(listId ? { listId } : {}) };
 }

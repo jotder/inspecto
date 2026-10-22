@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-351 route(s) registered; 351 in the OpenAPI contract, 0 not.
+353 route(s) registered; 353 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -236,6 +236,8 @@ tags: [api, routes, generated]
 | POST | `/onboard/files` | Add data: upload a file and get a draft of how to import it | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | POST | `/onboard/files/{fileId}/commit` | Add data: one confirm - write the import Pipeline, run it once, register the Dataset | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | GET | `/onboard/runs/{runId}` | Follow an import run answered with 202 | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
+| POST | `/onboarding/events` | Report a step only the browser sees (LA-ONBOARD-1 OB-13) | — | — | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java` |
+| GET | `/onboarding/metrics` | What the onboarding counters say (LA-ONBOARD-1 OB-13) | — | `canAdminister` | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java` |
 | GET | `/parsers` | GET /parsers (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | POST | `/parsers/{parserId}/preview` | POST /parsers/{parserId}/preview (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | GET | `/parsers/asn1/profile` | GET /parsers/asn1/profile (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |

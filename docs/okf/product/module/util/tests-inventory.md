@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.util`](../../../../../product-map/module/util.toon).
 
-36 test class(es): 36 unit, 0 real-HTTP control-plane, 0 IT.
+37 test class(es): 37 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -47,6 +47,7 @@ mvn -o test -pl platform/inspecto-util -Dtest=ModuleBuildIdTest,ModuleManifestsT
 | `LockingRunnerTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/LockingRunnerTest.java` |  |
 | `MappingCsvTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/MappingCsvTest.java` | {@link MappingCsv} — the shared Mapping CSV shape (ELT amendment §3.2, Phase 1). |
 | `NoRawInMemoryDuckDbOpenContractTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/NoRawInMemoryDuckDbOpenContractTest.java` | {@code DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1} — no production code opens an in-memory DuckDB except through |
+| `OnboardingCountersTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/OnboardingCountersTest.java` | {@link OnboardingCounters}: the append-only per-installation file behind OB-13. |
 | `OperationsZoneTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/OperationsZoneTest.java` | The operations zone — the one the scheduler fires on and {@code $today} resolves in. |
 | `SchedulerTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/SchedulerTest.java` |  |
 | `SchemaExtractorFieldListTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/SchemaExtractorFieldListTest.java` | MAPPING-GEN-1 (decided 2026-09-10): {@code create-schema} — the only generator that writes to disk — must |
