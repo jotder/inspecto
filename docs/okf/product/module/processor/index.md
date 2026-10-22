@@ -39,5 +39,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | Queries / BI | demand |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `LA-ONBOARD-1` | P2 | feature | Inspecto LA onboarding, blank install to a first finding with the screens alone: LA level (Explorer / Investigations) as an install setti… | operator |
-| `LA-ONBOARD-FIXES-1` | P2 | defect | defects found in the 2026-10-22 blank-slate walkthrough (use cases §7): suggested schema selectors are names that registration refuses (F… | — |
+| `LA-ONBOARD-DRIFT-1` | P3 | defect | the schema drift check matches a draft's selector to the sample's column name (SchemaSuggest.drift, used by pipeline-parse-definition.com… | — |
 | `BI-QUERY-MASKING-1` | P2 | defect | /bi/query and /queries/{id}/run return a classified entity key raw to any viewer (decided 2026-10-12, operator: its own gated, reviewed r… | — |

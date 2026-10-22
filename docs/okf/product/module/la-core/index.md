@@ -35,7 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-ONBOARD-1` | P2 | feature | Inspecto LA onboarding, blank install to a first finding with the screens alone: LA level (Explorer / Investigations) as an install setti… | operator |
-| `LA-ONBOARD-FIXES-1` | P2 | defect | defects found in the 2026-10-22 blank-slate walkthrough (use cases §7): suggested schema selectors are names that registration refuses (F… | — |
 | `LA-GROW-EXCLUDE-RESIDUALS-1` | P3 | feature | what LA-GROW-EXCLUDE-1 left after it shipped (2026-10-22; as-built in okf/product/module/la-core/architecture.md §6.8–§6.9). | — |
 | `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1` | P3 | defect | the Dossier still shows a restricted exclusion list's removed ids and true counts to an analyst who may not see its members. | — |
 | `LA-GROW-EXCLUDE-UNDO-RACE-1` | P3 | defect | in a shared Investigation, a Grow / Exclude Undo can take back a team member's step. | — |
