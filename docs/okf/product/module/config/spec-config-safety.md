@@ -483,6 +483,12 @@ Space config root, everything else from its own directory) · schema-file resolu
 below) · the five arming checks · unknown collector Connection · the `webhook:` block · `AcceptedConfigKeys`
 census · route-predicate columns · summarize measure types · step configs (lookup, filter, dedup, profile — G4).
 
+🔴 **A delimited / fixed-width pipeline whose schema selects a column by NAME is REFUSED**
+(`ERR_SELECTOR_NOT_INDEX`, `SaveGate.selectorFindings`, LA-ONBOARD-FIXES-1 F-4), active or not: the load
+needs zero-based column indexes there and would refuse it, so the save reports the load's own message
+instead of accepting what registration then refuses. Judged by a pure `PipelineConfig.fromMap` over the
+draft from its own directory; every other parse refusal is left to the check that owns it.
+
 🔴 **An ACTIVE pipeline whose `schema_file` resolves nowhere is REFUSED** (`ERR_SCHEMA_FILE_UNRESOLVED`,
 `ConfigRoutes.schemaArmingFindings`, 2026-09-25); an inactive draft keeps the WARNING
 (`WARN_SCHEMA_FILE_UNRESOLVED`), so a scaffold may name its `<id>_schema.toon` before the Parse Apply

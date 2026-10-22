@@ -289,6 +289,8 @@ export class GrammarEditorDialog {
             // shape, where the root file wins the read and the drawer edits a schema the engine never loads.
             data: {
                 sampleRows: this.previewRows(),
+                // F-4: the suggested selectors must be the ones this frontend loads (indexes for delimited).
+                frontend: this.plugin() ? 'plugin' : (this.activeFrontend() ?? undefined),
                 home: 'config',
                 subdir: this.data.configSubdir,
                 // DERIVED-SCHEMA-PANEL-ORPHAN-1: only this opener knows a pipeline, so only this one

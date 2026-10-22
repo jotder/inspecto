@@ -327,7 +327,10 @@ final class ConfigPreviewRoutes implements RouteModule {
      * {@code POST /config/suggest/schema} — draft-schema inference over already-parsed
      * {@code sampleRows} (G1, {@code consignment-chain-plan.md} S4). {@code SchemaSuggest} runs
      * TRY_CAST voting per column on a scratch DuckDB and this handler shapes the winners into a
-     * DRAFT: a {@code raw.fields} list ({@code selector} = the sample's own column key) plus
+     * DRAFT: a {@code raw.fields} list ({@code selector} = the column's zero-based index in the sample for a
+     * delimited / fixed-width frontend — the default — or the sample's own column key for a name-addressed
+     * one, chosen by the optional body key {@code frontend}, the value {@code /config/preview/parsing}
+     * reports) plus
      * identity {@code mapping} rules, for the schema editor to seed a HUMAN edit — never
      * auto-applied (the {@code ParserPlugin.suggest} posture), and real ingest keeps
      * {@code auto_detect=false}. Body {@code {sampleRows:[{...}]}} — the parsing preview's output
@@ -345,6 +348,16 @@ final class ConfigPreviewRoutes implements RouteModule {
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (sampleRows.isEmpty())
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-empty 'sampleRows'");
+        // LA-ONBOARD-FIXES-1 (F-4): the selector must be what the frontend's load accepts. Delimited (the
+        // default when no frontend is named) and fixed-width address a column by its zero-based POSITION —
+        // a name there is refused at registration — so the selector is the column's index in the sample's
+        // own order; the name-addressed frontends (json, text_regex, xlsx, parquet, plugin) keep the name.
+        boolean byIndex;
+        try {
+            byIndex = PipelineConfig.selectsByColumnIndex(ApiContext.str(body, "frontend"));
+        } catch (IllegalArgumentException unknown) {
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, unknown.getMessage());
+        }
         try {
             List<com.gamma.pipeline.exec.SchemaSuggest.Field> inferred =
                     com.gamma.pipeline.exec.SchemaSuggest.infer(sampleRows);
@@ -353,7 +366,7 @@ final class ConfigPreviewRoutes implements RouteModule {
             for (com.gamma.pipeline.exec.SchemaSuggest.Field f : inferred) {
                 Map<String, Object> field = new LinkedHashMap<>();
                 field.put("name", f.name());
-                field.put("selector", f.name());
+                field.put("selector", byIndex ? String.valueOf(fields.size()) : f.name());
                 field.put("type", f.type());
                 // The strptime pattern a DATE was proven with — without it a non-ISO date lands NULL.
                 if (f.format() != null) field.put("format", f.format());

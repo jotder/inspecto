@@ -2183,6 +2183,34 @@ public final class PipelineConfig {
     }
 
     /**
+     * Whether a schema's {@code raw.fields[].selector} is a zero-based column INDEX for this
+     * {@code parsing.frontend} ({@code null}/blank = the default, delimited) — the rule the load enforces, so
+     * a generator (the schema suggestion) can write what a registration accepts.
+     *
+     * @throws IllegalArgumentException for a value that is not a recognised frontend
+     */
+    public static boolean selectsByColumnIndex(String frontend) {
+        return PipelineConfigParser.selectsByColumnIndex(frontend);
+    }
+
+    /**
+     * The load's refusal of a NAME where a delimited / fixed-width schema needs a column INDEX selector — a
+     * distinct type so a save gate can report exactly this refusal from a full parse and leave every other
+     * parse refusal to the check that owns it. The message is the load's own, verbatim.
+     */
+    public static final class SelectorNotIndexException extends IllegalArgumentException {
+        private final String schemaRef;
+
+        SelectorNotIndexException(String schemaRef, String message) {
+            super(message);
+            this.schemaRef = schemaRef;
+        }
+
+        /** Which schema the selector lives in: {@code schema_file}, or {@code schemas[col=N]} of the plural list. */
+        public String schemaRef() { return schemaRef; }
+    }
+
+    /**
      * Create the run's status directory — the single filesystem side-effect formerly performed
      * inline during {@code load}. A no-op when status is disabled or a literal {@code status_file}
      * was configured. Idempotent and safe to call more than once.

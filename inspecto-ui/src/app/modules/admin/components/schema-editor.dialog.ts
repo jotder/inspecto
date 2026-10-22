@@ -38,6 +38,12 @@ export interface SchemaEditorData {
      */
     home?: 'registry' | 'config';
     /**
+     * The parsing frontend `sampleRows` came from, forwarded to "Suggest from sample" so the suggested
+     * selectors are the ones that frontend loads (LA-ONBOARD-FIXES-1, F-4): absent = delimited, whose
+     * selectors are zero-based column indexes; json / text_regex / xlsx / parquet / plugin keep names.
+     */
+    frontend?: string;
+    /**
      * The pipeline's own config directory, for a `home: 'config'` satellite (`SCHEMA-SATELLITE-SUBDIR-1`).
      *
      * 🔴 Without it a drafted satellite lands at the WRITE ROOT rather than beside its pipeline, and
@@ -314,7 +320,7 @@ export class SchemaEditorDialog {
             if (!ok) return;
         }
         this.suggesting.set(true);
-        this.config.suggestSchema(sampleRows).subscribe({
+        this.config.suggestSchema(sampleRows, undefined, this.data.frontend).subscribe({
             next: (s) => {
                 this.suggesting.set(false);
                 this.onRows(

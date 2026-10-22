@@ -226,9 +226,11 @@ describe('GrammarEditorDialog', () => {
         // drafts a pipeline SATELLITE schema, which a parse node references by bare `<name>.toon`. The
         // Components pane passes 'registry' instead, and a schema created under the wrong home lands in
         // a file the opener can never read back.
+        // `frontend` (LA-ONBOARD-FIXES-1, F-4): "Suggest from sample" proposes selectors that frontend loads —
+        // column indexes for delimited, which a name selector would make unregistrable.
         expect(open).toHaveBeenCalledWith(
             expect.anything(),
-            expect.objectContaining({ data: { sampleRows: [{ id: '1' }], home: 'config' } }),
+            expect.objectContaining({ data: { sampleRows: [{ id: '1' }], frontend: 'delimited', home: 'config' } }),
         );
 
         c.onPreviewed({ kind: 'tree', recordCount: 1, nodes: [] });

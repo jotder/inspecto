@@ -1109,8 +1109,11 @@ public final class ControlApi implements AutoCloseable, HostContext {
             AuditTrail.record(ex, method, path, sent > 0 ? sent : 200);
             return;
         }
-        // No API route matched the path: a GET may be an SPA asset / deep link (PUBLIC).
-        if (!pathMatched && "GET".equals(method) && serveStatic(ex, path)) return;
+        // No API route matched the path: a GET may be an SPA asset / deep link (PUBLIC) — but never under
+        // /api/v1. An API caller asking for a route that does not exist must learn so, not receive a 200
+        // text/html SPA shell it then fails to parse (LA-ONBOARD-FIXES-1, F-13). The SPA and its assets are
+        // served from the root, which the non-v1 branch above handles.
+        if (!pathMatched && "GET".equals(method) && !ApiContext.v1(ex) && serveStatic(ex, path)) return;
         int status = pathMatched ? 405 : 404;
         // A non-GET attempt at a forbidden/unknown route (or a disallowed method on a read-only route —
         // the append-only immutability guard) is the auth-free analogue of a 401/403.

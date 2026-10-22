@@ -193,15 +193,19 @@ export class ConfigService {
     }
     /** Infer a DRAFT schema (typed fields + identity mapping) from already-parsed sample rows —
      *  stateless, scratch-only; the result seeds a human edit and is never auto-applied.
-     *  Pass `config` (the draft currently held) to also get the B3 `drift` diff back. */
+     *  Pass `config` (the draft currently held) to also get the B3 `drift` diff back. Pass `frontend` (the
+     *  parsing frontend the sample came from) so the selectors fit it: absent means delimited, whose
+     *  selectors are zero-based column indexes; a name-addressed frontend (json, xlsx, …) keeps names. */
     suggestSchema(
         sampleRows: Record<string, unknown>[],
         config?: Record<string, unknown>,
+        frontend?: string,
     ): Observable<SchemaSuggestion> {
-        return this.http.post<SchemaSuggestion>(
-            apiUrl('/config/suggest/schema'),
-            config ? { sampleRows, config } : { sampleRows },
-        );
+        return this.http.post<SchemaSuggestion>(apiUrl('/config/suggest/schema'), {
+            sampleRows,
+            ...(config ? { config } : {}),
+            ...(frontend ? { frontend } : {}),
+        });
     }
     /** Run a draft enrichment's transform over an in-memory `input` sample — stateless, scratch-only. */
     previewEnrichment(

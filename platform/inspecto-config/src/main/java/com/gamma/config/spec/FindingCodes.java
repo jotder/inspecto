@@ -130,6 +130,11 @@ public final class FindingCodes {
     /** The same unresolved {@code schema_file} on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_SCHEMA_FILE_UNRESOLVED = "WARN_SCHEMA_FILE_UNRESOLVED";
 
+    /** A delimited / fixed-width pipeline whose schema names a column where the load needs its zero-based
+     *  INDEX as the {@code raw.fields[].selector} — the pipeline would not load, so the save refuses it
+     *  regardless of {@code active} (LA-ONBOARD-FIXES-1, F-4). */
+    public static final String ERR_SELECTOR_NOT_INDEX = "ERR_SELECTOR_NOT_INDEX";
+
     // ── Safety ───────────────────────────────────────────────────────────────────────────────
     // (ConfigSafetyValidator issues register here as they migrate to the catalog)
 

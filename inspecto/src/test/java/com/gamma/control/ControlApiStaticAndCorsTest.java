@@ -64,8 +64,14 @@ class ControlApiStaticAndCorsTest {
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
+    /** A GET at the ROOT (no {@code /api/v1}) — where the SPA shell, its assets and its deep links live. */
+    private HttpResponse<String> ui(int port, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+                BodyHandlers.ofString());
+    }
+
     private HttpResponse<String> sendIfNoneMatch(int port, String path, String etag) throws Exception {
-        HttpRequest r = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+        HttpRequest r = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .header("If-None-Match", etag).GET().build();
         return client.send(r, BodyHandlers.ofString());
     }
@@ -113,7 +119,7 @@ class ControlApiStaticAndCorsTest {
     @Test
     void rootServesIndexHtml(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            HttpResponse<String> root = send(c.port, "GET", "/");
+            HttpResponse<String> root = ui(c.port, "/");
             assertEquals(200, root.statusCode());
             assertTrue(ctype(root).startsWith("text/html"));
             assertTrue(root.body().contains("Inspecto UI"), "index.html served at /");
@@ -123,7 +129,7 @@ class ControlApiStaticAndCorsTest {
     @Test
     void assetServedWithMimeType(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            HttpResponse<String> js = send(c.port, "GET", "/assets/app.js");
+            HttpResponse<String> js = ui(c.port, "/assets/app.js");
             assertEquals(200, js.statusCode());
             assertTrue(ctype(js).startsWith("text/javascript"));
             assertTrue(js.body().contains("inspecto"));
@@ -134,7 +140,7 @@ class ControlApiStaticAndCorsTest {
     void pathWithColonIsA404NotA500(@TempDir Path dir) throws Exception {
         // LA-DEMO-POLISH-1 (5): on Windows Path.resolve threw InvalidPathException for a ':' -> 500
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            HttpResponse<String> r = send(c.port, "GET", "/assets/a:b.js");
+            HttpResponse<String> r = ui(c.port, "/assets/a:b.js");
             assertEquals(404, r.statusCode());
             assertTrue(ctype(r).startsWith("application/json"), "a JSON 404, not an error page");
             assertFalse(r.body().contains("InvalidPathException"), "no exception text leaks");
@@ -145,15 +151,15 @@ class ControlApiStaticAndCorsTest {
     void anSpaRouteWithAColonServesIndexWhileTraversalIsStillRefused(@TempDir Path dir) throws Exception {
         // a masked key in an Entity deep link: on Windows ':' cannot be resolved as a file, yet it is an SPA route
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            HttpResponse<String> r = send(c.port, "GET", "/entities/msisdn/masked:2910537b29699a31");
+            HttpResponse<String> r = ui(c.port, "/entities/msisdn/masked:2910537b29699a31");
             assertEquals(200, r.statusCode());
             assertTrue(ctype(r).startsWith("text/html"));
             assertTrue(r.body().contains("Inspecto UI"));
             Files.writeString(dir.resolve("secret.txt"), "top secret");
-            HttpResponse<String> up = send(c.port, "GET", "/..%2Fsecret.txt");
+            HttpResponse<String> up = ui(c.port, "/..%2Fsecret.txt");
             assertNotEquals(200, up.statusCode(), "traversal outside the ui root is refused");
             assertFalse(up.body().contains("top secret"));
-            HttpResponse<String> upColon = send(c.port, "GET", "/..%2Fa:b%2Fsecret.txt");
+            HttpResponse<String> upColon = ui(c.port, "/..%2Fa:b%2Fsecret.txt");
             assertFalse(upColon.body().contains("top secret"));
             assertEquals(404, upColon.statusCode());
         }
@@ -162,7 +168,7 @@ class ControlApiStaticAndCorsTest {
     @Test
     void extensionlessDeepLinkFallsBackToIndex(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            HttpResponse<String> deep = send(c.port, "GET", "/dashboard/runs");
+            HttpResponse<String> deep = ui(c.port, "/dashboard/runs");
             assertEquals(200, deep.statusCode(), "SPA deep link resolves to index.html");
             assertTrue(ctype(deep).startsWith("text/html"));
             assertTrue(deep.body().contains("Inspecto UI"));
@@ -172,11 +178,11 @@ class ControlApiStaticAndCorsTest {
     @Test
     void anEmbedRouteWithADotInItsTokenIsStillAnSpaDeepLinkButADottedAssetPathElsewhereIs404(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            HttpResponse<String> embed = send(c.port, "GET", "/embed/inv/AbC123.sEcReT_x-y");   // an embed token is <grantId>.<secret>
+            HttpResponse<String> embed = ui(c.port, "/embed/inv/AbC123.sEcReT_x-y");   // an embed token is <grantId>.<secret>
             assertEquals(200, embed.statusCode(), "the viewer route must load the SPA shell: " + embed.body());
             assertTrue(ctype(embed).startsWith("text/html"));
             assertTrue(embed.body().contains("Inspecto UI"));
-            HttpResponse<String> missing = send(c.port, "GET", "/dashboard/missing.js");
+            HttpResponse<String> missing = ui(c.port, "/dashboard/missing.js");
             assertEquals(404, missing.statusCode(), "a missing asset elsewhere is still a 404, not the shell");
             assertFalse(missing.body().contains("Inspecto UI"));
         }
@@ -190,6 +196,33 @@ class ControlApiStaticAndCorsTest {
             assertEquals(404, r.statusCode());
             assertTrue(ctype(r).startsWith("application/json"), "API 404 is JSON, not the SPA shell");
             assertFalse(r.body().contains("<html"), "must not serve index.html for an API path");
+        }
+    }
+
+    /**
+     * LA-ONBOARD-FIXES-1 (F-13): a path under {@code /api/v1} that matches NO route used to fall through to
+     * the SPA and answer 200 with index.html — {@code GET /api/v1/spaces/{id}/datasets} looked like a
+     * successful call that returned HTML. Every such path is now a 404 in the v1 error envelope, while the
+     * same extensionless shape at the ROOT is still an SPA deep link.
+     */
+    @Test
+    void anUnmatchedApiPathIsAJson404WhileTheSameShapeAtTheRootIsAnSpaDeepLink(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(spaDir(dir).toString(), null)) {
+            for (String path : List.of("/spaces/default/datasets", "/datasets", "/link-analysis", "/no/such/route")) {
+                HttpResponse<String> r = send(c.port, "GET", path);
+                assertEquals(404, r.statusCode(), "/api/v1" + path + " has no route: " + r.body());
+                assertTrue(ctype(r).startsWith("application/json"), "an API 404 is JSON, not the SPA shell");
+                assertFalse(r.body().contains("Inspecto UI"), "must not serve index.html under /api/v1");
+                assertEquals("NOT_FOUND", new com.fasterxml.jackson.databind.ObjectMapper().readTree(r.body())
+                        .path("error").path("errorCode").asText(), "the standard v1 error envelope: " + r.body());
+            }
+            HttpResponse<String> spa = ui(c.port, "/link-analysis");
+            assertEquals(200, spa.statusCode(), "an SPA route outside the API prefix keeps its deep link");
+            assertTrue(ctype(spa).startsWith("text/html"));
+            assertTrue(spa.body().contains("Inspecto UI"));
+            HttpResponse<String> asset = ui(c.port, "/assets/app.js");
+            assertEquals(200, asset.statusCode(), "a static asset is still served");
+            assertTrue(asset.body().contains("inspecto"));
         }
     }
 
@@ -209,7 +242,7 @@ class ControlApiStaticAndCorsTest {
     @Test
     void staticIsPublicAndApiIsReachable(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            assertEquals(200, send(c.port, "GET", "/").statusCode(), "SPA shell loads");
+            assertEquals(200, ui(c.port, "/").statusCode(), "SPA shell loads");
             assertEquals(200, send(c.port, "GET", "/runs").statusCode(),
                     "CONTROL route is reachable");
         }
@@ -228,7 +261,7 @@ class ControlApiStaticAndCorsTest {
     void uiFilesCarryANoCacheDirectiveAndAValidator(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
             for (String path : List.of("/", "/assets/app.js")) {
-                HttpResponse<String> r = send(c.port, "GET", path);
+                HttpResponse<String> r = ui(c.port, path);
                 assertEquals("no-cache", r.headers().firstValue("Cache-Control").orElse(null),
                         path + " must tell the browser to revalidate before reuse");
                 assertTrue(r.headers().firstValue("ETag").isPresent(),
@@ -240,7 +273,7 @@ class ControlApiStaticAndCorsTest {
     @Test
     void unchangedUiFileRevalidatesToABodilessNotModified(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            String etag = send(c.port, "GET", "/assets/app.js").headers().firstValue("ETag").orElseThrow();
+            String etag = ui(c.port, "/assets/app.js").headers().firstValue("ETag").orElseThrow();
             HttpResponse<String> again = sendIfNoneMatch(c.port, "/assets/app.js", etag);
             assertEquals(304, again.statusCode(), "an unchanged file revalidates cheaply");
             assertEquals("", again.body(), "a 304 carries no body");
@@ -251,7 +284,7 @@ class ControlApiStaticAndCorsTest {
     void redeployedUiFileGetsANewEtagAndTheNewBytes(@TempDir Path dir) throws Exception {
         Path ui = spaDir(dir);
         try (Ctx c = open(ui.toString(), null)) {
-            String stale = send(c.port, "GET", "/assets/app.js").headers().firstValue("ETag").orElseThrow();
+            String stale = ui(c.port, "/assets/app.js").headers().firstValue("ETag").orElseThrow();
             Files.writeString(ui.resolve("assets").resolve("app.js"), "console.log('inspecto v2 rebuilt');");
             HttpResponse<String> fresh = sendIfNoneMatch(c.port, "/assets/app.js", stale);
             assertEquals(200, fresh.statusCode(), "a replaced file must NOT revalidate as unchanged");
@@ -264,7 +297,7 @@ class ControlApiStaticAndCorsTest {
     void noStaticServingWhenUiDirUnset(@TempDir Path dir) throws Exception {
         try (Ctx c = open(null, null)) {
             // no -Dui.dir → an unmatched GET is a plain JSON 404 (legacy behaviour preserved)
-            HttpResponse<String> r = send(c.port, "GET", "/");
+            HttpResponse<String> r = ui(c.port, "/");
             assertEquals(404, r.statusCode());
             assertTrue(ctype(r).startsWith("application/json"));
         }
