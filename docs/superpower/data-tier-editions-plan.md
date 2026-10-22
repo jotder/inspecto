@@ -17,8 +17,9 @@ tier. When a phase ships, distil the as-built facts into the product hubs (`edit
 
 - [`pipeline-editions-first-run-use-cases.md`](pipeline-editions-first-run-use-cases.md): console first-time user
   use cases, blank slate to a queryable Dataset (§6 answered by the operator 2026-10-22).
-- `docs/okf/product/module/la-core/spec-first-time-user-use-cases.md` (drafted in parallel, not yet committed when
-  this was written): the same journey in Inspecto LA, from a live blank-slate walkthrough (findings F-1…F-13).
+- [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md):
+  the same journey in Inspecto LA, from a live blank-slate walkthrough (findings F-1…F-13), with the operator's
+  answers A-1…A-16 (§8).
 - [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`): the onboarding
   experience both use-case docs ask for, including the "Add data" path this plan's phase 1 needs.
 
@@ -88,7 +89,7 @@ Cells marked **(DT-n)** depend on an open decision in §5.
 | Arrival | Manual only: *Add a file* and *Run now*; a re-import replaces, and says so; a trigger-less Pipeline never polls (DT-17); an enrichment recomputes its full window when run by hand | Scheduled and continuous; event chains and signal-driven Jobs; incremental recompute; late, duplicate and renamed-correction detection (DT-16) | Same, plus multi-node scale-out |
 | Shaping | No-code: column types, rename, choose columns, filter rows, dedupe; schema expression columns per DT-7 | Full Pipeline: Step Processors, SQL steps, parsing grammars | Same, plus PII masking |
 | Lookup and join across Datasets | Show a Reference's details on nodes and filter by them; no joins that build new data (DT-6) | Reference Datasets, enrichment, joins | Plus SCD2 history (when built) |
-| Data quality | Import checks, Expectations, quarantine and dedupe, as on every edition (DT-15) | Plus delivery Alerts and data trust | Plus maker-checker on configuration changes |
+| Data quality | Import checks, Expectations, quarantine and dedupe, explained in plain words, as on every edition (DT-15) | Plus delivery Alerts and data trust | Plus maker-checker on configuration changes |
 | Run history and statistics | Last import summary (rows in, rows quarantined) | Run history, processing statistics, lineage and provenance, Analytics kernel statistics | Plus long-retention operational stores on Postgres |
 | Outputs | Used inside Inspecto only; Pipeline bundle export (configuration, not data) | Publish and export sinks: webhook, mail and delivery channels, Postgres publish, object-storage export | Plus regulated publishing (four-eyes), egress governance (demand-gated) |
 | Jobs and orchestration | Maintenance Jobs only (cleanup, prune, retention; DT-16) | Jobs, schedules, Signals, retries | Plus distributed coordination |
@@ -187,7 +188,7 @@ lane per push.
 | 3 | Automation gate: save and load refusals, scheduler and acquire driver, Job save, Job scheduler and signal dispatcher, enrichment wiring; Activate copy and the manual-run gesture (DT-14) | 2 | 4 to 5 days |
 | 4 | Reach: both Offering moves (`connectors` out of Basic, `telecom-asn1` to Advanced), feature-naming refusals for remote kinds, the Collect stage's locked remote systems | 2 | 1.5 days |
 | 5 | Egress gate and its console locks | 2 | 1 day |
-| 6 | Step catalog `feature` field, refuse walk, schema expression check, palette locks, contract regeneration | 2 | 3 to 5 days |
+| 6 | Step catalog `feature` field, refuse walk, the schema expression check if DT-7 moves expression columns, palette locks, contract regeneration | 2 | 3 to 5 days |
 | 7 | Upgrade path: a test that boots Basic, imports, then boots Standard on the same Space and edits the import as an ordinary Pipeline | 1, 3 | 1 day |
 | 8 | Content packs (DT-18), release note, `docs/EDITIONS.md` matrix and rows (JOB-02, ING-01, SP-PRS-06, the remote SP-ACQ rows, JOB-01 / JOB-06, the SP-XFM rows), the edition hubs, the platform whitepaper's edition ladder, user guides | 3 to 6 | 1 day |
 | 9 | Per-application Basic forms (DT-10), application by application | — | per application |

@@ -10,8 +10,8 @@ its board rows, and archive this file when the last slice ships.
 
 - [`pipeline-editions-first-run-use-cases.md`](pipeline-editions-first-run-use-cases.md): the console, nine use
   cases (UC-1…UC-9) and a smart-help catalogue (H1…H9).
-- `docs/okf/product/module/la-core/spec-first-time-user-use-cases.md` (drafted in parallel, not yet committed when
-  this was written): Inspecto LA, fifteen use cases (UC-01…UC-15) and a live blank-slate walkthrough (findings F-1…F-13).
+- [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md):
+  Inspecto LA, fifteen use cases (UC-01…UC-15) and a live blank-slate walkthrough (findings F-1…F-13).
 - [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`): what each edition may do. This plan
   builds the experience; that plan decides the limits. Its phase 1 ("Add data", DT-1) is built here.
 

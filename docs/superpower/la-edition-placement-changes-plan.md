@@ -5,7 +5,8 @@
 >
 > ➡ **UPDATE 2026-10-22: the ingestion half moved.** §6, the D-LAE7 to D-LAE11 checks in §4.3, and decisions D-LAE7 to
 > D-LAE11 are taken over by [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`): D-LAE7 → DT-5
-> and DT-17, D-LAE8 → DT-7, D-LAE9 → DT-4, D-LAE10 → DT-16, D-LAE11 → DT-18. Answer them there, not here. This plan
+> and DT-17, D-LAE8 → DT-7, D-LAE9 → DT-4 (which **reverses** D-LAE9's recommendation: Basic keeps no database, not even
+> for manual pulls), D-LAE10 → DT-16, D-LAE11 → DT-18. Answer them there, not here. This plan
 > keeps D-LAE3, D-LAE4 and D-LAE6.
 >
 > 🟡 **DRAFT 2026-10-20 for operator review. Design only, nothing built, nothing decided.** This plan collects the

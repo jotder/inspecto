@@ -101,7 +101,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (69 open rows
 * [Route module contract](module/http-spi/index.md) - `module.http-spi` · 3 doc(s) · 0 open row(s)
 * [AI assist and intelligence](module/intelligence/index.md) - `module.intelligence` · 11 doc(s) · 1 open row(s)
 * [Link analysis and geo routes](module/la-api/index.md) - `module.la-api` · 8 doc(s) · 0 open row(s)
-* [Link analysis core and ports](module/la-core/index.md) - `module.la-core` · 18 doc(s) · 12 open row(s)
+* [Link analysis core and ports](module/la-core/index.md) - `module.la-core` · 19 doc(s) · 12 open row(s)
 * [Link analysis storage](module/la-storage/index.md) - `module.la-storage` · 7 doc(s) · 1 open row(s)
 * [Link analysis PostgreSQL store](module/la-store-pg/index.md) - `module.la-store-pg` · 6 doc(s) · 1 open row(s)
 * [Notification channels](module/notify-channels/index.md) - `module.notify-channels` · 8 doc(s) · 0 open row(s)
