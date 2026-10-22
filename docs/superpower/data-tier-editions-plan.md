@@ -20,8 +20,10 @@ tier. When a phase ships, distil the as-built facts into the product hubs (`edit
 - [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md):
   the same journey in Inspecto LA, from a live blank-slate walkthrough (findings F-1…F-13), with the operator's
   answers A-1…A-16 (§8).
-- [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`): the onboarding
-  experience both use-case docs ask for, including the "Add data" path this plan's phase 1 needs.
+- [`la-onboarding-plan.md`](la-onboarding-plan.md) (`LA-ONBOARD-1`): Inspecto LA onboarding and the **shared
+  `/onboard/files` import route** this plan's phase 1 needs.
+- [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`): the console on that
+  route (entry points, format evidence, fix catalogue, Dataset page, lookups, remote systems).
 
 ## 1. Why
 
@@ -108,7 +110,7 @@ protocols, masking, scale and organisational control.
 | DT-12 | **ASN.1 and the telecom decoders move to Advanced** (module `telecom-asn1` and add-on `telecomIndustryPack` from `offerings/standard.toon` to `advanced.toon`). Overrides this plan's 2026-10-21 placement (Standard). |
 | DT-13 | **Locked with a reason inside screens; the navigation stays lean**, on every gate this plan adds: inside a screen the control is disabled, with one line saying why and which edition has it, using the server's `refusal()` wording; whole Standard+ pages (such as Alerts) stay out of the Basic navigation (refined by LA A-11). Overrides the 2026-10-21 phase 2 text ("the SPA hides the affordances"). |
 | DT-14 | **The console work the gates need is part of this plan** (console use cases §6 Q3, Q4): *Add a file* and *Run now* together as one gesture on Basic (today upload is only in the Run-to-here test dialog and *Run now* only on the Collectors pane); Activate copy that follows the edition ("next poll cycle" is wrong on Basic); the `orders-starter` load-and-run sample button. The rest of the onboarding experience is `ONBOARDING-FIRST-RUN-1`. |
-| DT-1 | **Basic's way in is "Add data"**: upload a file, one column-review step, then a Dataset; the empty "Explore a Dataset" card in Inspecto LA becomes this entry point (LA A-6). Built by `ONBOARDING-FIRST-RUN-1` as one path for the console and Inspecto LA. The 2026-10-21 wording also offered "import from Postgres"; DT-4 removes it. |
+| DT-1 | **Basic's way in is "Add data"**: upload a file, one column-review step, then a Dataset; the empty "Explore a Dataset" card in Inspecto LA becomes this entry point (LA A-6). One server route (`/onboard/files`, `LA-ONBOARD-1` OB-2) and one screen for both apps (`LA-ONBOARD-1` phase 4; the console's entry points in `ONBOARDING-FIRST-RUN-1`). The 2026-10-21 wording also offered "import from Postgres"; DT-4 removes it. |
 | DT-2 | **A Basic import runs on a hidden one-step Collector and Pipeline** per import, created and run behind the scenes; an upgrade to Standard shows it as an ordinary, editable Pipeline. No parallel ingest path (LA A-6). |
 | DT-4 | **Files only on Basic; a database is shown locked** (LA A-12: "D-PE6 wins"). **Reverses** the 2026-10-21 DT-4 (a one-off Postgres snapshot in Basic). Every remote adapter, the `db` Collector included, is Standard and up, so the gate is **module absence**: `inspecto-connectors` leaves `offerings/basic.toon`. |
 | DT-6 | **Show a Reference's details on nodes and filter by them on Basic; joins that build new Datasets stay Standard** (LA A-5). Refines the 2026-10-21 "no joins or lookups in Basic". |
@@ -183,7 +185,7 @@ lane per push.
 
 | Phase | Content | Depends on | Effort |
 |---|---|---|---|
-| 1 | **"Add data" import (Basic and up)** — delivered by `ONBOARDING-FIRST-RUN-1` (its O2–O4); this plan owns its edition rules: hidden Collector + Pipeline (DT-2), files only (DT-4), formats, the Excel extension check and limits (DT-8) | decided | see that plan |
+| 1 | **"Add data" import (Basic and up)** — delivered by `LA-ONBOARD-1` (phase 2 route, phase 4 screen) and `ONBOARDING-FIRST-RUN-1` (console entry points); this plan owns its edition rules: hidden Collector + Pipeline (DT-2), files only (DT-4), formats, the Excel extension check and limits (DT-8) | decided | see that plan |
 | 2 | Groundwork: feature constants, `refusal()` texts, `OpsEditionFeatures` declarations, `/bootstrap` flags, the shared locked-with-reason component | §5.2 answered | 1 day |
 | 3 | Automation gate: save and load refusals, scheduler and acquire driver, Job save, Job scheduler and signal dispatcher, enrichment wiring; Activate copy and the manual-run gesture (DT-14) | 2 | 4 to 5 days |
 | 4 | Reach: both Offering moves (`connectors` out of Basic, `telecom-asn1` to Advanced), feature-naming refusals for remote kinds, the Collect stage's locked remote systems | 2 | 1.5 days |

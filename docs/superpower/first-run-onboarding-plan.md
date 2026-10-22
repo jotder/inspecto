@@ -1,237 +1,149 @@
-# First-run onboarding: from a blank install to a Dataset an application can use (`ONBOARDING-FIRST-RUN-1`)
+# Console first-run onboarding: from a blank install to a queryable Dataset (`ONBOARDING-FIRST-RUN-1`)
 
 **Status: PLAN 2026-10-22 for operator review — nothing built.** The direction is decided (§2, operator
-2026-10-22, including the answers A-1…A-16 recorded in the Inspecto LA use cases §8); the open decisions OB-1…OB-3
-and OB-5 (§8) need answers before their slices start. When a slice ships, distil
-the as-built facts into the product hubs (`layer/product`, `module/etl`, `module/la-core`, `edition/basic`), close
-its board rows, and archive this file when the last slice ships.
+2026-10-22); the open decisions OF-1…OF-3 (§7) need answers before their slices start. When a slice ships, distil
+the as-built facts into the product hubs (`layer/product`, `module/etl`, `module/processor`), close its board rows,
+and archive this file when the last slice ships.
+
+**What this plan is.** The **console companion** that [`la-onboarding-plan.md`](la-onboarding-plan.md)
+(`LA-ONBOARD-1`) expects in its OB-1: `LA-ONBOARD-1` builds the Inspecto LA screens **and the shared server pieces**
+(the `/onboard/files` import route, sample loading, the locked-with-reason component, local counters, the
+walkthrough fixes); this plan puts the **console** on those pieces and adds what only the console needs. Decision
+numbers here are **OF-n**, to stay apart from `LA-ONBOARD-1`'s OB-n.
 
 **Inputs.**
 
 - [`pipeline-editions-first-run-use-cases.md`](pipeline-editions-first-run-use-cases.md): the console, nine use
-  cases (UC-1…UC-9) and a smart-help catalogue (H1…H9).
+  cases (UC-1…UC-9) and a smart-help catalogue (H1…H9), §6 answered by the operator.
 - [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md):
-  Inspecto LA, fifteen use cases (UC-01…UC-15) and a live blank-slate walkthrough (findings F-1…F-13).
-- [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`): what each edition may do. This plan
-  builds the experience; that plan decides the limits. Its phase 1 ("Add data", DT-1) is built here.
+  Inspecto LA, fifteen use cases (UC-01…UC-15), walkthrough findings F-1…F-13, operator answers A-1…A-16.
+- [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`): what each edition may do.
 
-**Copy rule.** Product copy never says "wizard" (`GLOSSARY.md`). The step-by-step help is the **guide**; the
-running list of setup steps is the **Space guide** (H1; the term both use-case docs settled on).
+**Copy rule.** Product copy never says "wizard" (`GLOSSARY.md`). The step-by-step help is the **guide**; the running
+list of setup steps is the **Space guide** (H1). The button says **Add data**; the screen title says **Onboard a
+file** (`LA-ONBOARD-1` OB-14), so "Onboard" stays the one verb.
 
 ## 1. Goal and measures
 
-A first-time user reaches **a Dataset an application can use** (queryable in the console, drawable in Inspecto LA)
-without learning the pipeline layer, on every edition, with help that never dead-ends.
+A first-time console user reaches **a Dataset they can query** without learning the pipeline layer, on every
+edition, with help that never dead-ends.
 
 | Measure | Today | Target |
 |---|---|---|
-| Steps from a file to a queryable Dataset (console) | about 11 manual steps over 5 panes | one drop, one review, one confirm, no pane change |
-| From a file to a first graph (Inspecto LA, Basic) | impossible in the UI; 9 API calls (F-3, F-4) | the same three gestures plus "what the columns hold" |
-| Pipeline concepts a Basic user meets | about 6 (Collector, Pipeline, schema, parse settings, sink, trigger) | none; "one-time import" only |
+| Steps from a file to a queryable Dataset | about 11 manual steps over 5 panes (use cases §2) | one drop, one review, one confirm, no pane change |
 | Hidden knowledge needed | upload in a test dialog, *Run now* on another pane, detection only on click | none |
+| Pipeline concepts met before the first Dataset | Stream, Pipeline, Collector, stage, trigger | none; the guided editor stays available (*Open in editor*) |
 
-The measures are counted **always on, locally, on every edition, and never sent anywhere** (LA A-10): time from
-launch to the first Dataset, and how far each Space guide got.
+Counted by `LA-ONBOARD-1`'s onboarding counters (its OB-13): always on, local, never sent anywhere (A-10).
 
 ## 2. Decided (operator, 2026-10-22)
 
-1. **File first is the primary path.** Home, the Catalog, the empty Datasets pane and Inspecto LA's empty "Explore
-   a Dataset" card start with a file drop. The guided Pipeline editor stays one click away (*Open in editor*) as the
-   expert path.
+1. **File first is the primary path.** Home, the Catalog and the empty Datasets pane start with a file drop; the
+   guided Pipeline editor stays one click away (*Open in editor*) as the expert path.
 2. **Detected settings are pre-applied** to the draft, each with its evidence; low-confidence choices are
-   highlighted and need a click to confirm. What is saved is exactly what runs: ingest stays deterministic
-   (`auto_detect=false`, typed casts).
-3. **Locked with a reason inside screens; the navigation stays lean** (LA A-11, `DATA-TIERS-1` DT-13).
-4. **Onboarding is its own plan** (this one); the edition plan keeps only what its gates need (DT-14).
-5. **All nine console use cases are must-have.** The Inspecto LA data-in use cases (UC-01…UC-07) share the same
-   building blocks and ride with them.
-6. **The Inspecto LA answers that shape onboarding** (§8 there): Spaces are per data domain on every edition (A-1);
-   "Add data" takes CSV / TSV, Parquet and JSON / NDJSON (A-2), plus Excel when the bundle carries the DuckDB
-   `excel` extension (operator, same day; DT-8); **files only on Basic** (A-12, DT-4); Basic's "Add data" creates and
-   runs the Pipeline behind the scenes (A-6); the **primary entity is set per Dataset**, proposed in "Add data" (A-7);
-   the sample Space is offered at first launch and as *New from sample*, with one button that loads and runs it
-   (A-8); help on Basic is deterministic only (A-9); beginner measures are always on and local (A-10); in a sign-in
-   Space an administrator decides per Space whether analysts may import, off by default, with `canUploadData`
-   (A-15).
+   highlighted and need a click to confirm. What is saved is exactly what runs (ingest stays deterministic).
+3. **Locked with a reason inside screens; the navigation stays lean** (A-11, `DATA-TIERS-1` DT-13).
+4. **Onboarding is its own plan**; the edition plan keeps only what its gates need (DT-14).
+5. **All nine console use cases are must-have.**
+6. **The Inspecto LA answers apply to the console where they touch it:** files only on Basic (A-12, DT-4);
+   formats CSV / TSV, Parquet, JSON / NDJSON (A-2) plus Excel when the bundle carries the DuckDB `excel` extension
+   (DT-8); the import creates and runs the Pipeline behind the scenes (A-6, DT-2); the primary entity belongs to a
+   Dataset (A-7); deterministic help only on Basic (A-9); beginner measures always on and local (A-10); in a
+   sign-in Space analyst imports are a per-Space switch, off by default, with `canUploadData` (A-15).
 
-## 3. Use cases to building blocks
+## 3. Who builds what
 
-| Building block (§4) | Console use cases | Inspecto LA use cases |
+| Piece | Built by | Console use cases |
 |---|---|---|
-| B1 Space guide and getting started | UC-1, UC-2 (H1) | UC-01, UC-14, UC-15 |
-| B2 First Space | UC-1 | UC-02 (F-2) |
-| B3 "Add data" | UC-2, UC-3, UC-9 (H8) | UC-03, UC-04 (F-3, F-4) |
-| B4 Explained detection | UC-2, UC-3 (H2) | UC-03 step 2, UC-07 |
-| B5 Findings with fixes | UC-7 (H3) | UC-15 |
-| B6 The Dataset page | UC-5, UC-8 (H9) | UC-05, UC-06, UC-08, UC-14 |
-| B7 Sample data | UC-1 (H7) | UC-01 |
-| B8 Locks, empty states, contextual help | all (H4, H5) | UC-13, UC-15 (F-1, F-10) |
-| B9 Lookups | UC-4 (H9) | UC-04 |
-| B10 Remote systems (Standard) | UC-6 | UC-06 |
-| B11 Embedded in applications | UC-8, UC-9 | UC-03 (from the LA card), UC-08 |
+| `/onboard/files` draft + commit, *Add a file*, *Run now* (`POST /datasets/{id}/files`, `POST /datasets/{id}/run`); failed commit leaves nothing | `LA-ONBOARD-1` phase 2 (OB-2, OB-3) | UC-2, UC-3, UC-5 |
+| Suggested selectors as column indexes (F-4); unknown `/api/…` paths answer 404 (F-13) | `LA-ONBOARD-FIXES-1` (OB-4) | UC-2 |
+| Reference kind on import (entity details) | `LA-ONBOARD-1` phase 2 | UC-4 |
+| Value-shape detection for Entity Types and from / to | `LA-ONBOARD-1` phase 2 | UC-8 |
+| Space guide ticks from server state; first run keyed on "no Dataset yet" | `LA-ONBOARD-1` phase 3 | UC-1, UC-2 |
+| Sample Space that loads and runs (`POST /spaces {template, loadSamples: true}`) | `LA-ONBOARD-1` OB-12 | UC-1 |
+| Locked-with-reason component (`inspecto-locked-action`, `/bootstrap` `featureReasons`) | `LA-ONBOARD-1` OB-10 | all |
+| Help rules (empty-state reason + next action, plain terms, *What can I do next?*) | `LA-ONBOARD-1` phase 8, adopted here | all |
+| **Format evidence in the draft**: delimiter, header, quoting, date formats, file-name dates, the record path and fields to flatten for nested JSON, with confidence (B2) | **this plan**, contributed to the `/onboard/files` draft | UC-2, UC-3 |
+| **Fix catalogue** behind "problems in plain words" (B3) | **this plan**, server side, used by both UIs | UC-7 |
+| **Console entry points, Add data in the console, the console Space guide** (B1) | **this plan** | UC-1, UC-2, UC-9 |
+| **Console Dataset page** (B4) | **this plan** | UC-5, UC-8 |
+| **Console lookups** (B5) and **remote systems** (B6, Standard) | **this plan** | UC-4, UC-6 |
+| Edition gates, Activate copy, the manual-run gesture placement | `DATA-TIERS-1` (DT-13, DT-14) | UC-5 |
 
-The Inspecto LA steps after the data is in (focus, first graph, grow, discover, keep and share: UC-09…UC-13) and
-the LA-only findings (F-6…F-12) stay with the Link Analysis work; this plan supplies their starting point.
+## 4. Building blocks (this plan)
 
-## 4. Building blocks
+### B1 Console entry points, Add data and the Space guide
 
-### B1 Space guide and getting started
+- **Getting started** replaces Home's three first-run cards while setup is incomplete (*Try it with sample data*,
+  *Add data*, *Open my team's data*), with the **Space guide** beside it (*Space · Data · First query · (optional) a
+  dashboard*), reading `LA-ONBOARD-1`'s guide state.
+- **Drop a file** on Home, on the Catalog, or on an empty Datasets pane (H8) opens **Add data** inline.
+- **Add data** is the same screen as Inspecto LA's (`LA-ONBOARD-1` phase 4): choose the file → check the columns
+  (pre-applied, with evidence; no-code shaping, DT-7) → what the columns hold (optional in the console; the
+  primary entity per A-7) → name and create (runs once) → land on the Dataset page (B4). One component, shared by
+  both apps (OF-1).
+- **Expert path.** *Open in editor* on the review screen and on the Dataset page opens the import's Pipeline in the
+  guided editor (an ordinary Pipeline marked `origin: import`, `LA-ONBOARD-1` OB-3). The Catalog's *Onboard
+  Stream / Reference* dialog stays as the advanced start (OF-3).
+- On Basic, *From a database or a remote system* is shown locked with its reason (DT-4).
 
-- A **Getting started** panel replaces Home's three cards (console) and the LA home cards while setup is
-  incomplete. Choices: *Try it with sample data* (B7), *Use my own data* (B2 then B3), *Join my team's data* (when
-  Spaces with Datasets exist).
-- The **Space guide** stays visible, collapsible, until done: *Space · Data · (LA) What the columns hold · First
-  query or first graph · (optional) a list*. Every tick is **computed from server state**, never clicked.
-- First-run detection keys on **"no Dataset yet"**, not "zero Runs" (`home.component.ts:147` today), so the
-  guide survives a failed first run.
-- One component and one state read, used by the console and by `la-app`.
+### B2 Format evidence in the draft
 
-### B2 First Space
+- Detection exists: the client sniff (`parsing-sniff.ts`), the server dialect sniff (`ComponentPreview.sniffDialect`
+  over DuckDB `sniff_csv`) and `SchemaSuggest` (TRY_CAST vote, human date formats). What is missing is evidence,
+  confidence and pre-application.
+- The `/onboard/files` draft returns, per choice, the value, its evidence ("every one of 20 lines has 7 columns";
+  "100% of 500 values parse as `%d/%m/%Y`") and a confidence class (OF-2).
+- New detections: the record path and the fields to flatten for nested JSON (UC-3; exploding arrays into rows is
+  `transform.explode`, Standard per DT-7); dates in the file name; decimal mark.
+- `LA-ONBOARD-1` adds value shapes for Entity Types on the same draft; one evidence format serves both.
 
-- With zero Spaces, both UIs offer *New Space* (today Inspecto LA draws no switcher at all, F-2; the console's
-  Spaces pane offers *New from template* on a multi-space server).
-- A Space is per data domain, with cases inside it (A-1). Name; *What kind of data?* (pack: Mobile Money, Telecom,
-  Generic, or a vertical template, with three example column names each). The primary entity is not asked here: it
-  belongs to each Dataset (A-7, B3 step 3).
-- A template the edition cannot run stays visible, **locked with its reason** (today `missingFeatures`).
-- Create, then straight into B3.
+### B3 Fix catalogue
 
-### B3 "Add data" — one path, every edition (DT-1)
+- Entries: decimal mark, date format, delimiter, header row, encoding, quote character, a required column missing.
+  Each draft finding, commit refusal or quarantine reason that matches an entry carries a plain cause and a
+  one-click fix ("`amount` has `1.234,50` in 40 rows → *Switch decimal mark*").
+- A fix edits the draft and offers *Re-run*; nothing is applied silently. Every edition (correctness is not an
+  edition feature). Inspecto LA's "problems in plain words" (`LA-ONBOARD-1` phase 4) reads the same catalogue.
 
-One server-side composition and one UI, embeddable anywhere (Home, Catalog, Datasets, the LA card).
-
-1. **Choose the file.** Drag and drop or pick: CSV / TSV, Parquet, JSON / NDJSON, and Excel when the bundle
-   carries the DuckDB `excel` extension (otherwise the picker says "save as CSV"). Files only on Basic; *From a
-   database or a remote system* is shown locked with its reason (DT-4). Limits shown before upload (DT-8).
-2. **Check the columns.** The first rows as they will load, with every detected choice pre-applied and explained
-   (B4); no-code shaping (types, rename, choose columns, filter rows, dedupe; DT-7). Problems counted, not hidden
-   ("12 rows have no `to_account`").
-3. **What the columns hold** (shown when the target application needs it, always in Inspecto LA): *who* columns →
-   Entity Type, *link* columns → from / to, optional kind, time, amount; the Dataset's **primary entity** (A-7,
-   changeable later on the Dataset card); the rest → details. Proposed, then confirmed. This is the column
-   classification that has no screen anywhere today (LA F-5).
-4. **Name and create.** The name is proposed from the file name (a date in it recognised as a file-name date). One
-   confirm saves the hidden Collector and Pipeline (DT-2), **runs it once**, registers the Dataset (today
-   `DatasetRegistrationService.ensure` runs only at Activate) and, in Inspecto LA, saves the Entity Type mapping and
-   a default link mapping.
-5. **Land on the Dataset** (B6), or back in the application that started it (B11).
-
-**Server.** One route, `POST /data/import` (name to be fixed with the endpoint skill; OB-1), composes what exists:
-the inbox upload (`PipelineInboxRoutes`), schema suggestion (`/config/suggest/schema`), the config write and
-register (`POST /config/write`, `POST /runs`), a one-shot run, and Dataset registration. It reuses
-`LA-ANALYST-UPLOAD-1`'s landing and ingest chain and moves its 503-on-Basic gate. It answers on Basic: it is the
-Basic way in. With no sign-in it is always open; in a sign-in Space it answers only when the Space's administrator
-has turned analyst imports on (off by default) and the caller holds `canUploadData` (A-15). The four endpoint gates
-apply.
-
-**Expert path.** *Open in editor* opens the same Pipeline in the guided editor where the console is present; on
-Standard it is an ordinary, editable Pipeline (DT-2, `DATA-TIERS-1` phase 7). Inspecto LA hides Pipelines on Basic
-and hands off to the console on Standard+ (A-6).
-
-### B4 Explained detection
-
-- Detection exists: the client sniff (`parsing-sniff.ts`: JSON array, NDJSON, delimiter), the server dialect sniff
-  (`ComponentPreview.sniffDialect` over DuckDB `sniff_csv`), and `SchemaSuggest` (TRY_CAST vote, human date formats).
-  What is missing is **evidence, confidence and pre-application.**
-- Each detector returns, per choice, the value, its evidence ("every one of 20 lines has 7 columns"; "100% of 500
-  values parse as `%d/%m/%Y`") and a confidence class (high / low); the threshold rule is OB-2.
-- New detections: the record path and fields to flatten for nested JSON (console UC-3); file-name dates; value
-  shapes for Entity Types (phone number lengths, IMEI check digit, IBAN pattern, e-mail; LA UC-07); from / to
-  columns from names and value overlap.
-- Pre-applied to the draft; low-confidence choices highlighted and confirm-gated (§2 point 2).
-
-### B5 Findings with fixes
-
-- A small **fix catalogue**: decimal mark, date format, delimiter, header row, encoding, quote character, a
-  required column missing. Each save finding, run failure or kept-aside row reason that matches a catalogue entry
-  carries a plain cause and a one-click fix ("`amount` has `1.234,50` in 40 rows → *Switch decimal mark*").
-- A fix edits the draft and offers *Re-run*; nothing is applied silently.
-- In every edition: correctness explanations are not an edition feature.
-
-### B6 The Dataset page
+### B4 Console Dataset page
 
 - Summary: rows, time span, last import, quarantined rows with why (DT-15), "one-time import" or "kept up to date
-  by …" (LA UC-05); the primary entity, changeable (A-7).
-- **Manual-run gesture**: *Add a file* and *Run now* together; *Re-import* replaces and says how many rows
-  changed (DT-14, DT-5). On Standard also **Keep this up to date** (watch a folder, a schedule; next run time
-  shown); on Basic the switch is locked with its reason; without the right to configure it becomes *Ask an
-  administrator* (LA UC-06).
+  by …"; the primary entity, changeable (A-7).
+- **Manual-run gesture**: *Add a file* and *Run now* together; *Re-import* replaces and says how many rows changed
+  (DT-14, DT-5). On Standard also **Keep this up to date** (watch a folder, a schedule; next run time shown); on
+  Basic the switch is locked with its reason; without the right to configure it becomes *Ask an administrator*.
 - **What this Dataset can feed**, from its columns (H9): "looks like call records → *Explore as a network in Link
   Analysis*"; "has a date and an amount → *Make a starter dashboard*" (`POST /bi/templates/{id}/apply` exists);
   offers the edition cannot fulfil are locked with their reason.
-- In Inspecto LA: the default link mapping, editable (LA UC-08).
 
-### B7 Sample data
+### B5 Console lookups (References)
 
-- `orders-starter`: *Load the sample data* copies the samples into the inbox and runs the Pipeline (today a manual
-  copy on the server's disk; DT-14), then offers the dashboard and a query.
-- Inspecto LA: *Try it with sample data* creates the `la-showcase` Space and opens a ready graph, saying plainly
-  that the data is invented (LA UC-01). Offered at first launch and as *New from sample* in the Space switcher, to
-  anyone who may create Spaces; one button loads and runs it (A-8).
-
-### B8 Locks, empty states and contextual help
-
-Rules for every screen (from LA UC-15, which the console adopts):
-
-1. Every empty state names the reason and offers the one next action (F-1).
-2. Every refusal names the feature and the edition once, then offers what this edition can do instead (F-10). Inside
-   a screen the shared **locked-with-reason** component (DT-13) reads the server's `refusal()` text; whole Standard+
-   pages stay out of the Basic navigation (A-11).
-3. Product terms appear with a plain explanation on first use (Dataset = "a table Inspecto keeps").
-4. The Space guide and *What can I do next?* are always one click away.
-5. Each stage and finding links to the one doc section that explains it (H5).
-6. The assistant (H6) is offered only where it is available, with the reason when it is not; Basic help is
-   deterministic.
-
-### B9 Lookups (References)
-
-- *Add data → It describes entities* onboards a Reference: "Which column identifies the entity?"; the other
-  columns become details; re-import replaces and says how many rows changed (LA UC-04).
-- When a new file shares a column with an existing Dataset the product says so ("`store_id` matches 98% of
+- *Add data → It describes entities* uses the Reference kind of the import route.
+- When a new file shares a column with an existing Dataset the console says so ("`store_id` matches 98% of
   `sales.store_id`") and offers *Use as a lookup*.
-- Edition: showing details on nodes and filtering by them on Basic (A-5); enrichment and joins Standard (DT-6), locked
-  with their reason on Basic, with a query-time join in Studio as the Basic alternative.
+- Basic shows a Reference's details and filters by them (A-5); enrichment and joins are Standard (DT-6), locked
+  with their reason, with a query-time join in Studio as the Basic alternative.
 
-### B10 Remote systems (Standard)
+### B6 Remote systems (Standard)
 
-- The Collect stage and "Add data" offer *Connect a system*: kind, form, **Test connection** with a plain result
-  (DNS, port, auth, path, host key), browse the remote folder or table, pick a sample to drive B3 step 2.
-- On Basic: locked with its reason, databases included (files only, DT-4).
-
-### B11 Embedded in applications
-
-- B3 is one embeddable component: Inspecto LA's empty "Explore a Dataset" card and *Add data* run it inline and
-  return to the application with the Dataset bound (DT-1, LA UC-03).
-- An application can pass what it needs (for example "which columns are entities, which is time") so step 3
-  asks only that.
-- Inspecto LA hides Pipelines on Basic; on Standard+ anything beyond "Keep this up to date" hands off to the
-  console with the Pipeline pre-filled (A-6).
+- *Connect a system* in Add data and in the guided editor's Collect stage: kind, form, **Test connection** with a
+  plain result (DNS, port, auth, path, host key), browse the remote folder or table, pick a sample to drive the
+  draft.
+- On Basic: locked with its reason, databases included (DT-4).
 
 ## 5. Edition behaviour
 
 | Block | Basic | Standard | Advanced |
 |---|---|---|---|
-| B1, B2, B4, B5, B7, B8 | ✅ | ✅ | ✅ |
-| B3 "Add data" | ✅ files only (DT-4), limits and formats DT-8 | ✅ (and *Keep this up to date*) | ✅ |
-| B6 Dataset page | ✅ manual run and re-import; *Keep this up to date* locked | ✅ | ✅ |
-| B9 Lookups | details and filters only; joins locked | ✅ | ✅ |
-| B10 Remote systems | locked, databases included | ✅ | ✅ |
-| B11 Embedded | ✅ | ✅ | ✅ |
+| B1 entry points, Add data, Space guide | ✅ files only (DT-4), formats and limits DT-8 | ✅ | ✅ |
+| B2 format evidence, B3 fix catalogue | ✅ | ✅ | ✅ |
+| B4 Dataset page | ✅ manual run and re-import; *Keep this up to date* locked | ✅ | ✅ |
+| B5 lookups | details and filters only; joins locked | ✅ | ✅ |
+| B6 remote systems | locked, databases included | ✅ | ✅ |
 | Assistant help (H6) | — (deterministic help only) | ✅ where configured | ✅ |
 
-## 6. Prerequisite fixes (from the Inspecto LA walkthrough)
-
-Cross-cutting findings this plan depends on; reported in the LA use cases and not re-verified here (OB-5).
-
-| Finding | What | Needed by |
-|---|---|---|
-| F-2 | With zero Spaces there is no Space switcher and no *New Space* | B2 |
-| F-3 | Basic has no way to bring data in (the upload is inside Investigations, 503 on Basic) | B3 |
-| F-4 | `/config/suggest/schema` proposes column selectors by name, which registration refuses ("must be a zero-based column index"); fixing them trips the schema compatibility gate | B3, B4 |
-| F-5 | No screen sets a column's classification (which Entity Type a column holds) | B3 step 3, B6 |
-| F-13 | `GET /datasets` answers 200 with the app's HTML instead of 404 (the list is `/components/dataset`) | B6 |
-
-## 7. Slices
+## 6. Slices
 
 Each slice: tests in house style (real-HTTP for routes, vitest specs for the SPA, falsified negative tests), the
 affected-build protocol, an independent `verification` PASS, one lane per push. UI slices apply the `angular-ui`
@@ -239,38 +151,35 @@ skill (design system, WCAG 2.2 AA, axe gate).
 
 | Slice | Content | Depends on | Done when |
 |---|---|---|---|
-| O0 | Answer §8; verify the §6 findings; file defect rows for those that hold | — | decisions recorded |
-| O1 | Prerequisite fixes F-2, F-4, F-13 (F-5 is built by B3 step 3 and B6) | O0 | each has a failing-then-passing test |
-| O2 | B4 detection with evidence and confidence (server and client), nested JSON record path, value shapes | O0 | detectors return evidence; property tests over sample files |
-| O3 | B3 server: the import route, hidden Collector + Pipeline, one-shot run, Dataset registration, limits, the Excel extension check, the per-Space analyst-import switch (A-15), Basic gate move | O1 | a Basic real-HTTP test goes file → Dataset in one call; a sign-in Space refuses without the switch and `canUploadData` |
-| O4 | B3 UI as one embeddable component; entry points on Home, Catalog, Datasets and the LA card (B11) | O2, O3 | file to queried Dataset in three gestures, driven in the preview |
-| O5 | B1 Space guide and getting started; B2 first Space; B7 sample data (`orders-starter` button, `la-showcase`) | O3 | a blank install reaches a populated dashboard and a first graph with no file-system access |
-| O6 | B6 Dataset page: summary, manual-run gesture, re-import, *Keep this up to date* (Standard), feed offers | O3, `DATA-TIERS-1` phase 3 | console UC-5 and UC-8 pass on Basic and Standard |
-| O7 | B5 fix catalogue; B8 rules, the shared locked-with-reason component, contextual doc links | O2; DT-13 | every catalogue entry has a test that applies its fix and re-runs |
-| O8 | B9 lookups; B10 remote systems with test and browse | O4, `DATA-TIERS-1` phase 4 | console UC-4 and UC-6 pass; Basic shows the locks |
+| C0 | Answer §7 | — | decisions recorded |
+| C1 | B2 format evidence and confidence in the `/onboard/files` draft; nested JSON record path; file-name dates; decimal mark | `LA-ONBOARD-1` phase 2 contract | the draft returns evidence; property tests over sample files |
+| C2 | B3 fix catalogue (server), wired into draft findings, commit refusals and quarantine reasons | C1 | every entry has a test that applies its fix and re-runs |
+| C3 | B1 console entry points and Add data (the shared component) | `LA-ONBOARD-1` phases 2 and 4, C1 | file to queried Dataset in three gestures, driven in the preview |
+| C4 | B1 Getting started and the console Space guide; *New from sample* on the Spaces pane | `LA-ONBOARD-1` phase 3 and OB-12 | a blank install reaches the `orders-starter` dashboard with no file-system access |
+| C5 | B4 console Dataset page | C3, `DATA-TIERS-1` phase 3 | console UC-5 and UC-8 pass on Basic and Standard |
+| C6 | B5 lookups; B6 remote systems with test and browse | C3, `DATA-TIERS-1` phase 4 | console UC-4 and UC-6 pass; Basic shows the locks |
 
-O1 and O2 can start together; O5 to O8 can run in parallel once O3 and O4 are in.
+C1 and C2 are server work that `LA-ONBOARD-1` phase 4 also benefits from; they can start as soon as its phase 2
+contract is fixed.
 
-## 8. Open decisions
+## 7. Open decisions
 
 | # | Decision | Recommendation |
 |---|---|---|
-| OB-1 | One server route for "Add data", or the UI composing the existing routes | **One route**: the console and Inspecto LA share it, the Basic gate and the limits sit in one place, and a test can prove file → Dataset in one call |
-| OB-2 | The confidence rule for pre-applied choices | High when every sampled value agrees and the sample has at least 50 non-blank values; low otherwise; low is highlighted and confirm-gated |
-| OB-3 | Does "Add data" register the Dataset before or after the first run succeeds | After a run that loaded at least one row; a run that loads nothing leaves the draft and the fixes (B5), not an empty Dataset |
-| OB-5 | The LA walkthrough's findings F-2, F-4, F-5, F-13 | Verify in O0 (claims are hypotheses), then file each that holds as a defect row |
+| OF-1 | One Add data component for the console and Inspecto LA, or one each | **One**, in the code both apps already share (the console imports from `projects/link-analysis` today), built in `LA-ONBOARD-1` phase 4; the console passes "what the columns hold" as optional |
+| OF-2 | The confidence rule for pre-applied choices | High when every sampled value agrees and the sample has at least 50 non-blank values; low otherwise; low is highlighted and confirm-gated. Proposed to `LA-ONBOARD-1` so both UIs use one rule |
+| OF-3 | Does Add data replace the Catalog's *Onboard Stream / Reference* dialog | No: Add data is the primary start; the dialog stays as the advanced start next to *Open in editor*, for authors who want every stage from the outset |
 
-**Answered 2026-10-22 (operator), no longer open:** OB-4 Excel — accepted when the bundle carries the DuckDB `excel`
-extension, otherwise "save as CSV" (DT-8); OB-6 measures — always on, local, never sent anywhere (A-10).
+**Settled elsewhere, not reopened here:** one import route (`LA-ONBOARD-1` OB-2); the Dataset is registered by a
+commit that leaves nothing behind when it fails (OB-2); Excel (DT-8); measures (A-10, OB-13); the walkthrough fixes
+(`LA-ONBOARD-FIXES-1`).
 
-## 9. Not confirmed
+## 8. Not confirmed
 
-- Whether `DatasetRegistrationService.ensure` can be called server-side from the import route or is UI-only today
-  (it is a console service; the server-side equivalent was not surveyed).
-- Whether `LA-ANALYST-UPLOAD-1`'s ingest chain can run without an existing Collector.
-- The Inspecto LA findings in §6 (OB-5).
+- Whether the guided editor can open an `origin: import` Pipeline without changes.
+- Whether the Catalog's empty Datasets pane is a separate component that can take a drop zone.
 
-## 10. Board
+## 9. Board
 
 P2 `ONBOARDING-FIRST-RUN-1` in `BACKLOG.md` §3.4 (hold: operator), indexed in §1 *Decisions owed on individual
 rows*.

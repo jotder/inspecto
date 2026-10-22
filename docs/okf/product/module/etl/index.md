@@ -37,7 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
 | — | P3 | feature | P4 Test mapping on a generic parser node | — |
 | — | P3 | feature | Step Processor catalog | — |
-| `ONBOARDING-FIRST-RUN-1` | P2 | feature | first-run onboarding: from a blank install to a Dataset an application can use, in every edition. | operator |
+| `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |
 | `ANALYTICS-STEPS-TS-1` | P3 | feature | Steps for the Analytics Kernel time-series and cohort kernels: transform.timeseries.changepoint (ChangePoint, input a residual column + σ… | — |

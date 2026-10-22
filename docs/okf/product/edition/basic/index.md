@@ -34,5 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `e
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `ONBOARDING-FIRST-RUN-1` | P2 | feature | first-run onboarding: from a blank install to a Dataset an application can use, in every edition. | operator |
+| `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | operator |
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |
+| `LA-ONBOARD-1` | P2 | feature | Inspecto LA onboarding, blank install to a first finding with the screens alone: LA level (Explorer / Investigations) as an install setti… | operator |

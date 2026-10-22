@@ -10,7 +10,8 @@
 > D-PE5 → DT-7 (shaping), DT-15 (Expectations, quarantine and dedupe stay on Basic, decided) and DT-6 (lookups) ·
 > D-PE6 → DT-4 (decided: files only on Basic, every remote adapter Standard) · D-PE7 → DT-12 · D-PE8 → DT-19 ·
 > D-PE9 → the Outputs row and the `pipeline.egress` gate · D-PE10 → DT-18 · D-PE11 → DT-9. The onboarding experience is
-> [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`). The Inspecto LA side of
+> [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the console) on the shared
+> import route of [`la-onboarding-plan.md`](la-onboarding-plan.md) (`LA-ONBOARD-1`, Inspecto LA). The Inspecto LA side of
 > the same journey: [`spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md).
 >
 > 🟡 **DRAFT 2026-10-22.** It describes what a first-time user wants, what they must do today, and how the product
