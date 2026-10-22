@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.api` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-ONBOARD-FIXES-1` | P2 | defect | defects found in the 2026-10-22 blank-slate walkthrough (use cases §7): suggested schema selectors are names that registration refuses (F… | — |

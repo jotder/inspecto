@@ -35,3 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `e
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition: Basic gets a one-off "Add data" import (CSV / Parquet upload, Postgres snapshot, no-code shaping) and no sched… | operator |
+| `LA-ONBOARD-1` | P2 | feature | Inspecto LA onboarding, blank install to a first finding with the screens alone: LA level (Explorer / Investigations) as an install setti… | operator |
