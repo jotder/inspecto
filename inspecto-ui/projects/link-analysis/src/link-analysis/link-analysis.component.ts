@@ -1444,6 +1444,31 @@ export class LinkAnalysisComponent implements OnInit {
                     replaceUrl: true,
                 });
             });
+        // LA-ONBOARD-1 phase 3: `?view=<id>` opens that saved view, drawing its graph (the first-run sample lands here).
+        // Consumed once, like `seed`: the param is dropped so a reload does not draw it over the analyst's work.
+        this.route.queryParamMap
+            .pipe(
+                map((p) => p.get('view')),
+                distinctUntilChanged(),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe((viewId) => {
+                if (!viewId) return;
+                this.viewsService.list().subscribe({
+                    next: (all) => {
+                        const v = all.find((x) => x.id === viewId);
+                        if (v) void this.loadView(v);
+                        else this.toastr.info('That saved view is not in this Space.', 'Not found');
+                    },
+                    error: () => undefined,
+                });
+                void this.router.navigate([], {
+                    relativeTo: this.route,
+                    queryParams: { view: null },
+                    queryParamsHandling: 'merge',
+                    replaceUrl: true,
+                });
+            });
     }
 
     /** The Datasets of this Space, once listed (empty when the list failed). */

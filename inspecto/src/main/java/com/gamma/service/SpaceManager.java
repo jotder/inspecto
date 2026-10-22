@@ -438,6 +438,7 @@ public final class SpaceManager implements AutoCloseable {
                     List<Map<String, String>> missing = missingFeatures(dir.resolve("config"));
                     info.put("creatable", missing.isEmpty());
                     info.put("missingFeatures", missing);
+                    info.put("samples", SpaceSamples.shipped(dir));   // POST /spaces {loadSamples} accepts it (OB-12)
                     out.add(info);
                 } catch (Exception bad) {
                     log.warn("Skipping unreadable space template {}: {}", dir, bad.toString());
@@ -445,6 +446,19 @@ public final class SpaceManager implements AutoCloseable {
             }
         }
         return out;
+    }
+
+    /**
+     * Whether the shipped template {@code templateId} carries sample data ({@link SpaceSamples#shipped}).
+     *
+     * @throws IllegalArgumentException when no such template ships (or this server hosts a single space)
+     */
+    public boolean templateShipsSamples(String templateId) throws IOException {
+        Path root = templatesRoot();
+        Path tpl = root == null || templateId == null ? null : root.resolve(templateId).normalize();
+        if (tpl == null || !tpl.startsWith(root) || !Files.exists(tpl.resolve("template.toon")))
+            throw new IllegalArgumentException("no such space template '" + templateId + "'");
+        return SpaceSamples.shipped(tpl);
     }
 
     /**

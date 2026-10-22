@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
@@ -9,22 +9,26 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LensService, Space, SpacesService } from 'app/inspecto/api';
+import { SessionService } from 'app/inspecto/auth/session.service';
+import { SampleSpaceDialog } from 'app/inspecto/spaces/sample-space.dialog';
 import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
 
 /**
- * Header control that shows the active space and switches between them. Only rendered on a
- * multi-space (discover) server with spaces to switch between ({@link SpacesService.showSwitcher}).
+ * Header control that shows the active space and switches between them. Rendered on a multi-space (discover)
+ * server with spaces to switch between ({@link SpacesService.showSwitcher}) — and, with ZERO Spaces, whenever the
+ * user may create one (LA-ONBOARD-1 OB-11, F-2: before, a fresh install had no way to make its first Space).
  *
  * Switching persists the new space ({@link SpacesService.selectSpace}) and then hard-reloads at the
  * app root, which lands on the new Space's landing page (UIE-7 `landingGuard`; Home when it names none):
  * every feature component fetches on init and holds its own state, so a reload is the simplest correct way to re-scope the whole app to the new space
  * (and a deep link valid in the old space may not exist in the new one).
  *
- * "New space…" at the bottom of the menu opens the same {@link SpaceFormDialog} as Settings → Spaces and,
+ * "New Space…" at the bottom of the menu opens the same {@link SpaceFormDialog} as Settings → Spaces and,
  * on a successful create, switches straight to the new Space (builder pilot 2026-09-25: a Space created
- * from Settings was not obviously something you then had to activate). Offered only with
- * {@link LensService.canAdminister} — `POST /spaces` refuses anyone else once a Space is hosted, and the
- * switcher only renders when Spaces are hosted.
+ * from Settings was not obviously something you then had to activate). "New from sample…" opens
+ * {@link SampleSpaceDialog}: one call creates a Space from a template that ships samples, loads and runs them
+ * (OB-12). Both are offered to whoever may create a Space ({@link canCreate}): anyone with no sign-in (the server
+ * gates `POST /spaces` on `canAdminister` only for a signed-in Subject), otherwise {@link LensService.canAdminister}.
  *
  * A URL carrying `?space=<id>` (a menu screen link into another Space, a shared link) switches to that
  * Space and reloads at the SAME URL, so the link opens its screen in the right Space. An unknown id is
@@ -36,13 +40,13 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [MatButtonModule, MatDividerModule, MatIconModule, MatMenuModule, MatTooltipModule],
     template: `
-        @if (spaces.showSwitcher()) {
+        @if (visible()) {
             <button
                 mat-stroked-button
                 [matMenuTriggerFor]="menu"
                 class="min-w-0 max-sm:!px-2"
-                matTooltip="Switch space"
-                [attr.aria-label]="label() + ', switch space'"
+                [matTooltip]="spaces.availableSpaces().length ? 'Switch space' : 'Create a Space'"
+                [attr.aria-label]="label() + (spaces.availableSpaces().length ? ', switch space' : ', create a Space')"
             >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
                 <!-- label collapses to the icon on phones so the header row fits 375px (Wave 5 P2) -->
@@ -66,11 +70,17 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
                         <span>{{ s.displayName || s.id }}</span>
                     </button>
                 }
-                @if (lens.canAdminister()) {
-                    <mat-divider></mat-divider>
+                @if (canCreate()) {
+                    @if (spaces.availableSpaces().length) {
+                        <mat-divider></mat-divider>
+                    }
                     <button mat-menu-item (click)="newSpace()">
                         <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                        <span>New space…</span>
+                        <span>New Space…</span>
+                    </button>
+                    <button mat-menu-item (click)="newFromSample()">
+                        <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
+                        <span>New from sample…</span>
                     </button>
                 }
             </mat-menu>
@@ -80,6 +90,17 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
 export class SpaceSwitcherComponent implements OnInit {
     readonly spaces = inject(SpacesService);
     protected lens = inject(LensService);
+    private session = inject(SessionService);
+
+    /** The Inspecto LA create: New Space asks the name and What kind of data? only ({@link SpaceFormDialog}). */
+    readonly dataKind = input(false);
+    /** The sample New from sample picks first (e.g. `la-sample` in Inspecto LA). */
+    readonly preferredSample = input<string | undefined>(undefined);
+
+    /** May create a Space: no sign-in, or {@link LensService.canAdminister} (OB-11). */
+    readonly canCreate = computed(() => this.session.authMode() !== 'oidc' || this.lens.canAdminister());
+    /** Spaces to switch between, or none yet and the user may create the first. */
+    readonly visible = computed(() => this.spaces.showSwitcher() || (this.spaces.multiSpace() && this.canCreate()));
     private router = inject(Router);
     private dialog = inject(MatDialog);
     private destroyRef = inject(DestroyRef);
@@ -110,10 +131,11 @@ export class SpaceSwitcherComponent implements OnInit {
         window.location.reload();
     }
 
-    /** The active space's display label (its name, falling back to its id). */
+    /** The active space's display label (its name, falling back to its id; "No Space yet" before the first). */
     label(): string {
         const c = this.spaces.currentSpace();
-        return c ? c.displayName || c.id : (this.spaces.currentSpaceId() ?? '');
+        if (c) return c.displayName || c.id;
+        return this.spaces.availableSpaces().length ? (this.spaces.currentSpaceId() ?? '') : 'No Space yet';
     }
 
     switch(s: Space): void {
@@ -125,7 +147,17 @@ export class SpaceSwitcherComponent implements OnInit {
     /** Create a Space through the shared form, then make it the active one. */
     newSpace(): void {
         this.dialog
-            .open(SpaceFormDialog, { width: '520px', maxHeight: '90vh' })
+            .open(SpaceFormDialog, { width: '520px', maxHeight: '90vh', data: { dataKind: this.dataKind() } })
+            .afterClosed()
+            .subscribe((created?: Space) => {
+                if (created) this.switch(created);
+            });
+    }
+
+    /** Create a Space from a sample (loaded and run), then make it the active one. */
+    newFromSample(): void {
+        this.dialog
+            .open(SampleSpaceDialog, { width: '520px', maxHeight: '90vh', data: { preferred: this.preferredSample() } })
             .afterClosed()
             .subscribe((created?: Space) => {
                 if (created) this.switch(created);

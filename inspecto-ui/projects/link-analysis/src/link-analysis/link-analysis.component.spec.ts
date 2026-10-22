@@ -651,6 +651,28 @@ describe('LinkAnalysisComponent', () => {
         );
     });
 
+    // LA-ONBOARD-1 phase 3: the first-run sample lands on /link-analysis?view=<id> with its graph drawn.
+    it('?view= opens that saved view and clears the param', async () => {
+        const view: LinkAnalysisView = { id: 'ring', name: 'Ring', sourceId: 'entity-projection', query: {} };
+        const { fixture } = create({ views: [view], queryParams: { view: 'ring' } });
+        const load = vi.spyOn(fixture.componentInstance, 'loadView').mockResolvedValue(undefined);
+        const navigate = await consume(fixture);
+        expect(load).toHaveBeenCalledWith(view);
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { view: null }, queryParamsHandling: 'merge', replaceUrl: true }),
+        );
+    });
+
+    it('?view= naming no saved view of this Space says so and draws nothing', async () => {
+        const { fixture } = create({ views: [], queryParams: { view: 'gone' } });
+        const load = vi.spyOn(fixture.componentInstance, 'loadView').mockResolvedValue(undefined);
+        const info = vi.spyOn(TestBed.inject(ToastrService), 'info');
+        await consume(fixture);
+        expect(load).not.toHaveBeenCalled();
+        expect(info).toHaveBeenCalledWith('That saved view is not in this Space.', 'Not found');
+    });
+
     it('opens no Investigation without ?investigation=', async () => {
         const { fixture } = create({});
         const adopt = vi.spyOn(fixture.componentInstance.investigation, 'adopt').mockResolvedValue(true);

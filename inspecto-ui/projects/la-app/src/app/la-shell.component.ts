@@ -82,7 +82,7 @@ function readExpanded(): boolean {
             </nav>
             <div class="flex flex-row items-center gap-1 md:flex-col md:items-stretch">
                 <div [class.slim-switcher]="!expanded()">
-                    <inspecto-space-switcher></inspecto-space-switcher>
+                    <inspecto-space-switcher [dataKind]="true" preferredSample="la-sample"></inspecto-space-switcher>
                 </div>
                 <user [showAvatar]="false"></user>
                 <button

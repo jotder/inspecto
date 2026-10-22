@@ -7,6 +7,7 @@ import com.gamma.spi.http.RouteModule;
 import com.gamma.service.SpaceContext;
 import com.gamma.service.SpaceId;
 import com.gamma.service.SpaceManager;
+import com.gamma.service.SpaceSamples;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -20,7 +21,7 @@ import java.util.Map;
  *   GET    /spaces                 list every hosted space's manifest                              [v4.7.0]
  *   GET    /spaces/_meta           server capabilities: {multiSpace} — true when CRUD is supported [v4.9.0]
  *   GET    /spaces/templates       the shipped template gallery (spaces/_templates/&lt;id&gt;/template.toon)
- *   POST   /spaces                 body {id, display_name?, description?, template?} — create + boot
+ *   POST   /spaces                 body {id, display_name?, description?, template?, loadSamples?} — create + boot
  *                                  a space, optionally seeded from a shipped template               [v4.7.0]
  *   POST   /spaces/import?id={id}  create + boot a new space seeded from an uploaded bundle zip    [v4.8.0]
  *   PUT    /spaces/{id}            body {display_name?, description?} — rename/re-describe a space  [v4.10.0]
@@ -110,6 +111,8 @@ final class SpaceRoutes implements RouteModule {
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include a valid 'id' ([a-z0-9-], 1-63 chars, not starting with '-')");
         String template = ApiContext.str(body, "template");
+        boolean loadSamples = Boolean.TRUE.equals(body.get("loadSamples"));
+        if (loadSamples) requireSamples(api, template);   // refused before anything is created
         try {
             SpaceContext ctx = template == null
                     ? HostContext.of(api).spaces().create(SpaceId.of(id),
@@ -117,7 +120,12 @@ final class SpaceRoutes implements RouteModule {
                     : HostContext.of(api).spaces().createFromTemplate(SpaceId.of(id),
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template,
                             base -> TemplateSeedGate.require(e, base));   // every seeded kind meets its own route
-            return manifest(ctx);
+            Map<String, Object> out = manifest(ctx);
+            // OB-12: load the template's samples and run each Pipeline that received files, once. The Space stays
+            // created whatever a run answers; each Pipeline's outcome is reported.
+            if (loadSamples)
+                out.put("samples", Map.of("pipelines", SpaceSamples.load(ctx).stream().map(SpaceSamples.PipelineLoad::toMap).toList()));
+            return out;
         } catch (IllegalArgumentException badTemplate) { // unknown template id
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badTemplate.getMessage());
         } catch (IllegalStateException conflict) {   // already exists (single-mode was rejected above)
@@ -151,6 +159,23 @@ final class SpaceRoutes implements RouteModule {
         if (!HostContext.of(api).spaces().delete(SpaceId.of(id), purge))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return Map.of("id", id, "deleted", true, "purged", purge);
+    }
+
+    /** {@code loadSamples} needs a template that ships sample data: 422 naming the reason otherwise (400 for an unknown one). */
+    private static void requireSamples(ApiContext api, String template) throws IOException {
+        if (template == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "loadSamples needs a 'template': only a Space Template ships sample data; nothing was created");
+        boolean ships;
+        try {
+            ships = HostContext.of(api).spaces().templateShipsSamples(template);
+        } catch (IllegalArgumentException unknown) {
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, unknown.getMessage());
+        }
+        if (!ships)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template '" + template
+                    + "' ships no sample data (nothing under data/samples or data/inbox), so loadSamples cannot load any; "
+                    + "create the Space without loadSamples and add your own data; nothing was created");
     }
 
     private static void requireMultiSpace(ApiContext api) {
