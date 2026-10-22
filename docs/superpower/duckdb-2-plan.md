@@ -1,6 +1,8 @@
 # DuckDB 2.0.x plan — adoption, evidence, the looping-query candidates and the build order
 
 **Status: PLAN, 2026-10-05 — decided, not built** (merged 2026-10-22 with the loop-query research, which is archived).
+**2026-10-22: DuckDB `2.0.0.0` GA is on Maven Central (published 2026-10-21) and was trialled — §2a.** The staging
+alpha below is superseded; the trial pins the GA coordinates with no extra repository.
 The operator decided on 2026-10-05: *go with DuckDB 2.0.x from now on* (the alpha now, GA expected in a couple of
 weeks), for the performance and capability gains. This file is the one DuckDB 2.0.x plan: the decision, what was
 measured, what is already built on unmerged branches, what is blocked, the order in which to build, and (§7) the
@@ -57,12 +59,85 @@ the cause; a no-primary-key variant cannot be tested (`ON CONFLICT` needs a cons
 (`PRIMARY KEY (pipeline, key_hash, window_start)`, one `executeUpdate` per row). **Not yet known:** how many keys a real
 ingest claims per call. If that is large, the ledger is slow on every version and needs a bulk path.
 
+## 2a. GA trial — `2.0.0.0`, 2026-10-22
+
+**Branch:** `lane/duckdb-2-ga` at `35e8def16` (local only, worktree `C:\sandbox\duckdb2-ga`, from `origin/master`
+`ae2617828`). It pins `duckdb_jdbc 2.0.0.0` (`pom.xml`, `tools/dependencies.lock`, the step / nodetype templates) and
+moves every DuckDB lambda to the 2.0 form: `x ->` → `lambda x:` and `(x, i) ->` → `lambda x, i:` in `RowShaper` explode,
+seven Space Template jobs / views (business-assurance forecast, telco-bypass, telco-fraud) and three tests;
+`IndexBuilderTest` expects a `v2.` manifest. The ABI derivation needs no change for a plain four-part version (extensions
+resolve to `v2.0.0`). Nothing of it is on master.
+
+### Tests (full reactor, `-Pedition-advanced`, offline)
+
+2.0 refuses the single arrow outright (`Binder Error: Deprecated lambda arrow (->) detected`; `SET
+lambda_syntax='ENABLE_SINGLE_ARROW'` reverts it). With the arrows migrated, **15 tests stay red** — every one a 2.0
+behaviour change, none a lambda:
+
+| Area | Red test | What changed on 2.0 |
+|---|---|---|
+| 🔴 **Masking (security)** | `ControlApiBiQueryMaskingTest.aNumericDerivationOfANumericKeyIsMaskedAndACountIsNot`, `ControlApiDbBrowserMaskingTest.adHocSqlMayOnlySelectAMaskedKey` | the masked-key checks no longer catch a numeric derivation of a key or a `count(CASE WHEN key = …)` — the BI and DB-browser masking contracts are broken. **Cause not traced**; the likeliest is the new `json_serialize_sql` shape (row below) |
+| 🔴 **`SqlGuard` (security)** | `SqlGuardFileFunctionContractTest.everyScalarWithAPathParameterIsRefusedUnless…` | new scalars with a `path` parameter pass the guard: `->>`, `import_database`, `index_key`, `json_*` … (the `sec/sqlguard-duckdb2` branch, §3, was written for this on the alpha) |
+| SQL AST | `SqlAstContractTest`; `SqlSandboxTest` T2 (a bare bind parameter is no longer refused), T3 (the slimmed AST now deserialises), T4 (`query_location_length` end offsets) | `json_serialize_sql` shape: `NOT IN` is `OPERATOR_NOT(COMPARE_IN)`, offsets carry a length |
+| Error text | `DuckDbPendingQueryPreambleTest`, `FailureTextTest` | the driver no longer writes the pending-query preamble; a conversion error now quotes the source column and its value in a new shape — the value-stripping must be re-checked |
+| Capability | `PartitionWriterLayoutSpikeTest.fileSizeBytesCannotBeCombinedWithPartitionBy` | 2.0 now accepts `FILE_SIZE_BYTES` with `PARTITION_BY` (a gain; the spike's pin flips) |
+| Results drift | `ColumnProfileGoldenTest` (2 distinct counts), `PartnerSettlementSeedTest` (`settlement_billed` seed type drifted from its Job SQL), `TelcoRerateGoldenTest` mutant pin | computed values or inferred types differ; each needs a look before regenerating anything |
+| Probably flaky | `EngineDatasetProviderFingerprintTest.theCapIsExactly…` | `unknown:timeout` |
+
+Green on 2.0: the LA index (`IndexBuilderTest v2.`), asn, config, graph, LA core / storage, ops, scoring, screening and
+the rest (56 reactor modules ran). A later targeted re-run showed `NoClassDefFoundError` in two classes that passed in the
+full run — the shared `C:/.m2` jars had been replaced by another build meanwhile (the stale-jar trap), not DuckDB.
+
+### Benchmark — interleaved A1 (1.5.6) · B1 (2.0) · A2 (1.5.6) · B2 (2.0), `-Warmup 1 -Reps 3`
+
+> ⚠ **Taken on a LOADED machine** (operator's call, 2026-10-22): an orphan `C:\sandbox\bench-5e8\sampler.ps1` (PID 15412,
+> running since 2026-10-21) held a core throughout, and other sessions were building. Busy CPU before each side: A1 42 %,
+> B1 11.5 %, A2 25.4 %, B2 14 %. Same-version drift was up to ±32 %, so only large, sign-stable differences count.
+> The LA workloads (`la1m`, `la10m`) were not run: their corpus is not on this machine. Raw JSON: `C:\bench-ga2`.
+
+Rule (§2): real only if the sign holds in both A-vs-B pairs **and** both deltas exceed the same-version drift.
+
+| Workload | A1→B1 / A2→B2 | Same-version drift (A1→A2 / B1→B2) | Verdict |
+|---|---|---|---|
+| Engine ingest — union | +15.5 % / +6.3 % time | +17.2 % / +7.8 % | **not established.** The alpha's +95…106 % regression is gone or now under the noise |
+| Engine ingest — generation | +6.7 % / +6.3 % time | +31.7 % / +31.2 % | **not established** (alpha: +79…89 %) |
+| CSV → parquet write | −47.7 % / −39.5 % time | −4.1 % / +10.9 % | **real gain**, as on the alpha |
+| CSV read, transform, total rows/s | mixed sign or under drift | | not established |
+| Scan filter + aggregate | +78 % / +132 % time (2.2–2.8 ms → 5.0–5.2 ms) | −19.8 % / +4.3 % | **real regression**, small in absolute terms |
+| Scan high-cardinality group by | +29.0 % / +34.8 % | −1.3 % / +3.2 % | **real regression** |
+| Scan top-N · count distinct | +34.1 % / +39.8 % · +13.7 % / +24.9 % | −3.1 % / +1.1 % · −0.8 % / +9.0 % | **real regression** |
+| Concurrent readers, 8 threads | −14.4 % / −17.1 % queries/s | +10.2 % / +6.7 % | **real regression**; 1 and 4 threads not established |
+| Peak memory | +20…50 MB on scan / readers | | minor |
+
+### The `store` workload (operational-store inserts) — slow on both versions
+
+- **1.5.6.0: did not finish.** Side A1 of a first attempt ran the 50,000-row `INSERT … ON CONFLICT DO NOTHING` ledger
+  shape from 12:38 until stopped at 20:03 (7.5 h, about 8.8 CPU-hours, warm-up plus three reps unfinished) on the loaded
+  machine. That run was abandoned; no 1.5.6 `store` number exists.
+- **2.0.0.0 alone: 61 min** for warm-up plus three reps (loaded machine, 36 % busy before it): ledger batch 247–297
+  rows/s, ledger all-duplicates 145–294, single-row autocommit 110–154, upsert 234–263, **plain batched `INSERT` into a
+  table with no key only 568–859 rows/s**, re-sync 1,847–2,863 rows/s.
+- So the §2 dedup-ledger finding is worse than recorded: **row-at-a-time JDBC inserts into a file-backed DuckDB run at
+  hundreds of rows per second on both versions**, keyed or not. Every operational store that writes this way (ledger,
+  status, events) needs a bulk path (Appender or a staged `INSERT … SELECT`), independent of the pin move. The harness's
+  "store ~1 min" estimate was wrong and is corrected in `tests-performance.md`.
+
+### What the trial changes
+
+- **The ingest gate (§6, first bullet) looks met on GA** — the engine regression is not visible above the noise — but it
+  must be re-measured on a quiet machine before it is called closed.
+- **New blockers on GA:** the two masking reds and the `SqlGuard` path-function red are security contracts and come
+  first; then the AST (§5.3), the error-text seams and the result-drift tests.
+- **Scan and concurrent-reader regressions** (+29…40 % on group-by / top-N, −15 % at 8 readers) are new evidence the
+  operator should weigh against the parquet-write gain.
+
 ## 3. What is already built (unmerged branches, all local, none pushed)
 
 | Branch | Commit | What it holds | Merge? |
 |---|---|---|---|
 | `worktree-agent-a6325aaa8d0cf9744` | `3879e07fa` | **The upgrade:** `duckdb.version` → `2.0.0-alpha43385-881`, the staging repository (temporary), the dependency lock, the extension-ABI derivation (`-881` is the JDBC build counter, the ABI directory is `v2.0.0-alpha43385`), lambda syntax `lambda x:` in five Space templates and two test probes, `IndexBuilderTest` `v1.` → `v2.`, an OKF DuckDB 2.0 section, rows `DUCKDB-2-MIGRATION-1` and `DUCKDB-2-SQL-AST-SPA-1` | **No** — not until the §6 gates pass |
 | `sec/sqlguard-duckdb2` | `36e700ce2` | **`SqlGuard` fix** (on top of the upgrade): refuses the five new `*_external_resource` functions and `setval` by name; the contract test now pins an explicit reviewed set of 25 JSON-path / string scalars | **Unverified** — its tests were never run (§5, item 4) |
+| `lane/duckdb-2-ga` | `35e8def16` | **The GA trial** (§2a): `2.0.0.0` from Central, no staging repository, every lambda migrated on current master. Supersedes the alpha upgrade branch as the base for the move; `sec/sqlguard-duckdb2` still has to be ported onto it | **No** — the §2a blockers first |
 
 Already on master (this session): the benchmark harness (`tools/bench-duckdb.ps1`, `tools/bench-duckdb-compare.mjs`,
 `tools/bench/DuckDbBench.java`, a `-Dinspecto.bench.idxDir` knob on `IndexScaleBench`) and the loop-query research plan.

@@ -39,5 +39,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | — |
-| `DUCKDB-2-MIGRATION-1` | P2 | chore | move the DuckDB pin to 2.0.x (operator decision 2026-10-05: go 2.0.x). | external |
+| `DUCKDB-2-MIGRATION-1` | P2 | chore | move the DuckDB pin to 2.0.0.0 GA (on Maven Central since 2026-10-21; operator decision 2026-10-05: go 2.0.x) — trialled 2026-10-22 on la… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-10-18: the containment rule is BUILT; what is left is making the ingest lane write to it. | — |

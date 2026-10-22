@@ -35,4 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `ANALYTICS-CORE-1` | P2 | feature | one home for data operations and statistics; minimise duplicate data-operations code across modules. | — |
-| `DUCKDB-2-MIGRATION-1` | P2 | chore | move the DuckDB pin to 2.0.x (operator decision 2026-10-05: go 2.0.x). | external |
+| `DUCKDB-2-MIGRATION-1` | P2 | chore | move the DuckDB pin to 2.0.0.0 GA (on Maven Central since 2026-10-21; operator decision 2026-10-05: go 2.0.x) — trialled 2026-10-22 on la… | — |
