@@ -114,6 +114,9 @@ describe('LinkAnalysisGrowComponent (LA-GROW-EXCLUDE-1 §3.1)', () => {
         expect(q(el, 'la-grow-hold')?.textContent).toContain('Hold busy numbers with more than 500 contacts');
         expect(q(el, 'la-grow-from')?.textContent).toContain('the outer ring (degree 1): 3 numbers');
         expect(q(el, 'la-grow-hint')?.textContent).toContain('one ring at a time');
+        expect(q(el, 'la-grow-hint')?.querySelector('[data-testid="la-hint-guide"]')?.textContent).toContain(
+            'Grow and clean a graph',
+        );
         await expectNoA11yViolations(el);
         (q(el, 'la-grow-hint')!.querySelector('button') as HTMLButtonElement).click();
         fixture.detectChanges();

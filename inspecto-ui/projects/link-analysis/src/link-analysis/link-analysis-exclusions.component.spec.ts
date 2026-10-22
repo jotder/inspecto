@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExclusionListSummary } from '@inspecto/link-analysis/api/inv.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { penByLabel, penEdit } from '@inspecto/core/testing/pen-field';
@@ -63,7 +63,45 @@ function create() {
 
 const byLabel = (el: HTMLElement, label: string) => el.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement;
 
+beforeEach(() => localStorage.clear());
+
 describe('LinkAnalysisExclusionsComponent (LA-GROW-EXCLUDE-1 §3.3)', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('teaches once (first-time hint, pack-worded, naming the user guide chapter), remembered per browser; axe-clean', async () => {
+        const { fixture, el, host } = create();
+        const hint = () => el.querySelector('[data-testid="la-excl-hint"]') as HTMLElement | null;
+        expect(hint()?.textContent).toContain('keeps numbers out of every step');
+        expect(hint()?.textContent).toContain('Category lists come from your');
+        expect(hint()?.querySelector('[data-testid="la-hint-guide"]')?.textContent).toContain('Grow and clean a graph');
+        await expectNoA11yViolations(el);
+        host.mode.set('basic');
+        fixture.detectChanges();
+        expect(hint()?.textContent).toContain('hides numbers from this graph only (not recorded)');
+        (Array.from(hint()!.querySelectorAll('button')).find((b) => b.textContent?.includes('Got it')) as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(hint()).toBeNull();
+        expect(localStorage.getItem('inspecto.la.hint.exclusions')).toBe('1');
+        fixture.destroy();
+        TestBed.resetTestingModule();
+        expect(create().el.querySelector('[data-testid="la-excl-hint"]')).toBeNull(); // seen: not shown again
+    });
+
+    it('blocked storage (private window): the hint shows, and Got it still hides it — never an error', () => {
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new Error('SecurityError');
+        });
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('SecurityError');
+        });
+        const { fixture, el } = create();
+        const hint = () => el.querySelector('[data-testid="la-excl-hint"]');
+        expect(hint()).not.toBeNull();
+        (Array.from(hint()!.querySelectorAll('button')).find((b) => b.textContent?.includes('Got it')) as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(hint()).toBeNull();
+    });
+
     it('reads in plain words: the line, the lists in force with who keeps them and what they removed; axe-clean', async () => {
         const { el } = create();
         expect(el.querySelector('[data-testid="la-excl-line"]')?.textContent).toContain('17 numbers hidden by 2 lists');

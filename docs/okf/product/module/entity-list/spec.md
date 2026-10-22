@@ -188,7 +188,7 @@ Measured in `inspecto-entity-store` (`ListPruningSp4Bench`, `FactLogReplaySp4Ben
 
 ## Category lists: ownership, auto-apply, restricted members (LA-GROW-EXCLUDE-1 phase 4, 2026-10-22)
 
-Decisions GE-6, GE-8, GE-9 and GE-11 of [`la-grow-exclude-plan.md`](../../../../superpower/la-grow-exclude-plan.md), as built.
+Decisions GE-6, GE-8, GE-9 and GE-11 of [`la-grow-exclude-plan.md`](../../../../archived-documents/plans-archive/la-grow-exclude-plan.md) (archived 2026-10-22), as built.
 
 - **Three attributes on an `exclusion` list**, in the fact log: `ownerKind` (`admin` | `analyst`, default `analyst`),
   `autoApply` (default `false`) and `visibility` (`open` | `restricted`, default `open`). `list.created` of an exclusion

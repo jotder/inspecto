@@ -15,8 +15,8 @@ import {
     previewSentence,
     removedRows,
     roundRestricted,
+    neighboursPreviewBody,
     secondStepWhyNot,
-    sumPreviews,
 } from './grow-exclude';
 
 const TELECOM = packTerms({ labels: { nodes: 'Numbers', links: 'Calls', rows: 'Rows' } });
@@ -228,12 +228,23 @@ describe('grow-exclude — the explorer (Basic)', () => {
         expect(cut).toEqual({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ source: 'a', target: 'b' }], truncated: true });
     });
 
-    it('sums per-node previews, merging held items and list counts', () => {
-        const sum = sumPreviews([
-            preview({ addsNodes: 2, addsLinks: 3, held: [{ id: 'h', contacts: 900 }], excludedByLists: [{ listId: 'l', title: 'L', removed: 1 }] }),
-            preview({ addsNodes: 5, addsLinks: 7, held: [{ id: 'h', contacts: 900 }], excludedByLists: [{ listId: 'l', title: 'L', removed: 2 }], truncated: true }),
-        ]);
-        expect(sum).toMatchObject({ addsNodes: 7, addsLinks: 10, heldCount: 1, truncated: true });
-        expect(sum.excludedByLists).toEqual([{ listId: 'l', title: 'L', removed: 3 }]);
+    it('the explorer preview is ONE body over the whole frontier: ids, direction, hold threshold, kinds only with a kind column', () => {
+        const p = { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target', linkKindCol: 'kind' };
+        const req = { direction: 'out' as const, linkKinds: ['call'], threshold: 250 };
+        expect(neighboursPreviewBody(p, ['A', 'B'], req)).toEqual({
+            dataset: 'links-ds',
+            sourceCol: 'source',
+            targetCol: 'target',
+            linkKindCol: 'kind',
+            ids: ['A', 'B'],
+            direction: 'out',
+            linkKinds: ['call'],
+            hubThreshold: 250,
+        });
+        const bare = neighboursPreviewBody({ ...p, linkKindCol: '' }, ['A'], req);
+        expect(bare).not.toHaveProperty('linkKindCol');
+        expect(bare).not.toHaveProperty('linkKinds'); // the server refuses kinds without a kind column (422)
+        expect(bare).not.toHaveProperty('value'); // the neighbours read's one-entity form is gone
+        expect(bare).not.toHaveProperty('excludeBy'); // the explorer graph has no list in force
     });
 });

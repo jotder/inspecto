@@ -2939,6 +2939,51 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(fixture.componentInstance.growExclude.growOpen()).toBe(false);
     });
 
+    it('Basic preview: ONE neighbours/preview over the whole frontier (ids, direction, hold threshold), never one per node', async () => {
+        const previewNeighbors = vi.fn(() =>
+            of({ addsNodes: 4, addsLinks: 6, held: [], heldCount: 0, excludedByLists: [], truncated: false, readPath: 'flat' }),
+        );
+        const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
+        const { fixture, c, el } = await drawn({ expand, inv: { ...OLD_SERVER, previewNeighbors }, features: BASIC_EDITION_FEATURES });
+        c.onSelectionChange(['a', 'b']);
+        press(el, { key: 'g' });
+        await settle(fixture);
+        await settle(fixture);
+        expect(previewNeighbors).toHaveBeenCalledTimes(1);
+        const body = (previewNeighbors.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+        expect(body).toEqual({
+            dataset: 'links-ds',
+            sourceCol: 'source',
+            targetCol: 'target',
+            ids: ['A', 'B'], // the raw values, as the neighbours read names them
+            direction: 'either',
+            hubThreshold: c.growThreshold(),
+        });
+        expect(el.querySelector('[data-testid="la-grow-preview"]')?.textContent).toContain(
+            'This step adds about 4 nodes and 6 links.',
+        );
+    });
+
+    it('Basic preview: a 403 (restricted list) shows the server reason in the Grow panel, and Grow still runs', async () => {
+        const reason = "entity list 'politicians' is restricted: you may not preview an exclusion by it";
+        const previewNeighbors = vi.fn(() =>
+            throwError(() => new HttpErrorResponse({ status: 403, error: { error: { code: 'FORBIDDEN', message: reason } } })),
+        );
+        const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
+        const { fixture, c, el } = await drawn({ expand, inv: { ...OLD_SERVER, previewNeighbors }, features: BASIC_EDITION_FEATURES });
+        c.onSelectionChange(['a']);
+        press(el, { key: 'g' });
+        await settle(fixture);
+        await settle(fixture);
+        expect(c.growExclude.preview()).toMatchObject({ state: 'error', message: reason });
+        const shown = el.querySelector('[data-testid="la-grow-preview"]') as HTMLElement;
+        expect(shown.textContent).toContain('The preview was refused');
+        expect(shown.textContent).toContain(reason);
+        expect(el.querySelector('[data-testid="la-grow-no-preview"]')).toBeNull();
+        expect((el.querySelector('[data-testid="la-grow-go"]') as HTMLButtonElement).getAttribute('aria-disabled')).not.toBe('true');
+        await expectNoA11yViolations(el.querySelector('[data-testid="la-grow-panel"]') as HTMLElement);
+    });
+
     it('Basic Grow: the explorer grows through neighbours in the chosen direction, says so, and Ctrl+Z undoes it', async () => {
         const expand = vi.fn(async () => ({
             nodes: [

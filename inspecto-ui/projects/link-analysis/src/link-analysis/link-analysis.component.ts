@@ -81,9 +81,9 @@ import {
     filterExpansion,
     growKeepsEdge,
     hiddenByListsLine,
+    neighboursPreviewBody,
     packTerms,
     removedRows,
-    sumPreviews,
 } from './grow-exclude';
 import { LinkAnalysisGrowComponent } from './link-analysis-grow.component';
 import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
@@ -3265,26 +3265,20 @@ export class LinkAnalysisComponent implements OnInit {
         };
     });
 
-    /** The explorer's preview: one `neighbors/preview` per node, summed ("about"). An absent route → no numbers. */
+    /**
+     * The explorer's preview: ONE `neighbors/preview` over the whole frontier (distinct neighbours, so no over-count). An
+     * absent route → no numbers; a refusal (e.g. 403) reaches the panel with the server's reason. No `excludeBy`: the
+     * explorer graph has no list in force (its neighbours read cannot apply one), so the preview never counts one.
+     */
     readonly growBasicAdapter = (this.growExclude.basicAdapter = {
         preview: async (frontier: string[], req: GrowRequest) => {
             const p = this.lastRun()?.query.projection;
             if (!p) return null;
             const nodes = this.canvasData()?.nodes ?? [];
-            const reads = frontier.map((id) =>
-                firstValueFrom(
-                    this.inv.previewNeighbors({
-                        dataset: p.datasetId,
-                        sourceCol: p.sourceCol,
-                        targetCol: p.targetCol,
-                        linkKindCol: p.linkKindCol || undefined,
-                        value: nodes.find((n) => n.id === id)?.data.label ?? id,
-                    }),
-                ),
-            );
-            const sum = sumPreviews(await Promise.all(reads));
+            const ids = frontier.map((id) => nodes.find((n) => n.id === id)?.data.label ?? id);
+            const preview = await firstValueFrom(this.inv.previewNeighbors(neighboursPreviewBody(p, ids, req)));
             // held items only mean something while holding
-            return req.hold ? sum : { ...sum, held: [], heldCount: 0 };
+            return req.hold ? preview : { ...preview, held: [], heldCount: 0 };
         },
     });
 

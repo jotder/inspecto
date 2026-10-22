@@ -6,8 +6,10 @@ import type {
     GrowPreview,
     InvestigationLogEntry,
     InvestigationOpRequest,
+    NeighborsPreviewRequest,
     WorkingSet,
 } from '@inspecto/link-analysis/api/inv.service';
+import type { EntityProjection } from '@inspecto/core/graph';
 import type { DomainProfile } from '@inspecto/link-analysis/graph/domain-profile';
 
 /**
@@ -298,6 +300,12 @@ export function listTargets(
 
 // ── first-time hints (per browser; a convenience, never state that must survive) ──
 
+/**
+ * The user-guide chapter every first-time hint points to. The SPA serves no docs (they ship in the bundle's `docs/`
+ * folder), so the hint names the chapter rather than linking to a page that is not there.
+ */
+export const GROW_GUIDE = { chapter: 'Grow and clean a graph', where: 'Link Analysis manual, §5.4' } as const;
+
 const HINT_PREFIX = 'inspecto.la.hint.';
 
 export function hintSeen(key: string): boolean {
@@ -341,22 +349,24 @@ export function filterExpansion<G extends { nodes: { id: string }[]; edges: { so
     return { ...g, edges, nodes: g.nodes.filter((n) => n.id === origin || touched.has(n.id)) };
 }
 
-/** The per-node previews of a Basic Grow summed into one (an over-count where neighbourhoods overlap — "about"). */
-export function sumPreviews(all: readonly GrowPreview[]): GrowPreview {
-    const lists = new Map<string, { listId: string; title: string; removed: number }>();
-    for (const p of all)
-        for (const l of p.excludedByLists ?? [])
-            lists.set(l.listId, { ...l, removed: (lists.get(l.listId)?.removed ?? 0) + (l.removed || 0) });
-    const held = new Map<string, number>();
-    for (const p of all) for (const h of p.held ?? []) held.set(h.id, h.contacts);
+/**
+ * The explorer's ONE Grow preview body (`POST /inv/projection/neighbors/preview`): the whole frontier as `ids`, the
+ * direction, the link kinds (only with a link-kind column) and the hold threshold. No `excludeBy` — the explorer graph
+ * has no list in force.
+ */
+export function neighboursPreviewBody(
+    p: Pick<EntityProjection, 'datasetId' | 'sourceCol' | 'targetCol' | 'linkKindCol'>,
+    ids: string[],
+    req: Pick<GrowRequest, 'direction' | 'linkKinds' | 'threshold'>,
+): NeighborsPreviewRequest {
     return {
-        addsNodes: all.reduce((s, p) => s + (p.addsNodes || 0), 0),
-        addsLinks: all.reduce((s, p) => s + (p.addsLinks || 0), 0),
-        held: [...held].map(([id, contacts]) => ({ id, contacts })),
-        heldCount: held.size,
-        excludedByLists: [...lists.values()],
-        truncated: all.some((p) => p.truncated),
-        readPath: all[0]?.readPath ?? '',
-        needsApproval: all.some((p) => p.needsApproval),
+        dataset: p.datasetId,
+        sourceCol: p.sourceCol,
+        targetCol: p.targetCol,
+        ...(p.linkKindCol ? { linkKindCol: p.linkKindCol } : {}),
+        ids,
+        direction: req.direction,
+        ...(req.linkKinds && p.linkKindCol ? { linkKinds: req.linkKinds } : {}),
+        hubThreshold: req.threshold,
     };
 }

@@ -111,7 +111,8 @@ a node you have not expanded yet. **Undo** and **Redo** step through display and
 * **Hidden** (tool rail) shows the lists in force — "41 numbers hidden by 3 lists" — lets you switch one on or off,
   and shows what was removed.
 
-In an Investigation each of these is a recorded step; without one (Basic) they change only what you see.
+In an Investigation each of these is a recorded step; without one (Basic) they change only what you see. The first
+time each panel opens, a short note explains it; **Got it** hides the note in this browser.
 
 ---
 

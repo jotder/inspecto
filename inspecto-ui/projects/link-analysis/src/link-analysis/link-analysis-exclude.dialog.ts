@@ -56,7 +56,7 @@ const NOT_BLANK = /\S/;
         PenFieldComponent,
     ],
     template: `
-        <h2 mat-dialog-title [matTooltip]="'Exclusion: the items leave the graph and their links go with them'">
+        <h2 mat-dialog-title [matTooltip]="'Exclusion: the ' + data.terms.nodes + ' leave the graph and their ' + data.terms.links + ' go with them'">
             Exclude {{ data.count.toLocaleString('en') }} {{ data.count === 1 ? data.terms.node : data.terms.nodes }}
         </h2>
         <mat-dialog-content class="flex flex-col gap-3 text-sm">

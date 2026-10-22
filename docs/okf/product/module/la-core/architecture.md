@@ -950,7 +950,7 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
   is rounded; `/replay` (main and Draft) drops the `excludedKeys` those steps remembered and says `excludedKeysHidden: true`.
   ⚠ Not hidden, deliberately: the step's Working Set **delta** still names the admitted entities it removed (the canvas
   needs them, and the analyst saw them a step earlier), and the **Dossier** (its ledger counts and negative space) is
-  unchanged — BACKLOG row on `LA-GROW-EXCLUDE-1`.
+  unchanged — BACKLOG `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`.
 - **Grow previews.** `GrowPreview.listLine` rounds a list's `removed` only when the list is restricted (now, sealed, or
   no longer known) and the caller holds neither grant; an open list's count is exact. The Basic explorer's
   `POST /inv/projection/neighbors/preview` refuses `excludeBy` over a restricted list to such a caller (403), because two
@@ -962,6 +962,56 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
 - Tests: `ControlApiInvestigationCategoryListsTest` (geo-link, 5: auto-apply recorded and replayed with an optional, an
   analyst and a retired list beside it; the unsealable list refusing the create with nothing written; the chips in Basic;
   503; restricted hiding and rounding for an analyst against the true values for a `canRevealLinkEntities` lead).
+
+### 6.9 Grow, Held and Exclude on the graph (LA-GROW-EXCLUDE-1, SPA, as built 2026-10-22)
+
+The analyst side of the plan (archived:
+[`la-grow-exclude-plan.md`](../../../../archived-documents/plans-archive/la-grow-exclude-plan.md); decisions GE-1…GE-12
+built as recommended). How it reads to a user: [user guide §5.4](user-guide-manual.md) "Grow and clean a graph".
+
+- **Seams.** `grow-exclude.ts` is the pure half (wording, the request a Grow sends, lists in force, what they removed,
+  the hint store); `GrowExcludeStore` (provided beside `InvestigationSessionStore`) holds the session state and the
+  Investigation actions; the Grow panel, Held tray, Exclusions panel and Exclude dialog are presentational. Every recorded
+  change is an existing op — `expand`, `exclude`, `excludeBy`, `undo` (GE-12) — so replay and the Dossier are unchanged.
+  The explorer graph (Basic, or the query graph in any edition) is the `basic` mode: nothing recorded.
+- **Preview (GE-3).** An Investigation previews with `POST …/expand/preview` over exactly the `expand` body the Grow
+  would append (`growExpandBody`). The explorer previews with ONE `POST /inv/projection/neighbors/preview` over the
+  whole frontier — `{dataset, sourceCol, targetCol, linkKindCol?, ids, direction, linkKinds? (only with a kind column),
+  hubThreshold}` (`neighboursPreviewBody`) — so its counts are distinct neighbours, not a per-node sum (the first cut sent
+  one `{value}` call per node and over-counted shared neighbours; the server still accepts `value` as `ids: [value]`).
+  0 / 404 / 405 / 501 / 503 read as *No preview on this server* and Grow still runs; 404 / 405 / 501 are remembered per mode
+  for the session. Any other status, a 403 included, shows the server's reason in the panel (`previewFailure`), never a
+  toast. *2 steps* is offered only when a ready preview says the first step stays under the frontier cap.
+- **The explorer sends no `excludeBy`.** Its neighbours read (`/inv/projection/neighbors`) cannot apply a list, so a
+  preview counting one would promise removals the Grow does not make. Category lists therefore apply to Investigations
+  only (auto-apply on create, §6.8); the explorer's Exclude hides locally and can add to a list.
+- **Undo.** A Grow / Exclude result line offers Undo while the steps it made are still the newest effective steps of the
+  log as last read (`valid()`); it sends the `undo` op once per step. Ctrl+Z runs that Undo first, then the display
+  undo. The explorer's Undo restores the graph snapshot only while the graph is the one the Grow drew.
+- **Switch a list off = the `undo` of its step**, so only a list applied by the newest effective step can be switched off;
+  a list applied earlier, or in several steps, says why (`listsInForce`). A "skip this list for one Grow" would need an
+  `expand` parameter nobody has specified — deferred.
+- **First-time hints** (Grow panel, Held tray, Exclusions panel): each dismissible with *Got it*, remembered per browser in
+  `localStorage` (`inspecto.la.hint.grow` · `.busy` · `.exclusions`), every read and write in try/catch so a private
+  window shows the hint again and never errors. Each names the user-guide chapter *Grow and clean a graph* (`GROW_GUIDE`)
+  as text, not a link: the SPA serves no docs (they ship in the bundle's `docs/` folder).
+- **Pack-aware wording.** Every count, tooltip and hint speaks the active pack's node / link words (`packTerms`, from the
+  profile labels: Telecom *subscribers / calls*, Mobile Money *wallets / transfers*); the technical term (expand, super node,
+  exclusion list) stays in the tooltip.
+- **Keyboard.** **G** Grow, **X** Exclude…, **Ctrl+Z** Undo — not in a text field, grid, menu or dialog; listed in the main
+  app's `?` shortcuts help (`shortcuts-help.dialog.ts`). The standalone `la-app` has no `?` help dialog.
+- **Gotchas and deferrals** (open rows in [BACKLOG](../../../../BACKLOG.md)):
+  - *Shared-Investigation Undo race* (`LA-GROW-EXCLUDE-UNDO-RACE-1`): `POST …/undo` takes back the newest effective step
+    and carries no expected step, so a team member's step appended after this browser last read the log is the one undone.
+  - *Dossier* (`LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`): it still lists a restricted list's removed ids and true counts.
+  - *Previews are not audited*: neither preview route writes an audit record or event (read-shaped, rate class EXPENSIVE).
+  - *A broken auto-apply list blocks every Investigation create* in the Space (fail closed, the refusal names the list)
+    until an administrator fixes or retires it.
+  - No Access-Catalog node carries `canManageExclusionCategories` yet (`LensService` reads the identity capability).
+  - The think-aloud test with two new users (`tests-think-aloud-script.md`) was not run (`LA-GROW-EXCLUDE-THINK-ALOUD-1`).
+- Tests: `grow-exclude.spec.ts`, `grow-exclude.store.spec.ts`, the four component specs (axe-clean, hints remembered and
+  blocked storage), and `link-analysis.component.spec.ts` "Grow, Held and Exclude on the graph" (one explorer preview
+  with its body; a 403 shown in the panel; the rail, Basic Grow, Undo, Ctrl+Z, degrading without the routes).
 
 ## 7. Host registration, Jobs and live detection
 

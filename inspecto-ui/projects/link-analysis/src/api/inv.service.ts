@@ -70,6 +70,22 @@ export interface NeighborsRequest extends ProjectionRequest {
     value: string;
 }
 
+/**
+ * {@code POST /inv/projection/neighbors/preview} (LA-GROW-EXCLUDE-1): the explorer's Grow preview over a SET of entities.
+ * `excludeBy` over a restricted list is refused (403) to a caller who may not see its members.
+ */
+export interface NeighborsPreviewRequest extends ProjectionRequest {
+    /** The raw projected values to grow from. */
+    ids: string[];
+    direction?: 'either' | 'out' | 'in' | 'reciprocal';
+    /** Needs `linkKindCol`. */
+    linkKinds?: string[];
+    /** Busy neighbours above it are held (default: the Space's `hub_threshold`). */
+    hubThreshold?: number;
+    /** Exclusion list ids whose members the step would leave out. */
+    excludeBy?: string[];
+}
+
 /** {@code POST /inv/projection/neighbors} with {@code list: true}: one page of an entity's neighbours (LA-EXPAND-PICK-NEIGHBOURS-1). */
 export interface NeighbourListRequest extends NeighborsRequest {
     /** Neighbours to skip (default 0). */
@@ -2081,8 +2097,8 @@ export class InvService {
         return this.http.post<GrowPreview>(invPath(id, 'expand/preview'), body);
     }
 
-    /** The explorer's (Basic) dry run: what a neighbours read of `req.value` would add. */
-    previewNeighbors(req: NeighborsRequest): Observable<GrowPreview> {
+    /** The explorer's (Basic) dry run: what ONE neighbours step from `req.ids` would add. */
+    previewNeighbors(req: NeighborsPreviewRequest): Observable<GrowPreview> {
         return this.http.post<GrowPreview>(apiUrl('/inv/projection/neighbors/preview'), req);
     }
 

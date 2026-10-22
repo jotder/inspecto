@@ -266,8 +266,8 @@ A profile (*Generic graph, Financial crime, Telecom, Supply chain, Cyber*) renam
 
 ### 5.4 Grow and clean a graph
 
-`LA-GROW-EXCLUDE-1` (UI, phases 1–3 and 5). Three controls on the graph, worded in the active pack's terms (Telecom:
-*numbers* and *calls*; Mobile Money: *wallets* and *transfers*). On an open Investigation's canvas every change is one
+`LA-GROW-EXCLUDE-1` (phases 1–6, shipped 2026-10-22). Three controls on the graph, worded in the active pack's terms (Telecom:
+*subscribers* and *calls*; Mobile Money: *wallets* and *transfers*). On an open Investigation's canvas every change is one
 **recorded** step of the log (an existing op — `expand`, `exclude`, `excludeBy` or `undo` — so replay and the Dossier
 are unchanged); on the explorer graph (Basic, or the query graph) it is **not recorded**. Every change ends with a
 one-line result and **Undo** (also **Ctrl+Z**).
@@ -286,8 +286,10 @@ from the Investigation's outer ring (the explorer: the nodes not grown yet, the 
 * **Preview before the change**: "This step adds about 342 numbers and 1,210 calls; 3 busy numbers will be held; 41
   numbers are removed by your exclusion lists", with the lists in force as chips and their counts. A step that would
   need four-eyes approval says so. The preview is a dry run (`POST /inv/investigations/{id}/expand/preview`; the
-  explorer: `POST /inv/projection/neighbors/preview` per node, summed — "about"). A server without these routes
-  shows *No preview on this server* and Grow still runs; the result line then says what it did.
+  explorer: ONE `POST /inv/projection/neighbors/preview` over every node it grows from). The explorer applies no
+  exclusion list, so its preview names none; lists apply in an Investigation. A server without these routes shows
+  *No preview on this server* and Grow still runs; the result line then says what it did. A refused preview (for
+  example a 403) shows the server's reason in the panel.
 
 **Held — busy numbers** (super nodes). Items above the threshold stay on the graph with a ring and a **held** badge
 and are listed in the Held tray (bottom left) with their contact count. **Remove held** excludes all of them in one
@@ -311,8 +313,11 @@ members are never listed to an analyst — its count is rounded (nearest 5, at l
 offers *Create your first list* and names the category lists the administrator set up. Without *Manage incidents*
 every switch says why it is held.
 
+**First-time hints.** The Grow panel, the Held tray and *Hidden by lists* each explain themselves once, in a few lines,
+and name this chapter. **Got it** dismisses a hint for good in this browser (a private window shows it again).
+
 Keyboard: **G** Grow, **X** Exclude…, **Ctrl+Z** undoes the last Grow or Exclude (then the display undo). Not in a text
-field, a grid, a menu or a dialog.
+field, a grid, a menu or a dialog. The `?` shortcuts help lists all three.
 
 ---
 

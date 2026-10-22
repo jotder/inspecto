@@ -308,7 +308,7 @@ export class GrowExcludeStore {
             let title = this.lists()?.find((l) => l.id === id)?.title ?? id ?? '';
             if (!id) {
                 if (!list.entityType)
-                    return { ok: false, message: 'These items have no Entity Type, so they cannot go on a list.' };
+                    return { ok: false, message: `These ${t.nodes} have no Entity Type, so they cannot go on a list.` };
                 const made = await firstValueFrom(
                     this.inv.createEntityList({
                         title: list.newTitle!.trim(),

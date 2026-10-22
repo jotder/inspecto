@@ -1,5 +1,11 @@
 # Inspecto LA — grow the graph and exclude noise, made easy for a new analyst (`LA-GROW-EXCLUDE-1`)
 
+> **Status:** ✅ SHIPPED 2026-10-22 and archived (phases 1–6; the think-aloud test with two new users was not run and is
+> its own BACKLOG row). Current behaviour lives in the la-core hub — [architecture §6.8–§6.9](../../okf/product/module/la-core/architecture.md),
+> [user guide §5.4](../../okf/product/module/la-core/user-guide-manual.md) — and the entity-list hub
+> [spec](../../okf/product/module/entity-list/spec.md) "Category lists". Open items: BACKLOG `LA-GROW-EXCLUDE-RESIDUALS-1`,
+> `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`, `LA-GROW-EXCLUDE-UNDO-RACE-1`, `LA-GROW-EXCLUDE-THINK-ALOUD-1`. Provenance only — not maintained.
+
 **Status: PLAN 2026-10-21 — recommendations written for operator review. 2026-10-22: the UI lane (C) of phases 1, 2, 3 and 5 is built (`grow-exclude.ts`, `GrowExcludeStore`, the Grow / Held / Exclusions components and the Exclude dialog; user guide §5.4); backend lanes A (exclusion-list ownership) and B (expand preview) are built in parallel against the route contracts in §8, and the UI degrades without them.** Decisions GE-1…GE-12 are
 the assistant's recommendations (the operator asked for the plan "with your recommendations" and to improve
 intuitiveness for new users); confirm before phase 1 starts. When a phase ships, distil the as-built facts into
@@ -122,8 +128,8 @@ Recorded, replayable steps remain the reason to upgrade.
 3. **Exclude right-click + Exclusions panel** — `exclude` / `excludeBy`, list creation from the graph.
 4. **List ownership** — `owner_kind`, `auto_apply`, `visibility` on Entity Lists; admin-only category lists;
    restricted members; capability GE-11; Settings page for categories. **Built 2026-10-22** (wire names `ownerKind`,
-   `autoApply`, `visibility`): as built in the entity-list hub [spec](../okf/product/module/entity-list/spec.md)
-   "Category lists" and la-core [architecture §6.8](../okf/product/module/la-core/architecture.md).
+   `autoApply`, `visibility`): as built in the entity-list hub [spec](../../okf/product/module/entity-list/spec.md)
+   "Category lists" and la-core [architecture §6.8](../../okf/product/module/la-core/architecture.md).
 5. **Basic explorer variant** (GE-10).
 6. **New-user polish** — first-time hints, keyboard shortcuts, pack-aware wording, user-guide chapter
    "Grow and clean a graph", a think-aloud test with two new users (`tests-think-aloud-script.md`).

@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
-import { PackTerms, hintSeen, markHintSeen } from './grow-exclude';
+import { GROW_GUIDE, PackTerms, hintSeen, markHintSeen } from './grow-exclude';
 
 /** One held busy item as the tray lists it. */
 export interface HeldItem {
@@ -48,6 +48,7 @@ export interface HeldItem {
                             Call centres, switchboards and shops connect to thousands of {{ t().nodes }} and hide the real
                             links. Grow holds them: they stay on the graph, ringed and marked “held”, but are not grown further.
                         </p>
+                        <p class="text-secondary m-0" data-testid="la-hint-guide">More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).</p>
                         <button mat-button type="button" class="mt-1" (click)="dismissHint()">Got it</button>
                     </div>
                 }
@@ -132,12 +133,13 @@ export class LinkAnalysisHeldTrayComponent {
 
     readonly open = signal(true);
     readonly showHint = signal(!hintSeen('busy'));
+    readonly guide = GROW_GUIDE;
     readonly t = computed(() => this.terms());
     readonly shown = computed(() => this.held().slice(0, 50));
     readonly removeHint = computed(() =>
         this.mode() === 'investigation'
-            ? 'Exclude every held item — one recorded step, with the reason, that Undo reverts (super nodes)'
-            : 'Hide every held item from this graph (not recorded); Undo brings them back',
+            ? `Exclude every held ${this.t().node} — one recorded step, with the reason, that Undo reverts (super nodes)`
+            : `Hide every held ${this.t().node} from this graph (not recorded); Undo brings them back`,
     );
 
     dismissHint(): void {

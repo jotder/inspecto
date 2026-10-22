@@ -6,7 +6,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import type { ExclusionListSummary } from '@inspecto/link-analysis/api/inv.service';
-import { ListInForce, PackTerms, RemovedRow } from './grow-exclude';
+import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen } from './grow-exclude';
 
 /**
  * LA-GROW-EXCLUDE-1 §3.3 — the **Exclusions** panel beside the graph: the lists in force as chips (name, who keeps it,
@@ -37,6 +37,25 @@ import { ListInForce, PackTerms, RemovedRow } from './grow-exclude';
                     <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                 </button>
             </div>
+
+            @if (showHint()) {
+                <div class="rounded-md border p-2 text-xs" style="border-color: var(--gamma-border)" data-testid="la-excl-hint">
+                    @if (mode() === 'investigation') {
+                        <p class="m-0">
+                            An exclusion list keeps {{ t().nodes }} out of every step. Category lists come from your
+                            administrator; analyst lists, such as call centres, are yours.
+                        </p>
+                        <p class="m-0">Switching a list on or off is one recorded step, and Undo takes it back.</p>
+                    } @else {
+                        <p class="m-0">
+                            Exclude… hides {{ t().nodes }} from this graph only (not recorded); Show them again brings
+                            them back. A list you add them to is kept, and applies to every step of an Investigation.
+                        </p>
+                    }
+                    <p class="text-secondary m-0" data-testid="la-hint-guide">More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).</p>
+                    <button mat-button type="button" class="mt-1" (click)="dismissHint()">Got it</button>
+                </div>
+            }
 
             @if (mode() === 'investigation') {
                 <p class="m-0 text-sm" role="status" data-testid="la-excl-line">{{ line() }}</p>
@@ -148,7 +167,7 @@ import { ListInForce, PackTerms, RemovedRow } from './grow-exclude';
                 <div class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" data-testid="la-excl-first">
                     <p class="m-0 text-xs">
                         No exclusion list yet. A list keeps {{ t().nodes }} you never want to see — call centres, test
-                        numbers — out of every step.
+                        {{ t().nodes }} — out of every step.
                     </p>
                     <inspecto-pen-field label="List name" [formControl]="newTitle" placeholder="e.g. Call centres" [maxlength]="200"></inspecto-pen-field>
                     <button
@@ -193,6 +212,8 @@ export class LinkAnalysisExclusionsComponent {
     readonly createList = output<string>();
     readonly closed = output<void>();
 
+    readonly showHint = signal(!hintSeen('exclusions'));
+    readonly guide = GROW_GUIDE;
     readonly showRemoved = signal(false);
     readonly newTitle = new FormControl('', { nonNullable: true });
     readonly t = computed(() => this.terms());
@@ -210,6 +231,11 @@ export class LinkAnalysisExclusionsComponent {
 
     ownerLabel(kind: 'admin' | 'analyst' | null | undefined): string {
         return kind === 'admin' ? 'Category' : kind === 'analyst' ? 'Analyst' : 'List';
+    }
+
+    dismissHint(): void {
+        markHintSeen('exclusions');
+        this.showHint.set(false);
     }
 
     ownerHint(kind: 'admin' | 'analyst' | null | undefined): string {

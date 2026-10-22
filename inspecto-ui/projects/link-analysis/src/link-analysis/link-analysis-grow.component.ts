@@ -28,6 +28,7 @@ import { PenFieldComponent } from '@inspecto/core/components/pen-field.component
 import type { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
 import {
     GROW_DIRECTIONS,
+    GROW_GUIDE,
     GrowContext,
     GrowDirection,
     GrowRequest,
@@ -74,7 +75,7 @@ import { GrowExcludeStore } from './grow-exclude.store';
                 <h2
                     id="la-grow-title"
                     class="m-0 text-sm font-semibold"
-                    matTooltip="Grow is an expand: one recorded step that adds the next ring of linked items"
+                    [matTooltip]="'Grow is an expand: one step that adds the next ring of linked ' + t().nodes"
                 >
                     Grow
                 </h2>
@@ -89,6 +90,7 @@ import { GrowExcludeStore } from './grow-exclude.store';
                     <p class="m-0">Grow adds the {{ t().nodes }} linked to what is on the graph — one ring at a time.</p>
                     <p class="m-0">You see what a step would add before anything changes.</p>
                     <p class="m-0">Every Grow can be undone (Undo, or Ctrl+Z).</p>
+                    <p class="text-secondary m-0" data-testid="la-hint-guide">More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).</p>
                     <button mat-button type="button" class="mt-1" (click)="dismissHint()">Got it</button>
                 </div>
             }
@@ -113,7 +115,7 @@ import { GrowExcludeStore } from './grow-exclude.store';
                 <div class="flex flex-col gap-1">
                     <span class="text-xs font-semibold" id="la-grow-steps">How far</span>
                     <mat-button-toggle-group formControlName="steps" aria-labelledby="la-grow-steps">
-                        <mat-button-toggle [value]="1" matTooltip="One ring of linked items (one expand step)">
+                        <mat-button-toggle [value]="1" [matTooltip]="'One ring of linked ' + t().nodes + ' (one expand step)'">
                             <span class="text-xs">1 step</span>
                         </mat-button-toggle>
                         <mat-button-toggle
@@ -262,6 +264,7 @@ export class LinkAnalysisGrowComponent implements OnInit, OnChanges {
     private host: ElementRef<HTMLElement> = inject(ElementRef);
 
     readonly directions = GROW_DIRECTIONS;
+    readonly guide = GROW_GUIDE;
     readonly windowOptions: PickerOption[] = [
         { value: 'inherit', label: 'The Investigation’s window', hint: 'The window set for this Investigation' },
         { value: 'full', label: 'All available data', hint: 'Ignore the window for this step' },
