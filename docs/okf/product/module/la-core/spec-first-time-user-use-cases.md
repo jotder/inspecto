@@ -42,6 +42,31 @@ The beginner's vocabulary is the business one ("customer", "wallet", "phone numb
 "call"). Product terms (Dataset, Entity Type) are learned only when needed and always shown with a plain-words
 explanation. Pipeline terms never appear on Basic (§8 A-6).
 
+### 1.1 Two contexts: who the user is decides the rules, the LA level decides the screens
+
+Inspecto LA runs in two very different places. Three questions are kept apart (operator, 2026-10-22, A-14 to A-16):
+
+| Question | Decided by | Free install (no sign-in) | Enterprise install (sign-in, e.g. a Revenue Assurance product) |
+|---|---|---|---|
+| **Who is the user?** | Edition: Basic ships no authenticator (`authMode: none`); Standard and above sign in (OIDC) | One person who owns everything. There is no administrator; every permission check passes. | Many people with roles; administrators exist. |
+| **How much Link Analysis?** | **LA level, a licensed setting** (A-14): *Explorer* or *Investigations* | Explorer (Basic) | Explorer or Investigations, per licence, on Standard and above |
+| **Where does data come from?** | Context, and a per-Space switch (A-15) | The user's own files ("Add data") | Datasets built by Pipelines; "Add data" only where an administrator turned it on |
+
+**Rules that follow who the user is, never the LA level:**
+
+| Behaviour | No sign-in | Sign-in |
+|---|---|---|
+| Masking of entity ids | Off by default (anyone could reveal anyway) | On and enforced; reveal audited (A-16) |
+| Category exclusion lists (admin-owned, auto-applied, restricted) | The user owns and sees every list; "restricted" has no effect | Enforced: admin-owned, auto-applied, members hidden without the reveal right |
+| "Add data" | Always available | Per Space, off by default; when on, only with `canUploadData` (A-15) |
+| Pipelines | Hidden; "Add data" runs them behind the scenes | Built by data owners in the console; analysts see "kept up to date by…" |
+| "Ask an administrator" | Never shown | Shown where a right is missing |
+
+**The LA level only decides which screens exist** (Explorer: graph, Grow, algorithms, lists, saved views as cases;
+Investigations: recorded steps, approvals, Dossiers, integrations), the same in both contexts. An enterprise
+install with an Explorer licence is the "basic LA inside an enterprise product" case: full governance, explorer
+screens, Investigation actions shown locked with the licence as the reason.
+
 ## 2. What the beginner wants (goals)
 
 | Goal | In the user's words | Typical start |
@@ -135,6 +160,9 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 
 - **Actor:** P1 (Basic), P2, P3. **Trigger:** **Add data**, a dropped file (H8), the empty "Explore a Dataset"
   card, or the Space guide.
+- **Context (§1.1):** always available with no sign-in. With sign-in, available only in Spaces where an
+  administrator turned it on, and only with `canUploadData`; elsewhere the control is locked with "Data in this
+  Space comes from Pipelines - ask an administrator" (A-15).
 - **Goal:** turn a file into something Link Analysis can draw, without learning Pipelines.
 - **Today:** no UI on Basic. The analyst upload lives inside Investigations (Standard+) and only drops the file in
   a Collector's inbox. Setup took 9 steps over the API (parse preview, schema, a schema rewrite because suggested
@@ -285,8 +313,9 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **Today:** saved views, image and data export, Close; Investigations and Dossiers on Standard+.
 - **Target flow:** **Save as a case** names the view (it appears under **My work** with its lists) and states that
   a view re-reads live data and is not evidence; **Export** offers picture, table of nodes and links, and a one-page
-  summary. On Standard+ **Start an Investigation from this** records the steps from here; on Basic that action is
-  shown locked with one line on what an Investigation adds.
+  summary. With the Investigations LA level **Start an Investigation from this** records the steps from here; with
+  the Explorer level (Basic, or an enterprise Explorer licence, A-14) that action is shown locked with one line on
+  what an Investigation adds.
 
 ### UC-14 Come back later
 
@@ -377,6 +406,10 @@ Dataset, and which columns are from, to and which Entity Type). The target is ze
 | A-11 | Locked or hidden for what an edition lacks? | **Locked with a reason inside screens; the navigation stays lean** (whole Standard+ pages such as Alerts stay out of the Basic nav). |
 | A-12 | Postgres snapshot on Basic (DT-4) vs remote adapters Standard+ (D-PE6)? | **Files only on Basic** (D-PE6 wins); a database is shown locked. |
 | A-13 | Import checks only on Basic (DATA-TIERS-1) vs Expectations, quarantine, dedupe on Basic (D-PE5)? | **Keep them on Basic** (D-PE5 wins). |
+
+| A-14 | Can an enterprise (sign-in) install run Link Analysis without Investigations? | **Yes: the LA level (Explorer / Investigations) becomes its own licensed setting** on Standard and above; governance still comes from the edition. Basic stays Explorer with no sign-in. Today the `investigations` feature follows the edition, so this is a change. |
+| A-15 | May analysts import their own files in a sign-in Space? | **An administrator decides per Space**, off by default; when on, only people with `canUploadData`. Always on with no sign-in. |
+| A-16 | What decides the masking default? | **Whether people sign in**, not the edition name: no sign-in → off, sign-in → typed (follows from §1.1). Today `EditionMaskingDefault` keys on the Basic edition, which gives the same result only because Basic is the edition without sign-in. |
 
 A-12 and A-13 reverse parts of DATA-TIERS-1; that plan records the change (its DT-4 and the data-quality row).
 
