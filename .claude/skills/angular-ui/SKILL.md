@@ -482,7 +482,8 @@ src/app/
 - **Asking for ONE typed value → `<inspecto-pen-field>`** (`inspecto/components/pen-field.component.ts`; the
   Link Analysis left panel's own row, extended to the Investigation tab and Settings ▸ Link Analysis 2026-10-15).
   Pair it with `<inspecto-option-picker>` for a choice and the Link Analysis forms read as ONE idiom: **label ·
-  value · ✎**, the input only while the row is edited (Enter / blur commits, Escape drops). A `ControlValueAccessor`
+  value · ✎**, the input only while the row is edited (Enter / blur commits, Escape drops; a printable key typed on the
+  focused CLOSED row opens it holding that key, spreadsheet-style, 2026-10-22). A `ControlValueAccessor`
   (`formControlName` / `[formControl]` / `[(ngModel)]` as a `matInput` was), `type` `text | number | date`, `multiline`
   for a free-text note (Shift+Enter breaks a line), `maxlength`, `placeholder`, `default` (a ghost the → key accepts),
   `required` (the asterisk only), `[error]` (a host-rendered `role="alert"` line) and a public `focus()` for a host

@@ -114,6 +114,11 @@ export class DatasetEditorComponent implements OnInit {
     /** Why the picked store shows no preview rows (unknown store, unreadable, no offline sample). */
     readonly previewProblem = computed(() => this.page()?.error ?? null);
     readonly editing = signal(false);
+    /**
+     * The STORED Dataset this editor opened, for the keys and the viz it does not edit: a save writes them back as read.
+     * Only a stored copy counts - an imported draft's extra keys (another Space's envelope) are not carried.
+     */
+    private stored: Dataset | null = null;
     readonly saving = signal(false);
     readonly materializing = signal(false);
     readonly writesDisabled = signal(false);
@@ -240,7 +245,10 @@ export class DatasetEditorComponent implements OnInit {
         // guard would otherwise ignore the freshly-restored model.
         this.ready.set(false);
         this.datasets.get(id).subscribe({
-            next: (d) => this.seed(d),
+            next: (d) => {
+                this.stored = d;
+                void this.seed(d);
+            },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load dataset "${id}"`)),
         });
     }
@@ -442,7 +450,10 @@ export class DatasetEditorComponent implements OnInit {
             columns: this.columns(),
             measures: this.measures(),
             calculated: this.calculated(),
+            viz: this.stored?.viz ?? null,
         });
+        // What the editor does not edit goes back exactly as it was read (a new Dataset has none).
+        if (this.stored?.extra) ds.extra = this.stored.extra;
         this.saving.set(true);
         const draft = this.importDraft();
         const ifMatch = draft ? this.draftIfMatch : undefined;
