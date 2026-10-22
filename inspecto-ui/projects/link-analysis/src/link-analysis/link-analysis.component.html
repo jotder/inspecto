@@ -177,18 +177,16 @@
                 >
                     <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                 </button>
-                <!-- LA-10: the Investigation op log (opens the right dock's Investigation tab); absent on Basic -->
-                @if (investigationsEnabled()) {
-                    <button
-                        mat-icon-button
-                        (click)="openInvestigation()"
-                        [color]="investigation.active() ? 'primary' : undefined"
-                        matTooltip="Investigation — an ordered, replayable op log"
-                        aria-label="Open the Investigation"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                    </button>
-                }
+                <!-- LA-10: the Investigation op log (opens the right dock's Investigation tab; locked there on the Explorer level) -->
+                <button
+                    mat-icon-button
+                    (click)="openInvestigation()"
+                    [color]="investigation.active() ? 'primary' : undefined"
+                    matTooltip="Investigation — an ordered, replayable op log"
+                    aria-label="Open the Investigation"
+                >
+                    <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
+                </button>
 
                 @if (search() || kindFilter().length || timeColumn()) {
                     <button
@@ -1269,20 +1267,40 @@
                             (highlight)="emphasis.set($event)"
                         ></inspecto-link-analysis-temporal-findings>
 
-                        <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse -->
-                        @if (toolboxTab() === 'investigation' && investigationsEnabled()) {
-                            <inspecto-link-analysis-investigation
-                                role="tabpanel"
-                                id="la-toolbox-panel-investigation"
-                                aria-labelledby="la-toolbox-tab-investigation"
-                                [projection]="investigationProjection()"
-                                [projectionIssue]="investigationIssue()"
-                                [timeCol]="investigationTimeDefault()"
-                                [pending]="pendingInvestigation()"
-                                [degreePresets]="degreePresets()"
-                                [maxDegree]="maxDegree()"
-                                (pendingDone)="pendingInvestigation.set(null)"
-                            ></inspecto-link-analysis-investigation>
+                        <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse.
+                             On the Explorer level the tab stays and its one action is LOCKED with the reason (LA-ONBOARD-1 OB-10). -->
+                        @if (toolboxTab() === 'investigation') {
+                            @if (investigationsEnabled()) {
+                                <inspecto-link-analysis-investigation
+                                    role="tabpanel"
+                                    id="la-toolbox-panel-investigation"
+                                    aria-labelledby="la-toolbox-tab-investigation"
+                                    [projection]="investigationProjection()"
+                                    [projectionIssue]="investigationIssue()"
+                                    [timeCol]="investigationTimeDefault()"
+                                    [pending]="pendingInvestigation()"
+                                    [degreePresets]="degreePresets()"
+                                    [maxDegree]="maxDegree()"
+                                    (pendingDone)="pendingInvestigation.set(null)"
+                                ></inspecto-link-analysis-investigation>
+                            } @else {
+                                <div
+                                    class="flex flex-col gap-2"
+                                    data-testid="investigation-locked"
+                                    role="tabpanel"
+                                    id="la-toolbox-panel-investigation"
+                                    aria-labelledby="la-toolbox-tab-investigation"
+                                >
+                                    <p class="text-secondary m-0 text-sm">
+                                        An Investigation records each step you take from a start, so it can be replayed,
+                                        compared and handed over as a Dossier.
+                                    </p>
+                                    <inspecto-locked-action
+                                        label="Start an Investigation"
+                                        [reason]="investigationsLockedReason()"
+                                    />
+                                </div>
+                            }
                         }
 
                         <!-- View — layouts and canvas overlays. `[class.hidden]`, never `[hidden]`: Tailwind's `.flex`
@@ -1465,16 +1483,14 @@
                     >
                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                     </button>
-                    @if (investigationsEnabled()) {
-                        <button
-                            mat-icon-button
-                            (click)="openInvestigation()"
-                            matTooltip="Investigation"
-                            aria-label="Open the Investigation"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                        </button>
-                    }
+                    <button
+                        mat-icon-button
+                        (click)="openInvestigation()"
+                        matTooltip="Investigation"
+                        aria-label="Open the Investigation"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
+                    </button>
                     <button
                         mat-icon-button
                         (click)="openViewTools()"

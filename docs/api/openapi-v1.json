@@ -14252,7 +14252,7 @@
               },
               "investigations" : {
                 "type" : "boolean",
-                "description" : "True only when the Link Analysis Investigation surface is installed AND included in this edition (false on Basic, the Link Analysis explorer: its Investigation routes answer 503 CAPABILITY_UNAVAILABLE). LA-EDITIONS-1 phase 3."
+                "description" : "True only when the Link Analysis Investigation surface is installed AND included in this edition AND the install holds the Investigations add-on (false on Basic, the Link Analysis explorer, and on an install with -Daddons.laInvestigations=false: its Investigation routes answer 503 CAPABILITY_UNAVAILABLE). LA-EDITIONS-1 phase 3, LA-ONBOARD-1 OB-5."
               },
               "authMode" : {
                 "type" : "string"
@@ -14262,6 +14262,18 @@
                 "description" : "True only when -Dcontrol.bind narrows the listener to a loopback address. UIE-9, 2026-09-25."
               }
             }
+          },
+          "laLevel" : {
+            "type" : "string",
+            "enum" : [ "explorer", "investigations" ],
+            "description" : "The Link Analysis level (LA-ONBOARD-1 OB-5): investigations when features.investigations is true, else explorer. It decides the screens; the edition keeps deciding governance."
+          },
+          "featureReasons" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "featureId → one short line saying why that feature is locked and which edition or add-on has it (LA-ONBOARD-1 OB-10). Entries only for withheld features (today the route features investigations and geoMap); a present feature has none."
           },
           "configSpecs" : {
             "type" : "object",

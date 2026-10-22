@@ -28,14 +28,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Operator 2026-10-21: in <b>Basic</b> (no {@link EditionFeatures#INVESTIGATIONS}) a Space that states no {@code masking_mode}
- * masks nothing - the projection answers raw ids and {@code GET /settings/link-analysis} says {@code maskingModeInForce: none};
- * in <b>Standard</b> the shipped {@code typed} holds and a typed column is masked. A Space that STATES a mode keeps it in Basic.
- * Over real HTTP; the bound column is classified MSISDN, an Entity Type {@code typed} masks.
+ * The masking default follows SIGN-IN, not the Link Analysis level ({@code LA-ONBOARD-1} OB-6, operator answer A-16): with
+ * <b>no sign-in</b> ({@code auth.mode} none, no Authenticator) a Space that states no {@code masking_mode} masks nothing - the
+ * projection answers raw ids and {@code GET /settings/link-analysis} says {@code maskingModeInForce: none} - even where the
+ * Investigations level is present; where people <b>sign in</b> the shipped {@code typed} holds, WITH or WITHOUT the
+ * Investigations add-on. A mode the Space STATES wins either way. Over real HTTP; the bound column is classified MSISDN, an
+ * Entity Type {@code typed} masks.
  *
- * <p>Basic is simulated by pinning the edition features empty; Standard by the classpath's {@link InvestigationsEditionForTests}.
+ * <p>Sign-in is {@code -Dauth.mode=oidc}; the add-on is removed with {@code -Daddons.laInvestigations=false}; Basic is the
+ * edition features pinned empty; otherwise the classpath's {@link InvestigationsEditionForTests} declares Investigations.
  */
-class ControlApiBasicEditionMaskingDefaultTest {
+class ControlApiMaskingDefaultBySignInTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String A = "27820000001", B = "27820000002";
@@ -52,6 +55,8 @@ class ControlApiBasicEditionMaskingDefaultTest {
     @AfterEach
     void restore() {
         EditionFeatures.overrideForTest(null);
+        System.clearProperty("auth.mode");
+        System.clearProperty(EditionFeatures.LA_INVESTIGATIONS_SETTING);
     }
 
     private Ctx open(Path configDir, Path writeRoot) throws Exception {
@@ -80,20 +85,40 @@ class ControlApiBasicEditionMaskingDefaultTest {
         return JSON.readTree(r.body()).get("data");
     }
 
+    private void assertUnmasked(Ctx c) throws Exception {
+        assertEquals("none", data(c, "GET", "/settings/link-analysis", null).get("maskingModeInForce").asText());
+        JsonNode proj = data(c, "POST", "/inv/projection", PROJECTION);
+        assertEquals("none", proj.at("/masking/mode").asText());
+        assertFalse(proj.at("/masking/masked").asBoolean());
+        assertEquals(A, proj.get("rows").get(0).get("source").asText(), "no sign-in answers the raw id");
+    }
+
+    private void assertTypedMasked(Ctx c) throws Exception {
+        assertEquals("typed", data(c, "GET", "/settings/link-analysis", null).get("maskingModeInForce").asText());
+        JsonNode proj = data(c, "POST", "/inv/projection", PROJECTION);
+        assertEquals("typed", proj.at("/masking/mode").asText());
+        assertTrue(proj.get("rows").get(0).get("source").asText().startsWith("masked:"), proj.toString());
+        assertFalse(proj.toString().contains(A), "a sign-in install never answers the typed raw id: " + proj);
+    }
+
     @Test
-    void basicMasksNothingByDefault(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void noSignInOnBasicMasksNothingByDefault(@TempDir Path cfg, @TempDir Path root) throws Exception {
         EditionFeatures.overrideForTest(Set.of());
         try (Ctx c = open(cfg, root)) {
-            assertEquals("none", data(c, "GET", "/settings/link-analysis", null).get("maskingModeInForce").asText());
-            JsonNode proj = data(c, "POST", "/inv/projection", PROJECTION);
-            assertEquals("none", proj.at("/masking/mode").asText());
-            assertFalse(proj.at("/masking/masked").asBoolean());
-            assertEquals(A, proj.get("rows").get(0).get("source").asText(), "Basic answers the raw id");
+            assertUnmasked(c);
         }
     }
 
     @Test
-    void basicKeepsAModeTheSpaceStates(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void noSignInMasksNothingByDefaultEvenAtTheInvestigationsLevel(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        assertTrue(EditionFeatures.present(EditionFeatures.INVESTIGATIONS), "the classpath declares Investigations");
+        try (Ctx c = open(cfg, root)) {
+            assertUnmasked(c);
+        }
+    }
+
+    @Test
+    void noSignInKeepsAModeTheSpaceStates(@TempDir Path cfg, @TempDir Path root) throws Exception {
         EditionFeatures.overrideForTest(Set.of());
         try (Ctx c = open(cfg, root)) {
             Files.writeString(c.root().resolve("link-analysis.toon"), "masking_mode: typed\n");
@@ -104,13 +129,29 @@ class ControlApiBasicEditionMaskingDefaultTest {
     }
 
     @Test
-    void standardMasksTypedByDefault(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void signInWithTheInvestigationsAddonMasksTypedByDefault(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("auth.mode", "oidc");
         try (Ctx c = open(cfg, root)) {
-            assertEquals("typed", data(c, "GET", "/settings/link-analysis", null).get("maskingModeInForce").asText());
-            JsonNode proj = data(c, "POST", "/inv/projection", PROJECTION);
-            assertEquals("typed", proj.at("/masking/mode").asText());
-            assertTrue(proj.get("rows").get(0).get("source").asText().startsWith("masked:"), proj.toString());
-            assertFalse(proj.toString().contains(A), "Standard never answers the typed raw id: " + proj);
+            assertTypedMasked(c);
+        }
+    }
+
+    @Test
+    void signInWithoutTheInvestigationsAddonStaysMasked(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("auth.mode", "oidc");
+        System.setProperty(EditionFeatures.LA_INVESTIGATIONS_SETTING, "false");
+        assertFalse(EditionFeatures.present(EditionFeatures.INVESTIGATIONS), "the add-on is removed: the Explorer level");
+        try (Ctx c = open(cfg, root)) {
+            assertTypedMasked(c);
+        }
+    }
+
+    @Test
+    void signInKeepsAModeTheSpaceStates(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("auth.mode", "oidc");
+        try (Ctx c = open(cfg, root)) {
+            Files.writeString(c.root().resolve("link-analysis.toon"), "masking_mode: none\n");
+            assertUnmasked(c);
         }
     }
 }

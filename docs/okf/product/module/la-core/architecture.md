@@ -1059,7 +1059,7 @@ Edition names per `LA-EDITIONS-1` ED-2 (2026-10-17; formerly Personal / Professi
 | | Basic | Standard | Advanced | Preview |
 |---|---|---|---|---|
 | la-core, la-storage, la-api, geo-link, entity-list (the **explorer**) | ✓ | ✓ | ✓ | ✓ |
-| Investigation surface (`investigations` edition feature, declared by `inspecto-ops`) | — (503) | ✓ | ✓ | ✓ |
+| Investigation surface (`investigations` edition feature, declared by `inspecto-ops`, AND the Investigations add-on held) | — (503) | ✓ by default | ✓ by default | ✓ by default |
 | Sign-in (`inspecto-oidc`; Preview: demo sign-in) | — | ✓ | ✓ | ✓ |
 | la-store-pg (Postgres Investigations) | — | — | ✓ | ✓ |
 | D-E7 PDP (`providers/inspecto-policy`) | — | — | ✓ | ✓ |
@@ -1076,20 +1076,60 @@ answers each of them `503 CAPABILITY_UNAVAILABLE` "… available in Standard and
 (`ControlApi.requireModuleEnabled` → `EditionFeatures.gatesRoutes`) when no installed module declares
 `EditionFeatures.INVESTIGATIONS`; only `inspecto-ops` (`OpsEditionFeatures`) does. The explorer route modules
 (`InvRoutes`, `GeoRoutes`, `PatternRoutes`, `ValueMeasureRoutes`, `EntityIdentityRoutes`, `EntityProfileRoutes`) own
-`geoLink` only and answer with no sign-in. `/bootstrap` reports `features.investigations` (false on Basic); the SPA's
-`LA_FEATURES.investigations` hides the Investigation tab and buttons, the deep-link openers, Graph Run controls and the
-edge-index tool. Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
-⚠ **Masking on Basic is off by default, and display-only when on** (operator 2026-10-21). The in-force mode of a Space that
-states none is `none` on Basic and `typed` elsewhere: `LinkAnalysisSettings.effectiveMaskingMode` (entity-store, the one seam
-every masking reader and `GET /settings/link-analysis` `maskingModeInForce` share) asks the `MaskingDefault` ServiceLoader
-provider; the control plane ships `EditionMaskingDefault` (`none` when `investigations` is absent, read live), and with no
-provider on the classpath (entity-store / la-api unit tests) the shipped `typed` holds. A stated mode always wins. It is the
-Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, public dashboard shares, Report Job exports) follows it too.
-⚠ The `inspecto` module's own test classpath declares no `investigations`, so it runs as Basic: a test there that relies on
-the `typed` default must pin Standard (`EditionFeatures.overrideForTest`). Pinned by `ControlApiBasicEditionMaskingDefaultTest`
-(geo-link, real HTTP). With no sign-in there is no Subject, so the capability behind an audited reveal is never checked and
-anyone may reveal; a stated mode stops a casual glance, not a user. Enforced masking starts in Standard. The standalone LA app
-also hides its Alerts area on Basic (`la-nav.ts` `feature: 'investigations'`, `investigationsGuard` on `/alerts`).
+`geoLink` only and answer with no sign-in. `/bootstrap` reports `features.investigations` (false on Basic), `laLevel` and
+`featureReasons` (below). Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
+
+**Trust vs level (`LA-ONBOARD-1` phase 1, 2026-10-22; OB-5, OB-6, OB-10).** Three axes are kept apart: the EDITION decides who
+the user is (sign-in, masking, roles - DT-11: still the one governance switch), the **LA level** decides the screens, and
+data origin decides the entry points (phase 2).
+- **The Investigations add-on is enforced at runtime.** Product Map `addon.laInvestigations` (Order Code
+  `INS-AO-LA-INVESTIGATIONS`, `enforcement: runtime`, a vocabulary value added for it; `offerings/standard.toon` add-on
+  `laInvestigations` on module `ops`, inherited by Advanced and Preview). `EditionFeatures.present(INVESTIGATIONS)` = a module
+  declares it (Standard and above) AND `EditionFeatures.holdsInvestigationsAddon()`. The add-on is held by default; the install
+  setting `-Daddons.laInvestigations=false` (any value but `true`, read live) removes it. ⚠ **The hook:** that method is the
+  ONE place the proof is read; a signed entitlement replaces its body (until then whoever runs the server can claim the
+  add-on). Basic never has it - no module declares the feature, whatever the setting says. Without it every Investigation
+  route answers `503 CAPABILITY_UNAVAILABLE` with `refusal(INVESTIGATIONS)`, which names the add-on and its Order Code on a
+  Standard+ install ("… need the Investigations add-on (INS-AO-LA-INVESTIGATIONS), which this installation does not hold
+  (addons.laInvestigations=false) - Link Analysis runs at the Explorer level") and keeps "available in Standard and above,
+  with the Investigations add-on" on Basic. Every other gate (route dispatch, `/bootstrap`, the geo-link webhook tap) reads
+  `present()`, so nothing else changed.
+- **`/bootstrap` contract** (space-agnostic, also served before sign-in): `laLevel: "explorer" | "investigations"`
+  (`investigations` exactly when `features.investigations` is true) and `featureReasons: {featureId: oneLine}` -
+  `EditionFeatures.lockedReasons()`: one entry per WITHHELD route feature (today `investigations`, `geoMap`), none for a
+  present one, always an object. The line is `EditionFeatures.lockedReason(f)` ("Needs the Investigations add-on, which this
+  installation does not hold." / "Investigations are in Standard and above, with the Investigations add-on." / "The Geo map
+  is in Standard and above."); a feature without a short line falls back to `refusal(f)`, so DATA-TIERS-1 phase 2 extends the
+  map by adding refusals. ⚠ A feature switched off per Space (`modules.toon`) reports false with NO reason (it is not
+  withheld by the edition); the SPA then shows its own fallback line.
+- **Locked, not hidden** (A-11). Shared `<inspecto-locked-action label reason>` (`src/app/inspecto/components/
+  locked-action.component.ts`, usable by the console and `la-app`): the action's own stroked button, disabled but focusable
+  (`disabledInteractive`, `aria-disabled`), a lock icon, and one visible line (`aria-describedby`). The SPA reads
+  `SessionService.laLevel` / `featureReasons`; Link Analysis gets them through `LA_FEATURES.featureReasons` (optional) and
+  `investigationsLockedReason()` (fallback "Investigations need the Investigations add-on (Standard and above)."). Locked on
+  the Explorer level: *Start an Investigation from the top results* under a ranking (`LinkAnalysisResultNextComponent`), the
+  Investigation toolbox tab (kept in the tablist; its panel is the locked *Start an Investigation*; the rail's *Open the
+  Investigation* opens it), *Run on server* / *Run on index* (`LinkAnalysisServerRunComponent`, the over-cap note kept), and
+  the *All algorithms (server)* and *Edge index* tool groups (listed, their action locked). Whole Standard+ pages stay out of
+  the navigation (`la-nav.ts` Alerts, `investigationsGuard`). Deep links (`?investigation=`, `?seed=`) still do not open one.
+  ⚠ *Find paths (server)* is NOT locked: `POST /inv/traversal/recursive-paths` is an explorer route (`InvRoutes`, every
+  edition; EDITIONS "Find paths … ✅ Basic").
+- **The masking default keys on sign-in** (OB-6, A-16). `EditionMaskingDefault` answers `none` when nobody signs in
+  (`auth.mode` none AND no `Authenticator` installed) and `typed` otherwise, whatever the level: a sign-in install without the
+  add-on stays masked. `LinkAnalysisSettings.effectiveMaskingMode` (entity-store, the one seam every masking reader and
+  `GET /settings/link-analysis` `maskingModeInForce` share) asks this `MaskingDefault` ServiceLoader provider, read live; with
+  no provider on the classpath (entity-store / la-api unit tests) the shipped `typed` holds. A stated mode always wins. It is
+  the Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, public dashboard shares, Report Job exports)
+  follows it too. ⚠ Tests: no test classpath sets `auth.mode`, so every test without an armed `Authenticators.forTest` runs
+  as "no sign-in" (`none` by default); a test relying on the `typed` default sets `-Dauth.mode=oidc` or arms an
+  Authenticator (the `investigations` pin no longer matters). With no sign-in there is no Subject, so the capability behind an
+  audited reveal is never checked and anyone may reveal; a stated mode stops a casual glance, not a user.
+- Pinned by `ControlApiInvestigationsAddonTest` (Standard without / with the add-on, Basic with the setting on),
+  `ControlApiMaskingDefaultBySignInTest` (the matrix: no sign-in → none, also at the Investigations level; sign-in with and
+  without the add-on → typed; a stated mode wins), `EditionFeaturesTest.investigationsNeedTheEditionAndTheRuntimeAddon`, and
+  the vitest specs `locked-action.component.spec.ts`, `link-analysis-toolbox.component.spec.ts` (result next),
+  `link-analysis-toolbox.server-run.spec.ts` (Explorer level) and `link-analysis.component.spec.ts` (Explorer level), each with
+  axe.
 ⚠ `POST /inv/case-history` (Case history beside a node) is Standard and up by an explicit gate since 2026-10-20 (D-LAE1): it
 moved out of `InvRoutes` into its own route module `CaseHistoryRoutes` (an edition gate is per `RouteModule`) naming
 `geoLink` and `investigations`, so Basic answers 503 "available in Standard and above" at dispatch and the node dialog hides

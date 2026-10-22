@@ -2,7 +2,7 @@ import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile
 import { installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
 import { TELECOM_PACK_FIXTURE } from '@inspecto/link-analysis/graph/domain-profile.testing';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
-import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
+import type { LaFeatures, LaImportDraft } from '@inspecto/link-analysis/la-host';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -110,7 +110,7 @@ function create(
         /** "Investigate a number": a stand-in for the Dataset reads (latest event time, column probe). */
         rows?: Partial<DatasetRowsService>;
         /** The host's module flags (default: Standard and above - the Investigation surface present). */
-        features?: typeof STANDARD_EDITION_FEATURES;
+        features?: LaFeatures;
     } = {},
 ) {
     const queried: unknown[] = [];
@@ -2076,21 +2076,33 @@ describe('LinkAnalysisComponent', () => {
     });
 });
 
-describe('LinkAnalysisComponent - Basic edition: the explorer without Investigations (LA-EDITIONS-1 ED-4)', () => {
-    const BASIC = { ...STANDARD_EDITION_FEATURES, investigations: signal(false) };
+describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not hidden (LA-EDITIONS-1 ED-4, LA-ONBOARD-1 OB-10)', () => {
+    const REASON = 'Investigations are in Standard and above, with the Investigations add-on.';
+    const BASIC: LaFeatures = {
+        ...STANDARD_EDITION_FEATURES,
+        investigations: signal(false),
+        featureReasons: signal({ investigations: REASON }),
+    };
 
-    it('offers no Investigation tab, button or opener - an affordance that can only 503 is worse than none', () => {
+    it('keeps the Investigation tab; opening it shows Start an Investigation LOCKED with the server reason', async () => {
         const { fixture } = create({ features: BASIC });
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance;
         const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]')).map((t) => t.textContent?.trim());
-        expect(tabs).toEqual(['Analysis', 'View']);
-        expect(el.querySelector('[aria-label="Open the Investigation"]')).toBeNull();
-        c.openInvestigation();
+        expect(tabs).toEqual(['Analysis', 'View', 'Investigation']);
+        c.openInvestigation(); // what the rail's "Open the Investigation" button calls - no longer a no-op on this level
         fixture.detectChanges();
-        expect(c.toolboxTab()).not.toBe('investigation');
+        expect(c.toolboxTab()).toBe('investigation');
         expect(el.querySelector('inspecto-link-analysis-investigation')).toBeNull();
+        const panel = el.querySelector('[data-testid="investigation-locked"]') as HTMLElement;
+        expect(panel.getAttribute('role')).toBe('tabpanel');
+        expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-investigation');
+        const action = panel.querySelector('[data-testid="locked-action"]') as HTMLButtonElement;
+        expect(action.textContent).toContain('Start an Investigation');
+        expect(action.getAttribute('aria-disabled')).toBe('true');
+        expect(panel.querySelector('[data-testid="locked-reason"]')?.textContent?.trim()).toBe(REASON);
+        await expectNoA11yViolations(panel);
     });
 
     it('a ?seed= deep link says Investigations are a Standard feature and starts nothing', async () => {
