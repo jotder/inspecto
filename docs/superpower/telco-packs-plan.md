@@ -51,7 +51,7 @@ Each is either folded into a slice above or needs a slice of its own when demand
 - **Device signals**, blocked on the operator's real CDR contract (D-BP2's actual columns): S13's 7-day IMSI churn, S14 TAC class (an
   optional, never-bundled Reference, D-BP9), S15's cell concentration and peak concurrent calls per IMEI, and the device-cluster
   Risk Score factor (illustrative weight 12, `max(cluster_candidate_sims_excess)`). S16 in money needs the D-BP8 rate parameter.
-- **Hourly window** (D-BP5): a later slice, measured against `WS-21`.
+- **Hourly window** (D-BP5): a later slice, measured against `WS-21`. Persistence latency (`persist_days`, the illustrative 2 of 3 days) is still unmeasured.
 - **Geo Map** of cell co-location in the triage view.
 - **Unmeasured:** peak memory of the B2 stages, more than 405,000 SIMs a day, a real operator's volume and precision.
 

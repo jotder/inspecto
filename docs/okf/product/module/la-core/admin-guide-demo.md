@@ -403,7 +403,7 @@ timings are in the [whitepaper](brochure-inspecto-la-whitepaper.md) §6.4. What 
 * **Give every link Dataset an event-day column** (`eventDate`), or the data-trust strip and the Dossier say "as-of not
   known". A Dataset built by a Job carries no input-file stamps.
 * **Recalibrate thresholds on a full day.** The extract's thresholds fired hundreds to hundreds of thousands of times on
-  the production day. A Dataset Measure rule is edge-triggered: resolving its Alert by hand does not re-arm it while the
+  the production day. A Dataset Measure Alert Rule is edge-triggered: resolving its Alert by hand does not re-arm it while the
   measure stays breached, and a restart rebuilds the open-breach state from OPEN Alerts.
 * **Four-eyes beat.** A plain degree expand is bounded by the UI default and does not wait for approval. Use *Expand
   the whole Working Set* (or an expand with no ids) to show the held request.
