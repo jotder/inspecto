@@ -186,6 +186,19 @@ caught it. Two layers now pin the shape (both apply to `gamma` and `la-app`):
   (gzip) regressions, runtime cost of a module that is legitimately eager, and anything a build without `--stats-json` skipped
   (the guard fails loudly if the file is missing).
 
+### UI theme-token guard: `check-theme-tokens` (2026-10-22)
+
+`src/@gamma/styles/themes.scss` rebuilds each Material theme as `(color: …) + colours` to merge the gamma base colours, which
+drops the `_mat-system` map Material 22's M2 token functions read. Every system-derived colour token therefore comes out null:
+it is omitted, or emitted as an empty `color-mix(in srgb, , transparent)`. So `--mat-button-filled-container-color` was never declared and every `mat-flat-button color="primary|accent|warn"`
+rendered transparent in both apps and both schemes, with every build green. The fix restores only the filled-button fill and
+label from the palette (`filled-button-fills` in the same file). Keeping `_mat-system` would re-colour every Material component
+instead. Other system-derived tokens are still null and out of this fix's scope: the disabled fill, the state layers, an
+unthemed `mat-flat-button`, and the same gap in other components. **`inspecto-ui/tools/check-theme-tokens.mjs`** reads both apps' built
+`dist/<app>/browser/styles-*.css` after the two builds (`npm run check:theme-tokens`, CI `ui.yml` after the bundle-shape guard).
+It fails when any `.theme-*` × light/dark × primary/accent/warn filled button lacks a concrete container or label colour.
+`tools/check-theme-tokens.test.mjs` falsifies it.
+
 The SBOM step (`tools/sbom.mjs`) runs `mvn package dependency:list -DskipTests` over the edition's modules with
 `-am`, so reactor siblings (and their `tests` test-jars) resolve from `target/` outputs: **no prior `mvn install`
 into `~/.m2` is needed** (a bare `dependency:list -am` died "Could not find artifact ...inspecto-audit-spi" on a
