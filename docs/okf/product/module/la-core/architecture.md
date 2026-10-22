@@ -214,14 +214,20 @@ Design rules visible in the dependency graph:
   0 stays 0, for every list that does not read as open; Entity Lists carry no `visibility` yet (phase 4), so every count is
   rounded (`GrowPreview.open` is the one seam to flip). The explorer twin `POST /inv/projection/neighbors/preview` (Basic too,
   read-shaped exemption, no event) counts one neighbours step from a SET of ids with no Investigation: body `{dataset,
-  sourceCol, targetCol, linkKindCol?, ids[] (or the neighbours read's one-entity `value`), direction?, linkKinds?, hubThreshold?, excludeBy? [listIds], filter?, limit?}`, one
-  flat statement (distinct `(s, t, k)` pairs; neighbours outside `ids`; each neighbour's distinct contacts over the whole
-  Dataset), list members matched in Java by each list's normaliser (unknown list 404, retired 409), `limit` caps the neighbours
-  read (`truncated` then makes the counts lower bounds), ids in and out as exploration aliases. Both routes are rate-classed
+  sourceCol, targetCol, linkKindCol?, attrCols?, ids[] (or the neighbours read's one-entity `value`), drawn?, direction?, linkKinds?, hubThreshold?, excludeBy? [listIds], filter?, limit?}`, one
+  flat statement (distinct `(s, t, k, attrCols…)` links, the neighbours read's own fold; neighbours outside `ids` and
+  `drawn`; each neighbour's distinct contacts over the whole Dataset), list members matched in Java by each list's normaliser
+  (unknown list 404, retired 409), `limit` caps the neighbours read (`truncated` then makes the counts lower bounds), ids in
+  and out as exploration aliases. `drawn` (bounded as `ids`) names what the explorer graph already shows: those neighbours
+  are not added. The answer adds `linksWithinGraph`: the step's links whose both ends are already shown (between `ids`, or
+  to `drawn`), not in `addsLinks`; only the SPA knows which of them it draws, so it adds the rest (`withUndrawnLinks`) - none
+  on a graph its query drew whole, the missing ones on a graph cut short by a limit. Both routes are rate-classed
   EXPENSIVE. *Remove held super nodes* needs no route: the SPA appends an `exclude` with `reason: "busy number above N
   contacts"` - `exclude` already requires and seals `reason` (unchanged). `ControlApiGrowPreviewTest` pins parity (preview
   counts = the append's delta right after, log length and Working Set unchanged), list rounding, masking, four-eyes, the
-  armed gate and Basic.
+  armed gate and Basic; `theNeighboursPreviewCountsWhatTheExplorerGrowAdds` pins the explorer twin's parity (preview counts
+  = what one neighbours read per frontier value adds to the drawn graph: a whole graph, a grown one in each direction, a
+  filtered view, attribute columns, a graph cut short by the query's limit).
   *Neighbour list (LA-EXPAND-PICK-NEIGHBOURS-1 residuals, 2026-10-13):* the *Choose neighbours* list is the `list` form of `POST /inv/projection/neighbors`
   (`{..., value, list: true, offset?, limit?}`; no new route, so no manifest / route-gating / openapi entry changed): the server folds ONE entity's
   link rows per neighbour (events across kinds, sorted kinds), strongest first (ties by id), a self-link is no neighbour, and answers
@@ -976,9 +982,20 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   The explorer graph (Basic, or the query graph in any edition) is the `basic` mode: nothing recorded.
 - **Preview (GE-3).** An Investigation previews with `POST …/expand/preview` over exactly the `expand` body the Grow
   would append (`growExpandBody`). The explorer previews with ONE `POST /inv/projection/neighbors/preview` over the
-  whole frontier — `{dataset, sourceCol, targetCol, linkKindCol?, ids, direction, linkKinds? (only with a kind column),
-  hubThreshold}` (`neighboursPreviewBody`) — so its counts are distinct neighbours, not a per-node sum (the first cut sent
-  one `{value}` call per node and over-counted shared neighbours; the server still accepts `value` as `ids: [value]`).
+  whole frontier — `{dataset, sourceCol, targetCol, linkKindCol?, attrCols?, filter?, ids, drawn?, direction, linkKinds?
+  (only with a kind column), hubThreshold}` (`neighboursPreviewBody`) — so its counts are distinct neighbours, not a
+  per-node sum (the first cut sent one `{value}` call per node and over-counted shared neighbours; the server still accepts
+  `value` as `ids: [value]`). ⚠ **Parity with the Grow (fixed 2026-10-22):** the Grow is one neighbours read per frontier
+  node merged into `graph()`, so the preview must read with the SAME binding — the run query's `attrCols` and `filter`,
+  which `expandNode` passes — and must not count what is already drawn: `drawn` = every other node of `graph()` (hidden
+  ones too) by its spellings, the frontier's graph neighbours first, capped at `input.max_ids` and `input.id_length`
+  (`drawnValues`); its links are the server's `addsLinks` plus `linksWithinGraph` less the `graph()` links touching the
+  frontier in the Grow's direction and kinds (`withUndrawnLinks`). Raw spellings that one typed node folds still count
+  once each on the server (pre-existing, small). Before the
+  fix a graph its query drew whole ("Follow the money", 112 nodes) previewed "about 5 nodes and 10 links" — neighbours of
+  the first 25 nodes that were the other 87 — and the Grow then said 0 and 0; a filtered view previewed neighbours only its
+  unfiltered rows reach. Never fetch the neighbours themselves to preview: each `/inv/projection/neighbors` read emits
+  `LINK_EXPANDED` and spends the LA rate budget, which a preview must not.
   0 / 404 / 405 / 501 / 503 read as *No preview on this server* and Grow still runs; 404 / 405 / 501 are remembered per mode
   for the session. Any other status, a 403 included, shows the server's reason in the panel (`previewFailure`), never a
   toast. *2 steps* is offered only when a ready preview says the first step stays under the frontier cap.

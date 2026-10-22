@@ -57,6 +57,8 @@ export const LA_LIMIT_FALLBACKS = {
     'connect.default_hops': 3,
     'measures.max_window_days': 31,
     'dossier.max_snapshots': 40,
+    'input.max_ids': 1000,
+    'input.id_length': 512,
     'input.link_kinds': 100,
     'input.recurring_excludes': 32,
     'input.note_length': 2000,

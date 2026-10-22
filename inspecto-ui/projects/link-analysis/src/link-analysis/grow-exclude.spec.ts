@@ -1,7 +1,18 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { describe, expect, it } from 'vitest';
-import type { ExclusionListSummary, GrowPreview, InvestigationLogEntry, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
+import { of } from 'rxjs';
+import { describe, expect, it, vi } from 'vitest';
+import type { ConditionGroup } from '@inspecto/core/query/query-types';
+import type {
+    ExclusionListSummary,
+    GrowPreview,
+    InvestigationLogEntry,
+    InvService,
+    NeighborsRequest,
+    WorkingSet,
+} from '@inspecto/link-analysis/api/inv.service';
+import { EntityProjectionGraphSource } from './entity-projection';
 import {
+    drawnValues,
     filterExpansion,
     growExpandBody,
     growIds,
@@ -17,6 +28,7 @@ import {
     roundRestricted,
     neighboursPreviewBody,
     secondStepWhyNot,
+    withUndrawnLinks,
 } from './grow-exclude';
 
 const TELECOM = packTerms({ labels: { nodes: 'Numbers', links: 'Calls', rows: 'Rows' } });
@@ -228,23 +240,78 @@ describe('grow-exclude — the explorer (Basic)', () => {
         expect(cut).toEqual({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ source: 'a', target: 'b' }], truncated: true });
     });
 
-    it('the explorer preview is ONE body over the whole frontier: ids, direction, hold threshold, kinds only with a kind column', () => {
+    it('the explorer preview is ONE body over the whole frontier: ids, drawn, direction, hold threshold, kinds only with a kind column', () => {
         const p = { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target', linkKindCol: 'kind' };
         const req = { direction: 'out' as const, linkKinds: ['call'], threshold: 250 };
-        expect(neighboursPreviewBody(p, ['A', 'B'], req)).toEqual({
+        expect(neighboursPreviewBody(p, ['A', 'B'], req, ['C'])).toEqual({
             dataset: 'links-ds',
             sourceCol: 'source',
             targetCol: 'target',
             linkKindCol: 'kind',
             ids: ['A', 'B'],
+            drawn: ['C'],
             direction: 'out',
             linkKinds: ['call'],
             hubThreshold: 250,
         });
-        const bare = neighboursPreviewBody({ ...p, linkKindCol: '' }, ['A'], req);
+        const bare = neighboursPreviewBody({ ...p, linkKindCol: '' }, ['A'], req, []);
         expect(bare).not.toHaveProperty('linkKindCol');
         expect(bare).not.toHaveProperty('linkKinds'); // the server refuses kinds without a kind column (422)
         expect(bare).not.toHaveProperty('value'); // the neighbours read's one-entity form is gone
         expect(bare).not.toHaveProperty('excludeBy'); // the explorer graph has no list in force
+        expect(bare).not.toHaveProperty('drawn'); // nothing else on the graph
+        expect(bare).not.toHaveProperty('filter');
+        expect(bare).not.toHaveProperty('attrCols');
+    });
+
+    it('the explorer preview reads with the binding the Grow reads with: columns, attribute columns, the view filter', async () => {
+        // The defect (LA-GROW-EXCLUDE-1): the preview counted the whole Dataset while the Grow read under the view's filter,
+        // and folded one link per pair while the Grow draws one per attribute value. Same binding, same counts.
+        const p = { datasetId: 'pay', sourceCol: 'payer', targetCol: 'payee', linkKindCol: 'channel', attrCols: ['amount'] };
+        const filter: ConditionGroup = {
+            kind: 'group',
+            op: 'AND',
+            items: [{ kind: 'condition', field: 'amount', operator: '>=', value: '5000' }],
+        };
+        const neighbors = vi.fn((_body: NeighborsRequest) => of({ rows: [], truncated: false }));
+        const source = new EntityProjectionGraphSource({} as never, { neighbors } as unknown as InvService);
+        await source.expand('account:a', 'A', { projection: p, filter });
+        const { value, ...read } = neighbors.mock.calls[0][0];
+        expect(value).toBe('A');
+        const req = { direction: 'either' as const, linkKinds: null, threshold: 500 };
+        const preview = neighboursPreviewBody(p, ['A'], req, ['B'], filter);
+        const defined = Object.entries(read).filter(([, v]) => v !== undefined);
+        const keys = ['attrCols', 'dataset', 'filter', 'linkKindCol', 'sourceCol', 'targetCol'];
+        expect(defined.map(([k]) => k).sort()).toEqual(keys);
+        for (const [k, v] of defined) expect(preview[k as keyof typeof preview]).toEqual(v);
+    });
+
+    it('drawn: every node on the graph outside the frontier, by its spellings, the frontier neighbours first, capped', () => {
+        const node = (id: string, label: string, spellings?: string[]) => ({ id, data: { label, spellings } });
+        const g = {
+            nodes: [node('a', 'A'), node('far', 'FAR'), node('b', 'B', ['B', 'b ']), node('c', 'C'), node('blank', ' ')],
+            edges: [
+                { source: 'a', target: 'b' },
+                { source: 'c', target: 'a' },
+            ],
+        };
+        expect(drawnValues(g, ['a'], 1000, 512)).toEqual(['B', 'b ', 'C', 'FAR']); // never a blank value (the server refuses one)
+        expect(drawnValues(g, ['a'], 2, 512)).toEqual(['B', 'b ']);
+        expect(drawnValues(g, ['a'], 1000, 2)).toEqual(['B', 'b ', 'C']); // nor one over input.id_length
+        expect(drawnValues(g, ['a', 'b', 'c', 'far', 'blank'], 1000, 512)).toEqual([]);
+    });
+
+    it('the explorer preview adds the links between shown nodes that the graph does not draw yet (a graph cut by a limit)', () => {
+        // The server: 2 links to new neighbours, 3 links whose both ends are on the graph. The graph draws 2 of those 3.
+        const p = preview({ addsLinks: 2, linksWithinGraph: 3 });
+        const edge = (source: string, target: string, kind = 'call') => ({ source, target, data: { kind } });
+        const g = { edges: [edge('a', 'b'), edge('c', 'a', 'sms · 2'), edge('x', 'y')] };
+        const either = { direction: 'either' as const, linkKinds: null };
+        expect(withUndrawnLinks(p, g, ['a'], either).addsLinks).toBe(3); // a-b and c-a drawn: 1 more
+        expect(withUndrawnLinks(p, g, ['a'], { direction: 'out', linkKinds: null }).addsLinks).toBe(4); // only a-b counts out
+        expect(withUndrawnLinks(p, g, ['a'], { direction: 'in', linkKinds: ['sms'] }).addsLinks).toBe(4); // c-a, by its base kind
+        expect(withUndrawnLinks(p, g, ['a', 'b', 'c', 'x'], either).addsLinks).toBe(2); // never below the server's own count
+        expect(withUndrawnLinks(preview({ addsLinks: 2 }), g, ['a'], either).addsLinks).toBe(2); // an older server: unchanged
+        expect(withUndrawnLinks(p, g, ['a'], either)).toMatchObject({ addsNodes: 342, heldCount: 3 }); // the rest as served
     });
 });

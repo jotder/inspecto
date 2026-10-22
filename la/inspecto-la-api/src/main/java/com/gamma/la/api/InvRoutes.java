@@ -620,10 +620,15 @@ public final class InvRoutes implements RouteModule {
     /**
      * {@code POST /inv/projection/neighbors/preview} (LA-GROW-EXCLUDE-1 GE-3 / GE-10) — the Basic explorer's Grow preview:
      * what one neighbours step from a SET of entities would add, with no Investigation. Body {@code {dataset, sourceCol,
-     * targetCol, linkKindCol?, ids[] (or the neighbours read's one-entity {@code value}), direction? (either · out · in · reciprocal, default either), linkKinds?,
+     * targetCol, linkKindCol?, attrCols?, ids[] (or the neighbours read's one-entity {@code value}), drawn?, direction? (either · out · in · reciprocal, default either), linkKinds?,
      * hubThreshold? (default the Space's hub_threshold), excludeBy? [listIds], filter?, limit?}}. Answers
-     * {@link GrowPreview}'s shape: {@code addsNodes} the distinct neighbours outside {@code ids} not removed by a list,
-     * {@code addsLinks} their distinct {@code (source, target, kind)} links touching {@code ids} in the direction,
+     * {@link GrowPreview}'s shape: {@code addsNodes} the distinct neighbours outside {@code ids} and {@code drawn} not removed by a list,
+     * {@code addsLinks} their distinct {@code (source, target, kind, attrCols...)} links touching {@code ids} in the direction
+     * (folded as the neighbours read folds them, so one link per row the Grow would draw). {@code drawn} (LA-GROW-EXCLUDE-1
+     * parity fix; same bounds as {@code ids}) names the values already on the explorer graph: a step cannot add them again.
+     * {@code linksWithinGraph} counts the step's other links - those whose both ends are already on the graph (between
+     * {@code ids}, or from {@code ids} to {@code drawn}); the explorer adds the ones its graph does not draw yet (a graph cut
+     * short by a limit lacks some), since only it knows which it draws.
      * {@code held} those neighbours with more distinct contacts than the threshold (counted over the whole Dataset, as an
      * expand counts a hub; they are still added), {@code excludedByLists} per named list the neighbours it removes
      * (rounded unless the list is open). Read-only and unrecorded — no event, no state; the flat Dataset answers
@@ -639,9 +644,11 @@ public final class InvRoutes implements RouteModule {
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
+        List<String> attrCols = attrCols(body);
         LaLimitValues lim = SpaceLimits.of(writeRoot);
         int maxIds = SpaceLimits.get(lim, LaLimit.INPUT_MAX_IDS), maxIdLength = SpaceLimits.get(lim, LaLimit.INPUT_ID_LENGTH);
         List<String> ids = boundedStrings(body, "ids", maxIds, maxIdLength);
+        List<String> drawnIds = boundedStrings(body, "drawn", maxIds, maxIdLength);
         String value = ApiContext.str(body, "value");   // the neighbours read's one-entity body, accepted as ids: [value]
         if (ids.isEmpty() && value != null) {
             if (value.isBlank() || value.length() > maxIdLength)
@@ -667,6 +674,8 @@ public final class InvRoutes implements RouteModule {
         ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
         java.util.TreeSet<String> frontier = new java.util.TreeSet<>();
         for (String id : ids) frontier.add(mask.in(id));
+        java.util.TreeSet<String> drawn = new java.util.TreeSet<>();
+        for (String id : drawnIds) drawn.add(mask.in(id));
         DatasetProvider.BoundFilter filter = filterSql(body.get("filter"), datasetId, relationSql);
         Map<String, com.gamma.entitystore.EntityRegistry.EntityList> lists = new LinkedHashMap<>();
         if (!listIds.isEmpty()) {
@@ -683,18 +692,25 @@ public final class InvRoutes implements RouteModule {
         }
         refuseIfSensitive(writeRoot, "a neighbours preview (limit " + limit + ")", limit, 0);
 
-        // Flat and bound: the frontier and kinds are parameters, identifiers validated. pairs = the distinct (source, target, kind)
-        // links; nb = each neighbour outside the frontier with its links touching the frontier in the direction; deg = each
-        // neighbour's distinct contacts over the whole Dataset (both directions), the number an expand flags a hub on.
+        // Flat and bound: the frontier, the drawn values and kinds are parameters, identifiers validated. pairs = the distinct
+        // (source, target, kind, attrCols...) links, the neighbours read's fold; nb = each neighbour outside the frontier and the
+        // drawn values with its links touching the frontier in the direction; deg = each neighbour's distinct contacts over the
+        // whole Dataset (both directions), the number an expand flags a hub on.
         List<String> binds = new ArrayList<>();
         String src = q(sourceCol), tgt = q(targetCol);
-        StringBuilder sql = new StringBuilder("WITH fr AS ").append(com.gamma.la.storage.IndexReader.idRelation(frontier, binds))
-                .append(", pairs AS (SELECT CAST(").append(src).append(" AS VARCHAR) AS s, CAST(").append(tgt).append(" AS VARCHAR) AS t, ")
-                .append(kindCol != null ? "CAST(" + q(kindCol) + " AS VARCHAR)" : "NULL").append(" AS k FROM ").append(q(datasetId))
-                .append(" WHERE ").append(src).append(" IS NOT NULL AND ").append(tgt).append(" IS NOT NULL");
+        StringBuilder sql = new StringBuilder("WITH fr AS ").append(com.gamma.la.storage.IndexReader.idRelation(frontier, binds));
+        if (!drawn.isEmpty()) sql.append(", dr AS ").append(com.gamma.la.storage.IndexReader.idRelation(drawn, binds));
+        sql.append(", pairs AS (SELECT CAST(").append(src).append(" AS VARCHAR) AS s, CAST(").append(tgt).append(" AS VARCHAR) AS t, ")
+                .append(kindCol != null ? "CAST(" + q(kindCol) + " AS VARCHAR)" : "NULL").append(" AS k");
+        StringBuilder groupBy = new StringBuilder(" GROUP BY 1, 2, 3");
+        for (int i = 0; i < attrCols.size(); i++) {
+            sql.append(", CAST(").append(q(attrCols.get(i))).append(" AS VARCHAR) AS a").append(i);
+            groupBy.append(", ").append(i + 4);
+        }
+        sql.append(" FROM ").append(q(datasetId)).append(" WHERE ").append(src).append(" IS NOT NULL AND ").append(tgt).append(" IS NOT NULL");
         if (kinds != null)
             sql.append(" AND CAST(").append(q(kindCol)).append(" AS VARCHAR) IN ").append(com.gamma.la.storage.IndexReader.idRelation(kinds, binds));
-        sql.append(" AND (").append(filter.sql()).append(") GROUP BY 1, 2, 3)");
+        sql.append(" AND (").append(filter.sql()).append(")").append(groupBy).append(")");
         binds.addAll(filter.binds());
         String inF = " IN (SELECT id FROM fr)";
         sql.append(", cand AS (SELECT CASE WHEN p.s").append(inF).append(" THEN p.t ELSE p.s END AS other FROM pairs p WHERE ")
@@ -704,10 +720,16 @@ public final class InvRoutes implements RouteModule {
                case "reciprocal" -> "(p.s" + inF + " OR p.t" + inF + ") AND EXISTS (SELECT 1 FROM pairs r WHERE r.s = p.t AND r.t = p.s)";
                default -> "(p.s" + inF + " OR p.t" + inF + ")";
            }).append(")")
-           .append(", nb AS (SELECT other, COUNT(*) AS links FROM cand WHERE other NOT").append(inF).append(" GROUP BY other)")
+           .append(", nb AS (SELECT other, COUNT(*) AS links FROM cand WHERE other NOT").append(inF)
+           .append(drawn.isEmpty() ? "" : " AND other NOT IN (SELECT id FROM dr)").append(" GROUP BY other)")
            .append(", deg AS (SELECT id, COUNT(DISTINCT o) AS d FROM (SELECT s AS id, t AS o FROM pairs WHERE s IN (SELECT other FROM nb) "
                    + "UNION ALL SELECT t AS id, s AS o FROM pairs WHERE t IN (SELECT other FROM nb)) u GROUP BY id)")
-           .append(" SELECT nb.other AS id, nb.links AS links, deg.d AS degree FROM nb JOIN deg ON deg.id = nb.other ORDER BY nb.other");
+           // ig = the links the step reaches whose other end is already on the graph (in ids or drawn), one row joined to
+           // every neighbour row so it is read even when the step reaches no new neighbour (that answer is its row alone).
+           .append(", ig AS (SELECT COUNT(*) AS n FROM cand WHERE other").append(inF)
+           .append(drawn.isEmpty() ? "" : " OR other IN (SELECT id FROM dr)").append(")")
+           .append(" SELECT nb.other AS id, nb.links AS links, deg.d AS degree, ig.n AS in_graph FROM ig"
+                   + " LEFT JOIN (nb JOIN deg ON deg.id = nb.other) ON TRUE ORDER BY nb.other");
         DatasetProvider.Result r;
         try {
             r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId, relationSql, sql.toString(),
@@ -715,7 +737,7 @@ public final class InvRoutes implements RouteModule {
         } catch (SQLException e) {
             throw DatasetReadFault.of("neighbours preview failed", datasetId, writeRoot, e);
         }
-        long addsNodes = 0, addsLinks = 0;
+        long addsNodes = 0, addsLinks = 0, linksWithinGraph = 0;
         List<Map<String, Object>> held = new ArrayList<>();
         Map<String, Long> removed = new LinkedHashMap<>();
         Map<String, java.util.Set<String>> members = new LinkedHashMap<>();   // matched as an excludeBy matches: the id's key under the list's normaliser
@@ -725,6 +747,8 @@ public final class InvRoutes implements RouteModule {
             members.put(l.getKey(), l.getValue().liveMembers(now));
         }
         for (Map<String, Object> row : r.rows()) {
+            if (row.get("in_graph") instanceof Number n) linksWithinGraph = n.longValue();
+            if (row.get("id") == null) continue;   // the lone ig row: the step reaches no new neighbour
             String id = String.valueOf(row.get("id"));
             boolean dropped = false;
             for (var l : lists.entrySet())   // counted under the FIRST list naming it, as an Investigation's earlier excludeBy wins
@@ -744,6 +768,7 @@ public final class InvRoutes implements RouteModule {
         removed.forEach((id, n) -> lines.add(GrowPreview.listLine(id, lists.get(id), n, false)));   // a restricted list was refused above
         Map<String, Object> out = GrowPreview.answer(addsNodes, addsLinks, held, lines, r.truncated(), "flat", null);
         out.put("hubThreshold", hubThreshold);
+        out.put("linksWithinGraph", linksWithinGraph);
         out.put("masking", mask.describe());
         return out;
     }

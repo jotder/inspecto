@@ -23,6 +23,7 @@ import { PipelinesService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { ElementDetailData } from '@inspecto/link-analysis/investigation/element-detail.dialog';
 import { G6GraphData, GraphSource } from '@inspecto/core/graph';
+import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import { GeoLinkBrushService } from '@inspecto/link-analysis/graph/geo-link-brush';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
@@ -2939,9 +2940,18 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(fixture.componentInstance.growExclude.growOpen()).toBe(false);
     });
 
-    it('Basic preview: ONE neighbours/preview over the whole frontier (ids, direction, hold threshold), never one per node', async () => {
+    it('Basic preview: ONE neighbours/preview over the whole frontier (ids, drawn, direction, hold threshold), never one per node', async () => {
         const previewNeighbors = vi.fn(() =>
-            of({ addsNodes: 4, addsLinks: 6, held: [], heldCount: 0, excludedByLists: [], truncated: false, readPath: 'flat' }),
+            of({
+                addsNodes: 4,
+                addsLinks: 6,
+                held: [],
+                heldCount: 0,
+                excludedByLists: [],
+                truncated: false,
+                readPath: 'flat',
+                linksWithinGraph: 3, // both ends shown: a-b and b-c are drawn, so 1 more the Grow will add
+            }),
         );
         const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
         const { fixture, c, el } = await drawn({ expand, inv: { ...OLD_SERVER, previewNeighbors }, features: BASIC_EDITION_FEATURES });
@@ -2956,12 +2966,36 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             sourceCol: 'source',
             targetCol: 'target',
             ids: ['A', 'B'], // the raw values, as the neighbours read names them
+            // LA-GROW-EXCLUDE-1: the rest of the graph, which the Grow cannot add again - C (b's neighbour) first. Without
+            // it a graph the query drew whole previewed "about 5 nodes" that its Grow then reported as 0.
+            drawn: ['C', 'D', 'E'],
             direction: 'either',
             hubThreshold: c.growThreshold(),
         });
         expect(el.querySelector('[data-testid="la-grow-preview"]')?.textContent).toContain(
-            'This step adds about 4 nodes and 6 links.',
+            'This step adds about 4 nodes and 7 links.',
         );
+
+        // The view's predicate rides along, as it does on the Grow's own neighbours reads (expandNode → run.query).
+        const filter: ConditionGroup = {
+            kind: 'group',
+            op: 'AND',
+            items: [{ kind: 'condition', field: 'kind', operator: '=', value: 'x' }],
+        };
+        c.lastRun.update((r) => r && { ...r, query: { ...r.query, filter } });
+        await c.growBasicAdapter.preview(['a'], {
+            direction: 'out',
+            steps: 1,
+            linkKinds: null,
+            window: 'inherit',
+            hold: true,
+            threshold: 500,
+        });
+        expect((previewNeighbors.mock.calls[1] as unknown[])[0]).toMatchObject({
+            ids: ['A'],
+            drawn: ['B', 'C', 'D', 'E'],
+            filter,
+        });
     });
 
     it('Basic preview: a 403 (restricted list) shows the server reason in the Grow panel, and Grow still runs', async () => {

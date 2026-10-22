@@ -286,7 +286,8 @@ from the Investigation's outer ring (the explorer: the nodes not grown yet, the 
 * **Preview before the change**: "This step adds about 342 numbers and 1,210 calls; 3 busy numbers will be held; 41
   numbers are removed by your exclusion lists", with the lists in force as chips and their counts. A step that would
   need four-eyes approval says so. The preview is a dry run (`POST /inv/investigations/{id}/expand/preview`; the
-  explorer: ONE `POST /inv/projection/neighbors/preview` over every node it grows from). The explorer applies no
+  explorer: ONE `POST /inv/projection/neighbors/preview` over every node it grows from, which counts only what is not
+  on the graph yet and reads with the view's filter, so a graph the query drew whole previews 0). The explorer applies no
   exclusion list, so its preview names none; lists apply in an Investigation. A server without these routes shows
   *No preview on this server* and Grow still runs; the result line then says what it did. A refused preview (for
   example a 403) shows the server's reason in the panel.

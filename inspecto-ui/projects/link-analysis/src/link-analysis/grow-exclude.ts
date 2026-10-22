@@ -10,7 +10,9 @@ import type {
     WorkingSet,
 } from '@inspecto/link-analysis/api/inv.service';
 import type { EntityProjection } from '@inspecto/core/graph';
+import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import type { DomainProfile } from '@inspecto/link-analysis/graph/domain-profile';
+import { baseEdgeKind } from '@inspecto/link-analysis/graph/graph-analysis';
 
 /**
  * LA-GROW-EXCLUDE-1 — the pure half of Grow, the Held tray and Exclude (plan `docs/superpower/la-grow-exclude-plan.md`
@@ -350,23 +352,79 @@ export function filterExpansion<G extends { nodes: { id: string }[]; edges: { so
 }
 
 /**
- * The explorer's ONE Grow preview body (`POST /inv/projection/neighbors/preview`): the whole frontier as `ids`, the
- * direction, the link kinds (only with a link-kind column) and the hold threshold. No `excludeBy` — the explorer graph
- * has no list in force.
+ * The explorer's ONE Grow preview body (`POST /inv/projection/neighbors/preview`): the whole frontier as `ids`, what is
+ * already on the graph as `drawn`, the direction, the link kinds (only with a link-kind column) and the hold threshold —
+ * read with the binding the Grow's own neighbours reads carry (attribute columns, the query's filter), so the preview
+ * counts what the Grow would add. No `excludeBy` — the explorer graph has no list in force.
  */
 export function neighboursPreviewBody(
-    p: Pick<EntityProjection, 'datasetId' | 'sourceCol' | 'targetCol' | 'linkKindCol'>,
+    p: Pick<EntityProjection, 'datasetId' | 'sourceCol' | 'targetCol' | 'linkKindCol' | 'attrCols'>,
     ids: string[],
     req: Pick<GrowRequest, 'direction' | 'linkKinds' | 'threshold'>,
+    drawn: string[],
+    filter?: ConditionGroup,
 ): NeighborsPreviewRequest {
     return {
         dataset: p.datasetId,
         sourceCol: p.sourceCol,
         targetCol: p.targetCol,
         ...(p.linkKindCol ? { linkKindCol: p.linkKindCol } : {}),
+        ...(p.attrCols?.length ? { attrCols: p.attrCols } : {}),
+        ...(filter ? { filter } : {}),
         ids,
+        ...(drawn.length ? { drawn } : {}),
         direction: req.direction,
         ...(req.linkKinds && p.linkKindCol ? { linkKinds: req.linkKinds } : {}),
         hubThreshold: req.threshold,
     };
+}
+
+/**
+ * The explorer preview's `drawn`: the raw values of every node already on the graph outside the frontier (graph ids),
+ * each by all its spellings — a Grow cannot add them again. The frontier's neighbours on the graph come first, so a graph
+ * above `max` (the Space's `input.max_ids`) keeps the values a step most likely reaches; a value the server would refuse
+ * (blank, or longer than `maxLength`, the Space's `input.id_length`) is left out rather than failing the preview.
+ */
+export function drawnValues(
+    g: { nodes: { id: string; data: { label: string; spellings?: string[] } }[]; edges: { source: string; target: string }[] },
+    frontier: readonly string[],
+    max: number,
+    maxLength: number,
+): string[] {
+    const from = new Set(frontier);
+    const near = new Set<string>();
+    for (const e of g.edges) {
+        if (from.has(e.source)) near.add(e.target);
+        if (from.has(e.target)) near.add(e.source);
+    }
+    const rest = g.nodes.filter((n) => !from.has(n.id));
+    const out = new Set<string>();
+    for (const n of [...rest.filter((r) => near.has(r.id)), ...rest.filter((r) => !near.has(r.id))])
+        for (const v of n.data.spellings?.length ? n.data.spellings : [n.data.label])
+            if (v.trim() && v.length <= maxLength) out.add(v);
+    return [...out].slice(0, max);
+}
+
+/**
+ * The explorer preview's link count as the Grow will count it: the server's links to new neighbours (`addsLinks`) plus
+ * its `linksWithinGraph` (both ends already on the graph) less the graph's own links touching the frontier in the Grow's
+ * direction and kinds — those the graph already draws. A graph its query drew whole adds none of them; one cut short by
+ * a limit lacks some, and the Grow adds exactly those.
+ */
+export function withUndrawnLinks(
+    p: GrowPreview,
+    g: { edges: { source: string; target: string; data: { kind?: unknown } }[] },
+    frontier: readonly string[],
+    req: Pick<GrowRequest, 'direction' | 'linkKinds'>,
+): GrowPreview {
+    if (p.linksWithinGraph == null || p.addsLinks == null) return p;
+    const from = new Set(frontier);
+    const drawn = g.edges.filter((e) => {
+        const kind = baseEdgeKind(e.data.kind);
+        return (
+            (from.has(e.source) && growKeepsEdge(e.source, req, e, kind)) ||
+            (from.has(e.target) && growKeepsEdge(e.target, req, e, kind))
+        );
+    }).length;
+    return { ...p, addsLinks: p.addsLinks + Math.max(0, p.linksWithinGraph - drawn) };
 }

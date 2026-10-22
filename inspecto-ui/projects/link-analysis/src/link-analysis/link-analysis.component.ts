@@ -78,12 +78,14 @@ import { GrowExcludeStore } from './grow-exclude.store';
 import {
     GrowContext,
     GrowRequest,
+    drawnValues,
     filterExpansion,
     growKeepsEdge,
     hiddenByListsLine,
     neighboursPreviewBody,
     packTerms,
     removedRows,
+    withUndrawnLinks,
 } from './grow-exclude';
 import { LinkAnalysisGrowComponent } from './link-analysis-grow.component';
 import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
@@ -3266,17 +3268,29 @@ export class LinkAnalysisComponent implements OnInit {
     });
 
     /**
-     * The explorer's preview: ONE `neighbors/preview` over the whole frontier (distinct neighbours, so no over-count). An
-     * absent route → no numbers; a refusal (e.g. 403) reaches the panel with the server's reason. No `excludeBy`: the
-     * explorer graph has no list in force (its neighbours read cannot apply one), so the preview never counts one.
+     * The explorer's preview: ONE `neighbors/preview` over the whole frontier (distinct neighbours, so no over-count), with
+     * the rest of the graph as `drawn` and the Grow's own read binding (attribute columns, the query's filter), plus the
+     * links between nodes already shown that the graph does not draw yet (`withUndrawnLinks`), so it counts what `growBasic`
+     * would add. An absent route → no numbers; a refusal (e.g. 403) reaches the panel with the server's
+     * reason. No `excludeBy`: the explorer graph has no list in force (its neighbours read cannot apply one), so the
+     * preview never counts one.
      */
     readonly growBasicAdapter = (this.growExclude.basicAdapter = {
         preview: async (frontier: string[], req: GrowRequest) => {
-            const p = this.lastRun()?.query.projection;
+            const q = this.lastRun()?.query;
+            const p = q?.projection;
             if (!p) return null;
             const nodes = this.canvasData()?.nodes ?? [];
             const ids = frontier.map((id) => nodes.find((n) => n.id === id)?.data.label ?? id);
-            const preview = await firstValueFrom(this.inv.previewNeighbors(neighboursPreviewBody(p, ids, req)));
+            // what the Grow compares against: the whole graph, hidden nodes too (growBasic counts this.graph())
+            const graph = this.graph() ?? { nodes: [], edges: [] };
+            const drawn = drawnValues(graph, frontier, laLimit('input.max_ids'), laLimit('input.id_length'));
+            const preview = withUndrawnLinks(
+                await firstValueFrom(this.inv.previewNeighbors(neighboursPreviewBody(p, ids, req, drawn, q.filter))),
+                graph,
+                frontier,
+                req,
+            );
             // held items only mean something while holding
             return req.hold ? preview : { ...preview, held: [], heldCount: 0 };
         },

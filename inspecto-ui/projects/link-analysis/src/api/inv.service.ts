@@ -77,6 +77,8 @@ export interface NeighborsRequest extends ProjectionRequest {
 export interface NeighborsPreviewRequest extends ProjectionRequest {
     /** The raw projected values to grow from. */
     ids: string[];
+    /** The raw values already on the explorer graph: never counted as added, nor their links to `ids` (at most `input.max_ids`). */
+    drawn?: string[];
     direction?: 'either' | 'out' | 'in' | 'reciprocal';
     /** Needs `linkKindCol`. */
     linkKinds?: string[];
@@ -1612,6 +1614,11 @@ export interface GrowPreview {
     /** The step would be held for a second person's approval (four-eyes). */
     needsApproval?: boolean;
     reason?: string;
+    /**
+     * Explorer only: the step's links whose both ends are already on the graph (between `ids`, or to `drawn`) — NOT in
+     * `addsLinks`, which counts links to new neighbours; the explorer adds the ones its graph does not draw yet.
+     */
+    linksWithinGraph?: number;
 }
 
 // ── LA-17 slice 2: analyst identity resolution (`EntityIdentityRoutes`, entity-model design §8.2) ───────

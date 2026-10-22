@@ -394,4 +394,132 @@ class ControlApiGrowPreviewTest {
             assertTrue(a.get("masking").isObject(), raw.body());
         }
     }
+
+    // ── the explorer preview = the explorer Grow (parity) ─────────────────────────────────────────────
+
+    /** An explorer graph: its node values and its links keyed {@code source|target|kind|attrs}, as the SPA folds a read's rows. */
+    private record Graph(Set<String> nodes, Set<String> links) {}
+
+    private static String linkKey(JsonNode row) {
+        return row.get("source").asText() + "|" + row.get("target").asText() + "|" + row.get("kind").asText() + "|" + row.path("attrs");
+    }
+
+    /** The graph a read draws ({@code /inv/projection}, or one neighbours read). */
+    private Graph draw(Ctx c, String path, String body) throws Exception {
+        Set<String> nodes = new java.util.TreeSet<>(), links = new java.util.TreeSet<>();
+        for (JsonNode row : data(post(c, path, body), 200).get("rows")) {
+            nodes.add(row.get("source").asText());
+            nodes.add(row.get("target").asText());
+            links.add(linkKey(row));
+        }
+        return new Graph(nodes, links);
+    }
+
+    /**
+     * The explorer's Grow as the SPA runs it ({@code growBasic}): one {@code /inv/projection/neighbors} read per frontier value
+     * with the graph's own binding, each read's links kept by the direction, merged into {@code g}. Returns {nodes, links} added.
+     */
+    private int[] explorerGrow(Ctx c, String binding, Graph g, List<String> frontier, String direction) throws Exception {
+        Set<String> nodes = new java.util.HashSet<>(), links = new java.util.HashSet<>();
+        for (String v : frontier)
+            for (JsonNode row : data(post(c, "/inv/projection/neighbors", "{" + binding + ",\"value\":\"" + v + "\"}"), 200).get("rows")) {
+                String s = row.get("source").asText(), t = row.get("target").asText();
+                if ("out".equals(direction) && !s.equals(v) || "in".equals(direction) && !t.equals(v)) continue;
+                if (!g.links().contains(linkKey(row))) links.add(linkKey(row));
+                for (String n : List.of(s, t)) if (!g.nodes().contains(n)) nodes.add(n);
+            }
+        return new int[] {nodes.size(), links.size()};
+    }
+
+    /**
+     * The parity check: preview a Grow from {@code frontier} with the rest of {@code g} as {@code drawn}, run that Grow, and
+     * compare. The preview's links are read as the SPA reads them ({@code withUndrawnLinks}): {@code addsLinks} plus the
+     * {@code linksWithinGraph} the graph does not draw yet, i.e. minus its links touching the frontier in the direction. The
+     * Grow's own numbers are pinned too, so an empty fixture cannot pass by agreeing on zero by accident.
+     */
+    private JsonNode explorerParity(Ctx c, String binding, Graph g, List<String> frontier, String direction, int nodes, int links)
+            throws Exception {
+        List<String> others = g.nodes().stream().filter(n -> !frontier.contains(n)).toList();
+        JsonNode p = data(post(c, "/inv/projection/neighbors/preview", "{" + binding + ",\"ids\":" + JSON.writeValueAsString(frontier)
+                + ",\"drawn\":" + JSON.writeValueAsString(others) + ",\"direction\":\"" + direction + "\"}"), 200);
+        long drawnTouching = g.links().stream().map(k -> k.split("\\|", -1)).filter(k -> switch (direction) {
+            case "out" -> frontier.contains(k[0]);
+            case "in" -> frontier.contains(k[1]);
+            default -> frontier.contains(k[0]) || frontier.contains(k[1]);
+        }).count();
+        long previewLinks = p.get("addsLinks").asLong() + Math.max(0, p.get("linksWithinGraph").asLong() - drawnTouching);
+        int[] grew = explorerGrow(c, binding, g, frontier, direction);
+        assertEquals(nodes, grew[0], "the Grow from " + frontier + " " + direction);
+        assertEquals(links, grew[1], "the Grow from " + frontier + " " + direction);
+        assertEquals(grew[0], p.get("addsNodes").asInt(), "nodes: preview " + p + " vs the Grow, from " + frontier + " " + direction);
+        assertEquals(grew[1], previewLinks, "links: preview " + p + " vs the Grow, from " + frontier + " " + direction);
+        return p;
+    }
+
+    /**
+     * LA-GROW-EXCLUDE-1 parity for the explorer (Basic Grow): the neighbours preview counts exactly what the Grow then adds to
+     * the graph the explorer drew - with the frontier as {@code ids}, every other node on the graph as {@code drawn}, and the
+     * graph's own filter and attribute columns. The defect it pins: a graph its query drew whole previewed "5 nodes and 10
+     * links" its Grow could not add (they were on the graph already), so the Grow reported 0 and 0.
+     */
+    @Test
+    void theNeighboursPreviewCountsWhatTheExplorerGrowAdds(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of());   // Basic, where the explorer Grow is the only Grow
+        // every Grow here is a neighbours read per frontier value: far more than the LA budget's burst of 30
+        System.setProperty("control.rateLimit.linkAnalysis.capacity", "10000");
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            // The query drew the whole Dataset: a Grow can add nothing, and the preview says so.
+            Graph whole = draw(c, "/inv/projection", "{" + BINDING + "}");
+            assertEquals(9, whole.nodes().size(), whole.toString());
+            explorerParity(c, BINDING, whole, List.of("A1", "HUB9"), "either", 0, 0);
+            JsonNode blind = neighbours(c, "{\"ids\":[\"A1\"]}");
+            assertEquals(2, blind.get("addsNodes").asInt(), "without drawn, A1's neighbours on the graph are counted: " + blind);
+
+            // One expand drew A1's neighbourhood; growing its two new nodes adds what lies beyond, not A1 again.
+            Graph a1 = draw(c, "/inv/projection/neighbors", "{" + BINDING + ",\"value\":\"A1\"}");
+            assertEquals(Set.of("A1", "HUB9", "B2"), a1.nodes());
+            explorerParity(c, BINDING, a1, List.of("HUB9", "B2"), "either", 6, 6);
+            explorerParity(c, BINDING, a1, List.of("HUB9", "B2"), "out", 6, 6);
+            explorerParity(c, BINDING, a1, List.of("HUB9", "B2"), "in", 0, 0);
+
+            // A filtered view: its Grow reads under the view's filter, so its preview must count under it too.
+            String voice = BINDING + ",\"filter\":{\"kind\":\"group\",\"op\":\"AND\",\"items\":"
+                    + "[{\"kind\":\"condition\",\"field\":\"channel\",\"operator\":\"=\",\"value\":\"voice\"}]}";
+            Graph voiceOnly = draw(c, "/inv/projection", "{" + voice + "}");
+            assertFalse(voiceOnly.nodes().contains("C3"), "B2-C3 is sms: " + voiceOnly);
+            explorerParity(c, voice, voiceOnly, List.of("B2"), "either", 0, 0);
+
+            // Attribute columns split a folded pair into one link per value, in the Grow and so in the preview.
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("pay_view", "flow-x", List.of(),
+                    "SELECT payer, payee, amount FROM (VALUES ('P1','P2','10'), ('P2','P3','5'), ('P2','P3','7')) AS t(payer,payee,amount)",
+                    "2026-10-22T00:00:00Z"));
+            new ComponentStore(root.resolve("registry")).write("dataset", "pay_ds", Map.of("view", "pay_view"));
+            String pay = "\"dataset\":\"pay_ds\",\"sourceCol\":\"payer\",\"targetCol\":\"payee\",\"attrCols\":[\"amount\"]";
+            Graph p1 = draw(c, "/inv/projection/neighbors", "{" + pay + ",\"value\":\"P1\"}");
+            explorerParity(c, pay, p1, List.of("P2"), "either", 1, 2);
+
+            // A graph cut short by the query's limit lacks links between nodes it does show; the Grow adds them, and so
+            // does the preview (linksWithinGraph less the ones drawn) - links between two frontier nodes included.
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("tri_view", "flow-x", List.of(),
+                    "SELECT a, b FROM (VALUES ('T1','T2'), ('T1','T3'), ('T2','T3')) AS t(a,b)", "2026-10-22T00:00:00Z"));
+            new ComponentStore(root.resolve("registry")).write("dataset", "tri_ds", Map.of("view", "tri_view"));
+            String tri = "\"dataset\":\"tri_ds\",\"sourceCol\":\"a\",\"targetCol\":\"b\"";
+            JsonNode cut = data(post(c, "/inv/projection", "{" + tri + ",\"limit\":2}"), 200);
+            assertTrue(cut.get("truncated").asBoolean(), cut.toString());
+            Graph two = draw(c, "/inv/projection", "{" + tri + ",\"limit\":2}");
+            assertEquals(Set.of("T1", "T2", "T3"), two.nodes());
+            assertFalse(two.links().contains("T2|T3|null|"), "the limit cut T2-T3: " + two);
+            JsonNode p = explorerParity(c, tri, two, List.of("T2"), "either", 0, 1);
+            assertEquals(0, p.get("addsLinks").asInt(), "no link to a new neighbour: " + p);
+            assertEquals(2, p.get("linksWithinGraph").asInt(), "T1-T2 (drawn) and T2-T3 (not): " + p);
+            explorerParity(c, tri, two, List.of("T2", "T3"), "either", 0, 1);
+            explorerParity(c, tri, two, List.of("T2"), "out", 0, 1);
+            explorerParity(c, tri, two, List.of("T2"), "in", 0, 0);
+
+            assertEquals(422, post(c, "/inv/projection/neighbors/preview", "{" + BINDING + ",\"ids\":[\"A1\"],\"drawn\":[\" \"]}")
+                    .statusCode(), "drawn is bounded as ids are");
+        } finally {
+            System.clearProperty("control.rateLimit.linkAnalysis.capacity");
+        }
+    }
 }
