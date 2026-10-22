@@ -201,7 +201,9 @@ import {
     LA_TAGS,
     LA_TRANSFER,
     LaHostSlotComponent,
+    investigationsLockedReason,
 } from '@inspecto/link-analysis/la-host';
+import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
 import { draftSavedWarning, recheckDraft } from '@inspecto/link-analysis/investigation/draft-recheck';
 import {
@@ -381,6 +383,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         LinkAnalysisGrowComponent,
         LinkAnalysisHeldTrayComponent,
         LinkAnalysisExclusionsComponent,
+        LockedActionComponent,
     ],
     // LA-10: the Investigation session outlives the toolbox dock, which destroys its panel on collapse.
     // LA-GROW-EXCLUDE-1: Grow / Held / Exclude state sits beside it, for the same reason.
@@ -503,21 +506,22 @@ export class LinkAnalysisComponent implements OnInit {
         });
     });
     /**
-     * LA-EDITIONS-1 ED-4: the Investigation surface is included in this edition. False on Basic (the Link Analysis
-     * explorer), whose Investigation routes answer 503: the tab, the buttons and every opener are hidden, never left to 503.
+     * LA-EDITIONS-1 ED-4: the Investigation surface is included here. False on the Explorer level (Basic, or a sign-in
+     * install without the Investigations add-on, LA-ONBOARD-1 OB-5), whose Investigation routes answer 503: the tab and its
+     * openers stay, and the Investigation actions are shown LOCKED with {@link investigationsLockedReason} (OB-10).
      */
-    readonly investigationsEnabled = inject(LA_FEATURES).investigations;
+    private readonly laFeatures = inject(LA_FEATURES);
+    readonly investigationsEnabled = this.laFeatures.investigations;
+    /** Why an Investigation action is locked on the Explorer level (`/bootstrap` `featureReasons.investigations`). */
+    readonly investigationsLockedReason = computed(() => investigationsLockedReason(this.laFeatures));
     private readonly allToolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [
         { id: 'analysis', label: 'Analysis' },
         { id: 'view', label: 'View' },
         { id: 'investigation', label: 'Investigation' },
     ];
-    private readonly visibleToolboxTabs = computed(() =>
-        this.allToolboxTabs.filter((t) => t.id !== 'investigation' || this.investigationsEnabled()),
-    );
-    /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels). */
+    /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels) - the same on every level. */
     get toolboxTabs(): readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] {
-        return this.visibleToolboxTabs();
+        return this.allToolboxTabs;
     }
     /** The graph canvas's text alternative: the displayed graph as a keyboard-navigable node / link list. */
     readonly listMode = signal(false);
@@ -2061,7 +2065,6 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** LA-10: open the Investigation tab (start one, or work the open one's op log). */
     openInvestigation(): void {
-        if (!this.investigationsEnabled()) return; // Basic: no Investigation tab (LA-EDITIONS-1 ED-4)
         this.toolboxDockOpen.set(true);
         this.toolboxTab.set('investigation');
     }

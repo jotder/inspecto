@@ -14,6 +14,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** {@link Screener} over a real Entity List fact log (SCR-D3 … SCR-D9, SCR-D14). */
 class ScreenerTest {
 
+    /**
+     * The masking default is on where people sign in (LA-ONBOARD-1 OB-6, A-16) - not where Investigations are present. No test
+     * classpath sets auth.mode, so these tests, which rely on the {@code typed} default, state that people sign in.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void peopleSignIn() {
+        System.setProperty("auth.mode", "oidc");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSignIn() {
+        System.clearProperty("auth.mode");
+    }
+
     private static final double T = Screener.DEFAULT_THRESHOLD;
 
     private static List<Screener.Match> screen(Path root, Screener.Subject s, String... lists) throws Exception {

@@ -48,6 +48,9 @@ export interface BootstrapBranding {
     footerText: string | null;
 }
 
+/** The Link Analysis level (LA-ONBOARD-1 OB-5): the Explorer, or Investigations when the install holds the add-on. */
+export type LaLevel = 'explorer' | 'investigations';
+
 /** The slice of `GET /bootstrap` this service consumes (edition switch + session). */
 interface Bootstrap {
     edition?: string;
@@ -63,6 +66,10 @@ interface Bootstrap {
         ops?: boolean;
         [feature: string]: string | boolean | undefined;
     };
+    /** LA-ONBOARD-1 OB-5: the Link Analysis level - `investigations` while `features.investigations` is true. */
+    laLevel?: LaLevel;
+    /** LA-ONBOARD-1 OB-10: featureId -> one line saying why it is locked and which edition or add-on has it. */
+    featureReasons?: Record<string, string>;
     session?: { authenticated?: boolean; actor?: string; displayName?: string | null; capabilities?: string[] };
     branding?: Partial<BootstrapBranding>;
     auth?: Partial<OidcConfig> & { demoUsers?: DemoUser[]; spacesAttached?: number };
@@ -155,10 +162,18 @@ export class SessionService {
     readonly geoLinkEnabled = signal(false);
     /**
      * `bootstrap.features.investigations` — the Link Analysis Investigation surface is installed AND included in this
-     * edition. False on Basic (LA-EDITIONS-1 ED-4: the Link Analysis explorer, `geoLink` true), whose Investigation
-     * routes answer 503; Link Analysis hides every Investigation affordance on false.
+     * edition AND the install holds the Investigations add-on. False on the Explorer level (Basic, LA-EDITIONS-1 ED-4; or a
+     * sign-in install without the add-on, LA-ONBOARD-1 OB-5), whose Investigation routes answer 503; Link Analysis shows
+     * Investigation actions locked with `featureReasons` on false.
      */
     readonly investigationsEnabled = signal(false);
+    /** `bootstrap.laLevel` (LA-ONBOARD-1 OB-5): which Link Analysis screens exist - the edition still decides the rules. */
+    readonly laLevel = signal<LaLevel>('explorer');
+    /**
+     * `bootstrap.featureReasons` (LA-ONBOARD-1 OB-10): featureId -> one short line saying why that feature is locked and
+     * which edition or add-on has it, for `<inspecto-locked-action>`. Only withheld features have an entry.
+     */
+    readonly featureReasons = signal<Readonly<Record<string, string>>>({});
     /**
      * `bootstrap.features.events` — the operational events FEED is registered in this bundle (EDITIONS
      * CP-13: the optional `inspecto-events` module, Standard and above; EDG-01 cell 6).
@@ -279,6 +294,7 @@ export class SessionService {
         this.exchangeEnabled.set(boot.features?.exchange === true);
         this.geoLinkEnabled.set(boot.features?.geoLink === true);
         this.investigationsEnabled.set(boot.features?.investigations === true);
+        this.applyLevel(boot);
         this.eventsEnabled.set(boot.features?.events === true);
         this.opsEnabled.set(boot.features?.ops === true);
         this.loopbackOnly.set(boot.features?.loopbackOnly === true);
@@ -323,8 +339,18 @@ export class SessionService {
         this.exchangeEnabled.set(boot.features.exchange === true);
         this.geoLinkEnabled.set(boot.features.geoLink === true);
         this.investigationsEnabled.set(boot.features.investigations === true);
+        this.applyLevel(boot);
         this.eventsEnabled.set(boot.features.events === true);
         this.opsEnabled.set(boot.features.ops === true);
+    }
+
+    /** `laLevel` and `featureReasons` from a bootstrap (a server without them reads as the Explorer, no reasons). */
+    private applyLevel(boot: Bootstrap): void {
+        this.laLevel.set(boot.laLevel === 'investigations' ? 'investigations' : 'explorer');
+        const reasons = boot.featureReasons ?? {};
+        this.featureReasons.set(
+            Object.fromEntries(Object.entries(reasons).filter(([, v]) => typeof v === 'string' && v.trim() !== '')),
+        );
     }
 
     /** Start the Authorization-Code + PKCE redirect (or, in mock mode, grant a code locally offline). */

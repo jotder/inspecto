@@ -22,7 +22,7 @@ import { parseToon } from './check-offerings.mjs';
 export const KINDS = ['layer', 'module', 'functionality', 'addon', 'solution-pack', 'edition'];
 export const VOCAB = {
     billable: ['true', 'false'],
-    enforcement: ['build', 'enabled-gate', 'contract'],
+    enforcement: ['build', 'enabled-gate', 'contract', 'runtime'],
     'billing.model': ['included', 'flat', 'per-user', 'per-space', 'per-node'],
     'support.tier': ['community', 'standard', 'premium'],
     status: ['planned', 'preview', 'ga', 'deprecated'],

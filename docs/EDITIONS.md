@@ -33,8 +33,9 @@ explorer* below.
 | | Export (PNG, CSV), snapshots (not evidence-grade) | ✅ | ✅ | ✅ | ✅ |
 | | Link Analysis widgets on dashboards (offer hidden on Basic; routes stay open) | — | ✅ | ✅ | ✅ |
 | | Industry packs (Telecom, Mobile Money) | ✅ | ✅ | ✅ | ✅ |
-| | Masking | off by default (`none`); a mode the Space states is display only (no sign-in: anyone may reveal) | ✅ enforced, default `typed` | ✅ | ✅ |
-| Investigate | Investigations: sealed op log, replay, compare, temporal findings | — | ✅ | ✅ | ✅ |
+| | Masking (the default follows sign-in, never the LA level: `LA-ONBOARD-1` OB-6) | off by default (`none`); a mode the Space states is display only (no sign-in: anyone may reveal) | ✅ enforced, default `typed` (with or without the Investigations add-on) | ✅ | ✅ |
+| Investigate | **Investigations add-on** `INS-AO-LA-INVESTIGATIONS` (`LA-ONBOARD-1` OB-5): billable, enforced at runtime, included by default; every Investigate, Share, Scale and Operate row below needs it. Without it the install runs Link Analysis at the **Explorer** level and shows those actions locked with the reason | — | ✅ default | ✅ default | ✅ default |
+| | Investigations: sealed op log, replay, compare, temporal findings | — | ✅ | ✅ | ✅ |
 | | Dossier and Dossier bundle with verification | — | ✅ | ✅ | ✅ |
 | | Templates, external references | — | ✅ | ✅ | ✅ |
 | | Data trust: data strip, Files, coverage, delivery Alerts | — | ✅ | ✅ | ✅ |
@@ -193,6 +194,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | caseManagement | `case-management` | — | built | built | built |
 | incidents | `ops` | — | built | built | built |
 | integrationDelivery | `notify-channels` | — | built | built | built |
+| laInvestigations | `ops` | — | built | built | built |
 | linkAnalysis | `la-storage`, `la-core`, `la-api`, `geo-link` | built | built | built | built |
 | multiEntity | `exchange` | — | built | built | built |
 | premiumConnectors | `connectors-kafka` | — | built | built | built |
@@ -268,21 +270,35 @@ Investigations (…) are available in Standard and above — this build (Basic) 
 include them" — at dispatch (`ControlApi.requireModuleEnabled` → `EditionFeatures.gatesRoutes`), before the Space's own
 module switch (404 `MODULE_DISABLED`). The rule this document keeps — *a feature an edition lacks is a module that
 edition does not bundle* — still holds: Basic lacks the Investigation surface because it lacks `inspecto-ops`.
-`/bootstrap` reports `features.geoLink: true, investigations: false` on Basic, and the SPA (`LA_FEATURES.investigations`,
-from `SessionService.investigationsEnabled`) hides the Investigation tab and buttons, the `?investigation=` and `?seed=`
-openers, "start an Investigation from the top results", every Run-on-server control and the edge-index and
-server-algorithm tools, so nothing offered can only 503. The standalone Inspecto LA app also hides its **Alerts** area on
+`/bootstrap` reports `features.geoLink: true, investigations: false`, `laLevel: "explorer"` and
+`featureReasons.investigations` on Basic, and the SPA (`LA_FEATURES.investigations` / `featureReasons`, from
+`SessionService`) shows the Investigation actions LOCKED with that line (`<inspecto-locked-action>`, `LA-ONBOARD-1` OB-10;
+operator answer A-11 "locked with a reason inside screens"): the Investigation tab's *Start an Investigation*, "start an
+Investigation from the top results", every Run-on-server / Run-on-index control and the edge-index and server-algorithm
+tools. The `?investigation=` and `?seed=` openers still open nothing, so nothing offered can 503. The standalone Inspecto LA app also hides its **Alerts** area on
 Basic (operator 2026-10-21): those are the standing-detection Alerts behind Investigations, so the rail and landing page
 omit it (`la-nav.ts` `feature: 'investigations'`) and a typed `/alerts` lands on the landing page (`investigationsGuard`). Pinned by `ControlApiBasicEditionLinkAnalysisTest`
 (`la/inspecto-geo-link`: Basic answers an explorer route 200 with no sign-in and refuses one route per Investigation
-module; Standard answers both) and the Basic specs in `link-analysis.component.spec.ts` /
+module; Standard answers both) and the Explorer-level specs in `link-analysis.component.spec.ts` /
 `link-analysis-toolbox.server-run.spec.ts`.
 
-**Masking on Basic is off by default, and display-only when on** (operator 2026-10-21). A Basic Space that states no
-`masking_mode` masks nothing: the in-force mode is `none` (Standard, Advanced and Preview keep the shipped `typed`). The
-seam is `LinkAnalysisSettings.effectiveMaskingMode`, which every masking reader and `GET /settings/link-analysis`
-`maskingModeInForce` go through; it asks the `MaskingDefault` provider the control plane ships (`EditionMaskingDefault`:
-`none` when `investigations` is absent), so the API and the SPA agree. Pinned by `ControlApiBasicEditionMaskingDefaultTest`.
+**The Investigations add-on: the same Explorer level on Standard and above** (`LA-ONBOARD-1` OB-5, operator-confirmed
+2026-10-22, DATA-TIERS-1 DT-11 clarified). Investigations is a billable add-on (Product Map `addon.laInvestigations`,
+`INS-AO-LA-INVESTIGATIONS`, `enforcement: runtime`) included by default wherever the edition carries `inspecto-ops`. An
+installation that does not hold it starts with `-Daddons.laInvestigations=false` (for example in `INSPECTO_JAVA_OPTS`):
+`EditionFeatures.present(INVESTIGATIONS)` then answers false, so the same routes answer `503 CAPABILITY_UNAVAILABLE` naming
+the add-on ("… need the Investigations add-on (INS-AO-LA-INVESTIGATIONS), which this installation does not hold …") and
+`/bootstrap` reports `laLevel: "explorer"`. The edition stays the one governance switch: sign-in, roles and enforced
+masking are unchanged. Until a signed entitlement exists, whoever runs the server can claim the add-on; the one place the
+proof is read is `EditionFeatures.holdsInvestigationsAddon()`. Basic never has it, whatever the setting says. Pinned by
+`ControlApiInvestigationsAddonTest`.
+
+**Masking on Basic is off by default, and display-only when on** (operator 2026-10-21; since `LA-ONBOARD-1` OB-6 the default
+keys on SIGN-IN, operator answer A-16). A Space that states no `masking_mode` masks nothing when nobody signs in (`auth.mode`
+none and no Authenticator: Basic); wherever people sign in the shipped `typed` holds, with or without the Investigations
+add-on. The seam is `LinkAnalysisSettings.effectiveMaskingMode`, which every masking reader and `GET /settings/link-analysis`
+`maskingModeInForce` go through; it asks the `MaskingDefault` provider the control plane ships (`EditionMaskingDefault`), so
+the API and the SPA agree. Pinned by `ControlApiMaskingDefaultBySignInTest`.
 ⚠ It is the Space's ONE masking mode, so on Basic the BI reads (`BiResultMasking`: queries, KPIs, the DB browser, public
 dashboard shares and Report Job exports) are unmasked by default too. A Space that STATES a mode keeps it in every edition. Such a mode still masks entity ids in explorer answers, but with no
 sign-in there is no Subject, so the capability an audited reveal needs (`canRevealLinkEntities`) is never checked and
