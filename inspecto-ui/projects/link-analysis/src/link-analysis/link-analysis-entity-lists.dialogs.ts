@@ -40,6 +40,8 @@ const NOT_BLANK = /\S/;
 export interface CreateEntityListData {
     /** The Space's `entityTypesInForce` — a list's Entity Type must be one of them. */
     entityTypes: EntityTypeConfig[];
+    /** A suggested first list (LA-ONBOARD-1 phase 7): the form starts filled in; a type not in force is left to choose. */
+    initial?: { title: string; purpose: EntityListPurpose; entityType: string | null; reason: string };
 }
 
 /**
@@ -133,13 +135,18 @@ export class CreateEntityListDialog {
         hint: t.id,
     }));
     readonly form = new FormGroup({
-        title: new FormControl('', {
+        title: new FormControl(this.data.initial?.title ?? '', {
             nonNullable: true,
             validators: [Validators.required, Validators.pattern(NOT_BLANK), Validators.maxLength(200)],
         }),
-        purpose: new FormControl<EntityListPurpose | null>(null, { validators: [Validators.required] }),
-        entityType: new FormControl<string | null>(null, { validators: [Validators.required] }),
-        reason: new FormControl('', {
+        purpose: new FormControl<EntityListPurpose | null>(this.data.initial?.purpose ?? null, {
+            validators: [Validators.required],
+        }),
+        entityType: new FormControl<string | null>(
+            this.data.entityTypes.some((t) => t.id === this.data.initial?.entityType) ? this.data.initial!.entityType : null,
+            { validators: [Validators.required] },
+        ),
+        reason: new FormControl(this.data.initial?.reason ?? '', {
             nonNullable: true,
             validators: [Validators.required, Validators.pattern(NOT_BLANK), Validators.maxLength(1000)],
         }),

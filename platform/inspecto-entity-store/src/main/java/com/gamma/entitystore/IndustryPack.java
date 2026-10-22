@@ -45,18 +45,30 @@ public record IndustryPack(String id, String name, String description, List<Stri
 
     /**
      * How Link Analysis reads a projected graph under this pack: column-name hints for the measure and the time axis
-     * (case-insensitive patterns, in preference order), the toolbox groups to badge, and the optional "Investigate a
-     * number" binding ({@code null} = not offered).
+     * (case-insensitive patterns, in preference order), the toolbox groups to badge, the optional "Investigate a
+     * number" binding ({@code null} = not offered), and the first Entity Lists it suggests to a Space that has none.
      */
     public record Profile(List<String> measureHints, List<String> timeHints, List<String> suggestedTools,
-                          Map<String, Object> investigate) {
+                          Map<String, Object> investigate, List<SuggestedList> suggestedLists) {
         public Profile {
             measureHints = List.copyOf(measureHints);
             timeHints = List.copyOf(timeHints);
             suggestedTools = List.copyOf(suggestedTools);
             investigate = investigate == null ? null : Map.copyOf(investigate);
+            suggestedLists = List.copyOf(suggestedLists);
         }
     }
+
+    /**
+     * A first Entity List the pack suggests (LA-ONBOARD-1 phase 7, UC-10): a title in the pack's words ("Call centres"),
+     * a purpose from {@link #LIST_PURPOSES}, the core Entity Type its members are, and one line on why. A suggestion only:
+     * nothing is created until a person creates it.
+     */
+    public record SuggestedList(String title, String purpose, String entityType, String why) {}
+
+    /** The Entity List purposes a suggestion may name (the Entity List routes' own set). */
+    public static final Set<String> LIST_PURPOSES = Set.of("allow", "block", "watch", "exclusion");
+    private static final int MAX_SUGGESTED_LISTS = 10;
 
     /** The {@code concept.*} keys and their neutral labels (what a Space without a pack reads). */
     public static final Map<String, String> CONCEPTS = orderedMap(
@@ -212,6 +224,16 @@ public record IndustryPack(String id, String name, String description, List<Stri
         p.put("measureHints", profile.measureHints());
         p.put("timeHints", profile.timeHints());
         p.put("suggestedTools", profile.suggestedTools());
+        List<Map<String, Object>> lists = new ArrayList<>();
+        for (SuggestedList l : profile.suggestedLists()) {
+            Map<String, Object> x = new LinkedHashMap<>();
+            x.put("title", l.title());
+            x.put("purpose", l.purpose());
+            x.put("entityType", l.entityType());
+            x.put("why", l.why());
+            lists.add(x);
+        }
+        p.put("suggestedLists", lists);
         if (profile.investigate() != null) {
             Map<String, Object> inv = new LinkedHashMap<>();
             for (String k : List.of("entity_type", "dataset", "source_col", "target_col", "link_kind_col", "time_col",
@@ -281,7 +303,33 @@ public record IndustryPack(String id, String name, String description, List<Stri
             if (EntityTypes.DEFAULTS.stream().noneMatch(t -> t.id().equals(type)))
                 throw new IllegalArgumentException("profile.investigate.entity_type '" + type + "' is not a core Entity Type");
         }
-        return new Profile(measure, time, tools, inv);
+        return new Profile(measure, time, tools, inv, suggestedLists(m.get("suggested_lists")));
+    }
+
+    /** {@code profile.suggested_lists[n]{title,purpose,entity_type,why}}: optional; every entry checked, a bad one refuses the pack. */
+    private static List<SuggestedList> suggestedLists(Object raw) {
+        if (raw == null) return List.of();
+        List<?> rows = list(raw, "profile.suggested_lists");
+        if (rows.size() > MAX_SUGGESTED_LISTS)
+            throw new IllegalArgumentException("profile.suggested_lists: at most " + MAX_SUGGESTED_LISTS + " lists, got " + rows.size());
+        List<SuggestedList> out = new ArrayList<>();
+        Set<String> titles = new HashSet<>();
+        for (Object o : rows) {
+            if (!(o instanceof Map<?, ?> l)) throw new IllegalArgumentException("each profile.suggested_lists entry must be an object");
+            String title = bounded(str(l, "title"), "profile.suggested_lists title", MAX_LABEL);
+            if (!titles.add(title.toLowerCase(java.util.Locale.ROOT)))
+                throw new IllegalArgumentException("profile.suggested_lists: '" + title + "' is listed twice");
+            String purpose = str(l, "purpose");
+            if (!LIST_PURPOSES.contains(purpose))
+                throw new IllegalArgumentException("profile.suggested_lists '" + title + "': purpose must be one of " + LIST_PURPOSES
+                        + ", got '" + purpose + "'");
+            String type = str(l, "entity_type");
+            if (EntityTypes.DEFAULTS.stream().noneMatch(t -> t.id().equals(type)))
+                throw new IllegalArgumentException("profile.suggested_lists '" + title + "': entity_type '" + type + "' is not a core Entity Type");
+            String why = bounded(str(l, "why"), "profile.suggested_lists '" + title + "' why", MAX_DEFINITION);
+            out.add(new SuggestedList(title, purpose, type, why));
+        }
+        return out;
     }
 
     private static List<String> hints(Object raw, String what) {

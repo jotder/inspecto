@@ -60,6 +60,16 @@ saved in the Space) and, optional, **A list** (an Entity List exists). Click a l
 the guide with the arrow (the choice is remembered in this browser). It disappears once the four required steps
 are ticked.
 
+**My work.** Once the Space holds data, the front page shows **My work** under the Space guide:
+
+* **Cases** - every case saved in the Space (section 5, *Save as a case*), the most recent first, with when it was
+  saved and the Entity Lists it uses (*Lists: started from Suspects; leaves out Busy merchants*). Click one to open
+  its graph. A case re-reads your data each time it opens: it is not evidence.
+* **What changed in your data** - one line per Dataset you brought in with **Add data**, its last import first:
+  *transfers: imported 1 Oct 2026, +2,104 rows*, or after another file *transfers: re-imported 3 Oct 2026, 2,300
+  rows loaded* (the line counts what the run loaded; it does not say whether the new file replaced the rows or was
+  added to them). Rows a run set aside are counted too. Data a Pipeline keeps up to date is not listed here.
+
 ### Add data: onboard a file
 
 **Add data** opens the screen **Onboard a file**. It turns one of your files into a Dataset that Link Analysis can
@@ -157,6 +167,8 @@ picked when you come from *Explore in Link Analysis*), then what to start from:
 * **A paste** - paste values, one per line (commas and semicolons work too).
 * **The whole Dataset** - draws every link at once. When the Dataset holds more entities than the node cap, the
   box warns you first: the graph is cut to the busiest, and starting from one entity is usually clearer.
+* **The busiest, or a group** - once a graph is drawn, *Find something interesting* (section 6) answers who is
+  busiest and which groups stick together; **Start from these** on a result starts a new graph from those entities.
 
 **Start** draws what you chose and everything linked to it - **one ring** - with busy numbers held (see *Grow and
 clean the graph* below), so **Grow** continues from there one step at a time. A line above the graph says what was
@@ -215,11 +227,40 @@ a node you have not expanded yet. **Undo** and **Redo** step through display and
 In an Investigation each of these is a recorded step; without one (Basic) they change only what you see. The first
 time each panel opens, a short note explains it; **Got it** hides the note in this browser.
 
+### Save as a case
+
+A **case** is a graph you keep: a named view plus the Entity Lists it uses. **Save as a case** (the bookmark in the
+top bar) asks a **Name** and an optional description, names the lists the graph uses - the list it started from and
+the exclusion lists you added entities to from it - and says once that a case re-reads live data and is not
+evidence. The case appears under **My work** on the front page. Opening it draws its start again over the data as
+it is then: the list's members as they are now, the entities you started from and grew, each with one ring; then
+whatever its exclusion lists hold now is hidden again. A case saved from **Explore a Dataset** reruns that query.
+
+Without Investigations (Basic, or a signed-in install without the Investigations add-on), the menu also shows
+**Start an Investigation from this** locked, with one line naming what has it. With Investigations, the
+Investigation tab starts one as before. To keep a frozen copy, use **Save this analysis** (section 7).
+
 ---
 
 ## 6. The analysis tools (Toolbox → Analysis)
 
-Open one group at a time; results stay while you switch tabs. Click a row in a ranking to select that node and
+**Find something interesting** sits at the top of the Analysis tab: three plain questions about the graph on screen.
+
+* **Who is busiest** - the five entities with the most links on this graph, each read in one sentence (*MERCHANT-BIG
+  takes part in 270 transfers, the most on this graph.*). When the busiest one has at least 5 links and twice the links of the
+  next, it asks: *MERCHANT-BIG has 270 transfers. Add it to an exclusion list?*
+* **Which groups stick together** - groups of three or more that link mostly among themselves (*Group 1: 9
+  accounts, 14 transfers among them within 3 days*; the days are said when a time column is chosen).
+* **How does A reach B** - choose **From** and **To**: the shortest chain following the links' direction, or in
+  either direction when there is none (it says which).
+
+Every result row offers **Show on graph** (highlights it), **Start from these** (a new graph from those entities and
+one ring, as the Start box draws) and **Add to a list** (an existing list of the same Entity Type, or a new one with
+its purpose in plain words: *Watch these*, *Never follow these*, *Known good*, *Block*; a reason is recorded). An
+exclusion list you add to becomes one of the case's lists, and without an Investigation its entities are hidden at once
+(Undo brings them back).
+
+The full toolbox follows. Open one group at a time; results stay while you switch tabs. Click a row in a ranking to select that node and
 centre the canvas on it.
 
 | Group | Use it to answer |
@@ -279,7 +320,10 @@ instead, or ask for Reveal rights.
 ## 8. Entity Lists, Alerts and Geo
 
 * **Entity Lists:** named watch lists of accounts or numbers, with every change on the record. With an Investigation
-  open, click an entity on the canvas and **Add selection** to a list.
+  open, click an entity on the canvas and **Add selection** to a list; without one, use **Add to a list** on a *Find
+  something interesting* result. A Space with no list yet is offered **first lists to start with** from its kind of
+  data (a telecom Space: *Call centres* to leave out, *Lines to watch*; mobile money: *Merchants*, *Wallets to
+  watch*; otherwise *Busy entities to leave out* and *Entities to watch*). **Create** opens *New list* filled in.
 * **Alerts:** fired Alerts, and a way into the Investigation behind a standing detection.
 * **Geo:** places entities and routes on a map, over a Dataset with coordinates.
 

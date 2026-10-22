@@ -36,6 +36,14 @@ describe('domain profiles', () => {
     beforeEach(() => installDomainProfiles([], null));
     afterEach(() => installDomainProfiles([], null));
 
+    it('the suggested first lists of a pack reach the profile; the neutral profile suggests neutral ones (phase 7)', () => {
+        const lists = [{ title: 'Call centres', purpose: 'exclusion' as const, entityType: 'msisdn', why: 'Busy.' }];
+        expect(profileFromPack({ ...TELECOM, profile: { ...TELECOM.profile, suggestedLists: lists } }).suggestedLists).toEqual(lists);
+        expect(profileFromPack(MONEY).suggestedLists).toEqual([]); // an older server sends none
+        expect(GENERIC_PROFILE.suggestedLists?.map((l) => l.purpose)).toEqual(['exclusion', 'watch']);
+        expect(GENERIC_PROFILE.suggestedLists?.every((l) => l.entityType === '')).toBe(true);
+    });
+
     it('hold only the neutral generic profile until the server installs its packs', () => {
         expect(domainProfiles().map((p) => p.id)).toEqual(['generic']);
         expect(domainProfile('telecom').id).toBe('generic');

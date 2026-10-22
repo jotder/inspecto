@@ -449,6 +449,45 @@ same picker drew the whole Dataset with the seed merely queued. Both now draw / 
 Link Analysis*, phase 4) preselects the Dataset in the Start box when it can start a graph, else picks it in the Query panel
 as *Explore a Dataset* does.
 
+**My work and discovery (LA-ONBOARD-1 phase 7, as built 2026-10-22; UC-10, UC-12, UC-13, UC-14, A-1b).** SPA only, plus one
+optional pack field; no route was added.
+* **A case = a saved view + the Entity Lists it uses.** `LinkAnalysisView` (the `link-analysis-view` content) gained two
+  optional keys, read defensively (`listsOf` / `startOf` drop a wrong shape): `lists {start?, exclusions?[]}` (Entity List
+  ids) and `start {datasetId, values?[], listId?}`. The page keeps `caseStart` / `caseLists` signals: a Start box start sets
+  them (`startFrom`, `startFromEntity`), an exclusion written from this graph adds to `exclusions` (Exclude → Add to a list,
+  on either level, and *Add to a list* with purpose exclusion), `clearResults` (any new graph) forgets both. *Save as a case*
+  (the former *Save view* menu, same `saveView()`) writes them with the view: `start.values` = the drawn values plus every
+  grown node's first raw id (at most 25); for a list start only what was grown beyond the members, because opening re-reads
+  the list. **Opening a case with `start`** (`loadView` → `drawCaseStart`) draws `drawStart` over the start Dataset (live
+  list members + values), then hides the drawn nodes whose raw id is a member of an `exclusions` list now (case-insensitive,
+  `hideLocally`, undoable); when the Dataset no longer starts a graph or nothing is found it reruns `query`, as every older
+  view does. Specs `link-analysis.component.spec.ts` "a case, and Find something interesting" (falsified: without
+  `drawCaseStart` the whole-Dataset projection runs; without `caseOfState` nothing is saved) and `link-analysis.service.spec.ts`.
+* **My work** (`la-app` `my-work.ts` + `my-work.component.ts`, on the home page after the Space guide): cases from
+  `GET /components/link-analysis-view` (the list carries `modified`, now on `ComponentDef`), most recent first, list titles
+  from `GET /entity-lists`, each a link to `/link-analysis?view=<id>` (phase 3's param). **What changed in your data** reads
+  no new route: the registry's `dataset` entries with `origin: import` + `importPipeline`, then `GET /runs/{pipeline}/batches`
+  (the ingest audit ledger, ungated, Basic) - the last `SUCCESS` batch's `end_time`, `total_output_rows`, `rejected_rows`. The
+  run summary itself is persisted nowhere, and the ledger does not say whether a re-import replaced or appended, so the first
+  import reads `+N rows` and a re-import `N rows loaded`, never a net change.
+* **Find something interesting** (`discover.ts` pure, `link-analysis-discover.component.ts`, top of the Analysis tab):
+  *Who is busiest* = `degreeCentrality` top 5 (super nodes skipped; the hint "X has N links. Add it to an exclusion list?" on
+  the top row when it has at least 5 links and twice the next one's); *Which groups stick together* = `louvainCommunities`, groups
+  of 3+, largest 5, links among them and the days their links span when a time column is chosen; *How does A reach B* =
+  `shortestPath` direction `out`, else `both` (said so). Every reading is one sentence in `packTerms`. Row actions: *Show on
+  graph* (emphasis + focus), *Start from these* = the new `StartRequest` kind `found` over the graph's Dataset (delivers phase
+  6's "the busiest / a community" start), *Add to a list* = `LinkAnalysisAddToListDialog` (pick a list of the same Entity
+  Type or create one with a purpose in plain words; it writes `POST /entity-lists` + `/members` and closes with the list).
+* **First lists from the pack**: `IndustryPack.Profile.suggestedLists` from the manifest's optional
+  `profile.suggested_lists[n]{title,purpose,entity_type,why}` (at most 10; purpose one of allow / block / watch / exclusion;
+  a core Entity Type; a bad entry refuses the pack whole), served as `profile.suggestedLists`; the neutral profile suggests
+  *Busy entities to leave out* and *Entities to watch* with no Entity Type. The Entity Lists page offers them while the Space
+  has no list and the person may write lists; *Create* opens `CreateEntityListDialog` with `initial`. Telecom ships *Call
+  centres* / *Lines to watch*, mobile money *Merchants* / *Wallets to watch* (`IndustryPacksTest`).
+* **Levels.** Everything works on Explorer. *Start an Investigation from this* is shown locked in the *Save as a case* menu
+  on Explorer (`inspecto-locked-action`, `featureReasons.investigations`); with Investigations the Investigation tab is
+  unchanged.
+
 ### 3.5 Entity store (identity data)
 
 * **Identity Fact log** (`EntityFactLog`): `<Space config root>/audit/entity-facts/`, one file per fact
@@ -477,7 +516,7 @@ as *Explore a Dataset* does.
   packs, Basic included, ED-5). Each jar may carry an index `META-INF/inspecto/industry-packs.toon`
   (`packs[n]: a,b`); each pack is four files under `META-INF/inspecto/industry-packs/<id>/`: `industry-pack.toon`
   (id, name, description, `space_templates`, `pattern_packs`, `profile` = measure / time column hints, suggested tool
-  groups and the optional "Investigate a number" binding), `industry-pack-terms.toon`
+  groups, the optional "Investigate a number" binding and the optional `suggested_lists`, LA-ONBOARD-1 phase 7), `industry-pack-terms.toon`
   (`terms[n]{key,label,abbreviation,definition}`), `industry-pack-entity-types.toon` (core Entity Types restated:
   normaliser from the closed set, masked, classifications; an id the core lacks is refused) and
   `industry-pack-link-kinds.toon`. Normalisers stay the closed set: a pack picks one per type, it never ships code.

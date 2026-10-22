@@ -32,6 +32,8 @@ import {
     EntityListReasonDialog,
 } from './link-analysis-entity-lists.dialogs';
 import { isUnavailable } from './link-analysis-template.dialogs';
+import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile.service';
+import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
 
 /**
  * **Link Analysis — Entity Lists** (LA-17 step 6, SPA half) inside the Investigation panel, over `/entity-lists*`
@@ -185,6 +187,30 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                             title="No Entity Lists"
                             message="This Space has no Entity Lists yet. A list is a named set of Entity keys — allow, block, watch or exclusion — that an Investigation can exclude or seed by."
                         ></inspecto-empty-state>
+                        @if (canWrite() && suggestions().length) {
+                            <section class="flex flex-col gap-1" aria-labelledby="la-suggested-lists" data-testid="la-suggested-lists">
+                                <h4 id="la-suggested-lists" class="m-0 text-xs font-semibold">First lists to start with</h4>
+                                <ul class="m-0 flex list-none flex-col gap-1 p-0">
+                                    @for (sl of suggestions(); track sl.title) {
+                                        <li class="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1" style="border-color: var(--gamma-border)">
+                                            <div class="min-w-0 flex-auto">
+                                                <span class="font-semibold">{{ sl.title }}</span>
+                                                <span class="text-secondary"> · {{ purposeLabel(sl.purpose) }}</span>
+                                                <p class="text-secondary m-0">{{ sl.why }}</p>
+                                            </div>
+                                            <button
+                                                mat-stroked-button
+                                                [disabled]="busy()"
+                                                (click)="createSuggested(sl)"
+                                                [attr.aria-label]="'Create the list ' + sl.title"
+                                            >
+                                                Create
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                            </section>
+                        }
                     }
                 } @else if (loading()) {
                     <inspecto-skeleton [lines]="3"></inspecto-skeleton>
@@ -201,6 +227,8 @@ export class LinkAnalysisEntityListsComponent {
     private confirm = inject(InspectoConfirmService);
     readonly features = inject(LA_FEATURES);
     readonly store = inject(InvestigationSessionStore);
+    /** Loads the Space's Domain Profile, whose pack suggests the first lists. */
+    private readonly profiles = inject(DomainProfileService);
 
     readonly lists = signal<EntityListSummary[] | null>(null);
     readonly loading = signal(false);
@@ -262,8 +290,27 @@ export class LinkAnalysisEntityListsComponent {
         return t ? t.label : `${id} (not in force)`;
     }
 
-    async create(): Promise<void> {
-        const data: CreateEntityListData = { entityTypes: this.settings.limits().entityTypesInForce };
+    /**
+     * LA-ONBOARD-1 phase 7 (UC-10): the first lists the Space's pack suggests while it has none - the active Domain
+     * Profile's `suggestedLists` (the neutral profile suggests neutral ones).
+     */
+    readonly suggestions = computed<SuggestedList[]>(() => domainProfile(activeDomainProfileId()).suggestedLists ?? []);
+
+    /** Open *New list* filled in from a suggestion; the person checks it and gives the reason recorded with it. */
+    createSuggested(sl: SuggestedList): Promise<void> {
+        return this.create({
+            title: sl.title,
+            purpose: sl.purpose,
+            entityType: sl.entityType || null,
+            reason: 'A first list suggested for this Space',
+        });
+    }
+
+    async create(initial?: CreateEntityListData['initial']): Promise<void> {
+        const data: CreateEntityListData = {
+            entityTypes: this.settings.limits().entityTypesInForce,
+            ...(initial ? { initial } : {}),
+        };
         const created = await firstValueFrom(
             this.dialog
                 .open<CreateEntityListDialog, CreateEntityListData, EntityListDetail | undefined>(

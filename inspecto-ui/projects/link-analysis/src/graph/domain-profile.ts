@@ -36,6 +36,19 @@ export interface DomainProfile {
     investigate?: InvestigateProfile;
     /** The pack's relabels, by canonical concept key. Empty for `generic`. */
     terms: Record<string, DomainTerm>;
+    /**
+     * LA-ONBOARD-1 phase 7 (UC-10): the first Entity Lists the pack suggests to a Space that has none ("Call centres",
+     * "Merchants"), from the pack's `profile.suggested_lists`. Absent = none.
+     */
+    suggestedLists?: SuggestedList[];
+}
+
+/** One first list a pack suggests: its title, purpose, the Entity Type its members are, and why, in one line. */
+export interface SuggestedList {
+    title: string;
+    purpose: 'allow' | 'block' | 'watch' | 'exclusion';
+    entityType: string;
+    why: string;
 }
 
 /** The Dataset + columns an Investigation binds by default (`POST /inv/investigations`). */
@@ -93,6 +106,22 @@ export const GENERIC_PROFILE: DomainProfile = {
     timeHints: [],
     suggestedTools: [],
     terms: {},
+    // Neutral first lists: every Space has busy entities that drown a graph, and entities worth watching. The Entity
+    // Type is left for the person to choose (the neutral vocabulary knows no data).
+    suggestedLists: [
+        {
+            title: 'Busy entities to leave out',
+            purpose: 'exclusion',
+            entityType: '',
+            why: 'Entities that link to almost everything (a shared service, a payroll account) hide the links that matter.',
+        },
+        {
+            title: 'Entities to watch',
+            purpose: 'watch',
+            entityType: '',
+            why: 'The entities you want to see again whenever they show up in new data.',
+        },
+    ],
 };
 
 /** One installed pack as `GET /settings/link-analysis/domain-profile` answers it. */
@@ -106,6 +135,7 @@ export interface IndustryPackDto {
         measureHints: string[];
         timeHints: string[];
         suggestedTools: string[];
+        suggestedLists?: SuggestedList[];
         investigate?: {
             entityType: string;
             dataset: string;
@@ -149,6 +179,7 @@ export function profileFromPack(pack: IndustryPackDto): DomainProfile {
         timeHints: (pack.profile?.timeHints ?? []).map(pattern).filter((r): r is RegExp => !!r),
         suggestedTools: pack.profile?.suggestedTools ?? [],
         terms,
+        suggestedLists: pack.profile?.suggestedLists ?? [],
         ...(inv
             ? {
                   investigate: {

@@ -14,6 +14,9 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
 import { CreateEntityListDialog, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile.service';
+import { installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
+import { TELECOM_PACK_FIXTURE } from '@inspecto/link-analysis/graph/domain-profile.testing';
 
 @Component({
     standalone: true,
@@ -108,6 +111,8 @@ function create({ lists = LISTS, canWrite = true, geoLink = true, canAuthor = tr
                 useValue: { canManageIncidents: signal(canWrite), canAuthorWorkbench: signal(canAuthor) },
             },
             { provide: InspectoConfirmService, useValue: confirm },
+            // the packs are installed by each test; the real service would read the server
+            { provide: DomainProfileService, useValue: {} },
             {
                 provide: LinkAnalysisSettingsService,
                 useValue: {
@@ -421,5 +426,65 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         await settle();
         expect(el.querySelector('[aria-label="Entity Lists"]')).toBeNull();
         expect(inv.listEntityLists).not.toHaveBeenCalled();
+    });
+
+    describe('first lists suggested from the pack (LA-ONBOARD-1 phase 7, UC-10)', () => {
+        const TELECOM = profileFromPack({
+            ...TELECOM_PACK_FIXTURE,
+            profile: {
+                ...TELECOM_PACK_FIXTURE.profile,
+                suggestedLists: [
+                    { title: 'Call centres', purpose: 'exclusion', entityType: 'msisdn', why: 'Busy numbers call almost everyone.' },
+                ],
+            },
+        });
+
+        it('a Space with no lists is offered the first lists of its pack; Create opens New list filled in (no violations)', async () => {
+            installDomainProfiles([TELECOM], 'telecom');
+            try {
+                const { el, dialog, settle } = create({ lists: [] });
+                await settle();
+                const offered = el.querySelector('[data-testid="la-suggested-lists"]') as HTMLElement;
+                expect(offered.textContent).toContain('Call centres');
+                expect(offered.textContent).toContain('Exclusion');
+                expect(offered.textContent).toContain('Busy numbers call almost everyone.');
+                await expectNoA11yViolations(el);
+                (el.querySelector('button[aria-label="Create the list Call centres"]') as HTMLButtonElement).click();
+                await settle();
+                const [type, config] = dialog.open.mock.calls[0] as unknown as [unknown, { data: { initial: unknown } }];
+                expect(type).toBe(CreateEntityListDialog);
+                expect(config.data.initial).toEqual({
+                    title: 'Call centres',
+                    purpose: 'exclusion',
+                    entityType: 'msisdn',
+                    reason: 'A first list suggested for this Space',
+                });
+            } finally {
+                installDomainProfiles([], null);
+            }
+        });
+
+        it('without a pack the neutral first lists are offered, the Entity Type left to choose', async () => {
+            installDomainProfiles([], null);
+            const { el, dialog, settle } = create({ lists: [] });
+            await settle();
+            expect(el.querySelector('[data-testid="la-suggested-lists"]')?.textContent).toContain('Busy entities to leave out');
+            (el.querySelector('button[aria-label="Create the list Entities to watch"]') as HTMLButtonElement).click();
+            await settle();
+            const [, config] = dialog.open.mock.calls[0] as unknown as [unknown, { data: { initial: { entityType: unknown } } }];
+            expect(config.data.initial.entityType).toBeNull();
+        });
+
+        it('no suggestion once the Space has a list', async () => {
+            const withLists = create();
+            await withLists.settle();
+            expect(withLists.el.querySelector('[data-testid="la-suggested-lists"]')).toBeNull();
+        });
+
+        it('no suggestion for someone who may not create a list', async () => {
+            const { el, settle } = create({ lists: [], canWrite: false });
+            await settle();
+            expect(el.querySelector('[data-testid="la-suggested-lists"]')).toBeNull();
+        });
     });
 });

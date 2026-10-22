@@ -94,8 +94,9 @@ export interface Dataset extends DatasetConfig {
     };
     /**
      * Every stored key Studio does not edit (`description`, `origin`, `primaryEntityType`, `defaultLinkMapping`,
-     * `importPipeline`, the sharing envelope, keys a later feature adds, ...), carried as read so a save writes them
-     * back: the registry PUT replaces the whole entry, so a key left out is a key deleted.
+     * `importPipeline`, keys a later feature adds, ...), carried as read so a save writes them back: the registry PUT
+     * replaces the whole entry, so a key left out is a key deleted. The sharing envelope (`owner` / `shares`) is the
+     * exception: never carried, so the server keeps the current one (`datasets.service.ts` `ENVELOPE_KEYS`).
      */
     extra?: Record<string, unknown>;
 }

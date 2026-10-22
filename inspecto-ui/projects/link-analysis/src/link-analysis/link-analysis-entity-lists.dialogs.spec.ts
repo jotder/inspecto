@@ -113,6 +113,26 @@ describe('CreateEntityListDialog (LA-17)', () => {
         );
     });
 
+    it('a suggested first list opens filled in (LA-ONBOARD-1 phase 7); a type not in force is left to choose', () => {
+        configure({
+            entityTypes: TYPES,
+            initial: { title: 'Call centres', purpose: 'exclusion', entityType: 'msisdn', reason: 'A first list' },
+        });
+        const f = TestBed.createComponent(CreateEntityListDialog);
+        f.detectChanges();
+        expect(f.componentInstance.form.getRawValue()).toEqual({
+            title: 'Call centres',
+            purpose: 'exclusion',
+            entityType: 'msisdn',
+            reason: 'A first list',
+        });
+        expect(f.componentInstance.form.dirty).toBe(false); // Cancel closes without asking: nothing was typed
+        TestBed.resetTestingModule();
+        configure({ entityTypes: TYPES, initial: { title: 'X', purpose: 'watch', entityType: 'wallet', reason: 'r' } });
+        const g = TestBed.createComponent(CreateEntityListDialog);
+        expect(g.componentInstance.form.controls.entityType.value).toBeNull();
+    });
+
     it('warns when no Entity Type is in force', () => {
         configure({ entityTypes: [] });
         const f = TestBed.createComponent(CreateEntityListDialog);

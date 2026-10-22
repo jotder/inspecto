@@ -69,6 +69,8 @@ export interface ComponentDef {
      * content it just saved); a caller with no hash writes unconditionally, exactly as before.
      */
     contentHash?: string;
+    /** ISO-8601 time the stored file last changed (the server's file attribute); absent on a local copy, null when unknown. */
+    modified?: string | null;
 }
 
 /** One archived prior copy of a component (MET-5): `GET /components/{type}/{id}/versions`. */
