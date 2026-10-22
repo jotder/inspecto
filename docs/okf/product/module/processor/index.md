@@ -38,6 +38,9 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | operator |
 | — | P3 | feature | Queries / BI | demand |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
+| `LA-ONBOARD-ORPHAN-PIPELINE-1` | P3 | defect | deleting an Add data Dataset's registry entry leaves its imports/<id> Pipeline with no owning Dataset; someone with canAuthorWorkbench co… | — |
+| `LA-SAMPLE-GALLERY-DEMOAUTH-1` | P3 | defect | on Basic the *New from sample* dialog lists la-audit, la-claims and la-mobile-money as creatable because the template gallery reports the… | — |
+| `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) *Find paths (server)* stays unlocked on Basic (open explorer route, a Basic feature in… | — |
 | `LA-ONBOARD-1` | P2 | feature | Inspecto LA onboarding, blank install to a first finding with the screens alone: LA level (Explorer / Investigations) as an install setti… | operator |
 | `LA-ONBOARD-DRIFT-1` | P3 | defect | the schema drift check matches a draft's selector to the sample's column name (SchemaSuggest.drift, used by pipeline-parse-definition.com… | — |
 | `BI-QUERY-MASKING-1` | P2 | defect | /bi/query and /queries/{id}/run return a classified entity key raw to any viewer (decided 2026-10-12, operator: its own gated, reviewed r… | — |
