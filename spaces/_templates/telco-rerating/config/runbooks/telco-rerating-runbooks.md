@@ -4,7 +4,7 @@
 > finding and groups the findings into root causes. It compares nothing with the invoice and raises no Alert, so there is no Incident to
 > work from this file: the reading guide below is for the analyst who opens the `rerating_tariff_findings`, `rerated_usage`,
 > `rerating_findings` and `rerating_root_causes` Datasets. The root-cause and Incident runbooks arrive with the Alert Rules in the next slices
-> (`docs/superpower/rerating-tariff-validation-plan.md`).
+> (`docs/superpower/telco-packs-plan.md`).
 
 **This pack is an unbilled preview.** It re-rates usage for validation only: it is independent of the billing system, it never
 writes to one, and it is not priced or ordered yet. A re-rated amount is evidence that a charge differs from the tariff table

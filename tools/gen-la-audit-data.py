@@ -9,7 +9,7 @@ Writes under spaces/_templates/la-audit/data/:
   inbox/gl_journal/GL_JOURNAL_FY2026.csv               40 journals (intercompany lines)
   staged/ap_invoice/AP_INVOICE_202610.csv, staged/ap_approval/AP_APPROVAL_202610.csv   the NEXT month (ordinary only)
 
-PLANTED STORIES (docs/superpower/la-multi-vertical-showcase-plan.md section 2.B; pinned by LaAuditGoldenTest):
+PLANTED STORIES (docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md section 2.B; pinned by LaAuditGoldenTest):
   1 V-117 shares bank account + address with employee E-31 and has 14 invoices, all approved by E-31's manager E-15.
   2 V-131..V-135 share bank account BA-7701 (shell cluster); V-136 is the deliberately unlinked sixth: its own account,
     but it shares an address with V-131 and V-132, so link prediction proposes it.

@@ -8,10 +8,12 @@ timestamp: 2026-09-26T00:00:00Z
 
 # Assurance capability plan — build the product before the project
 
-> **Status: ACTIVE — waves 1–3 SHIPPED 2026-09-27 (`origin/master` `d5bf89ad1`) except 2.2 ⏸ (Link Analysis leads the Entity List); wave 4 SHIPPED 2026-09-29/30 (all six items, `origin/master` `2844ba34a`); wave 5 BUILT 2026-09-30/10-01 — all four packs on `origin/master` (5.4 `b9e88805a`, 5.1 `ca89b9979`, 5.2 `62c0ee613`, 5.3 slice 1 `a2b6ee8c5`); their rows stay open as BUILT with recorded residuals. Decisions D-P1 … D-P14 answered (§5).**
+> **ARCHIVED 2026-10-22** — as-built facts in `docs/okf/product/layer/product/plan-assurance-capability.md` (the generic test, the wave → hub map, the parked list) and the module / pack hubs it names; open items in docs/BACKLOG.md.
+
+> **Status (as of 2026-10-14): ACTIVE — waves 1–3 SHIPPED 2026-09-27 (`origin/master` `d5bf89ad1`) except 2.2 ⏸ (Link Analysis leads the Entity List); wave 4 SHIPPED 2026-09-29/30 (all six items, `origin/master` `2844ba34a`); wave 5 BUILT 2026-09-30/10-01 — all four packs on `origin/master` (5.4 `b9e88805a`, 5.1 `ca89b9979`, 5.2 `62c0ee613`, 5.3 slice 1 `a2b6ee8c5`); their rows stay open as BUILT with recorded residuals. Decisions D-P1 … D-P14 answered (§5).**
 > **Why this exists.** An assurance bid was planned workstream by workstream (`WS-01 … WS-46`) in a
 > local, git-excluded working set (`superpower/rfp-mvno-assurance/build-plan.md`, listed in
-> [`../INDEX.md`](../INDEX.md)). That project is **not confirmed**. The operator's call (2026-09-26):
+> [`../INDEX.md`](../../INDEX.md)). That project is **not confirmed**. The operator's call (2026-09-26):
 > build the capabilities that are **generic product** — useful to any telecom assurance customer and
 > needing **no customer data, feed samples, partner or sign-off** — so they exist when a real project
 > starts. This file re-orders that work by product value and dependency, not by bid milestone.
@@ -153,7 +155,7 @@ mostly integration against the customer's own systems.
 
 **Not in this plan for other reasons:** WS-14 velocity / baseline Steps (Step Processor hold, operator
 2026-09-23 — SQL windows cover detection meanwhile); WS-29 investigation evidential controls (owned by
-[`link-analysis-backlog-plan.md`](../archived-documents/plans-archive/link-analysis-backlog-plan.md), which is re-landing it); ML scoring and
+[`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md), which is re-landing it); ML scoring and
 Arabic / RTL (roadmap).
 
 ## 5. Operator decisions owed (internal — no customer needed)
@@ -175,7 +177,7 @@ are on `BACKLOG.md` (D-P9).
 | D-P6 | Reverse `BI-4` (paths, not attachments) and choose the xlsx writer | 4.3 | yes, with a size cap; the writer is the already-staged DuckDB `excel` extension (no new dependency) |
 | D-P7 | Name a near-real-time latency target | 4.1 | p95 ≤ 30 s event-to-Incident, measured |
 | **D-P8** | Classification-driven masking in audit hardening | 3.3 | ✅ **DECIDED 2026-10-06 (operator): mask on read, no read-audit yet.** An AUDIT / ACCESS_DENIED row served to a caller without `canRevealLinkEntities` has its classified values (the `EvidenceMasker` resolver) replaced by the Space's `masked:` token; stored rows stay raw, so the hash chain and `/audit/verify` are untouched. Read auditing is deferred. Built `AuditReadMasking` (`okf/product/module/event/spec-events-metrics.md`). |
-| **D-P10** | One concept, two names: the assurance allow / block / watch list (bid plan: *Control List*) and the Link Analysis `LA-17` **Entity List** (a Space-scoped set of typed Entity keys with a purpose). | 2.2, `LA-17` | ✅ **DECIDED 2026-09-26 (operator): one kind, named Entity List** — the GLOSSARY name, so nothing is renamed. Purposes widen to allow · block · watch · exclusion; entries may be single keys or key ranges (number prefix, CIDR); Link Analysis consumes it through `excludeBy` / `seedBy`. *Control List* is not used. ⚠ **Storage reconciled 2026-09-26 (operator, `LA-17` D-M8):** "one kind" = one concept in ONE store — the per-Space append-only **Identity Fact** log that `LA-17` already ships (`EntityFactLog`, routes `/entity-lists*`), NOT a `ComponentStore` kind; its purposes are already `allow · block · watch · exclusion`. WS-12 adds ranges / CIDR, `expires-at`, the Parquet sidecar and four-eyes to that store, and likely moves it out of `inspecto-geo-link` into core. See [`link-analysis-entity-model-design.md`](../archived-documents/plans-archive/link-analysis-entity-model-design.md) §6. |
+| **D-P10** | One concept, two names: the assurance allow / block / watch list (bid plan: *Control List*) and the Link Analysis `LA-17` **Entity List** (a Space-scoped set of typed Entity keys with a purpose). | 2.2, `LA-17` | ✅ **DECIDED 2026-09-26 (operator): one kind, named Entity List** — the GLOSSARY name, so nothing is renamed. Purposes widen to allow · block · watch · exclusion; entries may be single keys or key ranges (number prefix, CIDR); Link Analysis consumes it through `excludeBy` / `seedBy`. *Control List* is not used. ⚠ **Storage reconciled 2026-09-26 (operator, `LA-17` D-M8):** "one kind" = one concept in ONE store — the per-Space append-only **Identity Fact** log that `LA-17` already ships (`EntityFactLog`, routes `/entity-lists*`), NOT a `ComponentStore` kind; its purposes are already `allow · block · watch · exclusion`. WS-12 adds ranges / CIDR, `expires-at`, the Parquet sidecar and four-eyes to that store, and likely moves it out of `inspecto-geo-link` into core. See [`link-analysis-entity-model-design.md`](link-analysis-entity-model-design.md) §6. |
 | D-P9 | Board rows: put each wave's items on `BACKLOG.md` now, or keep this plan off the board like the bid plan | scheduling | put waves 1–2 on the board now |
 | D-P11 | Wave 1: may a machine heal resolve a per-key Incident? | 1.1, 1.3 | ✅ **DECIDED 2026-09-26: never.** The Alert resolves; the Incident stays open until a person records a Disposition. A relapse re-opens a human-resolved Incident. |
 | D-P12 | Wave 1: may impact change on a terminal object (late recoveries)? | 1.3 | ✅ **DECIDED 2026-09-26:** on a RESOLVED Incident or CLOSED Case only `recovered` and `prevented` may change, audited; ARCHIVED refuses everything. |

@@ -14,7 +14,7 @@ Terms follow [`GLOSSARY.md`](../../../../GLOSSARY.md) (Dataset, Collector, Pipel
 Companion pages: the [user manual](user-guide-manual.md), the backend page
 [`okf/product/module/la-core/architecture.md`](architecture.md) (cited below as *backend §n*), the
 feature concept [`okf/product/module/la-core/user-guide-link-analysis.md`](user-guide-link-analysis.md) (*feature page*)
-and the [demo readiness plan](../../../../superpower/la-demo-readiness-plan.md) (*defence matrix* = its section 2).
+and the archived [demo readiness plan](../../../../archived-documents/plans-archive/la-demo-readiness-plan.md) (*defence matrix* = its section 2; every row built by 2026-10-13, kept as history).
 
 ---
 

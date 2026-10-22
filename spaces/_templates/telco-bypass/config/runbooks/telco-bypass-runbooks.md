@@ -4,7 +4,7 @@
 > agreement, persistence, the `tb_allow` and `tb_watch` Entity Lists and a shadow switch, raises the Alert Rules
 > `tb_sim_high` and `tb_allowed_line_changed`, and finds the BOX: the SIMs that share a device, a cell or an activation batch,
 > one Incident (`tb_box_suspected`) and one Case (`tb_box_case`) per box. The Anomaly Model factor and the 7-day device signals
-> are the next slices (`docs/superpower/bypass-simbox-detection-plan.md`).
+> are the next slices (`docs/superpower/telco-packs-plan.md`).
 
 **A CDR pattern is evidence of consistency with a SIM-box, never proof.** Only a verification step (a call to the
 customer or the dealer, a test call) separates a quiet box from a quiet dialler or PBX, and that step is a process, not

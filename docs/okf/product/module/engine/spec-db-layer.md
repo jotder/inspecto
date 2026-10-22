@@ -121,7 +121,7 @@ containing `"` was shown to give broken SQL; the reference view names and `event
 `ConsignmentIngestStrategy` followed on 2026-10-18, pinned by `ConsignmentDropQuotingTest`; many other `"\"" + name + "\""`
 wraps of engine-generated scratch names remain, listed under `ANALYTICS-CORE-1` in `BACKLOG.md`), statistics computed inline (`VolumeBaseline`'s lower median), and a robust z named
 only `z` (`RobustStats.z`) are not counted, so a 0 means "no copy of the escape", not "no hand-built SQL". Plan:
-[`analytics-core-plan.md`](../../../../superpower/analytics-core-plan.md) §1a, §4a.
+[`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md) §1a, §4a.
 
 ---
 

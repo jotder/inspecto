@@ -1,7 +1,9 @@
 # 5G / IoT / cloud / digital service assurance: a plan for a file-fed platform
 
-> 🟡 **PLAN 2026-10-18 (`PACK-5G-IOT-ASSURANCE-1`): design only, nothing built.** Competitive gap **U** (5G, IoT, cloud and
-> digital service assurance) is **N** for Inspecto in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../okf/product/layer/product/brochure-competitive-matrix.md):
+> ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
+>
+> *Status before parking:* 🟡 **PLAN 2026-10-18 (`PACK-5G-IOT-ASSURANCE-1`): design only, nothing built.** Competitive gap **U** (5G, IoT, cloud and
+> digital service assurance) is **N** for Inspecto in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../../layer/product/brochure-competitive-matrix.md):
 > LATRO, Mobileum and TEOCO sell it (TEOCO's HELIX is 5G service assurance), Subex and Neural are partial or adjacent. The
 > backlog row says "not designed; build when a prospect names it". This plan designs it **for the platform Inspecto is**:
 > a file- and event-feed platform with **no probes and no inline path**. It is deliberately narrow: it assures what
@@ -9,8 +11,8 @@
 > plainly what needs network counters or a real-time path and is out. Decisions **D-5G1…D-5G10 are open** (§10). Every claim
 > about volume is a hypothesis until slice **U0** measures it.
 >
-> **House style.** Mirrors [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md) and
-> [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md); this plan **reuses their `rerated_usage`
+> **House style.** Mirrors [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md) and
+> [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md); this plan **reuses their `rerated_usage`
 > contract** instead of re-deriving a rated charge (§4, §6.2).
 >
 > **Method.** Read on 2026-10-18: matrix rows U, F, X, A, P; the `PACK-5G-IOT-ASSURANCE-1` row; `docs/GLOSSARY.md`; the
@@ -306,10 +308,10 @@ recommended (D-5G6 is still decided at U6 and D-5G10 stays the operator's call a
 
 ## References
 
-- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows U, F, X, A, P.
-- Earlier plans: [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md), [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md).
-- Parsers: [`okf/product/module/engine/spec-parser-plugins.md`](../okf/product/module/engine/spec-parser-plugins.md). Anomaly Detection: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md).
-- Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).
+- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../../layer/product/brochure-competitive-matrix.md) rows U, F, X, A, P.
+- Earlier plans: [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md), [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md).
+- Parsers: [`okf/product/module/engine/spec-parser-plugins.md`](../../module/engine/spec-parser-plugins.md). Anomaly Detection: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../../module/anomaly/spec-anomaly-scores.md).
+- Canonical vocabulary: [`GLOSSARY.md`](../../../../GLOSSARY.md) (the single source of truth).
 - RFP working set (git-excluded, this checkout only): `docs/superpower/rfp-mvno-assurance/` (`compliance-matrix.xlsx`, `gap-register.md`, `build-plan.md`, `assurance-content-catalog.xlsx`).
 
 ## 13. Measurements (filled by slice U0)

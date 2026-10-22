@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The {@code la-mobile-money} Space Template's seven planted stories (docs/superpower/la-multi-vertical-showcase-plan.md,
+ * The {@code la-mobile-money} Space Template's seven planted stories (docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md,
  * vertical A), over the SHIPPED corpus ({@code spaces/_templates/la-mobile-money/data}, read in place). The link table is
  * folded the way the {@code mm_links} Job folds it (one link per transaction; shared_device / shared_id pairs from
  * wallet_master, placeholders excluded, a key held by more than 12 wallets excluded, lower id to higher id); the graph is

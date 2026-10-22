@@ -15,7 +15,7 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
+| plan | current | [Telecom bypass (SIM-box) — decisions and as-built record](plan-as-built.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Telecom bypass (SIM-box)](architecture.md) |
 | features | current | [Telecom bypass (SIM-box) — features](features.md) |

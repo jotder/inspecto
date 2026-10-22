@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Seeds the RUNTIME state of the `la-audit` Space (vertical B of docs/superpower/la-multi-vertical-showcase-plan.md) over HTTP, as the
+// Seeds the RUNTIME state of the `la-audit` Space (vertical B of docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md) over HTTP, as the
 // right Demo Users: Investigations, members, an Entity List, a Case, a bound Alert Rule. None has a registry kind, so no Space
 // Template can carry them. Self-contained (its own plan); only the tiny sign-in client in tools/lib/la-client.mjs is shared.
 //

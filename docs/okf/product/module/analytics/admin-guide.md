@@ -24,7 +24,7 @@ and the cap cannot be disabled.
 
 A malformed or non-positive value keeps the default. A model's own `maxEntities` (1 to 2,000,000) overrides the
 flag. The model kernels (k-means, logistic regression, isolation forest) use the same numbers and refuse, never
-sample, past them (D-AN24 in the [plan](../../../../superpower/analytics-core-plan.md)).
+sample, past them (D-AN24 in the [plan](../../../../archived-documents/plans-archive/analytics-core-plan.md)).
 
 ## Monitor
 

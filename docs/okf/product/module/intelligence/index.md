@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [AI assist and intelligence — plan](plan.md) |
+| plan | current | [Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)](plan-agentic-investigation.md) · [AI assist and intelligence — plan](plan.md) |
 | spec | current | [AI assist and intelligence — spec](spec.md) |
 | architecture | current | [Embedded intelligence (AGT-5)](architecture-embedded-intelligence.md) · [AI assist](architecture-overview.md) |
 | features | current | [AI assist — features](features-ai-assist.md) |

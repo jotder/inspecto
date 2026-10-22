@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Scripted API-level smoke of the `la-mobile-money` showcase (vertical A of docs/superpower/la-multi-vertical-showcase-plan.md).
+// Scripted API-level smoke of the `la-mobile-money` showcase (vertical A of docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md).
 // Needs the Demo Auth build (serve-demo, loopback), the Space created from the la-mobile-money template, the mm_links Job run once,
 // and tools/seed-la-mm.mjs --apply. Sends only `demo:<id>` codes. Self-contained: shares nothing with la-demo-smoke.mjs.
 //

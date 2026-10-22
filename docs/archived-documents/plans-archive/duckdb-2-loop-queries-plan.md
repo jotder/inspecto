@@ -1,6 +1,8 @@
 # DuckDB 2.0 for the looping / graph-style queries — research and plan
 
-> **Status: 🟡 RESEARCH + DESIGN 2026-10-05 — nothing built, no decision signed.** Operator goal: get the full
+> **ARCHIVED 2026-10-22** — merged into the one DuckDB 2.0.x plan [`duckdb-2-plan.md`](../../superpower/duckdb-2-plan.md) §7 (the open candidates C1–C8, their benchmarks and the caveats); open items in docs/BACKLOG.md. This file is kept for the full inventory and experiment tables.
+
+> **Status (as of 2026-10-05): 🟡 RESEARCH + DESIGN 2026-10-05 — nothing built, no decision signed.** Operator goal: get the full
 > advantage of DuckDB 2.0.x for Link Analysis, storage/index, lineage, hop expansion and path finding.
 > Every "verified" claim below was run on `duckdb_jdbc 2.0.0-alpha43385-881` (and, where it matters, on the
 > repo pin `1.5.6.0`) with tiny throw-away queries — **2 threads, one run each, an alpha build, a machine
@@ -12,7 +14,7 @@
 1. **DuckDB 2.0 (alpha) has no native graph syntax.** `CREATE PROPERTY GRAPH` / `GRAPH_TABLE` / `ANY SHORTEST`
    are parse errors on 2.0 and on 1.5.6, and the community `duckpgq` extension is an HTTP 404 for both
    `v2.0.0-alpha43385` and `v1.5.6`. Decision `D9` in
-   [`la-separation-feasibility-plan.md`](../archived-documents/plans-archive/la-separation-feasibility-plan.md) ("DuckDB 2.0's own graph features
+   [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) ("DuckDB 2.0's own graph features
    when the pin moves") has therefore **no native-syntax answer yet**; what 2.0 actually offers is the
    items below.
 2. **The one big, verified win is recursive-CTE `USING KEY`** (key-based recursion, with the `recurring.<cte>`
@@ -222,7 +224,7 @@ Lane C and D need the machine quiet (benchmark timings); A and B are safe to run
 
 ## References
 
-- [`la-separation-feasibility-plan.md`](../archived-documents/plans-archive/la-separation-feasibility-plan.md) §7.10 — spikes `D-S1`..`D-S5`, decision `D9` (graph engine order), `DuckPGQ` dropped 2026-10-01.
-- [`../okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md) — the Link Analysis concept.
+- [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.10 — spikes `D-S1`..`D-S5`, decision `D9` (graph engine order), `DuckPGQ` dropped 2026-10-01.
+- [`../okf/product/module/la-core/user-guide-link-analysis.md`](../../okf/product/module/la-core/user-guide-link-analysis.md) — the Link Analysis concept.
 - `inspecto-geo-link/src/test/java/com/gamma/control/InvTraversalBench.java` — the measurement harness (gate `G-R4`).
 - `docs/GLOSSARY.md` — canonical vocabulary (Dataset, Working Set, Investigation, Pipeline).

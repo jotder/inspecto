@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * <b>Analyst upload</b> (LA-ANALYST-UPLOAD-1, roadmap D4, {@code docs/superpower/la-analyst-upload-plan.md}):
+ * <b>Analyst upload</b> (LA-ANALYST-UPLOAD-1, roadmap D4, {@code docs/archived-documents/plans-archive/la-analyst-upload-plan.md}):
  * {@code POST /inv/uploads/{collector}?name=<file>.csv[&replace=true]} lands the raw CSV body in the poll directory of a
  * Collector that opted in ({@code collector.accepts_upload: true}). It lands BYTES and nothing else: the Collector's own
  * Pipeline parses, types, masks and quarantines the file, the Dataset it fills is then readable by the identity import and the

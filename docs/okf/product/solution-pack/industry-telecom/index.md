@@ -15,7 +15,7 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
+| plan | current | [5G / IoT / cloud / digital service assurance: a plan for a file-fed platform](plan-5g-iot-assurance.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Telecom industry pack — architecture](architecture.md) |
 | features | current | [Telecom industry pack — features](features.md) |

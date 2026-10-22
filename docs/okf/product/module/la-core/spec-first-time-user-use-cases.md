@@ -18,7 +18,7 @@ root and driven as a first-time user with a synthetic mobile-money file pair (`t
 `accounts.csv` 312 rows, a hidden mule ring and one busy merchant). Today's state in each use case comes from
 that walkthrough, marked **F-n** and listed in §7.
 
-**Companion.** The [console first-run use cases](../../../../superpower/pipeline-editions-first-run-use-cases.md)
+**Companion.** The [console first-run use cases](../etl/spec-first-time-user-use-cases.md)
 (nine use cases UC-1…UC-9, help catalogue H1…H9) cover the console path from a file to a Dataset. This doc covers
 what Inspecto LA adds on top of it. §9 maps the two and records what was reconciled. Edition rules for the data
 layer are owned by `DATA-TIERS-1` (the draft `PIPELINE-EDITIONS-1` was merged into it and never published; its

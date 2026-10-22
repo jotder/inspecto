@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-data-ops-duplication — the inventory of data-operations code that is COPIED into modules instead of living once in
-// its shared home (ANALYTICS-CORE-1, docs/superpower/analytics-core-plan.md §1a, §4 M9/M10, §4a).
+// its shared home (ANALYTICS-CORE-1, docs/archived-documents/plans-archive/analytics-core-plan.md §1a, §4 M9/M10, §4a).
 //
 //   node tools/check-data-ops-duplication.mjs [--root .] [--json] [--ratchet] [--baseline-write]
 //

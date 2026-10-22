@@ -2294,7 +2294,7 @@ The SPA half of the inbound deep link; the wire contract and the server rules ar
 
 ## i2-gap work on the canvas and the selection bar (as built 2026-10-18)
 
-The decisions behind these (D-M1 stands; D-UP1…D-UP8 with the `canUploadData` capability; heroicons glyphs with no pack field; *Search around* inside the toolbox Pattern section) were **decided under operator delegation, recorded 2026-10-18** (`LA-I2-GAPS-RESIDUALS-1` tracks what is left). The canvas-styling, visual-query and entity-merge plans are archived in `docs/archived-documents/plans-archive/`; what they deferred is retired to `BACKLOG.md` §6 with a reopen trigger. The analyst-upload plan stays active (`docs/superpower/la-analyst-upload-plan.md`).
+The decisions behind these (D-M1 stands; D-UP1…D-UP8 with the `canUploadData` capability; heroicons glyphs with no pack field; *Search around* inside the toolbox Pattern section) were **decided under operator delegation, recorded 2026-10-18** (`LA-I2-GAPS-RESIDUALS-1` tracks what is left). The canvas-styling, visual-query and entity-merge plans are archived in `docs/archived-documents/plans-archive/`; what they deferred is retired to `BACKLOG.md` §6 with a reopen trigger. The analyst-upload plan was archived 2026-10-22 (`docs/archived-documents/plans-archive/la-analyst-upload-plan.md`); its open items are in `docs/superpower/link-analysis-roadmap.md` §D4.
 
 ### Upload a CSV (analyst upload pane, as built 2026-10-19)
 

@@ -1,7 +1,8 @@
 # Product Map
 
 The commercial tree of Inspecto: one TOON file per **Product Map Item**, at `<kind>/<name>.toon`, with id `<kind>.<name>`.
-The design and decisions are in [`docs/superpower/product-map-plan.md`](../docs/superpower/product-map-plan.md); the words are in
+The as-built design and decisions are in [`docs/okf/product/layer/platform/spec-product-map.md`](../docs/okf/product/layer/platform/spec-product-map.md)
+(history: the archived [`product-map-plan.md`](../docs/archived-documents/plans-archive/product-map-plan.md)); the words are in
 `docs/GLOSSARY.md` §15.
 
 | Folder | Item | Links to |

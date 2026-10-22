@@ -1,5 +1,7 @@
 # Analytics core — one home for data operations and statistics (plan, 2026-10-17; reviewed 2026-10-18)
 
+> **ARCHIVED 2026-10-22** — as-built facts in `docs/okf/product/module/analytics/` (`spec.md`, `plan.md`) and `docs/okf/product/module/engine/spec-db-layer.md`; open items in docs/BACKLOG.md (`ANALYTICS-CORE-1`; C7 = `docs/superpower/duckdb-2-plan.md` §7 C1 / C2).
+
 > 🟢 **BUILT — every Must, every Should, and Could C1–C6, C8, C9** (2026-10-17 and 2026-10-18). Open: C7 (blocked on
 > DuckDB 2.0) and the follow-ups in §10. Row: `ANALYTICS-CORE-1` in `docs/BACKLOG.md`. As-built:
 > `okf/product/module/analytics/spec.md` and `okf/product/module/engine/spec-db-layer.md` (one SQL building path).
