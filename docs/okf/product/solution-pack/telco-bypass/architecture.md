@@ -4,7 +4,8 @@
 > (`spaces/_templates/telco-bypass/template.toon`). **Slices B1 to B3 of `TELCO-BYPASS-SIMBOX-1` are built: the signals, the
 > Risk Score, the allow and watch lists, persistence, agreement, shadow mode, the SIM Alert, the cluster stage and the box Incident
 > and Case.** The Anomaly Model factor and the 7-day device signals are later slices
-> ([plan](../../../../superpower/bypass-simbox-detection-plan.md)). Checked against the template on 2026-10-20.
+> ([open work](../../../../superpower/telco-packs-plan.md); decisions, measurements and traps of B0 to B3 in the
+> [as-built record](plan-as-built.md)). Checked against the template on 2026-10-20.
 
 ## Business problem
 
@@ -109,7 +110,7 @@ on a live `tb_allow` entry. Each candidate has three possible keys: its dominant
 SIM joins the **first** key that is a box, in that order, so one box is one `cluster_key` (`imei:<imei>`, `cell:<cell>`, `batch:<dealer>/<day>`).
 Two devices at one cell are two boxes; a box that swaps IMEIs on every call has no shared device and is caught by its cell; with no `imei`
 column at all the cell key finds every box whose SIMs share a cell. Only SIMs in a box are written, so no row has a NULL key (the Case Rule trap of
-plan section 16.4). `imei_count` (IMEIs a SIM used today) is the evidence of swapping.
+B0 answer 3, [as-built record](plan-as-built.md)). `imei_count` (IMEIs a SIM used today) is the evidence of swapping.
 
 **`tb_clusters`** rolls the members up to one row per box per day: `candidate_sims`, `scored_sims` (members that have a `tb_features` row; a slow-roll
 box has none), `alerting_sims` (members whose `tb_findings.status` is `alert`), `max_score`, `est_bypass_minutes` (the members' talk minutes),
@@ -132,7 +133,7 @@ projects `tb_cluster_members` (SIM to box, link kind = the key that decided it) 
 ⚠ Every rule reads the whole retained Dataset (31 days), so a SIM or a box that alerted stays breached until its day partition is pruned: an Incident
 opens once and the rule does not heal early, and a second night opens no second Incident for the same box (the box row's `days_seen` and `last_day`
 move; the Incident's text is not refreshed). The SIM rule's `stormCap` is 1000, the ceiling, because the probe counts distinct SIMs over the retention, and
-above it the rule opens ONE storm Incident and no per-SIM Incident: 1,200 SIMs of 20 boxes are expressed by the 20 box Incidents (plan section 19).
+above it the rule opens ONE storm Incident and no per-SIM Incident: 1,200 SIMs of 20 boxes are expressed by the 20 box Incidents (the G-SB(b) re-check, [as-built record](plan-as-built.md)).
 
 ## Entity Lists
 
@@ -189,5 +190,6 @@ shadow mode. `BypassBoxCaseRuleTest` (module `inspecto-case-management`) runs th
 
 ## Related
 
-[user guide](user-guide.md) · [admin guide](admin-guide.md) · [features](features.md) · [plan](../../../../superpower/bypass-simbox-detection-plan.md) ·
+[user guide](user-guide.md) · [admin guide](admin-guide.md) · [features](features.md) · [as-built record](plan-as-built.md) ·
+[open work](../../../../superpower/telco-packs-plan.md) ·
 the starter typology it complements: [Telecom fraud](../telco-fraud/architecture.md).

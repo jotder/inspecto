@@ -1,7 +1,9 @@
 # Interconnect / wholesale fraud from CDRs (IRSF, Wangiri, flash-call / CLI): plan
 
-> 🟡 **PLAN 2026-10-18 (`PACK-IRSF-WANGIRI-1`): design only, nothing built.** Competitive gap **H** (interconnect / wholesale fraud:
-> Wangiri, IRSF, flash calls, CLI) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../okf/product/layer/product/brochure-competitive-matrix.md):
+> ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
+>
+> *Status before parking:* 🟡 **PLAN 2026-10-18 (`PACK-IRSF-WANGIRI-1`): design only, nothing built.** Competitive gap **H** (interconnect / wholesale fraud:
+> Wangiri, IRSF, flash calls, CLI) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../../layer/product/brochure-competitive-matrix.md):
 > two per-subscriber detection windows exist in the `telco-fraud` Space Template and nothing at the **trunk, partner or
 > destination** level, where wholesale fraud is actually priced. This plan is **CDR-based only**: no signalling, no test calls,
 > no inline blocking (those are matrix rows F, G and I). It is written to be **RFP-compatible** (§12): every slice maps to the
@@ -48,7 +50,7 @@ A **CDR-only interconnect-fraud layer** built from configuration over engines th
 Datasets, Anomaly Models, Entity Lists, Alert Rules, Case Rules, runbooks, Impact. **No new Step Processor** (hold on new Steps is
 in force for velocity / baseline Steps, build-plan `D-16`; SQL windows are the recorded form) and **no new Job Type** in v1.
 Eight capabilities, each a Dataset or a column, deterministic and recomputable (the standard of
-[`anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md): every verdict stores the numbers it came from):
+[`anomaly-scores.md`](../../module/anomaly/spec-anomaly-scores.md): every verdict stores the numbers it came from):
 
 | # | Capability | What it is | Closes |
 |---|---|---|---|
@@ -73,9 +75,9 @@ calls or probes (rows F, G); no trained model (no ML runtime; RFP `FM-18` stays 
   (sibling lane `TELCO-BYPASS-SIMBOX-1`; shared features are reused, not rebuilt), roaming (`telco-fraud` `fraud_roaming`), payment
   and recharge fraud, any write to a switch, HLR or billing system.
 - **Interface with the sibling plans.** The wholesale **cost per minute** comes from the partner / interconnect rate Reference of
-  [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md) (`ic_rates` today: `PARTNER`, `RATE_PER_MIN`, not effective-dated)
+  [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md) (`ic_rates` today: `PARTNER`, `RATE_PER_MIN`, not effective-dated)
   and, when it ships, its effective-dated agreement; this plan **reads** it and never edits it. The retail `rerated_usage` contract of
-  [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md) is the retail revenue side; exposure here is the **wholesale payable**. Cases and
+  [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md) is the retail revenue side; exposure here is the **wholesale payable**. Cases and
   disputes with a partner belong to the settlement plan; this plan raises the **fraud** Incident and hands the evidence over.
 
 ## 4. High-risk destination and premium-range reference data
@@ -120,7 +122,7 @@ supported there as a number block, `okf/product/module/entity-list/spec.md`, but
 ## 5. Detection features
 
 All windows are `sql.template` Jobs over the `cdr` Dataset and `destination_risk`, staged through Job-written Datasets (the recorded
-layering, [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5), partition-incremental like the existing Jobs. Names below are
+layering, [`okf/product/module/config/plan-spaces.md`](../../module/config/plan-spaces.md) §3.5), partition-incremental like the existing Jobs. Names below are
 proposals. **Every threshold is configuration**, in the Job parameters or the Alert Rule, as today.
 
 ### 5.1 IRSF (outbound, per subscriber, per day and per hour window)
@@ -351,7 +353,7 @@ range columns are `INTERNAL` (a range is not an individual), and **no peer-group
   shared-tree memories record; the CDR Schema v2 is a breaking change to a feed other Jobs read. `fraud_irsf` and `fraud_wangiri` **stay**
   in `telco-fraud` as the lightweight starter; nothing is retired. Cost: the `cdr` Schema is copied. (Breaking changes are free on any
   surface, so the alternative, extending `telco-fraud` and re-pinning every count, is viable if the operator prefers one template.)
-- **Content pack on the telecom side**, `product-map/solution-pack/telco-interconnect-fraud.toon`, `enforcement: build`, like `telco-fraud` and `telco-ra`.
+- **Content pack on the telecom side**, `product-map/solution-pack/telco-interconnect-fraud.toon` (proposed; the file does not exist yet), `enforcement: build`, like `telco-fraud` and `telco-ra`.
 - **Edition.** Config only, **no new Step Processor and no new Job Type** in v1. `minEdition: standard` (Alert Rules, Anomaly Models, Entity Lists;
   the existing `telco-fraud` manifest says its Anomaly Model part needs "the Standard, Advanced or Preview edition with Anomaly Detection"), listed beside
   `telco-fraud` in the offering's `contentPacks`; the Preview edition carries everything. ⚠ Verify at IW9 (a) how Advanced inherits `contentPacks`
@@ -488,7 +490,7 @@ one rate / CLI boundary: **no CLI column, signal or Alert Rule defined in both p
 - `BACKLOG.md`: a new P3 row **`PACK-IRSF-WANGIRI-1`** after `PACK-RERATING-1` (competitive gap H); the board's row-count markers move
   with it. Close it when IW9 ships; file residuals as their own rows.
 - `INDEX.md`: this plan's row in the in-flight table (superpower tier).
-- On ship (IW9): distil as-built facts (decisions, seams, gotchas) into [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) (a new
+- On ship (IW9): distil as-built facts (decisions, seams, gotchas) into [`okf/product/module/config/plan-spaces.md`](../../module/config/plan-spaces.md) (a new
   subsection beside §3.5), add a solution page under `stakeholders/solutions/`, update the matrix row H, then `git mv` this plan to
   `archived-documents/plans-archive/`.
 - **Not touched by this plan:** the RFP working set (read-only here), `GLOSSARY.md` (this plan adds no new term: *recommend-block* is a Decision Rule
@@ -501,11 +503,11 @@ memory on a synthetic 5M-CDR day, hourly-cadence detection latency, the module o
 
 ## References
 
-- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows D, E, H, I.
-- `telco-fraud` as-built: [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5.
-- Anomaly Models: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md). Entity Lists:
-  [`okf/product/module/entity-list/spec.md`](../okf/product/module/entity-list/spec.md). Action Requests:
-  [`okf/product/module/action-requests/spec.md`](../okf/product/module/action-requests/spec.md).
-- Sibling plans: [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md),
-  [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md).
-- Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).
+- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../../layer/product/brochure-competitive-matrix.md) rows D, E, H, I.
+- `telco-fraud` as-built: [`okf/product/module/config/plan-spaces.md`](../../module/config/plan-spaces.md) §3.5.
+- Anomaly Models: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../../module/anomaly/spec-anomaly-scores.md). Entity Lists:
+  [`okf/product/module/entity-list/spec.md`](../../module/entity-list/spec.md). Action Requests:
+  [`okf/product/module/action-requests/spec.md`](../../module/action-requests/spec.md).
+- Sibling plans: [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md),
+  [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md).
+- Canonical vocabulary: [`GLOSSARY.md`](../../../../GLOSSARY.md) (the single source of truth).

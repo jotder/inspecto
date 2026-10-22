@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Seeds the RUNTIME state of the `la-mobile-money` Space (vertical A of docs/superpower/la-multi-vertical-showcase-plan.md) over
+// Seeds the RUNTIME state of the `la-mobile-money` Space (vertical A of docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md) over
 // HTTP, as the right Demo Users. Investigations, members, Entity Lists, identity facts, a Case and a bound Alert Rule have no
 // registry kind, so no Space Template can carry them; this script is their home. Self-contained: it shares no code with
 // tools/seed-la-showcase.mjs (each showcase vertical owns its seed, smoke and runbook).

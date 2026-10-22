@@ -16,7 +16,7 @@ tags: [product-item, layer]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Compliance (CMP) — capability spec](plan-compliance.md) · [Data plane (DAT)](plan-data-plane.md) · [Editions & packaging (PKG) — capability spec](plan-editions.md) · [Inspecto — Forward Roadmap](plan-roadmap.md) · [Guards & repository tooling (TOOL) — capability spec](plan-tooling.md) |
-| spec | current | [Branching & Release Policy](spec-branching-release.md) · [Build & Test](spec-build-test.md) · [Module reorganisation - decision record (D-MR1..D-MR12)](spec-module-reorg-decisions.md) · [Module reorganisation - traps and gotchas](spec-module-reorg-gotchas.md) · [Work tracking — one board, tagged rows, generated hub views](spec-work-tracking.md) |
+| spec | current | [Branching & Release Policy](spec-branching-release.md) · [Build & Test](spec-build-test.md) · [Module reorganisation - decision record (D-MR1..D-MR12)](spec-module-reorg-decisions.md) · [Module reorganisation - traps and gotchas](spec-module-reorg-gotchas.md) · [Product Map — the commercial tree, its guard, its views and customer builds (as built)](spec-product-map.md) · [Work tracking — one board, tagged rows, generated hub views](spec-work-tracking.md) |
 | architecture | current | [Log](architecture-change-log.md) · [Editions Model](architecture-editions-model.md) · [Architecture layers — platform-wide design map](architecture-layers.md) · [Inspecto as a Living Operational System](architecture-living-system.md) · [Module taxonomy — axes, offerings, gates (target model)](architecture-module-taxonomy.md) · [Inspecto Backend Overview](architecture-overview.md) · [Platform Services](architecture-platform-services.md) · [Maven reactor & modularization (as-built)](architecture-reactor.md) · [Inspecto — Technical Architecture](architecture-technical.md) · [Backend Architecture](architecture.md) |
 | features | current | [Platform — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
@@ -36,7 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 |---|---|---|---|---|
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | Linux / macOS native licences are checked by hash, but not exercised or fully verified. | — |
-| `ASSURE-OPERABILITY-1` | P2 | feature | the generic operability half (WS-01/02/04/26, wave 4.5 of superpower/assurance-capability-plan.md). | operator |
+| `ASSURE-OPERABILITY-1` | P2 | feature | the generic operability half (WS-01/02/04/26, wave 4, item 4.5, of the archived plan; wave map in okf/product/layer/product/plan-assuranc… | operator |
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
 | — | P2 | feature | Postgres multi-user | — |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | Two test groups cannot run on the shared User profile, so a green reactor does not cover them. | — |
@@ -48,4 +48,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `MODULE-REORG-P4-3` | P3 | feature | a disabled module's in-flight work and long-lived subscriptions (the only P4 residue). | — |
 | `MODULE-REORG-P3-THIN-JARS` | P3 | feature | thin per-module jars + Offering-driven launcher classpath. | — |
 | `CODEGRAPH-AFFECTED-UNUSABLE-1` | P3 | chore | codegraph affected over-reports to uselessness; only the upstream defect is open. | external |
+| `PRODUCT-MAP-S6-1` | P3 | feature | Product Map slice S6, on demand: | demand |
+| `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` | P3 | defect | a trimmed customer bundle is not exact: | operator |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |

@@ -593,7 +593,7 @@ dropping the preview overlay, and dropping the in-profile import rewrite each go
   name only (~:124) and NULLs any `List` (~:189), so those columns load NULL. The "cheaper before C1" window has
   passed (C1–C4 shipped 2026-09-25). The design states no numeric threshold. **Operator decided 2026-10-11 to design it —
   ✅ **designed and operator-approved 2026-10-11; slices 1, 2 and 3 SHIPPED** (`derive` select / reduce, `children` explode, drawer list):
-  [`docs/superpower/parsing-repeated-child-design.md`](../../../../superpower/parsing-repeated-child-design.md).
+  [`docs/archived-documents/plans-archive/parsing-repeated-child-design.md`](../../../../archived-documents/plans-archive/parsing-repeated-child-design.md).
   An optional `derive` block under `asn1:` (segment key → column → operation; closed vocabulary, no expression)
   is compiled by `com.gamma.etl.DeriveSpec` (validated on `DecodeProfile.read` and at config load, `ASN1-DERIVE-*`
   codes; replaced whole on overlay) and evaluated per record by `Asn1RecordIngester`: VARCHAR derived columns
@@ -617,10 +617,16 @@ dropping the preview overlay, and dropping the in-profile import rewrite each go
   a map key (`usage.usage: Usage`). Tests: `ChildSpecTest`, `Asn1RecordIngesterChildTest` over the synthetic
   `repeated_child` case, and over `repeated_child_nested` (the child element holds a nested list, so a child `derive` yields real sum / count / first values, `PARSING-CHILD-DERIVE-CORPUS-1`). **Slice 3 SHIPPED 2026-10-12** — the Parse drawer lists the effective `derive` read-only
   ("N derived columns on M segments", segment / column / operation; the Pipeline's own `asn1.derive` wins whole
-  over the profile's). **Still open:** the preview does NOT compute derived columns — the ASN.1 preview is a record
-  Tree (no rows or columns), so where a derived value would appear is an undecided design question; the counters
-  channel stays log-only (operator D5: `RecordSink` is not widened); `ASN1-DERIVE-NOT-IN-GRAMMAR` deferred
-  (D5); no editor.
+  over the profile's). **Preview rows SHIPPED 2026-10-12** (`PARSING-PREVIEW-DERIVED-1`): the derived columns are
+  served beside the record Tree as `ParseResult.Rows` (see `previewRows` above) and shown as a drawer table.
+  `select` equality matches the **stringified** leaf (numbers and enum names alike). The per-file counters
+  `derive_non_numeric` / `derive_no_match` are logged at INFO, not written to a sink summary. **Still open
+  (deferred by decision, design archived 2026-10-22):** the counters channel stays log-only (operator D5:
+  `RecordSink` is not widened); `ASN1-DERIVE-NOT-IN-GRAMMAR` (a list path that is not a `SEQUENCE OF` in the
+  compiled grammar) is not implemented — it needs a walk over the compiled grammar's schema, and since 7 of 24
+  grammars have OPTIONAL stripped it could check path existence only, never mandatory-ness; slice 4, an optional
+  profile editor for `derive` / `children`, is operator-gated (the drawer stays read-only; row
+  `PARSING-DERIVE-EDITOR-1`).
 - **T2 — signer anchoring** (`-Djobs.packs.trustStore`, SEC-7). Not built. D2 made T1 the required gate.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24

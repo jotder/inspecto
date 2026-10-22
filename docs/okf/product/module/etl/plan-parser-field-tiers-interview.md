@@ -1,4 +1,6 @@
-> ✅ **BACK IN THE ACTIVE TIER 2026-09-16 — the gate has fired and this kit is being run.**
+> ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
+>
+> *Status before parking:* ✅ **BACK IN THE ACTIVE TIER 2026-09-16 — the gate has fired and this kit is being run.**
 > It was archived 2026-09-09 as an unexecuted research instrument; a real onboarding user is now
 > available, so the work is in flight and the plan lives here again (docs lifecycle tier 2). It returns
 > to `plans-archive/` when the session has been run and its deliverable landed.
@@ -11,7 +13,7 @@
 >
 > ✅ **The load-bearing half stays in the current tier**, not here: the two questions, the
 > **pre-agreed analysis rule**, the capture marks and the deliverable are in
-> [`okf/product/module/config/user-guide-grammar-config.md`](../okf/product/module/config/user-guide-grammar-config.md)
+> [`okf/product/module/config/user-guide-grammar-config.md`](../config/user-guide-grammar-config.md)
 > §"The D13 field-tier session". ⛔ **That rule's entire evidentiary force comes from being agreed
 > BEFORE the session — re-grounding a refuted PREMISE is not re-deriving the RULE, and the rule below is
 > untouched.**

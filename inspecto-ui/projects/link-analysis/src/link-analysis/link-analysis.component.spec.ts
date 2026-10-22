@@ -3187,3 +3187,101 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(c.growWriteWhyNot()).toContain('Incident management');
     });
 });
+
+describe('LinkAnalysisComponent - canvas overlays at laptop width (LA-ONBOARD-FIXES-1, F-11)', () => {
+    const LEGEND = 'inspecto.la.overlayOpen.legend';
+    const WS = 'inspecto.la.overlayOpen.workingSet';
+    const clear = () => [LEGEND, WS].forEach((k) => localStorage.removeItem(k));
+    beforeEach(clear);
+    afterEach(() => {
+        clear();
+        vi.restoreAllMocks();
+    });
+
+    it('on an ~800px canvas the legend and Working set start as their pills, expandable, and axe-clean', async () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.fitOverlaysToWidth(800);
+        fixture.detectChanges();
+        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
+        const el = fixture.nativeElement as HTMLElement;
+        const legend = el.querySelector('inspecto-link-analysis-legend') as HTMLElement;
+        const ws = el.querySelector('inspecto-link-analysis-working-set') as HTMLElement;
+        expect(legend.querySelector('[aria-label="Node kinds"]')).toBeNull();
+        expect(ws.querySelector('[aria-label="Working set statistics"]')).toBeNull();
+        await expectNoA11yViolations(legend);
+        await expectNoA11yViolations(ws);
+        expect(localStorage.getItem(LEGEND)).toBeNull(); // the width rule is not the user's choice
+
+        (legend.querySelector('button[aria-label="Show the legend"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(c.legendOpen()).toBe(true);
+        expect(legend.querySelector('[aria-label="Node kinds"]')).toBeTruthy();
+        expect(localStorage.getItem(LEGEND)).toBe('true'); // an explicit open is remembered
+    });
+
+    it('a wide canvas starts them open, and the rule decides once (a later narrow reading collapses nothing)', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.fitOverlaysToWidth(1400);
+        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([true, true]);
+        c.fitOverlaysToWidth(600);
+        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([true, true]);
+    });
+
+    it('a choice this browser remembers wins over the width rule, both ways', () => {
+        localStorage.setItem(LEGEND, 'true');
+        localStorage.setItem(WS, 'false');
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.fitOverlaysToWidth(800);
+        expect(c.legendOpen()).toBe(true);
+        c.fitOverlaysToWidth(1400);
+        expect(c.workingSetOpen()).toBe(false);
+        c.setOverlayOpen('workingSet', true); // View > Overlays, or the pill
+        expect(localStorage.getItem(WS)).toBe('true');
+    });
+
+    it('a saved view stating the overlays open does not force them open on a narrow canvas; its "collapsed" stands', async () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        const view = (legend: boolean, workingSet: boolean) =>
+            ({
+                id: 'v',
+                name: 'v',
+                sourceId: 'entity-projection',
+                query: { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } },
+                view: { legend, workingSet },
+            }) as LinkAnalysisView;
+        // loaded before the canvas was measured (wide until known), then the first measurement says narrow
+        await c.loadView(view(true, true));
+        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([true, true]);
+        c.fitOverlaysToWidth(800);
+        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
+        // the showcase starter view states both open; loaded on the measured narrow canvas they stay pills
+        await c.loadView(view(true, true));
+        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
+        // a wide canvas: the view's own state, including a collapsed Working set
+        c.fitOverlaysToWidth(1400);
+        await c.loadView(view(true, false));
+        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([true, false]);
+    });
+
+    it('with storage blocked the width rule still applies and a toggle still works', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        // blocked after the shell's own services are up (they read storage unguarded at construction)
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new Error('blocked');
+        });
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('blocked');
+        });
+        c.fitOverlaysToWidth(800);
+        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
+        c.setOverlayOpen('legend', true);
+        expect(c.legendOpen()).toBe(true);
+    });
+});

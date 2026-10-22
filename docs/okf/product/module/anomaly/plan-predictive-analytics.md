@@ -1,10 +1,12 @@
 # Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)
 
-**Status 2026-10-12: interview HELD - decisions in section 9a (OD-1..OD-9, OD-14, OD-17 decided; S0 done); no kernel built; P3 design-only.** Written by a docs-only lane
+> ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
+
+*Status before parking:* **Status 2026-10-12: interview HELD - decisions in section 9a (OD-1..OD-9, OD-14, OD-17 decided; S0 done); no kernel built; P3 design-only.** Written by a docs-only lane
 before any code. The key deliverable is section 9 (open decisions). Row: `PREDICTIVE-ANALYTICS-1` (P3) in
-[BACKLOG](../BACKLOG.md); the later Sales & Marketing BI pack is `PACK-SALES-MARKETING-1`. How an add-on, an optional
-module and an Offering are modelled: [`okf/product/layer/platform/spec-module-reorg-decisions.md`](../okf/product/layer/platform/spec-module-reorg-decisions.md)
-and [`okf/product/layer/platform/architecture-module-taxonomy.md`](../okf/product/layer/platform/architecture-module-taxonomy.md). When this ships: distil into an OKF concept, move
+[BACKLOG](../../../../BACKLOG.md); the later Sales & Marketing BI pack is `PACK-SALES-MARKETING-1`. How an add-on, an optional
+module and an Offering are modelled: [`okf/product/layer/platform/spec-module-reorg-decisions.md`](../../layer/platform/spec-module-reorg-decisions.md)
+and [`okf/product/layer/platform/architecture-module-taxonomy.md`](../../layer/platform/architecture-module-taxonomy.md). When this ships: distil into an OKF concept, move
 leftovers to BACKLOG, `git mv` to `archived-documents/plans-archive/` (CLAUDE.md lifecycle).
 
 > **Honesty box - what was and was not verified.** Verified by reading this checkout at `299becc07`: the Anomaly and Risk
@@ -299,7 +301,7 @@ run S0 (decisions + glossary) only when the operator schedules the module.
 
 ## 10. Proposed BACKLOG rows (text only - this lane may not edit `docs/BACKLOG.md`)
 
-- **P3 `PREDICTIVE-ANALYTICS-1`** (existing row, re-point): design in `superpower/predictive-analytics-design.md`; S0 is the
+- **P3 `PREDICTIVE-ANALYTICS-1`** (existing row, re-point): design in `docs/okf/product/module/anomaly/plan-predictive-analytics.md` (this file); S0 is the
   interview of OD-1..OD-17; nothing built.
 - **P3 `PREDICTIVE-WINDOWED-MEASURES-1`**: entity Measures over a trailing window as-of a date (recency, frequency, sum), the
   shared kernel for RFM and churn inputs; bound values; golden corpus.

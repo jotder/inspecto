@@ -1081,7 +1081,7 @@
                             (onlyUnexpandedChange)="onlyUnexpanded.set($event)"
                             (nextUnexpanded)="selectNextUnexpanded()"
                             [open]="legendOpen()"
-                            (openChange)="legendOpen.set($event)"
+                            (openChange)="setOverlayOpen('legend', $event)"
                         ></inspecto-link-analysis-legend>
                         <!-- render strip: what the render left out and the level-of-detail state; the counts, the caps and the modules live in the footer status bar -->
                         <div
@@ -1112,7 +1112,7 @@
                             [splitIdentityHint]="splitIdentityHint()"
                             [mode]="strandedCount() ? strandedCount() + ' stranded' : 'top-N by count'"
                             [open]="workingSetOpen()"
-                            (openChange)="workingSetOpen.set($event)"
+                            (openChange)="setOverlayOpen('workingSet', $event)"
                         ></inspecto-link-analysis-working-set>
                         <!-- The text alternative of the canvas: the SAME canvasData(), as a keyboard-navigable list. -->
                         @if (listMode()) {
@@ -1324,12 +1324,15 @@
                                 <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
                                     Overlays
                                 </h3>
-                                <mat-checkbox [checked]="legendOpen()" (change)="legendOpen.set($event.checked)">
+                                <mat-checkbox
+                                    [checked]="legendOpen()"
+                                    (change)="setOverlayOpen('legend', $event.checked)"
+                                >
                                     Legend
                                 </mat-checkbox>
                                 <mat-checkbox
                                     [checked]="workingSetOpen()"
-                                    (change)="workingSetOpen.set($event.checked)"
+                                    (change)="setOverlayOpen('workingSet', $event.checked)"
                                 >
                                     Working set
                                 </mat-checkbox>

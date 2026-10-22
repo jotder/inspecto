@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Scripted probes of the `la-audit` Space (vertical B of docs/superpower/la-multi-vertical-showcase-plan.md), run against a SEEDED
+// Scripted probes of the `la-audit` Space (vertical B of docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md), run against a SEEDED
 // demo and ASSERTED: the Job outputs carry every planted fact (the ground truths pinned offline by LaAuditGoldenTest), the Dossier
 // seals, verifies and FAILS verification after one byte is changed, and the personas hold. Needs the Demo Auth build (serve-demo,
 // loopback) and the la-audit Space seeded by tools/seed-la-audit.mjs. Sends only `demo:<id>` codes. Self-contained.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-product-map — holds product-map/<kind>/<name>.toon (docs/superpower/product-map-plan.md, PRODUCT-MAP-1 slice S2) against the
+// check-product-map — holds product-map/<kind>/<name>.toon (docs/archived-documents/plans-archive/product-map-plan.md, PRODUCT-MAP-1 slice S2) against the
 // module manifests, offerings/*.toon, Space Templates and Industry packs. Reads files only; no build.
 //
 //   node tools/check-product-map.mjs [--root .]      exit 1 on any finding

@@ -1,7 +1,7 @@
 # Inspecto LA (Link Analysis) showcase B: Finance and audit (runbook, synthetic data only)
 
 **Status: BUILT and LIVE-REHEARSED 2026-10-16 on a booted Space (Advanced Demo Auth bundle, port 8141): smoke 30/30, the HTTP routes and the headline browser scenes driven; what was not driven is listed in section 6.** Vertical B of the
-[multi-vertical showcase plan](../../../../superpower/la-multi-vertical-showcase-plan.md): "procure-to-pay and the journal". The analyst's questions: is this vendor real, who approved,
+[multi-vertical showcase plan](../../../../archived-documents/plans-archive/la-multi-vertical-showcase-plan.md) (archived; the rehearsal still owed is in the [roadmap](../../../../superpower/link-analysis-roadmap.md) §D5): "procure-to-pay and the journal". The analyst's questions: is this vendor real, who approved,
 is the control chain sound? The headline is the **Dossier as an audit workpaper**: seal it, verify it, change one byte, watch Verify fail.
 Everything is invented (names, bank accounts, addresses, ids). The plants are labelled as planted; nothing here is a detection-rate claim.
 The stakeholder-facing sibling script is the [demo runbook](../../module/la-core/admin-guide-demo.md) (mule transfers and telecom); this Space is separate and shares none of its files.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// render-product-map — the generated views of the Product Map (docs/superpower/product-map-plan.md, PRODUCT-MAP-1 slice S3):
+// render-product-map — the generated views of the Product Map (docs/archived-documents/plans-archive/product-map-plan.md, PRODUCT-MAP-1 slice S3):
 // a CSV, an Excel workbook and a standalone collapsible mind-map page, written to target/product-map/ (gitignored, never committed).
 //
 //   node tools/render-product-map.mjs [--root .] [--out target/product-map]

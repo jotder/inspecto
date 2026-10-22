@@ -3,7 +3,7 @@
 *Status: written 2026-10-16 from the code, the seed script, the smoke runner and a live pass (a fresh Space from the template on a demo-auth bundle, seed `--apply` clean, smoke 10/10).
 Scenes marked **UNVERIFIED (rehearse first)** have no test or probe behind one of their claims; the browser walk-through of the Graph page is not part of this pass.*
 
-Vertical A of the [multi-vertical showcase plan](../../../../superpower/la-multi-vertical-showcase-plan.md): **"the agent who never sleeps"**. A Space created from the `la-mobile-money`
+Vertical A of the [multi-vertical showcase plan](../../../../archived-documents/plans-archive/la-multi-vertical-showcase-plan.md) (archived; the rehearsal still owed is in the [roadmap](../../../../superpower/link-analysis-roadmap.md) §D5): **"the agent who never sleeps"**. A Space created from the `la-mobile-money`
 Space Template holds 420 wallets, 40 agents, 40 merchants and about 5 700 transactions over 14 days (1 to 14 October 2026), with seven planted stories whose ground truths are pinned
 by `LaMobileMoneyGoldenTest` and `MmLinksJobGoldenTest`. It does not replace the shipped mule and telecom demo ([demo runbook](../../module/la-core/admin-guide-demo.md)); it is a second, self-contained one.
 Every value is invented. Do not make a precision or detection-rate claim from it: the plants are planted.

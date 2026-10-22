@@ -13,8 +13,9 @@ numbers here are **OF-n**, to stay apart from `LA-ONBOARD-1`'s OB-n.
 
 **Inputs.**
 
-- [`pipeline-editions-first-run-use-cases.md`](pipeline-editions-first-run-use-cases.md): the console, nine use
-  cases (UC-1…UC-9) and a smart-help catalogue (H1…H9), §6 answered by the operator.
+- [`okf/product/module/etl/spec-first-time-user-use-cases.md`](../okf/product/module/etl/spec-first-time-user-use-cases.md): the
+  console, nine use cases (UC-1…UC-9) and a smart-help catalogue (H1…H9), an agreed spec in the ETL hub, §6 answered
+  by the operator.
 - [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md):
   Inspecto LA, fifteen use cases (UC-01…UC-15), walkthrough findings F-1…F-13, operator answers A-1…A-16.
 - [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`): what each edition may do.

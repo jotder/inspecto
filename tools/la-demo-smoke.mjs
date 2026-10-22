@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // LA-DEMO-GUARDS-1 / DR-T5 + DR-T7: the Link Analysis demo's scripted probes, run against a SEEDED demo and ASSERTED
-// (docs/superpower/la-demo-readiness-plan.md walkthrough steps 0, 2, 7). Needs the Demo Auth build (serve-demo, loopback)
+// (docs/archived-documents/plans-archive/la-demo-readiness-plan.md walkthrough steps 0, 2, 7). Needs the Demo Auth build (serve-demo, loopback)
 // and the `la-showcase` + `la-showcase-off` Spaces seeded by tools/seed-la-showcase.mjs. Sends only `demo:<id>` codes.
 //
 //   node tools/la-demo-smoke.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--off-space la-showcase-off]

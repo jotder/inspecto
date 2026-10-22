@@ -1,7 +1,9 @@
 # Sales, commissions, marketing and churn: a plan (`PACK-SALES-MARKETING-1`)
 
-> 🟡 **PLAN 2026-10-18 (`PACK-SALES-MARKETING-1`, competitive gap V): design only, nothing built.** Gap **V** (sales,
-> commissions, marketing, churn) is **N** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../okf/product/layer/product/brochure-competitive-matrix.md):
+> ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
+>
+> *Status before parking:* 🟡 **PLAN 2026-10-18 (`PACK-SALES-MARKETING-1`, competitive gap V): design only, nothing built.** Gap **V** (sales,
+> commissions, marketing, churn) is **N** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../../layer/product/brochure-competitive-matrix.md):
 > LATRO and Mobileum sell it, Subex partly, Neural, TEOCO and Araxxe do not. The row `PACK-SALES-MARKETING-1` said "no design
 > yet" and "depends on `PREDICTIVE-ANALYTICS-1`". **This plan finds that dependency is only half true:** three of the four
 > lanes, and the deterministic half of the fourth, run on engines that already ship. Only a *probability* of churn, a
@@ -11,11 +13,11 @@
 > claim about volume is a hypothesis until slice SM0 measures it.
 >
 > **Method.** Read on 2026-10-18: matrix rows V, P, J, L; the `PACK-SALES-MARKETING-1`, `PREDICTIVE-ANALYTICS-1` and
-> `ANALYTICS-CORE-1` rows; [`predictive-analytics-design.md`](predictive-analytics-design.md) (decisions §9a);
-> [`analytics-core-plan.md`](analytics-core-plan.md) S5; the `business-assurance` and `mobile-money` templates (the
+> `ANALYTICS-CORE-1` rows; [`predictive-analytics-design.md`](../../module/anomaly/plan-predictive-analytics.md) (decisions §9a);
+> [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md) S5; the `business-assurance` and `mobile-money` templates (the
 > `mm_commission` Job, Alert Rule, KPI and Risk Score model); the Risk Score, Anomaly Score and Entity List concepts;
-> `docs/GLOSSARY.md`; the two sibling plans [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md) and
-> [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md) (house style); and the git-excluded MVNO RFP
+> `docs/GLOSSARY.md`; the two sibling plans [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md) and
+> [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md) (house style); and the git-excluded MVNO RFP
 > working set under `docs/superpower/rfp-mvno-assurance/` (`compliance-matrix.xlsx`, `gap-register.md`, `build-plan.md`,
 > `assurance-content-catalog.xlsx`, `generator/rfp_rows.py`). ⚠ That working set is a **draft dated 2026-09-23/24**; the
 > workstream statuses it carries were not all re-checked (§8 marks which were).
@@ -28,11 +30,11 @@
 |---|---|---|
 | `mobile-money` Job `mm_commission` | **A flat-rate recomputation, per agent per day.** `sum(round(amount × rate, 2))` for `CASH_IN` and `CASH_OUT` against `sum(commission)` paid; two rates are Job parameters (`0.005`, `0.01`); `abs(paid − expected)` plus a `direction` of `OVERPAID` / `UNDERPAID` / `EXACT`. Alert Rule `mm_commission` `max(commission_variance) > 5` `by: agent_id`; KPI `mm_commission_variance`; the variance is a **factor of the `mm_agent` Risk Score** (weight 1, cap 30). | `spaces/_templates/mobile-money/config/jobs/mm_commission_job.toon`, `registry/alert-rules/mm_commission.toon`, `registry/risk-scores/mm_agent.toon` |
 | `business-assurance` template | Holt-Winters additive forecast with a band in **DuckDB SQL** (`ba_revenue_forecast`), and margin erosion per product × channel × partner (`ba_margin_erosion`); five Alert Rules, three KPIs, one dashboard. Listed in `offerings/basic.toon` `contentPacks`, so in every edition. | `docs/okf/product/solution-pack/business-assurance/architecture.md` |
-| Reconciliation add-on | Two or three Datasets compared at a key grain with `exact` / `absolute` / `percent` tolerance; Break lifecycle, dedupe, Incident promotion. | [`okf/product/module/reconciliation/architecture-overview.md`](../okf/product/module/reconciliation/architecture-overview.md) |
-| Scoring & Lists add-on | **Risk Score** (weighted factors, each a Measure over a Dataset with a cap, 0–100, per-factor explanation, recomputable) and **Entity Lists** (`allow` / `block` / `watch` / `exclusion`, expiring entries, Parquet sidecar, `WatchListFeed.feedScored` from a score band). | [`okf/product/module/scoring/spec-risk-scores.md`](../okf/product/module/scoring/spec-risk-scores.md), [`entity-lists.md`](../okf/product/module/entity-list/spec.md) |
-| Anomaly Detection add-on | Per-entity robust **self and Peer Group** baselines with seasonality, 0–100 score with a per-Feature explanation; statistical, not ML. | [`okf/product/module/anomaly/spec-anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md) |
-| Analytics Kernel (`ANALYTICS-CORE-1`, M1–M10 and Should batches built 2026-10-17) | Canonical statistics, time-series primitives and Steps (`resample`, `shift`, `forecast`), accuracy measures and a rolling-origin backtest, seasonality detection, a seeded holdout split, `transform.analytics.rank`, `transform.data.binning`, `transform.stats.correlation`, `transform.entity.link`. | [`okf/product/module/analytics/spec.md`](../okf/product/module/analytics/spec.md) |
-| Predictive Analytics (`PREDICTIVE-ANALYTICS-1`) | **Design only.** One optional module `inspecto-predictive`, three component kinds (Segmentation Model, Churn Model, Forecast Model), declared-coefficient first slices, **no training in v1**. Open: OD-10 churn label, OD-11 forecast grain, OD-12, OD-13, OD-15, OD-16. | [`predictive-analytics-design.md`](predictive-analytics-design.md) §9a |
+| Reconciliation add-on | Two or three Datasets compared at a key grain with `exact` / `absolute` / `percent` tolerance; Break lifecycle, dedupe, Incident promotion. | [`okf/product/module/reconciliation/architecture-overview.md`](../../module/reconciliation/architecture-overview.md) |
+| Scoring & Lists add-on | **Risk Score** (weighted factors, each a Measure over a Dataset with a cap, 0–100, per-factor explanation, recomputable) and **Entity Lists** (`allow` / `block` / `watch` / `exclusion`, expiring entries, Parquet sidecar, `WatchListFeed.feedScored` from a score band). | [`okf/product/module/scoring/spec-risk-scores.md`](../../module/scoring/spec-risk-scores.md), [`entity-lists.md`](../../module/entity-list/spec.md) |
+| Anomaly Detection add-on | Per-entity robust **self and Peer Group** baselines with seasonality, 0–100 score with a per-Feature explanation; statistical, not ML. | [`okf/product/module/anomaly/spec-anomaly-scores.md`](../../module/anomaly/spec-anomaly-scores.md) |
+| Analytics Kernel (`ANALYTICS-CORE-1`, M1–M10 and Should batches built 2026-10-17) | Canonical statistics, time-series primitives and Steps (`resample`, `shift`, `forecast`), accuracy measures and a rolling-origin backtest, seasonality detection, a seeded holdout split, `transform.analytics.rank`, `transform.data.binning`, `transform.stats.correlation`, `transform.entity.link`. | [`okf/product/module/analytics/spec.md`](../../module/analytics/spec.md) |
+| Predictive Analytics (`PREDICTIVE-ANALYTICS-1`) | **Design only.** One optional module `inspecto-predictive`, three component kinds (Segmentation Model, Churn Model, Forecast Model), declared-coefficient first slices, **no training in v1**. Open: OD-10 churn label, OD-11 forecast grain, OD-12, OD-13, OD-15, OD-16. | [`predictive-analytics-design.md`](../../module/anomaly/plan-predictive-analytics.md) §9a |
 | The RFP catalogue | `RA-C20` *Dealer commission recomputation* (monthly, absolute 1 tolerance, "recomputed vs paid; commission on churned lines") and `FM-R09` *Dealer unauthorised activation / commission churn* (activation-to-churn < 30 days above a peer baseline) are **specified, not built**. | `assurance-content-catalog.xlsx` sheet `Controls` |
 
 ### 1.2 What is missing (the gap)
@@ -463,16 +465,16 @@ If the bid is lost or deferred, none of the build is wasted: the lane stands as 
 
 ## References
 
-- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows P, J, L, V.
-- Predictive design: [`predictive-analytics-design.md`](predictive-analytics-design.md); Analytics Kernel:
-  [`okf/product/module/analytics/spec.md`](../okf/product/module/analytics/spec.md), [`analytics-core-plan.md`](analytics-core-plan.md).
-- Sibling plans (house style, contracts): [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md),
-  [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md).
-- Business assurance: [`okf/product/solution-pack/business-assurance/architecture.md`](../okf/product/solution-pack/business-assurance/architecture.md).
-- Scoring and lists: [`okf/product/module/scoring/spec-risk-scores.md`](../okf/product/module/scoring/spec-risk-scores.md),
-  [`anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md), [`entity-lists.md`](../okf/product/module/entity-list/spec.md).
-- Reconciliation module: [`okf/product/module/reconciliation/architecture-overview.md`](../okf/product/module/reconciliation/architecture-overview.md).
-- Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).
+- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../../layer/product/brochure-competitive-matrix.md) rows P, J, L, V.
+- Predictive design: [`predictive-analytics-design.md`](../../module/anomaly/plan-predictive-analytics.md); Analytics Kernel:
+  [`okf/product/module/analytics/spec.md`](../../module/analytics/spec.md), [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md).
+- Sibling plans (house style, contracts): [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md),
+  [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md).
+- Business assurance: [`okf/product/solution-pack/business-assurance/architecture.md`](architecture.md).
+- Scoring and lists: [`okf/product/module/scoring/spec-risk-scores.md`](../../module/scoring/spec-risk-scores.md),
+  [`anomaly-scores.md`](../../module/anomaly/spec-anomaly-scores.md), [`entity-lists.md`](../../module/entity-list/spec.md).
+- Reconciliation module: [`okf/product/module/reconciliation/architecture-overview.md`](../../module/reconciliation/architecture-overview.md).
+- Canonical vocabulary: [`GLOSSARY.md`](../../../../GLOSSARY.md) (the single source of truth).
 
 ## 13. Measurements (filled by slice SM0)
 

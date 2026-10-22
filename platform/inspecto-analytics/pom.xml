@@ -11,7 +11,7 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <!-- ANALYTICS-CORE-1 M1 + M6 (docs/superpower/analytics-core-plan.md, D-AN1): the Analytics Kernel - one written
+    <!-- ANALYTICS-CORE-1 M1 + M6 (docs/archived-documents/plans-archive/analytics-core-plan.md, D-AN1): the Analytics Kernel - one written
          definition per statistic (Stats: mean, variance / stddev, median modes, quantile modes, MAD, robust z, IQR,
          Tukey fences), the baseline contract promoted from inspecto-anomaly (com.gamma.analytics.baseline), the one
          column profiler (ColumnProfiler, M4) and the time-series primitives (com.gamma.analytics.time: TimeGrain,

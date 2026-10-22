@@ -15,7 +15,7 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
+| plan | current | [Sales, commissions, marketing and churn: a plan (`PACK-SALES-MARKETING-1`)](plan-sales-commissions-churn.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Revenue assurance (telecom)](architecture-revenue-assurance.md) · [Business assurance](architecture.md) |
 | features | current | [Business assurance — features](features.md) |

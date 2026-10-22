@@ -35,3 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-INDEX-SCALE-MEASURE-1` | P3 | chore | clauses (1) and (2) MEASURED 2026-10-05; clause (3) 10^9 still open. | — |
+| `DUCKDB-2-MIGRATION-1` | P2 | chore | move the DuckDB pin to 2.0.x (operator decision 2026-10-05: go 2.0.x). | external |

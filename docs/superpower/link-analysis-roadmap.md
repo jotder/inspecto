@@ -1,7 +1,8 @@
 <!--
   ACTIVE PLAN — docs/superpower/
-  Created 2026-10-05 by consolidating eight Link Analysis (LA) plan/design docs into ONE tracker. This is the ONLY
-  place that lists unbuilt LA work. How LA works today: docs/okf/product/module/la-core/user-guide-link-analysis.md. How to use it:
+  Created 2026-10-05 by consolidating eight Link Analysis (LA) plan/design docs into ONE tracker; 2026-10-22 it also took the
+  open items of six more archived LA plans (last section). This is the ONLY place that lists unbuilt LA work, besides
+  docs/superpower/la-onboarding-plan.md (LA-ONBOARD-1). How LA works today: docs/okf/product/module/la-core/user-guide-link-analysis.md. How to use it:
   docs/okf/product/module/la-core/user-guide-manual.md. Retire sections (distil into the OKF concept, rows to BACKLOG §3.12) as
   each ships; archive this file when nothing is open.
 -->
@@ -10,15 +11,15 @@
 
 **The three Link Analysis documents.** (1) [`okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md) — what is built and why; (2) [`okf/product/module/la-core/user-guide-manual.md`](../okf/product/module/la-core/user-guide-manual.md) — the analyst manual; (3) **this file** — what is still open. Backlog rows `LA-*` live in [`BACKLOG.md`](../BACKLOG.md) §3.12; terms in [`GLOSSARY.md`](../GLOSSARY.md).
 
-**Full original designs** (read only when you start the work; archived, never maintained) are in `archived-documents/plans-archive/`: `la-separation-feasibility-plan` · `la-separation-d7-design` · `la-embed-view-design` · `la-data-preparation-plan` · `investigation-store-design` · `link-analysis-entity-model-design` · `la-live-detection-design` · `link-analysis-ui-mockup.html`.
+**Full original designs** (read only when you start the work; archived, never maintained) are in `archived-documents/plans-archive/`: `la-separation-feasibility-plan` · `la-separation-d7-design` · `la-embed-view-design` · `la-data-preparation-plan` · `investigation-store-design` · `link-analysis-entity-model-design` · `la-live-detection-design` · `link-analysis-ui-mockup.html`. Folded 2026-10-22 (last section): `la-demo-readiness-plan` · `la-whitepaper-demo-plan` · `la-edition-placement-changes-plan` · `la-analyst-upload-plan` · `la-ims-showcase-plan` · `la-multi-vertical-showcase-plan`.
 
-## Status at a glance (2026-10-05)
+## Status at a glance (2026-10-05; demo, showcase and edition rows 2026-10-22)
 
 | Workstream | State | Open |
 |---|---|---|
-| Separation, option D (D-0…D-6) | built | `LA-APP-REAL-SIGNIN-1`, I1 trust, `LA-INDEX-SCALE-MEASURE-1` (§1) |
+| Separation, option D (D-0…D-6) | built (`LA-APP-REAL-SIGNIN-1` closed 2026-10-13: la-app signed in through a real WSO2) | I1 trust, `LA-INDEX-SCALE-MEASURE-1` (§1) |
 | D-7 parallel analyst sandboxes (Drafts) | built D7-1…D7-7 | team Drafts, Draft SPA surface, linear rebase (§1) |
-| Embed view | deferred | `LA-EMBED-VIEW-1` (§1) |
+| Embed view | **built** 2026-10-12/14 (`LA-EMBED-VIEW-1` closed 2026-10-14; as-built la-core architecture §6.2); §3 below is the design record | nothing |
 | Data preparation (CDR → fast index) | **plan; spikes SP1, SP2 (indicative), SP4, SP5 measured 2026-10-06; WP3 index builder still unbuilt** | LDP-D1…D11 open, WP0…WP10 (§2) |
 | Daily ingestion (CSV / Hive / database to the index) | **ingest chain built and accepted (T1-T9)** | `LA-DAILY-INGEST-1` T1…T9, decisions D-ING1…D-ING6 answered (D-ING5 file-first), T1/T2/T3/T4/T6/T7/T9 done, T5/T8 built; open: follow-ups in the BACKLOG row |
 | Configurable limits (`LA-CONFIG-LIMITS-1`) | **built 2026-10-15** (every limit a server-gated configuration item; plan archived) | `LA-CONFIG-LIMITS-RESIDUALS-1`; as-built: [`okf/product/module/la-core/architecture.md`](../okf/product/module/la-core/architecture.md) §9 |
@@ -26,6 +27,11 @@
 | Entity model LA-17 | slice 1 + slice 2 built | SPA member browsing, `excludeBy` range/CIDR (§3) |
 | Live detection | LD-1…LD-7 built | operator confirmation of D-LD2…D-LD18; template sharing (§3) |
 | Analyst flow (2026-10-13: one MSISDN, expand one node at a time, seed several and connect them) | **marker and chosen-neighbours built** (`LA-UNEXPANDED-MARKER-1`, `LA-EXPAND-PICK-NEIGHBOURS-1`, not browser-driven); **`LA-SEED-CONNECT-1` built** (2026-10-13: the `connect` op, not browser-driven; residuals in BACKLOG §3.12) | `LA-SEED-CONNECT-1` (all-pairs shortest connection within 3 hops as one sealed `connect` op, then expand from the path nodes), `LA-EXPAND-FOUREYES-CLARITY-1`, the residuals on the two built rows (BACKLOG §3.12) |
+| Demo readiness (`LA-DEMO-*`, eight rows) | **built**; all rows closed by 2026-10-13; go/no-go rehearsal 2026-10-14 GO | nothing (§D1) |
+| Technical / security review demo (whitepaper claims to live scenes) | **plan 2026-10-15, never rehearsed** | rehearsal + two operator questions (§D2) |
+| Edition placement (D-LAE*) | D-LAE1, 2, 5, 12 **built** 2026-10-20; D-LAE7…11 moved to `DATA-TIERS-1` | D-LAE3, D-LAE4, D-LAE6 (§D3) |
+| Analyst CSV upload (`LA-ANALYST-UPLOAD-1`) | **built** 2026-10-18/19 | D-UP1…D-UP8 confirmation, browser drive, multi-node quota ledger (§D4) |
+| Showcases: three synthetic verticals, one private real-feed Space | **built** 2026-10-15/16 | full browser rehearsal of A, B, C and the 30-minute tour (§D5) |
 
 ## Separation (option D) — what is NOT yet built or still open
 
@@ -48,8 +54,8 @@ Drawn from: `archived-documents/plans-archive/la-separation-feasibility-plan.md`
 | D-2 spikes D-S1..S5 | mostly measured; D-S2 dropped; 10^9 axis OPEN (`LA-INDEX-SCALE-MEASURE-1` (3)) |
 | D-3 `la-storage` index + `la-data` | Path A steps 1-8 built; index OFF by default; 5-level index walk FAILED the 1.5 s criterion in the spike (path narrowed); SPA surfaces + scale measure open (`LA-INDEX-SPA-SURFACES-1`, `LA-INDEX-SCALE-MEASURE-1`) |
 | D-4 `la-graph` server-side algorithms (now `platform/inspecto-graph`, D-AN2) | done; remainder is `LA-GRAPH-RUN-*` rows |
-| D-5 `la-app` host + SPA shell + product flavor | steps 1-7 built; real IdP sign-in unverified (`LA-APP-REAL-SIGNIN-1`) |
-| D-6 integration | references + Dossier bundle built; embeddable view OPEN (`LA-EMBED-VIEW-1`); I1 machine-to-machine trust not built (no live call needs it) |
+| D-5 `la-app` host + SPA shell + product flavor | steps 1-7 built; real IdP sign-in verified 2026-10-13 (`LA-APP-REAL-SIGNIN-1` closed) |
+| D-6 integration | references + Dossier bundle built; embeddable view built (`LA-EMBED-VIEW-1` closed 2026-10-14); I1 machine-to-machine trust not built (no live call needs it) |
 | D-7 Drafts | backend D7-1..D7-7 built 2026-10-03/04; open remainder in section 2 |
 
 Integration contracts still unbuilt (feasibility section 2): I1 trust between installations (OIDC client credentials; WSO2 supports it), I2 remote Dataset query (SEP-21), I3 remote Case adapter (SEP-22), I4 entity-context port (SEP-23, fingerprint/360), I5 "Open in Link Analysis" URL contract (SEP-24). Phase 2 (SEP-20..24) is only for a real cross-installation need. ⚠ Phase 0 must precede Phase 2 (D6). Each new mutating route clears the four `endpoint` gates + an `openapi-v1.json` entry. ⛔ Cross-installation security needs a formal review first (SSRF, token scope, replay, audit on both sides; precedent `ses-sns-adapter-design.md`). Masking at export must keep the Dossier SHA-256 root verifiable (LA `D-U6`).
@@ -91,7 +97,9 @@ Name decided (D16): **Draft** (not "sandbox": that is the SQL lockdown; ⛔ not 
 - Accepted gaps: a pending promote does not freeze the Draft (a later write just makes approval 409); expiry of a Draft with a pending promote => approve 409, redo from a new fork; analyst promote on a NON-sensitive Investigation appends with no second person (as signed, say so if unwanted); conflict report recomputes on every GET; `expiryWarning` field is the only warning (no push channel); a same-size/same-mtime in-place tamper of the main log is caught only by replay; checkpoint is in memory (restart = one cold fold); Draft writes still parse main prefix + own log (parse-free path open).
 - ⚠ `reveal` and fork-reorder are lead-only; if analysts must unmask that is a decision to take at the Draft gate, not an accident.
 
-### 3. Embed view (`LA-EMBED-VIEW-1`, P3, board section 3.12) — DEFERRED, design only
+### 3. Embed view (`LA-EMBED-VIEW-1`) — design record; BUILT 2026-10-12/14 (row closed 2026-10-14, as-built la-core architecture §6.2)
+
+> The "deferred" wording below is the 2026-10-05 design state, kept until this section is distilled; the operator lifted the deferral when a real customer portal became the consumer (2026-10-13).
 
 - **Why deferred:** operator 2026-10-03 KEEP DEFERRED until a NAMED consumer asks (EMB-1). It needs a NEW principal type in `inspecto-auth-spi` (read-only token scoped to ONE Investigation), a grant store, new gated routes and a host-wide header change.
 - **Needs:** reuse the BI share-token PATTERN, not the class (stateless HMAC cannot be revoked one at a time; `ShareTokens` is package-private in core). New `EmbedGrants` store behind the `InvestigationStore` seam from day one; opaque random 256-bit token, only SHA-256 stored; principal `EmbedGrant(grantId, space, investigationId, issuedBy, issuedAt, expiresAt, label)` which is NOT a `Subject` (no Subject attached => fails closed on every capability-gated route; structural safety property).
@@ -107,8 +115,8 @@ Name decided (D16): **Draft** (not "sandbox": that is the SQL lockdown; ⛔ not 
 
 | Id | State |
 |---|---|
-| `LA-EMBED-VIEW-1` | P3 open, section 3 |
-| `LA-APP-REAL-SIGNIN-1` | P3 open: la-app OIDC proven over Demo auth and a scripted real WSO2 backend run, never from the SPA against a real IdP |
+| `LA-EMBED-VIEW-1` | closed 2026-10-14 (built; section 3 is the design record) |
+| `LA-APP-REAL-SIGNIN-1` | closed 2026-10-13: la-app signed in through a real WSO2 IS from the SPA |
 | `LA-INDEX-SCALE-MEASURE-1` | open; item (3) = 10^9 run (bucket count ~256-1024 at 10^9; extrapolation only) |
 | `LA-INDEX-SPA-SURFACES-1` | open (index SPA surfaces) |
 | `LA-SEP-SPIKES-1` | CLOSED 2026-10-03 (D-S5 re-run at 10^8); 10^9 moved to `LA-INDEX-SCALE-MEASURE-1` |
@@ -538,3 +546,61 @@ Hard invariants: narrow only (a refusal is EMPTY, never a value); aggregate outp
 - Rules bound before D-LD11 stopped sweeping until their owner enables them.
 
 **The one still-unbuilt item: template sharing (D-LD6).** Templates are write-once and owner-only with no sharing; sharing via the registry envelope was declined for now. It needs an operator decision and a decision on how a shared template interacts with owner-only `instantiate` and each instantiator's own R3 gate.
+
+## Demos, showcases, edition placement and upload - what is still open (folded 2026-10-22)
+
+Drawn from six plans archived 2026-10-22 in `docs/archived-documents/plans-archive/` (read them for history and full detail, never as current). As-built facts: the [demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (§8 holds the real-feed lessons), [`la-core/architecture.md`](../okf/product/module/la-core/architecture.md) §6.6 (upload) and §8 (editions), [`EDITIONS.md`](../EDITIONS.md), the [showcase design rules](../okf/product/solution-pack/la-showcase/architecture.md) and the per-vertical runbooks under `okf/product/solution-pack/la-*/`.
+
+### D1. Demo readiness (`la-demo-readiness-plan`) - nothing open
+
+All eight rows (`LA-DEMO-SEED-1`, `LA-DEMO-DEFECTS-1`, `LA-DEMO-INDEX-1`, `LA-UI-MEMBERS-DRAFTS-1`, `LA-UI-SETTINGS-MASKING-1`, `LA-UI-EVIDENCE-1`, `LA-ALGO-UI-PARITY-1`, `LA-DEMO-GUARDS-1`) closed by 2026-10-13: the editing Settings pass, the sealed Compare, DR-D2…D8, the evidence and algorithm views and the index staleness review included; DR-T3 is the CI guard `tools/check-engine-names-no-la.mjs`. The plan's own status line (2026-10-11) was stale. The final go/no-go rehearsal (2026-10-14) was GO, 22 of 22 beats (runbook §7). The defence matrix and the DR-* ids stay in the archived plan (§2-§3) as provenance.
+
+### D2. Technical / security review demo (`la-whitepaper-demo-plan`) - written 2026-10-15, never rehearsed
+
+For a CISO, lead architect and forensic reviewer: every PROVEN row of the whitepaper's Claims Register shown live or by a named test, every NOT YET row said out loud. It reuses the runbook's scenes, personas and seed. Run of show (45 min at rehearsal pace; the 35-minute cut drops T10 and T12 and shortens T3; never cut T5, T6, T7, T9). Section numbers are the [whitepaper](../okf/product/module/la-core/brochure-inspecto-la-whitepaper.md)'s current ones.
+
+| # | Claim (whitepaper §) | Scene | Evidence if challenged |
+|---|---|---|---|
+| T1 | In-process, no external graph database (§4.1) | S1 | dependency fences |
+| T2 | Explainable Suspicion score, Propagated Risk (§3.2-§3.3) | S1 | `GraphSuspicionParityTest`, `ControlApiGraphRunTest` |
+| T3 | 29 algorithms, TypeScript and Java parity (§3.1) | S5 | `GraphAlgorithmsParityTest` |
+| T4 | Value Measures, the 97 % cash-out (§3.4) | S6 | `ControlApiLaShowcaseFiguresTest` |
+| T5 | Keyed masking, audited Reveal (§5.2, §5.4) | S3, S4 | `ControlApiExplorationMaskingTest`, `ControlApiInvestigationOversightTest` |
+| T6 | Gate order, strict 404 (§5.1) | S7 | `ControlApiGeoLinkModuleGateTest`, `ControlApiInvestigationMembersTest` |
+| T7 | Four-eyes, self-approval refused (§5.3) | S8 | `ControlApiInvestigationOversightTest` |
+| T8 | Op log, replay, drift on file append (§2.2) | S2 | `ControlApiReplayDriftOnFileAppendTest` |
+| T9 | SHA-256 Dossier, tamper-evident (§2.3) | S11 | `ControlApiDossierTest` |
+| T10 | Drafts, atomic promotion (§2.4) | S9 | Draft tests |
+| T11 | Ephemeral embed, revoke (§5.5) | S14 | `ControlApiInvestigationEmbedTest` |
+| T12 | Data trust strip (§4.6) | - | `okf/product/module/la-core/tests-data-trust-live-drive.md` |
+| T13 | Scale and limits (§6) | S15 | `InvTraversalBench`; `okf/product/module/la-storage/tests-index-scale-run.md` |
+
+Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA, native Hive / Kerberos (NOT YET); the demo build signs in Demo Users, so it is no SSO demonstration; a full-disk consistent rewrite (anchor the Dossier root externally). Prepare a tampered manifest (T9), a late file (T8), an admin token (T6, T11), two browser profiles (T7) and a recorded fallback for T8, T9, T11.
+
+**Open** (row `LA-WHITEPAPER-DEMO-1`)**:** (1) rehearse once with a second person as the sceptical reviewer, record it in the runbook, then move this run of show into the runbook and drop it here; (2) operator: a real IdP sign-in in the room or Demo Users (real WSO2 sign-in on la-app was verified 2026-10-13, `LA-APP-REAL-SIGNIN-1`; runbook [`admin-guide-real-signin.md`](../okf/product/module/la-core/admin-guide-real-signin.md)); (3) operator: keep T12 in the technical cut.
+
+### D3. Edition placement (`la-edition-placement-changes-plan`) - D-LAE3, D-LAE4, D-LAE6 open
+
+D-LAE1 (Case history), D-LAE2 (dashboard widgets, UI flag only), D-LAE5 (Geo map, own `geoMap` feature) and D-LAE12 (no migration shim) are built (2026-10-20; as-built in `EDITIONS.md`). D-LAE7…D-LAE11, the ingestion half, belong to `DATA-TIERS-1` ([`data-tier-editions-plan.md`](data-tier-editions-plan.md)): answer them there. Pre-build checks for the three left are in the archived plan §4.3. Row: `LA-EDITION-PLACEMENT-1`.
+
+| Id | Question | State |
+|---|---|---|
+| D-LAE3 | Masking on Basic | **Partly overtaken.** Since 2026-10-21 Basic defaults to `none`, a stated mode wins and masking is display-only there (`EditionMaskingDefault`; la-core architecture §8); `LA-ONBOARD-1` OB-6 rekeys that default on sign-in. Left for the operator: close it as answered, or also refuse a stated non-`none` mode on Basic and hide the setting (shape (1) of §4.3), for every masking reader or only the Link Analysis ones. |
+| D-LAE4 | Entity profile pages Standard and up | **Check passed (HOLD), ready to answer.** A route feature `entityPages` on `EntityProfileRoutes`, a `/bootstrap` flag, the nav entry and two back-links hidden; `ControlApiBasicEditionLinkAnalysisTest` must stop probing `GET /inv/entity-types`. About 1 to 1.5 days. |
+| D-LAE6 | Patterns and pattern packs on Basic | **Needs a narrower answer.** P-A works only as: split the burst / periodicity scan into its own `TemporalRoutes` module (feature `serverPatterns`, optionally server branching too) and hide the pack picker by a UI flag (cosmetic: authored packs come from the base `/components` route). Or P-C, keep everything. About 2 to 3 days. |
+
+### D4. Analyst CSV upload (`la-analyst-upload-plan`) - built, three items open
+
+Built 2026-10-18/19 (route, status, delete, retention, pane, review hardening; la-core architecture §6.6). Open: operator confirmation of D-UP1…D-UP8 (assistant-decided under delegation); a live browser drive over HTTP (`LA-I2-GAPS-RESIDUALS-1` item 2); a daily-quota ledger shared across nodes (one JVM lock today).
+
+### D5. Showcases (`la-multi-vertical-showcase-plan`, `la-ims-showcase-plan`) - browser rehearsal owed
+
+The three synthetic verticals were built 2026-10-16: A `la-mobile-money`, B `la-audit`, C `la-claims`. Each has its own generator, golden test, seed script, smoke runner, runbook and embed portal. B and C were rehearsed live the same day at the API (smoke 30/30 and 29/29) plus their headline browser scenes. A was smoked 10 of 10 with no browser walk-through. Still owed (plan step S7; row `LA-SHOWCASE-REHEARSAL-1`):
+
+- **A:** the Graph-page browser walk-through and the scenes its runbook marks UNVERIFIED (M-10 dormant wake, M-13 Dossier).
+- **B:** the client clicks for Jaccard, Link prediction, Maximum spanning forest and Is forest; the Draft, Members, Settings and Entity profile panels; tamper through the Dossier file upload; `gl_intercompany` Find cycles and Maximum flow on screen (runbook §6).
+- **C:** the nine *Run on server* clicks, the saved views `claims_network` and `claims_provider_money`, the Dossier panel, the Reveal dialog and the Investigation tab (runbook §6).
+- **All:** client-versus-server parity and run time per algorithm (plan step S6), and the 30-minute cross-vertical tour (ladder and masking A, four-eyes A, algorithms A-B-C, Dossier tamper B, embed C, Alert to Case A), which has not been written yet.
+- Open findings from the B and C passes: no audit or insurance Domain Profile (the generic one greets with "Investigate a number / MSISDN"); identity groups annotate the Working Set, but expand does not follow them.
+
+The real-feed (IMS) Space is private, outside the repo, and has no tracked open work. Its lessons are in runbook §8. Not done there: a spoken run with a second person, the tamper check by file upload on screen, and the burst, device and four-eyes beats re-checked at production-day scale.

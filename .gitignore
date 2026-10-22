@@ -189,3 +189,6 @@ docs/okf/product/**/*.docx
 
 # Product Map prices and customer records (PRODUCT-MAP-1, D-PM3): never committed
 product-map/private/
+
+# Real-data working notes (operator 2026-10-16): never committed; local copy lives as a *.local.md
+docs/superpower/la-ims-production-day-measurements.md

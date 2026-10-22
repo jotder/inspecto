@@ -3,7 +3,8 @@
 > **Level 2 solution page.** Content pack: Space Template `partner-settlement`
 > (`spaces/_templates/partner-settlement/template.toon`). **Slices S0 to S4 of `PACK-PARTNER-SETTLEMENT-1` are built: the
 > References, statement ingestion, the compare, and netting positions with a roll-forward.** Disputes as Cases, aging, accruals and the evidence pack are later
-> slices ([plan](../../../../superpower/partner-settlement-wholesale-plan.md), sections 16 and 17). Checked against the template on 2026-10-21.
+> slices ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S4 in the
+> [as-built record](plan-as-built.md)). Checked against the template on 2026-10-21.
 
 ## Business problem
 
@@ -28,7 +29,7 @@ Seven Pipelines with Schemas under `spaces/_templates/partner-settlement/config/
 | `fx_rate` | `rate_date, from_currency, to_currency, rate_type, rate, rate_source`, fed by the operator's finance; the platform fetches no rate |
 | `holiday` | `country, holiday_date, name`, matched to `partner.country` |
 | `settlement_statement` | one row per statement line: `statement_id, statement_version, line_no, partner_id, agreement_id, period_start, period_end, usage_date, direction, service, destination_class, units, amount, currency, fx_rate_applied` (optional), `line_kind, control_total_amount, control_total_lines, received_at` |
-| `rerated_usage` | the stand-in for the re-rating contract (plan section 5): one row per agreement, direction, service, destination class, day and rating run, with `units, amount_expected, currency, rate_id, rating_run_id, rated_at, record_count, reason`. **The re-rating pack's own `rerated_usage` is a different, per-call retail contract and cannot feed this one yet** (plan section 17.1) |
+| `rerated_usage` | the stand-in for the re-rating contract (R1 to R8, [open work](../../../../superpower/telco-packs-plan.md) section 4.1): one row per agreement, direction, service, destination class, day and rating run, with `units, amount_expected, currency, rate_id, rating_run_id, rated_at, record_count, reason`. **The re-rating pack's own `rerated_usage` is a different, per-call retail contract and cannot feed this one yet** (same plan, section 4.2) |
 | `settlement_payment` | finance's record, read and never written: `payment_id, agreement_id, partner_id, direction, payment_date, kind` (`payment`, `credit_note`, `debit_note`)`, amount, currency, recorded_at` |
 
 Every Dataset, feeds and Job outputs, ships a zero-row schema seed under `spaces/_templates/partner-settlement/data/`, so the
@@ -85,7 +86,7 @@ Nine chained `sql.template` Jobs (the first daily at 01:00, each next one on the
   country's holidays; the settlement calendar is separate from the Workflow and SLA business calendar. A cycle change between two
   versions inside one cycle is not supported.
 - **Vocabulary.** *Settlement Agreement*, *Settlement Statement*, *Settlement Cycle*, *Settlement Position* and *Dispute* are
-  proposed in the plan (section 13) and enter the glossary with slice S8; the UI and these docs use the plan's words.
+  proposed in the [open-work plan](../../../../superpower/telco-packs-plan.md) (section 2.4) and enter the glossary with slice S8; the UI and these docs use the plan's words.
 - **Netting and the roll-forward (S4).** Netting happens inside one settlement currency: agreements of one netting group in
   different settlement currencies give separate positions (cross-currency netting needs a position currency and a reverse-rate
   convention, an open decision). A statement belongs to the month its cycle ends in, a payment or note to the month of its date. The
@@ -114,10 +115,11 @@ an agreement invoiced in EUR into a USD agreement and finance payments, credit a
 position and roll-forward row equals an independent oracle; the identities (net = payable - receivable; opening + invoiced - paid +
 adjustments = closing; opening = previous closing; the last closing = the sum of the movements) are one SQL assertion each; a
 restated statement moves the closing by exactly the corrected line and the roll-forward still closes; with no FX rate the lines are
-counted and named. Eleven mutants each turn a named row red (see plan section 17.4); one, a flipped sign, leaves the SQL identity green, which
+counted and named. Eleven mutants each turn a named row red (see the [as-built record](plan-as-built.md)); one, a flipped sign, leaves the SQL identity green, which
 is why the oracle and hand-worked amounts exist.
 
 ## Related
 
-[user guide](user-guide.md) · [admin guide](admin-guide.md) · [features](features.md) · [plan](../../../../superpower/partner-settlement-wholesale-plan.md) ·
+[user guide](user-guide.md) · [admin guide](admin-guide.md) · [features](features.md) · [as-built record](plan-as-built.md) ·
+[open work](../../../../superpower/telco-packs-plan.md) ·
 the starter it extends: [Telecom revenue assurance](../telco-ra/architecture.md) · [Reconciliation](../../module/reconciliation/index.md).

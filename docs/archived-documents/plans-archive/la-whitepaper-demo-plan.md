@@ -1,10 +1,12 @@
+> **ARCHIVED 2026-10-22** — not yet rehearsed; the run of show and the open items moved to `docs/superpower/link-analysis-roadmap.md` §D2; the scenes it reuses are in the la-core hub (`admin-guide-demo.md`).
+
 # Link Analysis: technical / security review demo plan (whitepaper claim to live scene)
 
 **Status: PLAN 2026-10-15, not yet rehearsed.** Audience: CISO, lead architect, forensic and audit reviewers. Length: 35 to 40 minutes plus questions.
 Purpose: every PROVEN row of the whitepaper's Claims Register (section 7 of the Link Analysis whitepaper, `LINK_ANALYSIS_WHITEPAPER.md`, written 2026-10 and not yet committed)
 is shown live or by a named test, and every NOT YET / DOCUMENTED row is said out loud. It reuses the scenes, personas and seed of the
-[demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (S1 to S15); it does not replace it. Variants (Postgres store, Personal) are in the
-[variants runbook](../okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md); Q&A answers are in the [stakeholder Q&A](../okf/product/module/la-core/tests-stakeholder-qa.md).
+[demo runbook](../../okf/product/module/la-core/admin-guide-demo.md) (S1 to S15); it does not replace it. Variants (Postgres store, Personal) are in the
+[variants runbook](../../okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md); Q&A answers are in the [stakeholder Q&A](../../okf/product/module/la-core/tests-stakeholder-qa.md).
 
 When this ships: distil the as-built facts into `okf/product/module/la-core/user-guide-link-analysis.md`, then `git mv` this plan to `archived-documents/plans-archive/`.
 
@@ -64,5 +66,5 @@ Total 45 minutes at rehearsal pace. **Cut line for 35 minutes:** drop T10 and T1
 ## References
 
 * Whitepaper: the Link Analysis whitepaper (`LINK_ANALYSIS_WHITEPAPER.md`, under the stakeholders docs folder); plain text on purpose, because it was untracked when this plan was written. Make this a link once it is committed.
-* Runbook: [`la-demo-runbook.md`](../okf/product/module/la-core/admin-guide-demo.md), section 4 (claims we do NOT make) and section 7 (last rehearsal)
+* Runbook: [`la-demo-runbook.md`](../../okf/product/module/la-core/admin-guide-demo.md), section 4 (claims we do NOT make) and section 7 (last rehearsal)
 * Readiness plan: [`la-demo-readiness-plan.md`](la-demo-readiness-plan.md)

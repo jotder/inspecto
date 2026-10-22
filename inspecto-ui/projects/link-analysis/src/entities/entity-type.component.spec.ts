@@ -161,6 +161,22 @@ describe('EntityTypeComponent (Entity Type Profile)', () => {
         expect(el.querySelector('inspecto-la-entity-lookup form[aria-label="Open an Entity"]')).toBeTruthy();
     });
 
+    it('the Masked tile reads the EFFECTIVE state: under masking mode none a masked type says No and the hint explains why', () => {
+        const { el } = make({ ...PROFILE, masking: { mode: 'none', masked: false } });
+        const tile = el.querySelector('[data-testid=masked-tile]') as HTMLElement;
+        expect(tile.textContent).toContain('No');
+        expect(tile.textContent).not.toContain('Yes');
+        expect(tile.textContent).toContain('Off in this Space (mode none)');
+        expect(tile.textContent).toContain('type set to masked');
+    });
+
+    it('the Masked tile says Yes under mode typed for a masked type', () => {
+        const { el } = make(PROFILE);
+        const tile = el.querySelector('[data-testid=masked-tile]') as HTMLElement;
+        expect(tile.textContent).toContain('Yes');
+        expect(tile.textContent).toContain('Mode typed');
+    });
+
     it('marks approximate counts, and never shows a dominant value', () => {
         const { el } = make(PROFILE);
         const v = section(el, 'volume');
