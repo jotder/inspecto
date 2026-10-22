@@ -141,6 +141,36 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.investigationsEnabled()).toBe(true);
     });
 
+    it('reads laLevel and featureReasons (LA-ONBOARD-1 OB-5 / OB-10): a Standard install without the add-on', async () => {
+        const init = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            edition: 'standard',
+            laLevel: 'explorer',
+            featureReasons: { investigations: 'Needs the Investigations add-on, which this installation does not hold.', blank: ' ' },
+            features: { authMode: 'none', geoLink: true, investigations: false },
+        });
+        await init;
+        expect(svc.laLevel()).toBe('explorer');
+        expect(svc.featureReasons()).toEqual({
+            investigations: 'Needs the Investigations add-on, which this installation does not hold.',
+        });
+    });
+
+    it('an older server with neither field reads as the Explorer with no reasons; investigations level when stated', async () => {
+        const init = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'basic', features: { authMode: 'none' } });
+        await init;
+        expect(svc.laLevel()).toBe('explorer');
+        expect(svc.featureReasons()).toEqual({});
+
+        const reload = svc.reloadFeatures();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ edition: 'standard', laLevel: 'investigations', featureReasons: {}, features: { investigations: true } });
+        await reload;
+        expect(svc.laLevel()).toBe('investigations');
+    });
+
     it('reads features.events (EDG-01 cell 6 — the optional events feed module)', async () => {
         const init = svc.init();
         httpMock

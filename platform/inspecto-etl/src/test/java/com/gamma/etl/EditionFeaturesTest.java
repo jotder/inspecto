@@ -23,6 +23,7 @@ class EditionFeaturesTest {
     @AfterEach
     void restore() {
         EditionFeatures.overrideForTest(null);
+        System.clearProperty(EditionFeatures.LA_INVESTIGATIONS_SETTING);
     }
 
     private static PipelineConfig pipeline(Path dir, boolean lake, String onSuccess) throws Exception {
@@ -110,5 +111,37 @@ class EditionFeaturesTest {
         assertEquals(List.of(), EditionFeatures.pipelineRefusals(draft), "a declared feature lifts the refusal");
         EditionFeatures.overrideForTest(Set.of(EditionFeatures.SINK_ARCHIVE, EditionFeatures.SINK_DUCKLAKE));
         assertEquals(2, EditionFeatures.pipelineRefusals(draft).size(), "Standard features do not lift it");
+    }
+
+    /**
+     * {@code LA-ONBOARD-1} OB-5: Investigations needs the edition (a declaring module) AND the add-on, which the install holds
+     * unless {@code addons.laInvestigations} says otherwise; the add-on never lifts an edition that lacks the feature, and it
+     * withholds nothing else. The refusal and the short locked reason name the add-on on an install that lacks only it.
+     */
+    @Test
+    void investigationsNeedTheEditionAndTheRuntimeAddon() {
+        EditionFeatures.overrideForTest(Set.of(EditionFeatures.INVESTIGATIONS, EditionFeatures.GEO_MAP));   // Standard
+        assertTrue(EditionFeatures.holdsInvestigationsAddon(), "held by default");
+        assertTrue(EditionFeatures.present(EditionFeatures.INVESTIGATIONS));
+        assertEquals(Map.of(), EditionFeatures.lockedReasons(), "nothing withheld");
+
+        for (String off : List.of("false", "FALSE", " false ", "no")) {
+            System.setProperty(EditionFeatures.LA_INVESTIGATIONS_SETTING, off);
+            assertFalse(EditionFeatures.present(EditionFeatures.INVESTIGATIONS), "'" + off + "' removes the add-on");
+        }
+        assertTrue(EditionFeatures.present(EditionFeatures.GEO_MAP), "the add-on withholds Investigations only");
+        assertTrue(EditionFeatures.refusal(EditionFeatures.INVESTIGATIONS).contains("need the Investigations add-on ("
+                + EditionFeatures.LA_INVESTIGATIONS_ORDER_CODE + ")"), EditionFeatures.refusal(EditionFeatures.INVESTIGATIONS));
+        assertEquals(Map.of(EditionFeatures.INVESTIGATIONS, "Needs the Investigations add-on, which this installation does not hold."),
+                EditionFeatures.lockedReasons());
+
+        System.setProperty(EditionFeatures.LA_INVESTIGATIONS_SETTING, "true");
+        EditionFeatures.overrideForTest(Set.of());   // Basic
+        assertFalse(EditionFeatures.present(EditionFeatures.INVESTIGATIONS), "the add-on never lifts Basic");
+        assertTrue(EditionFeatures.refusal(EditionFeatures.INVESTIGATIONS).contains("available in Standard and above, with the "
+                + "Investigations add-on"), EditionFeatures.refusal(EditionFeatures.INVESTIGATIONS));
+        assertEquals(List.of(EditionFeatures.GEO_MAP, EditionFeatures.INVESTIGATIONS), List.copyOf(EditionFeatures.lockedReasons().keySet()));
+        assertEquals("Investigations are in Standard and above, with the Investigations add-on.",
+                EditionFeatures.lockedReason(EditionFeatures.INVESTIGATIONS));
     }
 }

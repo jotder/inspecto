@@ -1,4 +1,5 @@
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import { LA_FEATURES, LaFeatures } from '@inspecto/link-analysis/la-host';
+import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -110,7 +111,7 @@ function make(
         graph?: typeof CANVAS | null;
         answer?: (r: GraphRunRequest) => Observable<GraphRunView>;
         /** The host's module flags (default: Standard and above). */
-        features?: typeof STANDARD_EDITION_FEATURES;
+        features?: LaFeatures;
     } = {},
 ) {
     const run = vi.fn(opts.answer ?? (() => of(view('COMPLETED'))));
@@ -157,18 +158,62 @@ function make(
     return { fixture, c, run, emphases, el, button, last: () => emphases[emphases.length - 1] };
 }
 
-describe('LinkAnalysisToolboxComponent - Basic edition (LA-EDITIONS-1 ED-4: Graph Run is Standard and above)', () => {
+describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-ONBOARD-1 OB-10: Graph Run locked)', () => {
     afterEach(() => resetLaLimits());
 
-    it('offers no server-algorithm or edge-index tool and no Run on server control; the browser tools stay', () => {
-        const { fixture, c, el } = make({ features: { ...STANDARD_EDITION_FEATURES, investigations: signal(false) } });
+    const REASON = 'Needs the Investigations add-on, which this installation does not hold.';
+    const EXPLORER: LaFeatures = {
+        ...STANDARD_EDITION_FEATURES,
+        investigations: signal(false),
+        featureReasons: signal({ investigations: REASON }),
+    };
+    const locked = (el: HTMLElement) =>
+        [...el.querySelectorAll<HTMLElement>('inspecto-locked-action')].map((l) => ({
+            label: l.querySelector('[data-testid="locked-action"]')?.textContent?.trim(),
+            reason: l.querySelector('[data-testid="locked-reason"]')?.textContent?.trim(),
+            ariaDisabled: l.querySelector('button')?.getAttribute('aria-disabled'),
+        }));
+
+    it('keeps the server-algorithm and edge-index tools listed, each opening on a LOCKED action with the reason', async () => {
+        const { fixture, c, el, run } = make({ features: EXPLORER });
         fixture.detectChanges();
         const ids = c.tools.map((t) => t.id);
-        expect(ids).not.toContain('server-algorithms');
-        expect(ids).not.toContain('index-build');
-        expect(ids).toContain('path');
-        expect(ids).toContain('value-measures');
-        expect(el.querySelector('inspecto-link-analysis-server-run button')).toBeNull();
+        expect(ids).toEqual(expect.arrayContaining(['server-algorithms', 'index-build', 'path', 'value-measures']));
+
+        c.tab.set('server-algorithms');
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-link-analysis-server-algorithms')).toBeNull();
+        expect(locked(el)).toEqual([{ label: 'Run on server', reason: REASON, ariaDisabled: 'true' }]);
+        await expectNoA11yViolations(el);
+
+        c.tab.set('index-build');
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-link-analysis-index-build')).toBeNull();
+        expect(locked(el)).toEqual([{ label: 'Build index', reason: REASON, ariaDisabled: 'true' }]);
+        (el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement).click();
+        expect(run).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
+    });
+
+    it('above the cap the browser control becomes a LOCKED Run on server, still saying why the browser did not run it', async () => {
+        capAll(3);
+        const { fixture, c, el, run } = make({ features: EXPLORER });
+        c.tab.set('centrality');
+        c.centralityMetric.set('betweenness');
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="run-on-server"]')).toBeNull();
+        expect(el.textContent).toContain('This graph has 5 nodes - above the 3-node limit');
+        expect(locked(el)).toEqual([{ label: 'Run on server', reason: REASON, ariaDisabled: 'true' }]);
+        (el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement).click();
+        expect(run).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
+    });
+
+    it('a host that gives no reason still shows one line naming the add-on', () => {
+        const { fixture, c, el } = make({ features: { ...STANDARD_EDITION_FEATURES, investigations: signal(false) } });
+        c.tab.set('index-build');
+        fixture.detectChanges();
+        expect(locked(el)[0].reason).toBe('Investigations need the Investigations add-on (Standard and above).');
     });
 
     it('Standard keeps both server tools', () => {

@@ -50,6 +50,8 @@ test('2 a price or a copied technical fact is RED', () => {
 test('3 a value outside a closed vocabulary is RED', () => {
     assert.match(run({ 'addon/recon': swap('model: flat', 'model: usage') }), /billing.model 'usage' is not one of/);
     assert.match(run({ 'addon/recon': swap('enforcement: build', 'enforcement: licence') }), /enforcement 'licence'/);
+    // LA-ONBOARD-1 OB-5: `runtime` (the install setting a running server checks, e.g. addons.laInvestigations) is in the vocabulary.
+    assert.doesNotMatch(run({ 'addon/recon': swap('enforcement: build', 'enforcement: runtime') }), /enforcement 'runtime'/);
     assert.match(run({ 'module/ops': swap('status: ga', 'status: beta') }), /status 'beta'/);
     assert.match(run({ 'module/ops': swap('billable: false', 'billable: yes') }), /billable 'yes'/);
     assert.match(run({ 'addon/incidents': swap('tier: standard', 'tier: gold') }), /support.tier 'gold'/);

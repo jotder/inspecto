@@ -61,6 +61,10 @@ describe('la-app routes', () => {
         expect(await child('entity-lists').loadComponent!()).toBeTruthy();
     }, 60_000);
 
+    it('resolves the Add data page (LA-ONBOARD-1: Getting started links it)', async () => {
+        expect(await child('add-data').loadComponent!()).toBeTruthy();
+    }, 60_000);
+
     it('resolves the Settings page', async () => {
         expect(await settings.loadComponent!()).toBeTruthy();
     }, 60_000);

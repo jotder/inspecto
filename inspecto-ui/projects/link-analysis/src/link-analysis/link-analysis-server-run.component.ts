@@ -12,7 +12,8 @@ import {
     signal,
     untracked,
 } from '@angular/core';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import { LA_FEATURES, investigationsLockedReason } from '@inspecto/link-analysis/la-host';
+import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Subscription } from 'rxjs';
@@ -50,7 +51,7 @@ import { fmtScore } from './graph-run-summary';
     selector: 'inspecto-link-analysis-server-run',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, MatButtonModule, MatIconModule, InspectoAlertComponent, ChipComponent],
+    imports: [DecimalPipe, MatButtonModule, MatIconModule, InspectoAlertComponent, ChipComponent, LockedActionComponent],
     template: `
         @if (investigationsEnabled()) {
             @if (note()) {
@@ -223,6 +224,15 @@ import { fmtScore } from './graph-run-summary';
                     }
                 }
             }
+        } @else {
+            @if (note()) {
+                <p class="text-secondary mt-1 text-sm">{{ note() }}</p>
+            }
+            <inspecto-locked-action
+                class="mt-1"
+                [label]="indexOnly() ? 'Run on index' : 'Run on server'"
+                [reason]="lockedReason()"
+            />
         }
     `,
 })
@@ -231,8 +241,14 @@ export class LinkAnalysisServerRunComponent {
     private sub: Subscription | null = null;
 
     /** The server algorithm id (`GET /inv/graph/algorithms`). */
-    /** LA-EDITIONS-1 ED-4: Graph Run is part of the Investigation surface; on Basic this control renders nothing. */
-    readonly investigationsEnabled = inject(LA_FEATURES).investigations;
+    /**
+     * LA-EDITIONS-1 ED-4: Graph Run is part of the Investigation surface. On the Explorer level (Basic, or a sign-in install
+     * without the Investigations add-on) this control is the same button LOCKED with the server's reason (LA-ONBOARD-1 OB-10).
+     */
+    private readonly features = inject(LA_FEATURES);
+    readonly investigationsEnabled = this.features.investigations;
+    /** Why the run is locked on the Explorer level (`/bootstrap` `featureReasons.investigations`). */
+    readonly lockedReason = computed(() => investigationsLockedReason(this.features));
     readonly algorithm = input.required<string>();
     readonly params = input<Record<string, unknown>>({});
     /**

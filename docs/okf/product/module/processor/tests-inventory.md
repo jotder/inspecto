@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-355 test class(es): 131 unit, 224 real-HTTP control-plane, 0 IT.
+356 test class(es): 131 unit, 225 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -225,6 +225,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSinkDuckLakeSharedTableTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSinkDuckLakeSharedTableTest.java` | Two {@code sinks[]} destinations registering into ONE DuckLake table |
 | `ControlApiSpaceBootReadinessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceBootReadinessTest.java` | HA-RUNLEASE-DB-CREDENTIALS-1 (operator 2026-10-10): a node whose Spaces are CONFIGURED but none could boot must |
 | `ControlApiSpaceComparisonTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceComparisonTest.java` | Real-HTTP tests for {@code POST /space-comparisons} (space-comparison design, decided 2026-09-24) over a |
+| `ControlApiSpaceSamplesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceSamplesTest.java` | {@code LA-ONBOARD-1} OB-12 over real HTTP: {@code POST /spaces {template, loadSamples: true}} copies the template's |
 | `ControlApiSpacesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpacesTest.java` | The Stage-5 {@code SpaceRoutes} CRUD over real HTTP: create + boot a space without restart, list it, confirm the |
 | `ControlApiSpaceTemplateKpiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateKpiTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) over real HTTP, with an armed Authenticator: a Space Template's KPI pack |
 | `ControlApiSpaceTemplateSeedGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateSeedGateTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠ over real HTTP: EVERY registry kind a Space Template seeds meets its own |

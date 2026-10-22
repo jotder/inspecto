@@ -120,15 +120,18 @@ class ControlApiEntityListTest {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));
     }
 
-    /** These tests are about masking by default, which is Standard: this module's own classpath is Basic, where it is off. */
+    /**
+     * These tests are about masking by default, which is on where people sign in (LA-ONBOARD-1 OB-6): no test classpath sets
+     * auth.mode, so without this every test here runs as "no sign-in", where it is off.
+     */
     @org.junit.jupiter.api.BeforeEach
-    void standardEdition() {
-        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.INVESTIGATIONS));
+    void signIn() {
+        System.setProperty("auth.mode", "oidc");
     }
 
     @org.junit.jupiter.api.AfterEach
-    void restoreEdition() {
-        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    void signOut() {
+        System.clearProperty("auth.mode");
     }
 
     // ── 503 ────────────────────────────────────────────────────────────────────────────────────────────

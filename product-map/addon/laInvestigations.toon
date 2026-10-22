@@ -1,0 +1,13 @@
+id: addon.laInvestigations
+kind: addon
+title: Link Analysis Investigations
+offeringAddon: laInvestigations
+billable: true
+orderCode: INS-AO-LA-INVESTIGATIONS
+enforcement: runtime
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/okf/product/addon/laInvestigations/index.md

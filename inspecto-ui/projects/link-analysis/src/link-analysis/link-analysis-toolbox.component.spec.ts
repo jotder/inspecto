@@ -42,6 +42,9 @@ function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = [], inv
                     exchange: signal(false),
                     geoLink: signal(false),
                     investigations: signal(investigations),
+                    featureReasons: signal({
+                        investigations: 'Needs the Investigations add-on, which this installation does not hold.',
+                    }),
                 },
             },
         ],
@@ -675,16 +678,23 @@ describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', 
         await expectNoA11yViolations(el);
     });
 
-    it('on Basic (no Investigations) offers only what exists and names the level once - no dead Investigation suggestion', async () => {
-        const { fixture } = ranked(false);
+    it('on the Explorer level shows Start an Investigation LOCKED with the server reason - never a dead suggestion', async () => {
+        const { c, fixture } = ranked(false);
         const el = fixture.nativeElement as HTMLElement;
-        const hint = el.querySelector('[data-testid="result-next-hint"]')?.textContent ?? '';
+        const next = el.querySelector('inspecto-link-analysis-result-next') as HTMLElement;
+        const hint = next.querySelector('[data-testid="result-next-hint"]')?.textContent ?? '';
         expect(hint).toContain('click a row');
         expect(hint).not.toMatch(/start an Investigation/i);
-        expect(hint.match(/Standard and above/g)).toHaveLength(1);
-        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('Investigation'))).toBe(
-            false,
+        const action = next.querySelector('[data-testid="locked-action"]') as HTMLButtonElement;
+        expect(action.textContent).toContain('Start an Investigation from the top results');
+        expect(action.getAttribute('aria-disabled')).toBe('true');
+        expect(next.querySelector('[data-testid="locked-reason"]')?.textContent?.trim()).toBe(
+            'Needs the Investigations add-on, which this installation does not hold.',
         );
+        const seeds: unknown[] = [];
+        c.seedFromResults.subscribe((s) => seeds.push(s));
+        action.click();
+        expect(seeds).toHaveLength(0);
         await expectNoA11yViolations(el);
     });
 

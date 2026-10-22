@@ -31,6 +31,36 @@ Two modes, and the difference matters:
 2. The front page offers **Link Analysis**, **Geo**, **Entity Lists** and **Alerts** (and **Settings** if you may
    change them). The same areas sit in the slim menu down the left edge, with the Space switcher and your user menu.
 
+### Getting started (a new install)
+
+Until your Space holds data, the front page is **Getting started** instead of the area cards. It appears while
+there is no Space yet, or the current Space has no Dataset yet (a table Inspecto keeps). Three ways in:
+
+* **Try it with sample data** — **Try the sample** creates a Space called *Sample: invented data*, loads three
+  days of invented money transfers with a planted money-mule ring, and opens Link Analysis with the ring drawn
+  (the `la-sample` Space Template; nothing in it is real). If part of the data does not load, the card names what
+  failed and still offers **Open the sample Space**.
+* **Use my own data** — **Create a Space** asks two things: a **Name** (one Space per kind of data, such as
+  *Mobile money* or *Call records*) and **What kind of data?**: *Mobile Money*, *Telecom* or *Generic*, each shown
+  with three example column names. The choice sets the words Link Analysis uses for your data (the Space's Domain
+  Profile). Then you land on **Add data**. When a Space already exists, the button is **Add data** itself.
+  *(The Add data screen is still being built: for now it says so.)*
+* **Open my team's data** — shown when Spaces exist: the Space switcher, to move to the Space your team uses.
+
+A choice you cannot take is greyed out with one line saying why: with sign-in, only an administrator may create a
+Space; a server running a single Space cannot add a sample one.
+
+The **Space switcher** in the left menu works the same way from the first minute: with no Space yet it reads
+**No Space yet** and offers **New Space…** and **New from sample…** to anyone who may create a Space (everyone
+when nobody signs in; with sign-in, Space administrators).
+
+**The Space guide.** Under the choices, and later above the area cards, the **Space guide** lists the setup steps
+and ticks each one from what the server holds: **Space** (one is open), **Data** (a Dataset exists), **What the
+columns hold** (a Dataset says which columns hold accounts, numbers or other things), **First graph** (a graph is
+saved in the Space) and, optional, **A list** (an Entity List exists). Click a line to go to that step; collapse
+the guide with the arrow (the choice is remembered in this browser). It disappears once the four required steps
+are ticked.
+
 **What you can do depends on your role.** If a button is greyed out, hover it: it says which capability is missing.
 
 | You want to | You need |

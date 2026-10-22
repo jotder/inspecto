@@ -1,0 +1,7 @@
+id: solution-pack.la-sample
+kind: solution-pack
+title: Link Analysis sample (invented data)
+template: la-sample
+billable: false
+status: ga
+docs: docs/okf/product/solution-pack/la-sample/index.md
