@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
@@ -11,6 +11,7 @@ import {
     EntityTypeList,
     EntityTypeSummary,
 } from '@inspecto/link-analysis/api/entity-profile.service';
+import { LinkAnalysisSettingsService } from '@inspecto/link-analysis/link-analysis/link-analysis-settings.service';
 import { EntitiesComponent } from './entities.component';
 
 @Component({
@@ -60,18 +61,21 @@ const IMEI: EntityTypeSummary = {
     },
 };
 
-function make(read: Observable<EntityTypeList>) {
+/** `mode` = the Space's masking mode in force (`maskingModeInForce`); undefined = not read (yet). */
+function make(read: Observable<EntityTypeList>, mode: string | undefined = 'typed') {
+    const limits = signal<{ maskingModeInForce?: string }>({ maskingModeInForce: mode });
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
             { provide: EntityProfileService, useValue: { entityTypes: () => read } },
+            { provide: LinkAnalysisSettingsService, useValue: { limits } },
         ],
     });
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement };
+    return { fixture, el: fixture.nativeElement as HTMLElement, limits };
 }
 
 describe('EntitiesComponent', () => {
@@ -88,6 +92,23 @@ describe('EntitiesComponent', () => {
         expect(m.querySelector('[data-testid=as-of]')!.textContent).toContain('9 Oct 2026');
         expect(m.querySelector('[data-testid=freshness]')!.textContent).toMatch(/fresh|stale/i);
         expect(m.querySelector('[data-testid=masked]')).toBeTruthy();
+    });
+
+    it('says "Masked: shown as aliases." only where it is true: never under masking mode none, nothing until the mode is known', () => {
+        const { el, fixture, limits } = make(of({ items: [MSISDN, IMEI] }), 'none');
+        for (const [mode, shown] of [
+            ['none', false],
+            [undefined, false],
+            ['all', true],
+        ] as const) {
+            limits.set({ maskingModeInForce: mode });
+            fixture.detectChanges();
+            const masked = Array.from(el.querySelectorAll('[data-testid=entity-type-card]')).map(
+                (c) => !!c.querySelector('[data-testid=masked]'),
+            );
+            // MSISDN is set to masked, IMEI is not; mode all masks both
+            expect(masked, String(mode)).toEqual(shown ? [true, true] : [false, false]);
+        }
     });
 
     it('renders an unassessed headline as "not assessed" with its reason, never as zero', () => {

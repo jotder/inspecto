@@ -207,7 +207,8 @@ condition*).
   Information density, Fruchterman,* and tree layouts (*Mind map, Organization chart, …*) that are enabled only when
   the data is tree-shaped.
 * **Overlays** — *Legend*, *Working set* (top-N counts), *Node labels*, *Link labels*, *Level of detail*, *Minimap*,
-  *Grid*.
+  *Grid*. On a canvas narrower than 1000 px (a laptop) the legend and Working set start as small pills you can
+  expand; once you open or minimise one, this browser remembers your choice.
 * **Lenses and selection** — a link-kind lens, hover / brush / lasso selection, fisheye, community hulls and
   edge bundling.
 * **Display options** — labels, colour, shape, pattern and size per kind. Saved with the view.
@@ -349,7 +350,8 @@ suspicion score 1 000, and says so). Above an algorithm's cap the tool offers **
 select that node and centre the canvas on it. Under the table, **Start an Investigation from the top results**
 carries the top five nodes to the **Investigation** tab as *queued seed entities*; nothing is created. You fill in the
 title and purpose and press **Start Investigation with 5 queued seeds** — only then is the Investigation created
-and the queued entities seeded as its first step. You can remove one from the queue or clear it first.
+and the queued entities seeded as its first step. You can remove one from the queue or clear it first. On Basic
+there is no such action: the hint under the table says that recorded Investigations are in Standard and above.
 
 ---
 

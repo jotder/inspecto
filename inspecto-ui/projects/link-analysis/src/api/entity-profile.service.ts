@@ -160,7 +160,8 @@ export interface EntityTypeProfile {
     lineage?: ProfileLineage[];
     links?: ProfileLinks;
     relationships?: ProfileRelationship[];
-    masking?: { mode: string };
+    /** The Space's masking mode in force and whether THIS type is masked under it (the effective answer). */
+    masking?: { mode: string; masked?: boolean };
 }
 
 export type EntityTypeProfileSection =

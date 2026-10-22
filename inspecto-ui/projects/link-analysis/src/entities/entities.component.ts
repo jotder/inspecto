@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -7,7 +7,8 @@ import { InspectoPageHeaderComponent } from '@inspecto/core/components/page-head
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { EntityProfileService, EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
-import { count, day, entitiesBase, freshness, notAssessedText } from './entity-profile-view';
+import { LinkAnalysisSettingsService } from '@inspecto/link-analysis/link-analysis/link-analysis-settings.service';
+import { count, day, entitiesBase, freshness, maskedUnder, notAssessedText } from './entity-profile-view';
 
 /**
  * **Entities**: one card per Entity Type in force (`GET /inv/entity-types`, the cached headline - no profile query on
@@ -81,7 +82,7 @@ import { count, day, entitiesBase, freshness, notAssessedText } from './entity-p
                                         {{ notAssessed(t.headline) }}
                                     </p>
                                 }
-                                @if (t.masked) {
+                                @if (maskedHere(t)) {
                                     <p class="text-secondary m-0 text-xs" data-testid="masked">
                                         Masked: shown as aliases.
                                     </p>
@@ -104,8 +105,11 @@ import { count, day, entitiesBase, freshness, notAssessedText } from './entity-p
 })
 export class EntitiesComponent implements OnInit {
     private readonly svc = inject(EntityProfileService);
+    private readonly settings = inject(LinkAnalysisSettingsService);
     protected readonly base = entitiesBase(inject(ActivatedRoute), 0);
 
+    /** The Space's masking mode in force (`none` on Basic by default); unknown until the settings are read. */
+    private readonly maskingMode = computed(() => this.settings.limits().maskingModeInForce);
     readonly items = signal<EntityTypeSummary[] | null>(null);
     readonly error = signal('');
 
@@ -122,6 +126,15 @@ export class EntitiesComponent implements OnInit {
 
     fresh(t: EntityTypeSummary) {
         return freshness(t.headline.dataAsOf, t.headline.assessed);
+    }
+
+    /**
+     * "Masked: shown as aliases." only where it is true: the type's own setting under the Space's mode in force
+     * (LA-ONBOARD-FIXES-1, F-6 - under mode `none` nothing is masked). Said nothing until the mode is known.
+     */
+    maskedHere(t: EntityTypeSummary): boolean {
+        const mode = this.maskingMode();
+        return !!mode && maskedUnder(mode, t.masked);
     }
 
     /** Distinct Datasets the type is bound in. */

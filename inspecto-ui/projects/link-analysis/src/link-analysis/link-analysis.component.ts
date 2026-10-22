@@ -161,8 +161,12 @@ import {
     legendEdgeKindsFor,
     legendItemsFor,
     toggleHiddenKind,
+    CanvasOverlay,
     LinkAnalysisLegendComponent,
     LinkAnalysisWorkingSetComponent,
+    overlayStartsOpen,
+    rememberOverlayOpen,
+    storedOverlayOpen,
 } from './link-analysis-overlays.component';
 import { ICON_COLOR_SWATCHES } from '@inspecto/core/theme/chart-tokens';
 import {
@@ -521,9 +525,16 @@ export class LinkAnalysisComponent implements OnInit {
     readonly investigation = inject(InvestigationSessionStore);
     private readonly cdr = inject(ChangeDetectorRef);
     private readonly graphRuns = inject(GraphRunsService);
-    /** Canvas overlays — each minimises to a pill so the graph gets the space. */
-    readonly legendOpen = signal(true);
-    readonly workingSetOpen = signal(true);
+    /**
+     * Canvas overlays — each minimises to a pill so the graph gets the space. The user's own choice in this browser
+     * wins; otherwise the first measurement of the canvas decides ({@link fitOverlaysToWidth}).
+     */
+    readonly legendOpen = signal(storedOverlayOpen('legend') ?? true);
+    readonly workingSetOpen = signal(storedOverlayOpen('workingSet') ?? true);
+    /** The canvas zone's last measured width; 0 = not measured yet (no layout, or jsdom), which counts as wide. */
+    private canvasWidth = 0;
+    /** What the loaded saved view states about the overlays (`undefined` = it does not say). */
+    private overlaysStated: { legend?: boolean; workingSet?: boolean } = {};
     /**
      * Keep the canvas usable on a narrow page that has not stacked yet (the stack breakpoint is the VIEWPORT's
      * 960px, so a ~800px page beside an open nav stayed side-by-side and squeezed the canvas to ~15px): when the
@@ -532,10 +543,46 @@ export class LinkAnalysisComponent implements OnInit {
     private readonly watchCanvasWidth = afterNextRender(() => {
         const zone = this.canvasZone?.nativeElement;
         if (!zone || typeof ResizeObserver === 'undefined') return;
-        const ro = new ResizeObserver((entries) => this.fitDocksToWidth(entries[0]?.contentRect.width ?? 0));
+        const ro = new ResizeObserver((entries) => {
+            const width = entries[0]?.contentRect.width ?? 0;
+            this.fitOverlaysToWidth(width);
+            this.fitDocksToWidth(width);
+        });
         ro.observe(zone);
         this.destroyRef.onDestroy(() => ro.disconnect());
     });
+
+    /**
+     * LA-ONBOARD-FIXES-1 (F-11): on a narrow canvas (a laptop's ~800 px) the open legend and Working set covered most
+     * of the graph, so below {@link OVERLAY_COLLAPSE_BELOW_PX} they START as their pills. Decided on the FIRST
+     * measurement (a later resize never collapses what is open) and again when a saved view is loaded.
+     */
+    fitOverlaysToWidth(zoneWidth: number): void {
+        if (zoneWidth <= 0) return;
+        const first = this.canvasWidth === 0;
+        this.canvasWidth = zoneWidth;
+        if (first) this.applyOverlayStart();
+    }
+
+    /**
+     * The overlays' starting state: a saved view that states `false` keeps that one collapsed; otherwise the choice this
+     * browser remembers, else the width rule. A view's `true` (whoever saved it, on whatever screen) never forces a box
+     * open over a narrow canvas.
+     */
+    private applyOverlayStart(): void {
+        const start = (which: CanvasOverlay): boolean =>
+            this.overlaysStated[which] === false
+                ? false
+                : overlayStartsOpen(storedOverlayOpen(which), this.canvasWidth || Number.POSITIVE_INFINITY);
+        this.legendOpen.set(start('legend'));
+        this.workingSetOpen.set(start('workingSet'));
+    }
+
+    /** The user opened or minimised an overlay (its pill / minimise button, or View ▸ Overlays): remembered per browser. */
+    setOverlayOpen(which: CanvasOverlay, open: boolean): void {
+        (which === 'legend' ? this.legendOpen : this.workingSetOpen).set(open);
+        rememberOverlayOpen(which, open);
+    }
 
     /** Collapse one dock when the canvas zone is narrower than {@link CANVAS_MIN_PX} (side-by-side layout only). */
     fitDocksToWidth(zoneWidth: number): void {
@@ -3080,8 +3127,8 @@ export class LinkAnalysisComponent implements OnInit {
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         if (view.view?.plugins) this.viewOptions.set(view.view.plugins);
-        this.legendOpen.set(view.view?.legend ?? true);
-        this.workingSetOpen.set(view.view?.workingSet ?? true);
+        this.overlaysStated = { legend: view.view?.legend, workingSet: view.view?.workingSet };
+        this.applyOverlayStart();
         this.queryPanel?.patchFormFromView(view);
         this.investigation.restore(view.investigations ?? []);
         await this.execute(view.sourceId, view.query);

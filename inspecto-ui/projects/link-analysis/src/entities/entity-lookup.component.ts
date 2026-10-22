@@ -51,11 +51,24 @@ export class EntityLookupComponent {
     readonly busy = signal(false);
 
     /**
-     * Enter in the editor opens the Entity. The pen field takes Enter to commit (and so the form never submits); the
-     * event still bubbles here after the commit. Enter on the closed row only starts editing.
+     * Enter opens the Entity. In the editor: the pen field takes Enter to commit (and so the form never submits); the
+     * event still bubbles here after the commit. On the CLOSED row that already holds a value (typed, then committed by
+     * Tab or a click elsewhere) Enter opens it too - it used to re-open the editor, which read as Enter doing nothing
+     * (LA-ONBOARD-FIXES-1, F-12); `preventDefault` stops the button's own Enter-click. An empty row still starts
+     * editing, and the pencil always edits.
      */
     onEnter(e: Event): void {
-        if ((e.target as HTMLElement).tagName === 'INPUT') this.open();
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT') {
+            this.open();
+        } else if (
+            target.tagName === 'BUTTON' &&
+            !target.classList.contains('pen-pencil') &&
+            this.form.controls.value.value.trim()
+        ) {
+            e.preventDefault();
+            this.open();
+        }
     }
 
     open(): void {
