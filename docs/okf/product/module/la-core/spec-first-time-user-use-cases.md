@@ -18,13 +18,16 @@ root and driven as a first-time user with a synthetic mobile-money file pair (`t
 `accounts.csv` 312 rows, a hidden mule ring and one busy merchant). Today's state in each use case comes from
 that walkthrough, marked **F-n** and listed in §7.
 
-**Companion.** The console first-run use cases of `PIPELINE-EDITIONS-1` ("First-time user use cases: from a blank
-slate to a queryable Dataset", drafted 2026-10-22 in `docs/superpower/` and not yet on origin/master) cover the
-console path from a file to a Dataset. This doc covers what Inspecto LA adds on top of it. §9 maps the two and
-records what was reconciled. Both use the same copy rules: **guide**, never "wizard"; **Onboard** is the one verb
-for creating a data origin (GLOSSARY).
+**Companion.** The [console first-run use cases](../../../../superpower/pipeline-editions-first-run-use-cases.md)
+(nine use cases UC-1…UC-9, help catalogue H1…H9) cover the console path from a file to a Dataset. This doc covers
+what Inspecto LA adds on top of it. §9 maps the two and records what was reconciled. Edition rules for the data
+layer are owned by `DATA-TIERS-1` (the draft `PIPELINE-EDITIONS-1` was merged into it and never published; its
+D-PE decisions map to DT numbers there). Both use the same copy rules: **guide**, never "wizard"; **Onboard** is
+the one verb for creating a data origin (GLOSSARY).
 
-Related: [DATA-TIERS-1 plan](../../../../superpower/data-tier-editions-plan.md) · [user manual](user-guide-manual.md) ·
+Related: [DATA-TIERS-1 plan](../../../../superpower/data-tier-editions-plan.md) ·
+[LA-ONBOARD-1 plan](../../../../superpower/la-onboarding-plan.md) ·
+[ONBOARDING-FIRST-RUN-1 console plan](../../../../superpower/first-run-onboarding-plan.md) · [user manual](user-guide-manual.md) ·
 [end-user guide](user-guide-end-user.md) · [GLOSSARY](../../../../GLOSSARY.md).
 
 ---
@@ -49,7 +52,7 @@ Inspecto LA runs in two very different places. Three questions are kept apart (o
 | Question | Decided by | Free install (no sign-in) | Enterprise install (sign-in, e.g. a Revenue Assurance product) |
 |---|---|---|---|
 | **Who is the user?** | Edition: Basic ships no authenticator (`authMode: none`); Standard and above sign in (OIDC) | One person who owns everything. There is no administrator; every permission check passes. | Many people with roles; administrators exist. |
-| **How much Link Analysis?** | **LA level, a licensed setting** (A-14): *Explorer* or *Investigations* | Explorer (Basic) | Explorer or Investigations, per licence, on Standard and above |
+| **How much Link Analysis?** | **LA level** (A-14): *Explorer*, or *Investigations* as a billable add-on enforced at runtime | Explorer (Basic) | Explorer, plus Investigations when the install holds the add-on (included by default on Standard and above) |
 | **Where does data come from?** | Context, and a per-Space switch (A-15) | The user's own files ("Add data") | Datasets built by Pipelines; "Add data" only where an administrator turned it on |
 
 **Rules that follow who the user is, never the LA level:**
@@ -64,8 +67,9 @@ Inspecto LA runs in two very different places. Three questions are kept apart (o
 
 **The LA level only decides which screens exist** (Explorer: graph, Grow, algorithms, lists, saved views as cases;
 Investigations: recorded steps, approvals, Dossiers, integrations), the same in both contexts. An enterprise
-install with an Explorer licence is the "basic LA inside an enterprise product" case: full governance, explorer
-screens, Investigation actions shown locked with the licence as the reason.
+install without the Investigations add-on is the "basic LA inside an enterprise product" case: full governance,
+explorer screens, Investigation actions shown locked with the add-on as the reason. The edition stays the one
+product-wide switch for governance (DATA-TIERS-1 DT-11).
 
 ## 2. What the beginner wants (goals)
 
@@ -170,7 +174,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   Dataset definition with column classification, saved view) (F-3, F-4).
 - **Target flow ("Add data", one screen, file first):** this is the console's file-first onboarding (console UC-2,
   UC-9) embedded in Inspecto LA, with one step added for Link Analysis.
-  1. **Drop the file**: CSV / TSV, Parquet, JSON or NDJSON. Excel: "save as CSV" until a reader exists. Limits
+  1. **Drop the file**: CSV / TSV, Parquet, JSON or NDJSON. Excel when the bundle carries the DuckDB `excel` extension, otherwise "save as CSV" (DATA-TIERS-1 DT-8). Limits
      shown before upload: 500 MB per file, 10 million rows per import, 20 imports per Space, all configurable
      (§8 A-2). A database is not offered on Basic; *Read from a database* is shown locked (§8 A-12).
   2. **Check the columns** (H2): detected format, delimiter, header and types are pre-applied with their evidence;
@@ -200,7 +204,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   entity?" (e.g. `account_id` → Account) and treats the other columns as **entity details**. Link Analysis shows
   them on nodes and filters and colours by them. Re-importing replaces the previous version and says how many rows
   changed (a Reference is mutable, GLOSSARY). Joins that build new Datasets inside a Pipeline stay Standard+
-  (enrichment, D-PE5) and are shown locked.
+  (DATA-TIERS-1 DT-6) and are shown locked.
 - **Help:** "312 accounts described; 295 of them appear in your transfers; 17 do not" (H9).
 
 ### UC-05 Use a Dataset that a Pipeline already builds
@@ -219,7 +223,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **Target flow:**
   1. After a first successful import, **Keep this up to date** (watch a folder or a schedule) turns it into an
      ordinary Pipeline; the Dataset card says "updates daily from inbox X". On Basic the item is shown locked:
-     Basic is manual-only (D-PE1), so **Add a file** and **Run now** sit together on the Dataset card (UC-14).
+     Basic is manual-only (DATA-TIERS-1 DT-5, DT-17), so **Add a file** and **Run now** sit together on the Dataset card (UC-14).
   2. A person without the right to configure sees **Ask an administrator to keep this up to date** instead.
   3. Anything beyond that (joins, SQL steps, remote Collectors) is **Open in editor** in the console, pre-filled.
      Inspecto LA never edits Pipelines itself (§8 A-6).
@@ -314,7 +318,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **Target flow:** **Save as a case** names the view (it appears under **My work** with its lists) and states that
   a view re-reads live data and is not evidence; **Export** offers picture, table of nodes and links, and a one-page
   summary. With the Investigations LA level **Start an Investigation from this** records the steps from here; with
-  the Explorer level (Basic, or an enterprise Explorer licence, A-14) that action is shown locked with one line on
+  the Explorer level (Basic, or an enterprise install without the Investigations add-on, A-14) that action is shown locked with one line on
   what an Investigation adds.
 
 ### UC-14 Come back later
@@ -324,7 +328,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   UI on Basic.
 - **Target flow:** home shows **My work** (cases: views with their lists, most recent first) and **What changed in
   your data** ("transfers: re-imported 1 Oct, +2,104 rows"). On Basic the Dataset card has **Add a file** and **Run
-  now** side by side (D-PE1, manual-only); a re-import of a one-time Dataset replaces it and says so.
+  now** side by side (DT-5, manual-only; the run also builds the Dataset's link index and evaluates its Expectations, DT-16); a re-import of a one-time Dataset replaces it and says so.
 
 ### UC-15 Get help when stuck
 
@@ -352,7 +356,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 | A file that describes entities (customers, devices) | UC-04 **Add details** | Basic | a Reference Dataset shown on nodes (re-import replaces) |
 | Data a colleague already loads | UC-05 pick a Dataset | any | (existing) |
 | Files that keep arriving | UC-06 **Keep this up to date** | Standard+ | a Pipeline-built Dataset |
-| A database or a remote system (SFTP, S3, Kafka) | UC-06 **Open in editor** | Standard+ (D-PE6) | a Pipeline-built Dataset |
+| A database or a remote system (SFTP, S3, Kafka) | UC-06 **Open in editor** | Standard+ (DT-4) | a Pipeline-built Dataset |
 | Several files or systems to join, check or clean | UC-06 **Open in editor** | Standard+ | Pipelines with enrichment |
 
 ## 6. Concepts a beginner meets, and when
@@ -395,7 +399,7 @@ Dataset, and which columns are from, to and which Entity Type). The target is ze
 |---|---|---|
 | A-1 | One Space per case, or per data domain? | **Per data domain, on every edition.** Cases live inside a Space. |
 | A-1b | What holds one case on Basic (no Investigations)? | **A named saved view plus the Entity Lists it uses**, grouped under *My work*. |
-| A-2 | Formats and limits for "Add data" on Basic? | **CSV / TSV, Parquet, JSON / NDJSON**; Excel = "save as CSV" until a reader exists; DT-8 limits (500 MB, 10 M rows, 20 imports per Space), configurable. |
+| A-2 | Formats and limits for "Add data" on Basic? | **CSV / TSV, Parquet, JSON / NDJSON**; Excel when the bundle carries the DuckDB `excel` extension (superseded by DATA-TIERS-1 DT-8, which owns edition rules); DT-8 limits (500 MB, 10 M rows, 20 imports per Space), configurable. |
 | A-5 | May Basic show Reference details on nodes and filter by them? | **Yes: display and filter.** Joins that build new Datasets stay Standard+. |
 | A-6 | Does Inspecto LA show Pipelines? | **Hidden on Basic; hand-off on Standard+.** Basic's "Add data" creates and runs the Pipeline behind the scenes (the Basic user is their own administrator and the Basic bundle has no console). Standard+: *Open in editor* in the console, or *Ask an administrator* without the right. |
 | A-7 | Where is the primary entity set? | **Per Dataset**: proposed in "Add data", changeable on the Dataset's card. |
@@ -404,16 +408,16 @@ Dataset, and which columns are from, to and which Entity Type). The target is ze
 | A-9 | Smart help on Basic? | **Deterministic only.** Assistant is Standard+ where configured, locked on Basic. |
 | A-10 | Measure beginners? | **Always on, local**: counted on the installation on every edition, never sent anywhere. |
 | A-11 | Locked or hidden for what an edition lacks? | **Locked with a reason inside screens; the navigation stays lean** (whole Standard+ pages such as Alerts stay out of the Basic nav). |
-| A-12 | Postgres snapshot on Basic (DT-4) vs remote adapters Standard+ (D-PE6)? | **Files only on Basic** (D-PE6 wins); a database is shown locked. |
-| A-13 | Import checks only on Basic (DATA-TIERS-1) vs Expectations, quarantine, dedupe on Basic (D-PE5)? | **Keep them on Basic** (D-PE5 wins). |
+| A-12 | Postgres snapshot on Basic (DT-4) vs remote adapters Standard+ (now DT-4)? | **Files only on Basic** (the remote-adapter rule wins; DATA-TIERS-1 DT-4); a database is shown locked. |
+| A-13 | Import checks only on Basic (DATA-TIERS-1) vs Expectations, quarantine, dedupe on Basic (now DT-15)? | **Keep them on Basic** (DATA-TIERS-1 DT-15). |
 
-| A-14 | Can an enterprise (sign-in) install run Link Analysis without Investigations? | **Yes: the LA level (Explorer / Investigations) becomes its own licensed setting** on Standard and above; governance still comes from the edition. Basic stays Explorer with no sign-in. Today the `investigations` feature follows the edition, so this is a change. |
+| A-14 | Can an enterprise (sign-in) install run Link Analysis without Investigations? | **Yes: Investigations becomes a billable add-on enforced at runtime, included by default on Standard and above**; the edition stays the only governance switch (reconciled with DATA-TIERS-1 DT-11, operator-confirmed 2026-10-22). Basic stays Explorer with no sign-in. Today the `investigations` feature follows the edition, so this is a change. |
 | A-15 | May analysts import their own files in a sign-in Space? | **An administrator decides per Space**, off by default; when on, only people with `canUploadData`. Always on with no sign-in. |
 | A-16 | What decides the masking default? | **Whether people sign in**, not the edition name: no sign-in → off, sign-in → typed (follows from §1.1). Today `EditionMaskingDefault` keys on the Basic edition, which gives the same result only because Basic is the edition without sign-in. |
 
 A-12 and A-13 reverse parts of DATA-TIERS-1; that plan records the change (its DT-4 and the data-quality row).
 
-## 9. Reconciliation with the console first-run use cases (`PIPELINE-EDITIONS-1`)
+## 9. Reconciliation with the console first-run use cases and `ONBOARDING-FIRST-RUN-1`
 
 **Division of work.** The console use cases own the path from a file to a queryable Dataset (parse, schema, run,
 failures) and the shared help catalogue. This doc owns what Link Analysis adds: the Entity Type and link step, the
@@ -424,11 +428,11 @@ primary entity, the focus, lists, the graph, and the Basic `la-app`-only install
 | UC-01 First launch | UC-1 Sample data; H1 Space guide; H7; H8 | Same guide and sample button; LA adds the `la-showcase` sample and *Open my team's data*. First-run detection on "no Dataset yet" in both. |
 | UC-02 Create a Space | §2 step 2 | LA adds the pack choice; per-domain Spaces (A-1). |
 | UC-03 Add data | UC-2 file first (core); UC-9 start from my app; H2, H3, H8 | **Same path**: LA embeds console UC-2 and adds step 3 (Entity Types and links, H9). File first, pre-applied detection with low confidence flagged, one confirm: as answered for the console. |
-| UC-03 JSON | UC-3 JSON or nested | Same; flattening is Basic, exploding arrays follows D-PE5. |
+| UC-03 JSON | UC-3 JSON or nested | Same; flattening is Basic, exploding arrays follows DT-7. |
 | UC-04 Reference | UC-4 lookup table | Console left "does Basic onboard References" open; **A-5 answers it: yes**, and LA shows details on nodes; in-Pipeline enrichment stays Standard+ (locked). |
-| UC-14 Come back | UC-5 next file arrives | Same: **Add a file** and **Run now** together on Basic (D-PE1). |
+| UC-14 Come back | UC-5 next file arrives | Same: **Add a file** and **Run now** together on Basic (DT-5, DT-14). |
 | UC-06 Keep data arriving | UC-5 Standard path; UC-6 remote system | Same; LA never edits Pipelines (A-6), it hands off. |
-| UC-03 step 5 | UC-7 failed run / quarantined rows | Same cause-and-fix messages (H3); D-PE5 keeps Expectations on Basic (A-13). |
+| UC-03 step 5 | UC-7 failed run / quarantined rows | Same cause-and-fix messages (H3); DT-15 keeps Expectations on Basic (A-13). |
 | UC-05, UC-03 step 6 | UC-8 feed a downstream app | Console's *Explore as a network in Link Analysis* offer lands on UC-09 with the Dataset picked. |
 | UC-15 rules | H4 locked with reason; H6 assistant | Same rule, with A-11's lean-nav exception for whole pages; deterministic help on Basic. |
 | UC-07 to UC-13 | - | LA only. |
@@ -436,9 +440,11 @@ primary entity, the focus, lists, the graph, and the Basic `la-app`-only install
 **Terms aligned.** "guide" (never "wizard"); "Space guide" (H1) replaces this doc's earlier "setup checklist";
 "Onboard" stays the console verb, "Add data" is its short form inside Inspecto LA.
 
-**Still to settle between the two plans.** D-PE5 must say whether exploding nested arrays is Basic (console UC-3).
-DATA-TIERS-1 and `PIPELINE-EDITIONS-1` overlap on Basic's data layer; once the console plan is on master, the
-companion onboarding plan should cite one of them as the authority for edition placement.
+**Settled with the console session (2026-10-22).** `DATA-TIERS-1` owns the edition rules of the data layer;
+`ONBOARDING-FIRST-RUN-1` is the console companion of `LA-ONBOARD-1`, which builds the shared pieces (the
+`/onboard/files` route, sample loading, `inspecto-locked-action`, onboarding counters, the walkthrough fixes) and
+the one Add data component both apps use (OF-1, with the OF-2 confidence rule). Exploding nested arrays follows
+DT-7.
 
 ## References
 
