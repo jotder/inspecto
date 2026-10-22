@@ -75,14 +75,35 @@ class SqlGuardFileFunctionContractTest {
     }
 
     /**
-     * Scalar/aggregate functions whose parameter is NAMED like a path. Today's only ones are the string
-     * splitters {@code parse_path}/{@code parse_dirname}/{@code parse_dirpath}/{@code parse_filename}, which
-     * never touch the file system; any other one a DuckDB upgrade adds must be refused.
+     * Non-table functions whose parameter is NAMED like a path, reviewed one by one (DuckDB 2.0,
+     * {@code DUCKDB-2-MIGRATION-1}). Each takes a STRING and never opens a file, URL or glob:
+     * <ul>
+     *   <li>string splitters / joiners: {@code parse_path}/{@code parse_dirname}/{@code parse_dirpath}/
+     *       {@code parse_filename}, {@code path_join} (string concatenation, no file-system lookup);</li>
+     *   <li>JSON-path extractors (2.0 names the parameter {@code path}; 1.5 left it unnamed): the
+     *       {@code ->>} operator and {@code json_extract*}/{@code json_value}/{@code json_exists}/
+     *       {@code json_type}/{@code json_keys}/{@code json_array_length}/{@code json_set}/
+     *       {@code json_insert}/{@code json_replace}/{@code json_remove} — the argument is a JSON Pointer
+     *       or {@code $.a.b} expression evaluated against the in-memory JSON value;</li>
+     *   <li>VARIANT-path extractors {@code variant_*} — the same, over a VARIANT value;</li>
+     *   <li>{@code index_key} — navigates a STRUCT by field name.</li>
+     * </ul>
+     * Anything else a DuckDB upgrade gives a path-like parameter must be refused by {@link SqlGuard} or
+     * reviewed and added HERE — never assumed safe. {@code import_database} (2.0 lists it as a pragma with
+     * a {@code path}) is deliberately NOT here: it reads a database directory, so SqlGuard refuses it.
      */
+    static final Set<String> REVIEWED_PATH_PARAMETER_FUNCTIONS_NOT_TOUCHING_FILES = Set.of(
+            "parse_path", "parse_dirname", "parse_dirpath", "parse_filename", "path_join",
+            "->>", "json_array_length", "json_exists", "json_extract", "json_extract_path",
+            "json_extract_path_text", "json_extract_string", "json_insert", "json_keys", "json_remove",
+            "json_replace", "json_set", "json_type", "json_value",
+            "variant_array_length", "variant_exists", "variant_extract_string", "variant_keys",
+            "variant_type", "index_key");
+
     @Test
-    void everyScalarWithAPathParameterIsRefusedUnlessItIsAStringSplitter() throws Exception {
-        Set<String> stringOnly = Set.of("parse_path", "parse_dirname", "parse_dirpath", "parse_filename");
-        Set<String> pathScalars = new TreeSet<>();
+    void everyFunctionWithAPathParameterIsRefusedUnlessReviewedAsNotTouchingFiles() throws Exception {
+        Set<String> reviewed = REVIEWED_PATH_PARAMETER_FUNCTIONS_NOT_TOUCHING_FILES;
+        Set<String> pathScalars = new TreeSet<>(), allNonTable = new TreeSet<>();
         try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
             loadInstalledExtensions(st);
             try (ResultSet rs = st.executeQuery("SELECT DISTINCT function_name FROM duckdb_functions() "
@@ -90,12 +111,44 @@ class SqlGuardFileFunctionContractTest {
                     + "lambda p: lower(p) SIMILAR TO '.*(path|file|url|uri|location|directory).*')) > 0")) {
                 while (rs.next()) pathScalars.add(rs.getString(1).toLowerCase(Locale.ROOT));
             }
+            try (ResultSet rs = st.executeQuery("SELECT DISTINCT function_name FROM duckdb_functions() "
+                    + "WHERE function_type NOT IN ('table', 'table_macro')")) {
+                while (rs.next()) allNonTable.add(rs.getString(1).toLowerCase(Locale.ROOT));
+            }
         }
         assertTrue(pathScalars.contains("parse_path"), "precondition: the parameter-name query found the known ones");
         List<String> unrefused = new ArrayList<>();
         for (String fn : pathScalars)
-            if (!stringOnly.contains(fn) && !refusesNaming(fn, "SELECT " + fn + "('x')")) unrefused.add(fn);
-        assertEquals(List.of(), unrefused, "path-taking scalar functions SqlGuard lets through");
+            if (!reviewed.contains(fn) && !refusesNaming(fn, "SELECT " + fn + "('x')")) unrefused.add(fn);
+        assertEquals(List.of(), unrefused, "path-taking functions SqlGuard lets through - refuse them in "
+                + "SqlGuard.BLOCKED_FUNCTION, or review them and add them to the reviewed set above");
+
+        List<String> stale = new ArrayList<>();
+        for (String fn : reviewed) if (!allNonTable.contains(fn)) stale.add(fn);
+        assertEquals(List.of(), stale, "stale reviewed entries (no longer a function in this DuckDB)");
+    }
+
+    /** The reviewed JSON / VARIANT path functions stay usable — a KPI may read a JSON column. */
+    @Test
+    void reviewedJsonAndVariantPathFunctionsStillPass() {
+        assertTrue(SqlGuard.isReadOnly("SELECT payload->>'$.a', json_extract_string(payload, '$.b.c') FROM input"));
+        assertTrue(SqlGuard.isReadOnly("SELECT json_keys(payload, '$.a'), json_type(payload, '$.a') FROM input"));
+        assertTrue(SqlGuard.isReadOnly("SELECT variant_extract_string(v, 'a'), variant_type(v, 'a') FROM input"));
+        assertTrue(SqlGuard.isReadOnly("SELECT path_join('a', 'b'), parse_path('/a/b')"));
+    }
+
+    /** DuckDB 2.0 additions that touch resources, files or catalog state — refused by NAME, not by luck. */
+    @Test
+    void duckDb2ResourceAndStateFunctionsAreRefusedByName() {
+        for (String fn : List.of("create_external_resource", "register_external_resource",
+                "register_external_resource_type", "deregister_external_resource", "destroy_external_resource"))
+            assertTrue(refusesNaming(fn, "SELECT * FROM " + fn + "('x')"), fn + " must be refused");
+        assertTrue(refusesNaming("setval", "SELECT setval('s', 1)"), "setval mutates a sequence");
+        assertTrue(refusesNaming("nextval", "SELECT nextval('s')"), "nextval advances a sequence");
+        assertTrue(refusesNaming("sleep_ms", "SELECT sleep_ms(600000)"), "sleep_ms stalls a connection");
+        assertTrue(refusesNaming("pg_sleep", "SELECT pg_sleep(600)"), "pg_sleep stalls a connection");
+        assertTrue(refusesNaming("import_database", "SELECT import_database('C:/x')"), "import_database reads a directory");
+        assertTrue(refusesNaming("export_database", "SELECT export_database('C:/x')"), "export_database writes a directory");
     }
 
     /**

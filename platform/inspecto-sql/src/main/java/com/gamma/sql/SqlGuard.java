@@ -65,7 +65,10 @@ public final class SqlGuard {
      * {@code truncate_duckdb_logs}), SQL-executing ones ({@code query}, {@code query_table},
      * {@code json_execute_serialized_sql}, {@code summary}/{@code histogram}, which run {@code query_table}
      * over a caller-named relation), and the autoloadable extensions' surfaces (ducklake, postgres, sqlite,
-     * mysql, odbc, iceberg, delta, azure, aws, excel, spatial, vortex, lance, motherduck, ui, tpch/tpcds).
+     * mysql, odbc, iceberg, delta, azure, aws, excel, spatial, vortex, lance, motherduck, ui, tpch/tpcds),
+     * and (DuckDB 2.0, {@code DUCKDB-2-MIGRATION-1}) by name: the external-resource table functions,
+     * {@code setval} / {@code nextval} (mutate a sequence), {@code sleep_ms} / {@code pg_sleep} (stall a connection) and {@code import_database} / {@code export_database} (read or
+     * write a database directory named by a path).
      * {@code SqlGuardFileFunctionContractTest} derives the table-function list from {@code duckdb_functions()}
      * and fails the build when a DuckDB upgrade adds one that this pattern does not refuse.
      */
@@ -75,6 +78,7 @@ public final class SqlGuard {
                     + "|parquet_\\w+|\\w*duckdb_\\w+|pragma_\\w+|which_secret|test_\\w+_types"
                     + "|\\w*checkpoint|\\w+_logging|\\w+_profiling"
                     + "|\\w+_attach|\\w+_query|\\w+_execute|\\w+_clear_cache|clear_\\w+_cache|pg_clear_cache"
+                    + "|\\w+_external_resource\\w*|setval|nextval|sleep_ms|pg_sleep|import_database|export_database"
                     + "|load_aws_credentials|(ducklake|postgres|sqlite|mysql|odbc|iceberg|delta|azure|aws|vortex"
                     + "|lance|md|motherduck|ui)_\\w+|st_read\\w*|start_ui|stop_ui_server|dbgen|dsdgen");
 
