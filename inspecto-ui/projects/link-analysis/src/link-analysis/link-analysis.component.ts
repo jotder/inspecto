@@ -1473,6 +1473,27 @@ export class LinkAnalysisComponent implements OnInit {
                     replaceUrl: true,
                 });
             });
+        // LA-ONBOARD-1 phase 4: `?dataset=<id>` alone (Add data's "Explore in Link Analysis") picks that Dataset in the
+        // Query panel, as the "Explore a Dataset" card does, once the Datasets are listed. With `seed` it belongs to the
+        // investigate request above. Consumed once, like `view`.
+        this.route.queryParamMap
+            .pipe(
+                map((p) => (p.get('seed') ? null : p.get('dataset'))),
+                distinctUntilChanged(),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe(async (datasetId) => {
+                if (!datasetId) return;
+                void this.router.navigate([], {
+                    relativeTo: this.route,
+                    queryParams: { dataset: null },
+                    queryParamsHandling: 'merge',
+                    replaceUrl: true,
+                });
+                const datasets = await this.datasetsLoaded;
+                if (datasets.some((d) => d.id === datasetId)) this.exploreDataset(datasetId);
+                else this.toastr.info('That Dataset is not in this Space.', 'Not found');
+            });
     }
 
     /** The Datasets of this Space, once listed (empty when the list failed). */
@@ -1593,13 +1614,16 @@ export class LinkAnalysisComponent implements OnInit {
         if (v) void this.loadView(v);
     }
 
-    /** Starter card "Explore a Dataset": show the Query panel and open its guided Dataset picker. */
-    exploreDataset(): void {
+    /**
+     * Starter card "Explore a Dataset": show the Query panel and open its guided Dataset picker. With `datasetId` (Add
+     * data's `?dataset=<id>`) that Dataset is picked instead, and its graph is drawn when its link columns are suggested.
+     */
+    exploreDataset(datasetId?: string): void {
         this.queryDockOpen.set(true);
         this.queryOpen.set(true);
         this.sourceId.set('entity-projection');
         this.cdr.detectChanges(); // the panel mounts with the dock - the picker must exist before it is opened
-        this.queryPanel?.startExplore();
+        this.queryPanel?.startExplore(datasetId);
     }
 
     /** Starter card "Open a saved view": the same menu as the rail's saved-views button. */

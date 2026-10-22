@@ -43,8 +43,7 @@ there is no Space yet, or the current Space has no Dataset yet (a table Inspecto
 * **Use my own data** — **Create a Space** asks two things: a **Name** (one Space per kind of data, such as
   *Mobile money* or *Call records*) and **What kind of data?**: *Mobile Money*, *Telecom* or *Generic*, each shown
   with three example column names. The choice sets the words Link Analysis uses for your data (the Space's Domain
-  Profile). Then you land on **Add data**. When a Space already exists, the button is **Add data** itself.
-  *(The Add data screen is still being built: for now it says so.)*
+  Profile). Then you land on **Add data** (below). When a Space already exists, the button is **Add data** itself.
 * **Open my team's data** — shown when Spaces exist: the Space switcher, to move to the Space your team uses.
 
 A choice you cannot take is greyed out with one line saying why: with sign-in, only an administrator may create a
@@ -60,6 +59,48 @@ columns hold** (a Dataset says which columns hold accounts, numbers or other thi
 saved in the Space) and, optional, **A list** (an Entity List exists). Click a line to go to that step; collapse
 the guide with the arrow (the choice is remembered in this browser). It disappears once the four required steps
 are ticked.
+
+### Add data: onboard a file
+
+**Add data** opens the screen **Onboard a file**. It turns one of your files into a Dataset that Link Analysis can
+draw, on one screen, in four steps:
+
+1. **Drop or choose a file.** First say what is in it: *Events between entities* (transfers, calls, messages) or
+   *Details about entities* (customers, accounts, devices). Then drop the file on the box or press **Choose a
+   file**. The screen lists what it reads (CSV or TSV, Parquet, JSON or NDJSON; Excel workbooks when this
+   installation includes Excel support, otherwise save the sheet as CSV) and this Space's limits (for example *up to
+   500 MB and 10,000,000 rows per file; 20 imports per Space*) before anything is sent. *Read from a database or a
+   remote system* is shown locked on Basic, with the reason.
+2. **Check the columns.** What was detected is already applied, with the reason beside it ("every one of 1000
+   sampled lines splits into 6 fields on ','"). A choice that was only a guess is highlighted and marked **A
+   guess**: press **Confirm**, or change it. You can rename a column, change its type or **Leave out** a column; a
+   table shows the first rows as they will be kept. Choosing another separator, header line or quote reads the
+   file again.
+3. **What does each column hold?** For each column, the kind of thing it holds (an *Entity Type*, such as Account or
+   Phone number) or *Nothing: a detail*. For events: which column a link goes **From** and **To**, and optionally its
+   kind, time and amount. For details about entities: **Which column identifies each entity?**. And the main kind of
+   thing in the file. Without a From and a To the screen warns that Link Analysis cannot draw the Dataset as a graph.
+4. **Create and run.** The Dataset name is filled in from the file name (lower-case letters, digits and `_`).
+   One sentence says what will happen; **Create and run** waits until every guess is confirmed or changed. A very
+   large file runs on the server, and the screen follows it until it ends.
+
+The result says what happened in plain words: how many rows were read and kept, rows set aside and why, whether the
+link index was built, and each check (Expectation) on the data. Then:
+
+* **Explore in Link Analysis** opens Link Analysis with the new Dataset picked and its graph drawn.
+* **Add details about these entities** starts again for a file that describes them (such as `accounts.csv`).
+* **Add another file** starts again.
+
+**The Dataset card** (on the result, and on the Add data page for every Dataset already imported into the Space)
+says *one-time import* and shows the last import. **Add a file** brings in the next file (for events, choose
+whether it *replaces the data* or *adds its rows*; details about entities are always replaced) and **Run now**
+runs the import again. **Keep this up to date** is locked on Basic: there, an import runs only when you add a file
+or press Run now. On a secured installation it says *Ask an administrator to keep this up to date*.
+
+If adding data is not allowed in this Space, the screen says why instead (for example *Add data is turned off in
+this Space: its data comes from Pipelines - ask an administrator to turn it on*). With no sign-in it is allowed
+unless someone turned it off for the Space; with sign-in an administrator turns it on per Space, and you need the
+right to upload data.
 
 **What you can do depends on your role.** If a button is greyed out, hover it: it says which capability is missing.
 

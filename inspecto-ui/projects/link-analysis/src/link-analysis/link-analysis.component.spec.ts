@@ -664,6 +664,27 @@ describe('LinkAnalysisComponent', () => {
         );
     });
 
+    // LA-ONBOARD-1 phase 4: Add data's "Explore in Link Analysis" lands on /link-analysis?dataset=<id>.
+    it('?dataset= alone picks that Dataset as "Explore a Dataset" does, and clears the param', async () => {
+        const { fixture } = create({ queryParams: { dataset: 'links-ds' } });
+        const explore = vi.spyOn(fixture.componentInstance, 'exploreDataset').mockImplementation(() => undefined);
+        const navigate = await consume(fixture);
+        expect(explore).toHaveBeenCalledWith('links-ds');
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { dataset: null }, queryParamsHandling: 'merge', replaceUrl: true }),
+        );
+    });
+
+    it('?dataset= naming no Dataset of this Space says so and picks nothing', async () => {
+        const { fixture } = create({ queryParams: { dataset: 'gone' } });
+        const explore = vi.spyOn(fixture.componentInstance, 'exploreDataset').mockImplementation(() => undefined);
+        const info = vi.spyOn(TestBed.inject(ToastrService), 'info');
+        await consume(fixture);
+        expect(explore).not.toHaveBeenCalled();
+        expect(info).toHaveBeenCalledWith('That Dataset is not in this Space.', 'Not found');
+    });
+
     it('?view= naming no saved view of this Space says so and draws nothing', async () => {
         const { fixture } = create({ views: [], queryParams: { view: 'gone' } });
         const load = vi.spyOn(fixture.componentInstance, 'loadView').mockResolvedValue(undefined);

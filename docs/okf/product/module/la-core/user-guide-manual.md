@@ -90,6 +90,49 @@ left edge (with the Space switcher and your user menu). A user who may change Li
   second approver for four-eyes), *Demo RA Analyst* and *Demo Manager* (both view-only, §11).
 * **When sign-in cannot start**, the page says so instead of showing a picker — see §13.
 
+### Add data — Onboard a file
+
+**Add data** (`/add-data` in Inspecto LA) is the one screen both applications use to turn a file into a Dataset
+(`LA-ONBOARD-1` phase 4; the shared component `inspecto-add-data`). It calls the Add data routes
+(`POST /onboard/files`, then `POST /onboard/files/{draftId}/commit`; [`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md)
+"Add data"). On one screen:
+
+1. **Drop or choose a file**, after saying whether it holds *Events between entities* (a Stream) or *Details about
+   entities* (a Reference). The formats and the Space's `import.*` limits are shown before upload; Excel is read only
+   when the bundle carries the DuckDB `excel` extension (known from the first draft, or from a refusal that says to
+   save as CSV). *Read from a database or a remote system* is shown locked on Basic (`/bootstrap` `remoteSystems`;
+   until the server names it, locked on the Basic edition with a built-in reason).
+2. **Check the columns.** Every choice of the draft is pre-applied with its evidence. A `low` choice (fewer than 50
+   sampled values, or values that disagree) is highlighted, marked *A guess*, listed above **Create and run**, and
+   holds it back until confirmed or changed. Rename, change a type, **Leave out** a column; a table previews the first
+   rows as kept. A different separator, header line or quote re-reads the file with that choice stated (the commit
+   cannot change the format).
+3. **What does each column hold?** An Entity Type per column (`/inv/entity-types`), the link's **From** and **To**
+   and optional kind, time and amount (Stream), the identifying column (Reference), and the main kind of thing (the
+   Dataset's primary Entity Type). In the console the step is optional and starts closed: there, a high-confidence
+   proposal is applied as detected and a low one is not applied unless the step is opened.
+4. **Create and run** commits once. A file above `import.inline_max_bytes` answers 202 and the screen follows
+   `GET /onboard/runs/{runId}` until it ends.
+
+**The result in plain words** reads the run summary: rows read and kept, rows set aside (rejected, or a file set
+aside with its reason), a replace with the row counts before and after, the link index (built with its links and
+entities, up to date, skipped, or not built with the reason) and each Expectation. **Explore in Link Analysis**
+opens `/link-analysis?dataset=<id>`: Link Analysis picks that Dataset in the Query panel, as **Explore a Dataset**
+does, and draws it when its from and to columns can be suggested. **Add details about these entities** restarts
+for a Reference; **Add another file** restarts.
+
+**The Dataset card** of an imported Dataset (`origin: import`) shows *one-time import*, the last import, and **Add a
+file** beside **Run now** (`POST /datasets/{id}/files?mode=replace|append`, `POST /datasets/{id}/run`; a Reference
+is always replaced). **Keep this up to date** is locked on Basic (`/bootstrap` `pipelineAutomation`); on Standard and
+above the console's card offers **Open in editor** (`/pipelines?guided=1&open=<pipeline>`) to someone who may author,
+and Inspecto LA says *Ask an administrator to keep this up to date*. The Add data page lists a card per import of the
+Space under the screen.
+
+**When it is locked.** With sign-in the screen needs `canUploadData`, and the Space's `data.self_import` must be on
+(`GET /settings/data`; off by default with sign-in, on by default with none). When either is missing, or the server
+refuses an upload with 403, the whole screen is the reason (`inspecto-locked-action`) instead of an upload that
+fails. A 503 (the Space has no data directory) is explained in place.
+
 ---
 
 ## 3. The screen
