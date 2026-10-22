@@ -1082,7 +1082,10 @@ final class PipelineConfigParser {
             if ((frontend.equals("json") || frontend.equals("text_regex"))
                     && !csv.containsKey("has_header"))
                 csv.put("has_header", "false");
-            b.delimiter       = opt(csv, "delimiter", ",");
+            // NOT opt(): its isBlank() turned a TAB delimiter into ',' - every TSV quarantined as field_mismatch
+            // (found by LA-ONBOARD-1's TSV import). Empty or absent is still the default.
+            Object delimiter  = csv.get("delimiter");
+            b.delimiter       = delimiter != null && !delimiter.toString().isEmpty() ? delimiter.toString() : ",";
             // 5.2 additive dialect chars — validated fail-closed: a key the engine cannot honor
             // must never load looking honored (docs/parsing-options-reference.md §5).
             b.quote           = singleChar(csv.get("quote"),   "quote");
@@ -2210,10 +2213,25 @@ final class PipelineConfigParser {
             if (!(o instanceof Map<?, ?> f)) continue;
             String sel = String.valueOf(f.get("selector")).trim();
             if (!sel.matches("\\d+"))
-                throw new IllegalArgumentException("Config error in " + pipeline + ": " + label
+                throw new PipelineConfig.SelectorNotIndexException(label, "Config error in " + pipeline + ": " + label
                         + " column '" + f.get("name") + "' has selector '" + sel
                         + "' - a selector must be a zero-based column index (0, 1, 2, ...), not a name");
         }
+    }
+
+    /**
+     * Whether {@code frontend}'s schema selectors are zero-based column INDEXES — the rule
+     * {@link #validateIndexSelectors} enforces at load: delimited (the default, so {@code null}/blank) and
+     * fixed-width are; json / text_regex / xlsx / parquet (paths, group names, headers) and the
+     * plugin / asn1 segment path are not.
+     *
+     * @throws IllegalArgumentException for a value that is not a recognised {@code parsing.frontend}
+     */
+    static boolean selectsByColumnIndex(String frontend) {
+        String f = frontend == null || frontend.isBlank() ? "delimited" : frontend.trim().toLowerCase();
+        if (!FRONTENDS.contains(f))
+            throw new IllegalArgumentException("unknown frontend '" + frontend + "' (expected one of " + FRONTENDS + ")");
+        return f.equals("delimited") || f.equals("fixedwidth") || f.equals("fixed_width");
     }
 
     /**

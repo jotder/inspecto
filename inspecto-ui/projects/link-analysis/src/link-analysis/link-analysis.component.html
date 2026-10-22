@@ -177,18 +177,16 @@
                 >
                     <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                 </button>
-                <!-- LA-10: the Investigation op log (opens the right dock's Investigation tab); absent on Basic -->
-                @if (investigationsEnabled()) {
-                    <button
-                        mat-icon-button
-                        (click)="openInvestigation()"
-                        [color]="investigation.active() ? 'primary' : undefined"
-                        matTooltip="Investigation — an ordered, replayable op log"
-                        aria-label="Open the Investigation"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                    </button>
-                }
+                <!-- LA-10: the Investigation op log (opens the right dock's Investigation tab; locked there on the Explorer level) -->
+                <button
+                    mat-icon-button
+                    (click)="openInvestigation()"
+                    [color]="investigation.active() ? 'primary' : undefined"
+                    matTooltip="Investigation — an ordered, replayable op log"
+                    aria-label="Open the Investigation"
+                >
+                    <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
+                </button>
 
                 @if (search() || kindFilter().length || timeColumn()) {
                     <button
@@ -300,7 +298,7 @@
                         </button>
                     }
                 } @else {
-                    <button mat-menu-item disabled>Nothing saved yet.</button>
+                    <button mat-menu-item disabled>Nothing saved yet: draw a graph, then Save as a case.</button>
                 }
                 @if (openWorkLabel(); as open) {
                     <button
@@ -370,14 +368,15 @@
                 [outputs]="transferMenuOutputs"
             />
 
-            <!-- save view — needs a rendered graph -->
+            <!-- save as a case (A-1b: a named view plus the Entity Lists it uses) — needs a rendered graph -->
             <button
                 mat-icon-button
                 #saveTrigger="matMenuTrigger"
                 [matMenuTriggerFor]="saveMenu" laFormMenu
                 [disabled]="!graph()"
-                matTooltip="Save view"
-                aria-label="Save the current view"
+                matTooltip="Save as a case"
+                aria-label="Save as a case"
+                data-testid="la-save-case"
             >
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
             </button>
@@ -388,8 +387,11 @@
                     (ngSubmit)="saveView()"
                     class="flex w-72 max-w-full flex-col p-3"
                     (click)="$event.stopPropagation()"
-                    aria-label="Save this view"
+                    aria-label="Save as a case"
                 >
+                    <p class="m-0 mb-2 text-sm font-semibold">
+                        Save as a <inspecto-term term="case"></inspecto-term>
+                    </p>
                     <mat-form-field>
                         <mat-label>Name</mat-label>
                         <input matInput formControlName="name" />
@@ -397,17 +399,28 @@
                             <mat-error>A name is required.</mat-error>
                         }
                         @if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>A view with this name already exists.</mat-error>
+                            <mat-error>A case with this name already exists.</mat-error>
                         }
                     </mat-form-field>
                     <mat-form-field>
                         <mat-label>Description (optional)</mat-label>
                         <input matInput formControlName="description" />
                     </mat-form-field>
+                    <p class="text-secondary m-0 mb-1 text-xs" data-testid="la-case-lists">{{ caseListsLine() }}</p>
+                    <p class="text-secondary m-0 mb-2 text-xs leading-snug" data-testid="la-case-not-evidence">
+                        <span class="text-warn font-semibold">Not evidence</span> — {{ savedViewNotice }}
+                    </p>
                     <button mat-stroked-button type="submit" [disabled]="saving() || !graph()">
                         <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-                        Save view
+                        Save as a case
                     </button>
+                    @if (!investigationsEnabled()) {
+                        <inspecto-locked-action
+                            class="mt-2"
+                            label="Start an Investigation from this"
+                            [reason]="investigationsLockedReason()"
+                        />
+                    }
                 </form>
             </mat-menu>
 
@@ -748,6 +761,16 @@
                 The projection hit the node cap — narrow the dataset or filter to see everything.
             </inspecto-alert>
         }
+        @if (startNotice(); as n) {
+            @if (graph()) {
+                <div class="flex items-start gap-1" data-testid="start-outcome">
+                    <inspecto-alert class="flex-auto" [variant]="n.variant">{{ n.text }}</inspecto-alert>
+                    <button mat-icon-button type="button" aria-label="Dismiss" (click)="startNotice.set(null)">
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
+            }
+        }
         @if (expandSourceNote(); as note) {
             <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-source">
                 Last neighbour expand: {{ note }}
@@ -1081,7 +1104,7 @@
                             (onlyUnexpandedChange)="onlyUnexpanded.set($event)"
                             (nextUnexpanded)="selectNextUnexpanded()"
                             [open]="legendOpen()"
-                            (openChange)="legendOpen.set($event)"
+                            (openChange)="setOverlayOpen('legend', $event)"
                         ></inspecto-link-analysis-legend>
                         <!-- render strip: what the render left out and the level-of-detail state; the counts, the caps and the modules live in the footer status bar -->
                         <div
@@ -1112,7 +1135,7 @@
                             [splitIdentityHint]="splitIdentityHint()"
                             [mode]="strandedCount() ? strandedCount() + ' stranded' : 'top-N by count'"
                             [open]="workingSetOpen()"
-                            (openChange)="workingSetOpen.set($event)"
+                            (openChange)="setOverlayOpen('workingSet', $event)"
                         ></inspecto-link-analysis-working-set>
                         <!-- The text alternative of the canvas: the SAME canvasData(), as a keyboard-navigable list. -->
                         @if (listMode()) {
@@ -1133,21 +1156,30 @@
                             <inspecto-empty-state
                                 class="block w-full max-w-3xl p-4"
                                 icon="heroicons_outline:circle-stack"
-                                title="Choose a Dataset to investigate this number"
+                                title="Choose a Dataset to start from"
                                 [message]="issue"
                                 actionLabel="Choose a Dataset"
                                 (action)="exploreDataset()"
                                 data-testid="investigate-issue"
                             ></inspecto-empty-state>
                         }
-                        <inspecto-link-analysis-starter-cards
+                        <inspecto-link-analysis-start-box
+                            [catalogue]="startCatalogue()"
+                            [lists]="entityLists()"
+                            [dataset]="startDataset()"
+                            [investigations]="investigationsEnabled()"
+                            [nodeCap]="nodeCap()"
+                            [notice]="startNotice()"
+                            [busy]="starting()"
                             [followView]="followView()"
                             [savedViewCount]="views().length"
+                            [addData]="addDataOffered"
+                            (start)="startFrom($event)"
                             (followMoney)="loadFollowTheMoney()"
                             (exploreDataset)="exploreDataset()"
                             (openSavedViews)="openSavedViews()"
-                            (investigateNumber)="investigateNumber($event)"
-                        ></inspecto-link-analysis-starter-cards>
+                            (openAddData)="openAddData()"
+                        ></inspecto-link-analysis-start-box>
                     </div>
                 }
             </div>
@@ -1214,6 +1246,20 @@
                         </button>
                     </div>
                     <div #toolboxScroll data-testid="toolbox-scroll" class="min-h-0 flex-auto overflow-y-auto p-3">
+                        <!-- LA-ONBOARD-1 phase 7 (UC-12): three plain questions first; the full toolbox below. -->
+                        <inspecto-link-analysis-discover
+                            class="mb-3"
+                            [class.hidden]="toolboxTab() !== 'analysis'"
+                            [graph]="canvasData()"
+                            [terms]="growTerms()"
+                            [timeAttr]="timeColumn()"
+                            [nodeOptions]="nodeOptions()"
+                            [startWhyNot]="discoverStartWhyNot()"
+                            [listWhyNot]="discoverListWhyNot()"
+                            (show)="showFound($event)"
+                            (startFrom)="startFromFound($event)"
+                            (addToList)="addFoundToList($event)"
+                        ></inspecto-link-analysis-discover>
                         <!-- Analysis (the graph-algorithms toolbox). Kept mounted via `[hidden]` so its results
                              survive tab switches; emits emphasis for the canvas. -->
                         <inspecto-link-analysis-toolbox
@@ -1269,20 +1315,40 @@
                             (highlight)="emphasis.set($event)"
                         ></inspecto-link-analysis-temporal-findings>
 
-                        <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse -->
-                        @if (toolboxTab() === 'investigation' && investigationsEnabled()) {
-                            <inspecto-link-analysis-investigation
-                                role="tabpanel"
-                                id="la-toolbox-panel-investigation"
-                                aria-labelledby="la-toolbox-tab-investigation"
-                                [projection]="investigationProjection()"
-                                [projectionIssue]="investigationIssue()"
-                                [timeCol]="investigationTimeDefault()"
-                                [pending]="pendingInvestigation()"
-                                [degreePresets]="degreePresets()"
-                                [maxDegree]="maxDegree()"
-                                (pendingDone)="pendingInvestigation.set(null)"
-                            ></inspecto-link-analysis-investigation>
+                        <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse.
+                             On the Explorer level the tab stays and its one action is LOCKED with the reason (LA-ONBOARD-1 OB-10). -->
+                        @if (toolboxTab() === 'investigation') {
+                            @if (investigationsEnabled()) {
+                                <inspecto-link-analysis-investigation
+                                    role="tabpanel"
+                                    id="la-toolbox-panel-investigation"
+                                    aria-labelledby="la-toolbox-tab-investigation"
+                                    [projection]="investigationProjection()"
+                                    [projectionIssue]="investigationIssue()"
+                                    [timeCol]="investigationTimeDefault()"
+                                    [pending]="pendingInvestigation()"
+                                    [degreePresets]="degreePresets()"
+                                    [maxDegree]="maxDegree()"
+                                    (pendingDone)="pendingInvestigation.set(null)"
+                                ></inspecto-link-analysis-investigation>
+                            } @else {
+                                <div
+                                    class="flex flex-col gap-2"
+                                    data-testid="investigation-locked"
+                                    role="tabpanel"
+                                    id="la-toolbox-panel-investigation"
+                                    aria-labelledby="la-toolbox-tab-investigation"
+                                >
+                                    <p class="text-secondary m-0 text-sm">
+                                        An Investigation records each step you take from a start, so it can be replayed,
+                                        compared and handed over as a Dossier.
+                                    </p>
+                                    <inspecto-locked-action
+                                        label="Start an Investigation"
+                                        [reason]="investigationsLockedReason()"
+                                    />
+                                </div>
+                            }
                         }
 
                         <!-- View — layouts and canvas overlays. `[class.hidden]`, never `[hidden]`: Tailwind's `.flex`
@@ -1324,12 +1390,15 @@
                                 <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
                                     Overlays
                                 </h3>
-                                <mat-checkbox [checked]="legendOpen()" (change)="legendOpen.set($event.checked)">
+                                <mat-checkbox
+                                    [checked]="legendOpen()"
+                                    (change)="setOverlayOpen('legend', $event.checked)"
+                                >
                                     Legend
                                 </mat-checkbox>
                                 <mat-checkbox
                                     [checked]="workingSetOpen()"
-                                    (change)="workingSetOpen.set($event.checked)"
+                                    (change)="setOverlayOpen('workingSet', $event.checked)"
                                 >
                                     Working set
                                 </mat-checkbox>
@@ -1462,16 +1531,14 @@
                     >
                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                     </button>
-                    @if (investigationsEnabled()) {
-                        <button
-                            mat-icon-button
-                            (click)="openInvestigation()"
-                            matTooltip="Investigation"
-                            aria-label="Open the Investigation"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                        </button>
-                    }
+                    <button
+                        mat-icon-button
+                        (click)="openInvestigation()"
+                        matTooltip="Investigation"
+                        aria-label="Open the Investigation"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
+                    </button>
                     <button
                         mat-icon-button
                         (click)="openViewTools()"
@@ -1568,7 +1635,7 @@
             />
             @if (!graph()) {
                 <span class="text-secondary hidden min-w-0 truncate text-xs md:inline">
-                    Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it.
+                    Draw a Dataset, or another graph source, as entities and links, then analyse it.
                 </span>
             }
             @if (selectedOnCanvas().length) {

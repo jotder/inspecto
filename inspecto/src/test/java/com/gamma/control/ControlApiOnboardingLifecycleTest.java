@@ -325,6 +325,97 @@ class ControlApiOnboardingLifecycleTest {
         }
     }
 
+    /**
+     * LA-ONBOARD-FIXES-1 (F-4), the live repro end to end: parse a delimited CSV sample, ask for a schema,
+     * write that schema and a pipeline naming it, then register the pipeline. The suggestion used to propose
+     * {@code selector = <column name>}, which the write accepted and registration then refused ("a selector
+     * must be a zero-based column index"). Now the suggestion writes indexes and every step succeeds.
+     */
+    @Test
+    void aSuggestedSchemaForACsvSampleWritesAndRegisters(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String parsing = "\"parsing\":{\"frontend\":\"delimited\",\"delimited\":{\"delimiter\":\",\",\"has_header\":true}}";
+            HttpResponse<String> parsed = post(c.port, "/config/preview/parsing", """
+                    {"config":{"name":"p","dirs":{"poll":"in","database":"out"},"processing":{"threads":1},%s},
+                     "sample_text":"txn_id,amount,booked\\nT1,10.5,2026-01-01\\nT2,7,2026-01-02\\n"}""".formatted(parsing));
+            assertEquals(200, parsed.statusCode(), parsed.body());
+            JsonNode rows = V1Body.of(parsed.body()).get("rows");
+
+            HttpResponse<String> suggested = post(c.port, "/config/suggest/schema", "{\"sampleRows\":" + rows + "}");
+            assertEquals(200, suggested.statusCode(), suggested.body());
+            JsonNode s = V1Body.of(suggested.body());
+            JsonNode fields = s.get("fields");
+            assertEquals(3, fields.size(), fields.toString());
+            for (int i = 0; i < 3; i++)
+                assertEquals(String.valueOf(i), fields.get(i).get("selector").asText(),
+                        "a delimited selector is the zero-based column index: " + fields);
+            assertEquals("txn_id", fields.get(0).get("name").asText(), "the NAME stays the column's name");
+
+            HttpResponse<String> schema = post(c.port, "/config/write", """
+                    {"type":"schema","config":{"raw":{"name":"txn_schema","format":"CSV","fields":%s},"mapping":%s}}"""
+                    .formatted(fields, s.get("mapping")));
+            assertEquals(200, schema.statusCode(), schema.body());
+
+            HttpResponse<String> pipeline = post(c.port, "/config/write", """
+                    {"type":"pipeline","config":{"name":"txn_feed","dirs":{"poll":"in","database":"out"},
+                       "processing":{"schema_file":"txn_schema.toon","threads":1},%s}}""".formatted(parsing));
+            assertEquals(200, pipeline.statusCode(), pipeline.body());
+            String path = V1Body.of(pipeline.body()).get("path").asText();
+
+            HttpResponse<String> reg = post(c.port, "/runs", "{\"configPath\":\"" + path + "\"}");
+            assertEquals(2, reg.statusCode() / 100, "the suggested schema registers: " + reg.body());
+        }
+    }
+
+    /** The suggestion keeps names for a name-addressed frontend, and refuses a frontend it does not know. */
+    @Test
+    void schemaSuggestKeepsNamesForANameAddressedFrontend(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            String rows = "[{\"txn_id\":\"T1\",\"amount\":\"10\"}]";
+            HttpResponse<String> json = post(c.port, "/config/suggest/schema",
+                    "{\"frontend\":\"json\",\"sampleRows\":" + rows + "}");
+            assertEquals(200, json.statusCode(), json.body());
+            assertEquals("amount", V1Body.of(json.body()).get("fields").get(1).get("selector").asText());
+
+            HttpResponse<String> fixed = post(c.port, "/config/suggest/schema",
+                    "{\"frontend\":\"fixedwidth\",\"sampleRows\":" + rows + "}");
+            assertEquals("1", V1Body.of(fixed.body()).get("fields").get(1).get("selector").asText(),
+                    "fixed-width addresses a slice by index too");
+
+            assertEquals(400, post(c.port, "/config/suggest/schema",
+                    "{\"frontend\":\"cobol\",\"sampleRows\":" + rows + "}").statusCode(), "an unknown frontend is the caller's error");
+        }
+    }
+
+    /**
+     * The write half of F-4: a delimited pipeline whose schema names its columns would not load, so
+     * {@code /config/write} refuses it with the load's own message instead of accepting what registration
+     * then refuses. A json pipeline over the same schema is untouched — names are its selectors.
+     */
+    @Test
+    void writingADelimitedPipelineOverANameSelectedSchemaIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/config/write", """
+                    {"type":"schema","config":{"raw":{"name":"named_schema","format":"CSV",
+                       "fields":[{"name":"txn_id","selector":"txn_id","type":"VARCHAR"}]}}}""").statusCode());
+
+            HttpResponse<String> refused = post(c.port, "/config/write", """
+                    {"type":"pipeline","config":{"name":"named_feed","dirs":{"poll":"in","database":"out"},
+                       "processing":{"schema_file":"named_schema.toon","threads":1}}}""");
+            assertEquals(422, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("ERR_SELECTOR_NOT_INDEX"), refused.body());
+            assertTrue(refused.body().contains("a selector must be a zero-based column index"), refused.body());
+            assertEquals(404, get(c.port, "/config/pipeline/named_feed").statusCode(), "nothing was written");
+
+            HttpResponse<String> json = post(c.port, "/config/write", """
+                    {"type":"pipeline","config":{"name":"named_json","dirs":{"poll":"in","database":"out"},
+                       "processing":{"schema_file":"named_schema.toon","threads":1},
+                       "parsing":{"frontend":"json"}}}""");
+            assertEquals(200, json.statusCode(), "a json pipeline selects by name: " + json.body());
+            assertFalse(json.body().contains("ERR_SELECTOR_NOT_INDEX"), json.body());
+        }
+    }
+
     /** A draft still matching its sample reports no drift — the indicator must stay dark. */
     @Test
     void schemaSuggestReportsNoDriftForAnUpToDateDraft(@TempDir Path cfg) throws Exception {

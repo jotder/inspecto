@@ -75,6 +75,11 @@ public final class LinkEventTypes {
      *  act; the key is never recorded (raw or alias). */
     public static final String LINK_ENTITY_KEY_RESOLVED = "LINK_ENTITY_KEY_RESOLVED";
 
+    /** The Start box's type-ahead listed the values of an Entity Type that start a graph ({@code POST /inv/entities/{type}/suggest},
+     *  LA-ONBOARD-1 OB-9). {@code entityType}/{@code masked}/{@code datasets}/{@code listed}/{@code byPrefix} carry the reach; the
+     *  prefix and the values are never recorded. */
+    public static final String LINK_ENTITY_SUGGESTED = "LINK_ENTITY_SUGGESTED";
+
     /** A Link Analysis evidence snapshot was SEALED ({@code POST /inv/snapshots}, LA-03).
      *  {@code snapshotId}, {@code nodes} and {@code edges} carry what was frozen. A distinct act from
      *  {@link #LINK_PROJECTED}: that one records what an analyst LOOKED AT, this one records what they

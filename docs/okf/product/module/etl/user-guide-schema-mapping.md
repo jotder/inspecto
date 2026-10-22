@@ -190,6 +190,15 @@ catalog and by persisting `fields[]`.
   persists until Save (`:181-183`). A suggested DATE fills the **Date format** column (`raw.fields[].format`,
   a strptime pattern such as `%B %d,%Y`) — without it a non-ISO date lands NULL; see
   [ingestion §3.8](plan-ingestion.md).
+- **Suggested selectors follow the frontend** (LA-ONBOARD-FIXES-1, F-4): the route's optional body key
+  `frontend` (the value `/config/preview/parsing` reports) picks the selector. Delimited — the default when
+  it is absent — and fixed-width get the column's **zero-based index** in the sample's order, because their
+  load refuses a name; json / text_regex / xlsx / parquet / plugin keep the column name; an unknown value is
+  a 400. The grammar editor's onward link passes its active frontend through `SchemaEditorData.frontend`
+  (`plugin` for a plugin grammar). The save gate backs it: a pipeline write whose delimited/fixed-width schema still selects by name is
+  refused `ERR_SELECTOR_NOT_INDEX` (active or not — it would not load), with the load's own message.
+  ⚠ The drift diff (`config` in the body) still joins the draft's selector to the sample's column NAME, so
+  an index-selected draft reads as fully drifted there.
 - **Inference (a separate, upstream endpoint):** `POST /parsers/{id}/preview` (`ParserRoutes.java:34,58-71`)
   runs a DuckDB `auto_detect` sniff and returns per-column types (`ParserRoutes.java:111-113`). Stateless —
   writes nothing.

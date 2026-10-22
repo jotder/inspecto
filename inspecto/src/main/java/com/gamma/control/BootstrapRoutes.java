@@ -64,7 +64,15 @@ final class BootstrapRoutes implements RouteModule {
         // D12: the deployment's topology, so an operator can tell a single node from one member of a set
         // that shares state — which decides whether a degraded store is tolerable or a boot failure.
         data.put("topology", com.gamma.util.Topology.mode().name().toLowerCase());
-        data.put("features", features(api));
+        Map<String, Object> features = features(api);
+        data.put("features", features);
+        // LA-ONBOARD-1 OB-5: the Link Analysis LEVEL decides the screens - "investigations" while the Investigation surface is
+        // reported (the edition includes it AND the install holds the Investigations add-on), else "explorer". Who the user is
+        // (sign-in, masking, roles) stays the edition's business (DT-11).
+        data.put("laLevel", Boolean.TRUE.equals(features.get("investigations")) ? "investigations" : "explorer");
+        // OB-10: one short line per withheld feature, saying why and which edition or add-on has it - what a locked control
+        // shows. A map so DATA-TIERS-1 phase 2 adds its refusals as more entries (EditionFeatures.lockedReasons).
+        data.put("featureReasons", com.gamma.etl.EditionFeatures.lockedReasons());
         // DEMO-AUTH-1: the session broker's pre-sign-in context (the demo relay's Demo User picker). Omitted when
         // no relay is installed or it publishes nothing — the OIDC relay, and Basic, are unchanged.
         TokenRelays.active().map(TokenRelay::bootstrapAuth).filter(a -> !a.isEmpty()).ifPresent(a -> data.put("auth", a));
@@ -83,6 +91,8 @@ final class BootstrapRoutes implements RouteModule {
             data.put("configSpecs", configSpecs());
             data.put("enumerations", enumerations());
             data.put("spaces", spaces(api));
+            // LA-ONBOARD-1 OB-7: whether this Space lets people Add data (`data.self_import` in force); both apps lock on it.
+            data.put("selfImport", DataSettings.forRoot(writeRootOrNull(api)).selfImportInForce());
         }
         data.put("session", session(ex));
 

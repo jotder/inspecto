@@ -101,6 +101,7 @@ final class SaveGate {
         if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
         f.addAll(webhookFindings(type, draft, api, referents));
         f.addAll(excelFindings(type, draft));
+        f.addAll(selectorFindings(type, draft, configDir));   // LA-ONBOARD-FIXES-1 (F-4)
         // A block no component reads is a SILENT LOSS (`DUCKLE-C3-DEAD-PROPERTY-1`).
         f.addAll(AcceptedConfigKeys.unknownKeyFindings(type, draft, Severity.ERROR));
         // TYPEFLOW-CONSUMERS-1 (a): need the declared columns, hence the config's own directory.
@@ -205,6 +206,32 @@ final class SaveGate {
                         + e.sheets().get(i).name() + "' refused: " + problem, FindingCodes.ERR_EXCEL_INVALID, fix));
         }
         return out;
+    }
+
+    /**
+     * A delimited / fixed-width pipeline whose schema addresses a column by NAME — the load refuses it ("a
+     * selector must be a zero-based column index"), so registration would refuse what this save accepted
+     * (LA-ONBOARD-FIXES-1, F-4). Judged by the load itself ({@link PipelineConfig#fromMap(Map, Path)}, pure,
+     * from the config's own directory) so the frontend and schema resolution cannot drift from it; only
+     * that one refusal is reported here — every other parse refusal belongs to the check that owns it, or
+     * (an unresolvable schema on an inactive draft) is deliberately not an error at the save. Refused
+     * regardless of {@code active}, like {@link #excelFindings}: the schema file exists and the config
+     * cannot load.
+     */
+    static List<Finding> selectorFindings(String type, Map<String, Object> draft, Path configDir) {
+        if (!"pipeline".equals(type) || !(draft.get("processing") instanceof Map<?, ?>)) return List.of();
+        try {
+            PipelineConfig.fromMap(draft, configDir);
+        } catch (PipelineConfig.SelectorNotIndexException refused) {
+            String field = "schema_file".equals(refused.schemaRef()) ? "processing.schema_file" : "processing.schemas";
+            return List.of(new Finding(Severity.ERROR, field, refused.getMessage(),
+                    FindingCodes.ERR_SELECTOR_NOT_INDEX,
+                    "write the schema's raw.fields selectors as zero-based column indexes (0, 1, 2, ...) — "
+                            + "POST /config/suggest/schema proposes them for a delimited sample"));
+        } catch (Exception notThisCheck) {
+            // Not the selector refusal: the owning check reports it (or it is not a save-time error).
+        }
+        return List.of();
     }
 
     /**

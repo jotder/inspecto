@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `LA-ONBOARD-DEFECTS-1` | P3 | defect | Inspecto LA explorer defects found by LA-ONBOARD-1 phases 6-8 (2026-10-22): (1) after Add a file in append mode the link index summary co… | — |
 | `LA-EDITION-PLACEMENT-1` | P3 | feature | the three open Link Analysis edition moves: D-LAE3 masking on Basic (partly overtaken by 7c6d77c80 and LA-ONBOARD-1 OB-6: close, or also… | operator |

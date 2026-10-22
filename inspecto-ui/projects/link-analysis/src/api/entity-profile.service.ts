@@ -160,7 +160,8 @@ export interface EntityTypeProfile {
     lineage?: ProfileLineage[];
     links?: ProfileLinks;
     relationships?: ProfileRelationship[];
-    masking?: { mode: string };
+    /** The Space's masking mode in force and whether THIS type is masked under it (the effective answer). */
+    masking?: { mode: string; masked?: boolean };
 }
 
 export type EntityTypeProfileSection =
@@ -206,6 +207,31 @@ export interface EntityResolution {
     masked: boolean;
 }
 
+/** `POST /inv/entities/{type}/suggest` body: a raw prefix (empty = the busiest), one Dataset, at most 20. */
+export interface EntitySuggestRequest {
+    prefix?: string;
+    dataset?: string;
+    limit?: number;
+}
+
+/** One value that starts a graph: the rows naming it in a link column, and when it was first and last seen. */
+export interface EntitySuggestion {
+    value: string;
+    links: number;
+    firstSeen: string | null;
+    lastSeen: string | null;
+}
+
+/** The type-ahead's answer. `distinct` = the Entities matching (null when not counted, e.g. a masked type by prefix). */
+export interface EntitySuggestions extends Assessed {
+    type: string;
+    masked: boolean;
+    datasets: string[];
+    items: EntitySuggestion[];
+    distinct: number | null;
+    truncated?: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class EntityProfileService {
     private http = inject(HttpClient);
@@ -236,5 +262,13 @@ export class EntityProfileService {
             apiUrl(`/inv/entities/${encodeURIComponent(type)}/${encodeURIComponent(key)}/profile`),
             { params: toParams({ from: window?.from, to: window?.to }) },
         );
+    }
+
+    /**
+     * LA-ONBOARD-1 OB-9, the Start box's type-ahead: the values of `type` that start a graph (its link-end columns, or one
+     * Dataset's), busiest first, and how many Entities match. The prefix travels in the body only; a masked type lists nothing.
+     */
+    suggestEntities(type: string, req: EntitySuggestRequest): Observable<EntitySuggestions> {
+        return this.http.post<EntitySuggestions>(apiUrl(`/inv/entities/${encodeURIComponent(type)}/suggest`), req);
     }
 }

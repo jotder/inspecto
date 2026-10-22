@@ -107,6 +107,37 @@ class IndustryPacksTest {
     }
 
     @Test
+    void theShippedPacksSuggestTheirFirstListsAndTheWireCarriesThem() {
+        IndustryPack telecom = IndustryPacks.bundled().find("telecom");
+        IndustryPack.SuggestedList first = telecom.profile().suggestedLists().get(0);
+        assertEquals(new IndustryPack.SuggestedList("Call centres", "exclusion", "msisdn",
+                "Call centres and other busy numbers call almost everyone; leaving them out keeps the graph readable."), first);
+        assertEquals("Merchants", IndustryPacks.bundled().find("mobile-money").profile().suggestedLists().get(0).title());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> wire = (List<Map<String, Object>>) ((Map<String, Object>) telecom.toMap().get("profile")).get("suggestedLists");
+        assertEquals(Map.of("title", "Call centres", "purpose", "exclusion", "entityType", "msisdn", "why", first.why()), wire.get(0));
+    }
+
+    @Test
+    void aPackWithoutSuggestedListsSuggestsNone() throws IOException {
+        IndustryPacks.Catalogue c = load(write(tmp.resolve("jar1"), "toy", f -> null));
+        assertEquals(List.of(), c.find("toy").profile().suggestedLists());
+    }
+
+    @Test
+    void aSuggestedListWithAnUnknownPurposeOrEntityTypeRefusesThePack() throws IOException {
+        IndustryPacks.Catalogue good = load(write(tmp.resolve("jar0"), "toy", f -> f.equals("manifest")
+                ? manifest("toy") + "  suggested_lists[1]{title,purpose,entity_type,why}:\n    Busy ones,exclusion,account,\"Too busy.\"\n" : null));
+        assertEquals("Busy ones", good.find("toy").profile().suggestedLists().get(0).title());
+        assertRefused(load(write(tmp.resolve("jar1"), "toy", f -> f.equals("manifest")
+                ? manifest("toy") + "  suggested_lists[1]{title,purpose,entity_type,why}:\n    Busy ones,ignore,account,\"Too busy.\"\n" : null)),
+                "toy", "purpose must be one of");
+        assertRefused(load(write(tmp.resolve("jar2"), "toy", f -> f.equals("manifest")
+                ? manifest("toy") + "  suggested_lists[1]{title,purpose,entity_type,why}:\n    Busy ones,exclusion,starship,\"Too busy.\"\n" : null)),
+                "toy", "is not a core Entity Type");
+    }
+
+    @Test
     void aTermNamingNoCoreConceptRefusesThePackWhole() throws IOException {
         IndustryPacks.Catalogue c = load(write(tmp.resolve("jar1"), "toy",
                 f -> f.equals("terms") ? "terms[1]{key,label,abbreviation,definition}:\n  concept.galaxy,Galaxies,\"\",\"New concept.\"\n" : null));

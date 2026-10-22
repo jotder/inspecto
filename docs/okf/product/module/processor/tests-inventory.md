@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-354 test class(es): 131 unit, 223 real-HTTP control-plane, 0 IT.
+357 test class(es): 131 unit, 226 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -171,6 +171,8 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiNotificationRulesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationRulesTest.java` | {@code /notifications/rules*} admin CRUD over real HTTP: the empty default, create with defaulted |
 | `ControlApiNotificationsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationsTest.java` | Integration tests for the in-app notification feed routes ({@code /notifications*}) over real HTTP. |
 | `ControlApiNotificationStreamTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationStreamTest.java` | Integration test for the SSE real-time stream ({@code GET /notifications/stream}): a notification |
+| `ControlApiOnboardFilesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardFilesTest.java` | Add data over real HTTP ({@code LA-ONBOARD-1} phase 2, OB-2/OB-3/OB-4/OB-7/OB-8): {@code POST /onboard/files} answers a |
+| `ControlApiOnboardingCountersTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardingCountersTest.java` | The onboarding counters over real HTTP ({@code LA-ONBOARD-1} OB-13, A-10): {@code GET /onboarding/metrics} <!-- vocab-allow: quoted Javadoc --> |
 | `ControlApiOnboardingLifecycleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardingLifecycleTest.java` | Integration tests for the stream-onboarding draft lifecycle (v5.1.0) over real HTTP: |
 | `ControlApiPackParserPreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPackParserPreviewTest.java` | Real-HTTP proof of operator decision D4 (parser-plugins-trust-design.md slice P4, 2026-09-25): |
 | `ControlApiParsersTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiParsersTest.java` | Real-HTTP tests for the parser-catalog routes: {@code GET /parsers} (the self-describing |
@@ -224,6 +226,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSinkDuckLakeSharedTableTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSinkDuckLakeSharedTableTest.java` | Two {@code sinks[]} destinations registering into ONE DuckLake table |
 | `ControlApiSpaceBootReadinessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceBootReadinessTest.java` | HA-RUNLEASE-DB-CREDENTIALS-1 (operator 2026-10-10): a node whose Spaces are CONFIGURED but none could boot must |
 | `ControlApiSpaceComparisonTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceComparisonTest.java` | Real-HTTP tests for {@code POST /space-comparisons} (space-comparison design, decided 2026-09-24) over a |
+| `ControlApiSpaceSamplesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceSamplesTest.java` | {@code LA-ONBOARD-1} OB-12 over real HTTP: {@code POST /spaces {template, loadSamples: true}} copies the template's |
 | `ControlApiSpacesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpacesTest.java` | The Stage-5 {@code SpaceRoutes} CRUD over real HTTP: create + boot a space without restart, list it, confirm the |
 | `ControlApiSpaceTemplateKpiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateKpiTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) over real HTTP, with an armed Authenticator: a Space Template's KPI pack |
 | `ControlApiSpaceTemplateSeedGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateSeedGateTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠ over real HTTP: EVERY registry kind a Space Template seeds meets its own |

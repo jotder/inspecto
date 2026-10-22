@@ -432,4 +432,8 @@ Gotchas: the two `mvn` workloads use `-Dduckdb.version=<v>` and the sibling jars
 peak RSS; the harness cannot see which DuckDB the forked JVM loaded beyond that property, so read `duckdbVersion` from the
 `DuckDbBench` workloads. The `scan`/`csv` corpus is generated once into `-CorpusDir` and shared across labels; databases are
 never shared across versions (the storage format differs). Estimated wall time at `-Warmup 1 -Reps 3`: scan ~1 min,
-readers ~1 min, csv ~1 min, store ~1 min, la1m ~3 min, la10m ~8 min (index build each), engine ~4 min, la100m ~4 min (read-only).
+readers ~1 min, csv ~1 min, la1m ~3 min, la10m ~8 min (index build each), engine ~4 min, la100m ~4 min (read-only).
+⚠ **`store` is NOT ~1 min:** measured 2026-10-22 it took 61 min on 2.0.0.0 and did not finish in 7.5 h on 1.5.6.0
+(50,000-row keyed inserts run at hundreds of rows/s; `superpower/duckdb-2-plan.md` §2a). Leave it out of an A/B run
+(`-Workloads engine,csv,scan,readers`) and time it on its own. The harness reads the DuckDB jar from the Maven local
+repository named in `~/.m2/settings.xml` (`<localRepository>`), else `~/.m2/repository`.

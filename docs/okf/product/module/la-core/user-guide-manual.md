@@ -43,23 +43,45 @@ The screen says *"Not evidence — saved views re-project live data"* on the sav
 
 ## 2. Quick start (five minutes)
 
-**Fastest start:** the first screen offers four starter cards. **Follow the money (example)** opens a ready-made
-saved view of your Space and draws it at once (shown only when your Space has one). **Explore a Dataset** opens the
-Dataset picker — the Datasets that look like links are listed first, each with a one-line reason — and when you
-pick one its from and to columns are filled in for you and the graph is drawn. **Open a saved view** opens
-your saved views. The steps below are the same thing done by hand.
+**Fastest start: Start from...** (LA-ONBOARD-1 phase 6, OB-9). The first screen is one box. Pick the **Dataset**
+(preselected from `?dataset=<id>`, which Add data's *Explore in Link Analysis* passes), then start from:
 
-**Investigate a number:** the fourth card takes an MSISDN (6 to 15 digits, an optional `+`). It opens the same
-flow as the deep link `/studio/link-analysis?seed=<id>&entityType=msisdn[&dataset=<datasetId>]`, which an
-Incident or Case page offers as **Investigate … in Link Analysis** when a keyed Alert Rule recorded the number
-(`key.msisdn`-style attribute). The Telecom profile binds the Dataset `telecom_links_dataset` (`a_msisdn` → `b_msisdn`, link
-kind `link_kind`, time `last_seen`); `dataset=` names another one. The Investigation tab asks only the purpose (the
-title is pre-filled *Suspect &lt;id&gt;*); **Investigate** then creates the Investigation, seeds the number and expands
-two degrees. **Expand next degree** goes one hop further from the outermost entities, up to degree 4, with the
-profile's presets (the 30 days up to the Dataset's latest event — "all available data" when that cannot be read — at least 1 event per link, at most 500 links per entity, 10,000 rows per degree);
-each degree's result, any budget cut or fan-out cap, and a degree held for four-eyes approval ("waiting for approval") is stated under the button. If the Space has no such
-Dataset the screen says so, keeps the number queued as a seed and offers the Dataset picker. The legend's link-kind
-chips hide or show each kind of link on the canvas.
+| Start | What you give | What it draws (Explorer level) |
+|---|---|---|
+| **One entity** | the **Entity Type first** (the Dataset's `primaryEntityType` preselected), then the value, with a type-ahead of matches, busiest first, each with its link rows and first / last seen | that entity plus one ring |
+| **A list** | an Entity List | its members (at most 25) plus one ring |
+| **A paste** | values, one per line (commas, semicolons and tabs also separate) | the values found plus one ring; values not in the Dataset are reported |
+| **The whole Dataset** | nothing more | every link (the old Explore draw), warned first when the Dataset holds more Entities than the projection node cap |
+
+Which Datasets can start a graph, and over which columns: the Dataset's own `defaultLinkMapping` (OB-8); else a Domain
+Profile's `investigate` mapping over it; else the first saved view over it; else its two classified link-end columns.
+An Entity Type can start a graph when a link end of such a Dataset holds it (`GET /inv/entity-types` binds it `source` /
+`target`), or when it is the Dataset's primary type. The type-ahead is `POST /inv/entities/{type}/suggest` (the prefix in the
+body; a masked type suggests nothing and is only counted as a whole).
+
+A start draws through the **neighbours read** (`POST /inv/projection/neighbors`, one per value), never the whole-Dataset
+projection, holds the busy neighbours above the Space's hub threshold (the Grow preview's own `held`), and marks the starting
+entities as grown, so **Grow** continues from the ring. A line above the graph says what was drawn, how many were held and
+which values were not found. On the **Investigations** level, **One entity** seeds an Investigation as before: a Domain
+Profile that investigates the type binds its own mapping and presets (the override); any other type binds the start
+Dataset's mapping with the server's default rung. A list or a paste is drawn and queued as the first seeds.
+
+**Investigate** on an Entity's profile page (and the deep link `/studio/link-analysis?seed=<id>&entityType=<type>[&dataset=<datasetId>]`,
+which an Incident or Case page offers as **Investigate … in Link Analysis** when a keyed Alert Rule recorded the entity) takes
+the same path: on the Explorer level it draws that entity and one ring over the named Dataset, or over the first Dataset that
+links its type. Before phase 6 the Explorer level stopped at "Investigations are available in Standard and above", dropped the
+seed and offered *Choose a Dataset*, whose pick drew the whole Dataset (F-8, 312 nodes in the walkthrough). The Telecom profile
+still binds `telecom_links_dataset` (`a_msisdn` → `b_msisdn`, link kind `link_kind`, time `last_seen`) for a phone number on
+the Investigations level: the Investigation tab asks only the purpose (the title is pre-filled *Suspect &lt;id&gt;*);
+**Investigate** creates the Investigation, seeds the number and expands one degree. **Expand next degree** goes one hop further,
+up to degree 4, with the profile's presets (the 30 days up to the Dataset's latest event — "all available data" when that
+cannot be read — at least 1 event per link, at most 500 links per entity, 10,000 rows per degree); each degree's result, any
+budget cut or fan-out cap, and a degree held for four-eyes approval ("waiting for approval") is stated under the button.
+
+Under the box: **Follow the money (example)** opens a ready-made saved view and draws it (shown only when your Space has
+one), **Open a saved view**, **Explore a Dataset** (choose the columns yourself — the Datasets that look like links are listed
+first) and **Add data** (where the application has it). The steps below are the same thing done by hand. The legend's
+link-kind chips hide or show each kind of link on the canvas.
 
 1. Open *Studio → Link Analysis*. Choose a **Domain profile** (for example *Financial crime — transactions* or
    *Telecom — call detail records*): it pre-selects the most useful tools.
@@ -89,6 +111,80 @@ left edge (with the Space switcher and your user menu). A user who may change Li
   (also holds the settings role), *Demo FM Analyst* (fraud analyst, lead), *Demo FM Manager* (fraud manager, the
   second approver for four-eyes), *Demo RA Analyst* and *Demo Manager* (both view-only, §11).
 * **When sign-in cannot start**, the page says so instead of showing a picker — see §13.
+
+### Getting started, help and the beginner counters
+
+The beginner's path from a blank install to a first finding (sample or own data → Add data → what the columns hold →
+Start from one entity → Grow and Exclude → Find something interesting → Save as a case → come back through My work)
+is walked through step by step in the [end user guide](user-guide-end-user.md) §2 *Getting started*, and scripted
+as the acceptance drive in [tests-onboarding-live-drive.md](tests-onboarding-live-drive.md). Help on every screen of
+Inspecto LA (`LA-ONBOARD-1` phase 8, UC-15), all deterministic (no assistant) on every edition:
+
+* **What can I do next?** - the light bulb in the left menu, on every screen. It reads the current Space from the
+  server (the same state as the Space guide: Space, Datasets, a column that says what it holds, saved cases, Entity
+  Lists) and offers at most three next actions, the recommended one first, each with one line of why; the Space guide
+  is underneath while it is not done. An action this person may not take (Create a Space without `canAdminister`, Add
+  data when the Space's self-import is off or without `canUploadData`) is shown locked with the reason.
+* **Terms explained on first use** - *Dataset*, *Entity Type*, *Entity*, *Entity List* and *case* carry a **?**
+  button the first time a screen names them (Entities, Columns, Entity Lists, Start from..., My work, Save as a case);
+  it shows one plain sentence (`TERM_HELP`, `inspecto-ui/src/app/inspecto/onboarding/term-help.ts`).
+* **Empty states** name their reason and offer the one action that fills them (Entities → *Open Columns*; Columns →
+  *Add data*; Entity Lists → *New list*; My work → *Save as a case*, or *Try again* when the cases could not be read).
+* **Beginner counters** (OB-13, A-10). Always on, local, never sent anywhere: one append-only file per installation,
+  `onboarding-counters.tsv` in the server-wide settings home (`-Dsystem.config.dir`, else the spaces folder, else the
+  single Space's config folder), one line per event - a timestamp and a word: `launch` (each server start),
+  `space_created`, `first_dataset` (the first Add data commit), `first_graph` (the first projection or neighbours read
+  that drew links), `guide_completed` and `step_abandoned` with the step (`space`, `add_data:file`,
+  `add_data:columns`, `add_data:create`, ...). No ids, names or values. `GET /onboarding/metrics` (`canAdminister`;
+  anyone with no sign-in) answers when each milestone first happened and the seconds from the first launch;
+  **Settings → Getting started counters** shows it to administrators, read-only.
+* **Settings → Add data** (This Space): *People may add data in this Space*, the Space's `data.self_import`
+  (`GET|PUT /settings/data`). Editable with no sign-in or with `canAdminister`, read-only otherwise; with sign-in it is
+  off until an administrator turns it on, and the locked Add data screen points that administrator here.
+
+### Add data — Onboard a file
+
+**Add data** (`/add-data` in Inspecto LA) is the one screen both applications use to turn a file into a Dataset
+(`LA-ONBOARD-1` phase 4; the shared component `inspecto-add-data`). It calls the Add data routes
+(`POST /onboard/files`, then `POST /onboard/files/{draftId}/commit`; [`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md)
+"Add data"). On one screen:
+
+1. **Drop or choose a file**, after saying whether it holds *Events between entities* (a Stream) or *Details about
+   entities* (a Reference). The formats and the Space's `import.*` limits are shown before upload; Excel is read only
+   when the bundle carries the DuckDB `excel` extension (known from the first draft, or from a refusal that says to
+   save as CSV). *Read from a database or a remote system* is shown locked on Basic (`/bootstrap` `remoteSystems`;
+   until the server names it, locked on the Basic edition with a built-in reason).
+2. **Check the columns.** Every choice of the draft is pre-applied with its evidence. A `low` choice (fewer than 50
+   sampled values, or values that disagree) is highlighted, marked *A guess*, listed above **Create and run**, and
+   holds it back until confirmed or changed. Rename, change a type, **Leave out** a column; a table previews the first
+   rows as kept. A different separator, header line or quote re-reads the file with that choice stated (the commit
+   cannot change the format).
+3. **What does each column hold?** An Entity Type per column (`/inv/entity-types`), the link's **From** and **To**
+   and optional kind, time and amount (Stream), the identifying column (Reference), and the main kind of thing (the
+   Dataset's primary Entity Type). In the console the step is optional and starts closed: there, a high-confidence
+   proposal is applied as detected and a low one is not applied unless the step is opened.
+4. **Create and run** commits once. A file above `import.inline_max_bytes` answers 202 and the screen follows
+   `GET /onboard/runs/{runId}` until it ends.
+
+**The result in plain words** reads the run summary: rows read and kept, rows set aside (rejected, or a file set
+aside with its reason), a replace with the row counts before and after, the link index (built with its links and
+entities, up to date, skipped, or not built with the reason) and each Expectation. **Explore in Link Analysis**
+opens `/link-analysis?dataset=<id>`: Link Analysis preselects that Dataset in **Start from...** (section 2) when it
+has a link; a Dataset without one is picked in the Query panel, as **Explore a Dataset** does, and drawn when its from
+and to columns can be suggested. **Add details about these entities** restarts
+for a Reference; **Add another file** restarts.
+
+**The Dataset card** of an imported Dataset (`origin: import`) shows *one-time import*, the last import, and **Add a
+file** beside **Run now** (`POST /datasets/{id}/files?mode=replace|append`, `POST /datasets/{id}/run`; a Reference
+is always replaced). **Keep this up to date** is locked on Basic (`/bootstrap` `pipelineAutomation`); on Standard and
+above the console's card offers **Open in editor** (`/pipelines?guided=1&open=<pipeline>`) to someone who may author,
+and Inspecto LA says *Ask an administrator to keep this up to date*. The Add data page lists a card per import of the
+Space under the screen.
+
+**When it is locked.** With sign-in the screen needs `canUploadData`, and the Space's `data.self_import` must be on
+(`GET /settings/data`; off by default with sign-in, on by default with none). When either is missing, or the server
+refuses an upload with 403, the whole screen is the reason (`inspecto-locked-action`) instead of an upload that
+fails. A 503 (the Space has no data directory) is explained in place.
 
 ---
 
@@ -197,6 +293,38 @@ condition*).
 * Very busy hub nodes are folded into a **super-node** so they do not hide everything else.
 * Above 20 links on the canvas, link labels are hidden (shown on hover or click) to keep the picture readable; *All link labels* in the Display menu overrides it.
 
+### 4.5 Entities: what the columns hold
+
+Two columns join up in the graph and share one profile only when they hold the same **Entity Type**: a column holds a
+type when its classification is one the type claims. The **Entities** page (left rail) is where you see and set this
+(LA-ONBOARD-1 phase 5).
+
+* **Entity Types** tab — one card per Entity Type that **occurs in this Space's data** (some Dataset column holds it),
+  with its distinct count, Datasets and data-as-of date. Types a Dataset names as its **primary** Entity Type come
+  first and carry *Primary in &lt;Dataset&gt;*. Types no column holds sit collapsed under **Not in your data (n)**;
+  open it to see them. A type a Dataset names as primary but no column holds stays there: nothing would be drawn.
+* **Columns** tab (also `?tab=columns`, where the Space guide's *What the columns hold* step lands) — per Dataset,
+  each column that looks like an identifier: one already classified, a link end of the Dataset's default link
+  mapping (*Links start here* / *Links end here*), or a name that suggests an Entity Type (*Looks like Account* for
+  `from_account`) or ends in `id`. **Show every column** lists the rest. **Holds** sets the column's Entity Type at
+  once, or *Not set* clears it; the change is written to the Dataset and the page reads the Entity Types again and
+  says the result (*"to_account" in transfers now holds Account. Account is in 2 columns of 1 Dataset.*). A column
+  classified with something no Entity Type claims says so in its note. The picker beside the Dataset name sets the
+  Dataset's **primary Entity Type** (the type its graph leads with); *None* removes it. A Dataset that lists no
+  columns says so; its columns cannot be set here.
+* **New Entity Type** (top right) — for a kind of thing your pack does not know: a **Name**, an **Example value**
+  (not stored: it shows *Kept as …*, how a value is compared) and **Compare values as**: *Upper case, spaces
+  trimmed*, *Digits only*, *Phone number* or *Case ignored*. Its id is the name in lower case with `_` between words,
+  and it claims the classification of the id in upper case (*Vehicle plate* → `vehicle_plate`, `VEHICLE_PLATE`). It
+  is added to the Space's Link Analysis settings: the first one turns the inherited types into a stated list (the
+  types in force plus the new one), so later pack relabels no longer apply to it. A new type is not masked; a name
+  the Space already has, or a classification another type claims, is refused before anything is written. It shows
+  under *Not in your data* until a column holds it.
+
+All three changes need `canAuthorWorkbench` with sign-in (everyone may without sign-in). Without it the values read
+as text and the action is shown locked with the reason (*Changing what a column holds needs permission to edit
+Datasets in this Space*).
+
 ---
 
 ## 5. Exploring the graph
@@ -207,7 +335,8 @@ condition*).
   Information density, Fruchterman,* and tree layouts (*Mind map, Organization chart, …*) that are enabled only when
   the data is tree-shaped.
 * **Overlays** — *Legend*, *Working set* (top-N counts), *Node labels*, *Link labels*, *Level of detail*, *Minimap*,
-  *Grid*.
+  *Grid*. On a canvas narrower than 1000 px (a laptop) the legend and Working set start as small pills you can
+  expand; once you open or minimise one, this browser remembers your choice.
 * **Lenses and selection** — a link-kind lens, hover / brush / lasso selection, fisheye, community hulls and
   edge bundling.
 * **Display options** — labels, colour, shape, pattern and size per kind. Saved with the view.
@@ -349,7 +478,8 @@ suspicion score 1 000, and says so). Above an algorithm's cap the tool offers **
 select that node and centre the canvas on it. Under the table, **Start an Investigation from the top results**
 carries the top five nodes to the **Investigation** tab as *queued seed entities*; nothing is created. You fill in the
 title and purpose and press **Start Investigation with 5 queued seeds** — only then is the Investigation created
-and the queued entities seeded as its first step. You can remove one from the queue or clear it first.
+and the queued entities seeded as its first step. You can remove one from the queue or clear it first. On Basic
+there is no such action: the hint under the table says that recorded Investigations are in Standard and above.
 
 ---
 
@@ -408,7 +538,7 @@ It binds that Dataset and its columns. (The query's filter is not carried into t
 A Space may require a stated **purpose** for sensitive steps; when asked, it is recorded in the log.
 Over a **pre-aggregated** Dataset (one row per pair with an event count, like `telecom_links`), bind its count column
 as `eventsCol` when the Investigation is created: an expand then counts a link's events as the sum of that column, not
-its rows (an empty count is one event). It must be a whole-number column. The Telecom profile's *Investigate a number*
+its rows (an empty count is one event). It must be a whole-number column. The Telecom profile's phone-number start (Start from... > One entity)
 binds `events` for you. Without it, each row is one event, as before.
 To have the entities an expand adds carry an **Entity Type** (so node actions such as *Add to watch list* find the
 lists of that type), declare it when the Investigation is created: `entityType` for both columns, or `sourceType` /
@@ -636,6 +766,7 @@ announces a count of possible split identities.)*
 | Bind an Alert Rule to a Measure | `canAuthorAlertRules` |
 | See entity keys unmasked | `canRevealLinkEntities` (otherwise masked per the Space's setting) |
 | Change Link Analysis settings (and see **Settings** in the standalone app) | `canAuthorWorkbench` |
+| Set what a Dataset column holds, a Dataset's primary Entity Type, add an Entity Type (Entities page, §4.5) | `canAuthorWorkbench` |
 
 **Read-only access.** Without `canManageIncidents` you can still read: the Investigation tab says *Changing an
 Investigation needs the Incident management capability - you can read it*, and Seed, Expand, Undo, marks and the Draft

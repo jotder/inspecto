@@ -352,16 +352,20 @@
                             />
                         }
                         @case ('server-algorithms') {
-                            <inspecto-link-analysis-server-algorithms
-                                [investigationId]="investigationId()"
-                                [investigationOpen]="investigationOpen()"
-                                [allowed]="canRunOnServer()"
-                                [nodeOptions]="nodeOptions()"
-                                [serverIds]="serverIds()"
-                                [profileId]="profileId()"
-                                (emphasisChange)="emphasisChange.emit($event)"
-                                (resultChange)="applyCatalogueResult($event)"
-                            />
+                            @if (investigationsEnabled()) {
+                                <inspecto-link-analysis-server-algorithms
+                                    [investigationId]="investigationId()"
+                                    [investigationOpen]="investigationOpen()"
+                                    [allowed]="canRunOnServer()"
+                                    [nodeOptions]="nodeOptions()"
+                                    [serverIds]="serverIds()"
+                                    [profileId]="profileId()"
+                                    (emphasisChange)="emphasisChange.emit($event)"
+                                    (resultChange)="applyCatalogueResult($event)"
+                                />
+                            } @else {
+                                <inspecto-locked-action label="Run on server" [reason]="lockedReason()" />
+                            }
                         }
                         @case ('value-measures') {
                             <inspecto-link-analysis-value-measures
@@ -371,10 +375,14 @@
                             />
                         }
                         @case ('index-build') {
-                            <inspecto-link-analysis-index-build
-                                [allowed]="canBuildIndex()"
-                                [mappings]="indexMappings()"
-                            />
+                            @if (investigationsEnabled()) {
+                                <inspecto-link-analysis-index-build
+                                    [allowed]="canBuildIndex()"
+                                    [mappings]="indexMappings()"
+                                />
+                            } @else {
+                                <inspecto-locked-action label="Build index" [reason]="lockedReason()" />
+                            }
                         }
                         @case ('centrality') {
                             <div class="flex flex-wrap items-center gap-2">

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * The Professional+ features whose code ships in every build but whose USE the edition board
@@ -52,7 +53,8 @@ public final class EditionFeatures {
      * above it is also a ROUTE FEATURE: a route module whose {@code featureIds()} names it is answered
      * {@code 503 CAPABILITY_UNAVAILABLE} with {@link #refusal} at dispatch when it is absent ({@link #gatesRoutes}),
      * while the Link Analysis EXPLORER routes beside it (projection, paths, patterns, Value Measures, Entity
-     * identities, Entity profile pages) answer in Basic as in every edition.
+     * identities, Entity profile pages) answer in Basic as in every edition. Since {@code LA-ONBOARD-1} OB-5 it is also the
+     * one feature an ADD-ON withholds at runtime: present only while the install holds {@link #LA_INVESTIGATIONS_ADDON}.
      */
     public static final String INVESTIGATIONS = "investigations";
     /**
@@ -81,8 +83,28 @@ public final class EditionFeatures {
 
     private EditionFeatures() {}
 
-    /** Whether this build brings {@code feature}. */
+    /**
+     * The Investigations add-on ({@code LA-ONBOARD-1} OB-5, Product Map {@code addon.laInvestigations}): billable, enforced at
+     * RUNTIME, included by default wherever a module declares {@link #INVESTIGATIONS} (Standard and above). An install without
+     * it keeps the edition's governance (sign-in, masking, roles - DATA-TIERS-1 DT-11: the edition stays the one switch) and
+     * runs Link Analysis at the Explorer level. Basic never has it: no module there declares the feature.
+     */
+    public static final String LA_INVESTIGATIONS_ADDON = "laInvestigations";
+    /** The add-on's Order Code ({@code product-map/addon/laInvestigations.toon}). */
+    public static final String LA_INVESTIGATIONS_ORDER_CODE = "INS-AO-LA-INVESTIGATIONS";
+    /** The install setting that removes the add-on: {@code -Daddons.laInvestigations=false}. Absent = held. */
+    public static final String LA_INVESTIGATIONS_SETTING = "addons." + LA_INVESTIGATIONS_ADDON;
+
+    /**
+     * Whether this build brings {@code feature} and the install holds what it needs: a module declares it, and - for
+     * {@link #INVESTIGATIONS} only - the install holds the Investigations add-on ({@link #holdsInvestigationsAddon}).
+     */
     public static boolean present(String feature) {
+        return declared(feature) && (!INVESTIGATIONS.equals(feature) || holdsInvestigationsAddon());
+    }
+
+    /** Whether a module of this build declares {@code feature} (or a test pinned it), add-ons aside. */
+    private static boolean declared(String feature) {
         Set<String> o = override;
         if (o != null) return o.contains(feature);
         Set<String> d = discovered;
@@ -90,7 +112,40 @@ public final class EditionFeatures {
         return d.contains(feature);
     }
 
-    /** The refusal message for {@code feature}, naming it and the edition that has it. */
+    /**
+     * Whether this install holds the Investigations add-on. ⚠ THE HOOK (OB-5): today the proof is a plain install setting,
+     * {@link #LA_INVESTIGATIONS_SETTING} (anything but {@code true} removes it; read live, never cached), so whoever runs the
+     * server can claim the add-on. A signed entitlement replaces this method's body; every gate already reads it.
+     */
+    public static boolean holdsInvestigationsAddon() {
+        return Boolean.parseBoolean(System.getProperty(LA_INVESTIGATIONS_SETTING, "true").trim());
+    }
+
+    /**
+     * One short line saying why {@code feature} is locked and which edition or add-on has it - the {@code /bootstrap}
+     * {@code featureReasons} wording a locked control shows ({@code LA-ONBOARD-1} OB-10). {@link #refusal} stays the full
+     * error text a refused request carries; a feature with no short line of its own answers that.
+     */
+    public static String lockedReason(String feature) {
+        if (INVESTIGATIONS.equals(feature))
+            return declared(INVESTIGATIONS)
+                    ? "Needs the Investigations add-on, which this installation does not hold."
+                    : "Investigations are in Standard and above, with the Investigations add-on.";
+        if (GEO_MAP.equals(feature)) return "The Geo map is in Standard and above.";
+        return refusal(feature);
+    }
+
+    /**
+     * {@code featureId -> lockedReason} for every route feature this install withholds (absent features only), sorted by id.
+     * The {@code /bootstrap} {@code featureReasons} map; a feature that is present has no entry.
+     */
+    public static Map<String, String> lockedReasons() {
+        Map<String, String> out = new TreeMap<>();
+        for (String f : ROUTE_FEATURES) if (!present(f)) out.put(f, lockedReason(f));
+        return out;
+    }
+
+    /** The refusal message for {@code feature}, naming it and the edition (or add-on) that has it. */
     public static String refusal(String feature) {
         String what = switch (feature) {
             case ALERT_DISPATCH -> "Alert Rules (control.alert.dispatch)";
@@ -107,8 +162,11 @@ public final class EditionFeatures {
         if (GEO_MAP.equals(feature))
             return what + " are available in Standard and above - this build (Basic) does not include them";
         if (INVESTIGATIONS.equals(feature))
-            return what + " are available in Standard and above — this build (Basic) is the Link Analysis explorer and does not "
-                    + "include them";
+            return declared(INVESTIGATIONS)
+                    ? what + " need the Investigations add-on (" + LA_INVESTIGATIONS_ORDER_CODE + "), which this installation does "
+                            + "not hold (" + LA_INVESTIGATIONS_SETTING + "=false) - Link Analysis runs at the Explorer level"
+                    : what + " are available in Standard and above, with the Investigations add-on — this build (Basic) is the "
+                            + "Link Analysis explorer and does not include them";
         return what + " is a Standard+ feature — this build (Basic) does not include it";
     }
 

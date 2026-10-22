@@ -1,4 +1,4 @@
-import { Provider, inject } from '@angular/core';
+import { Provider, computed, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { map } from 'rxjs';
 import { SessionService } from 'app/inspecto/api';
@@ -116,6 +116,10 @@ export function provideLaHostServices(): Provider[] {
                     exchange: session.exchangeEnabled,
                     geoLink: session.geoLinkEnabled,
                     investigations: session.investigationsEnabled,
+                    featureReasons: session.featureReasons,
+                    signIn: computed(() => session.authMode() === 'oidc'),
+                    edition: session.edition,
+                    flags: session.features,
                 };
             },
         },

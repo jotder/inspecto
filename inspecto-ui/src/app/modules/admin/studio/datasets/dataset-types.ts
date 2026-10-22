@@ -81,6 +81,24 @@ export interface Dataset extends DatasetConfig {
     name: string;
     /** The stored business description, read-only here (R2-16: a Reconciliation side's readable label). */
     description?: string;
+    /** LA-ONBOARD-1 OB-8, read-only here: the Entity Type the Dataset's graph leads with. */
+    primaryEntityType?: string;
+    /** LA-ONBOARD-1 OB-8, read-only here: the link every Link Analysis start draws (`{from, to, kind?, time?, …}`). */
+    defaultLinkMapping?: {
+        from: string;
+        to: string;
+        kind?: string;
+        time?: string;
+        amount?: string;
+        details?: string[];
+    };
+    /**
+     * Every stored key Studio does not edit (`description`, `origin`, `primaryEntityType`, `defaultLinkMapping`,
+     * `importPipeline`, keys a later feature adds, ...), carried as read so a save writes them back: the registry PUT
+     * replaces the whole entry, so a key left out is a key deleted. The sharing envelope (`owner` / `shares`) is the
+     * exception: never carried, so the server keeps the current one (`datasets.service.ts` `ENVELOPE_KEYS`).
+     */
+    extra?: Record<string, unknown>;
 }
 
 /**

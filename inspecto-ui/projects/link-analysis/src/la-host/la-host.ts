@@ -35,6 +35,20 @@ export interface LaDataset extends RowSourceRef {
     name: string;
     /** The stored business description, when the Dataset has one - the Dataset picker shows its first sentence. */
     description?: string;
+    /** LA-ONBOARD-1 OB-8: the Entity Type its graph leads with - the Start box preselects it. */
+    primaryEntityType?: string;
+    /** LA-ONBOARD-1 OB-8: the link every start draws without asking again. */
+    defaultLinkMapping?: LaLinkMapping;
+}
+
+/** A Dataset's default link (`defaultLinkMapping` on its registry entry): the from / to columns, and kind and time when named. */
+export interface LaLinkMapping {
+    from: string;
+    to: string;
+    kind?: string;
+    time?: string;
+    amount?: string;
+    details?: string[];
 }
 
 export interface LaDatasets {
@@ -225,13 +239,32 @@ export const LA_CASES = hostToken<LaCases>('LA_CASES', 'Case management');
  * - `geoLink` - the Link Analysis / Geo routes are registered in this bundle (server-side Entity Lists, Identity groups).
  * - `investigations` - the Investigation surface is included in this edition (Investigations, Drafts, Dossier, templates,
  *   members, embed links, data trust, Graph Run, index builds, Alert Rules on Investigations). False on Basic, the Link
- *   Analysis explorer (LA-EDITIONS-1 ED-4), where those routes answer 503: the affordances are hidden, never left to 503.
+ *   Analysis explorer (LA-EDITIONS-1 ED-4), and on a sign-in install without the Investigations add-on (LA-ONBOARD-1
+ *   OB-5): those routes answer 503, so Investigation actions are shown LOCKED with the reason below, never left to 503.
+ * - `featureReasons` - `/bootstrap` `featureReasons`: featureId -> one line saying why it is locked and which edition or
+ *   add-on has it (OB-10). Optional: a host without it gets {@link LA_LOCKED_REASON_FALLBACK}.
+ * - `signIn`, `edition`, `flags` - LA-ONBOARD-1 phase 4 (Add data): whether people sign in here (`authMode` oidc: rights
+ *   are checked; with none the person is their own administrator), the `/bootstrap` `edition`, and every boolean
+ *   `/bootstrap` feature by id (the DATA-TIERS-1 edition flags such as `remoteSystems`, `pipelineAutomation`). Optional:
+ *   absent reads as no sign-in, an unknown edition and no flags.
  */
 export interface LaFeatures {
     readonly ops: Signal<boolean>;
     readonly exchange: Signal<boolean>;
     readonly geoLink: Signal<boolean>;
     readonly investigations: Signal<boolean>;
+    readonly featureReasons?: Signal<Readonly<Record<string, string>>>;
+    readonly signIn?: Signal<boolean>;
+    readonly edition?: Signal<string>;
+    readonly flags?: Signal<Readonly<Record<string, boolean>>>;
+}
+
+/** What a locked Investigation action says when the host gave no `featureReasons.investigations` line. */
+export const LA_LOCKED_REASON_FALLBACK = 'Investigations need the Investigations add-on (Standard and above).';
+
+/** The one line a locked Investigation action shows: the host's `featureReasons.investigations`, else the fallback. */
+export function investigationsLockedReason(features: LaFeatures): string {
+    return features.featureReasons?.()['investigations'] || LA_LOCKED_REASON_FALLBACK;
 }
 
 /**

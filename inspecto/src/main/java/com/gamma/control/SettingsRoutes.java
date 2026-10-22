@@ -94,6 +94,23 @@ final class SettingsRoutes implements RouteModule {
         api.get("/settings/timezone", (e, m) -> ETags.respond(e, timezoneShape(TimezoneSettings.forRoot(api.writeRoot()))));
         api.put("/settings/timezone", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> writeTimezone(api, api.body(e))));
+        // LA-ONBOARD-1 OB-7: whether people may Add data in this Space is an administrator's decision.
+        api.get("/settings/data", (e, m) -> ETags.respond(e, DataSettings.forRoot(api.writeRoot()).shape()));
+        api.put("/settings/data", ApiContext.withCapability("canAdminister",
+                (e, m) -> writeData(api, api.body(e))));
+    }
+
+    /** {@code selfImport}: {@code true}, {@code false}, or {@code null} (unset: on with no sign-in, off with sign-in). */
+    private Object writeData(ApiContext api, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "data settings write");
+        if (!body.containsKey("selfImport"))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "selfImport is required (true, false or null)");
+        Object raw = body.get("selfImport");
+        if (raw != null && !(raw instanceof Boolean))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "selfImport must be true, false or null, got '" + raw + "'");
+        DataSettings s = new DataSettings((Boolean) raw);
+        s.write(root.resolve(DataSettings.FILE));
+        return s.shape();
     }
 
     /** {@code timezone}: {@code null}/blank = UTC; else an IANA region zone name or 422 — never an offset form. */

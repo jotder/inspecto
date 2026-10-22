@@ -230,7 +230,7 @@ describe('SchemaEditorDialog', () => {
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Suggest from sample');
 
         await c.suggestFromSample();
-        expect(api.suggestSchema).toHaveBeenCalledWith(sample);
+        expect(api.suggestSchema).toHaveBeenCalledWith(sample, undefined, undefined);
         expect(c.rows()).toEqual([
             { name: 'ID', selector: 'ID', type: 'BIGINT', format: '', description: '', unit: '', classification: '' },
             { name: 'AMT', selector: 'AMT', type: 'DOUBLE', format: '', description: '', unit: '', classification: '' },
@@ -251,6 +251,15 @@ describe('SchemaEditorDialog', () => {
         fixture.detectChanges();
         await new Promise((r) => setTimeout(r, 0));
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('Suggest from sample forwards the parsing frontend, so the selectors fit what that frontend loads', async () => {
+        const sample = [{ ID: '1' }];
+        const { c, api } = create(undefined, {}, sample);
+        c.data.frontend = 'json';
+
+        await c.suggestFromSample();
+        expect(api.suggestSchema).toHaveBeenCalledWith(sample, undefined, 'json');
     });
 
     it('suggesting over already-named rows asks first and keeps them on decline', async () => {

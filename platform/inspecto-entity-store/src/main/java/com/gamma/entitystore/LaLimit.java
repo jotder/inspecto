@@ -221,6 +221,16 @@ public enum LaLimit {
     UPLOAD_DAILY_BYTES("upload.daily_bytes", Layer.SPACE, false, "upload", "bytes", 200L * 1024 * 1024, 1, 107_374_182_400L,
             "The most bytes the Space's analyst uploads may land in one UTC day (D-UP2)."),
 
+    // ── Add data (SPACE; LA-ONBOARD-1 OB-2, DATA-TIERS-1 DT-8) ─────────────────────────────────────────────────────
+    IMPORT_MAX_BYTES("import.max_bytes", Layer.SPACE, false, "import", "bytes", 500L * 1024 * 1024, 1, 107_374_182_400L,
+            "The largest file Add data or Add a file may import (DT-8)."),
+    IMPORT_MAX_ROWS("import.max_rows", Layer.SPACE, false, "import", "rows", 10_000_000, 1, 10_000_000_000L,
+            "The most rows one imported file may hold (DT-8)."),
+    IMPORT_MAX_DATASETS("import.max_datasets", Layer.SPACE, false, "import", "count", 20, 1, 100_000,
+            "The most imported Datasets one Space may hold (DT-8)."),
+    IMPORT_INLINE_MAX_BYTES("import.inline_max_bytes", Layer.SPACE, false, "import", "bytes", 64L * 1024 * 1024, 0, 107_374_182_400L,
+            "Files up to this size are imported inside the request; a larger one answers 202 with a run to follow."),
+
     // ── entity profile (SPACE; la-entity-profile-plan §4.4 / §4.5) ──────────────────────────────────────────────
     ENTITY_PROFILE_TIMEOUT_S("entity_profile.timeout_s", Layer.SPACE, false, "entity_profile", "s", 30, 1, 600,
             "Statement timeout of one Entity profile read."),

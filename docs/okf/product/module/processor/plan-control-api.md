@@ -401,7 +401,10 @@ cached), and a concurrent probe against the *shipped* runtime.
 ### 3.10 Static SPA serving
 
 `serveStatic` (`:889-901`) serves `-Dui.dir`: a path with an extension gets its MIME type, an extensionless
-deep link gets `index.html`, and the target is jailed by `startsWith(uiDir)`. `writeFile` (`:921-949`) sets
+deep link gets `index.html`, and the target is jailed by `startsWith(uiDir)`. It is reached only for a request
+OUTSIDE `/api/v1`: an unmatched `/api/v1/…` GET is a JSON `404` in the v1 error envelope, never the shell
+(LA-ONBOARD-FIXES-1 F-13 — `GET /api/v1/spaces/{id}/datasets`, a route that does not exist, used to answer 200 `text/html`), so the SPA and
+its assets live at the root only. `writeFile` (`:921-949`) sets
 `Cache-Control: no-cache` plus a size/mtime/name ETag on **every** asset and honours `If-None-Match` — the
 deliberate cost of a stale-chunk bug that long-lived caching once caused. `-Dui.static.log=DEBUG` logs
 `served=<file>` beside the URL so a crossed pairing (§3.9) is visible in one grep. Routing `serveStatic`

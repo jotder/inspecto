@@ -198,6 +198,15 @@ public final class CapabilityManifest {
             // authoring write: the same capability as any job trigger, and the same effect was already
             // reachable by triggering a `maintenance` job with `task: materialize`.
             new Entry("POST", "/datasets/([^/]+)/materialize", Roles.CAN_OPERATE_RUNS),
+            // OnboardRoutes (LA-ONBOARD-1 OB-2, OB-7) - Add data lands a person's own file and makes a Dataset of it, so the
+            // upload verb (and, read by the handler, the Space's data.self_import switch); which Entity Type a Dataset column
+            // holds is a Dataset authoring write.
+            new Entry("POST", "/onboard/files", Roles.CAN_UPLOAD_DATA),
+            new Entry("POST", "/onboard/files/([^/]+)/commit", Roles.CAN_UPLOAD_DATA),
+            new Entry("GET", "/onboard/runs/([^/]+)", Roles.CAN_UPLOAD_DATA),
+            new Entry("POST", "/datasets/([^/]+)/files", Roles.CAN_UPLOAD_DATA),
+            new Entry("POST", "/datasets/([^/]+)/run", Roles.CAN_UPLOAD_DATA),
+            new Entry("PUT", "/datasets/([^/]+)/columns/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             // DecisionRoutes
             new Entry("POST", "/decision-rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/decision-rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
@@ -427,6 +436,10 @@ public final class CapabilityManifest {
             new Entry("PUT", "/settings/link-analysis", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/pipeline-history", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/timezone", Roles.CAN_AUTHOR_WORKBENCH),
+            // LA-ONBOARD-1 OB-7: whether people may Add data in a Space is the administrator's decision.
+            new Entry("PUT", "/settings/data", Roles.CAN_ADMINISTER),
+            // OnboardingRoutes (LA-ONBOARD-1 OB-13) — how beginners fare on this installation is an administrator's read.
+            new Entry("GET", "/onboarding/metrics", Roles.CAN_ADMINISTER),
             // LinkAnalysisLimitsRoutes (LA-CONFIG-LIMITS-1) — a Space's Link Analysis limits are authored like its other
             // Link Analysis settings; the install-wide (host resource) limits are administration.
             new Entry("PUT", "/settings/link-analysis/limits", Roles.CAN_AUTHOR_WORKBENCH),
@@ -544,6 +557,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/inv/reference-rows", "read-shaped", "looks up reference rows for at most 500 entity keys; persists nothing"),
             new Exemption("POST", "/inv/case-history", "read-shaped", "reads one Entity's Incident / Case history, resolving a masked key server-side; persists nothing"),
             new Exemption("POST", "/inv/entities/([^/]+)/resolve", "read-shaped", "resolves one Entity key (raw value in the body) to the alias its Entity page takes; reads no Dataset, persists nothing"),
+            new Exemption("POST", "/inv/entities/([^/]+)/suggest", "read-shaped", "lists the values of an Entity Type that start a graph, by a prefix sent in the body (the Start box's type-ahead); reads the caller's viewable Datasets, persists nothing"),
             new Exemption("POST", "/inv/deep-links/resolve", "read-shaped", "validates an Open in Inspecto LA link's entity, window and Investigation (LA-EDITIONS-1 section 4); reads no Dataset, persists nothing; an Investigation the caller cannot read is 404, and reveal:true demands canRevealLinkEntities in the handler"),
             new Exemption("POST", "/inv/traversal/recursive-paths", "read-shaped", "walks paths over a Dataset (LA-11); persists nothing"),
             new Exemption("POST", "/inv/pattern/branching", "read-shaped", "matches a branching motif over a Dataset (LA-14b); persists nothing"),
@@ -570,6 +584,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/agent/sessions", "self-limiting", "opens a conversation; no tool runs without its own gate"),
             new Exemption("POST", "/agent/sessions/(.+)/ask", "self-limiting", "a question to the assistant; tools self-gate"),
             new Exemption("POST", "/agent/sessions/(.+)/ask/stream", "self-limiting", "streaming form of /ask"),
+            new Exemption("POST", "/onboarding/events", "self-limiting", "LA-ONBOARD-1 OB-13: appends one word of a closed vocabulary (guide_completed, or step_abandoned with a closed step word) and a timestamp to the installation's onboarding counters - nothing the caller types is kept, guide_completed is written once, the standard rate bucket bounds the rest; a beginner is who reports it, so no capability fits - pinned by ControlApiOnboardingCountersTest"),
             new Exemption("POST", "/agent/tools/(.+)", "self-limiting", "a tool call, gated per tool by the capability the tool declares (IntelligenceAgent.toolCapability)"),
             new Exemption("POST", "/agent/tools/(.+)/derive", "self-limiting", "derives tool arguments, gated per tool like /agent/tools/(.+)"),
             new Exemption("POST", "/assist/(.+)", "self-limiting", "the skill-intent catch-all; dispatch only, the skill's own tools gate"),

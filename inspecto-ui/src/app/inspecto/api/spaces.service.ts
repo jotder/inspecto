@@ -22,6 +22,25 @@ export interface CreateSpaceRequest {
     description?: string;
     /** A Space-Template id ({@link SpaceTemplateInfo}) — the new space is seeded from its blueprint. */
     template?: string;
+    /** Also load the template's sample data and run each Pipeline that received files, once (LA-ONBOARD-1 OB-12).
+     *  Refused (422) when the template ships no samples ({@link SpaceTemplateInfo.samples}). */
+    loadSamples?: boolean;
+}
+
+/** One Pipeline's outcome of a `loadSamples` create. */
+export interface SampleLoadResult {
+    pipeline: string;
+    sampleFiles: number;
+    status: 'loaded' | 'failed';
+    filesLoaded: number;
+    filesQuarantined: number;
+    /** Why the Pipeline failed, in the server's words. */
+    error?: string;
+}
+
+/** `POST /spaces {…, loadSamples: true}` answer: the manifest plus each Pipeline's sample run. */
+export interface SampleSpace extends Space {
+    samples?: { pipelines: SampleLoadResult[] };
 }
 
 /**
@@ -43,6 +62,8 @@ export interface SpaceTemplateInfo {
     creatable?: boolean;
     /** The edition features the template uses that this build lacks — why it is not creatable. */
     missingFeatures?: { feature: string; message: string }[];
+    /** Whether it ships sample data, so `loadSamples` can load and run it (LA-ONBOARD-1 OB-12). */
+    samples?: boolean;
 }
 
 /** DELETE /spaces/{id} response. */
@@ -95,6 +116,15 @@ export interface ImportPreview {
     /** The same warnings the commit will return — the configs it will land disabled. */
     connectionWarnings?: ConnectionWarning[];
     valid: boolean;
+}
+
+/** `base`, or `base-2`, `base-3`, … — the first not in `taken`. */
+export function uniqueSpaceId(base: string, taken: readonly string[]): string {
+    const used = new Set(taken);
+    if (!used.has(base)) return base;
+    let n = 2;
+    while (used.has(`${base}-${n}`)) n++;
+    return `${base}-${n}`;
 }
 
 const STORAGE_KEY = 'inspecto.currentSpace';
@@ -182,6 +212,33 @@ export class SpacesService {
     /** Create + boot a space (multi-space servers only). 400 bad id, 409 dup / single-tenant. */
     create(req: CreateSpaceRequest): Observable<Space> {
         return this.http.post<Space>(apiUrl('/spaces'), req);
+    }
+
+    /**
+     * Create a Space from a template that ships samples, load them and run each Pipeline once (OB-12). The id is
+     * derived from `baseId`, made unique against the hosted Spaces (`sample`, `sample-2`, …).
+     */
+    createSample(template: string, displayName: string, baseId = 'sample'): Observable<SampleSpace> {
+        const id = uniqueSpaceId(
+            baseId,
+            this.availableSpaces().map((s) => s.id),
+        );
+        return this.http.post<SampleSpace>(apiUrl('/spaces'), {
+            id,
+            display_name: displayName,
+            template,
+            loadSamples: true,
+        } satisfies CreateSpaceRequest);
+    }
+
+    /**
+     * Set a Space's Domain Profile (the Industry pack Link Analysis reads it in; `null` = the neutral vocabulary).
+     * Addressed to the named Space, so it works for a Space just created and not yet active.
+     */
+    setDomainProfile(spaceId: string, domainProfile: string | null): Observable<unknown> {
+        return this.http.put(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/settings/link-analysis/domain-profile`), {
+            domainProfile,
+        });
     }
 
     /** Update a space's display name / description (the id/folder is immutable). 400 for `default`, 404 unknown. */

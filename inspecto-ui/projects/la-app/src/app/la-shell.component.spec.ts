@@ -1,3 +1,5 @@
+import { NextStepsDialog } from './next-steps.dialog';
+import { MatDialog } from '@angular/material/dialog';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
@@ -5,11 +7,13 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
 import { LensService } from 'app/inspecto/api';
+import { of } from 'rxjs';
 import { LA_PRODUCT_NAME } from './la-brand';
 import { LA_APP_NAV, LA_APP_SETTINGS_NAV } from './la-nav';
 import { LA_RAIL_EXPANDED_KEY, LaShellComponent } from './la-shell.component';
@@ -34,6 +38,13 @@ describe('la-app shell and landing page', () => {
                         actorName: signal(''),
                         loginRequired: signal(false),
                         features: signal(features),
+                    },
+                },
+                // A set-up install (Space, data, columns, a graph): the landing page shows its area cards, no guide.
+                {
+                    provide: SpaceGuideService,
+                    useValue: {
+                        load: () => of({ hasSpace: true, datasets: 1, columnsDescribed: true, views: 1, lists: 1 }),
                     },
                 },
                 provideRouter([
@@ -151,4 +162,13 @@ describe('la-app shell and landing page', () => {
     it('has no axe violations', async () => {
         await expectNoA11yViolations(await render());
     }, 30_000);
+
+    it('offers What can I do next? in the rail on every screen; it opens the next-steps dialog (UC-15 rule 4)', async () => {
+        const el = await render();
+        const open = vi.spyOn(TestBed.inject(MatDialog), 'open').mockReturnValue({} as never);
+        const button = el.querySelector('[data-testid="la-next-steps-open"]') as HTMLButtonElement;
+        expect(button.getAttribute('aria-label')).toBe('What can I do next?');
+        button.click();
+        expect(open).toHaveBeenCalledWith(NextStepsDialog, expect.anything());
+    });
 });

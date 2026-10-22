@@ -23,7 +23,8 @@ import {
     untracked,
     viewChild,
 } from '@angular/core';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import { LA_FEATURES, investigationsLockedReason } from '@inspecto/link-analysis/la-host';
+import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -232,6 +233,7 @@ type CentralityMetric =
         LinkAnalysisIndexBuildComponent,
         LinkAnalysisSearchAroundComponent,
         LinkAnalysisValueMeasuresComponent,
+        LockedActionComponent,
     ],
     templateUrl: './link-analysis-toolbox.component.html',
 })
@@ -404,14 +406,16 @@ export class LinkAnalysisToolboxComponent {
     /** The analysis tool groups (the accordion = the graph-algorithms toolbox). */
     /**
      * LA-EDITIONS-1 ED-4: Graph Run (server algorithms, the edge index, "start an Investigation from the top results") is
-     * part of the Investigation surface, which Basic does not include - those tools and run buttons are hidden there.
+     * part of the Investigation surface. On the Explorer level (Basic, or a sign-in install without the Investigations
+     * add-on) those tools stay listed and their actions are shown LOCKED with {@link lockedReason} (`LA-ONBOARD-1` OB-10).
      */
-    readonly investigationsEnabled = inject(LA_FEATURES).investigations;
-    /** The tool groups this edition offers ({@link allTools} minus the server-run ones on Basic). */
+    private readonly features = inject(LA_FEATURES);
+    readonly investigationsEnabled = this.features.investigations;
+    /** Why an Investigation action is locked here (`/bootstrap` `featureReasons.investigations`). */
+    readonly lockedReason = computed(() => investigationsLockedReason(this.features));
+    /** The tool groups - every level lists all of them; the Investigation ones lock on the Explorer level. */
     get tools(): { id: AnalysisTab; label: string; icon: string; hint?: string }[] {
-        return this.investigationsEnabled()
-            ? this.allTools
-            : this.allTools.filter((t) => t.id !== 'index-build' && t.id !== 'server-algorithms');
+        return this.allTools;
     }
     private readonly allTools: { id: AnalysisTab; label: string; icon: string; hint?: string }[] = [
         { id: 'path', label: 'Shortest path', icon: 'heroicons_outline:arrows-right-left' },

@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.entity-store` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `LA-ONBOARD-1` | P2 | feature | Inspecto LA onboarding, blank install to a first finding with the screens alone: LA level (Explorer / Investigations) as an install setti… | operator |
+_No open rows._

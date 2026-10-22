@@ -6,6 +6,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatRadioModule } from '@angular/material/radio';
 import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { environment } from 'environments/environment';
@@ -80,7 +81,29 @@ const MAX_LOGO_BYTES = 200 * 1024;
 /** Dialog input — pass an existing space to edit it; omit to create a new one. */
 export interface SpaceFormData {
     space?: Space;
+    /**
+     * The Inspecto LA create (LA-ONBOARD-1 UC-02, create only): ask the name and **What kind of data?** — nothing
+     * else (Ask the minimum: no description, branding or timezone) — and set the chosen Industry pack as the new
+     * Space's Domain Profile.
+     */
+    dataKind?: boolean;
 }
+
+/** One answer to *What kind of data?*: the Industry pack it selects (`null` = the neutral vocabulary). */
+export interface DataKindOption {
+    id: string;
+    label: string;
+    pack: string | null;
+    /** Three column names a user of this kind of data will recognise. */
+    examples: string;
+}
+
+/** The three answers (UC-02 step 2); `pack` ids are the shipped Industry packs. */
+export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
+    { id: 'mobile-money', label: 'Mobile Money', pack: 'mobile-money', examples: 'sender_wallet, receiver_wallet, amount' },
+    { id: 'telecom', label: 'Telecom', pack: 'telecom', examples: 'calling_number, called_number, call_duration' },
+    { id: 'generic', label: 'Generic', pack: null, examples: 'from_id, to_id, date' },
+];
 
 /**
  * Create a new space or edit an existing one, including its branding (logo, caption, footer). On create
@@ -92,15 +115,26 @@ export interface SpaceFormData {
 @Component({
     selector: 'app-space-form-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule],
+    imports: [
+        ReactiveFormsModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        MatRadioModule,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title>{{ editMode ? 'Edit space' : 'New space' }}</h2>
+        <h2 mat-dialog-title>{{ editMode ? 'Edit space' : dataKind ? 'Create a Space' : 'New space' }}</h2>
         <form [formGroup]="form" (ngSubmit)="submit()">
             <mat-dialog-content class="space-y-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Display name</mat-label>
+                    <mat-label>{{ dataKind ? 'Name' : 'Display name' }}</mat-label>
                     <input matInput formControlName="display_name" required autocomplete="off" cdkFocusInitial />
+                    @if (dataKind) {
+                        <mat-hint>Name it after the data, such as Mobile money or Call records: one Space per kind of data.</mat-hint>
+                    }
                     @if (form.get('display_name')?.hasError('required')) {
                         <mat-error>A name is required.</mat-error>
                     }
@@ -132,6 +166,28 @@ export interface SpaceFormData {
                     </mat-form-field>
                 }
 
+                @if (dataKind) {
+                    <div class="flex flex-col gap-2 pt-2">
+                        <span id="space-data-kind-label" class="font-medium">What kind of data?</span>
+                        <mat-radio-group
+                            formControlName="dataKind"
+                            aria-labelledby="space-data-kind-label"
+                            class="flex flex-col gap-1"
+                        >
+                            @for (k of dataKinds; track k.id) {
+                                <mat-radio-button [value]="k.id">
+                                    <span class="flex flex-col">
+                                        <span>{{ k.label }} </span>
+                                        <span class="text-secondary text-sm"
+                                            >Columns such as <span class="font-mono">{{ k.examples }}</span></span
+                                        >
+                                    </span>
+                                </mat-radio-button>
+                            }
+                        </mat-radio-group>
+                        <p class="text-secondary m-0 text-sm">It sets the words Link Analysis uses for your data.</p>
+                    </div>
+                } @else {
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Description</mat-label>
                     <input matInput formControlName="description" autocomplete="off" />
@@ -193,6 +249,7 @@ export interface SpaceFormData {
                     >
                     <mat-hint>An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it.</mat-hint>
                 </mat-form-field>
+                }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button type="button" mat-button (click)="requestClose()">Cancel</button>
@@ -217,6 +274,9 @@ export class SpaceFormDialog {
     protected data = inject<SpaceFormData | null>(MAT_DIALOG_DATA);
 
     readonly editMode = !!this.data?.space;
+    /** The Inspecto LA create: name + What kind of data? only ({@link SpaceFormData.dataKind}). */
+    readonly dataKind = !this.editMode && !!this.data?.dataKind;
+    protected readonly dataKinds = DATA_KIND_OPTIONS;
     readonly defaultLogo = environment.appLogo;
 
     readonly saving = signal(false);
@@ -241,6 +301,7 @@ export class SpaceFormDialog {
         caption: [''],
         footerText: [''],
         timezone: ['', [timezoneValidator]],
+        dataKind: ['generic'],
     });
 
     constructor() {
@@ -325,6 +386,8 @@ export class SpaceFormDialog {
                   display_name: v.display_name || undefined,
                   description: v.description || undefined,
               });
+        // UC-02: the chosen kind of data selects the new Space's Domain Profile; generic leaves it unset.
+        const pack = this.dataKind ? (DATA_KIND_OPTIONS.find((k) => k.id === v.dataKind)?.pack ?? null) : null;
 
         // The timezone is saved only when it was touched (never a null PUT on create), and AFTER the Space: a
         // refusal there must not read as the whole save failing — the Space is already saved.
@@ -332,9 +395,19 @@ export class SpaceFormDialog {
         const saveTz = this.form.controls['timezone'].dirty && !(!existing && tz === null);
         save$
             .pipe(
-                switchMap((space) => forkJoin({ space: of(space), _: this.brandingApi.saveFor(space.id, branding) })),
+                switchMap((space) =>
+                    forkJoin({
+                        space: of(space),
+                        // The data-kind create asks no branding, so it writes none.
+                        _: this.dataKind ? of(null) : this.brandingApi.saveFor(space.id, branding),
+                    }),
+                ),
                 switchMap(({ space }) => {
-                    const done: Observable<unknown> = saveTz ? this.timezoneApi.saveFor(space.id, tz) : of(null);
+                    const done: Observable<unknown> = saveTz
+                        ? this.timezoneApi.saveFor(space.id, tz)
+                        : pack
+                          ? this.api.setDomainProfile(space.id, pack)
+                          : of(null);
                     return done.pipe(
                         map(() => ({ space, tzError: null as unknown })),
                         catchError((e: unknown) => of({ space, tzError: e })),
@@ -346,8 +419,11 @@ export class SpaceFormDialog {
                     this.saving.set(false);
                     if (tzError) {
                         this.toastr.warning(
-                            `Space "${space.id}" was saved, but its default timezone was not: ` +
-                                apiErrorMessage(tzError, 'the timezone was refused.'),
+                            pack
+                                ? `Space "${space.id}" was created, but its kind of data was not set: ` +
+                                      apiErrorMessage(tzError, 'the Domain Profile was refused.')
+                                : `Space "${space.id}" was saved, but its default timezone was not: ` +
+                                      apiErrorMessage(tzError, 'the timezone was refused.'),
                         );
                     } else {
                         this.toastr.success(`Space "${space.id}" ${existing ? 'updated' : 'created'}`);

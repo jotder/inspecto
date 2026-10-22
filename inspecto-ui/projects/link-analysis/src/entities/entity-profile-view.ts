@@ -226,3 +226,44 @@ export function notHere(p: {
     }
     return out;
 }
+
+/**
+ * Whether a type's keys leave masked under the Space's masking mode in force (mirrors the server's
+ * `EntityProfiles.maskedUnder`): `none` masks nothing, `all` masks every type, `typed` follows the type's own setting.
+ * An unknown mode (not read yet) falls back to the type's setting.
+ */
+export function maskedUnder(mode: string | null | undefined, typeMasked: boolean): boolean {
+    if (mode === 'none') return false;
+    if (mode === 'all') return true;
+    return typeMasked;
+}
+
+/**
+ * The profile's "Masked" tile: the EFFECTIVE state in this Space as the value, the type's own setting explained in
+ * the (one-line, truncated) hint when the mode overrides it (LA-ONBOARD-FIXES-1, F-6: "Masked: Yes" used to sit
+ * beside "Masking mode none").
+ * `masking` is the profile's `{mode, masked}`; `masked` there is the server's effective answer and wins when present.
+ */
+export function maskingTile(
+    typeMasked: boolean,
+    masking: { mode: string; masked?: boolean } | null | undefined,
+): { value: string; hint: string } {
+    if (!masking) return { value: typeMasked ? 'Yes' : 'No', hint: '' };
+    const effective = masking.masked ?? maskedUnder(masking.mode, typeMasked);
+    const value = effective ? 'Yes' : 'No';
+    switch (masking.mode) {
+        case 'none':
+            return {
+                value: 'No',
+                hint: typeMasked
+                    ? 'Off in this Space (mode none); type set to masked'
+                    : 'Off in this Space (mode none)',
+            };
+        case 'all':
+            return { value, hint: 'Mode all: every type is masked here' };
+        case 'typed':
+            return { value, hint: 'Mode typed: as the type is set' };
+        default:
+            return { value, hint: `Masking mode ${masking.mode}` };
+    }
+}

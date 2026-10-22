@@ -600,7 +600,7 @@ final class EntityProfiles {
                 return m;
             }
         }
-        Map<String, Object> m = notAssessed("the type is a link end of no saved view or index mapping over a Dataset you can view");
+        Map<String, Object> m = notAssessed("the type is a link end of no saved view, index mapping or default link mapping over a Dataset you can view");
         m.put("from", null);
         return m;
     }
@@ -882,6 +882,60 @@ final class EntityProfiles {
         return out;
     }
 
+    /**
+     * The Start box's type-ahead (LA-ONBOARD-1 OB-9) over the frame's bindings (the caller keeps only link ends): the values
+     * whose raw spelling - or normalised key - begins with {@code prefix}, busiest first ({@code links} = the rows naming the
+     * value in a link-end column), each with its first and last seen; and {@code distinct}, the Entities matching. A masked
+     * type lists nothing and is counted only for an empty prefix: a count per prefix would spell a raw value out.
+     */
+    static Map<String, Object> suggest(Frame f, String prefix, int limit) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("type", f.type.id());
+        out.put("masked", f.masked());
+        out.put("datasets", f.datasets());
+        out.put("items", List.of());
+        out.put("distinct", null);
+        if (f.keysRelation == null) {
+            out.putAll(notAssessed(f.bindings.isEmpty() ? "no link column of a Dataset you can view holds this Entity Type"
+                    : "none of the type's link columns could be read"));
+            return out;
+        }
+        if (f.masked() && !prefix.isEmpty()) {
+            out.putAll(notAssessed("the Entity Type is masked: its values are not listed - type the whole value"));
+            return out;
+        }
+        String key = prefix.isEmpty() ? "" : EntityTypes.normalise(f.type.normaliser(), prefix);
+        // a value that normalises to nothing (`unknown` under e164) is no Entity, so it never starts a graph
+        String where = " WHERE k <> ''" + (prefix.isEmpty() ? ""
+                : " AND (starts_with(lower(raw), lower(?))" + (key.isEmpty() ? "" : " OR starts_with(k, ?)") + ")");
+        List<String> binds = prefix.isEmpty() ? List.of() : key.isEmpty() ? List.of(prefix) : List.of(prefix, key);
+        try {
+            out.put("distinct", ColumnProfile.num(f.keys("SELECT COUNT(DISTINCT k) AS n FROM " + KEYS + where, 1, binds).rows().get(0).get("n")));
+            if (f.masked()) {
+                out.putAll(notAssessed("the Entity Type is masked: its values are not listed - type the whole value"));
+                return out;
+            }
+            DatasetProvider.Result r = f.keys("SELECT raw AS v, COUNT(*) AS n, strftime(MIN(ts), '%Y-%m-%dT%H:%M:%SZ') AS mn, "
+                    + "strftime(MAX(ts), '%Y-%m-%dT%H:%M:%SZ') AS mx FROM " + KEYS + where + " GROUP BY raw ORDER BY n DESC, v LIMIT " + limit,
+                    limit, binds);
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (Map<String, Object> row : r.rows()) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("value", String.valueOf(row.get("v")));
+                item.put("links", ColumnProfile.num(row.get("n")));
+                item.put("firstSeen", row.get("mn"));
+                item.put("lastSeen", row.get("mx"));
+                items.add(item);
+            }
+            out.put("items", items);
+            out.put("truncated", f.datasetsTruncated);
+            assessed(out);
+        } catch (Exception e) {
+            out.putAll(failed(e));
+        }
+        return out;
+    }
+
     private static Map<String, Object> entityLinks(Frame f, String key) {
         for (LinkStatsSource s : LINK_SOURCES) {
             try {
@@ -893,7 +947,7 @@ final class EntityProfiles {
                 return m;
             }
         }
-        Map<String, Object> m = notAssessed("the type is a link end of no saved view or index mapping over a Dataset you can view");
+        Map<String, Object> m = notAssessed("the type is a link end of no saved view, index mapping or default link mapping over a Dataset you can view");
         m.put("from", null);
         return m;
     }

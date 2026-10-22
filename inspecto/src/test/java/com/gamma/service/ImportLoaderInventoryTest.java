@@ -73,14 +73,19 @@ class ImportLoaderInventoryTest {
                 "job-packs-staging", "jobs_runs.csv", "runlog", "flows", "pipelines", "investigations",
                 "alert-rules", "sets", "pending", "header.json", "log.jsonl", "attachments.jsonl", "references.jsonl", "members.jsonl", "discarded.json", "promoted.json", "promoting.json", "hibernated.json", "accessed.json", "index.json", "mask.key",
                 "pending.jsonl", "pending.held.jsonl",
-                "embeds", "embed-grants"))   // LA-EMBED-VIEW-1: sidecars under <write root>/audit/snapshots/ (reserved audit/); operator-approved 2026-10-12
+                "embeds", "embed-grants",   // LA-EMBED-VIEW-1: sidecars under <write root>/audit/snapshots/ (reserved audit/); operator-approved 2026-10-12
+                "data/samples", "data/inbox"))   // LA-ONBOARD-1 OB-12: SpaceSamples reads a template's / new Space's data dir, never config/
             ALLOWED.put(p, NOT_CONFIG);
         for (String p : List.of("docs", "docs/GLOSSARY.md", "docs/api/openapi-v1.json", "openapi-v1.json",
                 "inspecto-ui", "inspecto-ui/src/app/app.routes.ts", "index.html", "parser.json"))
             ALLOWED.put(p, REPO);
         for (String p : List.of("registry", "registry/datasets", "jobs", "views", "schemas", "mappings"))
             ALLOWED.put(p, IMPORTABLE);
-        ALLOWED.put("parked", "backup/parked/ (RawCopyRetention) - unprocessed raw copies under the DATA backup root, "
+        // LA-ONBOARD-1 phase 2: Add data keeps its drafts and its Pipelines' inboxes under the Space's DATA root
+        ALLOWED.put("draft.json", "an Add data draft record under <data root>/_onboard/<draftId>/ - the DATA root, never "
+                + "the config root an import writes");
+        ALLOWED.put("inbox", "<data root>/inbox/<id>, an Add data Pipeline's poll directory under the DATA root - not config");
+        ALLOWED.put("parked","backup/parked/ (RawCopyRetention) - unprocessed raw copies under the DATA backup root, "
                 + "outside the config tree; the sweep skips it and no import lands outside <config>");
         ALLOWED.put("archived-config", "ConfigMigrator's backup of a migrated config — written, never read back as "
                 + "live config, so a planted file there changes nothing");

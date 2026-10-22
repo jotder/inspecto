@@ -421,8 +421,72 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
   /inv/entities/{type}/resolve {key}` (raw value or alias, in the body) answers the alias of the normalised key - the same alias
   the exploration reads mint - or, for an unmasked type, the normalised value. The envelope's `links.self` echoes the request
   path, which is why the rule is enforced at the route.
-Audited as `LINK_ENTITY_TYPES_LISTED`, `LINK_ENTITY_TYPE_PROFILED`, `LINK_ENTITY_PROFILED`, `LINK_ENTITY_KEY_RESOLVED` (never a
-key). Rate class: the list exempt; both profiles and resolve expensive.
+* **The Start box's type-ahead** (LA-ONBOARD-1 phase 6, OB-9): `POST /inv/entities/{type}/suggest {prefix?, dataset?, limit?}`
+  runs over the same union relation, restricted to the type's LINK-END bindings (`source` / `target`; attribute columns never
+  start a graph) and optionally one Dataset: values whose raw spelling or normalised key begins with the prefix, busiest
+  first, with their link rows and first / last seen, plus `distinct` (Entities matching; a value that normalises to nothing
+  is no Entity). A masked type lists nothing, and is counted only for an EMPTY prefix - a count per prefix would spell a raw
+  value out character by character. The prefix travels in the body; the read is a `read-shaped` exemption like resolve.
+Audited as `LINK_ENTITY_TYPES_LISTED`, `LINK_ENTITY_TYPE_PROFILED`, `LINK_ENTITY_PROFILED`, `LINK_ENTITY_KEY_RESOLVED`,
+`LINK_ENTITY_SUGGESTED` (never a key, a prefix or a value). Rate class: the list exempt; both profiles, resolve and suggest expensive.
+
+**Start from... (LA-ONBOARD-1 phase 6, as built 2026-10-22).** The SPA's pure half is `link-analysis/start-from.ts`
+(`startMapping` precedence: `defaultLinkMapping` > a Domain Profile `investigate` mapping over the Dataset > the first saved
+single-mapping view > the classified `source` / `target` columns; `startCatalogue` over the Datasets, views and
+`GET /inv/entity-types`; with the registry unreadable only the primary types start). `LaDataset` (and the console's `Dataset`,
+read-only) carry `primaryEntityType` and `defaultLinkMapping`. An explorer start is `drawStart`: one neighbours read per value
+(at most 25, five at a time) merged into a NEW graph, the Grow preview's `held` set as the basic held items, the values marked
+expanded, and the run remembered over the mapping WITHOUT a filter, so Grow continues from the ring. One entity on the
+Investigations level goes through `prepareInvestigation`: the Domain Profile binding wins (override), else `genericBinding`
+(the start Dataset's mapping typed by the seed, server-default rung). **F-8 root cause** (traced 2026-10-22): an Entity
+profile's *Investigate* navigates `?seed=<key>&entityType=<type>&dataset=<where[0]>`; on the Explorer level
+`prepareInvestigation` returned at once with "Investigations are available in Standard and above…", queued nothing, ignored
+`dataset`, and the stream dropped the three params; the empty state's only action was *Choose a Dataset* →
+`exploreDataset()` → the Query panel's guided picker, whose pick ran an unseeded `POST /inv/projection` of the whole
+Dataset. The seed never reached any read. On Standard an `account` fared no better: no profile investigates it, so the
+same picker drew the whole Dataset with the seed merely queued. Both now draw / bind from the entity (spec
+`link-analysis.component.spec.ts` "F-8: …", falsified against the old branch). `?dataset=<id>` alone (Add data's *Explore in
+Link Analysis*, phase 4) preselects the Dataset in the Start box when it can start a graph, else picks it in the Query panel
+as *Explore a Dataset* does.
+
+**My work and discovery (LA-ONBOARD-1 phase 7, as built 2026-10-22; UC-10, UC-12, UC-13, UC-14, A-1b).** SPA only, plus one
+optional pack field; no route was added.
+* **A case = a saved view + the Entity Lists it uses.** `LinkAnalysisView` (the `link-analysis-view` content) gained two
+  optional keys, read defensively (`listsOf` / `startOf` drop a wrong shape): `lists {start?, exclusions?[]}` (Entity List
+  ids) and `start {datasetId, values?[], listId?}`. The page keeps `caseStart` / `caseLists` signals: a Start box start sets
+  them (`startFrom`, `startFromEntity`), an exclusion written from this graph adds to `exclusions` (Exclude → Add to a list,
+  on either level, and *Add to a list* with purpose exclusion), `clearResults` (any new graph) forgets both. *Save as a case*
+  (the former *Save view* menu, same `saveView()`) writes them with the view: `start.values` = the drawn values plus every
+  grown node's first raw id (at most 25); for a list start only what was grown beyond the members, because opening re-reads
+  the list. **Opening a case with `start`** (`loadView` → `drawCaseStart`) draws `drawStart` over the start Dataset (live
+  list members + values), then hides the drawn nodes whose raw id is a member of an `exclusions` list now (case-insensitive,
+  `hideLocally`, undoable); when the Dataset no longer starts a graph or nothing is found it reruns `query`, as every older
+  view does. Specs `link-analysis.component.spec.ts` "a case, and Find something interesting" (falsified: without
+  `drawCaseStart` the whole-Dataset projection runs; without `caseOfState` nothing is saved) and `link-analysis.service.spec.ts`.
+* **My work** (`la-app` `my-work.ts` + `my-work.component.ts`, on the home page after the Space guide): cases from
+  `GET /components/link-analysis-view` (the list carries `modified`, now on `ComponentDef`), most recent first, list titles
+  from `GET /entity-lists`, each a link to `/link-analysis?view=<id>` (phase 3's param). **What changed in your data** reads
+  no new route: the registry's `dataset` entries with `origin: import` + `importPipeline`, then `GET /runs/{pipeline}/batches`
+  (the ingest audit ledger, ungated, Basic) - the last `SUCCESS` batch's `end_time`, `total_output_rows`, `rejected_rows`. The
+  run summary itself is persisted nowhere, and the ledger does not say whether a re-import replaced or appended, so the first
+  import reads `+N rows` and a re-import `N rows loaded`, never a net change.
+* **Find something interesting** (`discover.ts` pure, `link-analysis-discover.component.ts`, top of the Analysis tab):
+  *Who is busiest* = `degreeCentrality` top 5 (super nodes skipped; the hint "X has N links. Add it to an exclusion list?" on
+  the top row when it has at least 5 links and twice the next one's); *Which groups stick together* = `louvainCommunities`, groups
+  of 3+, largest 5, links among them and the days their links span when a time column is chosen; *How does A reach B* =
+  `shortestPath` direction `out`, else `both` (said so). Every reading is one sentence in `packTerms`. Row actions: *Show on
+  graph* (emphasis + focus), *Start from these* = the new `StartRequest` kind `found` over the graph's Dataset (delivers phase
+  6's "the busiest / a community" start), *Add to a list* = `LinkAnalysisAddToListDialog` (pick a list of the same Entity
+  Type or create one with a purpose in plain words; it writes `POST /entity-lists` + `/members` and closes with the list).
+* **First lists from the pack**: `IndustryPack.Profile.suggestedLists` from the manifest's optional
+  `profile.suggested_lists[n]{title,purpose,entity_type,why}` (at most 10; purpose one of allow / block / watch / exclusion;
+  a core Entity Type; a bad entry refuses the pack whole), served as `profile.suggestedLists`; the neutral profile suggests
+  *Busy entities to leave out* and *Entities to watch* with no Entity Type. The Entity Lists page offers them while the Space
+  has no list and the person may write lists; *Create* opens `CreateEntityListDialog` with `initial`. Telecom ships *Call
+  centres* / *Lines to watch*, mobile money *Merchants* / *Wallets to watch* (`IndustryPacksTest`).
+* **Levels.** Everything works on Explorer. *Start an Investigation from this* is shown locked in the *Save as a case* menu
+  on Explorer (`inspecto-locked-action`, `featureReasons.investigations`); with Investigations the Investigation tab is
+  unchanged.
 
 ### 3.5 Entity store (identity data)
 
@@ -452,7 +516,7 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
   packs, Basic included, ED-5). Each jar may carry an index `META-INF/inspecto/industry-packs.toon`
   (`packs[n]: a,b`); each pack is four files under `META-INF/inspecto/industry-packs/<id>/`: `industry-pack.toon`
   (id, name, description, `space_templates`, `pattern_packs`, `profile` = measure / time column hints, suggested tool
-  groups and the optional "Investigate a number" binding), `industry-pack-terms.toon`
+  groups, the optional "Investigate a number" binding and the optional `suggested_lists`, LA-ONBOARD-1 phase 7), `industry-pack-terms.toon`
   (`terms[n]{key,label,abbreviation,definition}`), `industry-pack-entity-types.toon` (core Entity Types restated:
   normaliser from the closed set, masked, classifications; an id the core lacks is refused) and
   `industry-pack-link-kinds.toon`. Normalisers stay the closed set: a pack picks one per type, it never ships code.
@@ -588,7 +652,7 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **100**<!--count:la-routes--> routes (**93**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **101**<!--count:la-routes--> routes (**94**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -602,7 +666,7 @@ the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all presen
 | Graph Run | `/inv/graph/runs`, `/algorithms`, `/runs/{id}`, `/cancel` | `canRunLinkGraphAnalysis` on the POST that starts a run; list/get are read-gated; cancel is owner-or-admin, else 404 |
 | Analyst upload | `POST /inv/uploads/{collector}?name=x.csv[&replace=true]`; `GET /inv/uploads` (upload-enabled Collectors), `GET /inv/uploads/{collector}` (own uploads + ingest state), `DELETE /inv/uploads/{collector}/{file}` (withdraw a pending upload) | `canUploadData` (§6.6); the list is the caller's own, the delete is uploader-or-`canAdminister` |
 | Index | `/inv/index`, `/inv/index/builds`, `/builds/{id}`, `/cancel` | `canBuildLinkIndex` on the POST that starts a build; the reads and cancel are not capability-gated |
-| Entity profiles (2026-10-15) | `GET /inv/entity-types`, `GET /inv/entity-types/{id}/profile`, `GET /inv/entities/{type}/{key}/profile`, `POST /inv/entities/{type}/resolve` (la-api `EntityProfileRoutes`) | none beyond a subject (like the exploration reads); Dataset view gate per binding; profiles rate-limited as expensive |
+| Entity profiles (2026-10-15) | `GET /inv/entity-types`, `GET /inv/entity-types/{id}/profile`, `GET /inv/entities/{type}/{key}/profile`, `POST /inv/entities/{type}/resolve`, `POST /inv/entities/{type}/suggest` (2026-10-22, the Start box) (la-api `EntityProfileRoutes`) | none beyond a subject (like the exploration reads); Dataset view gate per binding; profiles rate-limited as expensive |
 | Data trust (LA-DATA-TRUST-1, 2026-10-14) | `GET /inv/datasets/{id}/files` (one row per File: outcome, event day, rows, error rows, index state; la-api `DatasetFilesRoutes`), `GET …/{id}/data-changes` (corrected-day warning; geo-link `InvestigationDataChangesRoutes`), `…/{id}/coverage` | read-only; Dataset view gate / Investigation `open` gate. As built: [frontend concept §Data trust](user-guide-link-analysis.md) |
 | Embed link | `…/{id}/embeds` (POST mint, GET list), `…/embeds/{grantId}/revoke`, and the public `GET /public/investigations/{token}` | `canShareInvestigation` on mint and revoke (+ lead role); the list is read-gated; the public GET is authenticated by its token alone (§6.2) |
 | Measures & detection (geo-link) | `…/{id}/measures`, `…/alert-rules`, `…/standing-detection` | `canAuthorAlertRules` |
@@ -1032,6 +1096,110 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   blocked storage), and `link-analysis.component.spec.ts` "Grow, Held and Exclude on the graph" (one explorer preview
   with its body; a 403 shown in the panel; the rail, Basic Grow, Undo, Ctrl+Z, degrading without the routes).
 
+### 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
+
+The route family lives in the **core** (every edition, Basic included, not under `/inv`); its contract, gates,
+limits and the commit's write order are in
+[`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md) ("Add data"). What Link Analysis relies on:
+
+- **The draft's `entityTypes` block** proposes, per column, the Entity Type of the Space
+  (`LinkAnalysisSettings.effectiveEntityTypes()`) from value shapes and names, the link's from / to / kind / time /
+  amount / details, the primary Entity Type, and for a Reference the identifying column. Every proposal is
+  `{value, evidence, confidence}` (OF-2); a column whose values fit no Entity Type stays a detail and says why.
+- **The registry entry carries the link (OB-8).** A committed Dataset has `columns[].classification`,
+  `primaryEntityType` and `defaultLinkMapping {from, to, kind?, time?, amount?, details?[]}`.
+  `DatasetEntryRules` (run by `ComponentRoutes.validateKind` on every Dataset write, so the generic component
+  routes refuse the same) checks the shape: from and to required and different, every named column one of the
+  entry's `columns[]` when it lists any, `primaryEntityType` a non-blank id.
+- **Entity profiles read `defaultLinkMapping` (F-9).** `EntityTypeBindings.resolve` adds the Dataset's own default
+  mapping after saved views and published index manifests (skipped when one of those already names the same two
+  ends), so link roles and the `links` section are assessed with no saved view. Pinned by
+  `ControlApiOnboardLinkAnalysisTest`: wallets registered with a default mapping are assessed, agents without one
+  are "not assessed"; red with the fallback removed.
+- **The index is built in the user's run on Basic (DT-16).** The commit, Add a file and Run now call the
+  `LinkIndexBuilder` SPI (the geo-link bridge, `ScheduledIndexBuild`) for the default mapping (source = from,
+  target = to, kind, time, weight = amount; no attribute columns; owner = the importer; a first build is FULL),
+  not a signal-driven `la.index.build` Job. Skipped (and said so) where `pipeline.automation` is present; that
+  feature is declared by no module yet, so today every edition builds in-run. The summary reports
+  `index:{result, edges, nodes}`.
+- **Change a column's Entity Type later:** `PUT /datasets/{id}/columns/{column}` (`canAuthorWorkbench`, edit access
+  to the Dataset). The profile cache keys on the binding signature, so the next read re-assesses.
+- **Not built here:** the screens (phase 4), the Start box reading `primaryEntityType` (phase 6), Reference details
+  on nodes (phase 5), and the C1 format detections (another session).
+
+### 6.11 Help on every screen and the onboarding counters (LA-ONBOARD-1 phase 8, as built 2026-10-22; UC-15, A-9, A-10, OB-13)
+
+`LA-ONBOARD-1` closed with this phase; the plan is archived
+(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in §3.4 (*Start from...*,
+*My work*), §6.10 and §8 (*Trust vs level*); the acceptance drive is
+[`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md).
+
+* **Onboarding counters (OB-13).** `com.gamma.util.OnboardingCounters` (inspecto-util, below both the host and la-api,
+  like `IngestActivity`): a process-wide static holder of ONE append-only file per installation,
+  `onboarding-counters.tsv`, one line per event, `<ISO instant>\t<event>[\t<step>]`. The closed vocabulary is the enum
+  `Event` (`launch`, `space_created`, `first_dataset`, `first_graph`, `guide_completed`, `step_abandoned`) and the set
+  `STEPS` (`space`, `data`, `columns`, `graph`, `list`, `add_data:file`, `add_data:columns`, `add_data:create`); a step
+  word outside it is dropped, so nothing a person typed can reach the file. `first_*` and `guide_completed` are written
+  once per installation (`install` reads the file, so a restart does not repeat them). `record` never throws: a full
+  disk loses the count, never the action. With no file installed every call is a no-op.
+  * **Where the file lives** (decided here): the server-wide document home, the same resolution as `scheduler.toon` and
+    `la-limits.toon` (`SchedulerRoutes.systemDocPath`: `-Dsystem.config.dir`, else the spaces container root, else the
+    sole Space's write root), not `-Ddata.dir`, which is per Space. Reserved in `ReservedConfigPaths` (an import must
+    not forge it). No home = `recording: false`.
+  * **Who records what.** `OnboardingRoutes.register` installs the file at boot and records `launch` (so "first launch"
+    = the first server start of this installation, the drive's clock start). `SpaceRoutes.createSpace` records
+    `space_created` (template, sample or bare); `OnboardImport.Job.finishCommit` records `first_dataset` after the undo
+    stack is cleared (inline and 202 commits alike); `InvRoutes.project` (projection AND the Start box's neighbours read)
+    records `first_graph` when the answer holds a link. The browser reports only what it alone sees through
+    `POST /onboarding/events {event, step?}`: `guide_completed` (the home page, once per app load) and `step_abandoned`
+    (Create Space dialog closed without a Space; Add data left with a file chosen - `add_data:file`, a draft -
+    `add_data:columns`, or a run in flight - `add_data:create`). Any other event, including `first_graph`, is 422: a
+    browser cannot claim a milestone.
+  * **Routes** (`OnboardingRoutes`, core, every edition): `GET /onboarding/metrics` (`canAdminister` in the manifest;
+    with no sign-in anyone) answers `{recording, firstLaunch, launches, spacesCreated, firstSpace/Dataset/Graph,
+    guideCompleted, each with *Seconds from the first launch, abandoned {step: n}}`; `POST /onboarding/events` is a
+    `self-limiting` exemption (open to any signed-in caller: a beginner is who reports it) on the standard rate bucket
+    (`ControlApi.isRateLimited`). Pinned by `ControlApiOnboardingCountersTest` (file, vocabulary, 401/403/200, 429),
+    `OnboardingCountersTest`, and the milestone assertions in `ControlApiSpaceSamplesTest` and
+    `ControlApiOnboardLinkAnalysisTest` (falsified: without the `InvRoutes` record the first graph stays null).
+  * **SPA**: `OnboardingEventsService` (`src/app/inspecto/onboarding/`, fire-and-forget, a failure is silent) and the
+    la-app **Settings → Getting started counters** section (server audience, read-only, listed when there is no sign-in
+    or the person holds `canAdminister`).
+* **Help rules (UC-15), all deterministic (A-9).**
+  * **What can I do next?** - a button in the la-app rail (`la-shell.component.ts`), so on every screen.
+    `next-steps.ts` (pure) turns the Space guide's `SpaceGuideState` plus *may create a Space* (`FirstRun.canCreate`) and
+    *why Add data is locked* (`AddDataAccess.lockReason`) into at most three steps, the recommended one first, each with
+    one line of why; `NextStepsDialog` draws them (a step the person may not take is an `inspecto-locked-action`) above
+    the Space guide.
+  * **Terms on first use** - `<inspecto-term term="...">` (`src/app/inspecto/onboarding/term-help.component.ts`, shared,
+    usable by the console): the word, a **?** button (tooltip and accessible name carry the explanation, `aria-expanded`
+    discloses it inline). `TERM_HELP` holds the sentences; a spec keeps them short and free of Pipeline words. Placed at
+    the first mention on Entities, Columns, Entity Lists, Start from..., My work and Save as a case. ⚠ The input is `term`,
+    not `id`: a static `id="..."` would also set the host's DOM id and duplicate it.
+  * **Empty states** now name a reason and one action: Entities → *Open Columns* (switches the tab), Columns → *Add
+    data*, Entity Lists → *New list* (for someone who may write lists; otherwise the existing line says why not), the
+    Start box's no-Dataset line points at the *Add data* / *Explore a Dataset* cards under it, the saved-views menu
+    says how to fill it, and My work says when the cases could not be read (*Try again*) instead of "No case yet".
+* **Found by the acceptance drive and fixed here** ([`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md)):
+  * **Add to a list was a dead end on the explorer.** `growEntityType` (used by *Add to a list* from Find something
+    interesting and by Exclude → Add to a list) knew only the Investigation binding, the Domain Profile's `investigate`
+    type and typed canvas nodes; a graph drawn by a Start box start has none, so the dialog offered no list and no *Create
+    a new list…*. It now falls back to the start Dataset's `primaryEntityType` (`discoverDataset()`), and the dialog says
+    why and where to make a list when nothing can take the entities.
+  * **No screen turned Add data on.** With sign-in `data.self_import` is off until an administrator turns it on, and the
+    locked screen says "ask an administrator" - who had only `PUT /settings/data`. la-app **Settings → This Space → Add
+    data** (`AddDataSettingsComponent`, `OnboardService.setDataSettings`) is that switch (editable with no sign-in or with
+    `canAdminister`, read-only otherwise), and the Add data page shows "You may turn it on: Settings, Add data" to the
+    person who may.
+  * The Link Analysis footer no longer says "pipeline planes" with no graph drawn (no Pipeline word on a Basic screen).
+* **Two phase 7 leftovers fixed.** (1) **A case's name came back as its id in My work**: `ComponentStore.write` stamps
+  the content's `name` with the id (in-file identity = URL id), so the display name a save wrote under `name` was
+  overwritten on every save. The view codec (`link-analysis.service.ts`) now also writes `title` and reads
+  `title ?? name ?? id`; older views read as before. ⚠ The Geo map's saved views use the same `SavedViewStore` pattern
+  and keep the defect (`LA-ONBOARD-DEFECTS-1`). (2) **One purpose vocabulary**: `ENTITY_LIST_PURPOSES` now carries the
+  plain words (*Watch these* · *Never follow these (exclusion)* · *Known good* · *Block*) and `purposeWords()` reads
+  them; the Entity Lists page, New list and Add to a list all say it that way (`PURPOSE_WORDS` is gone).
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (21); geo-link → `RouteModule`, `InvestigationMeasureProbe`,
@@ -1059,7 +1227,7 @@ Edition names per `LA-EDITIONS-1` ED-2 (2026-10-17; formerly Personal / Professi
 | | Basic | Standard | Advanced | Preview |
 |---|---|---|---|---|
 | la-core, la-storage, la-api, geo-link, entity-list (the **explorer**) | ✓ | ✓ | ✓ | ✓ |
-| Investigation surface (`investigations` edition feature, declared by `inspecto-ops`) | — (503) | ✓ | ✓ | ✓ |
+| Investigation surface (`investigations` edition feature, declared by `inspecto-ops`, AND the Investigations add-on held) | — (503) | ✓ by default | ✓ by default | ✓ by default |
 | Sign-in (`inspecto-oidc`; Preview: demo sign-in) | — | ✓ | ✓ | ✓ |
 | la-store-pg (Postgres Investigations) | — | — | ✓ | ✓ |
 | D-E7 PDP (`providers/inspecto-policy`) | — | — | ✓ | ✓ |
@@ -1076,20 +1244,60 @@ answers each of them `503 CAPABILITY_UNAVAILABLE` "… available in Standard and
 (`ControlApi.requireModuleEnabled` → `EditionFeatures.gatesRoutes`) when no installed module declares
 `EditionFeatures.INVESTIGATIONS`; only `inspecto-ops` (`OpsEditionFeatures`) does. The explorer route modules
 (`InvRoutes`, `GeoRoutes`, `PatternRoutes`, `ValueMeasureRoutes`, `EntityIdentityRoutes`, `EntityProfileRoutes`) own
-`geoLink` only and answer with no sign-in. `/bootstrap` reports `features.investigations` (false on Basic); the SPA's
-`LA_FEATURES.investigations` hides the Investigation tab and buttons, the deep-link openers, Graph Run controls and the
-edge-index tool. Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
-⚠ **Masking on Basic is off by default, and display-only when on** (operator 2026-10-21). The in-force mode of a Space that
-states none is `none` on Basic and `typed` elsewhere: `LinkAnalysisSettings.effectiveMaskingMode` (entity-store, the one seam
-every masking reader and `GET /settings/link-analysis` `maskingModeInForce` share) asks the `MaskingDefault` ServiceLoader
-provider; the control plane ships `EditionMaskingDefault` (`none` when `investigations` is absent, read live), and with no
-provider on the classpath (entity-store / la-api unit tests) the shipped `typed` holds. A stated mode always wins. It is the
-Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, public dashboard shares, Report Job exports) follows it too.
-⚠ The `inspecto` module's own test classpath declares no `investigations`, so it runs as Basic: a test there that relies on
-the `typed` default must pin Standard (`EditionFeatures.overrideForTest`). Pinned by `ControlApiBasicEditionMaskingDefaultTest`
-(geo-link, real HTTP). With no sign-in there is no Subject, so the capability behind an audited reveal is never checked and
-anyone may reveal; a stated mode stops a casual glance, not a user. Enforced masking starts in Standard. The standalone LA app
-also hides its Alerts area on Basic (`la-nav.ts` `feature: 'investigations'`, `investigationsGuard` on `/alerts`).
+`geoLink` only and answer with no sign-in. `/bootstrap` reports `features.investigations` (false on Basic), `laLevel` and
+`featureReasons` (below). Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
+
+**Trust vs level (`LA-ONBOARD-1` phase 1, 2026-10-22; OB-5, OB-6, OB-10).** Three axes are kept apart: the EDITION decides who
+the user is (sign-in, masking, roles - DT-11: still the one governance switch), the **LA level** decides the screens, and
+data origin decides the entry points (phase 2).
+- **The Investigations add-on is enforced at runtime.** Product Map `addon.laInvestigations` (Order Code
+  `INS-AO-LA-INVESTIGATIONS`, `enforcement: runtime`, a vocabulary value added for it; `offerings/standard.toon` add-on
+  `laInvestigations` on module `ops`, inherited by Advanced and Preview). `EditionFeatures.present(INVESTIGATIONS)` = a module
+  declares it (Standard and above) AND `EditionFeatures.holdsInvestigationsAddon()`. The add-on is held by default; the install
+  setting `-Daddons.laInvestigations=false` (any value but `true`, read live) removes it. ⚠ **The hook:** that method is the
+  ONE place the proof is read; a signed entitlement replaces its body (until then whoever runs the server can claim the
+  add-on). Basic never has it - no module declares the feature, whatever the setting says. Without it every Investigation
+  route answers `503 CAPABILITY_UNAVAILABLE` with `refusal(INVESTIGATIONS)`, which names the add-on and its Order Code on a
+  Standard+ install ("… need the Investigations add-on (INS-AO-LA-INVESTIGATIONS), which this installation does not hold
+  (addons.laInvestigations=false) - Link Analysis runs at the Explorer level") and keeps "available in Standard and above,
+  with the Investigations add-on" on Basic. Every other gate (route dispatch, `/bootstrap`, the geo-link webhook tap) reads
+  `present()`, so nothing else changed.
+- **`/bootstrap` contract** (space-agnostic, also served before sign-in): `laLevel: "explorer" | "investigations"`
+  (`investigations` exactly when `features.investigations` is true) and `featureReasons: {featureId: oneLine}` -
+  `EditionFeatures.lockedReasons()`: one entry per WITHHELD route feature (today `investigations`, `geoMap`), none for a
+  present one, always an object. The line is `EditionFeatures.lockedReason(f)` ("Needs the Investigations add-on, which this
+  installation does not hold." / "Investigations are in Standard and above, with the Investigations add-on." / "The Geo map
+  is in Standard and above."); a feature without a short line falls back to `refusal(f)`, so DATA-TIERS-1 phase 2 extends the
+  map by adding refusals. ⚠ A feature switched off per Space (`modules.toon`) reports false with NO reason (it is not
+  withheld by the edition); the SPA then shows its own fallback line.
+- **Locked, not hidden** (A-11). Shared `<inspecto-locked-action label reason>` (`src/app/inspecto/components/
+  locked-action.component.ts`, usable by the console and `la-app`): the action's own stroked button, disabled but focusable
+  (`disabledInteractive`, `aria-disabled`), a lock icon, and one visible line (`aria-describedby`). The SPA reads
+  `SessionService.laLevel` / `featureReasons`; Link Analysis gets them through `LA_FEATURES.featureReasons` (optional) and
+  `investigationsLockedReason()` (fallback "Investigations need the Investigations add-on (Standard and above)."). Locked on
+  the Explorer level: *Start an Investigation from the top results* under a ranking (`LinkAnalysisResultNextComponent`), the
+  Investigation toolbox tab (kept in the tablist; its panel is the locked *Start an Investigation*; the rail's *Open the
+  Investigation* opens it), *Run on server* / *Run on index* (`LinkAnalysisServerRunComponent`, the over-cap note kept), and
+  the *All algorithms (server)* and *Edge index* tool groups (listed, their action locked). Whole Standard+ pages stay out of
+  the navigation (`la-nav.ts` Alerts, `investigationsGuard`). Deep links (`?investigation=`, `?seed=`) still do not open one.
+  ⚠ *Find paths (server)* is NOT locked: `POST /inv/traversal/recursive-paths` is an explorer route (`InvRoutes`, every
+  edition; EDITIONS "Find paths … ✅ Basic").
+- **The masking default keys on sign-in** (OB-6, A-16). `EditionMaskingDefault` answers `none` when nobody signs in
+  (`auth.mode` none AND no `Authenticator` installed) and `typed` otherwise, whatever the level: a sign-in install without the
+  add-on stays masked. `LinkAnalysisSettings.effectiveMaskingMode` (entity-store, the one seam every masking reader and
+  `GET /settings/link-analysis` `maskingModeInForce` share) asks this `MaskingDefault` ServiceLoader provider, read live; with
+  no provider on the classpath (entity-store / la-api unit tests) the shipped `typed` holds. A stated mode always wins. It is
+  the Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, public dashboard shares, Report Job exports)
+  follows it too. ⚠ Tests: no test classpath sets `auth.mode`, so every test without an armed `Authenticators.forTest` runs
+  as "no sign-in" (`none` by default); a test relying on the `typed` default sets `-Dauth.mode=oidc` or arms an
+  Authenticator (the `investigations` pin no longer matters). With no sign-in there is no Subject, so the capability behind an
+  audited reveal is never checked and anyone may reveal; a stated mode stops a casual glance, not a user.
+- Pinned by `ControlApiInvestigationsAddonTest` (Standard without / with the add-on, Basic with the setting on),
+  `ControlApiMaskingDefaultBySignInTest` (the matrix: no sign-in → none, also at the Investigations level; sign-in with and
+  without the add-on → typed; a stated mode wins), `EditionFeaturesTest.investigationsNeedTheEditionAndTheRuntimeAddon`, and
+  the vitest specs `locked-action.component.spec.ts`, `link-analysis-toolbox.component.spec.ts` (result next),
+  `link-analysis-toolbox.server-run.spec.ts` (Explorer level) and `link-analysis.component.spec.ts` (Explorer level), each with
+  axe.
 ⚠ `POST /inv/case-history` (Case history beside a node) is Standard and up by an explicit gate since 2026-10-20 (D-LAE1): it
 moved out of `InvRoutes` into its own route module `CaseHistoryRoutes` (an edition gate is per `RouteModule`) naming
 `geoLink` and `investigations`, so Basic answers 503 "available in Standard and above" at dispatch and the node dialog hides

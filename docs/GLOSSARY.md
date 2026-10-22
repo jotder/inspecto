@@ -216,6 +216,15 @@ Catalog ▸ *Onboard Stream / Onboard Reference* opens a stage rail (Collection 
 `active: false` pipeline. One "onboard" verb product-wide. ⛔ never "wizard" in UI copy. *(Shipped 2026-07-16;
 seams: `docs/okf/product/module/processor/api-onboarding-authoring.md`.)*
 
+**Add data** — The Inspecto LA entry point to **Onboard a file** as a Stream or a Reference (`LA-ONBOARD-1`
+OB-14): the button says *Add data*, the screen title says *Onboard a file*, so "Onboard" stays the one verb. One
+server route family, every edition (`POST /onboard/files` → a draft whose every choice carries evidence and a
+confidence; `…/{draftId}/commit` → an ordinary Pipeline marked `origin: import`, run once, and the Dataset). On a
+Dataset made this way: **Add a file** and **Run now** (manual-only on Basic, DATA-TIERS-1 DT-5). Who may use it is
+the Space setting `data.self_import` (on with no sign-in, off with sign-in until an administrator turns it on).
+⛔ never "upload wizard" or "import wizard"; ⛔ not the Investigation tab's analyst upload (`/inv/uploads`, which
+only drops a file in an existing Collector's inbox).
+
 **Consignment** — A set of one or more files ingested and processed together as one unit of work. ⛔ *Batch*
 in this entity sense (renamed 2026-08-03, §13 — ✅ **rolled out in the Java code 2026-08-31**: the types are
 `Consignment`, `ConsignmentEvent`/`ConsignmentEventBus`, `ConsignmentManifest`, `ConsignmentAuditWriter`/
@@ -882,6 +891,8 @@ RBAC data scopes, and despite its name it is not the *type of a Case*.
 
 **Working Set** *(Link Analysis)* — What an **Investigation** currently shows: the entities and links its op log evaluates to, recomputed by replaying the log (`/replay`) and sealed per step. It is derived state, never an authored object; **Graph Runs**, Pattern and **Value Measure** tools, Alerts on an Investigation and the **Dossier** all read it. ⛔ Not a **Dataset** (the Working Set is bounded and lives inside one Investigation), not a saved **View**, and not a **Draft** (a Draft is a private copy of the log that yields its own Working Set).
 
+**LA level** *(Link Analysis; `/bootstrap` `laLevel`, `LA-ONBOARD-1` OB-5, 2026-10-22)* — Which Link Analysis screens an installation has: **Explorer** (the graph, Grow, browser algorithms, Entity Lists, saved views; every edition) or **Investigations** (adds the **Investigation** surface: op log, Drafts, Dossier, Graph Run, link index, Alert Rules on Investigations), which needs the billable **Investigations add-on** (`INS-AO-LA-INVESTIGATIONS`, included by default on Standard and above, removed with `-Daddons.laInvestigations=false`). The level decides the screens only; who the user is (sign-in, masking, roles) stays the **Edition**'s business. ⛔ Not an Edition and not a Tier. Actions the level lacks are shown **locked** with a one-line reason (`<inspecto-locked-action>`, `/bootstrap` `featureReasons`), never hidden; whole pages stay out of the navigation.
+
 **Snapshot** *(Link Analysis; `SnapshotStore`, `POST /inv/snapshots`)* — The **frozen content of one analysis as it stood when the analyst saved it**, optionally attached to a **Case**. Evidence, unlike a saved **View**, which only re-projects live data and so is not evidence. A Snapshot is an Instance with no Type. ⛔ Not the DuckDB or storage-level *snapshot* (a consistent read; see §6-B, where "generation pinning" is also banned), and not a **Dossier** (the custody-hashed report built from an Investigation's log, which may cite Snapshots as exhibits).
 
 **Dossier** *(Link Analysis; `GET /inv/investigations/{id}/dossier`)* — The **evidential report of an Investigation**: summary, chronological ledger, every exclusion with its author and reason, negative space, and a SHA-256 chain of custody that `POST …/dossier/verify` re-checks against the store. Rendered as JSON, numbered steps, a method statement or one printable HTML page, masked per the Space's **Masking mode**. Built only from the promoted Investigation, never from a **Draft**. ⛔ Not a **Case** and not a **Snapshot**; never "report" or "export" for this object.
@@ -1324,7 +1335,7 @@ and the SBOM are generated from Offerings. ⛔ Not *plan*, *SKU*, *package* or *
 
 **Product Map** *(added 2026-10-18, `PRODUCT-MAP-1`, plan [`archived-documents/plans-archive/product-map-plan.md`](archived-documents/plans-archive/product-map-plan.md); built, slices S0–S5; as-built in `okf/product/layer/platform/spec-product-map.md`)* — The commercial tree of everything Inspecto offers, laid out like a mind map (Layer → Module → **Functionality**, plus Add-ons, Solution packs and Editions), used for pricing, support and customer-specific builds. It refers to module manifests and Offerings by id and never restates their technical facts. ⛔ Not the **Catalog** (§3, the library of Schemas and Datasets) and not an **Offering** (what one bundle contains).
 
-**Product Map Item** — One node of the Product Map, carrying a `billable` flag and, when billable, an **Order Code** and an `enforcement` (`build` · `enabled-gate` · `contract`) saying how a sale is honoured. ⛔ Not *Catalog Item*, *SKU* or *billable unit*.
+**Product Map Item** — One node of the Product Map, carrying a `billable` flag and, when billable, an **Order Code** and an `enforcement` (`build` · `enabled-gate` · `contract` · `runtime`) saying how a sale is honoured (`runtime`: the running server checks an install setting, e.g. the **Investigations add-on**, `LA-ONBOARD-1` OB-5). ⛔ Not *Catalog Item*, *SKU* or *billable unit*.
 
 **Functionality** — A Product Map Item that a customer recognises inside a module (for example "Maker-checker approvals"); it can be priced but usually cannot be left out of a build. ⛔ Not a **Capability** (an RBAC permission, §1-A) and not a feature id (`provides.features`).
 

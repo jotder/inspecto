@@ -20,6 +20,7 @@ function create(
     const saveFor = vi.fn(() => of(NO_BRANDING));
     const spaceSave = vi.fn(() => of({ id: 'beta', displayName: 'Beta', description: '', createdAt: '' }));
     const tzGetFor = vi.fn(() => of({ timezone: 'Asia/Kolkata', effectiveTimezone: 'Asia/Kolkata' }));
+    const domainSave = vi.fn(() => of({}));
     TestBed.configureTestingModule({
         imports: [SpaceFormDialog],
         providers: [
@@ -28,7 +29,12 @@ function create(
             { provide: MAT_DIALOG_DATA, useValue: data },
             {
                 provide: SpacesService,
-                useValue: { availableSpaces: signal([{ id: 'taken' }]), create: spaceSave, update: spaceSave },
+                useValue: {
+                    availableSpaces: signal([{ id: 'taken' }]),
+                    create: spaceSave,
+                    update: spaceSave,
+                    setDomainProfile: domainSave,
+                },
             },
             { provide: BrandingService, useValue: { getFor, saveFor } },
             { provide: TimezoneSettingsService, useValue: { getFor: tzGetFor, saveFor: tzSave } },
@@ -37,7 +43,7 @@ function create(
     });
     const fixture = TestBed.createComponent(SpaceFormDialog);
     fixture.detectChanges();
-    return { fixture, getFor, spaceSave, tzSave };
+    return { fixture, getFor, saveFor, spaceSave, tzSave, domainSave };
 }
 
 /** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
@@ -125,6 +131,62 @@ describe('SpaceFormDialog', () => {
     it('has no a11y violations', async () => {
         const { fixture } = create();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    describe('the Inspecto LA create (dataKind, UC-02)', () => {
+        it('asks the name and What kind of data? only: three kinds with example columns (no violations)', async () => {
+            const { fixture } = create({ dataKind: true });
+            const el = fixture.nativeElement as HTMLElement;
+            expect(el.querySelector('h2')!.textContent).toContain('Create a Space');
+            expect(el.textContent).toContain('What kind of data?');
+            const radios = Array.from(el.querySelectorAll('mat-radio-button'));
+            expect(radios.map((r) => r.textContent!.replace(/\s+/g, ' ').trim())).toEqual([
+                'Mobile Money Columns such as sender_wallet, receiver_wallet, amount',
+                'Telecom Columns such as calling_number, called_number, call_duration',
+                'Generic Columns such as from_id, to_id, date',
+            ]);
+            // Ask the minimum: no description, branding or timezone.
+            for (const gone of ['description', 'caption', 'footerText', 'timezone'])
+                expect(el.querySelector(`[formControlName="${gone}"]`)).toBeNull();
+            expect(el.textContent).not.toContain('Logo');
+            await expectNoA11yViolations(el);
+        });
+
+        it('sets the chosen Industry pack as the new Space\'s Domain Profile, and writes no branding', () => {
+            const { fixture, spaceSave, domainSave, saveFor } = create({ dataKind: true });
+            const c = fixture.componentInstance;
+            c.form.patchValue({ display_name: 'Call records', dataKind: 'telecom' });
+            c.submit();
+            expect(spaceSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'call-records' }));
+            expect(domainSave).toHaveBeenCalledWith('beta', 'telecom');
+            expect(saveFor).not.toHaveBeenCalled();
+        });
+
+        it('Generic leaves the Domain Profile unset', () => {
+            const { fixture, domainSave } = create({ dataKind: true });
+            const c = fixture.componentInstance;
+            c.form.patchValue({ display_name: 'Things' });
+            expect(c.form.get('dataKind')!.value).toBe('generic');
+            c.submit();
+            expect(domainSave).not.toHaveBeenCalled();
+        });
+
+        it('a refused pack says the Space was created but its kind of data was not set', () => {
+            toastr.warning.mockClear();
+            const { fixture, domainSave } = create({ dataKind: true });
+            domainSave.mockReturnValue(throwError(() => ({ status: 422 })) as never);
+            const c = fixture.componentInstance;
+            c.form.patchValue({ display_name: 'Wallets', dataKind: 'mobile-money' });
+            c.submit();
+            expect(toastr.warning).toHaveBeenCalledWith(expect.stringContaining('its kind of data was not set'));
+        });
+
+        it('is ignored in edit mode', () => {
+            const space: Space = { id: 'beta', displayName: 'Beta', description: 'd', createdAt: '' };
+            const { fixture } = create({ space, dataKind: true });
+            expect(fixture.componentInstance.dataKind).toBe(false);
+            expect(fixture.nativeElement.textContent).not.toContain('What kind of data?');
+        });
     });
 
     it('shows the id pattern error only after submit — never before (the error lands in the subscript)', () => {

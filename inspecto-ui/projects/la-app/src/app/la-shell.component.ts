@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -9,6 +10,7 @@ import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_PRODUCT_NAME } from './la-brand';
 import { LA_APP_SETTINGS_NAV, visibleLaNav } from './la-nav';
+import { NextStepsDialog } from './next-steps.dialog';
 
 /** localStorage key remembering whether the navigation rail is expanded ('1') or slim (anything else). */
 export const LA_RAIL_EXPANDED_KEY = 'la-app.rail-expanded';
@@ -81,8 +83,23 @@ function readExpanded(): boolean {
                 }
             </nav>
             <div class="flex flex-row items-center gap-1 md:flex-col md:items-stretch">
+                <!-- UC-15 rule 4: always one click away, on every screen. -->
+                <button
+                    type="button"
+                    class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm focus-visible:outline-2"
+                    data-testid="la-next-steps-open"
+                    aria-label="What can I do next?"
+                    [matTooltip]="expanded() ? '' : 'What can I do next?'"
+                    matTooltipPosition="right"
+                    (click)="openNextSteps()"
+                >
+                    <mat-icon class="icon-size-5 flex-0" svgIcon="heroicons_outline:light-bulb"></mat-icon>
+                    <span [class]="expanded() ? 'max-md:sr-only' : 'sr-only'" aria-hidden="true"
+                        >What can I do next?</span
+                    >
+                </button>
                 <div [class.slim-switcher]="!expanded()">
-                    <inspecto-space-switcher></inspecto-space-switcher>
+                    <inspecto-space-switcher [dataKind]="true" preferredSample="la-sample"></inspecto-space-switcher>
                 </div>
                 <user [showAvatar]="false"></user>
                 <button
@@ -137,6 +154,12 @@ export class LaShellComponent {
     protected readonly logo = this.env.appLogo;
     protected readonly footer = this.env.footerText;
     protected readonly expanded = signal(readExpanded());
+    private readonly dialog = inject(MatDialog);
+
+    /** *What can I do next?* (UC-15 rule 4). */
+    protected openNextSteps(): void {
+        this.dialog.open(NextStepsDialog, { width: '560px', maxHeight: '90vh', autoFocus: 'first-tabbable' });
+    }
 
     protected toggle(): void {
         const next = !this.expanded();

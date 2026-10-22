@@ -217,10 +217,13 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     /**
      * The starter card "Explore a Dataset": open the guided Dataset picker (ranked, with reasons). Once a Dataset
      * is picked and its Source/Target could be suggested, the query runs - one click from the card to a graph.
+     * `datasetId` (Add data's *Explore in Link Analysis*, LA-ONBOARD-1 phase 4) picks that Dataset instead of opening the
+     * picker, so the same suggest-then-run follows.
      */
-    startExplore(): void {
+    startExplore(datasetId?: string): void {
         this.runAfterPick = true;
-        this.datasetPicker()?.open();
+        if (datasetId) this.queryForm.controls.datasetId.setValue(datasetId);
+        else this.datasetPicker()?.open();
     }
 
     private newMappingGroup() {

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { signal } from '@angular/core';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { of } from 'rxjs';
@@ -8,6 +9,7 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { G6GraphData } from '@inspecto/core/graph';
 import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import { GENERIC_PROFILE, installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 
 /** A tiny two-cluster graph: a–b–c plus d–e (mirrors the studio spec fixture). */
@@ -23,7 +25,7 @@ const GRAPH: G6GraphData = {
     ],
 };
 
-function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = []) {
+function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = [], investigations = false) {
     TestBed.configureTestingModule({
         imports: [LinkAnalysisToolboxComponent],
         providers: [
@@ -32,6 +34,19 @@ function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = []) {
             // The toolbox fetches this Space's authored pattern packs; an empty list leaves the shipped
             // built-ins in place, which is what most of these tests assert against.
             { provide: ComponentsService, useValue: { list: () => of(packs) } },
+            // Basic (the default) has no Investigation surface; Standard and above pass `investigations`.
+            {
+                provide: LA_FEATURES,
+                useValue: {
+                    ops: signal(false),
+                    exchange: signal(false),
+                    geoLink: signal(false),
+                    investigations: signal(investigations),
+                    featureReasons: signal({
+                        investigations: 'Needs the Investigations add-on, which this installation does not hold.',
+                    }),
+                },
+            },
         ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisToolboxComponent);
@@ -619,8 +634,8 @@ describe('LinkAnalysisToolboxComponent', () => {
 });
 
 describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', () => {
-    function ranked() {
-        const m = make();
+    function ranked(investigations = false) {
+        const m = make(GRAPH, [], investigations);
         m.c.tab.set('centrality');
         m.c.runCentrality();
         m.fixture.detectChanges();
@@ -646,7 +661,7 @@ describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', 
     });
 
     it('says what to do next under the ranking, and offers to start an Investigation from the top results', async () => {
-        const { c, fixture } = ranked();
+        const { c, fixture } = ranked(true);
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('[data-testid="result-next-hint"]')?.textContent).toContain('click a row');
         const seeds: unknown[][] = [];
@@ -660,6 +675,26 @@ describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', 
         expect((seeds[0] as { id: string }[])[0].id).toBe('b');
         expect(seeds[0]).toHaveLength(5);
         expect(seeds[0][0]).toMatchObject({ ids: ['B'] });
+        await expectNoA11yViolations(el);
+    });
+
+    it('on the Explorer level shows Start an Investigation LOCKED with the server reason - never a dead suggestion', async () => {
+        const { c, fixture } = ranked(false);
+        const el = fixture.nativeElement as HTMLElement;
+        const next = el.querySelector('inspecto-link-analysis-result-next') as HTMLElement;
+        const hint = next.querySelector('[data-testid="result-next-hint"]')?.textContent ?? '';
+        expect(hint).toContain('click a row');
+        expect(hint).not.toMatch(/start an Investigation/i);
+        const action = next.querySelector('[data-testid="locked-action"]') as HTMLButtonElement;
+        expect(action.textContent).toContain('Start an Investigation from the top results');
+        expect(action.getAttribute('aria-disabled')).toBe('true');
+        expect(next.querySelector('[data-testid="locked-reason"]')?.textContent?.trim()).toBe(
+            'Needs the Investigations add-on, which this installation does not hold.',
+        );
+        const seeds: unknown[] = [];
+        c.seedFromResults.subscribe((s) => seeds.push(s));
+        action.click();
+        expect(seeds).toHaveLength(0);
         await expectNoA11yViolations(el);
     });
 

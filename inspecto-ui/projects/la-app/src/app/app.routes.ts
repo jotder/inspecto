@@ -35,6 +35,8 @@ export const laAppRoutes: Route[] = [
         canActivate: [authGuard],
         children: [
             { path: '', pathMatch: 'full', component: LandingComponent },
+            // Add data (OB-14), the first-run page's "Use my own data": the one Add data screen both apps use (LA-ONBOARD-1 phase 4).
+            { path: 'add-data', loadComponent: () => import('./add-data.page').then((m) => m.AddDataPageComponent) },
             // The library's lazy boundaries, exactly as the gamma host loads them.
             {
                 path: 'link-analysis',

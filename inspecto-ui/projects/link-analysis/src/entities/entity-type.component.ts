@@ -28,6 +28,7 @@ import {
     day,
     dayStart,
     entitiesBase,
+    maskingTile,
     notAssessedText,
     notHere,
     percent,
@@ -93,10 +94,12 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
                                 label="Normaliser"
                                 [value]="p.entityType.normaliser"
                             ></inspecto-stat-tile>
+                            @let mask = maskingTile(p.entityType.masked, p.masking);
                             <inspecto-stat-tile
                                 label="Masked"
-                                [value]="p.entityType.masked ? 'Yes' : 'No'"
-                                [hint]="p.masking ? 'Masking mode ' + p.masking.mode : ''"
+                                data-testid="masked-tile"
+                                [value]="mask.value"
+                                [hint]="mask.hint"
                             ></inspecto-stat-tile>
                             <div class="sm:col-span-2">
                                 <span class="text-secondary text-xs font-medium">Classifications it claims</span>
@@ -366,6 +369,7 @@ export class EntityTypeComponent implements OnInit {
     protected readonly count = count;
     protected readonly day = day;
     protected readonly dayStart = dayStart;
+    protected readonly maskingTile = maskingTile;
     protected na(s: { assessed: boolean; reason: string | null } | undefined): string {
         return notAssessedText(s ?? NOT_RETURNED);
     }

@@ -6,7 +6,7 @@ import { Router, provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { penEdit, penError } from '@inspecto/core/testing/pen-field';
+import { penEdit, penError, penOpen } from '@inspecto/core/testing/pen-field';
 import { EntityProfileService, EntityResolution } from '@inspecto/link-analysis/api/entity-profile.service';
 import { EntityLookupComponent } from './entity-lookup.component';
 
@@ -74,7 +74,40 @@ describe('EntityLookupComponent (Open an Entity)', () => {
         expect(router.url).toBe('/studio/entities/msisdn/masked:f01a9b8ca40c4eb1');
     });
 
-    it('Enter on the closed row only starts editing: no resolve, no error', () => {
+    it('Enter on the closed row that holds a typed value opens it (the value committed by Tab / a click elsewhere)', async () => {
+        const { fixture, pen, resolveEntity, router } = make(() =>
+            of({ type: 'msisdn', key: 'masked:f01a9b8ca40c4eb1', masked: true }),
+        );
+        const box = penOpen(fixture, pen) as HTMLInputElement;
+        box.value = RAW;
+        box.dispatchEvent(new Event('input'));
+        box.dispatchEvent(new Event('blur')); // Tab away: the pen field commits and closes
+        fixture.detectChanges();
+        expect(resolveEntity).not.toHaveBeenCalled();
+        const row = pen.querySelector('button:not(.pen-pencil)') as HTMLButtonElement;
+        const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        row.dispatchEvent(enter);
+        await fixture.whenStable();
+        expect(enter.defaultPrevented).toBe(true); // the button's own Enter-click (re-open the editor) is suppressed
+        expect(resolveEntity).toHaveBeenCalledWith('msisdn', RAW);
+        expect(router.url).toBe('/studio/entities/msisdn/masked:f01a9b8ca40c4eb1');
+    });
+
+    it('Enter on the pencil of a filled row still edits: no resolve', () => {
+        const { fixture, pen, resolveEntity } = make(() => of({ type: 'msisdn', key: 'x', masked: false }));
+        const box = penOpen(fixture, pen) as HTMLInputElement;
+        box.value = RAW;
+        box.dispatchEvent(new Event('input'));
+        box.dispatchEvent(new Event('blur'));
+        fixture.detectChanges();
+        const pencil = pen.querySelector('button.pen-pencil') as HTMLButtonElement;
+        const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        pencil.dispatchEvent(enter);
+        expect(enter.defaultPrevented).toBe(false);
+        expect(resolveEntity).not.toHaveBeenCalled();
+    });
+
+    it('Enter on the closed, empty row only starts editing: no resolve, no error', () => {
         const { fixture, pen, resolveEntity } = make(() => of({ type: 'msisdn', key: 'x', masked: false }));
         const row = pen.querySelector('button') as HTMLButtonElement;
         row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));

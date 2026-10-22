@@ -1,3 +1,4 @@
+import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import {
     ChangeDetectionStrategy,
     ChangeDetectorRef,
@@ -24,7 +25,7 @@ import {
     ValidatorFn,
 } from '@angular/forms';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
+import { EntityProfileService, EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -52,11 +53,28 @@ import {
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { indexSourceNote } from './index-source';
 import { IndexMappingTarget } from './link-analysis-index-build.component';
-import { IndexSource, InvService, MultiProjectionMappingSummary } from '@inspecto/link-analysis/api/inv.service';
+import {
+    EntityListSummary,
+    IndexSource,
+    InvService,
+    MultiProjectionMappingSummary,
+} from '@inspecto/link-analysis/api/inv.service';
 import { OfferShareDialog, OfferShareResult } from '@inspecto/core/components/offer-share.dialog';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ComponentHistoryDialog } from '@inspecto/core/components/component-history.dialog';
-import { LinkAnalysisStarterCardsComponent } from './link-analysis-starter-cards.component';
+import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
+import {
+    START_MAX_SEEDS,
+    StartDataset,
+    StartRequest,
+    datasetForType,
+    genericBinding,
+    hasRoute,
+    seedNodeOf,
+    startCatalogue,
+    startOutcome,
+    someValues,
+} from './start-from';
 import { QueuedSeed, pickFollowTheMoney } from './la-starter';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
@@ -64,7 +82,6 @@ import {
     InvestigateRequest,
     PendingInvestigation,
     investigateBinding,
-    investigateQueryParams,
     latestTimeOf,
     latestTimeSql,
     missingMappedColumns,
@@ -107,6 +124,7 @@ import {
     mergeGraphs,
     searchNodes,
     aggregateSuperNodes,
+    GraphSelection,
     SUPER_NODE_KIND,
 } from '@inspecto/link-analysis/graph/graph-analysis';
 import {
@@ -161,8 +179,12 @@ import {
     legendEdgeKindsFor,
     legendItemsFor,
     toggleHiddenKind,
+    CanvasOverlay,
     LinkAnalysisLegendComponent,
     LinkAnalysisWorkingSetComponent,
+    overlayStartsOpen,
+    rememberOverlayOpen,
+    storedOverlayOpen,
 } from './link-analysis-overlays.component';
 import { ICON_COLOR_SWATCHES } from '@inspecto/core/theme/chart-tokens';
 import {
@@ -197,7 +219,9 @@ import {
     LA_TAGS,
     LA_TRANSFER,
     LaHostSlotComponent,
+    investigationsLockedReason,
 } from '@inspecto/link-analysis/la-host';
+import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
 import { draftSavedWarning, recheckDraft } from '@inspecto/link-analysis/investigation/draft-recheck';
 import {
@@ -215,11 +239,14 @@ import {
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
 import {
+    CaseStart,
     LinkAnalysisService,
     LinkAnalysisView,
     LinkAnalysisViewOptions,
     SAVED_VIEW_NOT_EVIDENCE,
 } from './link-analysis.service';
+import { FoundAction, LinkAnalysisDiscoverComponent } from './link-analysis-discover.component';
+import { AddToListData, AddToListResult, LinkAnalysisAddToListDialog } from './link-analysis-add-to-list.dialog';
 import { LinkAnalysisTemporalFindingsComponent, TemporalRunRequest } from './link-analysis-temporal-findings.component';
 import { LinkAnalysisTimelinePlaybackComponent } from './link-analysis-timeline-playback.component';
 import { TemporalFindingsState, allTemporalSelection, temporalResultToState } from './temporal-findings';
@@ -338,7 +365,9 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        TermHelpComponent,
         FormMenuDirective,
+        LinkAnalysisDiscoverComponent,
         LinkAnalysisGlossaryComponent,
         LinkAnalysisDisplayRulesComponent,
         LinkAnalysisCapsComponent,
@@ -358,7 +387,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
-        LinkAnalysisStarterCardsComponent,
+        LinkAnalysisStartBoxComponent,
         InspectoSkeletonComponent,
         GraphViewComponent,
         DataTableComponent,
@@ -377,6 +406,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         LinkAnalysisGrowComponent,
         LinkAnalysisHeldTrayComponent,
         LinkAnalysisExclusionsComponent,
+        LockedActionComponent,
     ],
     // LA-10: the Investigation session outlives the toolbox dock, which destroys its panel on collapse.
     // LA-GROW-EXCLUDE-1: Grow / Held / Exclude state sits beside it, for the same reason.
@@ -460,6 +490,7 @@ export class LinkAnalysisComponent implements OnInit {
 
     @ViewChild(GraphViewComponent) private graphView?: GraphViewComponent;
     @ViewChild(LinkAnalysisToolboxComponent) private toolbox?: LinkAnalysisToolboxComponent;
+    @ViewChild(LinkAnalysisDiscoverComponent) private discover?: LinkAnalysisDiscoverComponent;
     @ViewChild(LinkAnalysisQueryPanelComponent) private queryPanel?: LinkAnalysisQueryPanelComponent;
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
@@ -499,21 +530,22 @@ export class LinkAnalysisComponent implements OnInit {
         });
     });
     /**
-     * LA-EDITIONS-1 ED-4: the Investigation surface is included in this edition. False on Basic (the Link Analysis
-     * explorer), whose Investigation routes answer 503: the tab, the buttons and every opener are hidden, never left to 503.
+     * LA-EDITIONS-1 ED-4: the Investigation surface is included here. False on the Explorer level (Basic, or a sign-in
+     * install without the Investigations add-on, LA-ONBOARD-1 OB-5), whose Investigation routes answer 503: the tab and its
+     * openers stay, and the Investigation actions are shown LOCKED with {@link investigationsLockedReason} (OB-10).
      */
-    readonly investigationsEnabled = inject(LA_FEATURES).investigations;
+    private readonly laFeatures = inject(LA_FEATURES);
+    readonly investigationsEnabled = this.laFeatures.investigations;
+    /** Why an Investigation action is locked on the Explorer level (`/bootstrap` `featureReasons.investigations`). */
+    readonly investigationsLockedReason = computed(() => investigationsLockedReason(this.laFeatures));
     private readonly allToolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [
         { id: 'analysis', label: 'Analysis' },
         { id: 'view', label: 'View' },
         { id: 'investigation', label: 'Investigation' },
     ];
-    private readonly visibleToolboxTabs = computed(() =>
-        this.allToolboxTabs.filter((t) => t.id !== 'investigation' || this.investigationsEnabled()),
-    );
-    /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels). */
+    /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels) - the same on every level. */
     get toolboxTabs(): readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] {
-        return this.visibleToolboxTabs();
+        return this.allToolboxTabs;
     }
     /** The graph canvas's text alternative: the displayed graph as a keyboard-navigable node / link list. */
     readonly listMode = signal(false);
@@ -521,9 +553,16 @@ export class LinkAnalysisComponent implements OnInit {
     readonly investigation = inject(InvestigationSessionStore);
     private readonly cdr = inject(ChangeDetectorRef);
     private readonly graphRuns = inject(GraphRunsService);
-    /** Canvas overlays — each minimises to a pill so the graph gets the space. */
-    readonly legendOpen = signal(true);
-    readonly workingSetOpen = signal(true);
+    /**
+     * Canvas overlays — each minimises to a pill so the graph gets the space. The user's own choice in this browser
+     * wins; otherwise the first measurement of the canvas decides ({@link fitOverlaysToWidth}).
+     */
+    readonly legendOpen = signal(storedOverlayOpen('legend') ?? true);
+    readonly workingSetOpen = signal(storedOverlayOpen('workingSet') ?? true);
+    /** The canvas zone's last measured width; 0 = not measured yet (no layout, or jsdom), which counts as wide. */
+    private canvasWidth = 0;
+    /** What the loaded saved view states about the overlays (`undefined` = it does not say). */
+    private overlaysStated: { legend?: boolean; workingSet?: boolean } = {};
     /**
      * Keep the canvas usable on a narrow page that has not stacked yet (the stack breakpoint is the VIEWPORT's
      * 960px, so a ~800px page beside an open nav stayed side-by-side and squeezed the canvas to ~15px): when the
@@ -532,10 +571,46 @@ export class LinkAnalysisComponent implements OnInit {
     private readonly watchCanvasWidth = afterNextRender(() => {
         const zone = this.canvasZone?.nativeElement;
         if (!zone || typeof ResizeObserver === 'undefined') return;
-        const ro = new ResizeObserver((entries) => this.fitDocksToWidth(entries[0]?.contentRect.width ?? 0));
+        const ro = new ResizeObserver((entries) => {
+            const width = entries[0]?.contentRect.width ?? 0;
+            this.fitOverlaysToWidth(width);
+            this.fitDocksToWidth(width);
+        });
         ro.observe(zone);
         this.destroyRef.onDestroy(() => ro.disconnect());
     });
+
+    /**
+     * LA-ONBOARD-FIXES-1 (F-11): on a narrow canvas (a laptop's ~800 px) the open legend and Working set covered most
+     * of the graph, so below {@link OVERLAY_COLLAPSE_BELOW_PX} they START as their pills. Decided on the FIRST
+     * measurement (a later resize never collapses what is open) and again when a saved view is loaded.
+     */
+    fitOverlaysToWidth(zoneWidth: number): void {
+        if (zoneWidth <= 0) return;
+        const first = this.canvasWidth === 0;
+        this.canvasWidth = zoneWidth;
+        if (first) this.applyOverlayStart();
+    }
+
+    /**
+     * The overlays' starting state: a saved view that states `false` keeps that one collapsed; otherwise the choice this
+     * browser remembers, else the width rule. A view's `true` (whoever saved it, on whatever screen) never forces a box
+     * open over a narrow canvas.
+     */
+    private applyOverlayStart(): void {
+        const start = (which: CanvasOverlay): boolean =>
+            this.overlaysStated[which] === false
+                ? false
+                : overlayStartsOpen(storedOverlayOpen(which), this.canvasWidth || Number.POSITIVE_INFINITY);
+        this.legendOpen.set(start('legend'));
+        this.workingSetOpen.set(start('workingSet'));
+    }
+
+    /** The user opened or minimised an overlay (its pill / minimise button, or View ▸ Overlays): remembered per browser. */
+    setOverlayOpen(which: CanvasOverlay, open: boolean): void {
+        (which === 'legend' ? this.legendOpen : this.workingSetOpen).set(open);
+        rememberOverlayOpen(which, open);
+    }
 
     /** Collapse one dock when the canvas zone is narrower than {@link CANVAS_MIN_PX} (side-by-side layout only). */
     fitDocksToWidth(zoneWidth: number): void {
@@ -1304,6 +1379,21 @@ export class LinkAnalysisComponent implements OnInit {
         this.views().map((v) => ({ kind: 'link-analysis-view' as const, id: v.id })),
     );
 
+    /** The start the graph on screen was drawn from (phase 6); a case saves it so reopening draws it again. Null = none. */
+    readonly caseStart = signal<CaseStart | null>(null);
+    /** The Entity Lists the graph on screen uses (A-1b): the list it started from, the exclusion lists written from it. */
+    readonly caseLists = signal<{ start?: string; exclusions: string[] }>({ exclusions: [] });
+    /** The lists a case would save, with their titles, said in the *Save as a case* menu. */
+    readonly caseListsLine = computed(() => {
+        const { start, exclusions } = this.caseLists();
+        const title = (id: string) => this.entityLists().find((l) => l.id === id)?.title ?? id;
+        const parts = [
+            ...(start ? [`started from ${title(start)}`] : []),
+            ...(exclusions.length ? [`leaves out ${exclusions.map(title).join(', ')}`] : []),
+        ];
+        return parts.length ? `Lists it uses: ${parts.join('; ')}.` : 'It uses no Entity List yet.';
+    });
+
     readonly saveForm = this.fb.nonNullable.group({
         name: ['', [Validators.required, uniqueNameValidator(() => this.views().map((v) => v.name))]],
         description: [''],
@@ -1333,7 +1423,17 @@ export class LinkAnalysisComponent implements OnInit {
             }),
         );
         this.pipelinesService.list().subscribe({ next: (p) => this.pipelines.set(p), error: () => undefined });
-        this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
+        // A start (`?seed=`, below) waits for the views too: a Dataset's start mapping may come from a saved view.
+        this.viewsLoaded = new Promise((resolve) =>
+            this.viewsService.list().subscribe({
+                next: (v) => {
+                    this.views.set(v);
+                    resolve();
+                },
+                error: () => resolve(),
+            }),
+        );
+        this.loadStartSources(); // before the param streams: a deep-linked start awaits what it reads
         // The footer's server ceiling; absent when the server cannot answer. Graph Run is part of the Investigation surface,
         // so Basic (no Investigations) does not ask - its browser algorithms keep their own caps.
         if (this.investigationsEnabled()) this.graphRuns.loadCatalogue();
@@ -1388,7 +1488,8 @@ export class LinkAnalysisComponent implements OnInit {
             )
             .subscribe((req) => {
                 if (!req) return;
-                void this.prepareInvestigation(req);
+                // LA-ONBOARD-1 OB-9: the deep link, an Entity profile's Investigate and the Start box take ONE path (F-8).
+                void this.startFromEntity(req);
                 // Consumed: drop the params, so a reload does not start over and close the open Investigation.
                 void this.router.navigate([], {
                     relativeTo: this.route,
@@ -1397,6 +1498,254 @@ export class LinkAnalysisComponent implements OnInit {
                     replaceUrl: true,
                 });
             });
+        // LA-ONBOARD-1 phase 3: `?view=<id>` opens that saved view, drawing its graph (the first-run sample lands here).
+        // Consumed once, like `seed`: the param is dropped so a reload does not draw it over the analyst's work.
+        this.route.queryParamMap
+            .pipe(
+                map((p) => p.get('view')),
+                distinctUntilChanged(),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe((viewId) => {
+                if (!viewId) return;
+                this.viewsService.list().subscribe({
+                    next: (all) => {
+                        const v = all.find((x) => x.id === viewId);
+                        if (v) void this.loadView(v);
+                        else this.toastr.info('That saved view is not in this Space.', 'Not found');
+                    },
+                    error: () => undefined,
+                });
+                void this.router.navigate([], {
+                    relativeTo: this.route,
+                    queryParams: { view: null },
+                    queryParamsHandling: 'merge',
+                    replaceUrl: true,
+                });
+            });
+        // LA-ONBOARD-1 phases 4 + 6: `?dataset=<id>` alone (Add data's "Explore in Link Analysis") preselects that Dataset in
+        // the Start box when it can start a graph (a link the Space knows); a Dataset without one is picked in the Query panel,
+        // as the "Explore a Dataset" card does. With `seed` it is the entity's Dataset, which the seed stream consumes.
+        // Consumed once, like `view`.
+        this.route.queryParamMap
+            .pipe(
+                map((p) => (p.get('seed') ? null : p.get('dataset'))),
+                distinctUntilChanged(),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe(async (datasetId) => {
+                if (!datasetId) return;
+                void this.router.navigate([], {
+                    relativeTo: this.route,
+                    queryParams: { dataset: null },
+                    queryParamsHandling: 'merge',
+                    replaceUrl: true,
+                });
+                const [datasets] = await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+                if (this.startCatalogue().datasets.some((d) => d.id === datasetId)) this.startDataset.set(datasetId);
+                else if (datasets.some((d) => d.id === datasetId)) this.exploreDataset(datasetId);
+                else this.toastr.info('That Dataset is not in this Space.', 'Not found');
+            });
+    }
+
+    // ── LA-ONBOARD-1 phase 6 (OB-9): Start from one entity, a list, a paste or the whole Dataset ──
+
+    /** The Entity Types in force with their bindings; null = not read (no registry, or it failed): primary types only. */
+    readonly startTypes = signal<EntityTypeSummary[] | null>(null);
+    private startTypesLoaded: Promise<void> = Promise.resolve();
+    private viewsLoaded: Promise<void> = Promise.resolve();
+    /** The Space's Entity Lists, for "Start from a list". */
+    readonly entityLists = signal<EntityListSummary[]>([]);
+    /** The Dataset the Start box preselects (`?dataset=`); null = its first. */
+    readonly startDataset = signal<string | null>(null);
+    /** What the last start did (drawn, held, not found) - shown under the Start box and the graph's status line. */
+    readonly startNotice = signal<StartNotice | null>(null);
+    readonly starting = signal(false);
+    /** What can be started from: Datasets with a link, and the Entity Types their link ends hold. */
+    readonly startCatalogue = computed(() => startCatalogue(this.datasets(), this.views(), this.startTypes()));
+    /** The host has an Add data screen (the la-app's `/add-data`); the console has none yet, so the card is not offered there. */
+    readonly addDataOffered = hasRoute(this.router.config, 'add-data');
+    /** The projection node cap in force - read, never cached (My browser may lower it). */
+    readonly nodeCap = (): number => projectionNodeCapValue();
+
+    private loadStartSources(): void {
+        this.startTypesLoaded = new Promise<void>((resolve) => {
+            try {
+                this.injector
+                    .get(EntityProfileService)
+                    .entityTypes()
+                    .pipe(takeUntilDestroyed(this.destroyRef))
+                    .subscribe({
+                        next: (l) => {
+                            this.startTypes.set(l?.items ?? []);
+                            resolve();
+                        },
+                        error: () => resolve(), // degrade: the Datasets' primary types still start a graph
+                    });
+            } catch {
+                resolve(); // no registry in this host
+            }
+        });
+        this.inv
+            .listEntityLists()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({ next: (l) => this.entityLists.set(l?.lists ?? []), error: () => undefined });
+    }
+
+    openAddData(): void {
+        void this.router.navigateByUrl('/add-data');
+    }
+
+    /** The Start box's choice. One entity on the Investigations level seeds an Investigation; every other start draws. */
+    async startFrom(req: StartRequest): Promise<void> {
+        const ds = this.startCatalogue().datasets.find((d) => d.id === req.datasetId);
+        if (!ds || this.starting()) return;
+        this.startNotice.set(null);
+        if (req.kind === 'dataset') {
+            this.sourceId.set('entity-projection');
+            this.queryPanel?.patchFormFromView({ id: '', name: '', sourceId: 'entity-projection', query: { projection: ds.mapping } });
+            await this.execute('entity-projection', { projection: ds.mapping });
+            return;
+        }
+        if (req.kind === 'entity') {
+            await this.startFromEntity({ seed: req.value, entityType: req.entityType, dataset: ds.id });
+            return;
+        }
+        let values: string[];
+        if (req.kind === 'list') {
+            try {
+                const list = await firstValueFrom(this.inv.getEntityList(req.listId));
+                if (!list.members) {
+                    this.startNotice.set({ variant: 'warning', text: `The members of ${list.title} are not shown to you, so it cannot start a graph.` });
+                    return;
+                }
+                if (!list.members.length) {
+                    this.startNotice.set({ variant: 'warning', text: `${list.title} has no members yet.` });
+                    return;
+                }
+                values = list.members;
+            } catch (err) {
+                this.startNotice.set({ variant: 'warning', text: apiErrorMessage(err, 'The Entity List could not be read.') });
+                return;
+            }
+        } else values = req.values;
+        const found = await this.drawStart(ds, values);
+        if (found.length) {
+            // a case remembers its start (A-1b): reopening draws it again over the data as it is then
+            this.caseStart.set({ datasetId: ds.id, values: found, ...(req.kind === 'list' ? { listId: req.listId } : {}) });
+            if (req.kind === 'list') this.caseLists.set({ start: req.listId, exclusions: [] });
+            if (req.kind === 'found')
+                this.startNotice.update((n) => (n ? { ...n, text: `Started from ${req.what}. ${n.text}` } : n));
+        }
+        // Investigations level: the drawn start is also queued as the first seeds of the Investigation (as "top results" are).
+        if (found.length && this.investigationsEnabled())
+            this.queueSeedsAndOpen(found.map((v) => ({ id: v, label: v, ids: [v] })));
+    }
+
+    /**
+     * ONE entity (the Start box, the `?seed=` deep link, an Entity profile's Investigate): on the Explorer level draw it and one
+     * ring over a Dataset that links its type (F-8: it drew the whole Dataset); on the Investigations level seed an Investigation.
+     */
+    async startFromEntity(req: InvestigateRequest): Promise<void> {
+        if (this.investigationsEnabled()) {
+            await this.prepareInvestigation(req);
+            return;
+        }
+        this.investigateIssue.set('');
+        await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+        const ds = datasetForType(this.startCatalogue(), req.entityType, req.dataset);
+        if (!ds) {
+            this.startNotice.set({
+                variant: 'warning',
+                text:
+                    `No Dataset in this Space links ${req.entityType} entities yet, so ${req.seed} cannot be drawn. ` +
+                    'Add data, or explore a Dataset and choose its from and to columns.',
+            });
+            return;
+        }
+        const found = await this.drawStart(ds, [req.seed]);
+        if (found.length) this.caseStart.set({ datasetId: ds.id, values: found });
+    }
+
+    /**
+     * The explorer start (OB-9): one neighbours read per value (`POST /inv/projection/neighbors`, at most
+     * {@link START_MAX_SEEDS}) merged into a NEW graph - the values plus one ring - with the busy neighbours above the Space's
+     * hub threshold held (the Grow preview's own `held`), the values marked grown, and the run remembered over the Dataset's
+     * mapping, so Grow continues from the ring. Values that read nothing are reported. Returns the values that were drawn.
+     */
+    private async drawStart(ds: StartDataset, values: readonly string[]): Promise<string[]> {
+        const source = this.graphSources.byId('entity-projection');
+        if (!source?.expand) return [];
+        const wanted = values.slice(0, START_MAX_SEEDS);
+        const q: GraphSourceQuery = { projection: ds.mapping };
+        const firstDraw = !this.graph();
+        const focusBefore = this.focusHolder();
+        this.starting.set(true);
+        this.loading.set(true);
+        this.loadError.set('');
+        try {
+            const reads: ProjectedGraph[] = [];
+            for (let i = 0; i < wanted.length; i += 5)
+                reads.push(...(await Promise.all(wanted.slice(i, i + 5).map((v) => source.expand!(v, v, q) as Promise<ProjectedGraph>))));
+            const found = wanted.filter((_, i) => reads[i].edges.length > 0);
+            const unknown = wanted.filter((_, i) => reads[i].edges.length === 0);
+            if (!found.length) {
+                this.startNotice.set({
+                    variant: 'warning',
+                    text: `Not in ${ds.name}: ${someValues(unknown)}. Nothing was drawn - check the spelling, or pick another Dataset.`,
+                });
+                return [];
+            }
+            const drawn = reads.filter((r) => r.edges.length > 0);
+            const g = { ...mergeGraphs(drawn), idMappings: drawn[0].idMappings } as ProjectedGraph;
+            let held = new Map<string, number | null>();
+            try {
+                const p = await firstValueFrom(
+                    this.inv.previewNeighbors(
+                        neighboursPreviewBody(ds.mapping, found, { direction: 'either', linkKinds: null, threshold: this.growThreshold() }, []),
+                    ),
+                );
+                held = new Map(p.held.map((h) => [h.id, h.contacts]));
+            } catch {
+                // no preview on this server: nothing is held, Grow still asks before it goes through a busy one
+            }
+            this.clearResults();
+            this.growExclude.reset(); // a new graph: an Undo of the old one's Grow must not bring it back
+            this.sourceId.set('entity-projection');
+            this.queryPanel?.patchFormFromView({ id: '', name: '', sourceId: 'entity-projection', query: q });
+            this.graph.set(g);
+            this.truncated.set(drawn.some((r) => r.truncated));
+            this.mappingSummary.set([]);
+            this.kindFilter.set([]);
+            this.hiddenNodeIds.set([]);
+            this.lastRun.set(this.runOf('entity-projection', q, g));
+            this.expandedNodeIds.set(
+                drawn.map((r, i) => seedNodeOf(r, found[i])).filter((id): id is string => !!id),
+            );
+            this.growExclude.basicHeld.set(held);
+            this.queryOpen.set(false);
+            const t = this.growTerms();
+            this.startNotice.set({
+                variant: unknown.length ? 'warning' : 'info',
+                text: startOutcome({
+                    drawn: found.length,
+                    nodes: g.nodes.length,
+                    held: held.size,
+                    unknown,
+                    notDrawn: values.length - wanted.length,
+                    dataset: ds.name,
+                    terms: t,
+                }),
+            });
+            if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
+            return found;
+        } catch (err) {
+            this.toastr.error(invErrorMessage(err, 'The start could not be drawn.'));
+            return [];
+        } finally {
+            this.loading.set(false);
+            this.starting.set(false);
+        }
     }
 
     /** The Datasets of this Space, once listed (empty when the list failed). */
@@ -1412,15 +1761,7 @@ export class LinkAnalysisComponent implements OnInit {
      * open the Dataset picker — the regular start then seeds it.
      */
     async prepareInvestigation(req: InvestigateRequest): Promise<void> {
-        if (!this.investigationsEnabled()) {
-            // Basic (LA-EDITIONS-1 ED-4): there is no Investigation to start; the number is explored on the canvas instead.
-            this.pendingInvestigation.set(null);
-            this.investigateIssue.set(
-                `Investigations are available in Standard and above. Project the Dataset holding ${req.seed}'s links ` +
-                    `and search for ${req.seed} to explore it.`,
-            );
-            return;
-        }
+        if (!this.investigationsEnabled()) return; // the Explorer level has no Investigation: startFromEntity draws instead
         const badSeed = seedError(req);
         if (badSeed) {
             // The same rule as the starter card: a malformed number is refused, never queued.
@@ -1431,17 +1772,20 @@ export class LinkAnalysisComponent implements OnInit {
         // The packs arrive with the Space's Domain Profile: a deep link that lands first waits for them.
         if (!profileForEntityType(req.entityType) && !this.domainProfiles.state()) await this.domainProfiles.ready();
         const seed = req.entityType.toLowerCase() === 'msisdn' ? normaliseMsisdn(req.seed) : req.seed;
-        const binding = investigateBinding({ ...req, seed });
-        const datasets = await this.datasetsLoaded;
+        // A Domain Profile that investigates the type is the override; else OB-9's generic start: a Dataset whose link holds it.
+        const profiled = investigateBinding({ ...req, seed });
+        const [datasets] = await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+        const startDs = profiled ? null : datasetForType(this.startCatalogue(), req.entityType, req.dataset);
+        const binding = profiled ?? (startDs ? genericBinding(seed, req.entityType, startDs, activeDomainProfileId()) : null);
         const wanted = binding?.projection.datasetId ?? req.dataset;
         const ds = wanted ? datasets.find((d) => d.id === wanted) : undefined;
         let reason = !binding
-            ? `No domain profile investigates entities of type ${req.entityType}.`
+            ? `No Dataset in this Space links entities of type ${req.entityType}.`
             : !ds
               ? `The Dataset ${wanted} is not in this Space, so ${seed} cannot be investigated over it.`
               : '';
         // A Dataset named by the link must carry the profile's mapped columns, or every expand would be refused.
-        if (binding && ds && req.dataset) {
+        if (profiled && binding && ds && req.dataset) {
             const missing = missingMappedColumns(
                 binding,
                 (await this.datasetRows.columns(ds)).map((c) => c.name),
@@ -1477,22 +1821,6 @@ export class LinkAnalysisComponent implements OnInit {
         return res.error ? null : latestTimeOf(res.rows[0]?.['latest']);
     }
 
-    /** Starter card "Investigate a number": the same flow as the deep link — navigate with `?seed=`. */
-    investigateNumber(msisdn: string): void {
-        const req: InvestigateRequest = { seed: msisdn, entityType: 'msisdn' };
-        // The same number again is the same URL - no navigation, so the stream would not re-emit it.
-        if (sameInvestigateRequest(parseInvestigateParams(this.route.snapshot.queryParamMap), req)) {
-            void this.prepareInvestigation(req);
-            return;
-        }
-        void this.router.navigate([], {
-            relativeTo: this.route,
-            // `dataset: null` drops a previous link's Dataset: the card binds the profile's default.
-            queryParams: { ...investigateQueryParams(msisdn, 'msisdn'), dataset: null },
-            queryParamsHandling: 'merge',
-        });
-    }
-
     /** The current profile's "Expand next degree" presets ({} = the server defaults). */
     readonly degreePresets = computed(() => this.profile().investigate?.expand ?? {});
     readonly maxDegree = computed(() => this.profile().investigate?.maxDegree ?? DEFAULT_MAX_DEGREE);
@@ -1517,13 +1845,16 @@ export class LinkAnalysisComponent implements OnInit {
         if (v) void this.loadView(v);
     }
 
-    /** Starter card "Explore a Dataset": show the Query panel and open its guided Dataset picker. */
-    exploreDataset(): void {
+    /**
+     * Starter card "Explore a Dataset": show the Query panel and open its guided Dataset picker. With `datasetId` (Add
+     * data's `?dataset=<id>`) that Dataset is picked instead, and its graph is drawn when its link columns are suggested.
+     */
+    exploreDataset(datasetId?: string): void {
         this.queryDockOpen.set(true);
         this.queryOpen.set(true);
         this.sourceId.set('entity-projection');
         this.cdr.detectChanges(); // the panel mounts with the dock - the picker must exist before it is opened
-        this.queryPanel?.startExplore();
+        this.queryPanel?.startExplore(datasetId);
     }
 
     /** Starter card "Open a saved view": the same menu as the rail's saved-views button. */
@@ -1588,6 +1919,9 @@ export class LinkAnalysisComponent implements OnInit {
         this.temporalSealed.set(null);
         this.temporalSealError.set('');
         this.mappingSummary.set([]);
+        this.caseStart.set(null);
+        this.caseLists.set({ exclusions: [] });
+        this.discover?.reset();
     }
 
     /**
@@ -1643,6 +1977,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.investigation.clearQueuedSeeds();
         this.pendingInvestigation.set(null);
         this.investigateIssue.set('');
+        this.startNotice.set(null);
         this.clearResults();
         this.graph.set(null);
         this.lastRun.set(null);
@@ -1661,6 +1996,7 @@ export class LinkAnalysisComponent implements OnInit {
         const focusBefore = this.focusHolder();
         this.loading.set(true);
         this.loadError.set('');
+        this.startNotice.set(null); // a new graph: the last start's outcome no longer describes it
         this.clearResults();
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         try {
@@ -1989,7 +2325,6 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** LA-10: open the Investigation tab (start one, or work the open one's op log). */
     openInvestigation(): void {
-        if (!this.investigationsEnabled()) return; // Basic: no Investigation tab (LA-EDITIONS-1 ED-4)
         this.toolboxDockOpen.set(true);
         this.toolboxTab.set('investigation');
     }
@@ -2962,7 +3297,7 @@ export class LinkAnalysisComponent implements OnInit {
             this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
             this.saveForm.reset({ name: '', description: '' });
             this.saveTrigger?.closeMenu();
-            this.toastr.success(`Saved “${view.name}”.`);
+            this.toastr.success(`Saved the case “${view.name}”.`);
         } catch (err) {
             this.toastr.error(apiErrorMessage(err, 'Saving the view failed.'));
         } finally {
@@ -2990,6 +3325,32 @@ export class LinkAnalysisComponent implements OnInit {
             view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
             // LA-10: no server list exists — the view is where this screen remembers its Investigation ids.
             investigations: this.investigation.refs().length ? this.investigation.refs() : undefined,
+            ...this.caseOfState(),
+        };
+    }
+
+    /**
+     * A case's lists and start (A-1b): the list the graph started from and the exclusion lists written from it, and the
+     * start with every entity grown since (each re-drawn with its ring on open, at most {@link START_MAX_SEEDS}).
+     */
+    private caseOfState(): Pick<LinkAnalysisView, 'lists' | 'start'> {
+        const { start: startList, exclusions } = this.caseLists();
+        const lists = startList || exclusions.length ? { ...(startList ? { start: startList } : {}), ...(exclusions.length ? { exclusions } : {}) } : undefined;
+        const s = this.caseStart();
+        if (!s) return lists ? { lists } : {};
+        const nodes = this.graph()?.nodes ?? [];
+        const grown = this.expandedNodeIds()
+            .map((id) => nodes.find((n) => n.id === id))
+            .map((n) => (n ? rawIdsOf(n)[0] : undefined))
+            .filter((v): v is string => !!v);
+        // A list start re-reads the list's members as they are then: only what was grown beyond them is kept as values.
+        const drawn = new Set(s.values ?? []);
+        const values = s.listId
+            ? [...new Set(grown.filter((v) => !drawn.has(v)))].slice(0, START_MAX_SEEDS)
+            : [...new Set([...drawn, ...grown])].slice(0, START_MAX_SEEDS);
+        return {
+            ...(lists ? { lists } : {}),
+            start: { datasetId: s.datasetId, ...(s.listId ? { listId: s.listId } : {}), ...(values.length ? { values } : {}) },
         };
     }
 
@@ -3080,11 +3441,57 @@ export class LinkAnalysisComponent implements OnInit {
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         if (view.view?.plugins) this.viewOptions.set(view.view.plugins);
-        this.legendOpen.set(view.view?.legend ?? true);
-        this.workingSetOpen.set(view.view?.workingSet ?? true);
+        this.overlaysStated = { legend: view.view?.legend, workingSet: view.view?.workingSet };
+        this.applyOverlayStart();
         this.queryPanel?.patchFormFromView(view);
         this.investigation.restore(view.investigations ?? []);
+        if (view.start && (await this.drawCaseStart(view))) return;
         await this.execute(view.sourceId, view.query);
+        if (view.lists) this.caseLists.set({ start: view.lists.start, exclusions: view.lists.exclusions ?? [] });
+    }
+
+    /**
+     * Open a case drawn from a Start (phase 7): its list's members as they are now plus the values it saved, each with one
+     * ring, then its exclusion lists' members hidden again. False = the start cannot be drawn here (its Dataset no longer
+     * starts a graph, or nothing was found): the caller reruns the view's query instead.
+     */
+    private async drawCaseStart(view: LinkAnalysisView): Promise<boolean> {
+        const start = view.start!;
+        await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+        const ds = this.startCatalogue().datasets.find((d) => d.id === start.datasetId);
+        if (!ds) return false;
+        let values = start.values ?? [];
+        if (start.listId) {
+            try {
+                const list = await firstValueFrom(this.inv.getEntityList(start.listId));
+                values = [...new Set([...(list.members ?? []), ...values])];
+            } catch {
+                // the list is gone or unreadable: draw what the case saved
+            }
+        }
+        const found = await this.drawStart(ds, values);
+        if (!found.length) return false;
+        this.caseStart.set({ datasetId: ds.id, values: found, ...(start.listId ? { listId: start.listId } : {}) });
+        this.caseLists.set({ start: view.lists?.start, exclusions: view.lists?.exclusions ?? [] });
+        await this.hideExcludedByCase(view.lists?.exclusions ?? []);
+        return true;
+    }
+
+    /** Hide the drawn entities a case's exclusion lists hold now (as Exclude → Add to a list did when it was saved). */
+    private async hideExcludedByCase(listIds: readonly string[]): Promise<void> {
+        const members = new Set<string>();
+        for (const id of listIds) {
+            try {
+                for (const m of (await firstValueFrom(this.inv.getEntityList(id))).members ?? []) members.add(m.trim().toUpperCase());
+            } catch {
+                // an unreadable list hides nothing
+            }
+        }
+        if (!members.size) return;
+        const hide = (this.graph()?.nodes ?? [])
+            .filter((n) => rawIdsOf(n).some((v) => members.has(v.trim().toUpperCase())))
+            .map((n) => n.id);
+        if (hide.length) this.hideLocally(hide, 'on the case’s exclusion lists, hidden');
     }
 
     /** Prior saved copies of a view — a Component like any other, so the shared history dialog works
@@ -3158,6 +3565,8 @@ export class LinkAnalysisComponent implements OnInit {
             this.investigation.binding()?.entityType ??
             this.profile().investigate?.entityType ??
             this.canvasData()?.nodes.find((n) => n.data.entityType)?.data.entityType ??
+            // the explorer graph drawn by a start: the primary Entity Type of the Dataset it came from (LA-ONBOARD-1 phase 8)
+            this.discoverDataset()?.primaryEntityType ??
             null,
     );
 
@@ -3482,6 +3891,7 @@ export class LinkAnalysisComponent implements OnInit {
             if (res.ok) {
                 this.clearSelection();
                 this.toastr.info(res.message);
+                this.noteCaseExclusion(res.listId);
             } else this.toastr.error(res.message);
             return;
         }
@@ -3499,11 +3909,89 @@ export class LinkAnalysisComponent implements OnInit {
                 return;
             }
             this.toastr.info(res.message);
+            this.noteCaseExclusion(res.listId);
         }
         this.hideLocally(
             targets.map((n) => n.id),
             r.kind === 'list' ? 'added to the list and hidden' : 'hidden',
         );
+    }
+
+    /** An exclusion list written from this graph is one the case uses (A-1b). */
+    private noteCaseExclusion(listId: string | undefined): void {
+        if (!listId) return;
+        this.caseLists.update((c) => (c.exclusions.includes(listId) ? c : { ...c, exclusions: [...c.exclusions, listId] }));
+        this.refreshEntityLists();
+    }
+
+    /** Re-read the Space's Entity Lists (the Start box and the case's list titles read them). */
+    private refreshEntityLists(): void {
+        this.inv
+            .listEntityLists()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({ next: (l) => this.entityLists.set(l?.lists ?? []), error: () => undefined });
+    }
+
+    // ── LA-ONBOARD-1 phase 7 (UC-12): Find something interesting ──
+
+    /** Why *Start from these* cannot run: it draws over the Dataset the graph came from, which must start a graph. */
+    readonly discoverStartWhyNot = computed(() =>
+        this.investigation.canvas()
+            ? 'Starting again from these would leave the Investigation: close it first.'
+            : this.discoverDataset()
+              ? ''
+              : 'This graph was not drawn from a Dataset with a link, so nothing can start from it.',
+    );
+    /** Why *Add to a list* cannot run (list writes need the Incident management capability; the server asks the same). */
+    readonly discoverListWhyNot = computed(() =>
+        this.lens.canManageIncidents() ? '' : 'Adding to a list needs the Incident management capability.',
+    );
+
+    /** The Dataset the graph on screen was drawn from, when a start can draw over it. */
+    private discoverDataset(): StartDataset | null {
+        const id = this.lastRun()?.query?.projection?.datasetId;
+        return (id && this.startCatalogue().datasets.find((d) => d.id === id)) || null;
+    }
+
+    /** *Show on graph*: emphasise the result and bring its first entity into view. */
+    showFound(sel: GraphSelection): void {
+        this.emphasis.set(sel);
+        if (sel.nodeIds[0]) this.focusNode(sel.nodeIds[0]);
+    }
+
+    /** *Start from these*: the Start box's path (phase 6) over the graph's Dataset - "the busiest / a community". */
+    async startFromFound(a: FoundAction): Promise<void> {
+        const ds = this.discoverDataset();
+        if (!ds) return;
+        await this.startFrom({ kind: 'found', datasetId: ds.id, values: a.row.values, what: a.what });
+    }
+
+    /** *Add to a list* (UC-10): the dialog picks or creates the list and writes; an exclusion list becomes the case's. */
+    addFoundToList(a: FoundAction): void {
+        const data: AddToListData = {
+            labels: a.row.nodeIds.map((id) => this.labelOf(id)),
+            values: a.row.values,
+            entityType: this.growEntityType(),
+            lists: this.entityLists(),
+            purpose: a.purpose,
+            terms: this.growTerms(),
+        };
+        this.dialog
+            .open<LinkAnalysisAddToListDialog, AddToListData, AddToListResult | undefined>(LinkAnalysisAddToListDialog, {
+                width: '30rem',
+                data,
+            })
+            .afterClosed()
+            .subscribe((r) => {
+                if (!r) return;
+                this.toastr.info(r.message);
+                if (r.purpose === 'exclusion') {
+                    this.noteCaseExclusion(r.listId);
+                    // as Exclude → Add to a list does on the explorer graph: out of sight now, not only when the case reopens
+                    if (this.growMode() === 'basic') this.hideLocally(a.row.nodeIds, 'added to the list and hidden');
+                } else this.refreshEntityLists();
+                this.investigation.entityListsChanged.update((n) => n + 1);
+            });
     }
 
     /** Hide explorer nodes (presentation, undoable) and say so with an Undo. */

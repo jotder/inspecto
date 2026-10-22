@@ -31,8 +31,15 @@ $Workloads = @($Workloads | ForEach-Object { $_ -split ',' })   # `pwsh -File ..
 $root = Split-Path $PSScriptRoot -Parent
 $java = Join-Path $(if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:\Program Files\Java\latest\jdk-27' }) 'bin\java.exe'
 if (-not $DuckDbVersion) { $DuckDbVersion = ([regex]::Match((Get-Content "$root\pom.xml" -Raw), '<duckdb\.version>([^<]+)<')).Groups[1].Value }
-$jar = Join-Path $HOME ".m2\repository\org\duckdb\duckdb_jdbc\$DuckDbVersion\duckdb_jdbc-$DuckDbVersion.jar"
-if (-not (Test-Path $jar)) { throw "DuckDB jar not in ~/.m2: $jar" }
+# the Maven local repository: <localRepository> in ~/.m2/settings.xml when set, else ~/.m2/repository
+$m2Repo = Join-Path $HOME '.m2\repository'
+$settings = Join-Path $HOME '.m2\settings.xml'
+if (Test-Path $settings) {
+    $local = ([regex]::Match((Get-Content $settings -Raw), '<localRepository>\s*([^<]+?)\s*</localRepository>')).Groups[1].Value
+    if ($local) { $m2Repo = $local }
+}
+$jar = Join-Path $m2Repo "org\duckdb\duckdb_jdbc\$DuckDbVersion\duckdb_jdbc-$DuckDbVersion.jar"
+if (-not (Test-Path $jar)) { throw "DuckDB jar not in the Maven local repository: $jar" }
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $OutDir = (Resolve-Path $OutDir).Path
 

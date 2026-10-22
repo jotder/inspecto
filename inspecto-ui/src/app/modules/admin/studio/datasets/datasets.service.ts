@@ -78,6 +78,32 @@ export interface MaterializeAccepted {
     status: string;
 }
 
+/** The stored keys Studio itself writes; every other key is carried through untouched ({@link Dataset.extra}). */
+const STUDIO_KEYS = new Set([
+    'name',
+    'kind',
+    'sourceName',
+    'query',
+    'sql',
+    'physicalRef',
+    'columns',
+    'measures',
+    'calculated',
+    'viz',
+]);
+
+/** The stored keys Studio does not edit, as read. */
+function extraOf(content: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(content).filter(([k]) => !STUDIO_KEYS.has(k) && !ENVELOPE_KEYS.has(k)));
+}
+
+/**
+ * The sharing envelope is NEVER carried: the server keeps the CURRENT `owner` / `shares` when a write leaves them out,
+ * while a body stating them wins (an owner's save would undo a sharing change made since the editor opened; anyone
+ * else's is refused 403). Studio does not edit them, so it leaves them out.
+ */
+const ENVELOPE_KEYS = new Set(['owner', 'shares']);
+
 function toContent(d: Dataset): Record<string, unknown> {
     const config: DatasetConfig = {
         kind: d.kind,
@@ -90,7 +116,15 @@ function toContent(d: Dataset): Record<string, unknown> {
         calculated: d.calculated,
         viz: d.viz ?? null,
     };
-    return { name: d.name, ...config } as Record<string, unknown>;
+    // The keys Studio does not edit first, so its own keys always win (LA-ONBOARD-1 phase 5: a Studio save used to
+    // drop primaryEntityType, defaultLinkMapping, origin and every other key it does not know).
+    return { ...(d.extra ?? {}), name: d.name, ...config } as Record<string, unknown>;
+}
+
+/** A stored `defaultLinkMapping` names its two link ends (the server refuses one that does not; an old entry has none). */
+function isLinkMapping(v: unknown): boolean {
+    const m = v as { from?: unknown; to?: unknown } | null;
+    return !!m && typeof m === 'object' && typeof m.from === 'string' && typeof m.to === 'string';
 }
 
 function fromContent(name: string, content: Record<string, unknown>): Dataset {
@@ -98,6 +132,12 @@ function fromContent(name: string, content: Record<string, unknown>): Dataset {
         id: name,
         name: (content['name'] as string) ?? name,
         ...(typeof content['description'] === 'string' ? { description: content['description'] } : {}),
+        ...(typeof content['primaryEntityType'] === 'string'
+            ? { primaryEntityType: content['primaryEntityType'] }
+            : {}),
+        ...(isLinkMapping(content['defaultLinkMapping'])
+            ? { defaultLinkMapping: content['defaultLinkMapping'] as Dataset['defaultLinkMapping'] }
+            : {}),
         kind: (content['kind'] as DatasetKind) ?? 'virtual',
         // ⛔ Never default this to an INVENTED source name. The old `?? 'data'` named a key that did
         // not exist, so a dataset written without a sourceName read `[]` rows in every consumer and was
@@ -121,5 +161,6 @@ function fromContent(name: string, content: Record<string, unknown>): Dataset {
         measures: (content['measures'] as NamedMeasure[]) ?? [],
         calculated: (content['calculated'] as CalculatedColumn[]) ?? [],
         viz: (content['viz'] as Dataset['viz']) ?? null,
+        extra: extraOf(content),
     };
 }

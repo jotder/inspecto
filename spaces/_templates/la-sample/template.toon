@@ -1,0 +1,5 @@
+name: Link Analysis sample (invented data)
+tagline: "Try Link Analysis on invented transfers - a planted money-mule ring, loaded and ready to draw"
+description: "The first-run sample of Inspecto LA (LA-ONBOARD-1 OB-12): one Pipeline and Dataset of invented account-to-account transfers (three days, about 390 rows) and one saved view. Planted story: 12 SMURF accounts structure cash into MULE-HUB-01, which passes it on through RELAY-01/02 to OFFSHORE-77; SHELL-A to SHELL-D circulate money in a loop. Created with loadSamples the sample files are copied into the inbox and the Pipeline runs once; otherwise copy data/samples/mule_transfers into data/inbox/mule_transfers. Runs on every edition, Basic included (no Alert Rules, no Jobs, no sign-in personas); the richer demo is la-showcase. Synthetic data only."
+icon: heroicons_outline:beaker
+contents[4]: "Pipeline + schema (daily partition)", "Dataset with account columns", "1 saved view (the layering ring)", "3 days of invented sample transfers"

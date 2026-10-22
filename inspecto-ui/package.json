@@ -18,6 +18,7 @@
     "lint:tokens": "node tools/check-design-tokens.mjs",
     "lint:denylist": "node tools/check-npm-denylist.mjs",
     "check:bundle-shape": "node tools/check-bundle-shape.mjs",
+    "check:theme-tokens": "node tools/check-theme-tokens.mjs",
     "format:check": "prettier --check \"{src,projects}/**/*.{ts,html,scss,json}\"",
     "format": "prettier --write \"{src,projects}/**/*.{ts,html,scss,json}\""
   },

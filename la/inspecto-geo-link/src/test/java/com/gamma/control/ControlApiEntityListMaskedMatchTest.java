@@ -33,6 +33,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ControlApiEntityListMaskedMatchTest {
 
+    /**
+     * The masking default is on where people sign in (LA-ONBOARD-1 OB-6, A-16) - not where Investigations are present. No test
+     * classpath sets auth.mode, so these tests, which rely on the {@code typed} default, state that people sign in.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void peopleSignIn() {
+        System.setProperty("auth.mode", "oidc");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSignIn() {
+        System.clearProperty("auth.mode");
+    }
+
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String A = "27820000001", B = "27820000002", C = "27820000003";
     private static final String ROWS = String.join(",",

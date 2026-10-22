@@ -39,17 +39,19 @@ class ImportCapabilityGuardTest {
             "reconciliation", List.of("/recon"));
 
     /** method + pattern → why it is not a write of the kind's config (so the generic door need not match it). */
-    private static final Map<String, String> ACTS = Map.of(
-            "POST /datasets/([^/]+)/materialize", "runs a materialize Job; the Dataset's config is untouched",
-            "POST /decision-rules/([^/]+)/apply", "applies a rule to data (canOperateRuns); the rule is untouched",
-            "POST /expectations/evaluate", "evaluates; results are run state, not config",
-            "POST /expectations/([^/]+)/evaluate", "evaluates one Expectation; run state",
-            "POST /expectations/([^/]+)/baseline/accept", "accepts a drift baseline; run state (canOperateRuns)",
-            "POST /expectations/([^/]+)/baseline/clear", "clears a drift baseline; run state (canOperateRuns)",
-            "POST /recon/promote", "opens an Incident from a break (canManageIncidents)",
-            "POST /recon/([^/]+)/record", "records a run into recon-state/ (R2-03), not the config",
-            "POST /recon/([^/]+)/breaks/status", "sets a break's status in recon-state/, not the config",
-            "POST /risk-scores/preview", "read-only POST (keys stay out of URLs), writes nothing (operator, 2026-10-06)");
+    private static final Map<String, String> ACTS = Map.ofEntries(
+            Map.entry("POST /datasets/([^/]+)/materialize", "runs a materialize Job; the Dataset's config is untouched"),
+            Map.entry("POST /decision-rules/([^/]+)/apply", "applies a rule to data (canOperateRuns); the rule is untouched"),
+            Map.entry("POST /expectations/evaluate", "evaluates; results are run state, not config"),
+            Map.entry("POST /expectations/([^/]+)/evaluate", "evaluates one Expectation; run state"),
+            Map.entry("POST /expectations/([^/]+)/baseline/accept", "accepts a drift baseline; run state (canOperateRuns)"),
+            Map.entry("POST /expectations/([^/]+)/baseline/clear", "clears a drift baseline; run state (canOperateRuns)"),
+            Map.entry("POST /recon/promote", "opens an Incident from a break (canManageIncidents)"),
+            Map.entry("POST /recon/([^/]+)/record", "records a run into recon-state/ (R2-03), not the config"),
+            Map.entry("POST /recon/([^/]+)/breaks/status", "sets a break's status in recon-state/, not the config"),
+            Map.entry("POST /risk-scores/preview", "read-only POST (keys stay out of URLs), writes nothing (operator, 2026-10-06)"),
+            Map.entry("POST /datasets/([^/]+)/files", "Add a file (LA-ONBOARD-1): lands data and runs the import; the Dataset's config is untouched"),
+            Map.entry("POST /datasets/([^/]+)/run", "Run now (LA-ONBOARD-1): runs the import Pipeline; the Dataset's config is untouched"));
 
     private static final Set<String> WRITE_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
