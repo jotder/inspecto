@@ -14,11 +14,12 @@ import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, of, throwError } from 'rxjs';
+import { BehaviorSubject, delay, of, throwError } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
 import { InvService, RecursivePathsRequest } from '@inspecto/link-analysis/api/inv.service';
+import { EntityProfileService, EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
 import { PipelinesService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { ElementDetailData } from '@inspecto/link-analysis/investigation/element-detail.dialog';
@@ -111,6 +112,10 @@ function create(
         rows?: Partial<DatasetRowsService>;
         /** The host's module flags (default: Standard and above - the Investigation surface present). */
         features?: LaFeatures;
+        /** The Space's Datasets (default: the one `links-ds`). */
+        datasets?: Dataset[];
+        /** `GET /inv/entity-types` (default: unreadable - the Start box then knows the Datasets' primary types only). */
+        entityTypes?: EntityTypeSummary[];
     } = {},
 ) {
     const queried: unknown[] = [];
@@ -136,10 +141,32 @@ function create(
             // the packs are installed above; the real service would read the server and fall back to generic
             { provide: DomainProfileService, useValue: { state: signal(null), ready: () => Promise.resolve() } },
             { provide: GraphSourcesService, useValue: { sources: [fakeSource], byId: () => fakeSource } },
-            { provide: DatasetsService, useValue: { list: () => of([DS]) } },
+            { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? [DS]) } },
+            {
+                provide: EntityProfileService,
+                useValue: {
+                    entityTypes: () =>
+                        // async, as over HTTP: a deep-linked start must wait for it (the live drive caught the race)
+                        opts.entityTypes
+                            ? of({ items: opts.entityTypes }).pipe(delay(5))
+                            : throwError(() => new Error('no registry')),
+                    suggestEntities: () => throwError(() => new Error('no type-ahead')),
+                },
+            },
             { provide: PipelinesService, useValue: { list: () => of([]) } },
             ...(opts.rows ? [{ provide: DatasetRowsService, useValue: opts.rows }] : []),
-            ...(opts.inv ? [{ provide: InvService, useValue: { masking: signal(null), ...opts.inv } }] : []),
+            ...(opts.inv
+                ? [
+                      {
+                          provide: InvService,
+                          useValue: {
+                              masking: signal(null),
+                              listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }),
+                              ...opts.inv,
+                          },
+                      },
+                  ]
+                : []),
             { provide: LinkAnalysisService, useValue: { list: () => of(opts.views ?? []), save } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             {
@@ -206,7 +233,7 @@ describe('LinkAnalysisComponent', () => {
     it('renders the empty state, is a11y-clean, and validates the mapping before querying', async () => {
         const { fixture, queried } = create();
         fixture.detectChanges();
-        expect(fixture.nativeElement.textContent).toContain('No graph yet');
+        expect(fixture.nativeElement.textContent).toContain('Start from...');
         await fixture.componentInstance.run(); // no mapping picked yet
         expect(fixture.componentInstance.loadError()).toMatch(/source and target/);
         expect(queried).toHaveLength(0);
@@ -446,7 +473,7 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         expect(c.graph()).toBeNull();
         expect(c.lastRun()).toBeNull();
-        expect(el.textContent).toContain('No graph yet');
+        expect(el.textContent).toContain('Start from...');
         expect(el.querySelector('[data-testid="la-close"]')).toBeNull();
     }, 45_000);
 
@@ -636,19 +663,6 @@ describe('LinkAnalysisComponent', () => {
         expect(c.pendingInvestigation()).toBeNull();
         expect(c.investigateIssue()).toContain('The Dataset telecom_links_dataset is not in this Space');
         expect(c.investigation.queuedSeeds()).toEqual([{ id: '966501', label: '966501', ids: ['966501'] }]);
-    });
-
-    it('the "Investigate a number" card navigates with ?seed= (the deep link flow), dropping a stale dataset', () => {
-        const { fixture } = create({});
-        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-        fixture.componentInstance.investigateNumber('+966501234567');
-        expect(navigate).toHaveBeenCalledWith(
-            [],
-            expect.objectContaining({
-                queryParams: { seed: '+966501234567', entityType: 'msisdn', dataset: null },
-                queryParamsHandling: 'merge',
-            }),
-        );
     });
 
     // LA-ONBOARD-1 phase 3: the first-run sample lands on /link-analysis?view=<id> with its graph drawn.
@@ -2127,16 +2141,6 @@ describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not
         await expectNoA11yViolations(panel);
     });
 
-    it('a ?seed= deep link says Investigations are a Standard feature and starts nothing', async () => {
-        const { fixture } = create({ features: BASIC, queryParams: { seed: '+254700000001', entityType: 'msisdn' } });
-        fixture.detectChanges();
-        await fixture.whenStable();
-        const c = fixture.componentInstance;
-        expect(c.investigateIssue()).toContain('available in Standard and above');
-        expect(c.pendingInvestigation()).toBeNull();
-        expect(c.toolboxTab()).not.toBe('investigation');
-    });
-
     it('Standard (the flag on) keeps the three tabs', () => {
         const { fixture } = create();
         fixture.detectChanges();
@@ -2164,11 +2168,11 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
     };
     const card = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement | null;
 
-    it('replaces the empty canvas with starter cards; the Explore card is always there', () => {
+    it('replaces the empty canvas with the Start box; the Explore card is always there', () => {
         const { fixture } = create();
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.textContent).toContain('No graph yet');
+        expect(el.textContent).toContain('Start from...');
         expect(card(el, 'starter-explore')).toBeTruthy();
         // nothing saved in this Space: the cards that need a saved view are hidden, not dead
         expect(card(el, 'starter-follow')).toBeNull();
@@ -3317,5 +3321,253 @@ describe('LinkAnalysisComponent - canvas overlays at laptop width (LA-ONBOARD-FI
         expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
         c.setOverlayOpen('legend', true);
         expect(c.legendOpen()).toBe(true);
+    });
+});
+
+describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7, F-8)', () => {
+    const BASIC: LaFeatures = { ...STANDARD_EDITION_FEATURES, investigations: signal(false) };
+    /** An imported transfers file (phase 2): its primary Entity Type and default link on the registry entry. */
+    const TRANSFERS: Dataset = {
+        ...DS,
+        id: 'transfers',
+        name: 'Transfers',
+        sourceName: 'transfers',
+        primaryEntityType: 'account',
+        defaultLinkMapping: { from: 'from_account', to: 'to_account', kind: 'channel' },
+    };
+    const MAPPING = {
+        datasetId: 'transfers',
+        sourceCol: 'from_account',
+        targetCol: 'to_account',
+        linkKindCol: 'channel',
+        entityType: 'account',
+    };
+    /** One neighbours read: the value and its ring (R1, R2 and the busy HUB); a value not in the data reads nothing. */
+    const ring = (v: string): G6GraphData =>
+        v.startsWith('NOPE')
+            ? { nodes: [], edges: [] }
+            : {
+                  nodes: [v, `${v}-R1`, `${v}-R2`, 'HUB'].map((id) => ({ id, data: { label: id, kind: 'entity' } })),
+                  edges: [`${v}-R1`, `${v}-R2`, 'HUB'].map((r) => ({
+                      id: `${v}->${r}`,
+                      source: v,
+                      target: r,
+                      data: { kind: 'transfer' },
+                  })),
+              };
+    const preview = () =>
+        vi.fn(() =>
+            of({
+                addsNodes: 0,
+                addsLinks: 0,
+                held: [{ id: 'HUB', contacts: 900 }],
+                heldCount: 1,
+                excludedByLists: [],
+                truncated: false,
+                readPath: 'dataset',
+            }),
+        );
+    async function settle(fixture: ReturnType<typeof create>['fixture']) {
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        fixture.componentInstance.ngOnInit();
+        for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r));
+        return navigate;
+    }
+
+    /**
+     * F-8 (2026-10-22 walkthrough): an Entity profile's *Investigate* on Basic navigates `?seed=<account>&entityType=account
+     * &dataset=<its Dataset>`. The page used to stop at "Investigations are available in Standard and above", drop the seed
+     * and offer "Choose a Dataset", whose pick projected the WHOLE Dataset (312 nodes). It now draws that account plus one
+     * ring through the neighbours read - never the whole-Dataset projection - with the busy neighbour held, so Grow goes on.
+     */
+    it('F-8: ?seed= from an Entity profile on the Explorer level draws that entity and ONE ring, never the whole Dataset', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const previewNeighbors = preview();
+        const { fixture, queried } = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors } as Partial<InvService>,
+            queryParams: { seed: 'MULE-HUB-01', entityType: 'account', dataset: 'transfers' },
+        });
+        const navigate = await settle(fixture);
+        const c = fixture.componentInstance;
+        expect(queried).toEqual([]); // the whole-Dataset projection never ran
+        expect(expand).toHaveBeenCalledWith('MULE-HUB-01', 'MULE-HUB-01', { projection: MAPPING });
+        expect(c.graph()!.nodes.map((n) => n.id).sort()).toEqual(['HUB', 'MULE-HUB-01', 'MULE-HUB-01-R1', 'MULE-HUB-01-R2']);
+        expect(c.investigateIssue()).toBe('');
+        expect(c.expandedNodeIds()).toEqual(['MULE-HUB-01']);
+        expect(previewNeighbors).toHaveBeenCalledWith(
+            expect.objectContaining({ dataset: 'transfers', ids: ['MULE-HUB-01'], hubThreshold: c.growThreshold() }),
+        );
+        expect(c.growExclude.basicHeld().get('HUB')).toBe(900);
+        expect(c.lastRun()?.query.projection).toMatchObject({ datasetId: 'transfers', sourceCol: 'from_account' });
+        // Grow continues from the ring: the seed is grown, the busy one held
+        const ctx = c.growContext();
+        expect(ctx.blocked).toBeNull();
+        expect([...ctx.frontier].sort()).toEqual(['MULE-HUB-01-R1', 'MULE-HUB-01-R2']);
+        expect(ctx.heldFrontier).toEqual(['HUB']);
+        expect(c.startNotice()?.text).toContain('Drew 1 start and 3 linked');
+        expect(c.startNotice()?.text).toContain('1 busy');
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { seed: null, entityType: null, dataset: null } }),
+        );
+    });
+
+    /** The la-sample shape: no default link; the Dataset's link comes from its saved view, its type from the column classification. */
+    it('F-8: a Dataset linked only by a saved view and its column types starts the entity once the registry answers', async () => {
+        const MULE: Dataset = { ...DS, id: 'mule', name: 'mule', sourceName: 'mule' };
+        const view: LinkAnalysisView = {
+            id: 'ring',
+            name: 'ring',
+            sourceId: 'entity-projection',
+            query: { projection: { datasetId: 'mule', sourceCol: 'PAYER', targetCol: 'PAYEE', linkKindCol: 'CHANNEL' } },
+        };
+        const account: EntityTypeSummary = {
+            id: 'account',
+            label: 'Account',
+            normaliser: 'upper-trim',
+            masked: false,
+            classifications: ['ACCOUNT'],
+            bindings: [
+                { dataset: 'mule', column: 'PAYEE', role: 'target' },
+                { dataset: 'mule', column: 'PAYER', role: 'source' },
+            ],
+            headline: { assessed: false, reason: null, distinct: null, approximate: false, rows: null, dataAsOf: null, computedAt: null },
+        };
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [MULE],
+            views: [view],
+            entityTypes: [account],
+            expand,
+            inv: { previewNeighbors: preview() } as Partial<InvService>,
+            queryParams: { seed: 'MULE-HUB-02', entityType: 'account', dataset: 'mule' },
+        });
+        await settle(fixture);
+        expect(expand).toHaveBeenCalledWith('MULE-HUB-02', 'MULE-HUB-02', {
+            projection: { datasetId: 'mule', sourceCol: 'PAYER', targetCol: 'PAYEE', linkKindCol: 'CHANNEL' },
+        });
+        expect(fixture.componentInstance.startNotice()?.text).toContain('Drew 1 start');
+    });
+
+    it('F-8: a profile Dataset that does not link the type falls back to one that does', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [DS, TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview() } as Partial<InvService>,
+            queryParams: { seed: 'ACC-7', entityType: 'account', dataset: 'links-ds' },
+        });
+        await settle(fixture);
+        expect(expand).toHaveBeenCalledWith('ACC-7', 'ACC-7', { projection: MAPPING });
+    });
+
+    it('an Entity Type no Dataset links says so and draws nothing', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            queryParams: { seed: '35000000001', entityType: 'imei' },
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        expect(expand).not.toHaveBeenCalled();
+        expect(c.graph()).toBeNull();
+        expect(c.startNotice()?.text).toContain('No Dataset in this Space links imei entities yet');
+    });
+
+    it('a paste draws the values it finds and reports the unknown ones', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview() } as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'NOPE-9', 'A-2'] });
+        expect(expand).toHaveBeenCalledTimes(3);
+        expect([...c.expandedNodeIds()].sort()).toEqual(['A-1', 'A-2']);
+        expect(c.startNotice()).toEqual({ variant: 'warning', text: expect.stringContaining('Not in Transfers: NOPE-9.') });
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="start-outcome"]')?.textContent).toContain(
+            'NOPE-9',
+        );
+    });
+
+    it('a paste where nothing is found draws nothing and says what was not found', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ features: BASIC, datasets: [TRANSFERS], expand });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['NOPE-1', 'NOPE-2'] });
+        expect(c.graph()).toBeNull();
+        expect(c.startNotice()?.text).toContain('Not in Transfers: NOPE-1, NOPE-2. Nothing was drawn');
+    });
+
+    it('a list draws its members with one ring', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', members: ['S-1', 'S-2'] }));
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), getEntityList } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'suspects' });
+        expect(getEntityList).toHaveBeenCalledWith('suspects');
+        expect([...c.expandedNodeIds()].sort()).toEqual(['S-1', 'S-2']);
+    });
+
+    it('the whole Dataset projects the default link (the explicit choice)', async () => {
+        const { fixture, queried } = create({ features: BASIC, datasets: [TRANSFERS] });
+        await settle(fixture);
+        await fixture.componentInstance.startFrom({ kind: 'dataset', datasetId: 'transfers' });
+        expect(queried).toEqual([{ projection: MAPPING }]);
+    });
+
+    it('?dataset= alone preselects that Dataset in the Start box and clears the param', async () => {
+        const { fixture } = create({ features: BASIC, datasets: [DS, TRANSFERS], queryParams: { dataset: 'transfers' } });
+        const navigate = await settle(fixture);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        expect(c.startDataset()).toBe('transfers');
+        expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { dataset: null } }));
+        const picker = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="start-dataset"]');
+        expect(picker?.textContent).toContain('Transfers');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('Investigations level, one entity: an account seeds an Investigation over its Dataset (generic binding, OB-9)', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' });
+        expect(c.pendingInvestigation()).toMatchObject({ seed: 'MULE-HUB-01', projection: MAPPING, presets: {} });
+        expect(c.investigateIssue()).toBe('');
+        expect(c.toolboxTab()).toBe('investigation');
+    });
+
+    it('Investigations level, a paste: drawn with one ring and queued as the first seeds', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview() } as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'A-2'] });
+        expect(c.investigation.queuedSeeds().map((s) => s.id)).toEqual(['A-1', 'A-2']);
+        expect(c.toolboxTab()).toBe('investigation');
+        expect(c.graph()).not.toBeNull();
     });
 });

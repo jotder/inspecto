@@ -421,8 +421,33 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
   /inv/entities/{type}/resolve {key}` (raw value or alias, in the body) answers the alias of the normalised key - the same alias
   the exploration reads mint - or, for an unmasked type, the normalised value. The envelope's `links.self` echoes the request
   path, which is why the rule is enforced at the route.
-Audited as `LINK_ENTITY_TYPES_LISTED`, `LINK_ENTITY_TYPE_PROFILED`, `LINK_ENTITY_PROFILED`, `LINK_ENTITY_KEY_RESOLVED` (never a
-key). Rate class: the list exempt; both profiles and resolve expensive.
+* **The Start box's type-ahead** (LA-ONBOARD-1 phase 6, OB-9): `POST /inv/entities/{type}/suggest {prefix?, dataset?, limit?}`
+  runs over the same union relation, restricted to the type's LINK-END bindings (`source` / `target`; attribute columns never
+  start a graph) and optionally one Dataset: values whose raw spelling or normalised key begins with the prefix, busiest
+  first, with their link rows and first / last seen, plus `distinct` (Entities matching; a value that normalises to nothing
+  is no Entity). A masked type lists nothing, and is counted only for an EMPTY prefix - a count per prefix would spell a raw
+  value out character by character. The prefix travels in the body; the read is a `read-shaped` exemption like resolve.
+Audited as `LINK_ENTITY_TYPES_LISTED`, `LINK_ENTITY_TYPE_PROFILED`, `LINK_ENTITY_PROFILED`, `LINK_ENTITY_KEY_RESOLVED`,
+`LINK_ENTITY_SUGGESTED` (never a key, a prefix or a value). Rate class: the list exempt; both profiles, resolve and suggest expensive.
+
+**Start from... (LA-ONBOARD-1 phase 6, as built 2026-10-22).** The SPA's pure half is `link-analysis/start-from.ts`
+(`startMapping` precedence: `defaultLinkMapping` > a Domain Profile `investigate` mapping over the Dataset > the first saved
+single-mapping view > the classified `source` / `target` columns; `startCatalogue` over the Datasets, views and
+`GET /inv/entity-types`; with the registry unreadable only the primary types start). `LaDataset` (and the console's `Dataset`,
+read-only) carry `primaryEntityType` and `defaultLinkMapping`. An explorer start is `drawStart`: one neighbours read per value
+(at most 25, five at a time) merged into a NEW graph, the Grow preview's `held` set as the basic held items, the values marked
+expanded, and the run remembered over the mapping WITHOUT a filter, so Grow continues from the ring. One entity on the
+Investigations level goes through `prepareInvestigation`: the Domain Profile binding wins (override), else `genericBinding`
+(the start Dataset's mapping typed by the seed, server-default rung). **F-8 root cause** (traced 2026-10-22): an Entity
+profile's *Investigate* navigates `?seed=<key>&entityType=<type>&dataset=<where[0]>`; on the Explorer level
+`prepareInvestigation` returned at once with "Investigations are available in Standard and above…", queued nothing, ignored
+`dataset`, and the stream dropped the three params; the empty state's only action was *Choose a Dataset* →
+`exploreDataset()` → the Query panel's guided picker, whose pick ran an unseeded `POST /inv/projection` of the whole
+Dataset. The seed never reached any read. On Standard an `account` fared no better: no profile investigates it, so the
+same picker drew the whole Dataset with the seed merely queued. Both now draw / bind from the entity (spec
+`link-analysis.component.spec.ts` "F-8: …", falsified against the old branch). ⚠ The console's Dataset editor writes
+`toContent()`, which does not carry `primaryEntityType` / `defaultLinkMapping`: saving a Dataset there drops them (seen while
+reading the code, not changed here).
 
 ### 3.5 Entity store (identity data)
 
@@ -588,7 +613,7 @@ key). Rate class: the list exempt; both profiles and resolve expensive.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **100**<!--count:la-routes--> routes (**93**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **101**<!--count:la-routes--> routes (**94**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -602,7 +627,7 @@ the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all presen
 | Graph Run | `/inv/graph/runs`, `/algorithms`, `/runs/{id}`, `/cancel` | `canRunLinkGraphAnalysis` on the POST that starts a run; list/get are read-gated; cancel is owner-or-admin, else 404 |
 | Analyst upload | `POST /inv/uploads/{collector}?name=x.csv[&replace=true]`; `GET /inv/uploads` (upload-enabled Collectors), `GET /inv/uploads/{collector}` (own uploads + ingest state), `DELETE /inv/uploads/{collector}/{file}` (withdraw a pending upload) | `canUploadData` (§6.6); the list is the caller's own, the delete is uploader-or-`canAdminister` |
 | Index | `/inv/index`, `/inv/index/builds`, `/builds/{id}`, `/cancel` | `canBuildLinkIndex` on the POST that starts a build; the reads and cancel are not capability-gated |
-| Entity profiles (2026-10-15) | `GET /inv/entity-types`, `GET /inv/entity-types/{id}/profile`, `GET /inv/entities/{type}/{key}/profile`, `POST /inv/entities/{type}/resolve` (la-api `EntityProfileRoutes`) | none beyond a subject (like the exploration reads); Dataset view gate per binding; profiles rate-limited as expensive |
+| Entity profiles (2026-10-15) | `GET /inv/entity-types`, `GET /inv/entity-types/{id}/profile`, `GET /inv/entities/{type}/{key}/profile`, `POST /inv/entities/{type}/resolve`, `POST /inv/entities/{type}/suggest` (2026-10-22, the Start box) (la-api `EntityProfileRoutes`) | none beyond a subject (like the exploration reads); Dataset view gate per binding; profiles rate-limited as expensive |
 | Data trust (LA-DATA-TRUST-1, 2026-10-14) | `GET /inv/datasets/{id}/files` (one row per File: outcome, event day, rows, error rows, index state; la-api `DatasetFilesRoutes`), `GET …/{id}/data-changes` (corrected-day warning; geo-link `InvestigationDataChangesRoutes`), `…/{id}/coverage` | read-only; Dataset view gate / Investigation `open` gate. As built: [frontend concept §Data trust](user-guide-link-analysis.md) |
 | Embed link | `…/{id}/embeds` (POST mint, GET list), `…/embeds/{grantId}/revoke`, and the public `GET /public/investigations/{token}` | `canShareInvestigation` on mint and revoke (+ lead role); the list is read-gated; the public GET is authenticated by its token alone (§6.2) |
 | Measures & detection (geo-link) | `…/{id}/measures`, `…/alert-rules`, `…/standing-detection` | `canAuthorAlertRules` |

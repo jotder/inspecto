@@ -746,6 +746,16 @@
                 The projection hit the node cap — narrow the dataset or filter to see everything.
             </inspecto-alert>
         }
+        @if (startNotice(); as n) {
+            @if (graph()) {
+                <div class="flex items-start gap-1" data-testid="start-outcome">
+                    <inspecto-alert class="flex-auto" [variant]="n.variant">{{ n.text }}</inspecto-alert>
+                    <button mat-icon-button type="button" aria-label="Dismiss" (click)="startNotice.set(null)">
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
+            }
+        }
         @if (expandSourceNote(); as note) {
             <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-source">
                 Last neighbour expand: {{ note }}
@@ -1131,21 +1141,30 @@
                             <inspecto-empty-state
                                 class="block w-full max-w-3xl p-4"
                                 icon="heroicons_outline:circle-stack"
-                                title="Choose a Dataset to investigate this number"
+                                title="Choose a Dataset to start from"
                                 [message]="issue"
                                 actionLabel="Choose a Dataset"
                                 (action)="exploreDataset()"
                                 data-testid="investigate-issue"
                             ></inspecto-empty-state>
                         }
-                        <inspecto-link-analysis-starter-cards
+                        <inspecto-link-analysis-start-box
+                            [catalogue]="startCatalogue()"
+                            [lists]="entityLists()"
+                            [dataset]="startDataset()"
+                            [investigations]="investigationsEnabled()"
+                            [nodeCap]="nodeCap()"
+                            [notice]="startNotice()"
+                            [busy]="starting()"
                             [followView]="followView()"
                             [savedViewCount]="views().length"
+                            [addData]="addDataOffered"
+                            (start)="startFrom($event)"
                             (followMoney)="loadFollowTheMoney()"
                             (exploreDataset)="exploreDataset()"
                             (openSavedViews)="openSavedViews()"
-                            (investigateNumber)="investigateNumber($event)"
-                        ></inspecto-link-analysis-starter-cards>
+                            (openAddData)="openAddData()"
+                        ></inspecto-link-analysis-start-box>
                     </div>
                 }
             </div>

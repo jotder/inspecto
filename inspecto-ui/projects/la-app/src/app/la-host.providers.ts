@@ -30,6 +30,7 @@ import {
     LaDataset,
     LaDatasets,
     LaFeatures,
+    LaLinkMapping,
     LaPipelineGraph,
     LaTags,
     LaTransfer,
@@ -99,6 +100,12 @@ function reportAbsent(token: string): void {
 export class NoDashboardHeaderComponent {}
 
 /** The Link Analysis application's implementation of the ten host tokens. See {@link LA_APP_TOKEN_PROVISION}. */
+/** A stored `defaultLinkMapping` names its two link ends (the server refuses one that does not; an old entry has none). */
+function isLinkMapping(v: unknown): boolean {
+    const m = v as { from?: unknown; to?: unknown } | null;
+    return !!m && typeof m === 'object' && typeof m.from === 'string' && typeof m.to === 'string';
+}
+
 export function provideLaAppHostServices(): Provider[] {
     return [
         {
@@ -119,6 +126,13 @@ export function provideLaAppHostServices(): Provider[] {
                     sql: (content['sql'] as string | null) ?? null,
                     columns: (content['columns'] as LaDataset['columns']) ?? [],
                     calculated: (content['calculated'] as LaDataset['calculated']) ?? [],
+                    // LA-ONBOARD-1 OB-8: what the Start box preselects and draws
+                    ...(typeof content['primaryEntityType'] === 'string'
+                        ? { primaryEntityType: content['primaryEntityType'] }
+                        : {}),
+                    ...(isLinkMapping(content['defaultLinkMapping'])
+                        ? { defaultLinkMapping: content['defaultLinkMapping'] as LaLinkMapping }
+                        : {}),
                 });
                 return {
                     list: () =>

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-113 test class(es): 18 unit, 95 real-HTTP control-plane, 0 IT.
+114 test class(es): 18 unit, 96 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -44,6 +44,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiEntityProfileIndexLinksTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntityProfileIndexLinksTest.java` | Plan D-EP4 "index first" over REAL HTTP: once a fresh index covers the type's one link mapping, the Links sections of |
 | `ControlApiEntityProfileScaleTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntityProfileScaleTest.java` | The Entity Type profile at production scale (IMS showcase plan §6, 2026-10-16: a 132 M-row day ran the profile out of the |
 | `ControlApiEntityProfileTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntityProfileTest.java` | {@code GET /inv/entities/{type}/{key}/profile} and {@code POST /inv/entities/{type}/resolve} over REAL HTTP |
+| `ControlApiEntitySuggestTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntitySuggestTest.java` | {@code POST /inv/entities/{type}/suggest} over REAL HTTP (LA-ONBOARD-1 OB-9, the Start box's type-ahead): the values of a |
 | `ControlApiEntityTypeProfileTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntityTypeProfileTest.java` | {@code GET /inv/entity-types} and {@code GET /inv/entity-types/{id}/profile} over REAL HTTP (la-entity-profile-plan §4.5): |
 | `ControlApiExplorationMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiExplorationMaskingTest.java` | DR-D2 / DR-T4 (operator 2026-10-10: <i>mask the same way everywhere</i>) over real HTTP. A Space that masks shows an |
 | `ControlApiGeoDatasetViewGateTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiGeoDatasetViewGateTest.java` | R3 on the Geo routes — a Dataset shared away from the caller is indistinguishable from an absent one on |

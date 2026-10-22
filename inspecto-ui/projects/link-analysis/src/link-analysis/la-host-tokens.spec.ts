@@ -129,7 +129,10 @@ describe('Link Analysis host-service tokens', () => {
                 provideRouter([]),
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: { list: () => of([]) } },
-                { provide: InvService, useValue: { masking: signal(null) } },
+                {
+                    provide: InvService,
+                    useValue: { masking: signal(null), listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }) },
+                },
                 { provide: LinkAnalysisService, useValue: { list: () => of([]) } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
                 {
@@ -147,7 +150,7 @@ describe('Link Analysis host-service tokens', () => {
         });
         const fixture = TestBed.createComponent(LinkAnalysisComponent);
         fixture.detectChanges();
-        expect(fixture.nativeElement.textContent).toContain('No graph yet');
+        expect(fixture.nativeElement.textContent).toContain('Start from...');
         // the Datasets the studio offers came through the token, not a host service
         expect(fixture.componentInstance.datasets()).toEqual([DS]);
     });
@@ -162,7 +165,10 @@ describe('Link Analysis host-service tokens', () => {
                 provideRouter([]),
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: { list: () => of([]) } },
-                { provide: InvService, useValue: { masking: signal(null) } },
+                {
+                    provide: InvService,
+                    useValue: { masking: signal(null), listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }) },
+                },
                 { provide: LinkAnalysisService, useValue: { list } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
                 {
@@ -234,7 +240,10 @@ describe('Link Analysis host-service tokens', () => {
                 ...fakeHost(),
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: {} },
-                { provide: InvService, useValue: { masking: signal(null) } },
+                {
+                    provide: InvService,
+                    useValue: { masking: signal(null), listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }) },
+                },
             ],
         });
         const g = await TestBed.inject(GraphSourcesService).byId('component-registry')!.query({});
@@ -248,7 +257,10 @@ describe('Link Analysis host-service tokens', () => {
                 ...fakeHost(),
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: {} },
-                { provide: InvService, useValue: { masking: signal(null) } },
+                {
+                    provide: InvService,
+                    useValue: { masking: signal(null), listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }) },
+                },
                 {
                     provide: LinkAnalysisService,
                     useValue: { get: () => of({ id: 'v', description: 'About this view' }) },

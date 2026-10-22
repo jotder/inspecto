@@ -93,22 +93,42 @@ stands for the same account, so you can still group, count, search and follow it
 
 ---
 
-## 4. Start here: three ways to get a graph
+## 4. Start here: Start from...
+
+The first screen is one **Start from...** box. Pick the **Dataset** first (the one you just added is already
+picked when you come from *Explore in Link Analysis*), then what to start from:
+
+* **One entity** - pick the **Entity Type** first (the Dataset's main one is already chosen: accounts for
+  transfers, phone numbers for calls), then type the value. As you type, matching values appear with how busy they
+  are: *MULE-HUB-01 - 10 links, first seen 3 Sep 2026, last seen 30 Sep 2026*. Any Entity Type works - an account is
+  no longer refused as "not a phone number". A masked type suggests nothing: type the whole value.
+* **A list** - pick an Entity List (suspects, a watch list).
+* **A paste** - paste values, one per line (commas and semicolons work too).
+* **The whole Dataset** - draws every link at once. When the Dataset holds more entities than the node cap, the
+  box warns you first: the graph is cut to the busiest, and starting from one entity is usually clearer.
+
+**Start** draws what you chose and everything linked to it - **one ring** - with busy numbers held (see *Grow and
+clean the graph* below), so **Grow** continues from there one step at a time. A line above the graph says what was
+drawn and lists any value that is not in the Dataset. A list or a paste draws at most 25 values in one start.
+
+With Investigations (Standard and above, with the add-on), **One entity** seeds an Investigation instead: state the
+**Purpose / legal basis** and press **Investigate**; it creates the Investigation, seeds the entity and draws one
+degree of everyone it is linked to. A list or a paste is drawn as above and queued as the first seeds of the
+Investigation you start.
+
+**Investigate** on an Entity's page takes the same path: it starts from that entity, never from the whole Dataset.
 
 ### 4.1 Use an example or a saved view
-On the first screen, **Follow the money (example)** opens a ready-made view and draws it at once. **Open a saved
-view** lists your Space's views. A saved view re-reads live data; it is a starting point, not evidence.
+Under the box, **Follow the money (example)** opens a ready-made view and draws it at once. **Open a saved
+view** lists your Space's views. A saved view re-reads live data; it is a starting point, not evidence. **Add data**
+brings a file into the Space.
 
 ### 4.2 Draw a Dataset yourself
+**Explore a Dataset** lets you choose the columns:
 1. Under **Dataset**, choose one. The list shows the ones that look like links first, each with the reason.
 2. The two **entity columns** are filled in for you. Change them if the link runs the other way. Optionally set a
    **Link type column** (channel, call type) and **Attribute columns** (amount, country, time).
 3. Press **Run query**. The footer says, for example, *20 nodes · 20 links drawn*.
-
-### 4.3 Investigate one number
-The fourth card takes a phone number (6 to 15 digits). Press **Investigate**, state the **Purpose / legal basis**,
-and press **Investigate** again. It creates an Investigation, seeds the number and draws one degree of everyone it
-is linked to. **Expand next degree** goes one hop further, up to four.
 
 > **Tip:** the Purpose field is required. If the Investigation tab opens scrolled somewhere else, scroll to its top.
 

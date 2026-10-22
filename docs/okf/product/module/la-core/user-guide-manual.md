@@ -43,23 +43,45 @@ The screen says *"Not evidence — saved views re-project live data"* on the sav
 
 ## 2. Quick start (five minutes)
 
-**Fastest start:** the first screen offers four starter cards. **Follow the money (example)** opens a ready-made
-saved view of your Space and draws it at once (shown only when your Space has one). **Explore a Dataset** opens the
-Dataset picker — the Datasets that look like links are listed first, each with a one-line reason — and when you
-pick one its from and to columns are filled in for you and the graph is drawn. **Open a saved view** opens
-your saved views. The steps below are the same thing done by hand.
+**Fastest start: Start from...** (LA-ONBOARD-1 phase 6, OB-9). The first screen is one box. Pick the **Dataset**
+(preselected from `?dataset=<id>`, which Add data's *Explore in Link Analysis* passes), then start from:
 
-**Investigate a number:** the fourth card takes an MSISDN (6 to 15 digits, an optional `+`). It opens the same
-flow as the deep link `/studio/link-analysis?seed=<id>&entityType=msisdn[&dataset=<datasetId>]`, which an
-Incident or Case page offers as **Investigate … in Link Analysis** when a keyed Alert Rule recorded the number
-(`key.msisdn`-style attribute). The Telecom profile binds the Dataset `telecom_links_dataset` (`a_msisdn` → `b_msisdn`, link
-kind `link_kind`, time `last_seen`); `dataset=` names another one. The Investigation tab asks only the purpose (the
-title is pre-filled *Suspect &lt;id&gt;*); **Investigate** then creates the Investigation, seeds the number and expands
-two degrees. **Expand next degree** goes one hop further from the outermost entities, up to degree 4, with the
-profile's presets (the 30 days up to the Dataset's latest event — "all available data" when that cannot be read — at least 1 event per link, at most 500 links per entity, 10,000 rows per degree);
-each degree's result, any budget cut or fan-out cap, and a degree held for four-eyes approval ("waiting for approval") is stated under the button. If the Space has no such
-Dataset the screen says so, keeps the number queued as a seed and offers the Dataset picker. The legend's link-kind
-chips hide or show each kind of link on the canvas.
+| Start | What you give | What it draws (Explorer level) |
+|---|---|---|
+| **One entity** | the **Entity Type first** (the Dataset's `primaryEntityType` preselected), then the value, with a type-ahead of matches, busiest first, each with its link rows and first / last seen | that entity plus one ring |
+| **A list** | an Entity List | its members (at most 25) plus one ring |
+| **A paste** | values, one per line (commas, semicolons and tabs also separate) | the values found plus one ring; values not in the Dataset are reported |
+| **The whole Dataset** | nothing more | every link (the old Explore draw), warned first when the Dataset holds more Entities than the projection node cap |
+
+Which Datasets can start a graph, and over which columns: the Dataset's own `defaultLinkMapping` (OB-8); else a Domain
+Profile's `investigate` mapping over it; else the first saved view over it; else its two classified link-end columns.
+An Entity Type can start a graph when a link end of such a Dataset holds it (`GET /inv/entity-types` binds it `source` /
+`target`), or when it is the Dataset's primary type. The type-ahead is `POST /inv/entities/{type}/suggest` (the prefix in the
+body; a masked type suggests nothing and is only counted as a whole).
+
+A start draws through the **neighbours read** (`POST /inv/projection/neighbors`, one per value), never the whole-Dataset
+projection, holds the busy neighbours above the Space's hub threshold (the Grow preview's own `held`), and marks the starting
+entities as grown, so **Grow** continues from the ring. A line above the graph says what was drawn, how many were held and
+which values were not found. On the **Investigations** level, **One entity** seeds an Investigation as before: a Domain
+Profile that investigates the type binds its own mapping and presets (the override); any other type binds the start
+Dataset's mapping with the server's default rung. A list or a paste is drawn and queued as the first seeds.
+
+**Investigate** on an Entity's profile page (and the deep link `/studio/link-analysis?seed=<id>&entityType=<type>[&dataset=<datasetId>]`,
+which an Incident or Case page offers as **Investigate … in Link Analysis** when a keyed Alert Rule recorded the entity) takes
+the same path: on the Explorer level it draws that entity and one ring over the named Dataset, or over the first Dataset that
+links its type. Before phase 6 the Explorer level stopped at "Investigations are available in Standard and above", dropped the
+seed and offered *Choose a Dataset*, whose pick drew the whole Dataset (F-8, 312 nodes in the walkthrough). The Telecom profile
+still binds `telecom_links_dataset` (`a_msisdn` → `b_msisdn`, link kind `link_kind`, time `last_seen`) for a phone number on
+the Investigations level: the Investigation tab asks only the purpose (the title is pre-filled *Suspect &lt;id&gt;*);
+**Investigate** creates the Investigation, seeds the number and expands one degree. **Expand next degree** goes one hop further,
+up to degree 4, with the profile's presets (the 30 days up to the Dataset's latest event — "all available data" when that
+cannot be read — at least 1 event per link, at most 500 links per entity, 10,000 rows per degree); each degree's result, any
+budget cut or fan-out cap, and a degree held for four-eyes approval ("waiting for approval") is stated under the button.
+
+Under the box: **Follow the money (example)** opens a ready-made saved view and draws it (shown only when your Space has
+one), **Open a saved view**, **Explore a Dataset** (choose the columns yourself — the Datasets that look like links are listed
+first) and **Add data** (where the application has it). The steps below are the same thing done by hand. The legend's
+link-kind chips hide or show each kind of link on the canvas.
 
 1. Open *Studio → Link Analysis*. Choose a **Domain profile** (for example *Financial crime — transactions* or
    *Telecom — call detail records*): it pre-selects the most useful tools.
@@ -410,7 +432,7 @@ It binds that Dataset and its columns. (The query's filter is not carried into t
 A Space may require a stated **purpose** for sensitive steps; when asked, it is recorded in the log.
 Over a **pre-aggregated** Dataset (one row per pair with an event count, like `telecom_links`), bind its count column
 as `eventsCol` when the Investigation is created: an expand then counts a link's events as the sum of that column, not
-its rows (an empty count is one event). It must be a whole-number column. The Telecom profile's *Investigate a number*
+its rows (an empty count is one event). It must be a whole-number column. The Telecom profile's phone-number start (Start from... > One entity)
 binds `events` for you. Without it, each row is one event, as before.
 To have the entities an expand adds carry an **Entity Type** (so node actions such as *Add to watch list* find the
 lists of that type), declare it when the Investigation is created: `entityType` for both columns, or `sourceType` /

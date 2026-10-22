@@ -24,7 +24,7 @@ import {
     ValidatorFn,
 } from '@angular/forms';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
+import { EntityProfileService, EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -52,11 +52,28 @@ import {
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { indexSourceNote } from './index-source';
 import { IndexMappingTarget } from './link-analysis-index-build.component';
-import { IndexSource, InvService, MultiProjectionMappingSummary } from '@inspecto/link-analysis/api/inv.service';
+import {
+    EntityListSummary,
+    IndexSource,
+    InvService,
+    MultiProjectionMappingSummary,
+} from '@inspecto/link-analysis/api/inv.service';
 import { OfferShareDialog, OfferShareResult } from '@inspecto/core/components/offer-share.dialog';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ComponentHistoryDialog } from '@inspecto/core/components/component-history.dialog';
-import { LinkAnalysisStarterCardsComponent } from './link-analysis-starter-cards.component';
+import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
+import {
+    START_MAX_SEEDS,
+    StartDataset,
+    StartRequest,
+    datasetForType,
+    genericBinding,
+    hasRoute,
+    seedNodeOf,
+    startCatalogue,
+    startOutcome,
+    someValues,
+} from './start-from';
 import { QueuedSeed, pickFollowTheMoney } from './la-starter';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
@@ -64,7 +81,6 @@ import {
     InvestigateRequest,
     PendingInvestigation,
     investigateBinding,
-    investigateQueryParams,
     latestTimeOf,
     latestTimeSql,
     missingMappedColumns,
@@ -364,7 +380,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
-        LinkAnalysisStarterCardsComponent,
+        LinkAnalysisStartBoxComponent,
         InspectoSkeletonComponent,
         GraphViewComponent,
         DataTableComponent,
@@ -1384,7 +1400,17 @@ export class LinkAnalysisComponent implements OnInit {
             }),
         );
         this.pipelinesService.list().subscribe({ next: (p) => this.pipelines.set(p), error: () => undefined });
-        this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
+        // A start (`?seed=`, below) waits for the views too: a Dataset's start mapping may come from a saved view.
+        this.viewsLoaded = new Promise((resolve) =>
+            this.viewsService.list().subscribe({
+                next: (v) => {
+                    this.views.set(v);
+                    resolve();
+                },
+                error: () => resolve(),
+            }),
+        );
+        this.loadStartSources(); // before the param streams: a deep-linked start awaits what it reads
         // The footer's server ceiling; absent when the server cannot answer. Graph Run is part of the Investigation surface,
         // so Basic (no Investigations) does not ask - its browser algorithms keep their own caps.
         if (this.investigationsEnabled()) this.graphRuns.loadCatalogue();
@@ -1439,7 +1465,8 @@ export class LinkAnalysisComponent implements OnInit {
             )
             .subscribe((req) => {
                 if (!req) return;
-                void this.prepareInvestigation(req);
+                // LA-ONBOARD-1 OB-9: the deep link, an Entity profile's Investigate and the Start box take ONE path (F-8).
+                void this.startFromEntity(req);
                 // Consumed: drop the params, so a reload does not start over and close the open Investigation.
                 void this.router.navigate([], {
                     relativeTo: this.route,
@@ -1473,6 +1500,216 @@ export class LinkAnalysisComponent implements OnInit {
                     replaceUrl: true,
                 });
             });
+        // LA-ONBOARD-1 phase 6: `?dataset=<id>` alone (Add data's "Explore in Link Analysis") preselects that Dataset in the
+        // Start box. With `seed` it is the entity's Dataset, which the seed stream consumes. Consumed once, like `view`.
+        this.route.queryParamMap
+            .pipe(
+                map((p) => (p.get('seed') ? null : p.get('dataset'))),
+                distinctUntilChanged(),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe((datasetId) => {
+                if (!datasetId) return;
+                this.startDataset.set(datasetId);
+                void this.router.navigate([], {
+                    relativeTo: this.route,
+                    queryParams: { dataset: null },
+                    queryParamsHandling: 'merge',
+                    replaceUrl: true,
+                });
+            });
+    }
+
+    // ── LA-ONBOARD-1 phase 6 (OB-9): Start from one entity, a list, a paste or the whole Dataset ──
+
+    /** The Entity Types in force with their bindings; null = not read (no registry, or it failed): primary types only. */
+    readonly startTypes = signal<EntityTypeSummary[] | null>(null);
+    private startTypesLoaded: Promise<void> = Promise.resolve();
+    private viewsLoaded: Promise<void> = Promise.resolve();
+    /** The Space's Entity Lists, for "Start from a list". */
+    readonly entityLists = signal<EntityListSummary[]>([]);
+    /** The Dataset the Start box preselects (`?dataset=`); null = its first. */
+    readonly startDataset = signal<string | null>(null);
+    /** What the last start did (drawn, held, not found) - shown under the Start box and the graph's status line. */
+    readonly startNotice = signal<StartNotice | null>(null);
+    readonly starting = signal(false);
+    /** What can be started from: Datasets with a link, and the Entity Types their link ends hold. */
+    readonly startCatalogue = computed(() => startCatalogue(this.datasets(), this.views(), this.startTypes()));
+    /** The host has an Add data screen (the la-app's `/add-data`); the console has none yet, so the card is not offered there. */
+    readonly addDataOffered = hasRoute(this.router.config, 'add-data');
+    /** The projection node cap in force - read, never cached (My browser may lower it). */
+    readonly nodeCap = (): number => projectionNodeCapValue();
+
+    private loadStartSources(): void {
+        this.startTypesLoaded = new Promise<void>((resolve) => {
+            try {
+                this.injector
+                    .get(EntityProfileService)
+                    .entityTypes()
+                    .pipe(takeUntilDestroyed(this.destroyRef))
+                    .subscribe({
+                        next: (l) => {
+                            this.startTypes.set(l?.items ?? []);
+                            resolve();
+                        },
+                        error: () => resolve(), // degrade: the Datasets' primary types still start a graph
+                    });
+            } catch {
+                resolve(); // no registry in this host
+            }
+        });
+        this.inv
+            .listEntityLists()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({ next: (l) => this.entityLists.set(l?.lists ?? []), error: () => undefined });
+    }
+
+    openAddData(): void {
+        void this.router.navigateByUrl('/add-data');
+    }
+
+    /** The Start box's choice. One entity on the Investigations level seeds an Investigation; every other start draws. */
+    async startFrom(req: StartRequest): Promise<void> {
+        const ds = this.startCatalogue().datasets.find((d) => d.id === req.datasetId);
+        if (!ds || this.starting()) return;
+        this.startNotice.set(null);
+        if (req.kind === 'dataset') {
+            this.sourceId.set('entity-projection');
+            this.queryPanel?.patchFormFromView({ id: '', name: '', sourceId: 'entity-projection', query: { projection: ds.mapping } });
+            await this.execute('entity-projection', { projection: ds.mapping });
+            return;
+        }
+        if (req.kind === 'entity') {
+            await this.startFromEntity({ seed: req.value, entityType: req.entityType, dataset: ds.id });
+            return;
+        }
+        let values: string[];
+        if (req.kind === 'list') {
+            try {
+                const list = await firstValueFrom(this.inv.getEntityList(req.listId));
+                if (!list.members) {
+                    this.startNotice.set({ variant: 'warning', text: `The members of ${list.title} are not shown to you, so it cannot start a graph.` });
+                    return;
+                }
+                if (!list.members.length) {
+                    this.startNotice.set({ variant: 'warning', text: `${list.title} has no members yet.` });
+                    return;
+                }
+                values = list.members;
+            } catch (err) {
+                this.startNotice.set({ variant: 'warning', text: apiErrorMessage(err, 'The Entity List could not be read.') });
+                return;
+            }
+        } else values = req.values;
+        const found = await this.drawStart(ds, values);
+        // Investigations level: the drawn start is also queued as the first seeds of the Investigation (as "top results" are).
+        if (found.length && this.investigationsEnabled())
+            this.queueSeedsAndOpen(found.map((v) => ({ id: v, label: v, ids: [v] })));
+    }
+
+    /**
+     * ONE entity (the Start box, the `?seed=` deep link, an Entity profile's Investigate): on the Explorer level draw it and one
+     * ring over a Dataset that links its type (F-8: it drew the whole Dataset); on the Investigations level seed an Investigation.
+     */
+    async startFromEntity(req: InvestigateRequest): Promise<void> {
+        if (this.investigationsEnabled()) {
+            await this.prepareInvestigation(req);
+            return;
+        }
+        this.investigateIssue.set('');
+        await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+        const ds = datasetForType(this.startCatalogue(), req.entityType, req.dataset);
+        if (!ds) {
+            this.startNotice.set({
+                variant: 'warning',
+                text:
+                    `No Dataset in this Space links ${req.entityType} entities yet, so ${req.seed} cannot be drawn. ` +
+                    'Add data, or explore a Dataset and choose its from and to columns.',
+            });
+            return;
+        }
+        await this.drawStart(ds, [req.seed]);
+    }
+
+    /**
+     * The explorer start (OB-9): one neighbours read per value (`POST /inv/projection/neighbors`, at most
+     * {@link START_MAX_SEEDS}) merged into a NEW graph - the values plus one ring - with the busy neighbours above the Space's
+     * hub threshold held (the Grow preview's own `held`), the values marked grown, and the run remembered over the Dataset's
+     * mapping, so Grow continues from the ring. Values that read nothing are reported. Returns the values that were drawn.
+     */
+    private async drawStart(ds: StartDataset, values: readonly string[]): Promise<string[]> {
+        const source = this.graphSources.byId('entity-projection');
+        if (!source?.expand) return [];
+        const wanted = values.slice(0, START_MAX_SEEDS);
+        const q: GraphSourceQuery = { projection: ds.mapping };
+        const firstDraw = !this.graph();
+        const focusBefore = this.focusHolder();
+        this.starting.set(true);
+        this.loading.set(true);
+        this.loadError.set('');
+        try {
+            const reads: ProjectedGraph[] = [];
+            for (let i = 0; i < wanted.length; i += 5)
+                reads.push(...(await Promise.all(wanted.slice(i, i + 5).map((v) => source.expand!(v, v, q) as Promise<ProjectedGraph>))));
+            const found = wanted.filter((_, i) => reads[i].edges.length > 0);
+            const unknown = wanted.filter((_, i) => reads[i].edges.length === 0);
+            if (!found.length) {
+                this.startNotice.set({
+                    variant: 'warning',
+                    text: `Not in ${ds.name}: ${someValues(unknown)}. Nothing was drawn - check the spelling, or pick another Dataset.`,
+                });
+                return [];
+            }
+            const drawn = reads.filter((r) => r.edges.length > 0);
+            const g = { ...mergeGraphs(drawn), idMappings: drawn[0].idMappings } as ProjectedGraph;
+            let held = new Map<string, number | null>();
+            try {
+                const p = await firstValueFrom(
+                    this.inv.previewNeighbors(
+                        neighboursPreviewBody(ds.mapping, found, { direction: 'either', linkKinds: null, threshold: this.growThreshold() }, []),
+                    ),
+                );
+                held = new Map(p.held.map((h) => [h.id, h.contacts]));
+            } catch {
+                // no preview on this server: nothing is held, Grow still asks before it goes through a busy one
+            }
+            this.clearResults();
+            this.growExclude.reset(); // a new graph: an Undo of the old one's Grow must not bring it back
+            this.sourceId.set('entity-projection');
+            this.queryPanel?.patchFormFromView({ id: '', name: '', sourceId: 'entity-projection', query: q });
+            this.graph.set(g);
+            this.truncated.set(drawn.some((r) => r.truncated));
+            this.mappingSummary.set([]);
+            this.kindFilter.set([]);
+            this.hiddenNodeIds.set([]);
+            this.lastRun.set(this.runOf('entity-projection', q, g));
+            this.expandedNodeIds.set(
+                drawn.map((r, i) => seedNodeOf(r, found[i])).filter((id): id is string => !!id),
+            );
+            this.growExclude.basicHeld.set(held);
+            this.queryOpen.set(false);
+            const t = this.growTerms();
+            this.startNotice.set({
+                variant: unknown.length ? 'warning' : 'info',
+                text: startOutcome({
+                    drawn: found.length,
+                    nodes: g.nodes.length,
+                    held: held.size,
+                    unknown,
+                    notDrawn: values.length - wanted.length,
+                    dataset: ds.name,
+                    terms: t,
+                }),
+            });
+            if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
+            return found;
+        } catch (err) {
+            this.toastr.error(invErrorMessage(err, 'The start could not be drawn.'));
+            return [];
+        } finally {
+            this.loading.set(false);
+            this.starting.set(false);
+        }
     }
 
     /** The Datasets of this Space, once listed (empty when the list failed). */
@@ -1488,15 +1725,7 @@ export class LinkAnalysisComponent implements OnInit {
      * open the Dataset picker — the regular start then seeds it.
      */
     async prepareInvestigation(req: InvestigateRequest): Promise<void> {
-        if (!this.investigationsEnabled()) {
-            // Basic (LA-EDITIONS-1 ED-4): there is no Investigation to start; the number is explored on the canvas instead.
-            this.pendingInvestigation.set(null);
-            this.investigateIssue.set(
-                `Investigations are available in Standard and above. Project the Dataset holding ${req.seed}'s links ` +
-                    `and search for ${req.seed} to explore it.`,
-            );
-            return;
-        }
+        if (!this.investigationsEnabled()) return; // the Explorer level has no Investigation: startFromEntity draws instead
         const badSeed = seedError(req);
         if (badSeed) {
             // The same rule as the starter card: a malformed number is refused, never queued.
@@ -1507,17 +1736,20 @@ export class LinkAnalysisComponent implements OnInit {
         // The packs arrive with the Space's Domain Profile: a deep link that lands first waits for them.
         if (!profileForEntityType(req.entityType) && !this.domainProfiles.state()) await this.domainProfiles.ready();
         const seed = req.entityType.toLowerCase() === 'msisdn' ? normaliseMsisdn(req.seed) : req.seed;
-        const binding = investigateBinding({ ...req, seed });
-        const datasets = await this.datasetsLoaded;
+        // A Domain Profile that investigates the type is the override; else OB-9's generic start: a Dataset whose link holds it.
+        const profiled = investigateBinding({ ...req, seed });
+        const [datasets] = await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+        const startDs = profiled ? null : datasetForType(this.startCatalogue(), req.entityType, req.dataset);
+        const binding = profiled ?? (startDs ? genericBinding(seed, req.entityType, startDs, activeDomainProfileId()) : null);
         const wanted = binding?.projection.datasetId ?? req.dataset;
         const ds = wanted ? datasets.find((d) => d.id === wanted) : undefined;
         let reason = !binding
-            ? `No domain profile investigates entities of type ${req.entityType}.`
+            ? `No Dataset in this Space links entities of type ${req.entityType}.`
             : !ds
               ? `The Dataset ${wanted} is not in this Space, so ${seed} cannot be investigated over it.`
               : '';
         // A Dataset named by the link must carry the profile's mapped columns, or every expand would be refused.
-        if (binding && ds && req.dataset) {
+        if (profiled && binding && ds && req.dataset) {
             const missing = missingMappedColumns(
                 binding,
                 (await this.datasetRows.columns(ds)).map((c) => c.name),
@@ -1551,22 +1783,6 @@ export class LinkAnalysisComponent implements OnInit {
         if (!timeCol || !ds.sourceName) return null;
         const res = await this.datasetRows.sql(ds.sourceName, latestTimeSql(ds.sourceName, timeCol), 1);
         return res.error ? null : latestTimeOf(res.rows[0]?.['latest']);
-    }
-
-    /** Starter card "Investigate a number": the same flow as the deep link — navigate with `?seed=`. */
-    investigateNumber(msisdn: string): void {
-        const req: InvestigateRequest = { seed: msisdn, entityType: 'msisdn' };
-        // The same number again is the same URL - no navigation, so the stream would not re-emit it.
-        if (sameInvestigateRequest(parseInvestigateParams(this.route.snapshot.queryParamMap), req)) {
-            void this.prepareInvestigation(req);
-            return;
-        }
-        void this.router.navigate([], {
-            relativeTo: this.route,
-            // `dataset: null` drops a previous link's Dataset: the card binds the profile's default.
-            queryParams: { ...investigateQueryParams(msisdn, 'msisdn'), dataset: null },
-            queryParamsHandling: 'merge',
-        });
     }
 
     /** The current profile's "Expand next degree" presets ({} = the server defaults). */
@@ -1719,6 +1935,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.investigation.clearQueuedSeeds();
         this.pendingInvestigation.set(null);
         this.investigateIssue.set('');
+        this.startNotice.set(null);
         this.clearResults();
         this.graph.set(null);
         this.lastRun.set(null);
@@ -1737,6 +1954,7 @@ export class LinkAnalysisComponent implements OnInit {
         const focusBefore = this.focusHolder();
         this.loading.set(true);
         this.loadError.set('');
+        this.startNotice.set(null); // a new graph: the last start's outcome no longer describes it
         this.clearResults();
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         try {

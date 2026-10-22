@@ -81,6 +81,17 @@ export interface Dataset extends DatasetConfig {
     name: string;
     /** The stored business description, read-only here (R2-16: a Reconciliation side's readable label). */
     description?: string;
+    /** LA-ONBOARD-1 OB-8, read-only here: the Entity Type the Dataset's graph leads with. */
+    primaryEntityType?: string;
+    /** LA-ONBOARD-1 OB-8, read-only here: the link every Link Analysis start draws (`{from, to, kind?, time?, …}`). */
+    defaultLinkMapping?: {
+        from: string;
+        to: string;
+        kind?: string;
+        time?: string;
+        amount?: string;
+        details?: string[];
+    };
 }
 
 /**

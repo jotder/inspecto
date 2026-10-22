@@ -49,6 +49,52 @@ public final class EntityProfileRoutes implements RouteModule {
         api.get("/inv/entity-types/([^/]+)/profile", (e, m) -> typeProfile(api, e, m.group(1)));
         api.get("/inv/entities/([^/]+)/([^/]+)/profile", (e, m) -> entityProfile(api, e, m.group(1), m.group(2)));
         api.post("/inv/entities/([^/]+)/resolve", (e, m) -> resolve(api, e, m.group(1), api.body(e)));
+        api.post("/inv/entities/([^/]+)/suggest", (e, m) -> suggest(api, e, m.group(1), api.body(e)));
+    }
+
+    /** The most values one suggest lists, and its default. */
+    static final int SUGGEST_MAX = 20, SUGGEST_DEFAULT = 8;
+
+    /**
+     * {@code POST /inv/entities/{type}/suggest} (LA-ONBOARD-1 OB-9, the Start box's type-ahead) - body {@code {prefix?, dataset?,
+     * limit?}}: the values of this type that START a graph (a link end of a mapping the Space knows, optionally one Dataset's)
+     * beginning with {@code prefix}, busiest first, each with its link rows and first / last seen; plus {@code distinct}, how many
+     * Entities match. The prefix travels in the body only. A type masked under the Space's mode lists no value and counts only for
+     * an empty prefix (a count per prefix would spell a raw value out).
+     */
+    private static Object suggest(ApiContext api, HttpExchange ex, String type, Map<String, Object> body) {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "entity suggest");
+        EntityTypes.EntityType t = type(writeRoot, type);
+        Object p = body.get("prefix");
+        if (p != null && !(p instanceof String))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'prefix' must be a string");
+        String prefix = p == null ? "" : ((String) p).strip();
+        int maxLength = SpaceLimits.get(SpaceLimits.of(writeRoot), com.gamma.entitystore.LaLimit.INPUT_ID_LENGTH);
+        if (prefix.length() > maxLength)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'prefix' is longer than input.id_length (" + maxLength + ")");
+        Object d = body.get("dataset");
+        if (d != null && (!(d instanceof String s) || s.isBlank()))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'dataset' must be a Dataset id");
+        String dataset = d == null ? null : ((String) d).strip();
+        Object l = body.get("limit");
+        if (l != null && !(l instanceof Integer n && n >= 1 && n <= SUGGEST_MAX))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'limit' must be a whole number from 1 to " + SUGGEST_MAX);
+        int limit = l == null ? SUGGEST_DEFAULT : (Integer) l;
+
+        List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
+        EntityTypeBindings.Resolved all = EntityTypeBindings.resolve(ex, writeRoot, types);
+        // Only a link end starts a graph: attribute columns are left out, and so is every other Dataset when one is named.
+        Map<String, List<EntityTypeBindings.Binding>> byType = new java.util.LinkedHashMap<>(all.byType());
+        byType.put(type, all.of(type).stream()
+                .filter(b -> !"attribute".equals(b.role()) && (dataset == null || b.dataset().equals(dataset))).toList());
+        EntityProfiles.Frame f = new EntityProfiles.Frame(api, writeRoot, t,
+                new EntityTypeBindings.Resolved(all.types(), byType, all.mappings(), all.datasets()));
+        Map<String, Object> out = EntityProfiles.suggest(f, prefix, limit);
+        int listed = out.get("items") instanceof List<?> items ? items.size() : 0;
+        audit(ex, LinkEventTypes.LINK_ENTITY_SUGGESTED, "link.entity.suggested", "link.entity.suggested " + type + " - " + listed + " listed",
+                b -> b.target("entity_type", type).attr("entityType", type).attr("masked", f.masked())
+                        .attr("datasets", f.datasets().size()).attr("listed", listed).attr("byPrefix", !prefix.isEmpty()));
+        return out;
     }
 
     private static Object list(ApiContext api, HttpExchange ex) {

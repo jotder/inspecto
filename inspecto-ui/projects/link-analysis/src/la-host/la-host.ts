@@ -35,6 +35,20 @@ export interface LaDataset extends RowSourceRef {
     name: string;
     /** The stored business description, when the Dataset has one - the Dataset picker shows its first sentence. */
     description?: string;
+    /** LA-ONBOARD-1 OB-8: the Entity Type its graph leads with - the Start box preselects it. */
+    primaryEntityType?: string;
+    /** LA-ONBOARD-1 OB-8: the link every start draws without asking again. */
+    defaultLinkMapping?: LaLinkMapping;
+}
+
+/** A Dataset's default link (`defaultLinkMapping` on its registry entry): the from / to columns, and kind and time when named. */
+export interface LaLinkMapping {
+    from: string;
+    to: string;
+    kind?: string;
+    time?: string;
+    amount?: string;
+    details?: string[];
 }
 
 export interface LaDatasets {

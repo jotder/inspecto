@@ -93,11 +93,23 @@ function toContent(d: Dataset): Record<string, unknown> {
     return { name: d.name, ...config } as Record<string, unknown>;
 }
 
+/** A stored `defaultLinkMapping` names its two link ends (the server refuses one that does not; an old entry has none). */
+function isLinkMapping(v: unknown): boolean {
+    const m = v as { from?: unknown; to?: unknown } | null;
+    return !!m && typeof m === 'object' && typeof m.from === 'string' && typeof m.to === 'string';
+}
+
 function fromContent(name: string, content: Record<string, unknown>): Dataset {
     return {
         id: name,
         name: (content['name'] as string) ?? name,
         ...(typeof content['description'] === 'string' ? { description: content['description'] } : {}),
+        ...(typeof content['primaryEntityType'] === 'string'
+            ? { primaryEntityType: content['primaryEntityType'] }
+            : {}),
+        ...(isLinkMapping(content['defaultLinkMapping'])
+            ? { defaultLinkMapping: content['defaultLinkMapping'] as Dataset['defaultLinkMapping'] }
+            : {}),
         kind: (content['kind'] as DatasetKind) ?? 'virtual',
         // ⛔ Never default this to an INVENTED source name. The old `?? 'data'` named a key that did
         // not exist, so a dataset written without a sourceName read `[]` rows in every consumer and was
