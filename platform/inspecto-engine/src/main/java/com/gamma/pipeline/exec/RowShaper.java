@@ -1146,7 +1146,7 @@ public final class RowShaper {
         else throw new IllegalArgumentException(what + ": column '" + src + "' is " + type
                     + ", not a LIST or a JSON array - there is nothing to explode");
 
-        String pairs = "list_transform(" + arr + ", (x, i) -> {'e': x, 'i': i})";
+        String pairs = "list_transform(" + arr + ", lambda x, i: {'e': x, 'i': i})";
         String unnested = onEmpty.equals("keep")
                 ? "CASE WHEN COALESCE(len(" + arr + "), 0) = 0 THEN [{'e': NULL, 'i': NULL}] ELSE " + pairs + " END"
                 : pairs;

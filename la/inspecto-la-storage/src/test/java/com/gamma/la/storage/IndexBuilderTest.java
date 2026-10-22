@@ -160,7 +160,7 @@ class IndexBuilderTest {
         assertEquals("fp-1", man.baseFingerprint());
         assertEquals(3, man.droppedNull());
         assertEquals(64, man.relationSqlHash().length());
-        assertTrue(man.duckdbVersion().startsWith("v1."), man.duckdbVersion());
+        assertTrue(man.duckdbVersion().startsWith("v2."), man.duckdbVersion());
         assertEquals(14, man.tables().get("out").rows());
         assertEquals(14, man.tables().get("in").rows());
         assertTrue(man.tables().get("out").files() >= 1 && man.tables().get("out").bytes() > 0);

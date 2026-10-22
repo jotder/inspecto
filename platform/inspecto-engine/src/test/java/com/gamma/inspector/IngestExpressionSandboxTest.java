@@ -82,7 +82,7 @@ class IngestExpressionSandboxTest {
     void aNormalIngestAndScalarExpressionsStillWork(@TempDir Path dir) throws Exception {
         // the payment-fraud PAN tripwire shape: regexp + error() + a lambda over list_transform
         PipelineConfig cfg = pipeline(dir, "CASE WHEN regexp_matches(CUSTOMER, '^[0-9]{16}$') THEN error('PAN') "
-                + "ELSE upper(CUSTOMER) || list_transform([1, 2], x -> x + 1)[1]::VARCHAR END");
+                + "ELSE upper(CUSTOMER) || list_transform([1, 2], lambda x: x + 1)[1]::VARCHAR END");
         CollectorProcessor.run(cfg);
         Path db = Path.of(cfg.dirs().database());
         assertEquals("2", TypedOutputThroughRecordTransformerTest.scalar(db, "COUNT(*)::VARCHAR"));

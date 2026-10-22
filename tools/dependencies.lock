@@ -88,7 +88,7 @@ org.bouncycastle:bcutil-jdk18on:jar:1.85:runtime
 org.bsc.async:async-generator:jar:4.3.1:compile
 org.bsc.langgraph4j:langgraph4j-core:jar:1.8.19:compile
 org.codehaus.jackson:jackson-core-asl:jar:1.9.13:compile
-org.duckdb:duckdb_jdbc:jar:1.5.6.0:compile
+org.duckdb:duckdb_jdbc:jar:2.0.0.0:compile
 org.jetbrains.kotlin:kotlin-stdlib-common:jar:1.9.10:compile
 org.jetbrains.kotlin:kotlin-stdlib-jdk7:jar:1.8.21:compile
 org.jetbrains.kotlin:kotlin-stdlib-jdk8:jar:1.8.21:compile

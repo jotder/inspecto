@@ -87,7 +87,7 @@ class SqlGuardFileFunctionContractTest {
             loadInstalledExtensions(st);
             try (ResultSet rs = st.executeQuery("SELECT DISTINCT function_name FROM duckdb_functions() "
                     + "WHERE function_type NOT IN ('table', 'table_macro') AND len(list_filter(parameters, "
-                    + "p -> lower(p) SIMILAR TO '.*(path|file|url|uri|location|directory).*')) > 0")) {
+                    + "lambda p: lower(p) SIMILAR TO '.*(path|file|url|uri|location|directory).*')) > 0")) {
                 while (rs.next()) pathScalars.add(rs.getString(1).toLowerCase(Locale.ROOT));
             }
         }

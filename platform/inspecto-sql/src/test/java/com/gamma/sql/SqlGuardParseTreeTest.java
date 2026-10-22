@@ -43,7 +43,7 @@ class SqlGuardParseTreeTest {
                 "WITH c AS (SELECT * FROM t, 'x.csv') SELECT * FROM c",
                 "SELECT * FROM t UNION ALL SELECT * FROM u, 'x.csv'",
                 "SELECT * FROM t, LATERAL (SELECT * FROM u, 'x.csv') l",
-                "SELECT list_transform([1], x -> (SELECT count(*) FROM t, 'x.csv'))",
+                "SELECT list_transform([1], lambda x: (SELECT count(*) FROM t, 'x.csv'))",
                 "SELECT * FROM t, 's3://bucket/k.parquet'",
                 "SELECT * FROM t, 'data/*.parquet'",
                 "SELECT * FROM \"c:\\x\".main.t"))
