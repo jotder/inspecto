@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 ## Required
 
 - **One graph library for every module** — decision **D-AN2** of `ANALYTICS-CORE-1`
-  ([`analytics-core-plan.md`](../../../../superpower/analytics-core-plan.md), [BACKLOG](../../../../BACKLOG.md)):
+  ([`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md), [BACKLOG](../../../../BACKLOG.md)):
   move the Link Analysis graph code to `platform/inspecto-graph`, Java only, so AML, Fraud and Case
   Management can run graph algorithms without depending on Link Analysis. The TypeScript twins and the
   parity fixtures stay with the Link Analysis library.

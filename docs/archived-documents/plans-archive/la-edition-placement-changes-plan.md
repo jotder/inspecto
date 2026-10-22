@@ -1,17 +1,19 @@
+> **ARCHIVED 2026-10-22** — open work (D-LAE3, D-LAE4, D-LAE6) moved to `docs/superpower/link-analysis-roadmap.md` §D3; D-LAE7…D-LAE11 belong to `DATA-TIERS-1` (`docs/superpower/data-tier-editions-plan.md`); as-built facts in `docs/EDITIONS.md` and the la-core hub (`architecture.md` §8).
+
 # Link Analysis edition placement changes and Basic-edition ingestion limits: a plan for operator review
 
 > 🟢 **UPDATE 2026-10-20: D-LAE1, D-LAE2, D-LAE5 and D-LAE12 are ANSWERED (§10) and are being built (lane A);
 > the rest below stays a draft.** The "nothing built" wording that follows describes the draft as written.
 >
 > ➡ **UPDATE 2026-10-22: the ingestion half moved.** §6, the D-LAE7 to D-LAE11 checks in §4.3, and decisions D-LAE7 to
-> D-LAE11 are taken over by [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`): D-LAE7 → DT-5
+> D-LAE11 are taken over by [`data-tier-editions-plan.md`](../../superpower/data-tier-editions-plan.md) (`DATA-TIERS-1`): D-LAE7 → DT-5
 > and DT-17, D-LAE8 → DT-7, D-LAE9 → DT-4 (which **reverses** D-LAE9's recommendation: Basic keeps no database, not even
 > for manual pulls), D-LAE10 → DT-16, D-LAE11 → DT-18. Answer them there, not here. This plan
 > keeps D-LAE3, D-LAE4 and D-LAE6.
 >
 > 🟡 **DRAFT 2026-10-20 for operator review. Design only, nothing built, nothing decided.** This plan collects the
 > operator's requested changes to the Link Analysis (LA) edition table and to what the Basic edition may ingest, and
-> grounds each one in how editions gate features today. [`EDITIONS.md`](../EDITIONS.md) (the placement decided
+> grounds each one in how editions gate features today. [`EDITIONS.md`](../../EDITIONS.md) (the placement decided
 > 2026-10-17, LA-EDITIONS-1) is **untouched**: no row moves until the decisions **D-LAE1…D-LAE12** (§10) are answered.
 > No backlog rows are filed yet, for the same reason (a row changes the board counters).
 >
@@ -35,7 +37,7 @@ From `offerings/basic.toon`: Basic stages the modules `connectors`, `entity-list
 `geo-link`, and the content packs `business-assurance`, `la-daily-feed`, `orders-starter`. Every `platform/*` module
 (`acquire`, `engine`, `etl`, `entity-store`, `event`, `graph`, `sql`, …) is **base**: present in every edition.
 
-The rows this plan touches, as [`EDITIONS.md`](../EDITIONS.md) shows them today:
+The rows this plan touches, as [`EDITIONS.md`](../../EDITIONS.md) shows them today:
 
 | Area | Feature | Basic today | Requested Basic |
 |---|---|---|---|

@@ -1,10 +1,11 @@
-# DuckDB 2.0.x adoption — decision, evidence and the build order for the next session
+# DuckDB 2.0.x plan — adoption, evidence, the looping-query candidates and the build order
 
-**Status: PLAN, 2026-10-05 — decided, not built.** The operator decided on 2026-10-05: *go with DuckDB 2.0.x from
-now on* (the alpha now, GA expected in a couple of weeks), for the performance and capability gains. This file is the
-single place for the decision, what was measured, what is already built on unmerged branches, what is blocked, and the
-order in which to build. The looping-query research is in
-[`duckdb-2-loop-queries-plan.md`](duckdb-2-loop-queries-plan.md); this file does not repeat it.
+**Status: PLAN, 2026-10-05 — decided, not built** (merged 2026-10-22 with the loop-query research, which is archived).
+The operator decided on 2026-10-05: *go with DuckDB 2.0.x from now on* (the alpha now, GA expected in a couple of
+weeks), for the performance and capability gains. This file is the one DuckDB 2.0.x plan: the decision, what was
+measured, what is already built on unmerged branches, what is blocked, the order in which to build, and (§7) the
+still-open looping-query candidates. The full loop-query research (the 13-site inventory, every experiment table)
+stays readable in [`duckdb-2-loop-queries-plan.md`](../archived-documents/plans-archive/duckdb-2-loop-queries-plan.md).
 
 ## 1. Decision and constraints
 
@@ -110,7 +111,7 @@ Lanes marked ∥ touch disjoint files and can run in parallel; the timing lanes 
    or the `SqlGuard` test; close `DUCKDB-2-SQL-AST-SPA-1`.
 4. ∥ **Verify the `SqlGuard` branch:** `-pl :inspecto-sql -am` with the contract and parse-tree tests; mutation-check the new
    reviewed set (remove one entry, expect red naming it); then merge it into the upgrade branch.
-5. **Loop-query batch** (from `duckdb-2-loop-queries-plan.md` §6): lambda-arrow migration (the upgrade branch already covers the
+5. **Loop-query batch** (§7 below): lambda-arrow migration (the upgrade branch already covers the
    Space templates; check what is left), the temporal burst / periodicity scan as window functions (gains on both versions,
    golden-fixture parity first), and the `USING KEY` reachability spike behind `SqlGraphEngine` benchmarked at 10^6 and
    10^8 edges on both pins — adopt only if it beats `IndexedTraversal` at 10^8. Timing lanes after item 1, on a quiet machine.
@@ -127,9 +128,43 @@ Lanes marked ∥ touch disjoint files and can run in parallel; the timing lanes 
   regression on ingest and Link Analysis lookups beyond what the operator accepts.
 - At GA: pin the GA version, remove the staging repository, re-run the benchmark once.
 
+## 7. Looping / graph-style queries — the open candidates (research 2026-10-05)
+
+> ⚠ **Timings are directions, not numbers to quote.** Every "verified" claim was run on `duckdb_jdbc
+> 2.0.0-alpha43385-881` (and, where it matters, on `1.5.6.0`) with tiny throw-away queries: **2 threads, one run each,
+> an alpha build, a machine busy with another benchmark**, mostly a 20 000-node / 400 000-edge in-memory graph. Each
+> candidate names the benchmark that must re-measure it before anything is built. Nothing here is built and no
+> candidate decision is signed beyond §1 item 4 ("use 2.0's capabilities for the looping queries").
+
+**What the research found.** DuckDB 2.0 has **no native graph syntax**: `CREATE PROPERTY GRAPH` / `GRAPH_TABLE` /
+`ANY SHORTEST` are parse errors on both versions and the community `duckpgq` extension is an HTTP 404 for both, so
+decision `D9` ([`la-separation-feasibility-plan.md`](../archived-documents/plans-archive/la-separation-feasibility-plan.md))
+has no native-syntax answer yet. The one big 2.0 win is **recursive-CTE `USING KEY`** (present on 1.5.6 too): on 2.0
+BFS reachability ran ~3x faster (47 ms vs 161 ms) and min-label propagation 81 ms where 1.5.6 was cancelled at 6 s.
+Path *enumeration* (`recursive-paths`) gains nothing (51 ms vs 47 ms). Joins, aggregates and windows showed no general
+2.0 speed-up; a `RANGE`-framed window beats a self range-join ~10x on **both** versions. The harness for the LA
+candidates is `InvTraversalBench` (`inspecto-geo-link/src/test/java/com/gamma/control/InvTraversalBench.java`,
+gate G-R4: 5 hops over 10^6 edges under 350 ms, runs only with `-Dinspecto.bench.dir=…`).
+
+| # | Candidate | MoSCoW | Needs the 2.0 pin? | Benchmark / proof that must pass first |
+|---|---|---|---|---|
+| C7 | Lambda syntax `x -> …` → `lambda x: …` (both `ba_revenue_forecast_*` Space templates, `IngestExpressionSandboxTest:85`, `SqlGuardParseTreeTest:46`; also grep the SPA SQL editor snippets) — still on master 2026-10-22, done on the upgrade branch; also the open Could item C7 of `ANALYTICS-CORE-1` | **Must** (precondition of the pin move) | no — works on 1.5.6 | the four sites' tests on both drivers |
+| C3 | Temporal `burst` / `periodicity` in DuckDB (`count(*) OVER (… RANGE …)`, `lag(ts)` gaps, `stddev/avg`) instead of hauling ≤ 200 000 rows to the JVM (`PatternRoutes.scan`, `TemporalFindings`, `IndexedTemporal`) | **Must** | no | golden-fixture parity with the Java detector (tie rules, `skippedNoTime`, `rowCapped`, byte-identical index variant), then a 10^7-event bench |
+| C1 | `UsingKeyGraphEngine`: k-hop / reachability / shortest path in one `WITH RECURSIVE … USING KEY` statement behind the `SqlGraphEngine` seam, lifting the 2-hop / 20-key caps | **Must** | measure on both; shines on 2.0 | `InvTraversalBench` G-R4 at 10^6 and 10^8 edges vs `IndexedTraversal` / `SqlGraphEngine`, both pins; parity vs `graph-paths-parity.fixture.json`. **Adopt only if it beats `IndexedTraversal` at 10^8** (a CTE cannot prune Parquet partitions per iteration — unproven); re-state the cap / four-eyes bound (D-U7) as a visited-node cap + the 5 s timeout; `SqlGuard` node whitelist for `USING KEY` not yet run |
+| C2 | Components by `USING KEY` label propagation | Should | yes (regresses badly on 1.5.6) | parity with `GraphStructure.connectedComponents` (`canonical-v1`, rule `D-S4`) + a 10^6-edge bench; converged labels never checked |
+| C4 | Branching-pattern legs with `ASOF JOIN` (135 ms vs 290 ms `LATERAL … LIMIT 1`) | Could | no | `ControlApiInvPatternTest` + `branching-parity.spec.ts` stay green; legs-out vs stage count |
+| C8 | `ducklake` as Draft / Working Set storage (attach + create works on 2.0) | Could (spike) | yes | a spike with the `D-S5` admission numbers; snapshots, time travel, multi-writer, offline vendoring and licensing unverified |
+| C5 | Multi-rung expand ladder as one statement | Could, **only after C1 has numbers** | — | the sealed-Investigation fingerprint (`sha256(canonical(rows))`) must not change |
+| — | C6 path enumeration, C9 native SQL/PGQ (re-spike when a `duckpgq` build for the final 2.0 exists), C10 Parquet v2 / bloom knobs, C11 `MERGE INTO` / `VARIANT` / `vss` | Won't (now) | — | no measured gain, or not a loop query |
+
+Lanes: C7 and C3 are safe to run anywhere; C1 and the pin-move rehearsal (§5) need a quiet machine. **Not verified —
+do not cite as fact:** HNSW / `vss` use, `ducklake` beyond attach, bloom filters on VARCHAR keys, `USING KEY` over a
+Parquet index scan and at 10^8 edges, converged component labels, PageRank-style iteration, the `SqlGuard` allow-list
+for the `USING KEY` node, and anything about the 2.0 final release.
+
 ## References
 
-- [`duckdb-2-loop-queries-plan.md`](duckdb-2-loop-queries-plan.md) — the 13-site loop inventory, the verified `USING KEY` / `ASOF` / window experiments and the candidate list C1–C11.
+- [`duckdb-2-loop-queries-plan.md`](../archived-documents/plans-archive/duckdb-2-loop-queries-plan.md) (archived; §7 above carries its open part) — the 13-site loop inventory, the verified `USING KEY` / `ASOF` / window experiments and the candidate list C1–C11.
 - `okf/product/layer/platform/tests-performance.md` — how to run the comparison harness.
 - `okf/product/module/engine/spec-duckdb.md` — the engine's DuckDB concept (the 2.0 section lives on the upgrade branch until it merges).
 - `docs/BACKLOG.md` §4 — `DUCKDB-2-MIGRATION-1` and `DUCKDB-2-SQL-AST-SPA-1` (on the upgrade branch).

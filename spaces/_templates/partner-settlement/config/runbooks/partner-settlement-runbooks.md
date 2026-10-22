@@ -1,6 +1,6 @@
 # Partner settlement runbooks
 
-> **Slices S1 to S4 of the plan** (`docs/superpower/partner-settlement-wholesale-plan.md`): the References, statement ingestion, the
+> **Slices S1 to S4** (open work: `docs/superpower/telco-packs-plan.md`): the References, statement ingestion, the
 > compare, and the netting positions with the roll-forward. There is no dispute Case workflow, aging or accrual here yet; a finding
 > opens an Incident through the Reconciliation and the Alert Rule, and the Case, the evidence pack and the aged balances arrive with
 > the next slices.

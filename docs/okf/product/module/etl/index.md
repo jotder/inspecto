@@ -15,8 +15,8 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Ingestion & parsing (ING)](plan-ingestion.md) · [Pipeline authoring (PIP) — capability spec](plan-pipeline-authoring.md) |
-| spec | current | [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
+| plan | current | [Ingestion & parsing (ING)](plan-ingestion.md) · [Parser field tiers — interview #2 observation-session kit (D13)](plan-parser-field-tiers-interview.md) · [Pipeline authoring (PIP) — capability spec](plan-pipeline-authoring.md) |
+| spec | current | [Console first-time user use cases (blank slate to a queryable Dataset)](spec-first-time-user-use-cases.md) · [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
 | architecture | current | [Parsing and ingest](architecture-parsing-ingest.md) · [Pipelines and Steps](architecture-pipelines-steps.md) |
 | features | current | [Parsing and ingest — features](features-parsing-ingest.md) · [Pipelines and Steps — features](features-pipelines-steps.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
@@ -37,6 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
 | — | P3 | feature | P4 Test mapping on a generic parser node | — |
 | — | P3 | feature | Step Processor catalog | — |
+| `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |

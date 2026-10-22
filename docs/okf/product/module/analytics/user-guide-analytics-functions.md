@@ -10,7 +10,7 @@ timestamp: 2026-10-18T00:00:00Z
 # Analytics functions
 
 ANALYTICS-CORE-1 Could item C8, built 2026-10-18 (decisions D-AN33…D-AN35 in
-[`analytics-core-plan.md`](../../../../superpower/analytics-core-plan.md) §7). Route `/analytics-functions`
+[`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md) §7). Route `/analytics-functions`
 (Operations nav group, lazy). It is the UI twin of LA's graph algorithm catalogue, for the Analytics Kernel.
 
 * **Data.** `GET /analytics/functions` through `AnalyticsCatalogueService` (`inspecto/api`). The pane holds the

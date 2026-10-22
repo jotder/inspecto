@@ -407,7 +407,7 @@ Each Job's `sink_dataset` is a shipped Dataset (`revenue_forecast`, `margin_eros
 Datasets stays MANUAL until the pack has been driven live; no second Alert Rule set ships.
 
 **The telecom fraud pack — `spaces/_templates/telco-fraud/`** (`ASSURE-PACK-TELCO-FRAUD-1`, wave 5.1 of
-`superpower/assurance-capability-plan.md`, BUILT 2026-09-30, verified 2026-10-03, retired from the board 2026-10-14 after the golden test re-ran green 8/8; the three items that wait on a customer or a model change are P3 `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1`: Schema-from-Job (deferred 2026-10-04), vendor thresholds (parked), register-matched exemptions (waits on a customer register)). Three feed Pipelines + schemas (`cdr`,
+`archived-documents/plans-archive/assurance-capability-plan.md`, BUILT 2026-09-30, verified 2026-10-03, retired from the board 2026-10-14 after the golden test re-ran green 8/8; the three items that wait on a customer or a model change are P3 `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1`: Schema-from-Job (deferred 2026-10-04), vendor thresholds (parked), register-matched exemptions (waits on a customer register)). Three feed Pipelines + schemas (`cdr`,
 `subscriber_events`, `payments`; each schema needs a `mapping:` — a `raw:`-only schema fails every file on the
 Consignment path with "a mapping with neither fields[] nor rules[]"); thirteen detection windows as `sql.template` Jobs (ten at the 2026-09-30 build; see *Content gaps closed* below)
 (`config/jobs/fraud_<typology>_job.toon`: IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap,
@@ -541,7 +541,7 @@ check that refuses a numeric-form IP); a refusal is 422 `template connection '<f
 > The Alert Rule over the template's own Risk Score output (`pf_high_risk_account`, `max(score) >= 60` by
 > `model, entity_key`) ships as a deferred seed — see §3.5.2.
 
-Wave 5.3 of `superpower/assurance-capability-plan.md`, generic half. `spaces/_templates/payment-fraud/` ships
+Wave 5.3 of `archived-documents/plans-archive/assurance-capability-plan.md`, generic half. `spaces/_templates/payment-fraud/` ships
 config and a synthetic corpus; it uses the opt-in `processing.refusal` mode of the ingest engine. There is no new
 Step Processor and no new route.
 

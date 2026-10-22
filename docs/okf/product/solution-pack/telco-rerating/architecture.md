@@ -3,7 +3,8 @@
 > **Level 2 solution page.** Content pack: Space Template `telco-rerating`
 > (`spaces/_templates/telco-rerating/template.toon`). **Slices R0 to R3 of `PACK-RERATING-1` are built: tariff versioning,
 > tariff-table hygiene, ambiguity verdicts, causes with confidence (including a wrong plan, inferred from a subscription history), root-cause grouping and revenue at risk.** Rate structure, Alert Rules and the
-> re-rated-versus-billed Reconciliation are later slices ([plan](../../../../superpower/rerating-tariff-validation-plan.md)).
+> re-rated-versus-billed Reconciliation are later slices ([open work](../../../../superpower/telco-packs-plan.md); decisions,
+> measurements, known limits and traps of R0 to R3 in the [as-built record](plan-as-built.md)).
 > Checked against the template on 2026-10-21. This pack is an unbilled preview: commercial terms are not set (D-RR10).
 
 ## Business problem
@@ -26,7 +27,7 @@ Three Pipelines with Schemas under `spaces/_templates/telco-rerating/config/`:
 
 Versions live **in the file**. `reference.load: scd2` was measured in slice R0 and does not fit: it appends a version row per
 changed key with `__valid_from` set to the ingest time and no end column, so it cannot carry an effective date in the past (see
-plan section 12). `tariff_version` is therefore an ordinary feed, and the file carries the whole table each time. **`subscription_history` is decided the same way (D-RR8, slice R3):** the plan's recommendation was an `scd2` Reference, but a subscriber's plan period needs a `FROM_TS` and a `TO_TS` in the past, which `scd2` cannot store (ingest-time start, no end column), so it is an ordinary feed with the periods in the file. The Pipeline sets
+R0 answer 1 in the [as-built record](plan-as-built.md)). `tariff_version` is therefore an ordinary feed, and the file carries the whole table each time. **`subscription_history` is decided the same way (D-RR8, slice R3):** the plan's recommendation was an `scd2` Reference, but a subscriber's plan period needs a `FROM_TS` and a `TO_TS` in the past, which `scd2` cannot store (ingest-time start, no end column), so it is an ordinary feed with the periods in the file. The Pipeline sets
 `csv_settings.null_padding: true`, so a file without the optional `PRIORITY` column ingests with it NULL. Every Dataset ships a
 zero-row schema seed under `spaces/_templates/telco-rerating/data/`, so the Jobs run on a fresh Space (an empty history simply infers nothing).
 
@@ -78,9 +79,9 @@ columns and are never netted (D-RR4).
   overlap or gap, and is reported on its own.
 - **No zone arithmetic.** Both Jobs compare naive timestamps only, so the result does not depend on the host's session zone; the
   golden runs both statements under two zones.
-- **Plan inference (R3, plan section 6.4).** Per subscriber and service over the day, for each plan the number of calls (with a charge and non-zero units) whose charge its rate, in the version in force at the call, reproduces within `tolerance`. The plan with the most is **inferred** when it is the only one at the top, explains at least `plan_share` (0.6) and there are at least `plan_min_rows` (3) calls. A `wrong_plan` is claimed for a finding when the history assigns the subscriber exactly one plan at the call's start (`FROM_TS` inclusive, `TO_TS` exclusive), that plan differs from the inferred one, and the inferred plan's rate in force at the call reproduces the charge. Confidence is exactness times that share (not the cohort of R2). Silent look-alikes: too few calls, two plans with the same rate, a share below the floor, no history, two plans assigned at once, and a subscriber whose assigned plan IS the inferred one (a plan change the rating label did not follow). The root cause is the plan pair (`wrong_plan|overbilled|PLAN_P1|DATA|P1-D-1|P2-D-1`), over every subscriber it touches. Inference reads the day's calls of the subscribers that have a finding; the other subscribers cost nothing.
+- **Plan inference (R3).** Per subscriber and service over the day, for each plan the number of calls (with a charge and non-zero units) whose charge its rate, in the version in force at the call, reproduces within `tolerance`. The plan with the most is **inferred** when it is the only one at the top, explains at least `plan_share` (0.6) and there are at least `plan_min_rows` (3) calls. A `wrong_plan` is claimed for a finding when the history assigns the subscriber exactly one plan at the call's start (`FROM_TS` inclusive, `TO_TS` exclusive), that plan differs from the inferred one, and the inferred plan's rate in force at the call reproduces the charge. Confidence is exactness times that share (not the cohort of R2). Silent look-alikes: too few calls, two plans with the same rate, a share below the floor, no history, two plans assigned at once, and a subscriber whose assigned plan IS the inferred one (a plan change the rating label did not follow). The root cause is the plan pair (`wrong_plan|overbilled|PLAN_P1|DATA|P1-D-1|P2-D-1`), over every subscriber it touches. Inference reads the day's calls of the subscribers that have a finding; the other subscribers cost nothing.
 - **Decided in R2:** a call on a negative-rate row has no usable tariff; a call with no charge or no units is `unratable_call`; `agree` outranks `precedence` (zero units); `PRIORITY_ORDERED` is a fact about one pair while `RESOLUTION` is the verdict
-  for a call; the gap names the version that ends last, ties to the greater id (the tariff file's order changes nothing). Details and the equivalent clauses no mutant can claim: plan section 14.
+  for a call; the gap names the version that ends last, ties to the greater id (the tariff file's order changes nothing). Details and the equivalent clauses no mutant can claim: the [as-built record](plan-as-built.md).
 - **Not built:** orphan-plan detection (needs the plan Reference), the stage columns of R4 (increments, minimum charge, rounding scope, zone, time band, tax) and their causes, allowances (R5), the Reconciliation, the
   Alert Rule by `ROOT_CAUSE_ID` and the dashboard (R6). `rr_explain` was measured in R3 only over in-memory tables, not the Job over Parquet (admin guide).
 
@@ -90,9 +91,10 @@ columns and are never netted (D-RR4).
 seeded synthetic `RerateCorpus` through the template's own Pipelines, runs all four Jobs as authored and holds every contract column of
 every call, every tariff finding, every finding of `rr_explain` and every root cause to an independent plain-Java oracle (and the planted causes to hand-declared ones); the findings to the exact planted set with every look-alike
 silent; the degradation (no `PRIORITY` column), the tolerance parameter, zone independence, idempotent re-runs and the signal chain; and
-a pass of 157 clause mutants that must each change the oracle's rows (57 must change a named row); the known unpinned clauses and limits are in the plan sections 13 to 15 (15 adds the unpinned inference clauses and `count(DISTINCT ITEM_KEY)`, which no corpus plan with two versions in force at one call pins).
+a pass of 157 clause mutants that must each change the oracle's rows (57 must change a named row); the known unpinned clauses and limits are in the [as-built record](plan-as-built.md) (R3 adds the unpinned inference clauses and `count(DISTINCT ITEM_KEY)`, which no corpus plan with two versions in force at one call pins).
 
 ## Related
 
-[user guide](user-guide.md) · [admin guide](admin-guide.md) · [features](features.md) · [plan](../../../../superpower/rerating-tariff-validation-plan.md) ·
+[user guide](user-guide.md) · [admin guide](admin-guide.md) · [features](features.md) · [as-built record](plan-as-built.md) ·
+[open work](../../../../superpower/telco-packs-plan.md) ·
 the starter control it extends: [Telecom revenue assurance](../telco-ra/architecture.md).

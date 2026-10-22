@@ -1,21 +1,31 @@
-# First-time user use cases: from a blank slate to a queryable Dataset
+---
+type: Reference
+title: Console first-time user use cases (blank slate to a queryable Dataset)
+description: Personas, the as-built first-run journey, use cases UC-1 to UC-9 and the smart help catalogue H1 to H9 for a console beginner, from an empty install to a queryable Dataset; operator answers of 2026-10-22.
+tags: [module, etl, onboarding, use-cases, spec]
+timestamp: 2026-10-22T00:00:00Z
+---
 
-> 🟢 **§6 ANSWERED 2026-10-22 (operator):** file first is primary, detected settings are pre-applied with low
-> confidence flagged, missing capabilities are shown locked with a reason, onboarding UX gets its own companion plan,
-> and all nine use cases are must-have.
->
-> ➡ **Edition plan: [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`).** This doc was
-> written for the draft `PIPELINE-EDITIONS-1`, which was merged into `DATA-TIERS-1` on 2026-10-22 and never
-> published on its own. Its decision numbers map as: D-PE1 → DT-5 and DT-17 · D-PE2, D-PE3, D-PE4 → DT-16 ·
+# Console first-time user use cases: from a blank slate to a queryable Dataset
+
+**Status: use cases agreed with the operator, answered 2026-10-22 (§6); nothing built.** File first is primary,
+detected settings are pre-applied with low confidence flagged, missing capabilities are shown locked with a reason,
+and all nine use cases are must-have. This spec states what a first-time console user wants, what they must do
+today, and how the product carries them the whole way. It is the requirement the plans build against; it is not a
+plan itself.
+
+**Owners.** The edition gates are [`data-tier-editions-plan.md`](../../../../superpower/data-tier-editions-plan.md)
+(`DATA-TIERS-1`, DT-13 and DT-14); the onboarding experience is
+[`first-run-onboarding-plan.md`](../../../../superpower/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the
+console) on the shared import route of [`la-onboarding-plan.md`](../../../../superpower/la-onboarding-plan.md)
+(`LA-ONBOARD-1`, Inspecto LA). The Inspecto LA side of the same journey:
+[`spec-first-time-user-use-cases.md`](../la-core/spec-first-time-user-use-cases.md).
+
+> **Decision numbers.** This doc was first written for the draft `PIPELINE-EDITIONS-1`, which was merged into
+> `DATA-TIERS-1` on 2026-10-22 and never published on its own. Its decision numbers map as: D-PE1 → DT-5 and DT-17 · D-PE2, D-PE3, D-PE4 → DT-16 ·
 > D-PE5 → DT-7 (shaping), DT-15 (Expectations, quarantine and dedupe stay on Basic, decided) and DT-6 (lookups) ·
 > D-PE6 → DT-4 (decided: files only on Basic, every remote adapter Standard) · D-PE7 → DT-12 · D-PE8 → DT-19 ·
-> D-PE9 → the Outputs row and the `pipeline.egress` gate · D-PE10 → DT-18 · D-PE11 → DT-9. The onboarding experience is
-> [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the console) on the shared
-> import route of [`la-onboarding-plan.md`](la-onboarding-plan.md) (`LA-ONBOARD-1`, Inspecto LA). The Inspecto LA side of
-> the same journey: [`spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md).
->
-> 🟡 **DRAFT 2026-10-22.** It describes what a first-time user wants, what they must do today, and how the product
-> could carry them the whole way. Nothing here is built.
+> D-PE9 → the Outputs row and the `pipeline.egress` gate · D-PE10 → DT-18 · D-PE11 → DT-9.
 >
 > **Grounding.** The "today" steps come from two read-only surveys of the checkout on 2026-10-22 (`26a2dde24`): one of
 > the console (`inspecto-ui/src/app`), one of the docs and control routes. Key claims were spot-checked (Home's
@@ -209,7 +219,7 @@ smart help involved (catalogue in §4), and what the edition plan must account f
 **deterministic**: H1 to H5 and H7 to H9. That fits the principle of no weaker correctness: the deterministic helpers
 are also the ones a reviewer can trust and test.
 
-## 5. What this means for the edition plan (for refinement)
+## 5. What this means for the edition plan (carried into the plans 2026-10-22)
 
 Points that should change or extend the edition plan before it is finalised, as written on 2026-10-22 (the D-PE
 numbers map to `DATA-TIERS-1` as in the note at the top). Points 1, 2 and 5 became DT-13 and DT-14; points 3 and 4
@@ -245,4 +255,4 @@ are DT-6 and DT-7; points 6 and 7 are `ONBOARDING-FIRST-RUN-1`.
 with a reason; *Add a file* and *Run now* sit together on Basic; Activate copy follows the edition; `orders-starter`
 gets a load-and-run sample button. **Everything else in §5 point 6, plus pre-applied inference (Q2), file-first
 entry points (Q1) and first-run detection (§5 point 7), is
-[`first-run-onboarding-plan.md`](first-run-onboarding-plan.md).**
+[`first-run-onboarding-plan.md`](../../../../superpower/first-run-onboarding-plan.md).**

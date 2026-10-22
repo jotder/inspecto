@@ -4,7 +4,7 @@
 (port 8142, `-Dla.embed.enabled=true`): `tools/la-claims-smoke.mjs --embed` passed 29 of 29 and the scenes marked **verified** below were driven in the
 browser pane or against the live API as the real Demo Users (section 6). Data and graph promises are pinned by tests (section 5).*
 
-What this is: the script for presenting vertical C of the [multi-vertical showcase plan](../../../../superpower/la-multi-vertical-showcase-plan.md),
+What this is: the script for presenting vertical C of the [multi-vertical showcase plan](../../../../archived-documents/plans-archive/la-multi-vertical-showcase-plan.md) (archived; the rehearsal still owed is in the [roadmap](../../../../superpower/link-analysis-roadmap.md) §D5),
 "one garage, one lawyer, twelve strangers". The graph here is built from **shared attributes** (one phone, one address, one garage), not from
 money moving, which is exactly where communities, identity resolution and Entity profile pages shine. Everything is synthetic: no real
 person, address, brand or police report. Names, ids, phones and addresses are invented; places are city centroids plus jitter.

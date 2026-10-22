@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// customer-build — a customer-specific build from the Product Map (docs/superpower/product-map-plan.md, PRODUCT-MAP-1 slice S5).
+// customer-build — a customer-specific build from the Product Map (docs/archived-documents/plans-archive/product-map-plan.md, PRODUCT-MAP-1 slice S5).
 //
 //   node tools/customer-build.mjs <customer> [--bundle <edition-bundle-dir>] [--out target/customers/<customer>] [--root .]
 //

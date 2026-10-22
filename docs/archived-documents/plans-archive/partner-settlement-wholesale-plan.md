@@ -1,7 +1,10 @@
 # Partner / settlement / wholesale: plan (`PACK-PARTNER-SETTLEMENT-1`, settlement half)
 
+> **ARCHIVED 2026-10-22** — open work moved to docs/superpower/telco-packs-plan.md; as-built facts in the partner-settlement hub
+> ([`okf/product/solution-pack/partner-settlement/`](../../okf/product/solution-pack/partner-settlement/index.md), `plan-as-built.md`).
+
 > 🟡 **PLAN 2026-10-18; S0 to S3 (the smallest cut) BUILT 2026-10-20, see §16; S4 BUILT 2026-10-21, see §17; S5 to S8 and W1 to W3 not built.** Closes competitive gap **Q** (partner / settlement / wholesale) in
-> [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md). Gap **C** (re-rating) has
+> [`okf/product/layer/product/brochure-competitive-matrix.md`](../../okf/product/layer/product/brochure-competitive-matrix.md). Gap **C** (re-rating) has
 > its own plan, written in parallel by a sibling session; this plan states only the **contract it needs from it** (§5) and
 > does not design re-rating. Decisions below are marked **PS-D1…PS-D10**: each was a recommendation, accepted by the operator
 > 2026-10-20 (§11), with how to reverse it. **What is NOT known:** no real partner statement, TAP file or MVNO wholesale invoice has been
@@ -18,8 +21,8 @@ Checked against the tree on 2026-10-18.
 | `ic_statement` feed | Five columns: `STATEMENT_ID`, `PARTNER`, `EVENT_DATE`, `MINUTES`, `AMOUNT` (USD, `DECIMAL(18,4)`). One line per partner and day. No period, currency, direction, destination, version, or control total. | `config/ic_statement/ic_statement_schema.toon` |
 | `ic_rates` Reference | Two columns: `PARTNER`, `RATE_PER_MIN`. **Not effective-dated**, no direction, destination class, tier or currency. | `config/ic_rates/ic_rates_schema.toon` |
 | `mobile-money` Reconciliation `mm_partner_settlement` | The only true Reconciliation against a partner file: ledger `BILL_PAY` rows vs settlement lines per transaction, `cardinality: one_to_many`, absolute tolerance 0.01. Per-transaction, not per-period. | `spaces/_templates/mobile-money/config/registry/reconciliations/mm_partner_settlement.toon` |
-| Reconciliation add-on | Two or three Datasets compared at a key grain; four Break types; Break lifecycle `open / assigned / resolved / auto_closed` with recurrence; `recon.run` Job; one deduped Incident per Reconciliation on a breach; Break → Incident via `POST /recon/promote`. | [`okf/product/module/reconciliation/architecture-overview.md`](../okf/product/module/reconciliation/architecture-overview.md) |
-| Incidents, Cases, Workflow & SLA | A Case groups Incidents (Case Rule auto-groups); Impact (suspected / confirmed / recovered / prevented) on an Incident or Case; an authored `workflow` **per object type**; an SLA Policy per object type (targets per priority on a business calendar); Escalation Rule once per breach. | [`okf/product/module/workflow/architecture-workflow-sla.md`](../okf/product/module/workflow/architecture-workflow-sla.md), [`okf/product/module/case-management/architecture-overview.md`](../okf/product/module/case-management/architecture-overview.md) |
+| Reconciliation add-on | Two or three Datasets compared at a key grain; four Break types; Break lifecycle `open / assigned / resolved / auto_closed` with recurrence; `recon.run` Job; one deduped Incident per Reconciliation on a breach; Break → Incident via `POST /recon/promote`. | [`okf/product/module/reconciliation/architecture-overview.md`](../../okf/product/module/reconciliation/architecture-overview.md) |
+| Incidents, Cases, Workflow & SLA | A Case groups Incidents (Case Rule auto-groups); Impact (suspected / confirmed / recovered / prevented) on an Incident or Case; an authored `workflow` **per object type**; an SLA Policy per object type (targets per priority on a business calendar); Escalation Rule once per breach. | [`okf/product/module/workflow/architecture-workflow-sla.md`](../../okf/product/module/workflow/architecture-workflow-sla.md), [`okf/product/module/case-management/architecture-overview.md`](../../okf/product/module/case-management/architecture-overview.md) |
 | Regulatory Reporting add-on | Report Templates rendered to XML / CSV / JSON from a Case or Incident, four-eyes approval, file-drop submission, audit log. | matrix row T |
 | R7 research | The host–MVNO settlement mechanics (§4.2), dispute causes (§4.4) and controls C1…C23 (§5); controls C8, C9, C18 are the settlement ones. | `group-regulator-assurance/research/R7-mvno-roll-up-and-wholesale.md` (a git-excluded working set, so not linked) |
 
@@ -333,17 +336,17 @@ engine's behaviour if reversed.
 
 ## 15. References
 
-- [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows C, H, Q and its gap table.
-- [`okf/product/solution-pack/business-assurance/architecture-revenue-assurance.md`](../okf/product/solution-pack/business-assurance/architecture-revenue-assurance.md): the `telco-ra` pack.
+- [`okf/product/layer/product/brochure-competitive-matrix.md`](../../okf/product/layer/product/brochure-competitive-matrix.md) rows C, H, Q and its gap table.
+- [`okf/product/solution-pack/business-assurance/architecture-revenue-assurance.md`](../../okf/product/solution-pack/business-assurance/architecture-revenue-assurance.md): the `telco-ra` pack.
 - `group-regulator-assurance/research/R7-mvno-roll-up-and-wholesale.md` (git-excluded working set, not linked) §4.1, §4.2, §4.4, §5, §7.2.
-- [`okf/product/module/reconciliation/architecture-overview.md`](../okf/product/module/reconciliation/architecture-overview.md), [`reconciliation-uplift-plan.md`](../archived-documents/plans-archive/reconciliation-uplift-plan.md).
-- [`okf/product/module/workflow/architecture-workflow-sla.md`](../okf/product/module/workflow/architecture-workflow-sla.md), [`okf/product/module/case-management/architecture-overview.md`](../okf/product/module/case-management/architecture-overview.md).
-- [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5 (`telco-ra`, `mobile-money`, `aml` pack precedents).
-- [`GLOSSARY.md`](../GLOSSARY.md): binding vocabulary.
+- [`okf/product/module/reconciliation/architecture-overview.md`](../../okf/product/module/reconciliation/architecture-overview.md), [`reconciliation-uplift-plan.md`](reconciliation-uplift-plan.md).
+- [`okf/product/module/workflow/architecture-workflow-sla.md`](../../okf/product/module/workflow/architecture-workflow-sla.md), [`okf/product/module/case-management/architecture-overview.md`](../../okf/product/module/case-management/architecture-overview.md).
+- [`okf/product/module/config/plan-spaces.md`](../../okf/product/module/config/plan-spaces.md) §3.5 (`telco-ra`, `mobile-money`, `aml` pack precedents).
+- [`GLOSSARY.md`](../../GLOSSARY.md): binding vocabulary.
 
 ## 16. S0 to S3 as built (2026-10-20)
 
-Branch `lane/ps-s0s3`; the commit is named in the hand-back of the lane. Hub: [`okf/product/solution-pack/partner-settlement/`](../okf/product/solution-pack/partner-settlement/index.md).
+Branch `lane/ps-s0s3`; the commit is named in the hand-back of the lane. Hub: [`okf/product/solution-pack/partner-settlement/`](../../okf/product/solution-pack/partner-settlement/index.md).
 The slices follow the order of §10; the smallest useful cut (S0 + S1 + S2 + S3) is built, S4 to S8 and W1 to W3 are not.
 
 **S0: contract and decisions.** PS-D1 to PS-D10 are answered (§11). The §5 contract with the re-rating plan is **not signed**: the
@@ -430,7 +433,7 @@ neither variance nor data quality).
 
 ## 17. S4 as built (2026-10-21)
 
-Branch `lane/ps-s4`, on top of S0 to S3 (§16). Hub: [`okf/product/solution-pack/partner-settlement/`](../okf/product/solution-pack/partner-settlement/index.md).
+Branch `lane/ps-s4`, on top of S0 to S3 (§16). Hub: [`okf/product/solution-pack/partner-settlement/`](../../okf/product/solution-pack/partner-settlement/index.md).
 S4 is netting, the roll-forward and FX as a column set; S5 (disputes) is **not** built, because its authored CASE workflow needs a
 Workflow and SLA seed decision that is the operator's (§16, open item 4). Decisions PS-D1 to PS-D10 are followed; PS-D6 to PS-D9 do not apply to S4.
 

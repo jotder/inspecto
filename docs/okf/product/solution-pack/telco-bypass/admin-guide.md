@@ -28,7 +28,7 @@ timestamp: 2026-10-20T00:00:00Z
 
 ## The CDR contract
 
-Required columns: `record_id, start_ts, direction, service, a_number, b_number, duration_s, roaming, cell_id`. Optional: `answered, release_cause, imei, imsi`; leave them blank, or end the file after `cell_id`. Numbers should be bare E.164 digits. Timestamps are naive and must all be in the zone named by the Job parameter `feed_zone`; set `local_zone` to the zone whose night the pack should use. Whether your operator, or the MVNE for an MVNO, can supply IMEI, IMSI, answer or release data is the largest unknown (plan section 2.1); the pack runs without them.
+Required columns: `record_id, start_ts, direction, service, a_number, b_number, duration_s, roaming, cell_id`. Optional: `answered, release_cause, imei, imsi`; leave them blank, or end the file after `cell_id`. Numbers should be bare E.164 digits. Timestamps are naive and must all be in the zone named by the Job parameter `feed_zone`; set `local_zone` to the zone whose night the pack should use. Whether your operator, or the MVNE for an MVNO, can supply IMEI, IMSI, answer or release data is the largest unknown (decision D-BP2, [as-built record](plan-as-built.md)); the pack runs without them.
 
 ## Create the Entity Lists (once, by hand)
 

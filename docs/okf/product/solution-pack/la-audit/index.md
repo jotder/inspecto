@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-audit` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | drive the three vertical showcases fully in the browser and write the 30-minute cross-vertical tour. | — |

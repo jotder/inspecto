@@ -15,7 +15,7 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
+| plan | current | [Telecom re-rating (tariff validation) — decisions and as-built record](plan-as-built.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Telecom re-rating (tariff validation)](architecture.md) |
 | features | current | [Telecom re-rating (tariff validation) — features](features.md) |

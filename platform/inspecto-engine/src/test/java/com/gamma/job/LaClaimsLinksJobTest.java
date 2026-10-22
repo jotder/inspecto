@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The {@code la-claims} Space Template's insurance-claims corpus RUN end to end from a verbatim copy: the six Pipelines
  * ingest the shipped extracts ({@code data/inbox/<feed>}, written by {@code tools/gen-la-claims-data.py}), then the two
  * {@code sql.template} Jobs build {@code claims_links} and {@code claims_policy_timing}. Pins the link contract (columns, the seven
- * kinds and their row counts), the de-duplication and placeholder rules of docs/superpower/la-multi-vertical-showcase-plan.md
+ * kinds and their row counts), the de-duplication and placeholder rules of docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md
  * section 4, and the planted figures that live in tables rather than in the graph (early-claim policies, the near-duplicate
  * pair NOT linked by phone). The graph-side plants (Louvain, cliques, HITS ...) are pinned by {@code LaClaimsGoldenTest} in
  * inspecto-graph over the same link counts.

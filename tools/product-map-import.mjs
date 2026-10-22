@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // product-map-import — brings edits made in the generated CSV or Excel workbook (tools/render-product-map.mjs) back into the Product Map
-// (docs/superpower/product-map-plan.md, PRODUCT-MAP-1 slice S4). Only COMMERCIAL columns are imported; prices go to the gitignored
+// (docs/archived-documents/plans-archive/product-map-plan.md, PRODUCT-MAP-1 slice S4). Only COMMERCIAL columns are imported; prices go to the gitignored
 // product-map/private/prices.csv (D-PM3), never into a committed file.
 //
 //   node tools/product-map-import.mjs <file.csv|file.xlsx> [--sheet "Items"] [--write] [--root .]

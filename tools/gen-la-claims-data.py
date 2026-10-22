@@ -4,7 +4,7 @@
 Writes spaces/_templates/la-claims/data/inbox/<feed>/<FEED>_20260930.csv for six feeds:
   claim, claim_party, policy, provider_bill, accident_location, provider_directory
 
-Planted stories (ground truth pinned by LaClaimsGoldenTest; plan: docs/superpower/la-multi-vertical-showcase-plan.md, 2.C):
+Planted stories (ground truth pinned by LaClaimsGoldenTest; plan: docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md, 2.C):
   1 staged-accident RING   12 claimants over 9 claims share 4 phones and 3 addresses; one garage GAR-03, one clinic CLI-04, one lawyer LAW-02
   2 REPEAT PASSENGER       one ring member is a passenger on 6 of those claims with 6 different drivers in under 7 months
   3 GEO CLUSTER            11 accidents within 400 m of one junction at 02:00-04:00, none with a police report (the 9 ring claims + 2 others)

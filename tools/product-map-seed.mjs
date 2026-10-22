@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// product-map-seed — writes the Product Map skeleton (docs/superpower/product-map-plan.md, PRODUCT-MAP-1 slice S1) from what already
+// product-map-seed — writes the Product Map skeleton (docs/archived-documents/plans-archive/product-map-plan.md, PRODUCT-MAP-1 slice S1) from what already
 // exists: one Product Map Item per layer directory, module manifest, Offering add-on, Solution pack and Edition.
 //
 //   node tools/product-map-seed.mjs [--root .] [--dry-run]

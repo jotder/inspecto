@@ -1,9 +1,11 @@
+> **ARCHIVED 2026-10-22** — the rehearsal still owed moved to `docs/superpower/link-analysis-roadmap.md` §D5; as-built facts in the la-showcase hub (`architecture.md`, showcase design rules) and the la-mobile-money / la-audit / la-claims runbooks.
+
 # Link Analysis showcases across three verticals (plan, synthetic data only)
 
 **Status: BUILT 2026-10-16 - the three lanes are merged to master (A booted and smoked 10 of 10; B and C pass unit and golden tests, live rehearsal still to do). The shared kit (S1) was dropped: each lane owns its generator, seed script, smoke runner, runbook and embed portal (under the template `portal` folder).** Goal: one small, believable, fully synthetic showcase per vertical, together exercising **every** Link Analysis
 capability (the 29 algorithms in the SPA and on the server, Dossier, embed links, masking, four-eyes, Drafts, standing detection, Geo Views). Verticals:
 **Mobile money**, **Finance and audit**, and a third chosen here, **Insurance claims (Special Investigations Unit, SIU)**.
-Reuses, does not replace: the [demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (mule transfers + telecom, scenes S1 to S15), the `la-showcase` Space Template,
+Reuses, does not replace: the [demo runbook](../../okf/product/module/la-core/admin-guide-demo.md) (mule transfers + telecom, scenes S1 to S15), the `la-showcase` Space Template,
 the [IMS showcase](la-ims-showcase-plan.md) (real data, kept outside the repo), and the generator pattern of `tools/gen-la-showcase-data.py`
 (deterministic, seeded `random.Random`, golden test pins the planted facts).
 When this ships: distil the as-built facts into `okf/product/module/la-core/user-guide-link-analysis.md`, move open items to `docs/BACKLOG.md`, then `git mv` this plan to `archived-documents/plans-archive/`.
@@ -181,5 +183,5 @@ resist enlarging the corpora, scale is a recorded benchmark; (5) **claims we mus
 
 ## References
 
-* [Demo runbook](../okf/product/module/la-core/admin-guide-demo.md) · [whitepaper demo plan](la-whitepaper-demo-plan.md) · [IMS showcase plan](la-ims-showcase-plan.md) · [demo readiness plan](la-demo-readiness-plan.md)
-* Backend concept: [`okf/product/module/la-core/architecture.md`](../okf/product/module/la-core/architecture.md); SPA concept: [`okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md)
+* [Demo runbook](../../okf/product/module/la-core/admin-guide-demo.md) · [whitepaper demo plan](la-whitepaper-demo-plan.md) · [IMS showcase plan](la-ims-showcase-plan.md) · [demo readiness plan](la-demo-readiness-plan.md)
+* Backend concept: [`okf/product/module/la-core/architecture.md`](../../okf/product/module/la-core/architecture.md); SPA concept: [`okf/product/module/la-core/user-guide-link-analysis.md`](../../okf/product/module/la-core/user-guide-link-analysis.md)

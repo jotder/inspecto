@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-10-22** — open work moved to `docs/superpower/link-analysis-roadmap.md` §D4; as-built facts in the la-core hub (`architecture.md` §6.6, `user-guide-link-analysis.md`).
+
 # LA analyst upload - bring your own spreadsheet (i2-gap 2, roadmap D4) - PLAN
 
 Status: BUILT 2026-10-18 after the decisions below were assistant-decided on the operator's delegation (**pending operator confirmation**). See "As built" at the end.

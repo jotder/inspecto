@@ -1,6 +1,8 @@
 # Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)
 
-**Status:** 🟡 DESIGN 2026-10-18 — nothing built. §8 decisions taken by the assistant under operator delegation (2026-10-18) — **PENDING OPERATOR CONFIRMATION**; S0 (decisions + GLOSSARY) done, S1+ not started.
+> ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
+
+**Status before parking:** 🟡 DESIGN 2026-10-18 — nothing built. §8 decisions taken by the assistant under operator delegation (2026-10-18) — **PENDING OPERATOR CONFIRMATION**; S0 (decisions + GLOSSARY) done, S1+ not started.
 **Row:** `docs/BACKLOG.md` §4, `AGENTIC-INVESTIGATION-1` (P2, competitive gap AA).
 **Competitors:** Mobileum RAID Agentic and Subex AI Agent Squads (see `okf/product/layer/product/brochure-competitive-matrix.md`, rows AA and the gap table).
 

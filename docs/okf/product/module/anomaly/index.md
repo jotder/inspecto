@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Anomaly Detection — plan](plan.md) |
+| plan | current | [Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)](plan-predictive-analytics.md) · [Anomaly Detection — plan](plan.md) |
 | spec | current | [Anomaly Scores — explainable behavioural anomaly scoring per entity](spec-anomaly-scores.md) |
 | architecture | current | [Anomaly Detection](architecture-overview.md) |
 | features | current | [Anomaly Detection — features](features-anomaly.md) |

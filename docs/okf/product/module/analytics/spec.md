@@ -2,7 +2,7 @@
 type: Architecture
 title: Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts
 description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4, M5, the M6 baseline contract and the M7 score output contract) — one written definition per statistic (mean, variance and stddev, median modes, quantile modes, MAD, robust z, IQR, Tukey fences, ratio and rate), the empty/NaN input rules, which DuckDB function each matches, the callers consolidated onto it (M2), the one column profiler and its callers (M4), the time-series primitives (one time-grain truncation with an explicit zone, resample with gap fill, period shift) and the truncation copies they retired (M5), the baseline package moved from Anomaly Detection, and the model-agnostic forecasting pieces of S5 (accuracy measures and a rolling-origin backtest, seasonality detection by autocorrelation, a deterministic holdout split). Also documents the similarity kit (S1: Jaro, Jaro-Winkler, Levenshtein, Jaccard, normalization, their DuckDB forms and parity, the Screening and Triage copies it retired, Step transform.similarity). Also documents the temporal motif matcher that moved to the graph library (S6), and ranking, sampling and pivot (S4: the deterministic seeded sampler with DuckDB parity, Steps transform.analytics.rank, transform.sample, transform.matrix.pivot), and deterministic entity grouping (S2: blocking keys, exact match conditions, union-find, its DuckDB form and parity, Step transform.entity.link; similarity never forms a group, D-M1). Also the distribution Steps (S3: outlier flags, equal-width and quantile bins, Pearson correlation and linear regression, their edge rules and DuckDB parity).
-resource: docs/superpower/analytics-core-plan.md
+resource: docs/archived-documents/plans-archive/analytics-core-plan.md
 tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, cohort, change-point, modules, duckdb]
 timestamp: 2026-10-18T00:00:00Z
 ---
@@ -11,7 +11,7 @@ timestamp: 2026-10-18T00:00:00Z
 
 > 🟡 **Status (2026-10-17): M1 (with ratio and rate), the M6 contract, the M4 column profiler, M2, M5 (time-series
 > primitives) and the M7 score output contract are built.** Plan:
-> [`analytics-core-plan.md`](../../../../superpower/analytics-core-plan.md) (row `ANALYTICS-CORE-1`). The column profiler
+> [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md) (row `ANALYTICS-CORE-1`). The column profiler
 > serves `transform.profile`, the Expectation `baseline` (profile and median) and Link Analysis' column profile and
 > degree quantiles (§ Column profiler); `VolumeBaseline`, `ReportService` and LA's `LinkTemporalDetector` use the kernel
 > statistics (see [Callers consolidated](#callers-consolidated)). The SQL-side statistics (`quantile_cont` /
@@ -1125,7 +1125,7 @@ planted anomalies at the top, bit-for-bit repeat, recompute, cap, preview refusa
 
 ## References
 
-* Plan and decisions D-AN1 … D-AN9 and D-AN20 … D-AN29: [`analytics-core-plan.md`](../../../../superpower/analytics-core-plan.md).
+* Plan and decisions D-AN1 … D-AN9 and D-AN20 … D-AN29: [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md).
 * The baselines' first consumer: [anomaly-scores](../anomaly/spec-anomaly-scores.md).
 * The score kinds on the contract: [anomaly-scores](../anomaly/spec-anomaly-scores.md), [risk-scores](../scoring/spec-risk-scores.md).
 * Module axes and manifests: [module-taxonomy](../../layer/platform/architecture-module-taxonomy.md).

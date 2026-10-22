@@ -1,5 +1,7 @@
 # Parsing D9 — a repeated-child operation for the ASN.1 Decode Profile (design)
 
+> **ARCHIVED 2026-10-22** — as-built facts in `docs/okf/product/module/engine/spec-parser-plugins.md` (D9 — tree operations on repeated children); open items in docs/BACKLOG.md.
+
 **Status 2026-10-12: APPROVED. SLICES 1, 2 AND 3 BUILT (1 = `9c07a0aeb`); slice 4 (editor) and the leftovers below stay open.**
 **2026-10-12 as-built:** `group_by` was REMOVED from `derive` (operator D6; a config naming it fails with
 `ASN1-DERIVE-UNKNOWN-OP`). Slice 2: `ChildSpec` (`platform/inspecto-etl`) + `Asn1RecordIngester.explode`;

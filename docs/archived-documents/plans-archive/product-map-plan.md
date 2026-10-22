@@ -1,5 +1,7 @@
 # Product Map: plan
 
+> **ARCHIVED 2026-10-22** — as-built facts in `docs/okf/product/layer/platform/spec-product-map.md` (and `product-map/README.md` for daily use); open items in docs/BACKLOG.md.
+
 > 🟢 **PLAN 2026-10-18 (`PRODUCT-MAP-1`): decisions D-PM1…D-PM8 were taken by the operator on 2026-10-18 (§8).
 > S0 (glossary), S1 (format, seed, gitignore), S2 (guard in CI), S3 (CSV, XLSX, mind map), S4 (import) and S5 (customer build, demo-telco pilot) are done; only S6 (later, on demand) remains.**
 > **Goal:** one place that is easy to manage, laid out like a mind map, that describes every **Product Map Item**:

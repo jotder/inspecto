@@ -1,7 +1,10 @@
 # Bypass / SIM-box detection from CDRs: a plan
 
+> **ARCHIVED 2026-10-22** — open work moved to docs/superpower/telco-packs-plan.md; as-built facts in the telco-bypass hub
+> ([`okf/product/solution-pack/telco-bypass/`](../../okf/product/solution-pack/telco-bypass/index.md), `plan-as-built.md`).
+
 > 🟡 **PLAN 2026-10-18 (`TELCO-BYPASS-SIMBOX-1`): B0 measured, B1 and B2 built 2026-10-20 (§16, §17, §18); B3 to B7 not built.** Competitive gap **E** (bypass /
-> SIM-box detection) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../okf/product/layer/product/brochure-competitive-matrix.md):
+> SIM-box detection) is **Partial** in [`COMPETITIVE_CAPABILITY_MATRIX.md`](../../okf/product/layer/product/brochure-competitive-matrix.md):
 > LATRO, Subex, Mobileum, Neural and Araxxe sell it, and the matrix records Inspecto as "CDR-based only". The same
 > matrix places signalling probes (row F) and test-call generation (row G) **out of scope**, so this plan is
 > **CDR-based only by design** and says in §11 which RFP lines it therefore cannot close. Interconnect-side fraud that is
@@ -71,8 +74,8 @@ trunk (§10, B5).
 - Bypass that leaves no local-SIM trace in the CDRs: OTT or VoIP bypass, a box on a foreign network, SMS A2P grey routes (the
   last is `FM-R13` / `T-07`, a different typology).
 - A trained model. Smart here means **deterministic, explainable, recomputable**, the standard Risk Scores and Anomaly Scores already hold
-  ([`okf/product/module/scoring/spec-risk-scores.md`](../okf/product/module/scoring/spec-risk-scores.md),
-  [`anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md)); ML scoring stays the roadmap gap `G-21` (`FM-18`).
+  ([`okf/product/module/scoring/spec-risk-scores.md`](../../okf/product/module/scoring/spec-risk-scores.md),
+  [`anomaly-scores.md`](../../okf/product/module/anomaly/spec-anomaly-scores.md)); ML scoring stays the roadmap gap `G-21` (`FM-18`).
 
 ### 2.1 The CDR contract this plan needs (decision D-BP2)
 
@@ -140,7 +143,7 @@ voice_cdr (feed) ─► tb_features (SIM-day signals) ─► tb_clusters (device
 Each stage is a `sql.template` Job writing one Dataset, chained with `on_signal: job.run.completed` and the guard
 `when: "$signal.job == <previous> && $signal.outcome == SUCCESS"`, the pattern `telco-ra` and the re-rating plan use. Incremental
 by partition (`window_date`), `lookback` of one day, `retain` 31. The Job-written Dataset layering is the recorded design
-([`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) §3.5): it avoids cycles and hidden cost. Why SQL and no new
+([`okf/product/module/config/plan-spaces.md`](../../okf/product/module/config/plan-spaces.md) §3.5): it avoids cycles and hidden cost. Why SQL and no new
 Step: the Step Processor hold was lifted 2026-10-06, but windowed detection already runs as `sql.template` throughout
 `telco-fraud`, and the bid plan records velocity as hand-written SQL until it is productised (`G-07`, `WS-14`).
 
@@ -254,7 +257,7 @@ so an allow-list entry cannot become a permanent hiding place.
 5. **Verdict, typed:** *confirmed box*, *false positive: verified business line*, *false positive: other*, or *needs verification*
    (a customer or dealer call, **a process step**, because only a call or a test call can separate a dialler from a box, §11).
 6. **Action (approval, never automatic):** an **Action Request** to the operator's provisioning API (suspend or bar the SIM, bar
-   the IMEI), held for four-eyes and sent once with bounded retries ([`okf/product/module/action-requests/spec.md`](../okf/product/module/action-requests/spec.md)); the
+   the IMEI), held for four-eyes and sent once with bounded retries ([`okf/product/module/action-requests/spec.md`](../../okf/product/module/action-requests/spec.md)); the
    target API is the customer's, so until one exists the step is a manual task on the Case.
 7. **Close** with the typed outcome and the financial-impact fields (`WS-10`; impact stays **manual**, the stance `telco-ra` and
    the re-rating plan already take). A confirmed SIM is added to `tb-block`; a verified false positive to `tb-allow` with expiry.
@@ -457,21 +460,21 @@ real call is ever read or copied; a real CDR sample, if one arrives, is calibrat
 - `BACKLOG.md`: the row **`TELCO-BYPASS-SIMBOX-1`** keeps its place and priority and its **text** now points at this plan (CDR-based
   slices B0 to B7; non-CDR evidence stays out of scope). No row is added or removed, so no count marker changes.
 - `INDEX.md`: this plan's row in the in-flight table.
-- On ship (B7): distil as-built facts into [`okf/product/module/config/plan-spaces.md`](../okf/product/module/config/plan-spaces.md) (a subsection beside §3.5),
+- On ship (B7): distil as-built facts into [`okf/product/module/config/plan-spaces.md`](../../okf/product/module/config/plan-spaces.md) (a subsection beside §3.5),
   add a solution page under `stakeholders/solutions/`, update the matrix row E, then `git mv` this plan to
   `archived-documents/plans-archive/`.
 
 ## References
 
-- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../okf/product/layer/product/brochure-competitive-matrix.md) rows E, F, G, H.
+- Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../../okf/product/layer/product/brochure-competitive-matrix.md) rows E, F, G, H.
 - Existing pack: `spaces/_templates/telco-fraud/` (`fraud_simbox` Job, Alert Rule, runbook, `tf_subscriber_usage` Anomaly Model,
-  Case Rule); [`okf/product/solution-pack/telco-fraud/architecture.md`](../okf/product/solution-pack/telco-fraud/architecture.md).
-- Add-ons: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../okf/product/module/anomaly/spec-anomaly-scores.md),
-  [`risk-scores.md`](../okf/product/module/scoring/spec-risk-scores.md), [`entity-lists.md`](../okf/product/module/entity-list/spec.md),
-  [`action-requests.md`](../okf/product/module/action-requests/spec.md).
+  Case Rule); [`okf/product/solution-pack/telco-fraud/architecture.md`](../../okf/product/solution-pack/telco-fraud/architecture.md).
+- Add-ons: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../../okf/product/module/anomaly/spec-anomaly-scores.md),
+  [`risk-scores.md`](../../okf/product/module/scoring/spec-risk-scores.md), [`entity-lists.md`](../../okf/product/module/entity-list/spec.md),
+  [`action-requests.md`](../../okf/product/module/action-requests/spec.md).
 - Sibling plans (house style): [`rerating-tariff-validation-plan.md`](rerating-tariff-validation-plan.md),
   [`partner-settlement-wholesale-plan.md`](partner-settlement-wholesale-plan.md).
-- Canonical vocabulary: [`GLOSSARY.md`](../GLOSSARY.md) (the single source of truth).
+- Canonical vocabulary: [`GLOSSARY.md`](../../GLOSSARY.md) (the single source of truth).
 
 ## 16. Measurements (slice B0 results, 2026-10-20)
 
@@ -625,7 +628,7 @@ re-measure the cluster stage after B3. Record the memory note of §16.3 in the p
 ## 17. B1 as built (2026-10-20)
 
 Commits on `lane/bypass-b1`: `cf5dda252` (template skeleton, feeds, seeds, runbook skeleton, offering and Product Map Item),
-`add360e45` (the `tb_features` Job and the golden). Hub: [`okf/product/solution-pack/telco-bypass/`](../okf/product/solution-pack/telco-bypass/index.md).
+`add360e45` (the `tb_features` Job and the golden). Hub: [`okf/product/solution-pack/telco-bypass/`](../../okf/product/solution-pack/telco-bypass/index.md).
 
 **Delivered.** The `telco-bypass` Space Template: four Pipelines (`voice_cdr` with the optional `answered`, `release_cause`, `imei`,
 `imsi`; the Reference feeds `cell_site`, `number_plan`, `subscriber_profile`), their Datasets and zero-row seeds, one daily
@@ -688,7 +691,7 @@ the box Incident (D-BP3); S13 to S16; D-BP10; an operator's real CDR contract (D
 
 ## 18. B2 as built (2026-10-20)
 
-Commits on `lane/bypass-b2`: see the BACKLOG row. Hub: [`okf/product/solution-pack/telco-bypass/`](../okf/product/solution-pack/telco-bypass/index.md).
+Commits on `lane/bypass-b2`: see the BACKLOG row. Hub: [`okf/product/solution-pack/telco-bypass/`](../../okf/product/solution-pack/telco-bypass/index.md).
 
 **Delivered.** Three Jobs and a model beside `tb_features`: `tb_factors` (`sql.template`, a one-window snapshot: the factor columns, `primary_signals`, `est_bypass_minutes`), the Risk Score `tb_sim` (11 factors) run by the `risk.score` Job `tb_risk_score`, and `tb_findings` (`sql.template`, incremental, 31 days) which applies the allow list, agreement, persistence, the watch list and the shadow switch and is the only Dataset the two Alert Rules read: `tb_sim_high` (CRITICAL, `max(alert_score)`, by `entity_key`, `stormCap` 1000) and `tb_allowed_line_changed` (INFO). Seeds for `tb_factors`, `tb_findings` and the sidecars of `tb_allow` and `tb_watch`. Tests: in module `inspecto-scoring`, `BypassScoreTest` (6), `BypassAllowListTest` (10, the `tb_findings` stage in isolation, G-SB(c)), `TelcoBypassGoldenTest` (5), the opt-in `BypassScaleMeasureTest`; in `inspecto`, `BypassCorpus.generateB2()` and `filesOnDay`, two more `BypassCorpusTest` tests, and `BypassFeatureGoldenTest` updated for three `sql.template` Jobs. `inspecto` now publishes a test-jar and `inspecto-scoring` reads it (test scope) so the golden reuses `BypassCorpus` instead of copying it; `tools/affected-modules.mjs` therefore answers FULL for this lane (any module pom edit does).
 
@@ -713,7 +716,7 @@ Commits on `lane/bypass-b2`: see the BACKLOG row. Hub: [`okf/product/solution-pa
 
 ## 19. B3 as built (2026-10-21)
 
-Commits on `lane/bypass-b3`: see the BACKLOG row. Hub: [`okf/product/solution-pack/telco-bypass/`](../okf/product/solution-pack/telco-bypass/index.md).
+Commits on `lane/bypass-b3`: see the BACKLOG row. Hub: [`okf/product/solution-pack/telco-bypass/`](../../okf/product/solution-pack/telco-bypass/index.md).
 
 **Delivered.** Two `sql.template` Jobs, two Datasets, one Alert Rule, one Case Rule, one Link Analysis view and one runbook in the `telco-bypass` template. `tb_cluster_members` (03:40) reads the day's `voice_cdr` itself and keeps the candidate SIMs (at least `cand_min_events` 10 non-roaming MO voice calls and all five `box_like` clauses, strict, at the `tb_features` parameter values; not on a live `tb_allow` entry) that share a key with at least `min_box_sims` 5 candidates: `imei`, then `cell`, then `batch` (dealer and activation day); a SIM joins the first key that is a box, so one box is one `cluster_key`. `tb_clusters` (03:50) rolls the members up to one row per box per day (candidates, scored and alerting members, top score, talk minutes, cells, devices, spoofed SIMs, `days_seen`). Alert Rule `tb_box_suspected` (CRITICAL, `max(alert_value)` by `cluster_key`, `stormCap` 500, runbook linked) and Case Rule `tb_box_case` (`groupBy: cluster_key`). Zero-row seeds for both Datasets. D-BP10 is untouched: no offering, `orderCode` or matrix change.
 

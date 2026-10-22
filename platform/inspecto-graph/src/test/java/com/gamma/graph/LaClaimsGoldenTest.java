@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The {@code la-claims} Space Template's seven planted stories (docs/superpower/la-multi-vertical-showcase-plan.md, 2.C), over the SHIPPED
+ * The {@code la-claims} Space Template's seven planted stories (docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md, 2.C), over the SHIPPED
  * corpus ({@code spaces/_templates/la-claims/data/inbox}, read in place) folded to the same link graph the {@code claims_links} Job
  * builds (the per-kind row counts below equal those {@code LaClaimsLinksJobTest} pins over the real Pipelines and SQL). Every figure is
  * a promise a presenter may make; a regeneration that breaks one fails here.

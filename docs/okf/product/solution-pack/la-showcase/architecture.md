@@ -89,3 +89,32 @@ home; `tools/seed-la-showcase.mjs` and `tools/seed-la-mm.mjs` create them agains
 - `la-showcase` and `la-mobile-money` are not in any offering's `contentPacks` list; only
   `la-daily-feed` is (`offerings/basic.toon`).
 - The AML pack ships its own Link Analysis starter view (see [AML](../aml/architecture.md)).
+
+## Showcase design rules (decided 2026-10-16 for the three vertical showcases)
+
+The verticals [`la-mobile-money`](../la-mobile-money/admin-guide-showcase-runbook.md) (A),
+[`la-audit`](../la-audit/admin-guide-showcase-runbook.md) (B) and [`la-claims`](../la-claims/admin-guide-showcase-runbook.md) (C)
+follow the `la-showcase` layout. Each is built to these rules (plan archived:
+`docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md`; rehearsal still owed: roadmap §D5).
+
+- **Synthetic and small.** Every value is invented, from small pools and a seeded lognormal, with cities used only for
+  Geo. Each corpus stays at about 600 entities, 8,000 link rows and under 1 MB of CSV. Scale is shown from the recorded
+  benchmark, never from a showcase.
+- **Planted stories with known answers.** Each vertical plants 5 to 7 findings, and a golden test pins the ground truth
+  of each (`LaMobileMoneyGoldenTest`, `LaAuditGoldenTest`, `LaClaimsGoldenTest`). Each plant has a **benign look-alike**
+  (a big biller, a busy approver, a family sharing one phone), so "high connectivity is not guilt" is a scene.
+  Regeneration is byte-identical (seeded `random.Random`). The background graph stays sparse and acyclic wherever a
+  story promises "the only cycle", and the golden test builds the graph the way the app draws it (one link per row).
+- **Data shape.** One feed per fact (Collector + Pipeline). `sql.template` Jobs fold the raw Pipelines into one link
+  Dataset per vertical, so normalisation lives in the Jobs. Every link Dataset carries a real event-day column (for
+  the data-trust strip) and a `via` key for shared-attribute links. It never carries an identifier column that a tile
+  could sum. Shared-attribute links are materialised once and de-duplicated, with blank or placeholder values
+  excluded. Entity ids are typed and classified (`typed` masking), and Entity List membership must match the alias the
+  canvas shows.
+- **Decisions D1-D5.** The third vertical is insurance claims (D1), because its graph comes from shared attributes, not
+  from moving money. A is a new template, so the shipped `mobile-money` demo is untouched (D2). The embed portals are
+  static pages served from the template's `portal/` folder (D3). The `la-showcase` mule corpus is not retired: it stays
+  the runbook's and the whitepaper's proven base (D4). Live runs use an Advanced or Preview Demo Auth bundle (D5).
+- **One kit per lane.** The planned shared kit was dropped: each vertical owns its generator (`tools/gen-la-*-data.py`),
+  seed script, smoke runner, runbook and portal. No precision or detection-rate claim is made from synthetic data, and
+  plants are called planted.

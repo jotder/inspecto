@@ -10,13 +10,14 @@ tier. When a phase ships, distil the as-built facts into the product hubs (`edit
 `module/acquire`, `module/engine`, `layer/platform`), update `docs/EDITIONS.md`, move open items to
 `docs/BACKLOG.md`, and archive this file when the last phase ships.
 
-**Takes over** the ingestion half of [`la-edition-placement-changes-plan.md`](la-edition-placement-changes-plan.md)
+**Takes over** the ingestion half of [`la-edition-placement-changes-plan.md`](../archived-documents/plans-archive/la-edition-placement-changes-plan.md)
 (its §6, its §4.3 checks for D-LAE7…D-LAE11, and those decisions). That plan keeps the Link Analysis moves.
 
 **Companions.**
 
-- [`pipeline-editions-first-run-use-cases.md`](pipeline-editions-first-run-use-cases.md): console first-time user
-  use cases, blank slate to a queryable Dataset (§6 answered by the operator 2026-10-22).
+- [`okf/product/module/etl/spec-first-time-user-use-cases.md`](../okf/product/module/etl/spec-first-time-user-use-cases.md): console
+  first-time user use cases, blank slate to a queryable Dataset (an agreed spec in the ETL hub; §6 answered by the
+  operator 2026-10-22).
 - [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md):
   the same journey in Inspecto LA, from a live blank-slate walkthrough (findings F-1…F-13), with the operator's
   answers A-1…A-16 (§8).
@@ -234,5 +235,5 @@ P2 `DATA-TIERS-1` in `BACKLOG.md` §3.8 (hold: operator), indexed in §1 *Decisi
 ## References
 
 - `docs/EDITIONS.md` (current edition matrix), `docs/archived-documents/plans-archive/inspecto-la-editions-plan.md`
-  (the 2026-10-17 edition decisions), `docs/superpower/la-analyst-upload-plan.md` (the existing upload route),
+  (the 2026-10-17 edition decisions), `docs/archived-documents/plans-archive/la-analyst-upload-plan.md` (the existing upload route),
   `docs/okf/product/layer/platform/` (data-layer hubs).

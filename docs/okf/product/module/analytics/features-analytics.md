@@ -20,7 +20,7 @@ onto it.
 
 The concept page of record, with every formula, is
 [analytics-kernel](spec.md); the plan is row `ANALYTICS-CORE-1` in
-[`analytics-core-plan.md`](../../../../superpower/analytics-core-plan.md).
+[`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md).
 
 ## Where it fits
 

@@ -15,7 +15,7 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
+| plan | current | [Interconnect / wholesale fraud from CDRs (IRSF, Wangiri, flash-call / CLI): plan](plan-irsf-wangiri.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Telecom fraud](architecture.md) |
 | features | current | [Telecom fraud — features](features.md) |

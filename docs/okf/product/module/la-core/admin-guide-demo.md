@@ -7,7 +7,9 @@ on the exact bundle you will present, then again the evening before.*
 What this is: the step-by-step script for presenting the Inspecto LA demo on the **standalone Inspecto LA app
 bundle**. It defends the architecture page ([`okf/product/module/la-core/architecture.md`](architecture.md),
 cited below as "arch §n") with the running application. The claim-to-evidence map and the requirement ids (DR-*) are in
-[`superpower/la-demo-readiness-plan.md`](../../../../superpower/la-demo-readiness-plan.md); every control label below is the
+the archived [demo readiness plan](../../../../archived-documents/plans-archive/la-demo-readiness-plan.md) (all built by 2026-10-13; history only). The
+technical / security review cut of this script, not yet rehearsed, is in the
+[Link Analysis roadmap](../../../../superpower/link-analysis-roadmap.md) §D2. Every control label below is the
 one on screen (see the [user manual](user-guide-manual.md)). The variants (Personal bundle, Postgres
 store) are in the [showcase variants runbook](../../solution-pack/la-showcase/admin-guide-variants-runbook.md).
 
@@ -294,7 +296,7 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
 * **Real IAM:** no real-IAM sign-in is verified on this bundle. Demo Users sign in with no password on a loopback-only, `-DemoAuth` build, which refuses
   to run bound elsewhere. Do not call it a security demonstration of SSO.
 * **Embed UI:** built (mint dialog, grant list, `/embed/inv/<token>` viewer, `-Dcontrol.frameDeny`, Space `embed.frame_ancestors`); this S14 script drives only the API. For a real deployment read *Embed links behind a reverse proxy* below.
-* **Fences:** the "engine names no la-* class" rule is grep-true but unguarded (DR-T3); the dependency fences are shown by a named guard, not live.
+* **Fences:** the "engine names no la-* class" rule is guarded in CI by `tools/check-engine-names-no-la.mjs` (DR-T3); the dependency fences are shown by a named guard, not live.
 * **Postgres store, Personal 503, 429/503 bursts:** other variants (see the variants runbook) or `--burst`, not part of this script.
 * **A fired Alert names entities:** it does not, by design (aggregate only).
 * **Alerts inside the standalone app:** the Alerts page is in the full SPA, not the la-app.
@@ -369,3 +371,42 @@ Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` with the built-in b
 Noted, not filed (cosmetic, no functional effect): the console logs "Unable to preventDefault inside passive event listener" on canvas wheel/zoom; the Add-reference form keeps System and Type after a successful add; the *Open Investigation* action was not seen in the `fm.manager` Alerts view (not investigated: `fm.analyst` has it).
 
 **GO.** 22/22 beats pass on the customer-zip path; no FAIL to fix or file.
+
+## 8. Building a private showcase on a customer's real feed (lessons, 2026-10-15/16)
+
+A showcase was built by hand on a real IMS call-and-message record feed: first a 29,650-record extract, then one production
+day of 132 M records. It ran in a private local Space outside the repo, and the data was never committed. The aggregate
+timings are in the [whitepaper](brochure-inspecto-la-whitepaper.md) §6.4. What carries over to the next real feed:
+
+* **Keep real identities private.** Use a local Space outside the repo (git-excluded), classify MSISDN, IMSI and IMEI
+  so `typed` masking is on, and mask recordings. If the demo must travel outside the data owner, alias the identities at
+  ingest. Make no fraud verdict: a burst is a pattern worth an analyst's time, and a multi-SIM handset may be a default IMEI.
+* **Never drop a trailing column because it looks empty.** One row filled the last of 84 columns. With the schema cut at
+  82, that row was rejected as `TOO MANY COLUMNS`, by design (`skip_tail_columns` is the escape). A 0.00 fill rate can
+  round a handful of values away.
+* **The Collector's duplicate check was by file name**, so a byte-identical copy under a new name ingested twice.
+  Dedupe on a record key, or guard the inbox.
+* **Normalise in a `sql.template` Job, not in the Pipeline**, so the raw Dataset stays raw. The single-statement guard
+  refuses a literal semicolon even inside a regex: strip a `;phone-context=` suffix with `split_part(x, chr(59), 1)`.
+  Exclude blank and placeholder identifiers (an empty IMEI is "unknown", not one shared device). Do not count a call
+  twice (setup and end records).
+* **Index Job timing.** Only `sql.template` emits `job.dataset.produced`, so put `la.index.build` on a cron after the
+  links Job. On a hand-built Space (not from a template) the Job's run is refused until it has a recorded last editor
+  (`JobAuthority`): an administrator re-saves it once (`PUT /jobs/<name>`).
+* **Non-numeric ends drop out of the index.** The index keys each end through its Entity Type's normaliser (`e164` for
+  a number), so sender names and short codes become NULL ends and are dropped and counted (`droppedNull`; about
+  12.8 M of 39.4 M links on the production day). A beat that seeds a sender name reads the Dataset instead, under the
+  projection limits.
+* **Place large Parquet inside the Space data root.** A Dataset reads only inside that root: an outside path, a
+  `read_parquet` literal and a junction are all refused. A Parquet ingest would rewrite every column as VARCHAR, so
+  the day's files were moved into the Pipeline's store instead.
+* **Give every link Dataset an event-day column** (`eventDate`), or the data-trust strip and the Dossier say "as-of not
+  known". A Dataset built by a Job carries no input-file stamps.
+* **Recalibrate thresholds on a full day.** The extract's thresholds fired hundreds to hundreds of thousands of times on
+  the production day. A Dataset Measure rule is edge-triggered: resolving its Alert by hand does not re-arm it while the
+  measure stays breached, and a restart rebuilds the open-breach state from OPEN Alerts.
+* **Four-eyes beat.** A plain degree expand is bounded by the UI default and does not wait for approval. Use *Expand
+  the whole Working Set* (or an expand with no ids) to show the held request.
+* **Bundle.** `package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`. The la-app UI has no Incidents or Cases
+  page, so show the Alert, Incident and Case through the full SPA or by API. The saved-view picker opens its submenu on
+  hover; a plain click on the row only closes the menu.

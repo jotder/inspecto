@@ -9,7 +9,7 @@ timestamp: 2026-10-19T00:00:00Z
 # Analytics Kernel — plan
 
 Row of record: `ANALYTICS-CORE-1` (P2) in [BACKLOG](../../../../BACKLOG.md); working plan
-[analytics-core-plan](../../../../superpower/analytics-core-plan.md); as-built detail in [spec](spec.md).
+[analytics-core-plan](../../../../archived-documents/plans-archive/analytics-core-plan.md); as-built detail in [spec](spec.md).
 
 ## Required
 
@@ -36,7 +36,8 @@ ratcheting duplication guard (Must items M1–M10).
 - `ANALYTICS-STEPS-TS-1` (P3): Steps for change-point and cohort / funnel.
 - The Anomaly Model form does not author `method` / `forest` (D-AN29).
 - Hand-wrapped scratch-name sites listed on the row; `PartitionCompactor` `union_by_name` (operator-owned).
-- C7 graph traversal in SQL — blocked on DuckDB 2.0 adoption.
+- C7 graph traversal in SQL — blocked on DuckDB 2.0 adoption; it is candidate C1 / C2 of
+  [`duckdb-2-plan.md`](../../../../superpower/duckdb-2-plan.md) §7.
 
 ## Refused (Won't, this horizon)
 
