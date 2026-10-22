@@ -1,0 +1,483 @@
+@if (access.lockReason(); as why) {
+    <section class="flex flex-col gap-3" aria-labelledby="add-data-locked-title" data-testid="add-data-locked">
+        <h2 id="add-data-locked-title" class="m-0 text-lg font-semibold">Adding data is not available here</h2>
+        <inspecto-locked-action label="Add data" [reason]="why"></inspecto-locked-action>
+    </section>
+} @else if (summary(); as s) {
+    <!-- 5. The result in plain words -->
+    <section class="flex flex-col gap-4" aria-labelledby="add-data-done-title" data-testid="add-data-result">
+        <h2 id="add-data-done-title" class="m-0 text-lg font-semibold">{{ s.dataset }} is ready</h2>
+        <div class="flex flex-wrap gap-2" data-testid="next-actions">
+            @if (s.kind === 'stream') {
+                <button mat-flat-button color="primary" type="button" data-testid="explore" (click)="explore()">
+                    <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                    Explore in Link Analysis
+                </button>
+                <button mat-stroked-button type="button" data-testid="add-details" (click)="addDetails()">
+                    <mat-icon svgIcon="heroicons_outline:identification"></mat-icon>
+                    Add details about these entities
+                </button>
+            }
+            <button mat-stroked-button type="button" data-testid="add-another" (click)="addAnother()">
+                <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                Add another file
+            </button>
+        </div>
+        @if (resultDataset(); as ds) {
+            <inspecto-import-dataset-card
+                [dataset]="ds"
+                [summary]="s"
+                [editorRoute]="editorRoute()"
+                (imported)="summary.set($event)"
+            ></inspecto-import-dataset-card>
+        }
+    </section>
+} @else {
+    <div class="flex flex-col gap-6">
+        <!-- 1. Drop or choose a file -->
+        <section class="flex flex-col gap-3" aria-labelledby="add-data-file-title" data-testid="step-file">
+            <h2 id="add-data-file-title" class="m-0 text-lg font-semibold">1. Drop or choose a file</h2>
+            <mat-radio-group
+                class="flex flex-col gap-1 sm:flex-row sm:gap-6"
+                [formControl]="kind"
+                aria-label="What is in the file?"
+                data-testid="import-kind"
+            >
+                <mat-radio-button value="stream" [disabled]="reading() || !!draft()">
+                    Events between entities: each row links two things
+                </mat-radio-button>
+                <mat-radio-button value="reference" [disabled]="reading() || !!draft()">
+                    Details about entities: each row describes one thing
+                </mat-radio-button>
+            </mat-radio-group>
+
+            @if (draft(); as d) {
+                <div class="flex flex-wrap items-center gap-2 text-sm" data-testid="chosen-file">
+                    <mat-icon
+                        class="icon-size-5"
+                        svgIcon="heroicons_outline:document-text"
+                        aria-hidden="true"
+                    ></mat-icon>
+                    <span class="font-semibold">{{ d.file.name }}</span>
+                    <span class="text-secondary">{{ count(d.file.rows) }} rows, {{ formatSize(d.file.bytes) }}</span>
+                    <button mat-button type="button" data-testid="choose-another" (click)="startOver()">
+                        Choose another file
+                    </button>
+                </div>
+            } @else {
+                <div
+                    class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center"
+                    [class.border-primary]="dragging()"
+                    data-testid="drop-zone"
+                    (dragover)="onDragOver($event)"
+                    (dragleave)="dragging.set(false)"
+                    (drop)="onDrop($event)"
+                >
+                    <mat-icon
+                        class="icon-size-8"
+                        svgIcon="heroicons_outline:arrow-up-tray"
+                        aria-hidden="true"
+                    ></mat-icon>
+                    <p class="m-0">Drop a file here, or</p>
+                    <input
+                        #chooser
+                        type="file"
+                        class="sr-only"
+                        tabindex="-1"
+                        aria-hidden="true"
+                        data-testid="file-input"
+                        [accept]="accept"
+                        (change)="onChoose($event)"
+                    />
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        type="button"
+                        data-testid="choose-file"
+                        [disabled]="reading()"
+                        (click)="chooser.click()"
+                    >
+                        Choose a file
+                    </button>
+                </div>
+            }
+            <ul class="text-secondary m-0 flex list-none flex-col gap-0.5 p-0 text-sm" data-testid="formats-and-limits">
+                <li>Reads {{ formats }}.</li>
+                <li data-testid="excel-line">{{ excelText() }}</li>
+                @if (draft(); as d) {
+                    <li data-testid="limits-line">{{ limitsLine(d.limits) }}</li>
+                } @else if (limitsText(); as l) {
+                    <li data-testid="limits-line">{{ l }}</li>
+                }
+            </ul>
+            @if (access.remoteLock(); as why) {
+                <inspecto-locked-action
+                    label="Read from a database or a remote system"
+                    [reason]="why"
+                ></inspecto-locked-action>
+            } @else {
+                <p class="text-secondary m-0 text-sm" data-testid="remote-hand-off">
+                    A database or a remote system is read by a Pipeline that keeps the data up to date.
+                </p>
+            }
+            @if (reading()) {
+                <p class="m-0 text-sm" role="status">Reading the file…</p>
+            }
+            @if (unavailable()) {
+                <inspecto-alert variant="info" title="This Space cannot take data">{{ unavailable() }}</inspecto-alert>
+            }
+            @if (error() && !draft()) {
+                <inspecto-alert variant="error" data-testid="file-error">{{ error() }}</inspecto-alert>
+            }
+        </section>
+
+        @if (draft(); as d) {
+            <form class="flex flex-col gap-6" [formGroup]="form" (ngSubmit)="create()">
+                <!-- 2. Check the columns -->
+                <section
+                    class="flex flex-col gap-3"
+                    aria-labelledby="add-data-columns-title"
+                    data-testid="step-columns"
+                >
+                    <h2 id="add-data-columns-title" class="m-0 text-lg font-semibold">2. Check the columns</h2>
+                    <p class="text-secondary m-0 text-sm">
+                        What was detected is already applied, with the reason beside it. A highlighted choice was a
+                        guess: confirm it or change it.
+                    </p>
+
+                    <!-- The file type, for every format: a CSV of fewer than 50 lines reads as a guess too (OF-2). -->
+                    <div
+                        class="flex flex-col gap-1 rounded-lg p-2"
+                        data-testid="format-type"
+                        [class]="lowClasses(key.format('type'))"
+                    >
+                        <p class="m-0 text-sm">
+                            File type: <span class="font-semibold">{{ d.format.type.value }}</span>
+                        </p>
+                        <ng-container
+                            *ngTemplateOutlet="evidence; context: { c: d.format.type, k: key.format('type') }"
+                        ></ng-container>
+                    </div>
+                    @if (d.format.delimiter) {
+                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3" data-testid="format-choices">
+                            <div
+                                class="flex flex-col gap-1 rounded-lg p-2"
+                                [class]="lowClasses(key.format('delimiter'))"
+                            >
+                                <inspecto-option-picker
+                                    label="Separator"
+                                    formControlName="delimiter"
+                                    data-testid="format-delimiter"
+                                    [options]="delimiterOptions"
+                                ></inspecto-option-picker>
+                                <ng-container
+                                    *ngTemplateOutlet="
+                                        evidence;
+                                        context: { c: d.format.delimiter, k: key.format('delimiter') }
+                                    "
+                                ></ng-container>
+                            </div>
+                            <div class="flex flex-col gap-1 rounded-lg p-2" [class]="lowClasses(key.format('header'))">
+                                <inspecto-option-picker
+                                    label="Header line"
+                                    formControlName="header"
+                                    data-testid="format-header"
+                                    [options]="headerOptions"
+                                ></inspecto-option-picker>
+                                <ng-container
+                                    *ngTemplateOutlet="
+                                        evidence;
+                                        context: { c: d.format.header, k: key.format('header') }
+                                    "
+                                ></ng-container>
+                            </div>
+                            <div class="flex flex-col gap-1 rounded-lg p-2" [class]="lowClasses(key.format('quote'))">
+                                <inspecto-option-picker
+                                    label="Quote"
+                                    formControlName="quote"
+                                    data-testid="format-quote"
+                                    [options]="quoteOptions"
+                                ></inspecto-option-picker>
+                                <ng-container
+                                    *ngTemplateOutlet="evidence; context: { c: d.format.quote, k: key.format('quote') }"
+                                ></ng-container>
+                            </div>
+                        </div>
+                    }
+
+                    <ul class="m-0 flex list-none flex-col gap-2 p-0" formArrayName="columns" data-testid="column-list">
+                        @for (g of columnGroups(); track g.controls.name.value; let i = $index) {
+                            <li
+                                class="flex flex-col gap-1 rounded-lg border p-2"
+                                [class]="lowClasses(key.type(g.controls.name.value))"
+                                [formGroupName]="i"
+                                [attr.data-column]="g.controls.name.value"
+                            >
+                                <div class="grid grid-cols-1 items-center gap-2 sm:grid-cols-[2fr_2fr_auto]">
+                                    <inspecto-pen-field
+                                        formControlName="rename"
+                                        [label]="'Column ' + (i + 1)"
+                                        [ariaLabel]="'Name of column ' + g.controls.name.value"
+                                        [readOnly]="g.controls.drop.value"
+                                        [error]="renameErrors().get(g.controls.name.value) ?? ''"
+                                    ></inspecto-pen-field>
+                                    <inspecto-option-picker
+                                        label="Type"
+                                        formControlName="type"
+                                        [attr.data-testid]="'type-' + g.controls.name.value"
+                                        [options]="typeOptions"
+                                        [readOnly]="g.controls.drop.value"
+                                    ></inspecto-option-picker>
+                                    <mat-checkbox formControlName="drop" data-testid="drop-column"
+                                        >Leave out</mat-checkbox
+                                    >
+                                </div>
+                                @if (!g.controls.drop.value) {
+                                    <p class="text-secondary m-0 truncate text-xs">
+                                        e.g. {{ sample(g.controls.name.value) }}
+                                    </p>
+                                    <ng-container
+                                        *ngTemplateOutlet="
+                                            evidence;
+                                            context: {
+                                                c: typeChoice(g.controls.name.value),
+                                                k: key.type(g.controls.name.value),
+                                            }
+                                        "
+                                    ></ng-container>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    @if (everyColumnDropped()) {
+                        <p class="text-warn m-0 text-sm" role="alert">Keep at least one column.</p>
+                    }
+
+                    <div class="flex flex-col gap-1">
+                        <h3 class="m-0 text-sm font-semibold">The first rows, as they will be kept</h3>
+                        <inspecto-data-table
+                            tier="mini"
+                            [rows]="previewRows()"
+                            [columns]="previewColumns()"
+                            noRowsTitle="The file has no rows to show"
+                        ></inspecto-data-table>
+                    </div>
+                </section>
+
+                <!-- 3. What does each column hold? -->
+                <section class="flex flex-col gap-3" aria-labelledby="add-data-hold-title" data-testid="step-hold">
+                    <h2 id="add-data-hold-title" class="m-0 text-lg font-semibold">3. What does each column hold?</h2>
+                    @if (!whatOpen()) {
+                        <p class="text-secondary m-0 text-sm">
+                            Optional: say which columns hold a kind of thing (an account, a phone number) and how rows
+                            link them. Sure detections are applied anyway; guesses are not.
+                        </p>
+                        <div>
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                data-testid="open-hold"
+                                (click)="whatOpen.set(true)"
+                            >
+                                Say what the columns hold
+                            </button>
+                        </div>
+                    } @else {
+                        <p class="text-secondary m-0 text-sm">
+                            An Entity Type is a kind of thing, like an account. Columns that hold one become the dots of
+                            the graph; the others are details.
+                        </p>
+                        <ul class="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2" formArrayName="columns">
+                            @for (g of columnGroups(); track g.controls.name.value; let i = $index) {
+                                @if (!g.controls.drop.value) {
+                                    <li
+                                        class="flex flex-col gap-1 rounded-lg border p-2"
+                                        [class]="lowClasses(key.entityType(g.controls.name.value))"
+                                        [formGroupName]="i"
+                                        [attr.data-entity-column]="g.controls.name.value"
+                                    >
+                                        <inspecto-option-picker
+                                            formControlName="entityType"
+                                            [attr.data-testid]="'entity-' + g.controls.name.value"
+                                            [label]="g.controls.rename.value || g.controls.name.value"
+                                            [options]="entityOptions()"
+                                        ></inspecto-option-picker>
+                                        <ng-container
+                                            *ngTemplateOutlet="
+                                                evidence;
+                                                context: {
+                                                    c: entityChoice(g.controls.name.value),
+                                                    k: key.entityType(g.controls.name.value),
+                                                }
+                                            "
+                                        ></ng-container>
+                                    </li>
+                                }
+                            }
+                        </ul>
+
+                        @if (d.kind === 'stream' && d.entityTypes.link; as l) {
+                            <div class="flex flex-col gap-2" data-testid="link-choices">
+                                <h3 class="m-0 text-sm font-semibold">Each row is a link</h3>
+                                <div
+                                    class="grid grid-cols-1 gap-2 rounded-lg p-2 sm:grid-cols-2"
+                                    [class]="lowClasses(key.link('from'))"
+                                >
+                                    <inspecto-option-picker
+                                        label="From"
+                                        formControlName="from"
+                                        data-testid="link-from"
+                                        [options]="optionalColumnOptions()"
+                                    ></inspecto-option-picker>
+                                    <inspecto-option-picker
+                                        label="To"
+                                        formControlName="to"
+                                        data-testid="link-to"
+                                        [options]="optionalColumnOptions()"
+                                    ></inspecto-option-picker>
+                                    <div class="sm:col-span-2">
+                                        <ng-container
+                                            *ngTemplateOutlet="evidence; context: { c: l.from, k: key.link('from') }"
+                                        ></ng-container>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                    @for (role of linkRoles; track role.id) {
+                                        <div
+                                            class="flex flex-col gap-1 rounded-lg p-2"
+                                            [class]="lowClasses(key.link(role.id))"
+                                        >
+                                            <inspecto-option-picker
+                                                [label]="role.label"
+                                                [formControlName]="role.id"
+                                                [options]="optionalColumnOptions()"
+                                            ></inspecto-option-picker>
+                                            <ng-container
+                                                *ngTemplateOutlet="
+                                                    evidence;
+                                                    context: { c: l[role.id], k: key.link(role.id) }
+                                                "
+                                            ></ng-container>
+                                        </div>
+                                    }
+                                </div>
+                                @if (linkMissing()) {
+                                    <inspecto-alert variant="warning" data-testid="no-link">
+                                        Without a From and a To column (two different columns) the rows are not links,
+                                        so Link Analysis cannot draw this Dataset as a graph.
+                                    </inspecto-alert>
+                                }
+                            </div>
+                        }
+                        @if (d.kind === 'reference' && d.entityTypes.identifying; as idc) {
+                            <div
+                                class="flex flex-col gap-1 rounded-lg p-2"
+                                [class]="lowClasses(key.identifying)"
+                                data-testid="identifying"
+                            >
+                                <inspecto-option-picker
+                                    label="Which column identifies each entity?"
+                                    formControlName="identifying"
+                                    [options]="optionalColumnOptions()"
+                                ></inspecto-option-picker>
+                                <ng-container
+                                    *ngTemplateOutlet="evidence; context: { c: idc, k: key.identifying }"
+                                ></ng-container>
+                                <p class="text-secondary m-0 text-xs">
+                                    The other columns become details shown on that entity.
+                                </p>
+                            </div>
+                        }
+                        <div
+                            class="flex flex-col gap-1 rounded-lg p-2"
+                            [class]="lowClasses(key.primary)"
+                            data-testid="primary"
+                        >
+                            <inspecto-option-picker
+                                label="The main kind of thing in this file"
+                                formControlName="primary"
+                                [options]="primaryOptions()"
+                            ></inspecto-option-picker>
+                            <ng-container
+                                *ngTemplateOutlet="evidence; context: { c: d.entityTypes.primary, k: key.primary }"
+                            ></ng-container>
+                        </div>
+                    }
+                </section>
+
+                <!-- 4. Create and run -->
+                <section class="flex flex-col gap-3" aria-labelledby="add-data-create-title" data-testid="step-create">
+                    <h2 id="add-data-create-title" class="m-0 text-lg font-semibold">4. Create and run</h2>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <inspecto-pen-field
+                            label="Dataset name"
+                            formControlName="name"
+                            data-testid="dataset-name"
+                            [required]="true"
+                            [mono]="true"
+                            [error]="nameError()"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Description"
+                            formControlName="description"
+                            placeholder="Optional"
+                            [multiline]="true"
+                        ></inspecto-pen-field>
+                    </div>
+                    @if (pending().length) {
+                        <div class="text-sm" id="add-data-pending" data-testid="pending">
+                            <p class="m-0">Confirm or change these guesses first:</p>
+                            <ul class="m-0 pl-5">
+                                @for (p of pending(); track p.key) {
+                                    <li>{{ p.label }}</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                    <p class="m-0 text-sm" data-testid="create-line">{{ createLine() }}</p>
+                    <div>
+                        <button
+                            mat-flat-button
+                            color="primary"
+                            type="submit"
+                            data-testid="create"
+                            [disabled]="!canCreate()"
+                            [attr.aria-describedby]="pending().length ? 'add-data-pending' : null"
+                        >
+                            Create and run
+                        </button>
+                    </div>
+                    @if (running()) {
+                        <p class="m-0 text-sm" role="status" data-testid="running">
+                            {{
+                                following()
+                                    ? 'The file is large, so it runs on the server - following it until it ends…'
+                                    : 'Creating the Dataset and running it…'
+                            }}
+                        </p>
+                    }
+                    @if (error()) {
+                        <inspecto-alert variant="error" data-testid="create-error">{{ error() }}</inspecto-alert>
+                    }
+                </section>
+            </form>
+        }
+    </div>
+}
+
+<!-- One choice's evidence, and its confirm while it is a guess (OF-2). -->
+<ng-template #evidence let-c="c" let-k="k">
+    @if (c) {
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+            @if (isPending(k)) {
+                <inspecto-chip variant="soft" tone="warning">A guess</inspecto-chip>
+            }
+            <span class="text-secondary">{{ c.evidence }}</span>
+            @if (isPending(k)) {
+                <button mat-button type="button" data-testid="confirm" [attr.data-key]="k" (click)="confirm(k)">
+                    Confirm
+                </button>
+            }
+        </div>
+    }
+</ng-template>

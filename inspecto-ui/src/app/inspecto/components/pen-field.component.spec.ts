@@ -28,6 +28,26 @@ class NotesHostComponent {
     dateCtl = new FormControl<string | null>(null);
 }
 
+@Component({
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.Eager,
+    imports: [PenFieldComponent, ReactiveFormsModule],
+    template: `
+        <inspecto-pen-field label="Name" [formControl]="nameCtl" />
+        <inspecto-pen-field label="Depth" type="number" [formControl]="depthCtl" />
+        <inspecto-pen-field label="From" type="date" [formControl]="dateCtl" />
+        <inspecto-pen-field label="Fixed" [readOnly]="true" [formControl]="fixedCtl" />
+        <inspecto-pen-field label="Off" [formControl]="offCtl" />
+    `,
+})
+class TypingHostComponent {
+    nameCtl = new FormControl<string | null>('old');
+    depthCtl = new FormControl<number | null>(3);
+    dateCtl = new FormControl<string | null>(null);
+    fixedCtl = new FormControl<string | null>('kept');
+    offCtl = new FormControl<string | null>({ value: 'off', disabled: true });
+}
+
 describe('PenFieldComponent', () => {
     function setup() {
         const fixture = TestBed.createComponent(HostComponent);
@@ -113,6 +133,97 @@ describe('PenFieldComponent', () => {
             pen.focus();
             fixture.detectChanges();
             expect(hosts[0].querySelector('textarea')).not.toBeNull();
+        });
+    });
+
+    describe('typing on the closed row (a keyboard user who tabs to it and types)', () => {
+        function setupTyping() {
+            const fixture = TestBed.createComponent(TypingHostComponent);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            return {
+                fixture,
+                host: fixture.componentInstance,
+                hosts: Array.from(el.querySelectorAll<HTMLElement>('inspecto-pen-field')),
+            };
+        }
+        function press(target: Element, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+            const e = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+            target.dispatchEvent(e);
+            return e;
+        }
+        const valueButton = (h: HTMLElement) => h.querySelector('button:not(.pen-pencil)') as HTMLButtonElement;
+
+        it('a printable key opens the editor holding that key (it replaces the value), focused with the caret after it', async () => {
+            const { fixture, host, hosts } = setupTyping();
+            const e = press(valueButton(hosts[0]), 'N');
+            expect(e.defaultPrevented).toBe(true); // the key is not typed a second time
+            fixture.detectChanges();
+            await fixture.whenStable();
+            const box = hosts[0].querySelector('input') as HTMLInputElement;
+            expect(box).not.toBeNull();
+            expect(box.value).toBe('N');
+            expect(document.activeElement).toBe(box);
+            expect(box.selectionStart).toBe(1);
+            box.value = 'New';
+            box.dispatchEvent(new Event('input'));
+            press(box, 'Enter');
+            fixture.detectChanges();
+            expect(host.nameCtl.value).toBe('New');
+        });
+
+        it('the pencil takes a typed key too; Escape still drops the edit', () => {
+            const { fixture, host, hosts } = setupTyping();
+            press(hosts[0].querySelector('button.pen-pencil')!, 'x');
+            fixture.detectChanges();
+            const box = hosts[0].querySelector('input') as HTMLInputElement;
+            expect(box.value).toBe('x');
+            press(box, 'Escape');
+            fixture.detectChanges();
+            expect(host.nameCtl.value).toBe('old');
+        });
+
+        it('shortcuts, Space, Tab, arrows and Enter keep their meaning', () => {
+            const { fixture, hosts } = setupTyping();
+            const btn = valueButton(hosts[0]);
+            for (const [key, init] of [
+                ['a', { ctrlKey: true }],
+                ['c', { metaKey: true }],
+                ['x', { altKey: true }],
+                [' ', {}],
+                ['Tab', {}],
+                ['ArrowDown', {}],
+                ['Enter', {}],
+                ['F2', {}],
+            ] as const) {
+                const e = press(btn, key, init);
+                fixture.detectChanges();
+                expect(e.defaultPrevented, key).toBe(false);
+                expect(hosts[0].querySelector('input'), key).toBeNull();
+            }
+        });
+
+        it('a number field opens only on a key a number can start with; a date field never opens from one key', () => {
+            const { fixture, hosts } = setupTyping();
+            press(valueButton(hosts[1]), 'q');
+            fixture.detectChanges();
+            expect(hosts[1].querySelector('input')).toBeNull();
+            press(valueButton(hosts[1]), '7');
+            fixture.detectChanges();
+            expect((hosts[1].querySelector('input') as HTMLInputElement).value).toBe('7');
+            press(valueButton(hosts[2]), '2');
+            fixture.detectChanges();
+            expect(hosts[2].querySelector('input')).toBeNull();
+        });
+
+        it('a read-only or disabled row does not open', () => {
+            const { fixture, hosts } = setupTyping();
+            for (const h of [hosts[3], hosts[4]]) {
+                const e = press(valueButton(h), 'z');
+                fixture.detectChanges();
+                expect(e.defaultPrevented).toBe(false);
+                expect(h.querySelector('input')).toBeNull();
+            }
         });
     });
 });

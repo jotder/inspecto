@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Provider, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Provider, computed, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { map, of } from 'rxjs';
 import { AiAssistComponent } from '@inspecto/core/ai-assist/ai-assist.component';
@@ -187,6 +187,9 @@ export function provideLaAppHostServices(): Provider[] {
                     geoLink: session.geoLinkEnabled,
                     investigations: session.investigationsEnabled,
                     featureReasons: session.featureReasons,
+                    signIn: computed(() => session.authMode() === 'oidc'),
+                    edition: session.edition,
+                    flags: session.features,
                 };
             },
         },

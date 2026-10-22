@@ -288,6 +288,33 @@ describe('DatasetEditorComponent', () => {
         expect(c.previewProblem()).toBe('no store "orders_feed"');
     });
 
+    it('editing a Dataset saves back the keys and the viz the editor does not edit', async () => {
+        const stored = {
+            id: 'transfers',
+            name: 'transfers',
+            kind: 'physical',
+            sourceName: 'cdr',
+            physicalRef: 'cdr',
+            columns: [],
+            measures: [],
+            calculated: [],
+            viz: { type: 'table' },
+            extra: { origin: 'import', primaryEntityType: 'account', defaultLinkMapping: { from: 'a', to: 'b' } },
+        } as unknown as Dataset;
+        const save = vi.fn((d: Dataset) => of(d));
+        const fixture = create(save, [], stored);
+        fixture.componentInstance.id = 'transfers';
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        await vi.waitFor(() => expect(c.sourceNames()).toContain('cdr'));
+        await vi.waitFor(() => expect(c.form.controls.name.disabled).toBe(true));
+        c.save();
+        await vi.waitFor(() => expect(save).toHaveBeenCalled());
+        const ds = save.mock.calls[0][0] as Dataset;
+        expect(ds.extra).toEqual(stored.extra);
+        expect(ds.viz).toEqual({ type: 'table' });
+    });
+
     it('a readable store is not flagged as unpreviewable', async () => {
         const fixture = create();
         fixture.detectChanges();

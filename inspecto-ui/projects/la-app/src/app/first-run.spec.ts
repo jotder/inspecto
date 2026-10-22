@@ -83,7 +83,7 @@ describe('FirstRun', () => {
         const { run, nav, open } = create();
         for (const [step, url] of [
             ['data', '/add-data'],
-            ['columns', '/entities'],
+            ['columns', '/entities?tab=columns'],
             ['graph', '/link-analysis'],
             ['list', '/entity-lists'],
         ] as const) {

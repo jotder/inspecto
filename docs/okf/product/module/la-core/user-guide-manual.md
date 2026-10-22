@@ -112,6 +112,50 @@ left edge (with the Space switcher and your user menu). A user who may change Li
   second approver for four-eyes), *Demo RA Analyst* and *Demo Manager* (both view-only, §11).
 * **When sign-in cannot start**, the page says so instead of showing a picker — see §13.
 
+### Add data — Onboard a file
+
+**Add data** (`/add-data` in Inspecto LA) is the one screen both applications use to turn a file into a Dataset
+(`LA-ONBOARD-1` phase 4; the shared component `inspecto-add-data`). It calls the Add data routes
+(`POST /onboard/files`, then `POST /onboard/files/{draftId}/commit`; [`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md)
+"Add data"). On one screen:
+
+1. **Drop or choose a file**, after saying whether it holds *Events between entities* (a Stream) or *Details about
+   entities* (a Reference). The formats and the Space's `import.*` limits are shown before upload; Excel is read only
+   when the bundle carries the DuckDB `excel` extension (known from the first draft, or from a refusal that says to
+   save as CSV). *Read from a database or a remote system* is shown locked on Basic (`/bootstrap` `remoteSystems`;
+   until the server names it, locked on the Basic edition with a built-in reason).
+2. **Check the columns.** Every choice of the draft is pre-applied with its evidence. A `low` choice (fewer than 50
+   sampled values, or values that disagree) is highlighted, marked *A guess*, listed above **Create and run**, and
+   holds it back until confirmed or changed. Rename, change a type, **Leave out** a column; a table previews the first
+   rows as kept. A different separator, header line or quote re-reads the file with that choice stated (the commit
+   cannot change the format).
+3. **What does each column hold?** An Entity Type per column (`/inv/entity-types`), the link's **From** and **To**
+   and optional kind, time and amount (Stream), the identifying column (Reference), and the main kind of thing (the
+   Dataset's primary Entity Type). In the console the step is optional and starts closed: there, a high-confidence
+   proposal is applied as detected and a low one is not applied unless the step is opened.
+4. **Create and run** commits once. A file above `import.inline_max_bytes` answers 202 and the screen follows
+   `GET /onboard/runs/{runId}` until it ends.
+
+**The result in plain words** reads the run summary: rows read and kept, rows set aside (rejected, or a file set
+aside with its reason), a replace with the row counts before and after, the link index (built with its links and
+entities, up to date, skipped, or not built with the reason) and each Expectation. **Explore in Link Analysis**
+opens `/link-analysis?dataset=<id>`: Link Analysis preselects that Dataset in **Start from...** (section 2) when it
+has a link; a Dataset without one is picked in the Query panel, as **Explore a Dataset** does, and drawn when its from
+and to columns can be suggested. **Add details about these entities** restarts
+for a Reference; **Add another file** restarts.
+
+**The Dataset card** of an imported Dataset (`origin: import`) shows *one-time import*, the last import, and **Add a
+file** beside **Run now** (`POST /datasets/{id}/files?mode=replace|append`, `POST /datasets/{id}/run`; a Reference
+is always replaced). **Keep this up to date** is locked on Basic (`/bootstrap` `pipelineAutomation`); on Standard and
+above the console's card offers **Open in editor** (`/pipelines?guided=1&open=<pipeline>`) to someone who may author,
+and Inspecto LA says *Ask an administrator to keep this up to date*. The Add data page lists a card per import of the
+Space under the screen.
+
+**When it is locked.** With sign-in the screen needs `canUploadData`, and the Space's `data.self_import` must be on
+(`GET /settings/data`; off by default with sign-in, on by default with none). When either is missing, or the server
+refuses an upload with 403, the whole screen is the reason (`inspecto-locked-action`) instead of an upload that
+fails. A 503 (the Space has no data directory) is explained in place.
+
 ---
 
 ## 3. The screen
@@ -218,6 +262,38 @@ condition*).
   sentence appears on a sealed expand step. An unrecognised reason is shown as sent, never hidden.
 * Very busy hub nodes are folded into a **super-node** so they do not hide everything else.
 * Above 20 links on the canvas, link labels are hidden (shown on hover or click) to keep the picture readable; *All link labels* in the Display menu overrides it.
+
+### 4.5 Entities: what the columns hold
+
+Two columns join up in the graph and share one profile only when they hold the same **Entity Type**: a column holds a
+type when its classification is one the type claims. The **Entities** page (left rail) is where you see and set this
+(LA-ONBOARD-1 phase 5).
+
+* **Entity Types** tab — one card per Entity Type that **occurs in this Space's data** (some Dataset column holds it),
+  with its distinct count, Datasets and data-as-of date. Types a Dataset names as its **primary** Entity Type come
+  first and carry *Primary in &lt;Dataset&gt;*. Types no column holds sit collapsed under **Not in your data (n)**;
+  open it to see them. A type a Dataset names as primary but no column holds stays there: nothing would be drawn.
+* **Columns** tab (also `?tab=columns`, where the Space guide's *What the columns hold* step lands) — per Dataset,
+  each column that looks like an identifier: one already classified, a link end of the Dataset's default link
+  mapping (*Links start here* / *Links end here*), or a name that suggests an Entity Type (*Looks like Account* for
+  `from_account`) or ends in `id`. **Show every column** lists the rest. **Holds** sets the column's Entity Type at
+  once, or *Not set* clears it; the change is written to the Dataset and the page reads the Entity Types again and
+  says the result (*"to_account" in transfers now holds Account. Account is in 2 columns of 1 Dataset.*). A column
+  classified with something no Entity Type claims says so in its note. The picker beside the Dataset name sets the
+  Dataset's **primary Entity Type** (the type its graph leads with); *None* removes it. A Dataset that lists no
+  columns says so; its columns cannot be set here.
+* **New Entity Type** (top right) — for a kind of thing your pack does not know: a **Name**, an **Example value**
+  (not stored: it shows *Kept as …*, how a value is compared) and **Compare values as**: *Upper case, spaces
+  trimmed*, *Digits only*, *Phone number* or *Case ignored*. Its id is the name in lower case with `_` between words,
+  and it claims the classification of the id in upper case (*Vehicle plate* → `vehicle_plate`, `VEHICLE_PLATE`). It
+  is added to the Space's Link Analysis settings: the first one turns the inherited types into a stated list (the
+  types in force plus the new one), so later pack relabels no longer apply to it. A new type is not masked; a name
+  the Space already has, or a classification another type claims, is refused before anything is written. It shows
+  under *Not in your data* until a column holds it.
+
+All three changes need `canAuthorWorkbench` with sign-in (everyone may without sign-in). Without it the values read
+as text and the action is shown locked with the reason (*Changing what a column holds needs permission to edit
+Datasets in this Space*).
 
 ---
 
@@ -660,6 +736,7 @@ announces a count of possible split identities.)*
 | Bind an Alert Rule to a Measure | `canAuthorAlertRules` |
 | See entity keys unmasked | `canRevealLinkEntities` (otherwise masked per the Space's setting) |
 | Change Link Analysis settings (and see **Settings** in the standalone app) | `canAuthorWorkbench` |
+| Set what a Dataset column holds, a Dataset's primary Entity Type, add an Entity Type (Entities page, §4.5) | `canAuthorWorkbench` |
 
 **Read-only access.** Without `canManageIncidents` you can still read: the Investigation tab says *Changing an
 Investigation needs the Incident management capability - you can read it*, and Seed, Expand, Undo, marks and the Draft

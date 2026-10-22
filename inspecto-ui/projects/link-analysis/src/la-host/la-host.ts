@@ -243,6 +243,10 @@ export const LA_CASES = hostToken<LaCases>('LA_CASES', 'Case management');
  *   OB-5): those routes answer 503, so Investigation actions are shown LOCKED with the reason below, never left to 503.
  * - `featureReasons` - `/bootstrap` `featureReasons`: featureId -> one line saying why it is locked and which edition or
  *   add-on has it (OB-10). Optional: a host without it gets {@link LA_LOCKED_REASON_FALLBACK}.
+ * - `signIn`, `edition`, `flags` - LA-ONBOARD-1 phase 4 (Add data): whether people sign in here (`authMode` oidc: rights
+ *   are checked; with none the person is their own administrator), the `/bootstrap` `edition`, and every boolean
+ *   `/bootstrap` feature by id (the DATA-TIERS-1 edition flags such as `remoteSystems`, `pipelineAutomation`). Optional:
+ *   absent reads as no sign-in, an unknown edition and no flags.
  */
 export interface LaFeatures {
     readonly ops: Signal<boolean>;
@@ -250,6 +254,9 @@ export interface LaFeatures {
     readonly geoLink: Signal<boolean>;
     readonly investigations: Signal<boolean>;
     readonly featureReasons?: Signal<Readonly<Record<string, string>>>;
+    readonly signIn?: Signal<boolean>;
+    readonly edition?: Signal<string>;
+    readonly flags?: Signal<Readonly<Record<string, boolean>>>;
 }
 
 /** What a locked Investigation action says when the host gave no `featureReasons.investigations` line. */

@@ -473,6 +473,22 @@ describe('LinkAnalysisQueryPanelComponent - starting guidance (operator 2026-10-
         expect(runs).toHaveLength(1);
     });
 
+    it('Explore with a Dataset id (Add data, LA-ONBOARD-1 phase 4) picks it without the picker and runs the query', async () => {
+        const { c, fixture } = withDatasets();
+        const picker = fixture.debugElement
+            .queryAll(By.directive(InspectoOptionPickerComponent))
+            .map((d) => d.componentInstance as InspectoOptionPickerComponent)
+            .find((p) => p.label() === 'Dataset') as InspectoOptionPickerComponent;
+        const open = vi.spyOn(picker, 'open').mockImplementation(() => undefined);
+        const runs: unknown[] = [];
+        c.run.subscribe(() => runs.push(1));
+        c.startExplore('mule_transfers_dataset');
+        await settle(fixture);
+        expect(open).not.toHaveBeenCalled();
+        expect(c.queryForm.getRawValue().datasetId).toBe('mule_transfers_dataset');
+        expect(runs).toHaveLength(1);
+    });
+
     it('Explore does not run a query it cannot map (no suggestion = the analyst chooses columns first)', async () => {
         const { c, fixture } = withDatasets();
         const runs: unknown[] = [];

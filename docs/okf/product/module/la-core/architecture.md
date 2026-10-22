@@ -445,9 +445,9 @@ profile's *Investigate* navigates `?seed=<key>&entityType=<type>&dataset=<where[
 `exploreDataset()` → the Query panel's guided picker, whose pick ran an unseeded `POST /inv/projection` of the whole
 Dataset. The seed never reached any read. On Standard an `account` fared no better: no profile investigates it, so the
 same picker drew the whole Dataset with the seed merely queued. Both now draw / bind from the entity (spec
-`link-analysis.component.spec.ts` "F-8: …", falsified against the old branch). ⚠ The console's Dataset editor writes
-`toContent()`, which does not carry `primaryEntityType` / `defaultLinkMapping`: saving a Dataset there drops them (seen while
-reading the code, not changed here).
+`link-analysis.component.spec.ts` "F-8: …", falsified against the old branch). `?dataset=<id>` alone (Add data's *Explore in
+Link Analysis*, phase 4) preselects the Dataset in the Start box when it can start a graph, else picks it in the Query panel
+as *Explore a Dataset* does.
 
 ### 3.5 Entity store (identity data)
 
