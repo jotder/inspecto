@@ -51,6 +51,12 @@ const REASON = 'changed in Settings > Link Analysis';
             } @else if (loadError()) {
                 <inspecto-alert variant="error" title="Exclusion lists unavailable">{{ loadError() }}</inspecto-alert>
             } @else {
+                @for (l of broken(); track l.id) {
+                    <inspecto-alert variant="warning" title="New Investigations are refused">
+                        "{{ l.title }}" is applied to every new Investigation, but {{ l.problem }}. Until it is fixed or
+                        switched off, no Investigation can be created in this space.
+                    </inspecto-alert>
+                }
                 @if (categories().length) {
                     <ul class="flex flex-col divide-y rounded-lg border" aria-label="Category exclusion lists">
                         @for (l of categories(); track l.id) {
@@ -135,6 +141,8 @@ export class ExclusionCategoriesComponent implements OnInit {
     readonly busy = signal<string | null>(null);
     private readonly lists = signal<ExclusionListChip[]>([]);
     readonly categories = computed(() => this.lists().filter((l) => l.ownerKind === 'admin'));
+    /** Auto-apply lists the server cannot seal: each one refuses every Investigation create (fail closed). */
+    readonly broken = computed(() => this.categories().filter((l) => l.autoApply && l.problem));
 
     readonly form = new FormGroup({
         title: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),

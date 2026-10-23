@@ -4,6 +4,7 @@ import com.gamma.access.WriteGates;
 import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.EntityListFacts;
 import com.gamma.entitystore.EntityRegistry;
+import com.gamma.entitystore.LaLimit;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 
@@ -36,6 +37,19 @@ public final class ExclusionListRoutes implements RouteModule {
         api.get("/inv/exclusion-lists", (e, m) -> lists(api));
     }
 
+    /**
+     * Why an auto-apply list would refuse every Investigation create (LA-GROW-EXCLUDE-RESIDUALS-1 item 3): the two
+     * refusals {@code InvestigationRoutes.sealList} makes of a live list, so Settings can warn the administrator first.
+     * Null when the list would seal.
+     */
+    private static String sealProblem(Path root, EntityRegistry.EntityList l, int maxMembers) {
+        if (EntityListFacts.type(root, l.entityType()).isEmpty())
+            return "its Entity Type '" + l.entityType() + "' is no longer in force";
+        if (l.members().size() > maxMembers)
+            return "it has " + l.members().size() + " members; a list op seals at most " + maxMembers;
+        return null;
+    }
+
     private static Object lists(ApiContext api) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "exclusion lists");
         EntityFactLog.Log log = EntityListFacts.read(new EntityFactLog(root));
@@ -45,6 +59,7 @@ public final class ExclusionListRoutes implements RouteModule {
                         .thenComparing(l -> String.valueOf(l.title()))
                         .thenComparing(EntityRegistry.EntityList::id))
                 .toList();
+        int maxMembers = SpaceLimits.get(root, LaLimit.INPUT_LIST_MEMBERS);
         List<Map<String, Object>> out = new java.util.ArrayList<>();
         for (EntityRegistry.EntityList l : live) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -55,6 +70,10 @@ public final class ExclusionListRoutes implements RouteModule {
             m.put("autoApply", l.autoApply());
             m.put("visibility", l.visibility());
             m.put("size", l.members().size());
+            if (l.autoApply()) {
+                String problem = sealProblem(root, l, maxMembers);
+                if (problem != null) m.put("problem", problem);
+            }
             out.add(m);
         }
         return Map.of("lists", out);

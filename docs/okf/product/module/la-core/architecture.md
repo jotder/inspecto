@@ -1007,7 +1007,11 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
   the same `sealList`. With any such step the header and the steps are written in ONE move (`store.createFork`, as a fork or
   an instantiation), so an Investigation never exists without them; with none, `create` is unchanged. A list that cannot be
   sealed (Entity Type out of force 409, more than `input.list_members` 422) refuses the create, naming the list: fail closed,
-  an Investigation never starts silently without a policy list. The create answer adds `autoApplied: [listId]` (only when
+  an Investigation never starts silently without a policy list. `GET /inv/exclusion-lists` tells the administrator first
+  (`LA-GROW-EXCLUDE-RESIDUALS-1` item 3, 2026-10-24): a live auto-apply list the same two checks would refuse carries
+  `problem` (*its Entity Type 'x' is no longer in force* / *it has N members; a list op seals at most M*; the key is absent
+  on a list that seals), and Settings ▸ Link Analysis shows a warning per such list naming that new Investigations are
+  refused. The create answer adds `autoApplied: [listId]` (only when
   non-empty; the sealed header is unchanged). Template instantiation prepends the same steps, skipping a list the template's
   own method already excludes by; a fork (reorder) carries the parent's steps and adds none. Being ordinary steps, they
   replay, undo and appear in the Dossier like any `excludeBy`, and a later change to the list moves nothing already sealed.
@@ -1077,7 +1081,12 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   toast. *2 steps* is offered only when a ready preview says the first step stays under the frontier cap.
 - **The explorer sends no `excludeBy`.** Its neighbours read (`/inv/projection/neighbors`) cannot apply a list, so a
   preview counting one would promise removals the Grow does not make. Category lists therefore apply to Investigations
-  only (auto-apply on create, §6.8); the explorer's Exclude hides locally and can add to a list.
+  only (auto-apply on create, §6.8); the explorer's Exclude hides locally and can add to a list. **Decided 2026-10-24**
+  (assistant under operator delegation, pending confirmation): not added. The read emits `LINK_EXPANDED` per call and
+  records nothing, so a policy list applied there would be unaudited removal; adding `excludeBy` needs the capability,
+  audit, restricted-list and masking gates of §6.8 re-proved on a second route for a mode that has no record to replay.
+  Also decided: Grow previews stay unaudited (read-shaped, nothing changes; a restricted list's count is already rounded
+  or refused), and the SPA keeps naming the user-guide chapter instead of linking it until it serves docs.
 - **Undo.** A Grow / Exclude result line offers Undo while the steps it made are still the newest effective steps of the
   log as last read (`valid()`); it sends the `undo` op once per step, newest first, each naming its step
   (`{undoes: step}`). Ctrl+Z runs that Undo first, then the display undo. The explorer's Undo restores the graph
@@ -1095,7 +1104,8 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   the refusal stays in the error line and the result line's Undo is no longer offered.
 - **Switch a list off = the `undo` of its step**, so only a list applied by the newest effective step can be switched off;
   a list applied earlier, or in several steps, says why (`listsInForce`). A "skip this list for one Grow" would need an
-  `expand` parameter nobody has specified — deferred.
+  `expand` parameter nobody has specified — deferred (2026-10-24, assistant-decided under operator delegation, pending
+  confirmation: keep as is; an older list is switched off by undoing back to its step, which the log records).
 - **First-time hints** (Grow panel, Held tray, Exclusions panel): each dismissible with *Got it*, remembered per browser in
   `localStorage` (`inspecto.la.hint.grow` · `.busy` · `.exclusions`), every read and write in try/catch so a private
   window shows the hint again and never errors. Each names the user-guide chapter *Grow and clean a graph* (`GROW_GUIDE`)

@@ -31,9 +31,9 @@ const LISTS: ExclusionListChip[] = [
     },
 ];
 
-function setup(opts: { canEdit?: boolean; setAttributes?: () => unknown } = {}) {
+function setup(opts: { canEdit?: boolean; setAttributes?: () => unknown; lists?: ExclusionListChip[] } = {}) {
     const api = {
-        list: vi.fn(() => of({ lists: LISTS })),
+        list: vi.fn(() => of({ lists: opts.lists ?? LISTS })),
         create: vi.fn(() => of({})),
         setAttributes: vi.fn(opts.setAttributes ?? (() => of({}))),
     };
@@ -54,6 +54,12 @@ function setup(opts: { canEdit?: boolean; setAttributes?: () => unknown } = {}) 
     return { fixture, c: fixture.componentInstance, el, api, toastr };
 }
 
+function setup2(): HTMLElement {
+    TestBed.resetTestingModule();
+    const lists = [{ ...LISTS[0], problem: "its Entity Type 'msisdn' is no longer in force" }];
+    return setup({ lists }).el;
+}
+
 describe('ExclusionCategoriesComponent', () => {
     it('lists only the category lists with their switches (no a11y violations)', async () => {
         const { el } = setup();
@@ -65,6 +71,14 @@ describe('ExclusionCategoriesComponent', () => {
         const boxes = Array.from(rows[0].querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
         expect(boxes.map((b) => b.checked)).toEqual([true, true]);
         await expectNoA11yViolations(el);
+    });
+
+    it('warns the administrator when an auto-apply list would refuse every new Investigation', () => {
+        const { el } = setup();
+        expect(el.textContent).not.toContain('New Investigations are refused');
+        const broken = setup2();
+        expect(broken.textContent).toContain('New Investigations are refused');
+        expect(broken.textContent).toContain('its Entity Type');
     });
 
     it('turns auto-apply off with one PUT and a recorded reason', () => {
