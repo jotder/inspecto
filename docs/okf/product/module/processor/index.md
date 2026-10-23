@@ -38,5 +38,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | operator |
 | — | P3 | feature | Queries / BI | demand |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
+| `LA-ONBOARD-RETIRE-GAPS-1` | P3 | defect | small gaps left by c392cda7a (LA-ONBOARD-ORPHAN-PIPELINE-1, LA-ONBOARD-DRIFT-1, LA-SAMPLE-GALLERY-DEMOAUTH-1; 2026-10-23): (1) the Parse… | operator |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) *Find paths (server)* stays unlocked on Basic (open explorer route, a Basic feature in… | — |
 | `BI-QUERY-MASKING-1` | P2 | defect | /bi/query and /queries/{id}/run return a classified entity key raw to any viewer (decided 2026-10-12, operator: its own gated, reviewed r… | — |
