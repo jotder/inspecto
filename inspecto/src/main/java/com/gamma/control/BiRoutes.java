@@ -20,9 +20,12 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
 
@@ -134,8 +137,15 @@ final class BiRoutes implements RouteModule {
                 spec.limit(), 0, List.of(), List.of(), sql.params());
         try {
             QueryExecutor.Result raw = QueryExecutor.run(req);
-            QueryExecutor.Result shown = boundQuery == null ? masking.apply(raw, spec.groupBy(), null)
-                    : masking.applyBound(raw, boundQuery);
+            // only a raw groupBy column may keep the Space alias: not a Measure / ratio id, not a grain bucket (any case)
+            Set<String> grained = new HashSet<>();
+            if (spec.grains() != null) for (String g : spec.grains().keySet()) grained.add(g.toLowerCase(Locale.ROOT));
+            Set<String> grantable = new HashSet<>();
+            for (String g : spec.groupBy()) grantable.add(g.toLowerCase(Locale.ROOT));
+            grantable.removeAll(grained);
+            for (MeasureCompiler.Measure m : spec.measures()) grantable.remove(m.id().toLowerCase(Locale.ROOT));
+            for (MeasureCompiler.Ratio rt : spec.ratios()) grantable.remove(rt.id().toLowerCase(Locale.ROOT));
+            QueryExecutor.Result shown = masking.apply(raw, boundText == null ? spec.groupBy() : null, boundText, boundQuery, grantable);
             return response(shown, echoSql, masking.describe());
         } catch (SQLException e) {
             throw masking.scrub(ServerFaults.datasetRead("BI query failed", spec.dataset(), dataset, e, api));

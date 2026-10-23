@@ -36,7 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | operator |
-| `BI-MASKING-ROW-VALUE-LEAKS-1` | P1 | defect | free-SQL masking (BiResultMasking) still lets a masked key out through shapes that existed before BI-MASKING-SQL-SHAPE-LEAKS-1 and are un… | — |
+| `BI-MASKING-STRUCTURED-RESIDUALS-1` | P1 | defect | three masking holes outside free SQL, found by the review of BI-MASKING-ROW-VALUE-LEAKS-1 (2026-10-23, DuckDB 2.0; they predate it — re-r… | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `UI-THEME-NULL-TOKENS-1` | P3 | defect | themes.scss rebuilds each Material M2 theme without its _mat-system key, so Material 22 token functions return null; 3fa647719 restored o… | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |

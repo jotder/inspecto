@@ -97,7 +97,7 @@ final class QueryRoutes implements RouteModule {
             // BI-QUERY-MASKING-1: classified entity keys are masked in the rows unless the caller may reveal them.
             masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), datasetId, dataset,
                     BiResultMasking.mayReveal(ex));
-            masking.vetSort(sort(body));
+            masking.vetSort(sort(body), text);
             masking.vetParameterValues(text, callerValues(body).keySet());
         }
 

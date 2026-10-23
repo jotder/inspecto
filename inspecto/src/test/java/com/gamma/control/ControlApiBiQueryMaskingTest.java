@@ -372,6 +372,29 @@ class ControlApiBiQueryMaskingTest {
                     "a column the Dataset does not declare is not provably clean");
             assertEquals(Set.of("EU", "US"), Set.copyOf(column(
                     V1Body.of(bi(c, "revealer", "bare_ds", byRegion).body()).get("rows"), "region")), "a revealer is raw");
+
+            // A bound saved query over that untraceable lineage: an undeclared column renamed to a declared-clean name
+            // (email AS region) must not be filterable either (BI-MASKING-ROW-VALUE-LEAKS-1).
+            reg.write("query", "email_q", Map.of("type", "sql", "datasetId", "declared_ds",
+                    "text", "SELECT email AS region, amount FROM declared_ds"));
+            String probe = "\"query\":\"email_q\",\"measures\":[{\"agg\":\"count\"}],"
+                    + "\"filters\":[{\"field\":\"region\",\"op\":\"like\",\"value\":\"4417009001%\"}]";
+            assertEquals(422, bi(c, "viewer", "declared_ds", probe).statusCode());
+            assertEquals(200, bi(c, "revealer", "declared_ds", probe).statusCode());
+
+            // A grain bucket of a date over that untraceable lineage is not shown raw through a bound Widget either.
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("dob_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('" + A + "', DATE '1980-01-15'), ('" + B + "', DATE '1980-01-20')) AS t(msisdn, dob)",
+                    "2026-07-08T00:00:00Z"));
+            reg.write("dataset", "sib2_ds", Map.of("physicalRef", "dob_view",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+            reg.write("dataset", "un_ds", Map.of("view", "dob_view"));
+            reg.write("query", "un_q", Map.of("type", "sql", "datasetId", "un_ds", "text", "SELECT * FROM un_ds"));
+            JsonNode grain = V1Body.of(bi(c, "viewer", "un_ds", "\"query\":\"un_q\",\"measures\":[{\"agg\":\"count\"}],"
+                    + "\"groupBy\":[\"dob\"],\"grains\":{\"dob\":\"month\"}").body());
+            assertFalse(grain.get("rows").isEmpty(), grain.toString());
+            assertTrue(column(grain.get("rows"), "dob").stream().allMatch(s -> s.startsWith("masked:")),
+                    "an untraceable lineage withholds the grain bucket: " + grain.get("rows"));
         }
     }
 
@@ -519,6 +542,144 @@ class ControlApiBiQueryMaskingTest {
                         assertTrue(cell.isNull() || cell.asText().startsWith("masked:"), id + " -> " + row)));
                 assertEquals(200, post(c, "revealer", "/queries/" + id + "/run", null).statusCode(), "a revealer: " + id);
             }
+        }
+    }
+
+    @Test
+    void aSavedQueryThatRenamesTheKeyInFromOrReadsTheRowMasksEveryCell(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // BI-MASKING-ROW-VALUE-LEAKS-1: a FROM rename (column alias list, table function, UNPIVOT) or the row as a value.
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            Map<String, String> texts = Map.of(
+                    "alias_q", "SELECT CAST(m AS BIGINT) AS amount FROM calls_ds t(m)",
+                    "tablefn_q", "SELECT unnest AS amount FROM calls_ds, unnest([CAST(msisdn AS BIGINT)])",
+                    "unpivot_q", "SELECT value AS region FROM calls_ds UNPIVOT (value FOR col IN (msisdn))",
+                    "row_q", "SELECT CAST(c['msisdn'] AS BIGINT) AS amount, to_json(c) AS j FROM calls_ds c");
+            for (Map.Entry<String, String> e : texts.entrySet())
+                reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()));
+            for (String id : texts.keySet()) {
+                HttpResponse<String> r = post(c, "viewer", "/queries/" + id + "/run", null);
+                assertEquals(200, r.statusCode(), id + " -> " + r.body());
+                JsonNode rows = V1Body.of(r.body()).get("rows");
+                assertNoRaw(rows.toString());
+                rows.forEach(row -> row.forEach(cell ->
+                        assertTrue(cell.isNull() || cell.asText().startsWith("masked:"), id + " -> " + row)));
+                assertEquals(200, post(c, "revealer", "/queries/" + id + "/run", null).statusCode(), "a revealer: " + id);
+            }
+            // A caller sort on the author's alias of the key would return the rows in raw key order next to the alias.
+            reg.write("query", "k_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT msisdn AS k, region, count(*) AS n FROM calls_ds GROUP BY ALL"));
+            assertEquals(422, post(c, "viewer", "/queries/k_q/run", "{\"sort\":[{\"field\":\"k\",\"dir\":\"desc\"}]}").statusCode());
+            assertEquals(200, post(c, "revealer", "/queries/k_q/run", "{\"sort\":[{\"field\":\"k\",\"dir\":\"desc\"}]}").statusCode());
+            assertEquals(200, post(c, "viewer", "/queries/k_q/run", "{\"sort\":[{\"field\":\"n\",\"dir\":\"desc\"}]}").statusCode(),
+                    "a count stays sortable");
+
+            // A Widget bound to a saved query: a bare key keeps the Space alias (charts keep their labels), a derived value
+            // under the key's name does not.
+            reg.write("query", "bare_q", Map.of("type", "sql", "datasetId", "calls_ds", "text", "SELECT msisdn, region FROM calls_ds"));
+            reg.write("query", "prefix_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT substr(msisdn, 1, 4) AS msisdn, region FROM calls_ds"));
+            String spaceAlias = "masked:[0-9a-f]{16}";
+            JsonNode run = V1Body.of(post(c, "viewer", "/queries/bare_q/run", null).body());
+            Set<String> runAliases = Set.copyOf(column(run.get("rows"), "msisdn"));
+            JsonNode bare = V1Body.of(bi(c, "viewer", "calls_ds", "\"query\":\"bare_q\"," + BY_MSISDN).body());
+            assertTrue(column(bare.get("rows"), "msisdn").stream().allMatch(s -> s.matches(spaceAlias)), bare.get("rows").toString());
+            assertTrue(runAliases.containsAll(column(bare.get("rows"), "msisdn")), "one id, one alias: " + bare.get("rows"));
+            JsonNode prefix = V1Body.of(bi(c, "viewer", "calls_ds", "\"query\":\"prefix_q\"," + BY_MSISDN).body());
+            assertTrue(column(prefix.get("rows"), "msisdn").stream().noneMatch(s -> s.matches(spaceAlias)), prefix.get("rows").toString());
+            // An author's name collision (blank-padded, case-only, or a Measure id) does not hand a chosen value the alias.
+            Map<String, String> collide = Map.of(
+                    "pad_q", "SELECT msisdn AS \" k\", '" + A + "' AS \"k\" FROM calls_ds",
+                    "case_q2", "SELECT substr(msisdn, 1, 4) AS \"K\", msisdn AS \"k\" FROM calls_ds",
+                    "id_q", "SELECT msisdn AS \"count\", region FROM calls_ds");
+            for (Map.Entry<String, String> e : collide.entrySet())
+                reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()));
+            for (String id : List.of("pad_q", "case_q2")) {
+                JsonNode w = V1Body.of(bi(c, "viewer", "calls_ds",
+                        "\"query\":\"" + id + "\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"k\"]").body());
+                w.get("rows").forEach(row -> row.forEach(cell ->
+                        assertFalse(cell.asText().matches(spaceAlias), id + " -> " + row)));
+            }
+            JsonNode idw = V1Body.of(bi(c, "viewer", "calls_ds",
+                    "\"query\":\"id_q\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"region\"]").body());
+            idw.get("rows").forEach(row -> assertFalse(row.path("count").asText().matches(spaceAlias), "id_q -> " + row));
+
+            // The bound path parses the SAVED text: a FROM rename, the row as a value, a self-join star never come out raw.
+            Map<String, String> bound = Map.of(
+                    "brename_q", "SELECT m AS amount, region FROM calls_ds t(m)",
+                    "brow_q", "SELECT c, region FROM calls_ds c",
+                    "bjoin_q", "SELECT * FROM calls_ds a JOIN calls_ds b USING (region)");
+            for (Map.Entry<String, String> e : bound.entrySet())
+                reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()));
+            Map<String, String> byCol = Map.of("brename_q", "amount", "brow_q", "c", "bjoin_q", "msisdn_1");
+            for (Map.Entry<String, String> e : byCol.entrySet()) {
+                HttpResponse<String> r = bi(c, "viewer", "calls_ds",
+                        "\"query\":\"" + e.getKey() + "\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"" + e.getValue() + "\"]");
+                if (r.statusCode() == 200) {
+                    JsonNode rows = V1Body.of(r.body()).get("rows");
+                    assertNoRaw(rows.toString());
+                    rows.forEach(row -> assertFalse(row.path(e.getValue()).asText().matches(spaceAlias), e.getKey() + " -> " + row));
+                } else assertEquals(422, r.statusCode(), e.getKey() + " -> " + r.body());
+            }
+
+            // The key aliased to a declared-clean name: a Widget's order or filter on that name ranks or bisects the raw key.
+            reg.write("query", "wregion_q", Map.of("type", "sql", "datasetId", "calls_ds", "text", "SELECT msisdn AS region, amount FROM calls_ds"));
+            for (String probe : List.of(
+                    "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"region\"],\"orderBy\":[{\"field\":\"region\",\"dir\":\"desc\"}]",
+                    "\"measures\":[{\"agg\":\"count\"}],\"filters\":[{\"field\":\"region\",\"op\":\"like\",\"value\":\"4417009002%\"}]")) {
+                assertEquals(422, bi(c, "viewer", "calls_ds", "\"query\":\"wregion_q\"," + probe).statusCode(), probe);
+                assertEquals(200, bi(c, "revealer", "calls_ds", "\"query\":\"wregion_q\"," + probe).statusCode(), "a revealer: " + probe);
+            }
+            // DuckDB renames a repeated output name (msisdn_1, region_1, k_1): the copy of the key must not come out raw, and a
+            // value the author picked must not get the key's alias under the renamed name.
+            Map<String, String[]> dedup = Map.of(
+                    "dup1_q", new String[]{"SELECT msisdn, msisdn FROM calls_ds", "msisdn_1"},
+                    "dup2_q", new String[]{"SELECT *, msisdn AS region FROM calls_ds", "region_1"},
+                    "dup3_q", new String[]{"SELECT region AS k, msisdn AS k FROM calls_ds", "k_1"},
+                    "dup4_q", new String[]{"SELECT msisdn AS k, '" + A + "' AS k, msisdn AS k_1 FROM calls_ds", "k_1_1"},
+                    "dup5_q", new String[]{"SELECT true, msisdn AS \"true\", region FROM calls_ds", "true_1"},
+                    // DuckDB renames the 2nd k to k_1 and the author's own k_1 to k_1_1: the typed constant lands on k_1
+                    "dup6_q", new String[]{"SELECT msisdn AS k, '" + B + "' AS k, msisdn AS k_1 FROM calls_ds", "k_1"},
+                    "dup7_q", new String[]{"SELECT substr(msisdn, 1, 1) AS d, substr(msisdn, 1, 1) AS d, msisdn AS d_1 FROM calls_ds", "d_1"});
+            for (Map.Entry<String, String[]> e : dedup.entrySet()) {
+                reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()[0]));
+                HttpResponse<String> r = bi(c, "viewer", "calls_ds", "\"query\":\"" + e.getKey()
+                        + "\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"" + e.getValue()[1] + "\"]");
+                if (r.statusCode() == 200) {
+                    JsonNode rows = V1Body.of(r.body()).get("rows");
+                    assertNoRaw(rows.toString());
+                    rows.forEach(row -> assertFalse(row.path(e.getValue()[1]).asText().matches(spaceAlias), e.getKey() + " -> " + row));
+                } else assertEquals(422, r.statusCode(), e.getKey() + " -> " + r.body());
+                assertEquals(422, bi(c, "viewer", "calls_ds", "\"query\":\"" + e.getKey() + "\",\"measures\":[{\"agg\":\"count\"}],"
+                        + "\"filters\":[{\"field\":\"" + e.getValue()[1] + "\",\"op\":\"like\",\"value\":\"4417009001%\"}]").statusCode(),
+                        "a filter on the renamed copy: " + e.getKey());
+            }
+
+            // A chart over a plain-star saved query keeps its clean categories and counts (the key column alone is masked).
+            reg.write("query", "star_q", Map.of("type", "sql", "datasetId", "calls_ds", "text", "SELECT * FROM calls_ds"));
+            JsonNode star = V1Body.of(bi(c, "viewer", "calls_ds",
+                    "\"query\":\"star_q\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"region\"],"
+                            + "\"orderBy\":[{\"field\":\"count\",\"dir\":\"desc\"}]").body());
+            assertEquals(Set.of("EU", "US"), Set.copyOf(column(star.get("rows"), "region")), star.get("rows").toString());
+            assertTrue(star.get("rows").get(0).get("count").isNumber(), "a count stays a number: " + star.get("rows"));
+            // ...while a real clean column of a bound query stays filterable.
+            assertEquals(200, bi(c, "viewer", "calls_ds", "\"query\":\"bare_q\",\"measures\":[{\"agg\":\"count\"}],"
+                    + "\"filters\":[{\"field\":\"region\",\"op\":\"=\",\"value\":\"EU\"}]").statusCode());
+
+            // A grain buckets a date key: the bucket must not get the key's alias, whatever the case of the grained name.
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("dob_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('" + A + "', DATE '1980-01-15'), ('" + B + "', DATE '1980-01-20')) AS t(msisdn, dob)",
+                    "2026-07-08T00:00:00Z"));
+            reg.write("dataset", "dob_ds", Map.of("view", "dob_view", "columns", List.of(
+                    Map.of("name", "msisdn", "classification", "MSISDN"), Map.of("name", "dob", "classification", "MSISDN"))));
+            reg.write("query", "dob_q", Map.of("type", "sql", "datasetId", "dob_ds", "text", "SELECT msisdn, dob FROM dob_ds"));
+            JsonNode g = V1Body.of(bi(c, "viewer", "dob_ds", "\"query\":\"dob_q\",\"measures\":[{\"agg\":\"count\"}],"
+                    + "\"groupBy\":[\"dob\",\"DOB\"],\"grains\":{\"dob\":\"month\"}").body());
+            g.path("rows").forEach(row -> row.fields().forEachRemaining(f -> {
+                if (f.getKey().equalsIgnoreCase("dob") || f.getKey().toLowerCase(java.util.Locale.ROOT).startsWith("dob_"))
+                    assertFalse(f.getValue().asText().matches(spaceAlias), "a grain bucket must not get the alias: " + row);
+            }));
         }
     }
 

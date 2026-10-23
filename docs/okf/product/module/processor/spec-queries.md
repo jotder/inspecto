@@ -128,8 +128,10 @@ file-writing Job types. `BI-QUERY-MASKING-1` closed 2026-10-23 after its securit
 - **A Widget bound to a saved Query** (`/bi/query` with `query`): the masking reads the saved query's OWN text. It used to read
   the `WITH "__bound_query" AS (` prefix, which does not parse, so `SELECT #1 AS x` or a renaming star went unseen and `x`
   came back raw (a filter on it was an oracle). When that text reads a key (names it, holds a star / `#n`, or the lineage is
-  untraceable) every output column is masked and a filter or order on an undeclared column answers 422
-  (`BiResultMasking.applyBound`).
+  untraceable) every output column is masked and a filter or order on an undeclared column answers 422 (`BiResultMasking.apply` with the
+  saved text, `vet`). Refined by `BI-MASKING-ROW-VALUE-LEAKS-1`: when that text is fully traced (one base table, no rename, no
+  repeated output name) only the masked columns and the names the text gives a key are masked, so a chart over
+  `SELECT * FROM ds` keeps its clean categories and counts.
 - **Error text.** DuckDB quotes the offending VALUE in a run-time error: `error(msisdn)` answers `Invalid Input Error:
   4417..`, a failed `CAST(msisdn AS DATE)` (free SQL, or a calculated column) names the string. While masking is in force for
   the caller, a 422 keeps the driver's text only when every error type it names is compile-time (`Parser` / `Binder` /
@@ -175,8 +177,29 @@ it, and an alias of a key (lateral `msisdn AS k, k = '..'`) is followed. Ad-hoc 
 positional reference outside the select list; `ORDER BY 1` with no key selected and a bare `count(col)` / `count(*)` are
 unchanged. Gotcha: on 2.0 `ORDER BY ALL` serialises as a `STAR` with `columns: true`, and a `REPLACE` star sits inside
 `count(..)` as its argument. Tests: `ControlApiDbBrowserMaskingTest` (shape + oracle probes),
-`ControlApiBiQueryMaskingTest.aSavedQueryWhosePositionsCannotBeProvenMasksEveryCell`. Still open, older shapes:
-`BI-MASKING-ROW-VALUE-LEAKS-1` (table column aliases, the row as a value, a decodable alias).
+`ControlApiBiQueryMaskingTest.aSavedQueryWhosePositionsCannotBeProvenMasksEveryCell`.
+
+**Renames in FROM, the row as a value, and an unlinkable alias for anything but a bare key
+(`BI-MASKING-ROW-VALUE-LEAKS-1`, fixed 2026-10-23, verified on DuckDB 2.0.0.0).** A FROM entry that renames columns —
+a column alias list (`calls t(m)`), a table function (`unnest([..])`, `range`, `generate_series`), PIVOT / UNPIVOT —
+and any relation name used as a value (`SELECT c`, `to_json(calls)`, `c['msisdn']`, `main.calls`) count as reading a
+key: the output is masked whole, and `/db/query` refuses them in a filter or ordering (422). **The Space alias is kept
+only for a bare key** — a real column reference (not a lateral alias of another item) in a plain single SELECT whose
+FROM renames nothing and whose select list has no multi-column item other than plain stars. Every other masked cell
+in free SQL (a derived value, a rank, a constant the caller typed, a column masked only by an output name built at run
+time) is `masked:withheld` (`BiResultMasking.UNLINKABLE`): the alias is the same in every query, so a derived or
+chosen value aliased the same way would decode the key (`substr(msisdn,1,1)` next to `'4'`) or confirm a guessed
+number. Ordering beside a bare alias: on `/db/query` a window whose `ORDER BY` reads a key is refused; on
+`/queries/{id}/run` a caller `sort` is refused, when the text reads a key, unless it names a declared-clean column or
+an aliased item that reads no key (a `count` stays sortable). A Widget bound to a saved query runs inside `WITH
+"__bound_query" AS (…)`, which never parses as one statement, so masking parses the saved text itself; a Widget
+`groupBy` column keeps the alias only when the saved query emits exactly one output of that name (case-insensitive, no
+padding) as a bare key, and it is not a Measure / ratio id or a grain bucket. A Widget filter or order on any name the
+saved text gives a key — even a declared-clean one (`msisdn AS region`) — is refused 422; saved text that cannot be
+traced (no parse, a FROM rename, a multi-column item other than a plain star) makes every name suspect. Trade-off: derived columns in free SQL no longer show
+per-value aliases. Deliberately not covered: the text of a SAVED query is its author's (an author can still order by
+the key); structured-BI calculated columns are Dataset config. Tests: `ControlApiDbBrowserMaskingTest` (rename / row /
+dictionary / oracle probes), `ControlApiBiQueryMaskingTest.aSavedQueryThatRenamesTheKeyInFromOrReadsTheRowMasksEveryCell`.
 
 ## Row cap on `/bi/query`: ordered and honestly flagged (`BI-QUERY-TRUNCATION-1`, shipped 2026-10-08)
 

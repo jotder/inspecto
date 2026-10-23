@@ -66,6 +66,9 @@ final class BiResultMasking {
 
     private static final Pattern WORD = Pattern.compile("[A-Za-z0-9_]+");
 
+    /** A masked cell that is not a bare key: one value for every such cell, so it links to nothing (BI-MASKING-ROW-VALUE-LEAKS-1). */
+    static final String UNLINKABLE = "masked:withheld";
+
     /** The alias {@code DatasetRelation.withCalculated} gives the relation a calculated column is computed over. */
     private static final Set<String> CALC_BASE = Set.of("__base");
 
@@ -83,6 +86,8 @@ final class BiResultMasking {
     private final Map<String, String> tokens = new HashMap<>();   // per-request: a repeated key hashes once
     private byte[] key;
     private List<String> lastMasked = List.of();   // the result columns the last apply() masked
+    private Set<String> boundKeys = Set.of();      // a bound saved query's key names (readBound), per request
+    private boolean boundAll;                      // ... or every name, when the bound text cannot be traced
 
     private BiResultMasking(Path writeRoot, String mode, boolean reveal, Set<String> masked, boolean unknown,
                             Set<String> knownClean, String basis) {
@@ -205,7 +210,53 @@ final class BiResultMasking {
     /** A Dataset column (any type) the caller may not see raw: masked, or not provably clean while the lineage is unknown. */
     private boolean isMasked(String column, boolean viaText) {
         String c = column == null ? "" : column.trim().toLowerCase(Locale.ROOT);
-        return masked.contains(c) || ((unknown || viaText) && !knownClean.contains(c));
+        return masked.contains(c) || ((unknown || viaText) && !knownClean.contains(c)) || boundAll || boundKeys.contains(c);
+    }
+
+    /**
+     * A bound saved query's names that carry a key EVEN under a declared-clean name ({@code msisdn AS region}): a Widget's
+     * filter or order on them would bisect or rank the raw key (BI-MASKING-ROW-VALUE-LEAKS-1). Text that does not parse,
+     * renames in FROM, or holds a multi-column item other than a plain star cannot be traced, so every name is suspect.
+     */
+    private void readBound(String boundText, boolean viaText) {
+        boundKeys = Set.of();
+        boundAll = false;
+        if (boundText == null || !viaText) return;
+        JsonNode node = selectNode(boundText);
+        // one base table only: a join or subquery under a star repeats the key under a dedup name (msisdn_1) nothing traces
+        boolean untraceable = node == null || hasRenameOrRow(node, relationNames(node))
+                || !"BASE_TABLE".equals(node.path("from_table").path("type").asText());
+        Set<String> aliases = node == null ? Set.of() : keyAliases(node);
+        if (node != null) {
+            // DuckDB renames a repeated output name (msisdn_1, k_1): a copy of the key under a name nothing here knows
+            JsonNode list = node.path("select_list");
+            Set<String> seen = new HashSet<>();
+            boolean star = false;
+            for (JsonNode item : list) {
+                if ("STAR".equals(item.path("type").asText())) { star = true; continue; }
+                untraceable |= !seen.add(outputName(item).trim().toLowerCase(Locale.ROOT));
+            }
+            untraceable |= star && list.size() > 1;   // a star's names collide with the other items' unseen
+            for (JsonNode item : list) {
+                untraceable |= multiColumn(item) && !("STAR".equals(item.path("type").asText()) && !patternStar(item));
+                // an item DuckDB names itself (upper(msisdn), true, NULL): its output name is not known here, and an
+                // alias elsewhere that equals it makes DuckDB rename the key copy (true_1)
+                untraceable |= item.path("alias").asText("").isEmpty() && !"COLUMN_REF".equals(item.path("type").asText())
+                        && !"STAR".equals(item.path("type").asText());
+            }
+        }
+        if (untraceable) boundAll = true;
+        else boundKeys = aliases;
+    }
+
+    /**
+     * A bound saved query whose every output name is traced ({@link #readBound}): a Widget over it is judged like a
+     * structured spec — the masked columns plus the names the text gives a key — instead of treating every column as
+     * possibly masked, so a chart over {@code SELECT * FROM ds} keeps its clean categories and counts.
+     */
+    private boolean boundTraced(String boundText) {
+        readBound(boundText, true);
+        return boundText != null && !boundAll;
     }
 
     // ── refusals (inference channels) ───────────────────────────────────────────────
@@ -220,7 +271,9 @@ final class BiResultMasking {
      */
     void vet(MeasureCompiler.Spec spec, boolean checkFilters, String boundText) {
         if (!engaged()) return;
-        boolean viaText = boundText != null && readsKey(boundText);
+        boolean viaText = boundText != null && (unknown || readsKey(boundText));
+        readBound(boundText, viaText);
+        if (viaText && !boundAll) viaText = false;   // traced: only the masked columns and the names the text gives a key
         if (checkFilters)
             for (MeasureCompiler.Filter f : spec.filters()) refuseIfMasked(f.field(), "filtering", viaText);
         for (String field : whenFields(spec.when())) refuseIfMasked(field, "filtering", viaText);
@@ -242,7 +295,9 @@ final class BiResultMasking {
      */
     MeasureCompiler.Spec stripCosmeticOrder(MeasureCompiler.Spec spec, String boundText) {
         if (!engaged() || spec.measures().isEmpty()) return spec;   // no measure: the compiler's key-order fallback would leak, so vet refuses
-        boolean viaText = boundText != null && readsKey(boundText);
+        boolean viaText = boundText != null && (unknown || readsKey(boundText));
+        readBound(boundText, viaText);
+        if (viaText && !boundAll) viaText = false;   // traced: only the masked columns and the names the text gives a key
         List<MeasureCompiler.Sort> kept = new ArrayList<>();
         for (MeasureCompiler.Sort s : spec.orderBy())
             if (!(s.cosmetic() && isMasked(s.field(), viaText))) kept.add(s);
@@ -257,6 +312,31 @@ final class BiResultMasking {
     void vetSort(List<QueryExecutor.Sort> sort) {
         if (!engaged()) return;
         for (QueryExecutor.Sort s : sort) refuseIfMasked(s.field(), "ordering", false);
+    }
+
+    /**
+     * {@code POST /queries/{id}/run}: as {@link #vetSort(List)}, and when the saved query's text reads a key, a sort on an
+     * output the author named ({@code msisdn AS k}) would return the rows in raw key order next to the alias
+     * (BI-MASKING-ROW-VALUE-LEAKS-1): only a declared-clean column or a select item that reads no key may be sorted.
+     */
+    void vetSort(List<QueryExecutor.Sort> sort, String queryText) {
+        vetSort(sort);
+        if (!engaged() || sort.isEmpty() || !(unknown || mentions(queryText, masked) || opaqueRefs(queryText))) return;
+        JsonNode node = selectNode(queryText);
+        Set<String> safe = new HashSet<>(knownClean);
+        if (node != null && !hasOpaqueRef(node, relationNames(node))) {
+            Set<String> aliases = keyAliases(node);
+            for (JsonNode item : node.path("select_list")) {
+                String alias = item.path("alias").asText("").trim().toLowerCase(Locale.ROOT);
+                if (!alias.isEmpty() && !refsKey(item, aliases)) safe.add(alias);
+            }
+            for (String a : aliases) safe.remove(a);
+        } else safe.clear();   // positions and names cannot be traced: nothing is provably clean
+        for (QueryExecutor.Sort s : sort)
+            if (!safe.contains(s.field().trim().toLowerCase(Locale.ROOT)))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "ordering column '" + s.field()
+                        + "' is refused: the query reads a masked key and this column may carry it, so ordering by it would leak"
+                        + " its raw order; the caller needs " + REVEAL);
     }
 
     private void refuseIfMasked(String column, String what, boolean viaText) {
@@ -294,29 +374,63 @@ final class BiResultMasking {
      * not a declared clean one ({@code SELECT upper(msisdn) AS u}). ⚠ A NUMERIC derivation of a numeric key is not seen.
      */
     QueryExecutor.Result apply(QueryExecutor.Result r, List<String> dimensions, String sqlText) {
+        return apply(r, dimensions, sqlText, null, Set.of());
+    }
+
+    /**
+     * A Widget bound to a saved query: {@code sqlText} is the executed {@code WITH bound AS (..) SELECT ..}, which never parses
+     * as one plain SELECT, so which output keeps the Space alias is judged on the saved query's own text
+     * ({@code boundQuery}), by output NAME: a Widget column keeps it only when it is one of {@code grantable} (the
+     * Widget's raw {@code groupBy} columns that no Measure id shares and no grain buckets) and the query emits that name
+     * as a bare key ({@link #bareKeyNames}).
+     */
+    QueryExecutor.Result apply(QueryExecutor.Result r, List<String> dimensions, String sqlText, String boundQuery,
+                               Set<String> grantable) {
         if (!engaged()) return r;
+        Set<String> bareNames = null;
+        if (boundQuery != null) {
+            // The traced rule needs a known lineage and a traced text. Otherwise every column is withheld and nothing keeps the
+            // alias: DuckDB renames repeated names (k, k_1, k_1_1), so a name granted from an untraced text could be a chosen value,
+            // and with an unknown lineage a grain bucket would escape the name rule.
+            boolean traced = boundTraced(boundQuery) && !unknown;
+            bareNames = new HashSet<>();
+            if (traced) {
+                Set<String> g = new HashSet<>();
+                for (String s : grantable) g.add(s.trim().toLowerCase(Locale.ROOT));
+                bareNames = bareKeyNames(selectNode(boundQuery));
+                bareNames.retainAll(g);
+                dimensions = new ArrayList<>(g);   // judged like a structured spec (boundKeys added below)
+            }
+        } else boundKeys = Set.of();
         JsonNode tree = dimensions == null ? selectNode(sqlText) : null;
         // COLUMNS('msi.*') names the key by pattern, so the text need not spell it
-        boolean viaText = dimensions == null && (unknown || mentions(sqlText, masked) || opaqueRefs(sqlText));
+        boolean opaque = dimensions == null && (opaqueRefs(sqlText) || boundQuery != null && opaqueRefs(boundQuery));
+        boolean viaText = dimensions == null && (unknown || mentions(sqlText, masked) || opaque);
         Set<String> dims = new HashSet<>();
         if (dimensions != null) for (String d : dimensions) dims.add(d.trim().toLowerCase(Locale.ROOT));
         List<ResultSetDescriptor.Column> columns = new ArrayList<>();
         Set<String> hit = new LinkedHashSet<>();
         // Free SQL: which output POSITIONS derive from a masked column (a numeric CAST of a numeric key included), by the
         // DuckDB parse tree; null when the positions cannot be trusted (parse failure, subquery / CTE, a star or any other
-        // item that can expand to several columns).
-        Set<Integer> derived = viaText ? derivedPositions(tree) : null;
+        // item that can expand to several columns, a rename in FROM, the row as a value).
+        Set<Integer> derived = viaText && !opaque ? derivedPositions(tree) : null;
+        // A structured spec's dimensions are Dataset columns: the alias. Free SQL: only a parse-proven bare key keeps it, even when masked by an output name the text built at run time.
+        Predicate<Integer> keep = dimensions == null ? keepsSpaceAlias(tree) : p -> true;
+        Map<String, Boolean> keepByName = new HashMap<>();
         int pos = -1;
         for (ResultSetDescriptor.Column c : r.columns()) {
             pos++;
             String n = c.name().trim().toLowerCase(Locale.ROOT);
-            boolean mask = masked.contains(n)
+            boolean mask = masked.contains(n) || boundKeys.contains(n)
                     || (dimensions != null && unknown && dims.contains(n) && !knownClean.contains(n))
                     || (viaText && "string".equals(c.type()) && !knownClean.contains(n))
                     || (viaText && derived != null && derived.contains(pos))
                     // positions untrusted: every column is masked, a clean name included (a key can be aliased to one)
                     || (viaText && derived == null);
-            if (mask) hit.add(c.name());
+            if (mask) {
+                hit.add(c.name());
+                keepByName.merge(c.name(), bareNames != null ? bareNames.contains(n) : keep.test(pos), Boolean::logicalAnd);   // a repeated name: alias only if every copy may
+            }
             columns.add(mask ? new ResultSetDescriptor.Column(c.name(), "string", c.role(), c.cardinality()) : c);
         }
         lastMasked = List.copyOf(hit);
@@ -326,7 +440,7 @@ final class BiResultMasking {
             Map<String, Object> out = new LinkedHashMap<>(row);
             for (String col : hit) {
                 Object v = out.get(col);
-                if (v != null) out.put(col, alias(String.valueOf(v)));
+                if (v != null) out.put(col, keepByName.get(col) ? alias(String.valueOf(v)) : UNLINKABLE);
             }
             rows.add(out);
         }
@@ -355,7 +469,7 @@ final class BiResultMasking {
     private Set<Integer> derivedPositions(JsonNode node) {
         if (node == null) return null;
         JsonNode list = node.path("select_list");
-        Set<String> aliases = keyAliases(list);
+        Set<String> aliases = keyAliases(node);
         Set<Integer> out = new LinkedHashSet<>();
         for (int i = 0; i < list.size(); i++) {
             JsonNode expr = list.get(i);
@@ -392,25 +506,142 @@ final class BiResultMasking {
                 || n.path("replace_list").size() > 0 || n.path("rename_list").size() > 0;
     }
 
-    private static boolean hasOpaqueRef(JsonNode n) {
+    private static boolean hasOpaqueRef(JsonNode n, Set<String> relations) {
         // any star: a self-join's second copy of the key comes back as msisdn_1, which no name rule sees
         if (n.isObject() && ("STAR".equals(n.path("type").asText()) || "POSITIONAL_REFERENCE".equals(n.path("type").asText()))) return true;
-        for (JsonNode c : n) if (hasOpaqueRef(c)) return true;
+        if (fromRename(n) || rowRef(n, relations)) return true;
+        for (JsonNode c : n) if (hasOpaqueRef(c, relations)) return true;
         return false;
     }
 
     /**
-     * The WHOLE statement (a UNION, subquery or CTE included) holds a star or a {@code #n} reference, either of which may
-     * read a key the text never spells.
+     * The WHOLE statement (a UNION, subquery or CTE included) holds a star, a {@code #n} reference, a {@link #fromRename} or
+     * the row as a value, any of which may read a key the text never spells (BI-MASKING-ROW-VALUE-LEAKS-1).
      */
     private static boolean opaqueRefs(String sql) {
         JsonNode node = sql == null ? null : SqlGuard.parseSelectNode(sql);
-        return node != null && hasOpaqueRef(node);
+        return node != null && hasOpaqueRef(node, relationNames(node));
     }
 
-    /** The lower-cased aliases of select items that read a key, followed through lateral aliases ({@code msisdn AS k, k AS j}). */
-    private Set<String> keyAliases(JsonNode list) {
+    /**
+     * A FROM entry that renames columns out of sight of every name rule: a column alias list ({@code calls t(m)}), a table
+     * function ({@code unnest([msisdn])}, {@code range(..)}), PIVOT / UNPIVOT.
+     */
+    private static boolean fromRename(JsonNode n) {
+        if (!n.isObject() || n.has("class")) return false;   // expressions carry a class, table refs do not
+        String t = n.path("type").asText();
+        return n.path("column_name_alias").size() > 0 || "TABLE_FUNCTION".equals(t) || "PIVOT".equals(t);
+    }
+
+    /** A name that is a FROM relation: the whole row as a struct ({@code SELECT c}, {@code to_json(calls)}, {@code main.calls}). */
+    private static boolean rowRef(JsonNode n, Set<String> relations) {
+        JsonNode names = n.path("column_names");
+        return n.isObject() && "COLUMN_REF".equals(n.path("type").asText()) && names.size() > 0
+                && relations.contains(names.get(names.size() - 1).asText().trim().toLowerCase(Locale.ROOT));
+    }
+
+    /** Every table name and table-ref alias anywhere in the statement, lower-cased. */
+    private static Set<String> relationNames(JsonNode node) {
         Set<String> out = new HashSet<>();
+        collectRelations(node, out);
+        return out;
+    }
+
+    private static void collectRelations(JsonNode n, Set<String> out) {
+        if (n.isObject() && !n.has("class")) {   // a table ref (BASE_TABLE, SUBQUERY, TABLE_FUNCTION, JOIN, PIVOT ..)
+            for (String k : List.of("table_name", "alias")) {
+                String v = n.path(k).asText("").trim().toLowerCase(Locale.ROOT);
+                if (!v.isEmpty()) out.add(v);
+            }
+        }
+        for (JsonNode c : n) collectRelations(c, out);
+    }
+
+    /**
+     * Which masked output positions keep the Space alias. The alias is the same in every query, so a cell DERIVED from a key
+     * ({@code substr(msisdn,1,1)}, a rank) aliased the same way could be matched against the alias of a value the caller
+     * chose ({@code '4'}) and decoded; only a key selected bare keeps it: a plain SELECT whose FROM renames nothing, with
+     * either no star (the bare key column items) or nothing but plain stars and column references (every output is a raw
+     * column). Every other masked cell gets {@link #UNLINKABLE}.
+     */
+    private Predicate<Integer> keepsSpaceAlias(JsonNode tree) {
+        if (tree == null) return p -> false;
+        Set<String> relations = relationNames(tree);
+        JsonNode list = tree.path("select_list");
+        // a name another item aliases may be a lateral reference to it ('4417..' AS msisdn, msisdn AS k), not the column
+        List<String> itemAliases = new ArrayList<>();
+        for (JsonNode item : list) itemAliases.add(item.path("alias").asText("").trim().toLowerCase(Locale.ROOT));
+        boolean star = false, derivedItem = false;
+        Set<Integer> bare = new HashSet<>();
+        for (int i = 0; i < list.size(); i++) {
+            JsonNode item = list.get(i);
+            if ("STAR".equals(item.path("type").asText()) && !patternStar(item)) { star = true; continue; }
+            if (multiColumn(item)) return p -> false;   // * REPLACE, COLUMNS, unnest({..}) shift every later position
+            JsonNode names = item.path("column_names");
+            String name = names.size() == 1 ? names.get(0).asText().trim().toLowerCase(Locale.ROOT) : "";
+            boolean lateral = false;
+            for (int j = 0; j < itemAliases.size(); j++) lateral |= j != i && !name.isEmpty() && name.equals(itemAliases.get(j));
+            if ("COLUMN_REF".equals(item.path("type").asText()) && !rowRef(item, relations) && !lateral) {
+                if (refsKey(item, Set.of())) bare.add(i);
+            } else derivedItem = true;
+        }
+        for (Map.Entry<String, JsonNode> e : tree.properties())
+            if (!"select_list".equals(e.getKey()) && hasRenameOrRow(e.getValue(), relations)) return p -> false;
+        if (star) return derivedItem ? p -> false : p -> true;
+        return bare::contains;
+    }
+
+    /**
+     * The lower-cased output names {@link #keepsSpaceAlias} keeps for {@code node} (a lone plain star keeps every masked
+     * column's name). A Widget reads the bound query's columns BY NAME, case-insensitively, first match wins, so a name is
+     * proven only when exactly one output carries it ({@code substr(msisdn,1,4) AS m, msisdn AS m} or {@code AS "M"} would
+     * hand the derived value the alias) and it has no surrounding blanks ({@code " k"} / {@code "k"}).
+     */
+    private Set<String> bareKeyNames(JsonNode node) {
+        Set<String> out = new HashSet<>();
+        if (node == null) return out;
+        JsonNode list = node.path("select_list");
+        Map<String, Integer> seen = new HashMap<>();
+        boolean star = false;
+        for (JsonNode item : list) {
+            if ("STAR".equals(item.path("type").asText())) { star = true; continue; }
+            String name = outputName(item);
+            seen.merge(name.trim().toLowerCase(Locale.ROOT), 1, Integer::sum);
+        }
+        if (star && list.size() > 1) return out;   // a star's names cannot be told apart from the other items'
+        Predicate<Integer> keep = keepsSpaceAlias(node);
+        for (int i = 0; i < list.size(); i++) {
+            if (!keep.test(i)) continue;
+            JsonNode item = list.get(i);
+            if ("STAR".equals(item.path("type").asText())) { out.addAll(masked); continue; }
+            String name = outputName(item);
+            String key = name.trim().toLowerCase(Locale.ROOT);
+            if (name.equals(name.trim()) && seen.getOrDefault(key, 0) == 1) out.add(key);
+        }
+        return out;
+    }
+
+    private static String outputName(JsonNode item) {
+        String alias = item.path("alias").asText("");
+        JsonNode names = item.path("column_names");
+        return !alias.isEmpty() ? alias : names.size() > 0 ? names.get(names.size() - 1).asText() : "";
+    }
+
+    private static boolean hasRenameOrRow(JsonNode n, Set<String> relations) {
+        if (fromRename(n) || rowRef(n, relations) || patternStar(n)
+                || n.isObject() && "POSITIONAL_REFERENCE".equals(n.path("type").asText())) return true;
+        for (JsonNode c : n) if (hasRenameOrRow(c, relations)) return true;
+        return false;
+    }
+
+    /**
+     * The lower-cased names that read a key: every FROM relation name (the row as a value - {@code SELECT c}, {@code to_json(c)},
+     * {@code c['msisdn']} - carries the key), and the aliases of select items that read one, followed through lateral
+     * aliases ({@code msisdn AS k, k AS j}).
+     */
+    private Set<String> keyAliases(JsonNode node) {
+        Set<String> out = relationNames(node);
+        JsonNode list = node.path("select_list");
         for (boolean grew = true; grew; ) {
             grew = false;
             for (JsonNode item : list) {
@@ -421,17 +652,24 @@ final class BiResultMasking {
         return out;
     }
 
-    /** {@code n} reads a key: a masked column, an alias of one, or a {@link #patternStar} (fail closed). */
+    /** {@code n} reads a key: a masked column, an alias of one, a {@link #patternStar} or a {@link #fromRename} (fail closed). */
     private boolean refsKey(JsonNode n, Set<String> aliases) {
-        if (patternStar(n) || n.isObject() && "POSITIONAL_REFERENCE".equals(n.path("type").asText())) return true;   // #1 may be the key
-        if (n.isObject() && "COLUMN_REF".equals(n.path("type").asText()) && n.path("column_names").size() == 1
-                && aliases.contains(n.path("column_names").get(0).asText().trim().toLowerCase(Locale.ROOT))) return true;
+        if (patternStar(n) || fromRename(n) || n.isObject() && "POSITIONAL_REFERENCE".equals(n.path("type").asText())) return true;   // #1 may be the key
+        if (rowRef(n, aliases)) return true;   // an alias of a key, or a relation as a row value (c, main.calls)
         if (n.isObject() && "COLUMN_REF".equals(n.path("type").asText()) && n.path("column_names").isArray()) {
             JsonNode names = n.path("column_names");
             String col = names.get(names.size() - 1).asText().trim().toLowerCase(Locale.ROOT);
             if (masked.contains(col) || (unknown && !knownClean.contains(col))) return true;
         }
         for (JsonNode c : n) if (refsKey(c, aliases)) return true;
+        return false;
+    }
+
+    private boolean windowOrderedByKey(JsonNode n, Set<String> aliases) {
+        // PARTITION BY too: DuckDB emits each hash bin's partitions in key order
+        if (n.isObject() && "WINDOW".equals(n.path("class").asText())
+                && (refsKey(n.path("orders"), aliases) || refsKey(n.path("partitions"), aliases))) return true;
+        for (JsonNode c : n) if (windowOrderedByKey(c, aliases)) return true;
         return false;
     }
 
@@ -476,9 +714,11 @@ final class BiResultMasking {
         boolean leak = false;
         if (node != null) {
             JsonNode list = node.path("select_list");
-            Set<String> aliases = keyAliases(list);
+            Set<String> aliases = keyAliases(node);
             boolean keySelected = false;
             for (JsonNode item : list) keySelected |= refsKey(item, aliases) || multiColumn(item);   // a plain * selects the key too
+            // a window ordered by a key returns its rows in key order next to the bare alias: the rank leaks
+            for (JsonNode item : list) leak |= windowOrderedByKey(item, aliases);
             for (Map.Entry<String, JsonNode> e : node.properties()) {
                 if ("select_list".equals(e.getKey())) continue;
                 if ("modifiers".equals(e.getKey())) {
@@ -486,7 +726,7 @@ final class BiResultMasking {
                         if ("ORDER_MODIFIER".equals(mod.path("type").asText())) {
                             for (JsonNode o : mod.path("orders"))
                                 // any other star in a term (ORDER BY *, (* LIKE 'msi%')) may sort by the key: refused
-                                leak |= positional(o.path("expression")) ? keySelected : refsKey(o, aliases) || hasOpaqueRef(o);
+                                leak |= positional(o.path("expression")) ? keySelected : refsKey(o, aliases) || hasOpaqueRef(o, aliases);
                         } else leak |= refsKey(mod, aliases);
                 } else leak |= refsKey(e.getValue(), aliases);
             }
@@ -541,34 +781,6 @@ final class BiResultMasking {
     /** {@code sql} reads a key by a route the result masking recognises: it names a masked column, or holds an opaque reference. */
     private boolean readsKey(String sql) {
         return mentions(sql, masked) || opaqueRefs(sql);
-    }
-
-    /**
-     * {@code POST /bi/query} for a Widget bound to a saved Query: the output columns are the spec's, computed over the query's
-     * result, so the query's own select-list positions say nothing about them. When {@code queryText} (the saved query's
-     * rendered text) reads a key or the lineage is untraceable, every output column is masked; otherwise a column is masked
-     * by its name (review R1: the masking used to read the {@code WITH} prefix, which does not parse, so an opaque
-     * reference in the query went unseen).
-     */
-    QueryExecutor.Result applyBound(QueryExecutor.Result r, String queryText) {
-        if (!engaged()) return r;
-        boolean all = unknown || readsKey(queryText);
-        List<ResultSetDescriptor.Column> columns = new ArrayList<>();
-        Set<String> hit = new LinkedHashSet<>();
-        for (ResultSetDescriptor.Column c : r.columns()) {
-            boolean mask = all || masked.contains(c.name().trim().toLowerCase(Locale.ROOT));
-            if (mask) hit.add(c.name());
-            columns.add(mask ? new ResultSetDescriptor.Column(c.name(), "string", c.role(), c.cardinality()) : c);
-        }
-        lastMasked = List.copyOf(hit);
-        if (hit.isEmpty()) return r;
-        List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
-        for (Map<String, Object> row : r.rows()) {
-            Map<String, Object> out = new LinkedHashMap<>(row);
-            for (String col : hit) if (out.get(col) != null) out.put(col, alias(String.valueOf(out.get(col))));
-            rows.add(out);
-        }
-        return new QueryExecutor.Result(columns, rows, r.rowCount(), r.truncated(), r.elapsedMs());
     }
 
     /**
