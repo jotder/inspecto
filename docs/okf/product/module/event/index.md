@@ -35,3 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `SES-SNS-LIVE-CHECKS-1` | P3 | chore | live checks of the SES/SNS adapter, when a customer names SES | external |
+| `OPSTORE-BULK-INSERT-1` | P2 | defect | row-at-a-time JDBC inserts into a file-backed DuckDB run at hundreds of rows/s, on 1.5.6 AND 2.0. | — |

@@ -36,6 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | operator |
+| `BI-MASKING-SQL-SHAPE-LEAKS-1` | P1 | defect | BI / saved-query / DB-browser masking lets a masked key out through SQL shapes BiResultMasking.derivedPositions / vetAdHocSql do not mode… | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `LA-SAMPLE-GALLERY-DEMOAUTH-1` | P3 | defect | on Basic the *New from sample* dialog lists la-audit, la-claims and la-mobile-money as creatable because the template gallery reports the… | — |
 | `UI-THEME-NULL-TOKENS-1` | P3 | defect | themes.scss rebuilds each Material M2 theme without its _mat-system key, so Material 22 token functions return null; 3fa647719 restored o… | — |

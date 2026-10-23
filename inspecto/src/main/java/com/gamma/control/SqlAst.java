@@ -132,7 +132,7 @@ final class SqlAst {
     }
 
     private static void stripLocations(JsonNode n) {
-        if (n instanceof ObjectNode o) o.remove("query_location");
+        if (n instanceof ObjectNode o) { o.remove("query_location"); o.remove("query_location_length"); }   // 2.0 adds a length
         for (JsonNode child : n) stripLocations(child);   // an object iterates its values, an array its items
     }
 }

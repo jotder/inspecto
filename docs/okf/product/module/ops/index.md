@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `OPSTORE-BULK-INSERT-1` | P2 | defect | row-at-a-time JDBC inserts into a file-backed DuckDB run at hundreds of rows/s, on 1.5.6 AND 2.0. | — |
 | `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` | P3 | defect | a trimmed customer bundle is not exact: | operator |

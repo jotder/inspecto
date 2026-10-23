@@ -1,5 +1,8 @@
 # DuckDB 2.0.x plan — adoption, evidence, the looping-query candidates and the build order
 
+> **ARCHIVED 2026-10-23 — SHIPPED: master pins DuckDB 2.0.0.0** (§2a *Outcome*). As built:
+> `okf/product/module/engine/spec-duckdb.md` § *DuckDB 2.0.0.0*; open items in `docs/BACKLOG.md`.
+
 **Status: PLAN, 2026-10-05 — decided, not built** (merged 2026-10-22 with the loop-query research, which is archived).
 **2026-10-22: DuckDB `2.0.0.0` GA is on Maven Central (published 2026-10-21) and was trialled — §2a.** The staging
 alpha below is superseded; the trial pins the GA coordinates with no extra repository.
@@ -7,7 +10,7 @@ The operator decided on 2026-10-05: *go with DuckDB 2.0.x from now on* (the alph
 weeks), for the performance and capability gains. This file is the one DuckDB 2.0.x plan: the decision, what was
 measured, what is already built on unmerged branches, what is blocked, the order in which to build, and (§7) the
 still-open looping-query candidates. The full loop-query research (the 13-site inventory, every experiment table)
-stays readable in [`duckdb-2-loop-queries-plan.md`](../archived-documents/plans-archive/duckdb-2-loop-queries-plan.md).
+stays readable in [`duckdb-2-loop-queries-plan.md`](duckdb-2-loop-queries-plan.md).
 
 ## 1. Decision and constraints
 
@@ -131,6 +134,30 @@ Rule (§2): real only if the sign holds in both A-vs-B pairs **and** both deltas
 - **Scan and concurrent-reader regressions** (+29…40 % on group-by / top-N, −15 % at 8 readers) are new evidence the
   operator should weigh against the parquet-write gain.
 
+### Redo on current master, 2026-10-23 (quiet machine)
+
+Full reactor on 2.0.0.0 (`clean verify`, one reactor build): 11,117 tests, **14 red — the same set less the flaky one**
+(`EngineDatasetProviderFingerprintTest` green); no new red. Interleaved A/B/A/B with `engine,csv,scan,readers`, busy CPU
+before each side 16.7 / 20.5 / 12.4 / 10.8 % (`C:\bench-ga3`):
+
+| Workload | A1→B1 / A2→B2 | Same-version drift (A1→A2 / B1→B2) | Verdict |
+|---|---|---|---|
+| Engine ingest — union / generation | +2.8 % / −3.1 % · +3.0 % / −9.9 % time | ±6…17 % | **no difference** — the alpha's +80…106 % is gone |
+| Parquet write | −31.6 % / −58.6 % time | +14.5 % / −30.7 % | **real gain** |
+| Concurrent readers, 4 / 8 threads | −9.3 % / −20.4 % · −8.2 % / −10.8 % queries/s | +4.8 % / −8.1 % · +2.0 % / −0.9 % | **real regression**, about 10–20 % |
+| Scan filter + aggregate | +93 % / +21 % time (≈2 → 4 ms) | +10 % / −31 % | not established |
+| Scan group-by / top-N / count distinct, CSV read / transform | the sign flips between the pairs | | not established — the loaded run's "regressions" were noise |
+
+### Outcome — merged 2026-10-23
+
+The operator chose 2.0.0.0 (2026-10-23). Fixed on `lane/duckdb-2-ga` before the merge, each with an independent
+review: the `SqlGuard` path-parameter set (`import_database` refused), the masking operand shape (it failed OPEN on
+2.0), the SPA condition reader, the error-text echo, and **a DuckDB 2.0.0 wrong-results bug** — `window_self_join`
+loses hive-partition pruning, worked around with `SET disabled_optimizers = 'window_self_join'` on every analytics
+connection. Full reactor green (11,121 tests), UI suite 6,469 / 6,469. As built: `okf/product/module/engine/spec-duckdb.md`
+§ *DuckDB 2.0.0.0*. Still open, on the board: `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1`, `OPSTORE-BULK-INSERT-1`,
+`DUCKDB-2-LOOP-QUERIES-1` (§7 below), `DUCKDB-2-DECIMAL-WIDENING-AUDIT-1`.
+
 ## 3. What is already built (unmerged branches, all local, none pushed)
 
 | Branch | Commit | What it holds | Merge? |
@@ -213,7 +240,7 @@ Lanes marked ∥ touch disjoint files and can run in parallel; the timing lanes 
 
 **What the research found.** DuckDB 2.0 has **no native graph syntax**: `CREATE PROPERTY GRAPH` / `GRAPH_TABLE` /
 `ANY SHORTEST` are parse errors on both versions and the community `duckpgq` extension is an HTTP 404 for both, so
-decision `D9` ([`la-separation-feasibility-plan.md`](../archived-documents/plans-archive/la-separation-feasibility-plan.md))
+decision `D9` ([`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md))
 has no native-syntax answer yet. The one big 2.0 win is **recursive-CTE `USING KEY`** (present on 1.5.6 too): on 2.0
 BFS reachability ran ~3x faster (47 ms vs 161 ms) and min-label propagation 81 ms where 1.5.6 was cancelled at 6 s.
 Path *enumeration* (`recursive-paths`) gains nothing (51 ms vs 47 ms). Joins, aggregates and windows showed no general
@@ -239,7 +266,7 @@ for the `USING KEY` node, and anything about the 2.0 final release.
 
 ## References
 
-- [`duckdb-2-loop-queries-plan.md`](../archived-documents/plans-archive/duckdb-2-loop-queries-plan.md) (archived; §7 above carries its open part) — the 13-site loop inventory, the verified `USING KEY` / `ASOF` / window experiments and the candidate list C1–C11.
+- [`duckdb-2-loop-queries-plan.md`](duckdb-2-loop-queries-plan.md) (archived; §7 above carries its open part) — the 13-site loop inventory, the verified `USING KEY` / `ASOF` / window experiments and the candidate list C1–C11.
 - `okf/product/layer/platform/tests-performance.md` — how to run the comparison harness.
 - `okf/product/module/engine/spec-duckdb.md` — the engine's DuckDB concept (the 2.0 section lives on the upgrade branch until it merges).
 - `docs/BACKLOG.md` §4 — `DUCKDB-2-MIGRATION-1` and `DUCKDB-2-SQL-AST-SPA-1` (on the upgrade branch).

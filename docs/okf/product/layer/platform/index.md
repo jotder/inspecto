@@ -40,6 +40,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
 | — | P2 | feature | Postgres multi-user | — |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | Two test groups cannot run on the shared User profile, so a green reactor does not cover them. | — |
+| `DUCKDB-2-DECIMAL-WIDENING-AUDIT-1` | P3 | chore | DuckDB 2.0 widens DECIMAL(18,4) ± DECIMAL(18,4) to DECIMAL(19,4) (1.5 capped at 18); only partner-settlement is pinned. | — |
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Decisioning add-on | — |
 | `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | The only Helm chart is a replicas-1 StatefulSet; there is no N-pod topology, no ingress template, no per-pod Space assignment. | operator |

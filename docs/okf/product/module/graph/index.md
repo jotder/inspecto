@@ -35,4 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `ANALYTICS-CORE-1` | P2 | feature | one home for data operations and statistics; minimise duplicate data-operations code across modules. | — |
-| `DUCKDB-2-MIGRATION-1` | P2 | chore | move the DuckDB pin to 2.0.0.0 GA (on Maven Central since 2026-10-21; operator decision 2026-10-05: go 2.0.x) — trialled 2026-10-22 on la… | — |
+| `DUCKDB-2-LOOP-QUERIES-1` | P3 | feature | the looping / graph-style query candidates now that 2.0.0.0 is pinned: C1 / C2 USING KEY recursion behind SqlGraphEngine (Analytics C7),… | — |

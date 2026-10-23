@@ -16,7 +16,7 @@ Add a lesson as a new file here + one line below, in the same change. Personal o
 ## Editing & data traps
 - [Shell edit traps](shell-edit-traps.md) — heredoc escapes/truncation, open(w), perl -i UTF-8, chain with &&; prefer the Edit tool
 - [TOON config traps](toon-config-traps.md) — `#` line truncates, no single quotes, tabular arrays; decode + load + run
-- [DuckDB & SQL rules](duckdb-and-sql-rules.md) — session TZ = host; render persisted SQL at read; DuckDB 2 plan unmerged
+- [DuckDB & SQL rules](duckdb-and-sql-rules.md) — session TZ = host; render persisted SQL at read; DuckDB 2.0.0.0 pinned — lambda syntax, correctness settings, fail-closed AST reads
 
 ## Git & shared checkout
 - [Shared tree & peer work](shared-tree-peer-work.md) — fetch first; red gate may be a peer's dirty files; stage shared docs by hunk

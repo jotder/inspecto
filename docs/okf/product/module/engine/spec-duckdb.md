@@ -12,6 +12,27 @@ timestamp: 2026-06-28T00:00:00Z
 The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNAMED` JVM flag — see
 [build & run](../../layer/platform/spec-build-test.md)).
 
+## DuckDB 2.0.0.0 (pinned 2026-10-23, `DUCKDB-2-MIGRATION-1`)
+
+`pom.xml` `duckdb.version` = **`2.0.0.0`** (GA, Maven Central, no extra repository; extensions resolve to ABI
+`v2.0.0`). The move from 1.5.6.0 changed these engine facts — each is pinned by the named test, so a later bump that
+changes one again fails loudly:
+
+| 2.0 behaviour | What the product does | Pinned by |
+|---|---|---|
+| ⚠ **Wrong results:** the `window_self_join` optimizer rewrites an aggregate `OVER (PARTITION BY …)` (`count`, `sum`, `avg`, `max`, `count(DISTINCT)`, `list` …; not `rank` / `row_number` / ordered frames) into a self-join over a copy of the scan, and the copied `read_parquet` loses hive-partition pruning — a day-1 window aggregates day-2 rows | `DuckDbUtil.applyCorrectnessSettings` runs `SET disabled_optimizers = 'window_self_join'` on every analytics connection (`openConnection`, `openInMemory`, `applyGlobalDuckDbSettings`); the setting is global-scoped, survives `lock_configuration`, and author SQL cannot `SET` it back (`SqlGuard`). Upstream report owed (`DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1`) | `DuckDbWindowSelfJoinWorkaroundTest` (its canary fails once the raw driver stops miscounting: then remove the setting) |
+| The single-arrow lambda `x -> …` is a Binder error | every DuckDB lambda is `lambda x: …` / `lambda x, i: …` (engine, Space Templates, tests) | the template golden tests |
+| `json_serialize_sql` shape: constants `literal {kind, text}`, function operands `arguments[].expression`, `NOT IN` = `OPERATOR_NOT(COMPARE_IN)`, `TRUE` a `BOOLEAN` literal, `query_location_length` on every node | the SPA condition reader (`inspecto/query/sql-ast.ts`) reads the 2.0 shape only; `BiResultMasking` reads both operand lists and fails closed on neither | `SqlAstContractTest`, `ControlApiBiQueryMaskingTest`, `ControlApiDbBrowserMaskingTest` |
+| 22 non-table functions name a `path` parameter | `SqlGuard` refuses `import_database` / `export_database`, `setval` / `nextval`, `sleep_ms` / `pg_sleep` and the external-resource functions by name; the 21 JSON / VARIANT path extractors, `path_join` and `index_key` are a reviewed set that never opens a file | `SqlGuardFileFunctionContractTest` |
+| A runtime error echoes the SQL as `LINE n: …`, cut off at a fixed width (a literal can lose its closing quote); the pending-query preamble is gone | `FailureText` fingerprints the whole echo line; the preamble strip stays as a sanitiser | `FailureTextTest`, `DuckDbPendingQueryPreambleTest` |
+| `DECIMAL(18,4) ± DECIMAL(18,4)` widens to `DECIMAL(19,4)` (1.5 capped at 18) | partner-settlement pins `variance` with `CAST(… AS DECIMAL(18,4))` so its seeds hold on both engines; other packs' decimal arithmetic is not audited yet (`DUCKDB-2-DECIMAL-WIDENING-AUDIT-1`) | `PartnerSettlementSeedTest` |
+| `approx_count_distinct` is sharper (1.5's sketch merged two of three dates) · `FILE_SIZE_BYTES` now combines with `PARTITION_BY` (the writer still sizes files by bucket count) · a bare `?` binds in `json_serialize_sql`, a slim tree round-trips, nodes carry a length (the tree stays read-only, operator 2026-10-05) | — | `ColumnProfileGoldenTest`, `PartitionWriterLayoutSpikeTest`, `SqlSandboxTest` T2–T4 |
+
+Performance (interleaved A/B/A/B, 2026-10-23, quiet machine): engine ingest level with 1.5.6, parquet write 30–60 %
+faster, 4–8 concurrent readers about 10–20 % slower; row-at-a-time JDBC inserts into a file-backed store run at
+hundreds of rows/s on BOTH versions (`OPSTORE-BULK-INSERT-1`). The decision, every measurement and the trial history
+are in the archived [`duckdb-2-plan.md`](../../../../archived-documents/plans-archive/duckdb-2-plan.md).
+
 * **Appender, not JDBC batch.** `DuckDbRecordSink` and `TypedRecordIngester` bulk-load via the DuckDB
   `DuckDBAppender` API (heap buffer `APPEND_BATCH = 10,000` rows). Benchmarked on 1M rows: JDBC
   `PreparedStatement.executeBatch` ≈ 6.9K rows/s vs the Appender ≈ 520–530K rows/s — **~75× faster**, at

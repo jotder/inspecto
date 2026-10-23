@@ -123,9 +123,10 @@ public final class DuckDbUtil {
      * Engine-correctness settings every analytics connection gets, whatever else it is configured with.
      *
      * <p>{@code disabled_optimizers = 'window_self_join'} (DuckDB 2.0.0, {@code DUCKDB-2-MIGRATION-1}): that rewrite
-     * turns {@code count(*) OVER (PARTITION BY …)} into a self-join against an aggregate over a COPY of the scan, and
-     * on 2.0.0 the copied {@code read_parquet} scan loses the hive-partition pruning — rows of pruned partitions are
-     * counted (a day-1 window silently sees day 2). 1.5.6 is unaffected; disabling the rewrite is harmless there.
+     * turns an aggregate {@code OVER (PARTITION BY …)} ({@code count}, {@code sum}, {@code avg}, {@code max},
+     * {@code count(DISTINCT)}, {@code list}, … — not {@code rank}/{@code row_number} or ordered frames) into a self-join
+     * against an aggregate over a COPY of the scan, and on 2.0.0 the copied {@code read_parquet} scan loses the
+     * hive-partition pruning — rows of pruned partitions are aggregated (a day-1 window silently sees day 2). 1.5.6 is unaffected; disabling the rewrite is harmless there.
      * Pinned by {@code DuckDbWindowSelfJoinWorkaroundTest}; remove only when that test passes without it.
      */
     public static void applyCorrectnessSettings(Connection conn) throws SQLException {

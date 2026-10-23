@@ -47,6 +47,9 @@ class DuckDbWindowSelfJoinWorkaroundTest {
         String sql = corpus(tmp);
         try (Connection c = DuckDbUtil.openConnection(tmp.resolve("w.duckdb").toFile())) {
             assertEquals(2, n(c, sql), "openConnection (the Job / ingest path)");
+            // not only count: every PARTITION BY aggregate took the rewrite (k is 'a'/'b' -> 1 each on day 1)
+            assertEquals(2, n(c, sql.replace("count(*) OVER", "sum(CASE WHEN k IN ('a', 'b', 'c') THEN 1 END) OVER")),
+                    "sum OVER on openConnection");
         }
         try (Connection c = DuckDbUtil.openInMemory(tmp.resolve("spill"), List.of(tmp))) {
             assertEquals(2, n(c, sql), "openInMemory (the sealed analytics path)");

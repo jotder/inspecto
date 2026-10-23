@@ -37,7 +37,7 @@ ratcheting duplication guard (Must items M1–M10).
 - The Anomaly Model form does not author `method` / `forest` (D-AN29).
 - Hand-wrapped scratch-name sites listed on the row; `PartitionCompactor` `union_by_name` (operator-owned).
 - C7 graph traversal in SQL — blocked on DuckDB 2.0 adoption; it is candidate C1 / C2 of
-  [`duckdb-2-plan.md`](../../../../superpower/duckdb-2-plan.md) §7.
+  [`duckdb-2-plan.md`](../../../../archived-documents/plans-archive/duckdb-2-plan.md) §7.
 
 ## Refused (Won't, this horizon)
 
