@@ -2,7 +2,7 @@
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Link Analysis.
 > Offering: every edition from Basic (`linkAnalysis` add-on in `offerings/basic.toon`: `la-storage`, `la-core`, `la-api`, `geo-link`);
-> Advanced adds `la-store-pg`. Basic withholds the Investigation surface (see `docs/EDITIONS.md`). Checked against the code on 2026-10-17.
+> Advanced adds `la-store-pg`. Basic withholds the Investigation surface (see `docs/EDITIONS.md`). Checked against the code on 2026-10-24.
 
 ## 1. What it is
 
@@ -53,6 +53,38 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
 7. **Outputs**: dossier and bundle (SHA-256 root, verify routes), Case link, Working Set measures, standing
    detection via the `la.detect` Job into [Alerts](../../addon/incidents/architecture-alerts.md), public embeds.
 8. **Store**: filesystem by default; Postgres with `-Dinvestigations.backend=db` and a `jdbc:postgresql:` URL.
+
+
+### 4.1 Added since 2026-10-19
+
+- **Exploration alias book, persisted.** An exploration alias survives a restart or an eviction: each minted alias is
+  appended to the Space's alias book in one write through an `APPEND` channel (two processes lose no line), a line is
+  believed only when its alias is the token of its raw value, a per-file offset index makes a miss one line read, and a
+  repeated miss on a book of unchanged size answers from a bounded negative cache ([architecture §3.4](architecture.md)).
+- **Case history refuses raw keys under masking** (`LA-CASE-HISTORY-RAW-KEY-1`). `POST /inv/case-history` resolves a
+  raw key only under masking mode `none`; under any other mode it answers `resolved:false`, the same as an unknown
+  alias, so the route is no raw-id oracle.
+- **Edition gates D-LAE1, D-LAE2, D-LAE5** (Standard and up). Case history moved to its own route module
+  (`CaseHistoryRoutes`) and answers 503 on Basic; the Geo map, routes and co-location sit behind their own feature
+  `geoMap`; the Link Analysis and Geo map dashboard Widget Types are hidden on Basic by the `/bootstrap` flag `laWidgets`
+  (a UI flag only, not access control). See [`docs/EDITIONS.md`](../../../../EDITIONS.md).
+- **Grow, Held tray and Exclude** (`LA-GROW-EXCLUDE-1`). Grow previews what the next step adds
+  (`POST /inv/investigations/{id}/expand/preview`, `POST /inv/projection/neighbors/preview`), busy nodes are held in a
+  tray, Exclude removes from this Investigation or adds to a list, and every recorded change is an existing op
+  (`expand`, `exclude`, `excludeBy`, `undo`). **Category exclusion lists** kept by an administrator with `autoApply` become
+  `excludeBy` steps when an Investigation is created; a restricted list's members are hidden from callers who may not
+  read them, the Dossier included ([architecture §6.8, §6.9](architecture.md)).
+- **Onboarding** (`LA-ONBOARD-1`, closed 2026-10-22): a **Getting started** page with a sample Space and a Space guide;
+  **Add data** (the core `/onboard/files` import, every edition) writing `primaryEntityType` and `defaultLinkMapping`
+  on the Dataset; **Start from...** one entity, a list, a paste or the whole Dataset through the neighbours read;
+  the **Entities** page with its **Columns** tab to set what a column holds; **My work** (saved cases and what changed
+  in imported data) and *Find something interesting*; help on every screen (*What can I do next?*, terms on first use)
+  and local onboarding counters (`GET /onboarding/metrics`). Investigations need the runtime add-on
+  `laInvestigations`; without it LA runs at the Explorer level with locked, not hidden, actions
+  ([architecture §3.4, §6.10, §6.11](architecture.md)).
+- **Analyst upload status and delete.** `GET /inv/uploads`, `GET /inv/uploads/{collector}` (own uploads with their
+  ingest state) and `DELETE /inv/uploads/{collector}/{file}` (withdraw a file not yet picked up, under the Pipeline's
+  run claim); a metadata record per upload is kept 90 days ([architecture §6.6](architecture.md)).
 
 ## 5. Configuration
 

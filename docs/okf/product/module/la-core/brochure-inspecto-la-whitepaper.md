@@ -1,7 +1,7 @@
 # Inspecto LA whitepaper
 > **Sovereign Graph Operations: In-Process Entity Investigation, High-Scale Parquet Indexing, and Forensic Integrity Without Cluster or Cloud Sprawl**
 > *Audience: Chief Risk Officers (CRO), Chief Information Security Officers (CISO), Heads of Financial Crime & AML, Telecom Fraud Operations, Lead Enterprise Architects, Forensic Investigators, and the technical stakeholders who evaluate the system*
-> *Publication: October 2026 · Document version **1.3** of 2026-10-21 (supersedes 1.2)*
+> *Publication: October 2026 · Document version **1.4** of 2026-10-24 (supersedes 1.3)*
 
 **Inspecto LA (Link Analysis)** lets fraud and revenue-assurance investigators trace relationships across call records, wallets, devices and accounts, and turn what they find into court-grade evidence, inside the same platform that ingests and assures the data. This paper covers what the system does, how it is built, and what it has been measured to do.
 
@@ -70,6 +70,8 @@ Inspecto LA is sold in the same editions as the rest of Inspecto (names fixed by
 | Graph studio, projections from any Dataset, saved views, paths, neighbours, patterns, Value Measures | yes | yes | yes | yes |
 | Entity Lists, identity resolution, Entity profile pages | yes | yes | yes | yes |
 | Geo map, routes and co-location (decision `D-LAE5`, 2026-10-20) | — | yes | yes | yes |
+| Getting started, Add data from a file, Start from..., My work, help on every screen (`LA-ONBOARD-1`) | yes | yes | yes | yes |
+| Case history beside a node (decision `D-LAE1`); Link Analysis dashboard Widgets (decision `D-LAE2`) | — | yes | yes | yes |
 | Browser graph algorithms (28 of the 29) | yes | yes | yes | yes |
 | Industry packs (Telecom, Mobile Money) and the Domain Profile | yes | yes | yes | yes |
 | Masking | off by default; a mode the Space sets is display only (no sign-in, so anyone may reveal) | enforced, `typed` by default | enforced | enforced |
@@ -107,6 +109,21 @@ Every capability has a stated bound, and a request over its bound is refused wit
 | Dossier | Export of graph, steps and sealed rows with a SHA-256 root and a verify route | Verifies with identifiers masked | 2.3 |
 | Standing detection | Value-measure Alert Rules on an Investigation, swept on a schedule under the owner's re-checked authority | Ten typed refusal codes; the sweep holds no capability of its own | 5.6 |
 | Data Trust | Data-as-of, missing days, waiting Files and index version on every Investigation; delivery problems as Alerts | Freshness Alert after twice the poll interval (`maximumAge: auto`, `la-daily-feed`) | 4.6, 4.8 |
+
+---
+
+### From a blank install to a first finding in ten minutes
+
+Graph tools usually start with a data-engineering project. Inspecto LA starts with a file. A new installation opens on **Getting started**: **Try the sample** loads invented money transfers with a planted mule ring and opens the graph already drawn, or **Create a Space** names your data and its kind (*Mobile Money*, *Telecom* or *Generic*). A **Space guide** ticks each setup step from what the server actually holds.
+
+- **Add data.** Drop a CSV, TSV, Parquet or JSON file. The screen applies what it detected and says why; a guess is marked as one until the analyst confirms it. The analyst says which columns hold an Account or a Phone number and which way a link goes, presses **Create and run**, and gets the result in plain words: rows kept, rows set aside and why, each Expectation checked. The **Entities** page and its **Columns** tab show and change what each column holds, so two columns holding the same Entity Type join up in the graph.
+- **Start from what you know.** **Start from...** draws one entity (with a type-ahead that shows how busy each match is), an Entity List, a pasted list of values, or a whole Dataset (warned first when it is larger than the canvas cap). An entity, a list or a paste starts as one ring, with busy numbers held back, not as a hairball.
+- **Grow and Exclude.** **Grow** shows what the next step will add *before* it adds it. Call centres, switchboards and big merchants that link to everyone are **held** in a tray instead of flooding the canvas; **Exclude** removes a node from this Investigation or adds it to an exclusion list so it stays out of every later step. Administrators keep **category exclusion lists** (VIPs, politicians) that apply themselves to every new Investigation, as sealed, replayable steps whose members stay hidden from those who may not read them.
+- **Find something interesting.** Three plain questions over the graph: *Who is busiest*, *Which groups stick together* and *How does A reach B*, each answered in one sentence with **Show on graph**, **Start from these** and **Add to a list**.
+- **My work.** **Save as a case** keeps the graph's start and the lists it uses; the front page lists the cases and *what changed in your data* since the last import, so the analyst comes back to the work, not to a blank canvas.
+- **Help on every screen.** *What can I do next?* reads what the Space already holds and offers the next step with one line of why; key terms explain themselves on first use; anything an edition or role does not include is shown greyed out with the reason, never as a button that fails. Local beginner counters (never sent anywhere) tell an administrator how far first-time users get.
+
+**By edition.** Getting started, Add data from a file, Start from..., Entities and Columns, Find something interesting, My work and the help are in **every edition, Basic included**. On Basic, Grow, Held and Exclude change the analyst's view only; in an Investigation (**Standard and above**) each is a recorded, replayable step, and the auto-applied category exclusion lists apply to Investigations only. Keeping an import up to date on a schedule and reading from a database or remote system are locked on Basic. Case history beside a node, the Geo map and the Link Analysis dashboard Widgets are **Standard and above**.
 
 ---
 
@@ -1141,6 +1158,10 @@ Inspecto LA redefines the economics and operational posture of graph intelligenc
 For institutions seeking to modernize financial crime, intelligence and fraud operations without moving data outside their perimeter, Inspecto LA offers a graph platform whose claims are listed, sourced and bounded in Section 7.
 
 ---
+
+### What changed in version 1.4 (2026-10-24)
+
+- Added the onboarding story (Section 1, *From a blank install to a first finding in ten minutes*: Getting started, Add data, Start from..., Find something interesting, My work, help on every screen), Grow, Held and Exclude with the category exclusion lists, and the edition placement of Case history and the dashboard Widgets (decisions `D-LAE1`, `D-LAE2`).
 
 ### What changed in version 1.3 (2026-10-21)
 

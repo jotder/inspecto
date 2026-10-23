@@ -2352,6 +2352,67 @@ Refusals read as a cause plus a next step (DR-D6 conventions): 413 names the lim
 
 The page-title row in the footer renders the explain control through the `LA_AI_ASSIST` host slot (`<inspecto-la-host-slot [component]="aiExplain" [inputs]=...>`), as the header does, not a direct `@inspecto/core/ai-assist` import: the library's `no-restricted-imports` rule forbids host edges outside `la-host`.
 
+## Getting started (LA-ONBOARD-1, as built 2026-10-22)
+
+The beginner's path, step by step, is in the [end user guide](user-guide-end-user.md) §2 and §3; the reference is
+[user guide manual](user-guide-manual.md) §2. In short:
+
+- **Getting started page.** Until the current Space holds a Dataset (or while there is no Space), the la-app front page
+  is **Getting started**: **Try the sample** (the `la-sample` Space Template: invented transfers with a planted mule
+  ring, opened drawn), **Create a Space** (a name and *Mobile Money*, *Telecom* or *Generic*, which sets the Domain
+  Profile) or, when Spaces exist, the Space switcher. A choice the caller may not take is locked with one line of why.
+- **Space guide.** Ticks **Space**, **Data**, **What the columns hold**, **First graph** and optional **A list** from
+  what the server holds; it disappears once the four required steps are ticked.
+- **Help on every screen.** *What can I do next?* (the light bulb in the left menu) offers at most three next actions,
+  recommended first, each with one line of why; terms (*Dataset*, *Entity Type*, *Entity*, *Entity List*, *case*) carry a
+  **?** on first use; empty states name their reason and the one action that fills them. Local beginner counters are
+  shown read-only under **Settings → Getting started counters** (`GET /onboarding/metrics`, `canAdminister`).
+
+## Add data
+
+**Add data** opens **Onboard a file** (the core `/onboard/files` import, every edition; contract in
+[`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md)): choose *Events between entities* or
+*Details about entities*, drop the file, check the detected columns (a guess is marked **A guess** until confirmed),
+say what each column holds and which way a link goes, then **Create and run**. The committed Dataset carries
+`primaryEntityType` and `defaultLinkMapping`, so Link Analysis can draw it with no saved view. The result offers
+**Explore in Link Analysis** (opens **Start from...** with the Dataset picked, `?dataset=<id>`), **Add details about
+these entities** and **Add another file**; the Dataset card offers **Add a file** and **Run now**. *Keep this up to
+date* and *Read from a database or a remote system* are locked on Basic. With sign-in an administrator turns adding data
+on per Space (**Settings → Add data**) and the caller needs `canUploadData`.
+
+**Entities and Columns.** The **Entities** page lists the Entity Types the Space's data holds (primary types first,
+the rest under **Not in your data**); its **Columns** tab sets what each identifier-like column holds and each
+Dataset's primary Entity Type, and **New Entity Type** adds one. These writes need `canAuthorWorkbench` with sign-in.
+Detail: [user guide manual](user-guide-manual.md) §4.5.
+
+## Start from one entity, a list, a paste or a Dataset
+
+The first screen of Link Analysis is the **Start from...** box: pick the **Dataset**, then start from **One entity**
+(Entity Type first, then the value, with a type-ahead from `POST /inv/entities/{type}/suggest`, busiest first),
+**A list** (an Entity List, at most 25 members), **A paste** (values one per line; values not in the Dataset are
+reported) or **The whole Dataset** (warned first when it holds more Entities than the projection node cap). A start
+draws through the neighbours read, one per value, holds busy neighbours above the Space's hub threshold and marks the
+starting entities as grown, so **Grow** continues from the ring. On the Investigations level, **One entity** seeds an
+Investigation (a Domain Profile that investigates the type binds its own mapping); a list or a paste is drawn and queued
+as the first seeds. **Investigate** on an Entity profile takes the same path. Which Datasets can start a graph: the
+Dataset's `defaultLinkMapping`, else a Domain Profile `investigate` mapping, else the first saved view over it, else its
+two classified link-end columns. Code: `link-analysis/start-from.ts`; detail: [architecture §3.4](architecture.md).
+
+## My work
+
+On the la-app front page, after the Space guide, **My work** lists:
+
+- **Cases** — every case saved in the Space with **Save as a case** (a saved view plus the Entity Lists it started from
+  and excluded through), most recent first, with the lists it uses; opening one draws its start again over the data as
+  it is then and hides what its exclusion lists hold now. A case re-reads live data: it is not evidence.
+- **What changed in your data** — one line per Dataset imported with **Add data**: the last successful import's date,
+  rows loaded and rows set aside, read from the ingest audit ledger (`GET /runs/{pipeline}/batches`). It does not say
+  whether a re-import replaced or appended rows.
+
+**Find something interesting** (top of the Analysis tab) asks *Who is busiest*, *Which groups stick together* and *How
+does A reach B*, each answered in one sentence with **Show on graph**, **Start from these** and **Add to a list**.
+Code: `la-app` `my-work.ts`, `discover.ts`; detail: [architecture §3.4](architecture.md).
+
 ## Screens
 
 Screens for Link Analysis. Design and internals: [Link Analysis architecture](architecture-overview.md).
