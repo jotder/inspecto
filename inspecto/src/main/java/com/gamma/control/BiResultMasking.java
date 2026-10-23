@@ -266,14 +266,17 @@ final class BiResultMasking {
      */
     QueryExecutor.Result apply(QueryExecutor.Result r, List<String> dimensions, String sqlText) {
         if (!engaged()) return r;
-        boolean viaText = dimensions == null && (unknown || mentions(sqlText, masked));
+        JsonNode tree = dimensions == null ? selectNode(sqlText) : null;
+        // COLUMNS('msi.*') names the key by pattern, so the text need not spell it
+        boolean viaText = dimensions == null && (unknown || mentions(sqlText, masked) || opaqueRefs(sqlText));
         Set<String> dims = new HashSet<>();
         if (dimensions != null) for (String d : dimensions) dims.add(d.trim().toLowerCase(Locale.ROOT));
         List<ResultSetDescriptor.Column> columns = new ArrayList<>();
         Set<String> hit = new LinkedHashSet<>();
         // Free SQL: which output POSITIONS derive from a masked column (a numeric CAST of a numeric key included), by the
-        // DuckDB parse tree; null when the positions cannot be trusted (parse failure, subquery / CTE, SELECT *).
-        Set<Integer> derived = viaText ? derivedPositions(sqlText) : null;
+        // DuckDB parse tree; null when the positions cannot be trusted (parse failure, subquery / CTE, a star or any other
+        // item that can expand to several columns).
+        Set<Integer> derived = viaText ? derivedPositions(tree) : null;
         int pos = -1;
         for (ResultSetDescriptor.Column c : r.columns()) {
             pos++;
@@ -282,8 +285,8 @@ final class BiResultMasking {
                     || (dimensions != null && unknown && dims.contains(n) && !knownClean.contains(n))
                     || (viaText && "string".equals(c.type()) && !knownClean.contains(n))
                     || (viaText && derived != null && derived.contains(pos))
-                    // positions untrusted: a numeric column is masked unless declared clean (count(*) AS n then reads as masked)
-                    || (viaText && derived == null && !"string".equals(c.type()) && !knownClean.contains(n));
+                    // positions untrusted: every column is masked, a clean name included (a key can be aliased to one)
+                    || (viaText && derived == null);
             if (mask) hit.add(c.name());
             columns.add(mask ? new ResultSetDescriptor.Column(c.name(), "string", c.role(), c.cardinality()) : c);
         }
@@ -316,23 +319,101 @@ final class BiResultMasking {
      * The 0-based output positions of {@code sql}'s select list that derive from a masked column (or, with an untraceable
      * lineage, from any column not declared clean) through anything but a {@code count}; {@code null} when the positions
      * cannot be trusted: the text does not parse as one SELECT, holds a subquery or CTE (more than one SELECT node), or
-     * selects {@code *}. Closes the numeric derivation {@code CAST(msisdn AS BIGINT) AS m}, which no string rule sees.
+     * an item can expand to several columns ({@link #multiColumn}), which shifts every later position
+     * (BI-MASKING-SQL-SHAPE-LEAKS-1). Closes the numeric derivation {@code CAST(msisdn AS BIGINT) AS m}, which no string
+     * rule sees; an item that names an alias of a key ({@code msisdn AS k, k = '..' AS hit}) derives from it too.
      */
-    private Set<Integer> derivedPositions(String sql) {
-        JsonNode node = sql == null ? null : SqlGuard.parseSelectNode(sql);
-        if (node == null || !"SELECT_NODE".equals(node.path("type").asText()) || countSelectNodes(node) != 1) return null;
+    private Set<Integer> derivedPositions(JsonNode node) {
+        if (node == null) return null;
         JsonNode list = node.path("select_list");
+        Set<String> aliases = keyAliases(list);
         Set<Integer> out = new LinkedHashSet<>();
         for (int i = 0; i < list.size(); i++) {
             JsonNode expr = list.get(i);
-            if ("STAR".equals(expr.path("class").asText()) || "STAR".equals(expr.path("type").asText())) return null;
+            if (multiColumn(expr)) return null;
             String fn = expr.path("function_name").asText("").toLowerCase(Locale.ROOT);
             boolean count = "FUNCTION".equals(expr.path("class").asText()) && (fn.equals("count") || fn.equals("count_star"))
                     && (expr.path("filter").isNull() || expr.path("filter").isMissingNode())
                     && barePlainArguments(expr);   // count(msisdn) is a number; count(CASE WHEN msisdn = ..) is a test of a value
-            if (!count && refsMaskedColumn(expr)) out.add(i);
+            if (!count && refsKey(expr, aliases)) out.add(i);
         }
         return out;
+    }
+
+    /** The one plain SELECT in {@code sql}, or {@code null} (parse failure, not a SELECT, a subquery or CTE). */
+    private static JsonNode selectNode(String sql) {
+        JsonNode node = sql == null ? null : SqlGuard.parseSelectNode(sql);
+        return node != null && "SELECT_NODE".equals(node.path("type").asText()) && countSelectNodes(node) == 1 ? node : null;
+    }
+
+    /** A select item that can yield more than one column: any star ({@code *}, {@code COLUMNS(..)}, {@code t.*}), or {@code unnest} / {@code unpack}. */
+    private static boolean multiColumn(JsonNode n) {
+        if (n.isObject() && ("STAR".equals(n.path("class").asText()) || "STAR".equals(n.path("type").asText()))) return true;
+        String fn = n.isObject() ? n.path("function_name").asText("").toLowerCase(Locale.ROOT) : "";
+        if (fn.equals("unnest") || fn.equals("unlist") || fn.equals("unpack")) return true;
+        for (JsonNode c : n) if (multiColumn(c)) return true;
+        return false;
+    }
+
+    /** A star that picks or rewrites columns, so it may cover a key whatever its text says: {@code COLUMNS(..)}, EXCLUDE, REPLACE, RENAME. */
+    private static boolean patternStar(JsonNode n) {
+        if (!n.isObject() || !"STAR".equals(n.path("type").asText())) return false;
+        return n.path("columns").asBoolean(false) || !n.path("expr").isMissingNode() && !n.path("expr").isNull()
+                || n.path("exclude_list").size() > 0 || n.path("qualified_exclude_list").size() > 0
+                || n.path("replace_list").size() > 0 || n.path("rename_list").size() > 0;
+    }
+
+    private static boolean hasOpaqueRef(JsonNode n) {
+        // any star: a self-join's second copy of the key comes back as msisdn_1, which no name rule sees
+        if (n.isObject() && ("STAR".equals(n.path("type").asText()) || "POSITIONAL_REFERENCE".equals(n.path("type").asText()))) return true;
+        for (JsonNode c : n) if (hasOpaqueRef(c)) return true;
+        return false;
+    }
+
+    /**
+     * The WHOLE statement (a UNION, subquery or CTE included) holds a star or a {@code #n} reference, either of which may
+     * read a key the text never spells.
+     */
+    private static boolean opaqueRefs(String sql) {
+        JsonNode node = sql == null ? null : SqlGuard.parseSelectNode(sql);
+        return node != null && hasOpaqueRef(node);
+    }
+
+    /** The lower-cased aliases of select items that read a key, followed through lateral aliases ({@code msisdn AS k, k AS j}). */
+    private Set<String> keyAliases(JsonNode list) {
+        Set<String> out = new HashSet<>();
+        for (boolean grew = true; grew; ) {
+            grew = false;
+            for (JsonNode item : list) {
+                String alias = item.path("alias").asText("").trim().toLowerCase(Locale.ROOT);
+                if (!alias.isEmpty() && !out.contains(alias) && refsKey(item, out)) grew = out.add(alias);
+            }
+        }
+        return out;
+    }
+
+    /** {@code n} reads a key: a masked column, an alias of one, or a {@link #patternStar} (fail closed). */
+    private boolean refsKey(JsonNode n, Set<String> aliases) {
+        if (patternStar(n) || n.isObject() && "POSITIONAL_REFERENCE".equals(n.path("type").asText())) return true;   // #1 may be the key
+        if (n.isObject() && "COLUMN_REF".equals(n.path("type").asText()) && n.path("column_names").size() == 1
+                && aliases.contains(n.path("column_names").get(0).asText().trim().toLowerCase(Locale.ROOT))) return true;
+        if (n.isObject() && "COLUMN_REF".equals(n.path("type").asText()) && n.path("column_names").isArray()) {
+            JsonNode names = n.path("column_names");
+            String col = names.get(names.size() - 1).asText().trim().toLowerCase(Locale.ROOT);
+            if (masked.contains(col) || (unknown && !knownClean.contains(col))) return true;
+        }
+        for (JsonNode c : n) if (refsKey(c, aliases)) return true;
+        return false;
+    }
+
+    /** An ORDER BY term that names a select item by position or by {@code ALL}. */
+    private static boolean positional(JsonNode expr) {
+        while ("COLLATE".equals(expr.path("type").asText())) expr = expr.path("child");   // ORDER BY 1 COLLATE nocase
+        return "VALUE_CONSTANT".equals(expr.path("type").asText())
+                || "STAR".equals(expr.path("type").asText()) && expr.path("columns").asBoolean(false)
+                && (expr.path("expr").isMissingNode() || expr.path("expr").isNull())
+                && expr.path("exclude_list").size() == 0 && expr.path("qualified_exclude_list").size() == 0
+                && expr.path("replace_list").size() == 0 && expr.path("rename_list").size() == 0;   // not COLUMNS(* REPLACE ..)
     }
 
     /**
@@ -356,31 +437,35 @@ final class BiResultMasking {
     /**
      * Ad-hoc SQL typed by the caller ({@code POST /db/query}): a masked column may appear only in the select list (its
      * output is aliased); in a WHERE, HAVING, GROUP BY, ORDER BY, JOIN, subquery or CTE it would test or bisect raw values,
-     * so it is refused 422. Text that does not parse as one plain SELECT is refused when it names a masked column.
+     * so it is refused 422 - and so is an alias of it, a {@code COLUMNS(..)} pattern, and {@code ORDER BY 1} / {@code ORDER
+     * BY ALL} while a key is selected (BI-MASKING-SQL-SHAPE-LEAKS-1). Text that does not parse as one plain SELECT is
+     * refused when it names a masked column.
      */
     void vetAdHocSql(String sql) {
         if (!engaged()) return;
-        JsonNode node = SqlGuard.parseSelectNode(sql);
-        boolean plain = node != null && "SELECT_NODE".equals(node.path("type").asText()) && countSelectNodes(node) == 1;
+        JsonNode node = selectNode(sql);
         boolean leak = false;
-        if (plain) {
-            for (Map.Entry<String, JsonNode> e : node.properties())
-                if (!"select_list".equals(e.getKey()) && refsMaskedColumn(e.getValue())) leak = true;
-        } else leak = unknown || mentions(sql, masked);
+        if (node != null) {
+            JsonNode list = node.path("select_list");
+            Set<String> aliases = keyAliases(list);
+            boolean keySelected = false;
+            for (JsonNode item : list) keySelected |= refsKey(item, aliases) || multiColumn(item);   // a plain * selects the key too
+            for (Map.Entry<String, JsonNode> e : node.properties()) {
+                if ("select_list".equals(e.getKey())) continue;
+                if ("modifiers".equals(e.getKey())) {
+                    for (JsonNode mod : e.getValue())
+                        if ("ORDER_MODIFIER".equals(mod.path("type").asText())) {
+                            for (JsonNode o : mod.path("orders"))
+                                // any other star in a term (ORDER BY *, (* LIKE 'msi%')) may sort by the key: refused
+                                leak |= positional(o.path("expression")) ? keySelected : refsKey(o, aliases) || hasOpaqueRef(o);
+                        } else leak |= refsKey(mod, aliases);
+                } else leak |= refsKey(e.getValue(), aliases);
+            }
+        } else leak = unknown || mentions(sql, masked) || opaqueRefs(sql);
         if (leak)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the SQL compares, joins, groups or orders by a masked "
                     + "key (or its lineage is untraceable); that would leak its raw values, so a caller needs " + REVEAL
                     + " - a masked column may only be selected");
-    }
-
-    private boolean refsMaskedColumn(JsonNode n) {
-        if (n.isObject() && "COLUMN_REF".equals(n.path("type").asText()) && n.path("column_names").isArray()) {
-            JsonNode names = n.path("column_names");
-            String col = names.get(names.size() - 1).asText().trim().toLowerCase(Locale.ROOT);
-            if (masked.contains(col) || (unknown && !knownClean.contains(col))) return true;
-        }
-        for (JsonNode c : n) if (refsMaskedColumn(c)) return true;
-        return false;
     }
 
     private static int countSelectNodes(JsonNode n) {

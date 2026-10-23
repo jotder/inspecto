@@ -500,6 +500,29 @@ class ControlApiBiQueryMaskingTest {
     }
 
     @Test
+    void aSavedQueryWhosePositionsCannotBeProvenMasksEveryCell(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // BI-MASKING-SQL-SHAPE-LEAKS-1: a multi-column item shifts the positions, COLUMNS() names the key by pattern.
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            Map<String, String> texts = Map.of(
+                    "shift_q", "SELECT count(COLUMNS('region|amount')), max(CAST(msisdn AS BIGINT)) AS amount FROM calls_ds",
+                    "unnest_q", "SELECT unnest({'a': region, 'b': amount}), CAST(msisdn AS BIGINT) AS m FROM calls_ds",
+                    "pattern_q", "SELECT CAST(COLUMNS('msi.*') AS BIGINT) + 0 AS v FROM calls_ds",
+                    "replace_q", "SELECT count(COLUMNS(* REPLACE (CASE WHEN msisdn = '" + A + "' THEN 1 END AS msisdn))) FROM calls_ds");
+            for (Map.Entry<String, String> e : texts.entrySet())
+                reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()));
+            for (String id : texts.keySet()) {
+                HttpResponse<String> r = post(c, "viewer", "/queries/" + id + "/run", null);
+                assertEquals(200, r.statusCode(), id + " -> " + r.body());
+                V1Body.of(r.body()).get("rows").forEach(row -> row.forEach(cell ->
+                        assertTrue(cell.isNull() || cell.asText().startsWith("masked:"), id + " -> " + row)));
+                assertEquals(200, post(c, "revealer", "/queries/" + id + "/run", null).statusCode(), "a revealer: " + id);
+            }
+        }
+    }
+
+    @Test
     void aKpiMeasureThatReturnsARawKeyIsRefusedForAViewer(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seed(c, Map.of());

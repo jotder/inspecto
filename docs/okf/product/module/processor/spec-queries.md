@@ -123,6 +123,22 @@ telecom pack does not claim `PII`; use `maskingMode: all`); a table Widget's `li
 tile is masked like any other result. Retired to BACKLOG §6: D-M5 `revealKeys`, D-M4, live-mode Exchange grants, other
 file-writing Job types. Open on `BI-QUERY-MASKING-1`: only the operator's security review.
 
+**SQL shapes the position model cannot prove fail closed (`BI-MASKING-SQL-SHAPE-LEAKS-1`, fixed 2026-10-23, verified on
+DuckDB 2.0.0.0).** Free SQL (a saved query, `/db/query`) is read through `json_serialize_sql`. An item that can expand to several
+columns — any star (`*`, `t.*`, `COLUMNS(..)`) or `unnest` / `unpack` — makes the output positions untrusted, and then
+EVERY output column is masked, a declared-clean name included (a key aliased `AS amount` would otherwise pass). Any star
+or `#n` anywhere in the statement (a UNION, subquery or CTE included) engages this, since a self-join returns a second key
+as `msisdn_1`; on `/db/query` a statement that is not one plain SELECT and holds one is refused 422. A
+pattern star (`COLUMNS(..)`, `EXCLUDE`, `REPLACE`, `RENAME`) counts as reading a key even when the text never spells
+it, and an alias of a key (lateral `msisdn AS k, k = '..'`) is followed. Ad-hoc `/db/query` is refused 422 for
+`WHERE COLUMNS('msi.*') = ..`, `WHERE` / `HAVING` / `QUALIFY` / `ORDER BY` on an alias of a key, and `ORDER BY 1` /
+`ORDER BY ALL` while a key (or a plain `*`) is selected, `ORDER BY COLUMNS(* REPLACE / EXCLUDE ..)`, and any `#n`
+positional reference outside the select list; `ORDER BY 1` with no key selected and a bare `count(col)` / `count(*)` are
+unchanged. Gotcha: on 2.0 `ORDER BY ALL` serialises as a `STAR` with `columns: true`, and a `REPLACE` star sits inside
+`count(..)` as its argument. Tests: `ControlApiDbBrowserMaskingTest` (shape + oracle probes),
+`ControlApiBiQueryMaskingTest.aSavedQueryWhosePositionsCannotBeProvenMasksEveryCell`. Still open, older shapes:
+`BI-MASKING-ROW-VALUE-LEAKS-1` (table column aliases, the row as a value, a decodable alias).
+
 ## Row cap on `/bi/query`: ordered and honestly flagged (`BI-QUERY-TRUNCATION-1`, shipped 2026-10-08)
 
 `MeasureCompiler.compile` always ends in a `LIMIT` (the route default is 500). Two defects made that cap lie:

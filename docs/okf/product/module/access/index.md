@@ -34,5 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `BI-MASKING-SQL-SHAPE-LEAKS-1` | P1 | defect | BI / saved-query / DB-browser masking lets a masked key out through SQL shapes BiResultMasking.derivedPositions / vetAdHocSql do not mode… | — |
+| `BI-MASKING-ROW-VALUE-LEAKS-1` | P1 | defect | free-SQL masking (BiResultMasking) still lets a masked key out through shapes that existed before BI-MASKING-SQL-SHAPE-LEAKS-1 and are un… | — |
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |

@@ -193,4 +193,70 @@ class ControlApiDbBrowserMaskingTest {
                     query("calls", "SELECT region, sum(amount) AS total FROM calls WHERE region = 'EU' GROUP BY region")).statusCode());
         }
     }
+
+    /** BI-MASKING-SQL-SHAPE-LEAKS-1 (own server per test: the /db/query budget is 20 calls per caller). */
+    @Test
+    void aShapeThePositionModelCannotProveIsMaskedWhole(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            // A multi-column item shifts the positions, COLUMNS() names the key by pattern, a REPLACE star hides a CASE
+            // inside a count, a lateral alias tests the key: refused, or every cell masked.
+            for (String probe : List.of(
+                    "SELECT count(COLUMNS('region|amount')), max(CAST(msisdn AS BIGINT)) AS m FROM calls",
+                    "SELECT count(COLUMNS('region|amount')), max(CAST(msisdn AS BIGINT)) AS amount FROM calls",
+                    "SELECT unnest({'a': region, 'b': amount}), CAST(msisdn AS BIGINT) AS m FROM calls",
+                    "SELECT CAST(COLUMNS('msi.*') AS BIGINT) + 0 AS v FROM calls",
+                    "SELECT count(COLUMNS(* REPLACE (CASE WHEN msisdn = '" + A + "' THEN 1 END AS msisdn))) FROM calls",
+                    "SELECT msisdn AS k, k = '" + A + "' AS hit FROM calls",
+                    // wrapped in a set operation or a subquery, the same shapes
+                    "SELECT region FROM calls UNION ALL SELECT COLUMNS('msi.*') FROM calls",
+                    "SELECT (SELECT max(COLUMNS('msi.*')) FROM calls) AS r",
+                    "SELECT * FROM calls a, calls b",
+                    "SELECT unlist({'a': region, 'b': amount}), CAST(msisdn AS BIGINT) AS m FROM calls")) {   // the second key comes back as msisdn_1
+                HttpResponse<String> r = as("reader", c, "POST", "/spaces/s1/db/query", query("calls", probe));
+                if (r.statusCode() == 200) {
+                    V1Body.of(r.body()).get("rows").forEach(row -> row.forEach(cell ->
+                            assertTrue(cell.isNull() || cell.asText().startsWith("masked:"), probe + " -> " + row)));
+                } else assertEquals(422, r.statusCode(), probe + " -> " + r.body());
+                assertEquals(200, as("revealer", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), "a revealer: " + probe);
+            }
+            // Positional ordering with no key selected, and a bare count of the key, stay as they were.
+            assertEquals(200, as("reader", c, "POST", "/spaces/s1/db/query",
+                    query("calls", "SELECT region, amount FROM calls ORDER BY 1")).statusCode());
+            JsonNode n = V1Body.of(as("reader", c, "POST", "/spaces/s1/db/query",
+                    query("calls", "SELECT count(*) AS n, count(msisdn) AS c FROM calls")).body());
+            assertTrue(n.get("rows").get(0).get("n").isNumber() && n.get("rows").get(0).get("c").isNumber(), n.toString());
+        }
+    }
+
+    /** BI-MASKING-SQL-SHAPE-LEAKS-1: oracles through a pattern, a position, ALL or an alias of the key are refused. */
+    @Test
+    void anOracleThroughAPatternAPositionOrAnAliasIsRefused(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            for (String probe : List.of(
+                    "SELECT region FROM calls WHERE COLUMNS('msi.*') = '" + A + "'",
+                    "SELECT msisdn AS k, region FROM calls ORDER BY 1",
+                    "SELECT msisdn AS k FROM calls ORDER BY ALL",
+                    "SELECT msisdn AS k, region FROM calls WHERE k = '" + A + "'",
+                    "SELECT max(msisdn) AS k, region FROM calls GROUP BY region HAVING k > '5'",
+                    "SELECT msisdn AS k, region FROM calls QUALIFY row_number() OVER (ORDER BY k) = 1",
+                    "SELECT region, amount FROM calls ORDER BY COLUMNS(* REPLACE (msisdn AS region)) DESC",
+                    "SELECT region FROM calls ORDER BY COLUMNS(* EXCLUDE (region, amount, dt))",
+                    "SELECT * FROM calls ORDER BY 1",
+                    "SELECT * FROM calls ORDER BY ALL",
+                    "SELECT region FROM calls WHERE #1 = '" + A + "'",
+                    "SELECT msisdn AS k, region FROM calls ORDER BY 1 COLLATE nocase DESC",
+                    "SELECT count(*) AS n FROM (SELECT * FROM calls WHERE COLUMNS('msi.*') = '" + A + "')",
+                    "SELECT count(*) AS n FROM (SELECT * FROM calls WHERE #1 LIKE '4417009001%')",
+                    "SELECT region FROM calls WHERE '" + A + "' IN (SELECT COLUMNS('msi.*') FROM calls)",
+                    "SELECT region, amount FROM (SELECT * FROM calls ORDER BY 1 DESC LIMIT 1)",
+                    "SELECT * FROM calls UNION ALL SELECT * FROM calls ORDER BY 1",
+                    "SELECT amount FROM calls ORDER BY (* LIKE 'msi%') DESC LIMIT 1",
+                    "SELECT msisdn AS k, amount FROM calls ORDER BY * DESC LIMIT 1")) {
+                assertEquals(422, as("reader", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), probe);
+                assertEquals(200, as("revealer", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), "a revealer: " + probe);
+            }
+        }
+    }
 }
