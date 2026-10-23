@@ -480,12 +480,14 @@ final class ComponentRoutes implements RouteModule {
         boolean removed;
         try {
             PendingChanges.hold(api, ex, type, id, null, current.content());   // maker-checker: a delete is a change
+            // Retire BEFORE the entry goes (LA-ONBOARD-RETIRE-GAPS-1): retire is idempotent, so a failure here leaves the
+            // entry and the delete can simply be retried; the other order left a Pipeline with no entry to retry from.
+            if (retirement != null) retirement.retire();
             try {
                 removed = store.delete(type, id);
             } catch (IllegalArgumentException e) {
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
             }
-            if (retirement != null) retirement.retire();
         } finally {
             if (retirement != null) retirement.release();
         }

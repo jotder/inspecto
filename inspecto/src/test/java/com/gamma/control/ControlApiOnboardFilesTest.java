@@ -2,6 +2,8 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.Roles;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
@@ -549,6 +551,73 @@ class ControlApiOnboardFilesTest {
             assertEquals(409, json(c, "POST", "/datasets/" + id + "/run", null, null).statusCode());
             assertEquals(409, send(c, "POST", "/datasets/" + id + "/files?name=t.csv", transfers(5).getBytes(StandardCharsets.UTF_8), null).statusCode());
             assertEquals(30, data(json(c, "POST", "/datasets/" + keep + "/run", null, null), 200).get("rowsAfter").asLong());
+        }
+    }
+
+    /**
+     * LA-ONBOARD-RETIRE-GAPS-1 (2): retiring runs BEFORE the registry entry is deleted and is idempotent, so a retire that
+     * fails (here: the schema file is a non-empty directory) answers an error and leaves the entry in place; the same DELETE,
+     * retried once the cause is gone, finishes. Falsified: with the entry deleted first, the retry answers 404 and the
+     * Pipeline file stays registered with no entry to retire it from.
+     */
+    @Test
+    void aRetireThatFailsLeavesTheEntryAndTheDeleteCanBeRetried(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("halfretired");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(10), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            ComponentStore store = new ComponentStore(root.resolve("registry"));
+            Path schema = root.resolve("imports").resolve(id + "_schema.toon");
+            Path pipeline = root.resolve("imports").resolve(id + "_pipeline.toon");
+            Path blocked = root.resolve("imports").resolve(id + "_schema.toon.parked");
+            Files.move(schema, blocked);
+            Files.createDirectories(schema.resolve("inner"));   // deleteIfExists on a non-empty directory throws
+
+            assertTrue(json(c, "DELETE", "/components/dataset/" + id, null, null).statusCode() >= 500);
+            assertTrue(store.exists("dataset", id), "the entry is kept, so the delete can be retried");
+            assertTrue(Files.exists(pipeline), "the Pipeline file is the marker a retry finds it by");
+
+            Files.delete(schema.resolve("inner"));
+            Files.delete(schema);
+            assertEquals(id, data(json(c, "DELETE", "/components/dataset/" + id, null, null), 200).get("retiredPipeline").asText());
+            assertFalse(store.exists("dataset", id));
+            assertTrue(c.svc().configFor(id).isEmpty());
+            assertFalse(Files.exists(pipeline));
+        }
+    }
+
+    /**
+     * LA-ONBOARD-RETIRE-GAPS-1 (3): a Dataset delete held by an approval policy over Datasets is applied by another person's
+     * approval and that replay retires the import Pipeline too (a policy over Datasets alone does not refuse; one over
+     * Pipelines or schemas does). Held, nothing is retired.
+     */
+    @Test
+    void anApprovedReplayOfAHeldDatasetDeleteRetiresThePipelineToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("replayed");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(10), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            ComponentStore store = new ComponentStore(root.resolve("registry"));
+            Files.writeString(root.resolve(ApprovalPolicy.FILE), "approval:\n  dataset:\n    required: true\n");
+            Files.writeString(root.resolve(ApproverRoster.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("users", List.of("checker-1"))));
+            Authenticators.forTest(ex -> {   // OIDC-shaped: one seeded role each, recorded as held (apply re-checks it)
+                String[] who = switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+                    case AUTHOR -> new String[] {"author-1", "pipeline-developer"};
+                    case "Bearer checker" -> new String[] {"checker-1", "admin"};
+                    default -> null;
+                };
+                if (who == null) return Optional.empty();
+                Roles.Def def = Roles.effective(ex).get(who[1]);
+                ComponentAccess.heldRoles(ex, Set.of(who[1]));
+                return Optional.of(new Subject(who[0], def.capabilities(), def.dataScopes()));
+            });
+            String pc = data(json(c, "DELETE", "/components/dataset/" + id, null, AUTHOR), 202).at("/pendingChange/id").asText();
+            assertTrue(store.exists("dataset", id) && c.svc().configFor(id).isPresent(), "held: nothing deleted, nothing retired");
+            assertTrue(data(json(c, "POST", "/pending-changes/" + pc + "/approve", "{}", "Bearer checker"), 200).get("applied").asBoolean());
+            assertFalse(store.exists("dataset", id));
+            assertTrue(c.svc().configFor(id).isEmpty(), "the replay retired the Pipeline");
+            assertFalse(Files.exists(root.resolve("imports").resolve(id + "_pipeline.toon")));
+            assertFalse(Files.exists(root.resolve("imports").resolve(id + "_schema.toon")));
         }
     }
 

@@ -447,7 +447,13 @@ over it, and an entry re-created under the same id could drive it with Add a fil
 no Pipeline (409). An entry naming another Dataset's Pipeline retires nothing (only the file Add data wrote for THIS
 id), an import of that id in flight is 409, and under an approval policy over Pipelines or schemas the delete is
 refused 409 (retiring would write around it); a policy over Datasets holds the delete as usual, and the approved
-replay retires.
+replay retires (tested, `LA-ONBOARD-RETIRE-GAPS-1`). The steps run **before** the registry entry is deleted and are idempotent
+(unregister, schema, history, then the Pipeline file LAST - the file a retry finds it by): a failure answers an error and leaves
+the entry, so the same DELETE can be retried; deleting the entry first left a Pipeline nothing could retire. Calls recorded
+2026-10-24 (assistant-decided under operator delegation, pending confirmation): the data directory stays on delete (removing
+data on a config delete is irreversible; to reuse the id, import under another name or remove the folder by hand), and
+`POST /spaces` does not refuse a Demo Auth template (only the gallery marks it) - a server with no sign-in creates the sample
+Spaces legitimately and the roster is simply unused.
 
 Tests: `inspecto/.../ControlApiOnboardFilesTest` (draft evidence and confidence, value shapes, commit, overrides,
 Reference, failed commit, 202 and a failed 202, Add a file and Run now, the column route, limits, the Excel

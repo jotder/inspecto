@@ -124,11 +124,11 @@ class EngineDatasetProviderFingerprintTest {
     void theCapIsExactlyMaxFilesOneMoreIsTheTooManySentinel(@TempDir Path root) throws Exception {
         assertEquals(10_000, InputFingerprint.MAX_FILES);
         emptyFiles(root, InputFingerprint.MAX_FILES);
-        InputFingerprint atCap = fp(root);
+        InputFingerprint atCap = provider.inputFingerprint(DS, root, root, budgetTicking(0L));   // a frozen clock: only the cap decides, not the disk's speed
         assertTrue(atCap.known(), atCap.value());
         assertEquals(InputFingerprint.MAX_FILES, atCap.files().size());
         Files.createFile(root.resolve("orders").resolve("one-more.parquet"));
-        InputFingerprint over = fp(root);
+        InputFingerprint over = provider.inputFingerprint(DS, root, root, budgetTicking(0L));
         assertFalse(over.known());
         assertEquals("too-many-files:10000", over.value());
         assertEquals("too-many-files", InputFingerprint.unknownReason(over));

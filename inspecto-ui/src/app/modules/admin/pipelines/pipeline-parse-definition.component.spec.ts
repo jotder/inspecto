@@ -237,6 +237,7 @@ let profileReply: Observable<{ asn1: Record<string, unknown> }> = of({ asn1: {} 
 const decodeProfileCalls: { file: string; subdir?: string }[] = [];
 
 /** Segment-schema writes the pane made, in order — the two-hop contract is what these assert. */
+const suggestCalls: unknown[][] = [];
 const schemaWrites: { type: string; config: Record<string, unknown>; opts?: Record<string, unknown> }[] = [];
 let schemaWriteFails = false;
 /** Arms the schema BACKWARD save-gate's 422 (BUILDER-1b), which the pane must offer to override. */
@@ -270,6 +271,7 @@ async function create(
     configSubdir = '',
 ) {
     schemaWrites.length = 0;
+    suggestCalls.length = 0;
     decodeProfileCalls.length = 0;
     TestBed.configureTestingModule({
         imports: [HostComponent],
@@ -303,8 +305,9 @@ async function create(
                     // keys AND columns. Returning a real one exercises that path; a 404 would leave a
                     // keys-only draft, which validation correctly refuses (that is its own test).
                     // B3: the drift diff the 2a-iii indicator consumes.
-                    suggestSchema: () =>
-                        of({
+                    suggestSchema: (...args: unknown[]) => {
+                        suggestCalls.push(args);
+                        return of({
                             fields: [],
                             mapping: { fields: [] },
                             drift: {
@@ -313,7 +316,8 @@ async function create(
                                 missing: [],
                                 typeChanged: [{ name: 'IMSI', declared: 'VARCHAR', suggested: 'BIGINT' }],
                             },
-                        }),
+                        });
+                    },
                     read: () =>
                         savedSchemaMissing
                             ? throwError(() => ({ status: 404 }))
@@ -1201,6 +1205,17 @@ describe('PipelineParseDefinitionComponent', () => {
                 (n.config as Record<string, unknown>)['schema_file'] = 'spaces/default/config/parse_schema.toon';
                 return n;
             }
+
+            /** LA-ONBOARD-RETIRE-GAPS-1 (1): without the frontend the server reads an all-digit json key as a column index. */
+            it('tells the server which frontend the sample came from', async () => {
+                const node = schemadNode();
+                node.type = 'parser.json';
+                const fixture = await create(node);
+                fixture.detectChanges();
+                pane(fixture).onPreviewed(TABLE_PREVIEW);
+                fixture.detectChanges();
+                expect(suggestCalls.at(-1)?.[2]).toBe('json');
+            });
 
             it('asks for drift instead of re-deriving, and reports what changed', async () => {
                 const fixture = await create(schemadNode());

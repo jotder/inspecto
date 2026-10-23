@@ -1492,7 +1492,7 @@ export class PipelineParseDefinitionComponent {
     private checkDrift(rows: Record<string, unknown>[]): void {
         const fields = this.currentSchemaRows().map((r) => ({ name: r.name, selector: r.selector, type: r.type }));
         if (!fields.length) return;
-        this.configApi.suggestSchema(rows, { raw: { fields } }).subscribe({
+        this.configApi.suggestSchema(rows, { raw: { fields } }, this.frontend()).subscribe({
             next: (s) => this.schemaDrift.set(s.drift ?? null),
             // Drift is advisory: failing to compute it must not disturb an otherwise working pane.
             error: () => this.schemaDrift.set(null),

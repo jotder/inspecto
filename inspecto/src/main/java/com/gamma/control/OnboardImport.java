@@ -1024,12 +1024,15 @@ final class OnboardImport {
     /** A claimed import Pipeline: {@link #retire} once the Dataset entry is gone, {@link #release} always. */
     record Retirement(Path writeRoot, String id, Path pipelineFile, Path schemaFile, CollectorService service, String key) {
 
-        /** Unregister the Pipeline and remove its config files and history; the data directory is kept. */
+        /**
+         * Unregister the Pipeline and remove its config files and history; the data directory is kept. Idempotent, and the
+         * Pipeline file goes LAST: it is what {@link #claimRetirement} finds a retry by, so a step that fails leaves it to retry.
+         */
         void retire() throws IOException {
             service.unregisterPipeline(pipelineFile);
-            Files.deleteIfExists(pipelineFile);
             Files.deleteIfExists(schemaFile);
             PipelineHistory.purge(writeRoot, id);
+            Files.deleteIfExists(pipelineFile);
         }
 
         void release() {
