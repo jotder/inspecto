@@ -1157,10 +1157,14 @@ limits and the commit's write order are in
     browser cannot claim a milestone.
   * **Routes** (`OnboardingRoutes`, core, every edition): `GET /onboarding/metrics` (`canAdminister` in the manifest;
     with no sign-in anyone) answers `{recording, firstLaunch, launches, spacesCreated, firstSpace/Dataset/Graph,
-    guideCompleted, each with *Seconds from the first launch, abandoned {step: n}}`; `POST /onboarding/events` is a
-    `self-limiting` exemption (open to any signed-in caller: a beginner is who reports it) on the standard rate bucket
-    (`ControlApi.isRateLimited`). Pinned by `ControlApiOnboardingCountersTest` (file, vocabulary, 401/403/200, 429),
-    `OnboardingCountersTest`, and the milestone assertions in `ControlApiSpaceSamplesTest` and
+    guideCompleted, each with *Seconds from the first launch, abandoned {step: n}, abandonedCapReached}`;
+    `POST /onboarding/events` is a `self-limiting` exemption (open to any signed-in caller: a beginner is who reports it)
+    on the standard rate bucket (`ControlApi.isRateLimited`). The file keeps at most
+    `OnboardingCounters.ABANDONED_CAP_PER_STEP` (1000) `step_abandoned` lines per step, re-counted from the file at
+    install, so an open route cannot grow it without bound; a report past that answers 200 and is dropped, and
+    `abandonedCapReached` turns true (`LA-ONBOARD-RESIDUALS-1` item 11, 2026-10-23). Pinned by
+    `ControlApiOnboardingCountersTest` (file, vocabulary, 401/403/200, 429), `OnboardingCountersTest` (the cap
+    across a restart), and the milestone assertions in `ControlApiSpaceSamplesTest` and
     `ControlApiOnboardLinkAnalysisTest` (falsified: without the `InvRoutes` record the first graph stays null).
   * **SPA**: `OnboardingEventsService` (`src/app/inspecto/onboarding/`, fire-and-forget, a failure is silent) and the
     la-app **Settings → Getting started counters** section (server audience, read-only, listed when there is no sign-in

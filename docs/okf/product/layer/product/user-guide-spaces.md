@@ -28,11 +28,17 @@ active space reloads the app.
 real-backend-only by design** (blob/zip round-trips). *(The mock backend this sentence used to mention was
 deleted 2026-08-31; the template gallery renders whatever the server publishes.)* **Edition fit (2026-09-30):**
 each gallery entry carries `creatable` and `missingFeatures[{feature, message}]`. These come from
-`SpaceManager.missingFeatures`, which covers two cases:
+`SpaceManager.missingFeatures`, which covers three cases:
 - **Alert Rules:** a registry Alert Rule or a Decision Rule's `create-alert` needs `alert.dispatch`. A legacy
   per-file alert config is deliberately not counted: nothing loads one at runtime and the seed gate does not refuse
   one.
 - **Pipeline features:** a Pipeline's archive or DuckLake use, through `EditionFeatures.pipelineRefusals`.
+- **Demo User sign-in** (`demo-auth`, `LA-SAMPLE-GALLERY-DEMOAUTH-1`, 2026-10-23): a template carrying
+  `config/demo-users.toon` (the shipped `la-audit`, `la-claims`, `la-mobile-money`, `la-showcase`,
+  `la-showcase-off`) needs an installed Authenticator that names its principals from a Space's config - only Demo
+  Auth does; Basic has none and OIDC cannot say who exists. ⚠ Unlike the two above this is the gallery's verdict
+  only: `POST /spaces` does not refuse such a template, so the API still creates it (its Demo Users are then inert).
+  Pinned by `ControlApiSpaceTemplatesTest.galleryCountsTheDemoUserSignInATemplateNeeds`.
 
 A template this build cannot create renders as an **`aria-disabled`** card that names the missing feature,
 so the gallery never offers a create that `POST /spaces` would refuse with a 422.

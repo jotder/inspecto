@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -68,8 +69,17 @@ public final class OnboardingCounters {
     /** The events a browser may report ({@code POST /onboarding/events}); the rest are recorded where the action happens. */
     public static final Set<Event> REPORTABLE = EnumSet.of(Event.GUIDE_COMPLETED, Event.STEP_ABANDONED);
 
+    /**
+     * The most {@link Event#STEP_ABANDONED} lines kept per step ({@code LA-ONBOARD-RESIDUALS-1} item 11): the browser reports
+     * them on an open route, so the file is bounded by this, not by the per-caller rate bucket alone. A report past it is
+     * dropped, and the metrics say {@code abandonedCapReached}.
+     */
+    public static final int ABANDONED_CAP_PER_STEP = 1000;
+
     private static Path file;
     private static final Set<Event> written = EnumSet.noneOf(Event.class);
+    /** Abandoned-step lines in the file, per step: read at install, counted on every write. */
+    private static final Map<String, Integer> abandonedLines = new HashMap<>();
     private static Clock clock = Clock.systemUTC();
 
     private OnboardingCounters() {}
@@ -78,9 +88,11 @@ public final class OnboardingCounters {
     public static synchronized void install(Path path) {
         file = path;
         written.clear();
+        abandonedLines.clear();
         for (String[] line : lines()) {
             Event e = Event.of(line.length > 1 ? line[1] : null);
             if (e != null && e.once()) written.add(e);
+            if (e == Event.STEP_ABANDONED) abandonedLines.merge(line.length > 2 ? line[2] : "", 1, Integer::sum);
         }
     }
 
@@ -108,12 +120,15 @@ public final class OnboardingCounters {
         if (file == null || event == null) return;
         if (event.once() && written.contains(event)) return;
         String s = event == Event.STEP_ABANDONED && step != null && STEPS.contains(step) ? "\t" + step : "";
+        String capKey = s.isEmpty() ? "" : step;   // a step-less abandoned line is capped under ""
+        if (event == Event.STEP_ABANDONED && abandonedLines.getOrDefault(capKey, 0) >= ABANDONED_CAP_PER_STEP) return;
         String line = Instant.now(clock) + "\t" + event.word() + s + "\n";
         try {
             Path parent = file.getParent();
             if (parent != null) Files.createDirectories(parent);
             Files.writeString(file, line, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             if (event.once()) written.add(event);
+            if (event == Event.STEP_ABANDONED) abandonedLines.merge(capKey, 1, Integer::sum);
         } catch (IOException | UncheckedIOException e) {
             // A full disk or a read-only home: the action still succeeds, the count is lost.
         }
@@ -156,6 +171,7 @@ public final class OnboardingCounters {
         milestone(out, "firstGraph", first.get(Event.FIRST_GRAPH), firstLaunch);
         milestone(out, "guideCompleted", first.get(Event.GUIDE_COMPLETED), firstLaunch);
         out.put("abandoned", abandoned);
+        out.put("abandonedCapReached", abandoned.values().stream().anyMatch(n -> n >= ABANDONED_CAP_PER_STEP));
         return out;
     }
 

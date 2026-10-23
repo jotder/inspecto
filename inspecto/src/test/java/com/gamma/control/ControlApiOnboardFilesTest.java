@@ -416,12 +416,7 @@ class ControlApiOnboardFilesTest {
     }
 
     private JsonNode follow(Ctx c, String runId) throws Exception {
-        for (int i = 0; i < 600; i++) {
-            JsonNode s = data(json(c, "GET", "/onboard/runs/" + runId, null, null), 200);
-            if (!"running".equals(s.get("state").asText())) return s;
-            Thread.sleep(50);
-        }
-        throw new AssertionError("the followed run never finished");
+        return follow(c, runId, null);
     }
 
     // ── Add a file, Run now ─────────────────────────────────────────────────────────────────────────────────
@@ -508,6 +503,78 @@ class ControlApiOnboardFilesTest {
             assertEquals(60, data(json(c, "POST", "/datasets/" + victim + "/run", null, null), 200).get("rowsAfter").asLong(), "untouched");
             assertEquals(422, json(c, "POST", "/onboard/files/" + draft(c, "t.csv", "stream", transfers(5), null).get("draftId").asText()
                     + "/commit", "{\"name\":\"" + uniqueId("typed") + "\",\"primaryEntityType\":7}", null).statusCode(), "never a 500");
+        }
+    }
+
+    /**
+     * LA-ONBOARD-ORPHAN-PIPELINE-1: deleting an Add data Dataset retires its import Pipeline - unregistered, its config
+     * files gone, the data kept - so an entry re-created under the same id has nothing to drive: Run now and Add a file
+     * answer 409. An entry naming another Dataset's Pipeline retires nothing, and under an approval policy over Pipelines
+     * the delete is refused rather than written around it. Falsified: with the retirement removed from the delete, the
+     * re-created entry's Run now answers 200.
+     */
+    @Test
+    void deletingAnImportDatasetRetiresItsPipeline(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("retired");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(60), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            String keep = uniqueId("kept");
+            JsonNode d2 = draft(c, "transfers.csv", "stream", transfers(30), null);
+            data(json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", "{\"name\":\"" + keep + "\"}", null), 200);
+            ComponentStore store = new ComponentStore(root.resolve("registry"));
+
+            // an entry that names another Dataset's Pipeline retires nothing when it goes
+            store.write("dataset", "pointer", Map.of("physicalRef", keep + "/database", "origin", "import", "importPipeline", keep));
+            assertFalse(data(json(c, "DELETE", "/components/dataset/pointer", null, null), 200).has("retiredPipeline"));
+            assertTrue(c.svc().configFor(keep).isPresent(), "another Dataset's Pipeline is untouched");
+
+            // under an approval policy over Pipelines, retiring would write around it: the delete is refused
+            Files.writeString(root.resolve(ApprovalPolicy.FILE), "approval:\n  pipeline:\n    required: true\n");
+            HttpResponse<String> held = json(c, "DELETE", "/components/dataset/" + id, null, null);
+            assertEquals(409, held.statusCode(), held.body());
+            assertTrue(store.exists("dataset", id) && c.svc().configFor(id).isPresent(), "nothing changed");
+            Files.delete(root.resolve(ApprovalPolicy.FILE));
+
+            JsonNode del = data(json(c, "DELETE", "/components/dataset/" + id, null, null), 200);
+            assertEquals(id, del.get("retiredPipeline").asText(), del.toString());
+            assertTrue(c.svc().configFor(id).isEmpty(), "unregistered");
+            assertFalse(Files.exists(root.resolve("imports").resolve(id + "_pipeline.toon")));
+            assertFalse(Files.exists(root.resolve("imports").resolve(id + "_schema.toon")));
+            assertTrue(Files.isDirectory(Path.of("database", id, "database")), "the data is kept");
+
+            // re-created under the same id with the import's own markers: nothing to drive
+            store.write("dataset", id, Map.of("physicalRef", id + "/database", "origin", "import", "importPipeline", id,
+                    "importFormat", "csv", "kind", "stream"));
+            assertEquals(409, json(c, "POST", "/datasets/" + id + "/run", null, null).statusCode());
+            assertEquals(409, send(c, "POST", "/datasets/" + id + "/files?name=t.csv", transfers(5).getBytes(StandardCharsets.UTF_8), null).statusCode());
+            assertEquals(30, data(json(c, "POST", "/datasets/" + keep + "/run", null, null), 200).get("rowsAfter").asLong());
+        }
+    }
+
+    /**
+     * LA-ONBOARD-RESIDUALS-1 item 4: under an approval policy over any kind the commit writes (Dataset, Pipeline, schema)
+     * Add data cannot turn its three writes into one Pending Change, so it refuses (409) before writing anything, and the
+     * draft stays for a retry. Falsified: with the {@code holdRefusing} call removed from the commit, it answers 200.
+     */
+    @Test
+    void aCommitUnderAnApprovalPolicyIsRefusedBeforeAnythingIsWritten(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("governed");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(60), null);
+            for (String kind : List.of("dataset", "schema")) {
+                Files.writeString(root.resolve(ApprovalPolicy.FILE), "approval:\n  " + kind + ":\n    required: true\n");
+                HttpResponse<String> r = json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null);
+                assertEquals(409, r.statusCode(), r.body());
+                assertTrue(error(r).contains("approval policy holds changes to '" + kind + "'"), r.body());
+                assertFalse(Files.exists(root.resolve("imports")), "no config was written");
+                assertFalse(new ComponentStore(root.resolve("registry")).exists("dataset", id));
+                assertTrue(c.svc().configFor(id).isEmpty());
+                assertFalse(Files.exists(Path.of("database", "inbox", id)));
+            }
+            Files.delete(root.resolve(ApprovalPolicy.FILE));
+            assertEquals(60, data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200)
+                    .get("rowsAfter").asLong(), "the draft stayed, so the same commit succeeds once the policy is lifted");
         }
     }
 
@@ -687,5 +754,86 @@ class ControlApiOnboardFilesTest {
             assertEquals(404, json(c, "PUT", "/datasets/" + id + "/columns/amount", "{\"entityType\":null}", AUTHOR).statusCode(),
                     "another person's private Dataset is not there for this caller");
         }
+    }
+
+    /**
+     * LA-ONBOARD-RESIDUALS-1 item 4: with sign-in a followed run (202) is its starter's - another uploader polling its runId
+     * gets 404, an administrator and the starter get its state. Falsified: with the actor check removed from
+     * {@code OnboardImport.run}, the second uploader reads the run (200).
+     */
+    @Test
+    void aFollowedRunIsReadOnlyByItsStarterOrAnAdministrator(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            data(json(c, "PUT", "/settings/data", "{\"selfImport\":true}", ADMIN), 200);
+            data(json(c, "PUT", "/settings/link-analysis/limits", "{\"import.inline_max_bytes\":0}", AUTHOR), 200);
+            String id = uniqueId("owned_run");
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=t.csv", transfers(60).getBytes(StandardCharsets.UTF_8), UPLOADER), 200);
+            JsonNode r = data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", UPLOADER), 202);
+            String runId = r.get("runId").asText();
+            assertFalse(r.has("actor"), "the starter is not echoed: " + r);
+
+            HttpResponse<String> other = json(c, "GET", "/onboard/runs/" + runId, null, UPLOADER2);
+            assertEquals(404, other.statusCode(), "another uploader cannot see the run: " + other.body());
+            JsonNode admin = data(json(c, "GET", "/onboard/runs/" + runId, null, ADMIN), 200);
+            assertEquals(runId, admin.get("runId").asText());
+            assertFalse(admin.has("actor"), admin.toString());
+            JsonNode done = follow(c, runId, UPLOADER);
+            assertEquals("succeeded", done.get("state").asText(), done.toString());
+            assertEquals(404, json(c, "GET", "/onboard/runs/" + runId, null, UPLOADER2).statusCode(), "still not after it finished");
+        }
+    }
+
+    /**
+     * LA-ONBOARD-RESIDUALS-1 item 4: in a multi-Space server a followed (202) commit and a followed Add a file run in the
+     * Space they were started in - the background run uses the roots captured on the request thread, never "the current
+     * Space". Everything lands in {@code west}; {@code east} holds nothing of it.
+     */
+    @Test
+    void aFollowedRunInASecondSpaceLandsInThatSpace(@TempDir Path root) throws Exception {
+        for (String space : List.of("east", "west")) Files.createDirectories(root.resolve(space).resolve("config"));
+        com.gamma.service.SpaceManager spaces = com.gamma.service.SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        api.start();
+        try {
+            Ctx c = new Ctx(null, api, api.port(), root);
+            data(json(c, "PUT", "/spaces/west/settings/link-analysis/limits", "{\"import.inline_max_bytes\":0}", null), 200);
+            String id = "west_ledger";
+            JsonNode d = data(send(c, "POST", "/spaces/west/onboard/files?name=transfers.csv&kind=stream",
+                    transfers(70).getBytes(StandardCharsets.UTF_8), null), 200);
+            JsonNode r = data(json(c, "POST", "/spaces/west/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    "{\"name\":\"" + id + "\"}", null), 202);
+            JsonNode done = follow(c, r.get("runId").asText(), null);
+            assertEquals("succeeded", done.get("state").asText(), done.toString());
+            assertEquals(70, done.get("summary").get("rowsAfter").asLong());
+
+            JsonNode add = data(send(c, "POST", "/spaces/west/datasets/" + id + "/files?name=more.csv&mode=append",
+                    transfers(30).getBytes(StandardCharsets.UTF_8), null), 202);
+            JsonNode added = follow(c, add.get("runId").asText(), null);
+            assertEquals("succeeded", added.get("state").asText(), added.toString());
+            assertEquals(100, added.get("summary").get("rowsAfter").asLong(), added.toString());
+
+            assertTrue(Files.exists(root.resolve("west/config/imports").resolve(id + "_pipeline.toon")));
+            assertEquals(200, json(c, "GET", "/spaces/west/components/dataset/" + id, null, null).statusCode());
+            assertTrue(data(json(c, "GET", "/spaces/west/datasets/" + id + "/rows?limit=5", null, null), 200).toString().contains("ACC-"));
+            assertFalse(Files.exists(root.resolve("east/config/imports")), "nothing in the other Space's config");
+            assertEquals(404, json(c, "GET", "/spaces/east/components/dataset/" + id, null, null).statusCode());
+            try (Stream<Path> east = Files.walk(root.resolve("east"))) {
+                assertTrue(east.noneMatch(p -> p.getFileName().toString().contains(id)), "no data in the other Space");
+            }
+        } finally {
+            api.close();
+            spaces.close();
+            com.gamma.metrics.MetricRegistry.global().reset();
+        }
+    }
+
+    private JsonNode follow(Ctx c, String runId, String auth) throws Exception {
+        for (int i = 0; i < 600; i++) {
+            JsonNode s = data(json(c, "GET", "/onboard/runs/" + runId, null, auth), 200);
+            if (!"running".equals(s.get("state").asText())) return s;
+            Thread.sleep(50);
+        }
+        throw new AssertionError("the followed run never finished");
     }
 }

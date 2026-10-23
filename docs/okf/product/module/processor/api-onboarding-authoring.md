@@ -434,9 +434,24 @@ an unreadable schema is 409). With `replace` it moves `database/` aside, lands, 
 and drops the old data on success or restores it on failure; `append` adds rows. **Run now** runs whatever waits in
 the inbox. Both answer the run summary with the in-run index and Expectations.
 
+**Deleting an import Dataset retires its Pipeline** (`LA-ONBOARD-ORPHAN-PIPELINE-1`, 2026-10-23).
+`DELETE /components/dataset/{id}` on an entry with `origin: import` and `importPipeline` equal to its id, whose
+`imports/<id>_pipeline.toon` exists, unregisters that Pipeline and removes `imports/<id>_pipeline.toon`,
+`imports/<id>_schema.toon` and the Pipeline's config history (`OnboardImport.claimRetirement`); the answer adds
+`retiredPipeline: <id>`. The data directory `<data root>/<id>` is **kept** (so the id cannot be imported again until
+it is removed; Add data's commit says so with its 409). Before this the Pipeline stayed registered with no Dataset
+over it, and an entry re-created under the same id could drive it with Add a file and Run now; now that entry finds
+no Pipeline (409). An entry naming another Dataset's Pipeline retires nothing (only the file Add data wrote for THIS
+id), an import of that id in flight is 409, and under an approval policy over Pipelines or schemas the delete is
+refused 409 (retiring would write around it); a policy over Datasets holds the delete as usual, and the approved
+replay retires.
+
 Tests: `inspecto/.../ControlApiOnboardFilesTest` (draft evidence and confidence, value shapes, commit, overrides,
 Reference, failed commit, 202 and a failed 202, Add a file and Run now, the column route, limits, the Excel
-refusal, NDJSON and Parquet, `data.self_import` without and with sign-in, armed 401/403/200) and
+refusal, NDJSON and Parquet, `data.self_import` without and with sign-in, armed 401/403/200; since 2026-10-23 also
+the delete retirement, the commit refused under an approval policy over Datasets or schemas with nothing written,
+the 202 run read only by its starter or an administrator, and a 202 commit plus a 202 Add a file in a second Space
+landing in that Space only) and
 `la/inspecto-geo-link/.../ControlApiOnboardLinkAnalysisTest` (index BUILT in the run, `/inv/projection` with no
 saved view, Entity profile links assessed from `defaultLinkMapping` and not without it, falsified by removing the
 fallback in `EntityTypeBindings`).
