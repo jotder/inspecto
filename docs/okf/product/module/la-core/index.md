@@ -44,6 +44,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §9-§10; plan archived l… | — |
 | `LA-ENTITY-PROFILE-RESIDUALS-1` | P3 | feature | what the Entity profile pages left after P0-P3 shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §6.3, plan arc… | — |
 | `LA-I2-GAPS-RESIDUALS-1` | P3 | feature | what the i2-gap lanes left (2026-10-18). The canvas-styling, visual-query and entity-merge plans are fully shipped and archived (la-canva… | — |
-| `LA-DAILY-INGEST-1` | P2 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | — |
+| `LA-DAILY-INGEST-1` | P2 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | operator |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | rehearse the technical / security review demo (T1–T13) with a sceptical second person and record it in the demo runbook. | operator |
 | `LA-EDITION-PLACEMENT-1` | P3 | feature | the three open Link Analysis edition moves: D-LAE3 masking on Basic (partly overtaken by 7c6d77c80 and LA-ONBOARD-1 OB-6: close, or also… | operator |
