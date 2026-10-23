@@ -8,8 +8,8 @@ What this is: the step-by-step script for presenting the Inspecto LA demo on the
 bundle**. It defends the architecture page ([`okf/product/module/la-core/architecture.md`](architecture.md),
 cited below as "arch §n") with the running application. The claim-to-evidence map and the requirement ids (DR-*) are in
 the archived [demo readiness plan](../../../../archived-documents/plans-archive/la-demo-readiness-plan.md) (all built by 2026-10-13; history only). The
-technical / security review cut of this script, not yet rehearsed, is in the
-[Link Analysis roadmap](../../../../superpower/link-analysis-roadmap.md) §D2. Every control label below is the
+technical / security review cut of this script (T1-T13) is section 9 below: rehearsed by the
+assistant alone on 2026-10-24, the sceptical-reviewer rehearsal is still owed. Every control label below is the
 one on screen (see the [user manual](user-guide-manual.md)). The variants (Personal bundle, Postgres
 store) are in the [showcase variants runbook](../../solution-pack/la-showcase/admin-guide-variants-runbook.md).
 
@@ -105,7 +105,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 ### S2. The Investigation ladder, Replay and drift (3 min) [fm.analyst]
 * **Click:** Toolbox > **Investigation** tab > **Investigations** list > **Open** `mule-hub-case` (or **Open by id**). Scroll the ops ladder (8 steps).
   Press **Replay**. Then, optionally, land a new file (copy `data/staged/mule_transfers/TRANSFERS_20260904.csv` into
-  `data/inbox/mule_transfers/`, wait for ingest) and press **Replay** again, then **Re-read current data (drift check)**.
+  `data/inbox/mule_transfers/`, wait for ingest) and press **Replay** again; for drift tick the **Re-read current data (drift check)** checkbox, then **Replay** (rehearsed 2026-10-24: "Replay is equivalent", then a Drift table, step 2, 8 sealed rows, 8 now, "changed").
 * **Expect:** 8 steps as listed in §0.1; Replay reproduces the recorded Working Set hash. After a file lands, Replay's hash is unchanged and
   Re-read reports drift **only if the landed file touches entities the Investigation holds**: the shipped staged files touch no seeded entity, so
   they will NOT show drift. `la-demo-smoke.mjs --staged/--inbox` lands a 40-row `MULE-HUB-01` file to force drift (probes "replay hash
@@ -144,7 +144,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 
 ### S6. Value Measures: pass-through and cash-out (3 min) [fm.analyst]
 * **Click:** Toolbox > Value Measures (Dataset, link columns and `BOOKED_AT` are prefilled from the open Investigation). Choose
-  **Pass-through**, From `2026-09-01`, To `2026-09-04` (To is exclusive), **Run Measure**. Then **Cash-out concentration** with cash-out kind `cash_out`.
+  **Pass-through**, From `2026-09-01`, To `2026-09-04` (To is exclusive), **Run Measure**. Then the concentration Measure with cash-out kind `cash_out` (on the Telecom Domain profile of this Space the picker calls it **Withdrawal concentration**; the 97 % is checked by `node tools/la-demo-figures.mjs`).
 * **Expect (verified, `ControlApiLaShowcaseFiguresTest`):** Pass-through flags **13 accounts**; the two relays sit at ratio **0.985**
   (exactly two at 0.985); `MULE-HUB-01` is in the list (manual: 0.979; `SHELL-A` above 1). Velocity lists at least 3 fast forwarders. Cash-out
   concentration: `TILL-06` holds **97 %** (test tolerance 0.97 +/- 0.005) of cash-out value from **8 payers**. Benefit-transfer isolates `SKIMMER-01`
@@ -410,3 +410,34 @@ timings are in the [whitepaper](brochure-inspecto-la-whitepaper.md) §6.4. What 
 * **Bundle.** `package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`. The la-app UI has no Incidents or Cases
   page, so show the Alert, Incident and Case through the full SPA or by API. The saved-view picker opens its submenu on
   hover; a plain click on the row only closes the menu.
+
+## 9. Technical / security review cut (T1-T13) and its rehearsal record
+
+For a CISO, lead architect and forensic reviewer: every PROVEN row of the [whitepaper](brochure-inspecto-la-whitepaper.md)'s Claims Register shown live or by a named test, every NOT YET row said out loud. It reuses this runbook's scenes (S1-S15), personas and seed. Run of show: 45 minutes at rehearsal pace; the 35-minute cut drops T10 and T12 and shortens T3; never cut T5, T6, T7, T9. (Moved here from the roadmap §D2 on 2026-10-24; section numbers are the whitepaper's current ones, checked against its headings that day.)
+
+| # | Claim (whitepaper §) | Scene | Evidence if challenged | Rehearsal 2026-10-24 |
+|---|---|---|---|---|
+| T1 | In-process, no external graph database (§4.1) | S1 | dependency fences: `tools/check-module-deps.mjs`, `tools/check-engine-names-no-la.mjs` | PASS: both guards green (13 extracted modules, enforcer rules match); the bundle's jars hold `inspecto-graph` and `inspecto-la-*`, no graph database |
+| T2 | Explainable Suspicion score, Propagated Risk (§3.2-§3.3) | S1 | `GraphSuspicionParityTest`, `ControlApiGraphRunTest` | **PARTIAL**: `mule_layering_ring` (113 nodes, 225 links after the drift file) ranks the hub first (the same token as its 0.979 pass-through row); the per-node **Factors** column appears only when a Risk Score model name is typed and no showcase Space ships one (row `LA-SUSPICION-FACTORS-DEMO-1`) |
+| T3 | 29 algorithms, TypeScript and Java parity (§3.1) | S5 | `GraphAlgorithmsParityTest` | PASS: "29 algorithms on the server"; client and server agree on every algorithm compared in the [tour](../../solution-pack/la-showcase/admin-guide-cross-vertical-tour.md) section 1.3 |
+| T4 | Value Measures, the 97 % cash-out (§3.4) | S6 | `ControlApiLaShowcaseFiguresTest` | PASS: Pass-through 2026-09-01 to 2026-09-04: 13 entities, the two relays at 0.98499982, the hub at 0.9793; the 97 % is `node tools/la-demo-figures.mjs` (2/2: Pass-through 13, TILL-06 at 97 %), not driven in the form (the picker resets while selecting) |
+| T5 | Keyed masking, audited Reveal (§5.2, §5.4) | S3, S4 | `ControlApiExplorationMaskingTest`, `ControlApiInvestigationOversightTest` | PASS: tokens only for `fm.analyst`; `admin` Reveal answers "→ MULE-HUB-01 (reveal audited)"; Settings > Link Analysis masking `all` saved and "In force: all", then restored to `typed`. Under `typed` every Account id is already masked on this Space, so typed versus all differ only for an unmasked Entity Type |
+| T6 | Gate order, strict 404 (§5.1) | S7 | `ControlApiGeoLinkModuleGateTest`, `ControlApiInvestigationMembersTest` | PASS: smoke 401 no token, 403 `ra.analyst`, 404 non-member, 404 `MODULE_DISABLED`, 422 bad create, 200 member (the six probes; 20/20 with the drift and embed probes) |
+| T7 | Four-eyes, self-approval refused (§5.3) | S8 | `ControlApiInvestigationOversightTest` | PASS: `fm.manager` Approve: step 9 "requested by fm.analyst, approved by fm.manager", 9 to 15 entities; the requester sees "Waiting for a different person"; `audit.lead` and `audit.committee` approve answer 403 `canApproveLinkExpansions` (the same-person refusal is the test) |
+| T8 | Op log, replay, drift on file append (§2.2) | S2 | `ControlApiReplayDriftOnFileAppendTest` | PASS: *Replay* "Replay is equivalent"; ticking *Re-read current data (drift check)* then *Replay* adds a Drift table (step 2, 8 sealed rows, 8 now, "changed"). The smoke's far-future file moves the Data strip to "27 Apr 2033": run it before the day |
+| T9 | SHA-256 Dossier, tamper-evident (§2.3) | S11 | `ControlApiDossierTest` | PASS: untouched manifest Verified; one flipped digit uploaded: NOT verified, Changed `log.jsonl#2` (B) and `mm-structuring-case` (A) |
+| T10 | Drafts, atomic promotion (§2.4) | S9 | Draft tests | PASS: Conflicts "No conflicts", Rebase, Promote (step 7), Discard; Discard takes no confirmation |
+| T11 | Ephemeral embed, revoke (§5.5) | S14 | `ControlApiInvestigationEmbedTest` | PASS: link shown once, viewer masked and read-only at `/embed/inv/shared`, revoke asks to confirm, public read 404; smoke headers `frame-ancestors 'none'`, DENY, no-store; the claims partner portal frames the view |
+| T12 | Data trust strip (§4.6) | - | [`tests-data-trust-live-drive.md`](tests-data-trust-live-drive.md) | PASS: "Data as of … · 3 of 3 days · index v3" on `mule-hub-case`; on a Space whose index is still building: "days not assessed · no index" |
+| T13 | Scale and limits (§6) | S15 | `InvTraversalBench`; [`tests-index-scale-run.md`](../la-storage/tests-index-scale-run.md) | evidence only (a slide): the bench class and the scale-run page exist; nothing driven live |
+
+Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA, native Hive / Kerberos (NOT YET); the demo build signs in Demo Users, so it is no SSO demonstration; a full-disk consistent rewrite (anchor the Dossier root externally). Prepare a tampered manifest (T9), a late file (T8), an admin token (T6, T11), two browser profiles (T7) and a recorded fallback for T8, T9, T11.
+
+**Rehearsal record, 2026-10-24 (assistant alone, no second person).** Bundle `package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo -SkipBootCheck` from `31539d9c5`, four Spaces scaffolded on one server (port 8171, `-Dla.embed.enabled=true`), Demo Users only, synthetic data only; driven in the built-in browser. The T-scenes ran as written except where the table says otherwise. Defects found are on the board (`LA-INVESTIGATE-CARD-FOUR-EYES-HOLD-1`, `LA-BOUND-RULE-AUTHOR-READONLY-1`, `LA-SUSPICION-FACTORS-DEMO-1`, `LA-SEED-FIRST-RUN-1`, `LA-REVOKE-DISCARD-NO-CONFIRM-1`, `LA-DEMO-PICKER-NAMES-1`, `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1`, `LA-SAVED-VIEW-DOMAIN-PROFILE-1`); runbook errors found were corrected in place (S2 drift is a checkbox, S6 label, the audit Maximum flow of 3, the mobile-money index trigger persona).
+
+**Still owed (row `LA-WHITEPAPER-DEMO-1`):** (1) one spoken rehearsal with a sceptical second person, timed against 45 and 35 minutes: an assistant cannot be its own reviewer, and nothing here was timed against an audience; (2) the operator's confirmation of the two calls below.
+
+**Calls decided by the assistant, pending operator confirmation (2026-10-24):**
+
+* **IdP or Demo Users: Demo Users for a rehearsal.** It is the safest reading: no credential is typed and no external identity provider has to be reachable in the room. Say out loud that this build is no SSO demonstration. For the real review the operator may choose a real IdP sign-in instead (verified on la-app 2026-10-13, `LA-APP-REAL-SIGNIN-1`; [`admin-guide-real-signin.md`](admin-guide-real-signin.md)).
+* **T12 stays in the technical cut** (it is dropped only in the 35-minute cut, with T10).

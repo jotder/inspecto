@@ -28,7 +28,7 @@
 | Live detection | LD-1…LD-7 built | operator confirmation of D-LD2…D-LD18; template sharing (§3) |
 | Analyst flow (2026-10-13: one MSISDN, expand one node at a time, seed several and connect them) | **marker and chosen-neighbours built** (`LA-UNEXPANDED-MARKER-1`, `LA-EXPAND-PICK-NEIGHBOURS-1`, not browser-driven); **`LA-SEED-CONNECT-1` built** (2026-10-13: the `connect` op, not browser-driven; residuals in BACKLOG §3.12) | `LA-SEED-CONNECT-1` (all-pairs shortest connection within 3 hops as one sealed `connect` op, then expand from the path nodes), `LA-EXPAND-FOUREYES-CLARITY-1`, the residuals on the two built rows (BACKLOG §3.12) |
 | Demo readiness (`LA-DEMO-*`, eight rows) | **built**; all rows closed by 2026-10-13; go/no-go rehearsal 2026-10-14 GO | nothing (§D1) |
-| Technical / security review demo (whitepaper claims to live scenes) | **plan 2026-10-15, never rehearsed** | rehearsal + two operator questions (§D2) |
+| Technical / security review demo (whitepaper claims to live scenes) | **walked 2026-10-24 by the assistant; run of show in the demo runbook §9** | spoken rehearsal with a second person + two operator confirmations (§D2) |
 | Edition placement (D-LAE*) | D-LAE1, 2, 5, 12 **built** 2026-10-20; D-LAE7…11 moved to `DATA-TIERS-1` | D-LAE3, D-LAE4, D-LAE6 (§D3) |
 | Analyst CSV upload (`LA-ANALYST-UPLOAD-1`) | **built** 2026-10-18/19 | D-UP1…D-UP8 confirmation, browser drive, multi-node quota ledger (§D4) |
 | Showcases: three synthetic verticals, one private real-feed Space | **built** 2026-10-15/16 | full browser rehearsal of A, B, C and the 30-minute tour (§D5) |
@@ -555,29 +555,11 @@ Drawn from six plans archived 2026-10-22 in `docs/archived-documents/plans-archi
 
 All eight rows (`LA-DEMO-SEED-1`, `LA-DEMO-DEFECTS-1`, `LA-DEMO-INDEX-1`, `LA-UI-MEMBERS-DRAFTS-1`, `LA-UI-SETTINGS-MASKING-1`, `LA-UI-EVIDENCE-1`, `LA-ALGO-UI-PARITY-1`, `LA-DEMO-GUARDS-1`) closed by 2026-10-13: the editing Settings pass, the sealed Compare, DR-D2…D8, the evidence and algorithm views and the index staleness review included; DR-T3 is the CI guard `tools/check-engine-names-no-la.mjs`. The plan's own status line (2026-10-11) was stale. The final go/no-go rehearsal (2026-10-14) was GO, 22 of 22 beats (runbook §7). The defence matrix and the DR-* ids stay in the archived plan (§2-§3) as provenance.
 
-### D2. Technical / security review demo (`la-whitepaper-demo-plan`) - written 2026-10-15, never rehearsed
+### D2. Technical / security review demo (`la-whitepaper-demo-plan`) - walked by the assistant 2026-10-24, the sceptical-reviewer rehearsal is owed
 
-For a CISO, lead architect and forensic reviewer: every PROVEN row of the whitepaper's Claims Register shown live or by a named test, every NOT YET row said out loud. It reuses the runbook's scenes, personas and seed. Run of show (45 min at rehearsal pace; the 35-minute cut drops T10 and T12 and shortens T3; never cut T5, T6, T7, T9). Section numbers are the [whitepaper](../okf/product/module/la-core/brochure-inspecto-la-whitepaper.md)'s current ones.
+The run of show (T1-T13) moved into the demo runbook, [`admin-guide-demo.md`](../okf/product/module/la-core/admin-guide-demo.md) section 9, with the 2026-10-24 rehearsal record: 11 of 13 PASS, T2 PARTIAL (no Risk Score model ships, so no Factors column), T13 evidence only.
 
-| # | Claim (whitepaper §) | Scene | Evidence if challenged |
-|---|---|---|---|
-| T1 | In-process, no external graph database (§4.1) | S1 | dependency fences |
-| T2 | Explainable Suspicion score, Propagated Risk (§3.2-§3.3) | S1 | `GraphSuspicionParityTest`, `ControlApiGraphRunTest` |
-| T3 | 29 algorithms, TypeScript and Java parity (§3.1) | S5 | `GraphAlgorithmsParityTest` |
-| T4 | Value Measures, the 97 % cash-out (§3.4) | S6 | `ControlApiLaShowcaseFiguresTest` |
-| T5 | Keyed masking, audited Reveal (§5.2, §5.4) | S3, S4 | `ControlApiExplorationMaskingTest`, `ControlApiInvestigationOversightTest` |
-| T6 | Gate order, strict 404 (§5.1) | S7 | `ControlApiGeoLinkModuleGateTest`, `ControlApiInvestigationMembersTest` |
-| T7 | Four-eyes, self-approval refused (§5.3) | S8 | `ControlApiInvestigationOversightTest` |
-| T8 | Op log, replay, drift on file append (§2.2) | S2 | `ControlApiReplayDriftOnFileAppendTest` |
-| T9 | SHA-256 Dossier, tamper-evident (§2.3) | S11 | `ControlApiDossierTest` |
-| T10 | Drafts, atomic promotion (§2.4) | S9 | Draft tests |
-| T11 | Ephemeral embed, revoke (§5.5) | S14 | `ControlApiInvestigationEmbedTest` |
-| T12 | Data trust strip (§4.6) | - | `okf/product/module/la-core/tests-data-trust-live-drive.md` |
-| T13 | Scale and limits (§6) | S15 | `InvTraversalBench`; `okf/product/module/la-storage/tests-index-scale-run.md` |
-
-Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA, native Hive / Kerberos (NOT YET); the demo build signs in Demo Users, so it is no SSO demonstration; a full-disk consistent rewrite (anchor the Dossier root externally). Prepare a tampered manifest (T9), a late file (T8), an admin token (T6, T11), two browser profiles (T7) and a recorded fallback for T8, T9, T11.
-
-**Open** (row `LA-WHITEPAPER-DEMO-1`)**:** (1) rehearse once with a second person as the sceptical reviewer, record it in the runbook, then move this run of show into the runbook and drop it here; (2) operator: a real IdP sign-in in the room or Demo Users (real WSO2 sign-in on la-app was verified 2026-10-13, `LA-APP-REAL-SIGNIN-1`; runbook [`admin-guide-real-signin.md`](../okf/product/module/la-core/admin-guide-real-signin.md)); (3) operator: keep T12 in the technical cut.
+**Open** (row `LA-WHITEPAPER-DEMO-1`)**:** (1) one spoken rehearsal with a second person as the sceptical reviewer, timed; (2) operator: confirm the two calls the assistant decided on 2026-10-24 (Demo Users for a rehearsal, a real IdP sign-in only for the real review; real WSO2 sign-in on la-app was verified 2026-10-13, `LA-APP-REAL-SIGNIN-1`, [`admin-guide-real-signin.md`](../okf/product/module/la-core/admin-guide-real-signin.md)); keep T12 in the technical cut.
 
 ### D3. Edition placement (`la-edition-placement-changes-plan`) - D-LAE3, D-LAE4, D-LAE6 open
 
@@ -595,7 +577,7 @@ Built 2026-10-18/19 (route, status, delete, retention, pane, review hardening; l
 
 ### D5. Showcases (`la-multi-vertical-showcase-plan`, `la-ims-showcase-plan`) - browser rehearsal owed
 
-The three synthetic verticals were built 2026-10-16: A `la-mobile-money`, B `la-audit`, C `la-claims`. Each has its own generator, golden test, seed script, smoke runner, runbook and embed portal. B and C were rehearsed live the same day at the API (smoke 30/30 and 29/29) plus their headline browser scenes. A was smoked 10 of 10 with no browser walk-through. Still owed (plan step S7; row `LA-SHOWCASE-REHEARSAL-1`):
+The three synthetic verticals were built 2026-10-16: A `la-mobile-money`, B `la-audit`, C `la-claims`. Each has its own generator, golden test, seed script, smoke runner, runbook and embed portal. B and C were rehearsed live the same day at the API (smoke 30/30 and 29/29) plus their headline browser scenes. A was smoked 10 of 10 with no browser walk-through. Browser rehearsal done 2026-10-24 (the 30-minute tour is [`admin-guide-cross-vertical-tour.md`](../okf/product/solution-pack/la-showcase/admin-guide-cross-vertical-tour.md), numbers, parity and run times recorded there). What the pass still left, by row `LA-SHOWCASE-REHEARSAL-1`: A shortest path / Maximum flow by id pick; B Jaccard, Find similar and the `V-136` link prediction; C identity resolution, Geo View and `claims_shared_identity`; a spoken run. The list below is what was owed before the pass:
 
 - **A:** the Graph-page browser walk-through and the scenes its runbook marks UNVERIFIED (M-10 dormant wake, M-13 Dossier).
 - **B:** the client clicks for Jaccard, Link prediction, Maximum spanning forest and Is forest; the Draft, Members, Settings and Entity profile panels; tamper through the Dossier file upload; `gl_intercompany` Find cycles and Maximum flow on screen (runbook §6).

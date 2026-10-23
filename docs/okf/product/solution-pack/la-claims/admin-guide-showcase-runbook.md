@@ -88,7 +88,7 @@ masked and revocable. **Verified live**: the portal on `http://127.0.0.1:8099` f
 ## 3. Algorithm scenes (the nine assigned to this vertical)
 
 Run each **client first** (instant, small), then **Run on server** (a Job-class Algorithm; progress, cancel and result-parity beats). Scope: the Working Set after
-seeding `CL-0134` and expanding twice (about 21 entities) unless the row says otherwise. Server ids: `louvainCommunities`, `detectCommunities`,
+seeding `CL-0134` and expanding twice (about 21 entities) unless the row says otherwise. **The expected columns are the whole-graph golden-test values:** on the 21-entity Working Set the application returns Louvain 4 communities (8, 5, 5, 3), Label-propagation 1 community of 21, largest clique 7, `CL-0134` first on Triangle count, HITS hub, Eigenvector and Closeness (measured 2026-10-24, client and server equal). Server ids: `louvainCommunities`, `detectCommunities`,
 `cliques`, `triangleCount`, `pageRank`, `hits`, `eigenvectorCentrality`, `katzCentrality`, `closenessCentrality`. A server run of a masked Investigation returns masked ids.
 
 | Algorithm | Seed and scope | Expected top result (measured by the golden test over the shipped corpus) | Story |
@@ -147,3 +147,5 @@ framed the masked embed. API: the Entity type profile (473 distinct parties, 6 6
 **Not yet driven in the browser** (verified only through the API or the smoke): the nine algorithms by clicking **Run on server** (the smoke starts the same runs over HTTP and they finish; run times were not recorded), the saved views `claims_network` and `claims_provider_money`, the Dossier panel and the Reveal dialog, the Investigation tab. Not recorded: client-versus-server parity per algorithm and run times.
 
 **Open findings.** The generic domain profile greets this Space with "Investigate a number / MSISDN"; an insurance profile is the SPA follow-up already listed in section 4. The Entities page shows "Not assessed" until the Entity type profile is computed; the type profile itself answers. Identity groups annotate the Working Set but expand does not follow them.
+
+**Browser rehearsal, 2026-10-24.** All nine *Run on server* clicks driven (0 to 3 ms each on 21 entities), the saved views `claims_network` (388 nodes, 2 574 links) and `claims_provider_money` (320 / 806, drawn as a vertical sliver by the dagre layout: defect row `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1`), the Dossier (verified, three references), the audited Reveal (inline in Oversight, not a dialog), the partner portal on :8099 and the revoke (404). The *Investigate* card is held for four-eyes in this Space; open `ring-case` instead. [the cross-vertical tour](../la-showcase/admin-guide-cross-vertical-tour.md).
