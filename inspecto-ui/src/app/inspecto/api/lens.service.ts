@@ -255,17 +255,18 @@ export class LensService {
 
     /** May approve / deny a held sensitive Investigation expand (D-U7, `POST /inv/investigations/{id}/pending/{rid}/
      *  approve | deny`). {@link identityCapability}, as {@link canRunLinkGraphAnalysis} is. The server adds
-     *  four-eyes (the requester cannot decide their own request) — this only decides whether the buttons show. No Access-Catalog action node carries it yet
-     *  (a backend-only gate), so `allows` answers true for the node id. */
+     *  four-eyes (the requester cannot decide their own request) — this only decides whether the buttons show. Its
+     *  Access-Catalog node is `linkgraph.approve` (LA-ACCESS-NODE-IDS-1: this read `linkgraph.approve-expansions`, an id
+     *  no catalog node carries, so denying the node changed nothing on screen). */
     readonly canApproveLinkExpansions = computed(() =>
-        this.identityCapability('canApproveLinkExpansions', 'linkgraph.approve-expansions'),
+        this.identityCapability('canApproveLinkExpansions', 'linkgraph.approve'),
     );
 
     /** May reveal a masked entity of an Investigation, one at a time (D-U6, `POST /inv/investigations/{id}/reveal`).
-     *  {@link identityCapability}; the server gates the route and audits each reveal. Like
-     *  {@link canApproveLinkExpansions}, no Access-Catalog node carries it yet. */
+     *  {@link identityCapability}; the server gates the route and audits each reveal. Its Access-Catalog node is
+     *  `linkgraph.reveal` (LA-ACCESS-NODE-IDS-1, as {@link canApproveLinkExpansions}). */
     readonly canRevealLinkEntities = computed(() =>
-        this.identityCapability('canRevealLinkEntities', 'linkgraph.reveal-entities'),
+        this.identityCapability('canRevealLinkEntities', 'linkgraph.reveal'),
     );
 
     /** May mint and revoke the read-only embed links of an Investigation (LA-EMBED-SPA-1,

@@ -340,6 +340,22 @@ capabilities (Admin-owned, and admin never qualifies for a non-Business lens), w
 > action node exist for it. **As of 2026-07-26 every route capability has both** — the last instance,
 > `canRequestShares`, closed below.
 
+**A node and a signal must also agree on the node ID** (`LA-ACCESS-NODE-IDS-1`, 2026-10-23). Saved Access
+profiles key grants by catalog node id, and `LensService` looks a capability's grant up by the id it passes to
+`allows`. `canRevealLinkEntities` and `canApproveLinkExpansions` read `linkgraph.reveal-entities` /
+`linkgraph.approve-expansions` while their nodes are `linkgraph.reveal` / `linkgraph.approve`, so denying
+either node changed nothing on screen (the server still gated both routes). The lens now reads the catalog ids,
+the ones stored profiles already use. `access/access-lens-parity.spec.ts` pins the parity from both real sides
+(the derived catalog, and the id each `can*` signal actually looks up): every lens capability reads its node's
+id, every action node is read by the capability it names, and a saved lens profile denying a node turns that
+capability off. Two named exception lists, each checked against the code so a stale entry fails:
+- **Node with no screen:** `exchange.offer-signals` (`canOfferSignals`). No screen offers a Signal type
+  (`POST /exchange/signal-offers` is API-only), but a **role** profile denying the node still strips the
+  capability server-side (`AccessGrants`), so the node stays.
+- **Signal with no node (backend-only gates no Access profile can deny yet):** `canBuildLinkIndex`,
+  `canUploadData`, `canShareInvestigation`. So the 2026-07-26 claim above that every route capability has both
+  is not true for these three.
+
 **`canRequestShares` is the one Exchange capability that is lens-scoped** (2026-07-26). Same bug shape as
 its two siblings — "Request access" and "Pin a snapshot version" rendered for everyone and 403'd on click —
 but the opposite classification, and the reason is worth keeping: **which side of the table a capability

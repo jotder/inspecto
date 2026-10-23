@@ -1480,7 +1480,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Tests: `LaDailyFeedTemplateRulesTest` 6. `LaDailyIngestAcceptanceTest` covers 7 days, a late day, a re-run, a correction, a part-count change, a missing day and a dimension change. `ScheduledDailyChainTest` (geo-link) runs on the scheduler alone. Benches `LaDailyIngestScaleBench` / `DailyIndexScaleBench`: 10^7 rows a day ingest in 35–40 s, 10^8 in 489 s, APPEND 31 s onto 10^8 (BACKLOG `LA-DAILY-INGEST-1`).
   - Live drive on 2026-10-14 (`module/la-core/tests-data-trust-live-drive.md`): 8 steps, 1 FAIL (corrected day, since fixed by `f3a90e6a3`). At that time the template shipped no index Job; the Jobs were added later and are pinned by `theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit`.
   - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions-model.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, open, hold: operator). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
-  - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. How owner authority resolves there is unverified. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java:59`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
+  - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. By code read (2026-10-23, `LA-DAILY-INGEST-1`): on an open server the run authority is skipped (`JobAuthority.runAuthority`) and the template's Dataset has no `shares`, so `ComponentAccess.canViewAs` allows `admin`; with an Authenticator, `TemplateSeedGate.stampJobs` re-stamps the owner to the applier unless the applier holds `canConfigureAccess`. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java:59`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
   - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
 - **Strengths vs market:**
   - The ingestion is measured to 10^8 rows a day with append-only index refresh and data-trust signals (freshness, gaps, quarantine, index lag). Neo4j Bloom and Linkurious leave this to customer ETL (general market).
@@ -1488,14 +1488,14 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **Gaps vs market / RFP risk:**
   - Sold in Basic, where its Alert Rules cannot dispatch and Investigations, the consumers of the index, are absent (`OFFERING-DECLARATION-DRIFT-1` D1).
   - No Hive/Kerberos or JDBC Collector path for Link Analysis, and no SCD2 / as-of join (deferred `D-ING4`/`D-ING5` in `LA-DAILY-INGEST-1`, P2, owner calls). Leaders ingest from warehouses directly (general market).
-  - A same-name corrected file is skipped (it now signals `DUPLICATE_SKIPPED`), and the switch-off of `duplicate_check` for daily feeds is still an owner call (`LA-DAILY-INGEST-1` (1b)).
-  - Scale beyond 10^8 is unmeasured, and so are a single 10^8-row file and entity cardinality above 1.8 M (`LA-DAILY-INGEST-1`).
+  - A same-name corrected file takes effect on the shipped feeds since 2026-10-14 (`2196ce8ea`: `collector.duplicate` checksum + `on_change: reprocess`; partition replaced, one `REDELIVERED`); a feed on the default path markers still skips it with `DUPLICATE_SKIPPED`.
+  - Scale beyond 10^8 is unmeasured, and so are a single 10^8-row file and entity cardinality above 12 M at 10^8 rows (12.1 M nodes measured at 10^7 edges on 2026-10-20; `LA-DAILY-INGEST-1`).
 - **RFP stance on the 5 most-asked requirements (scheduled LA ingestion):**
 
 | Requirement | Stance | Evidence or caveat |
 |---|---|---|
 | Scheduled daily ingestion with incremental index refresh | Comply (Standard+) / Partial (Basic) | `ScheduledDailyChainTest`; Basic lacks the consumers |
-| Late, missing and corrected file handling | Comply | `LaDailyIngestAcceptanceTest`; corrected day must use a new name |
+| Late, missing and corrected file handling | Comply | `LaDailyIngestAcceptanceTest`; a corrected same-name day replaces its partition on the shipped feeds |
 | Freshness / completeness alerting | Partial | Alert Rules ship; dispatch is Standard+ (D1) |
 | Database / warehouse feeds (Hive, JDBC) | Roadmap | `D-ING5` deferred until a named customer feed |
 | Proven scale for national telco volumes | Partial | 10^8/day on a laptop, synthetic; 10^9 not measured |
