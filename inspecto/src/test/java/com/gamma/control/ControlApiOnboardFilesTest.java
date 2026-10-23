@@ -676,7 +676,11 @@ class ControlApiOnboardFilesTest {
             data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", UPLOADER), 200);
             JsonNode ds = data(json(c, "GET", "/components/dataset/" + id, null, UPLOADER), 200).get("content");
             assertEquals("uploader-1", ds.get("owner").asText(), "the importer owns the Dataset");
-            assertEquals(0, ds.get("shares").size(), "private to the importer until shared");
+            // LA-ONBOARD-DEFECTS-1: shared with the Space like every other Dataset in it - it was `shares: []`, private to the
+            // importer, with no screen to share it, so an analyst of the Space could not start a graph from it
+            assertFalse(ds.has("shares"), "no sharing envelope: the owner is provenance, not a restriction");
+            assertEquals("uploader-1", data(json(c, "GET", "/components/dataset/" + id, null, ANALYST), 200).at("/content/owner").asText(),
+                    "a colleague in the Space sees the imported Dataset");
             data(json(c, "POST", "/datasets/" + id + "/run", null, UPLOADER), 200);
             assertEquals(404, json(c, "GET", "/onboard/runs/r" + "0".repeat(32), null, UPLOADER).statusCode());
 
@@ -684,7 +688,12 @@ class ControlApiOnboardFilesTest {
             new ComponentStore(root.resolve("registry")).write("dataset", "open_ds", Map.of("physicalRef", "open_ds/database",
                     "columns", List.of(Map.of("name", "a"))));
             data(json(c, "PUT", "/datasets/open_ds/columns/a", "{\"entityType\":\"account\"}", AUTHOR), 200);
-            assertEquals(404, json(c, "PUT", "/datasets/" + id + "/columns/amount", "{\"entityType\":null}", AUTHOR).statusCode(),
+            // a Dataset made private through the component routes stays private to its owner
+            ComponentStore registry = new ComponentStore(root.resolve("registry"));
+            Map<String, Object> privateDs = new java.util.LinkedHashMap<>(registry.get("dataset", id).orElseThrow().content());
+            privateDs.put("shares", List.of());
+            registry.write("dataset", id + "_private", privateDs);
+            assertEquals(404, json(c, "PUT", "/datasets/" + id + "_private/columns/amount", "{\"entityType\":null}", AUTHOR).statusCode(),
                     "another person's private Dataset is not there for this caller");
         }
     }

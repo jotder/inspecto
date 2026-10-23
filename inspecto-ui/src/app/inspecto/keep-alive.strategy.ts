@@ -18,7 +18,10 @@ interface KeptHandle {
  * route behaves exactly as Angular's default.
  *
  * <p>A kept page belongs to one Space and one signed-in user: one kept for another is destroyed, never shown. (Switching
- * Space reloads the app anyway; this is the guard for a sign-out and sign-in without a reload.)
+ * Space reloads the app anyway; this is the guard for a sign-out and sign-in without a reload.) With sign-in on, a page
+ * left while NO ONE is signed in is not kept at all: a sign-out clears the person before it navigates away, so the page
+ * was kept for "nobody" - and the next person, whose name the session reads only after it has navigated back, was
+ * "nobody" too and got it (LA-ONBOARD-DEFECTS-1).
  */
 @Injectable()
 export class KeepAliveRouteReuseStrategy extends BaseRouteReuseStrategy {
@@ -27,7 +30,7 @@ export class KeepAliveRouteReuseStrategy extends BaseRouteReuseStrategy {
     private readonly kept = new Map<Route, { handle: DetachedRouteHandle; owner: string }>();
 
     override shouldDetach(route: ActivatedRouteSnapshot): boolean {
-        return route.routeConfig?.data?.[KEEP_ALIVE] === true;
+        return route.routeConfig?.data?.[KEEP_ALIVE] === true && this.someoneOrNoSignIn();
     }
 
     override store(route: ActivatedRouteSnapshot, handle: DetachedRouteHandle | null): void {
@@ -50,6 +53,12 @@ export class KeepAliveRouteReuseStrategy extends BaseRouteReuseStrategy {
         this.kept.delete(config);
         (kept.handle as KeptHandle).componentRef?.destroy();
         return null;
+    }
+
+    /** No sign-in in this edition, or a person is signed in: only then is there someone a page can be kept for. */
+    private someoneOrNoSignIn(): boolean {
+        const session = this.injector.get(SessionService);
+        return session.authMode() !== 'oidc' || !!session.actor();
     }
 
     private owner(): string {

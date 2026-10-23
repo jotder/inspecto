@@ -16,6 +16,7 @@ import static com.gamma.control.EntityProfileFixture.B;
 import static com.gamma.control.EntityProfileFixture.C;
 import static com.gamma.control.EntityProfileFixture.D;
 import static com.gamma.control.EntityProfileFixture.OWNER;
+import static com.gamma.control.EntityProfileFixture.REVEALER;
 import static com.gamma.control.EntityProfileFixture.STRANGER;
 import static com.gamma.control.EntityProfileFixture.data;
 import static com.gamma.control.EntityProfileFixture.noRaw;
@@ -106,6 +107,31 @@ class ControlApiEntitySuggestTest {
             JsonNode whole = noRaw(suggest(c, "msisdn", "{}", OWNER));
             assertEquals(0, whole.get("items").size());
             assertEquals(5, whole.get("distinct").asLong(), "the whole count is an aggregate - the start box warns with it");
+        }
+    }
+
+    /**
+     * LA-ONBOARD-DEFECTS-1 (4): someone who may reveal asks {@code reveal: true} and is suggested the masked type's values;
+     * without the ask nothing changes, and without {@code canRevealLinkEntities} the ask is refused. Red on the old code: the
+     * ask was ignored, so the revealer was suggested nothing.
+     */
+    @Test
+    void aRevealerAskingRevealIsSuggestedAMaskedTypesValues(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            JsonNode d = data(suggest(c, "msisdn", "{\"prefix\":\"+2499120000\",\"reveal\":true}", REVEALER));
+            assertTrue(d.get("masked").asBoolean());
+            assertTrue(d.get("revealed").asBoolean(), d.toString());
+            assertTrue(d.get("assessed").asBoolean(), d.toString());
+            assertEquals(List.of(A, B, C, D), values(d));
+            assertEquals(4, d.get("distinct").asLong());
+
+            JsonNode unasked = noRaw(suggest(c, "msisdn", "{\"prefix\":\"+2499120000\"}", REVEALER));
+            assertEquals(0, unasked.get("items").size(), "masking is lifted only when asked");
+            assertFalse(unasked.get("revealed").asBoolean());
+            assertEquals(403, suggest(c, "msisdn", "{\"prefix\":\"+2499120000\",\"reveal\":true}", OWNER).statusCode(),
+                    "asking without canRevealLinkEntities is refused, not silently masked");
+            assertEquals(422, suggest(c, "msisdn", "{\"reveal\":\"yes\"}", REVEALER).statusCode());
         }
     }
 

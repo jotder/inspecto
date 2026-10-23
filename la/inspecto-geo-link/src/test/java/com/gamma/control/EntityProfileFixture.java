@@ -39,6 +39,8 @@ final class EntityProfileFixture {
 
     static final ObjectMapper JSON = new ObjectMapper();
     static final String OWNER = "Bearer owner", STRANGER = "Bearer stranger";
+    /** The owner again, holding {@code canRevealLinkEntities}. */
+    static final String REVEALER = "Bearer revealer";
     static final String A = "+249912000001", B = "+249912000002", C = "+249912000003", D = "+249912000004";
     static final String I1 = "350000000000011", I2 = "350000000000022", I3 = "350000000000033";
     /** Every raw identifier of the fixture, with and without the plus. */
@@ -66,6 +68,7 @@ final class EntityProfileFixture {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case OWNER -> Optional.of(new Subject("analyst-1", Set.of()));
             case STRANGER -> Optional.of(new Subject("analyst-3", Set.of()));
+            case REVEALER -> Optional.of(new Subject("analyst-1", Set.of("canRevealLinkEntities")));
             default -> Optional.empty();
         });
     }

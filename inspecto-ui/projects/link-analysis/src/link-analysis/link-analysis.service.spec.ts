@@ -41,6 +41,20 @@ describe('LinkAnalysisService - a case is a view plus the Entity Lists it uses (
         expect(odd.lists).toEqual({ exclusions: ['ok'] });
         expect(odd.start).toBeUndefined(); // a start with nothing to draw is no start
     });
+
+    it('LA-ONBOARD-DEFECTS-1 (2): a case keeps the Entity Type its start named; a wrong shape is dropped', () => {
+        const s = service();
+        const typed: LinkAnalysisView = {
+            ...VIEW,
+            start: { datasetId: 'transfers', entityType: 'wallet', values: ['W-1'] },
+        };
+        expect(s.fromContent('ring-one', s.toContent(typed)).start).toEqual(typed.start);
+        const odd = s.fromContent('odd', {
+            name: 'Odd',
+            start: { datasetId: 'transfers', entityType: 7, values: ['W-1'] },
+        });
+        expect(odd.start).toEqual({ datasetId: 'transfers', values: ['W-1'] });
+    });
 });
 
 describe('LinkAnalysisService - a case keeps its own name (LA-ONBOARD-1 phase 8)', () => {

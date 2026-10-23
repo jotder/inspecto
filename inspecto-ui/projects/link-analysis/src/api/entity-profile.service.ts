@@ -212,6 +212,8 @@ export interface EntitySuggestRequest {
     prefix?: string;
     dataset?: string;
     limit?: number;
+    /** List a masked type's raw values: needs `canRevealLinkEntities` (403), audited (LA-ONBOARD-DEFECTS-1). */
+    reveal?: boolean;
 }
 
 /** One value that starts a graph: the rows naming it in a link column, and when it was first and last seen. */
@@ -226,6 +228,8 @@ export interface EntitySuggestion {
 export interface EntitySuggestions extends Assessed {
     type: string;
     masked: boolean;
+    /** A masked type's values were listed because the caller asked `reveal` and may. */
+    revealed?: boolean;
     datasets: string[];
     items: EntitySuggestion[];
     distinct: number | null;

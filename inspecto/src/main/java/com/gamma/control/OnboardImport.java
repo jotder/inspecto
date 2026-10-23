@@ -158,7 +158,9 @@ final class OnboardImport {
             Map<String, Object> schema = plan.schema(id);
             Map<String, Object> pipeline = plan.pipeline(id, dataRoot, kind, fileName, String.valueOf(draft.get("type")));
             Map<String, Object> dataset = plan.dataset(id, kind, fileName, String.valueOf(draft.get("type")));
-            if (OnboardRoutes.signedIn(ex)) dataset.put(ComponentAccess.SHARES, List.of());   // private to the importer until shared
+            // Shared with the Space like every other Dataset in it (LA-ONBOARD-DEFECTS-1): no `shares` key, so `owner` (the
+            // importer, stamped here) is provenance, not a restriction. It was `shares: []`, private to the importer, and no
+            // screen could share it, so colleagues saw "No Dataset in this Space has a link yet".
             dataset = ComponentAccess.onCreate(ex, dataset);
             try {
                 ComponentRoutes.validateKind(api, "dataset", id, dataset);

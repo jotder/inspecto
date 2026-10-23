@@ -41,6 +41,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-ONBOARD-ORPHAN-PIPELINE-1` | P3 | defect | deleting an Add data Dataset's registry entry leaves its imports/<id> Pipeline with no owning Dataset; someone with canAuthorWorkbench co… | — |
 | `LA-SAMPLE-GALLERY-DEMOAUTH-1` | P3 | defect | on Basic the *New from sample* dialog lists la-audit, la-claims and la-mobile-money as creatable because the template gallery reports the… | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) *Find paths (server)* stays unlocked on Basic (open explorer route, a Basic feature in… | — |
-| `LA-ONBOARD-DEFECTS-1` | P3 | defect | Inspecto LA explorer defects found by LA-ONBOARD-1 phases 6-8 (2026-10-22): (1) after Add a file in append mode the link index summary co… | — |
 | `LA-ONBOARD-DRIFT-1` | P3 | defect | the schema drift check matches a draft's selector to the sample's column name (SchemaSuggest.drift, used by pipeline-parse-definition.com… | — |
 | `BI-QUERY-MASKING-1` | P2 | defect | /bi/query and /queries/{id}/run return a classified entity key raw to any viewer (decided 2026-10-12, operator: its own gated, reviewed r… | — |

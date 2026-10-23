@@ -60,7 +60,8 @@ public final class EntityProfileRoutes implements RouteModule {
      * limit?}}: the values of this type that START a graph (a link end of a mapping the Space knows, optionally one Dataset's)
      * beginning with {@code prefix}, busiest first, each with its link rows and first / last seen; plus {@code distinct}, how many
      * Entities match. The prefix travels in the body only. A type masked under the Space's mode lists no value and counts only for
-     * an empty prefix (a count per prefix would spell a raw value out).
+     * an empty prefix (a count per prefix would spell a raw value out) - unless the caller asks {@code reveal: true}, which needs
+     * {@code canRevealLinkEntities} (403) and is audited as {@code revealed} (LA-ONBOARD-DEFECTS-1).
      */
     private static Object suggest(ApiContext api, HttpExchange ex, String type, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity suggest");
@@ -80,6 +81,11 @@ public final class EntityProfileRoutes implements RouteModule {
         if (l != null && !(l instanceof Integer n && n >= 1 && n <= SUGGEST_MAX))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'limit' must be a whole number from 1 to " + SUGGEST_MAX);
         int limit = l == null ? SUGGEST_DEFAULT : (Integer) l;
+        Object rv = body.get("reveal");
+        if (rv != null && !(rv instanceof Boolean))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reveal' must be true or false");
+        boolean reveal = Boolean.TRUE.equals(rv);
+        if (reveal) ApiContext.requireCapability(ex, "canRevealLinkEntities");
 
         List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
         EntityTypeBindings.Resolved all = EntityTypeBindings.resolve(ex, writeRoot, types);
@@ -89,10 +95,11 @@ public final class EntityProfileRoutes implements RouteModule {
                 .filter(b -> !"attribute".equals(b.role()) && (dataset == null || b.dataset().equals(dataset))).toList());
         EntityProfiles.Frame f = new EntityProfiles.Frame(api, writeRoot, t,
                 new EntityTypeBindings.Resolved(all.types(), byType, all.mappings(), all.datasets()));
-        Map<String, Object> out = EntityProfiles.suggest(f, prefix, limit);
+        Map<String, Object> out = EntityProfiles.suggest(f, prefix, limit, reveal);
         int listed = out.get("items") instanceof List<?> items ? items.size() : 0;
         audit(ex, LinkEventTypes.LINK_ENTITY_SUGGESTED, "link.entity.suggested", "link.entity.suggested " + type + " - " + listed + " listed",
                 b -> b.target("entity_type", type).attr("entityType", type).attr("masked", f.masked())
+                        .attr("revealed", Boolean.TRUE.equals(out.get("revealed")))
                         .attr("datasets", f.datasets().size()).attr("listed", listed).attr("byPrefix", !prefix.isEmpty()));
         return out;
     }
