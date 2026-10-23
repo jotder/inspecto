@@ -30,7 +30,7 @@
             @for (card of cards(); track card.role.name) {
                 <div class="bg-card flex flex-col gap-2 rounded-lg border p-4">
                     <div class="flex flex-wrap items-center gap-2">
-                        <span class="font-medium">{{ card.role.name }}</span>
+                        <span class="font-medium" [attr.title]="label(card.role.name) !== card.role.name ? card.role.name : null">{{ label(card.role.name) }}</span>
                         <inspecto-chip variant="soft" [tone]="card.role.source === 'authored' ? 'primary' : 'neutral'">
                             {{ card.role.source === 'authored' ? 'Authored' : 'Seed default' }}
                         </inspecto-chip>

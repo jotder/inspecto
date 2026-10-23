@@ -3,6 +3,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { OnboardingEventsService, OnboardingMetrics } from 'app/inspecto/onboarding/onboarding-events.service';
+import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { apiErrorMessage, LensService } from 'app/inspecto/api';
 import { SessionService } from 'app/inspecto/auth/session.service';
@@ -227,7 +228,13 @@ export class OnboardingCountersSettingsComponent implements OnInit {
     selector: 'la-app-add-data-settings',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [InspectoAlertComponent, InspectoPageHeaderComponent, InspectoSkeletonComponent, MatSlideToggleModule],
+    imports: [
+        InspectoAlertComponent,
+        InspectoPageHeaderComponent,
+        InspectoSkeletonComponent,
+        MatButtonModule,
+        MatSlideToggleModule,
+    ],
     template: `
         <div class="flex flex-col gap-6 p-6">
             <inspecto-page-header
@@ -253,6 +260,11 @@ export class OnboardingCountersSettingsComponent implements OnInit {
                 </p>
             } @else if (error()) {
                 <inspecto-alert variant="info">{{ error() }}</inspecto-alert>
+                <div>
+                    <button mat-stroked-button type="button" data-testid="la-self-import-retry" (click)="load()">
+                        Try again
+                    </button>
+                </div>
             } @else {
                 <inspecto-skeleton [lines]="2"></inspecto-skeleton>
             }
@@ -270,6 +282,12 @@ export class AddDataSettingsComponent implements OnInit {
     protected readonly saving = signal(false);
 
     ngOnInit(): void {
+        this.load();
+    }
+
+    /** Read the setting again: the first read, and the retry after a read or a change was refused. */
+    protected load(): void {
+        this.error.set('');
         this.onboard.dataSettings().subscribe({
             next: (s) => this.settings.set(s),
             error: (e) => this.error.set(apiErrorMessage(e, 'This Space does not say whether people may add data.')),

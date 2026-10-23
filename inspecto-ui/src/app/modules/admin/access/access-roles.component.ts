@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -55,6 +55,9 @@ export class AccessRolesComponent {
     private readonly actionNodes: AccessNode[] = actionsOf(deriveSpaceAccessCatalog());
     private readonly idx: CatalogIndex = indexCatalog(deriveSpaceAccessCatalog());
 
+    /** Role id -> plain label shown instead of the id (the id stays what is stored and matched). Inspecto LA passes one. */
+    readonly labels = input<Record<string, string>>({});
+
     readonly loading = signal(true);
     readonly saving = signal(false);
     readonly rows = signal<RoleDef[]>([]);
@@ -89,6 +92,10 @@ export class AccessRolesComponent {
             ),
         })),
     );
+
+    label(roleId: string): string {
+        return this.labels()[roleId] ?? roleId;
+    }
 
     constructor() {
         this.load();

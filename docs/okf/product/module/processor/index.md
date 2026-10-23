@@ -39,4 +39,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | Queries / BI | demand |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `BI-MASKING-FREE-SQL-ORACLES-1` | P1 | defect | a caller without canRevealLinkEntities can still TEST a masked key's value through free SQL, with every output cell masked — found by the… | operator |
-| `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) *Find paths (server)* stays unlocked on Basic (open explorer route, a Basic feature in… | — |
+| `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |

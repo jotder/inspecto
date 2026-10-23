@@ -1283,6 +1283,23 @@ Each fix carries a test that fails on the code before it (falsified).
   the analyst upload (§6.6) into their own Collector. Test: `ControlApiOnboardFilesTest`
   "withSignInSelfImportIsOffByDefault...".
 
+### 6.13 Onboarding residuals (LA-ONBOARD-RESIDUALS-1, as built 2026-10-24)
+
+Calls marked * were assistant-decided under operator delegation, pending confirmation.
+
+* **One definition of "people sign in".** `BootstrapRoutes.edition()` now asks `EditionMaskingDefault.signsIn()` (an
+  `auth.mode` other than `none`, or an installed Authenticator), the same test the masking default uses; before, an
+  Authenticator with no `auth.mode` made masking `typed` while `/bootstrap` still said `basic`. Test:
+  `BootstrapEditionTest.anInstalledAuthenticatorMeansSignInEvenWithoutAuthMode`.
+* **Role label.** The Inspecto LA Access screen shows `pipeline-developer` as *Data builder* (`AccessRolesComponent`
+  takes an optional `labels` map; the LA app passes it). The id is unchanged in `roles.toon` and the console.
+* **Add data settings** offers *Try again* after a refused change or a failed read (it reads the setting afresh).
+* **Commits stay inline up to `import.inline_max_bytes`*** (default 64 MiB, per Space; 0 sends every commit to a
+  followed 202 run). Not benchmarked; the knob is the bound, so there is no code change.
+* **Find paths (server) stays unlocked on Basic*:** `docs/EDITIONS.md` lists it for all four editions.
+* **Still demand-gated\*:** the `pipeline.automation` feature and DT-17 trigger (item 3), no-code row filtering (6), a
+  stored run summary for replace-vs-append (7), and the phase-8 notes; each is a feature, not a small change.
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (21); geo-link → `RouteModule`, `InvestigationMeasureProbe`,
