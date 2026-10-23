@@ -3470,7 +3470,14 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         await settle(fixture);
         expect(expand).toHaveBeenCalledWith('MULE-HUB-02', 'MULE-HUB-02', {
-            projection: { datasetId: 'mule', sourceCol: 'PAYER', targetCol: 'PAYEE', linkKindCol: 'CHANNEL' },
+            // typed by the seed's Entity Type (LA-ONBOARD-DEFECTS-1): the Dataset names no primary type
+            projection: {
+                datasetId: 'mule',
+                sourceCol: 'PAYER',
+                targetCol: 'PAYEE',
+                linkKindCol: 'CHANNEL',
+                entityType: 'account',
+            },
         });
         expect(fixture.componentInstance.startNotice()?.text).toContain('Drew 1 start');
     });
@@ -3547,6 +3554,49 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'suspects' });
         expect(getEntityList).toHaveBeenCalledWith('suspects');
         expect([...c.expandedNodeIds()].sort()).toEqual(['S-1', 'S-2']);
+    });
+
+    /**
+     * LA-ONBOARD-DEFECTS-1 (2): the Start box's Entity Type types the drawn mapping. It used to be the Dataset's primary type
+     * whatever was picked, so a wallet start over a transfers file was normalised, masked and listed as an account, and *Add
+     * to a list* offered account lists for it.
+     */
+    it('a start types its mapping by the picked Entity Type, not the primary; Add to a list and the case follow it', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const previewNeighbors = preview();
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors } as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'entity', datasetId: 'transfers', entityType: 'wallet', value: 'W-1' });
+        expect(expand).toHaveBeenCalledWith('W-1', 'W-1', { projection: { ...MAPPING, entityType: 'wallet' } });
+        expect(c.lastRun()?.query.projection?.entityType).toBe('wallet');
+        expect(c.growEntityType()).toBe('wallet');
+        expect(c.caseStart()).toEqual({ datasetId: 'transfers', values: ['W-1'], entityType: 'wallet' });
+
+        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'wallet', values: ['W-2'] });
+        expect(expand).toHaveBeenLastCalledWith('W-2', 'W-2', { projection: { ...MAPPING, entityType: 'wallet' } });
+        expect(c.caseStart()?.entityType).toBe('wallet');
+    });
+
+    it('a list start is typed by the list, whatever the Dataset\'s primary type', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const getEntityList = vi.fn(() => of({ id: 'w', title: 'Wallets', entityType: 'wallet', members: ['W-1'] }));
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), getEntityList } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'w' });
+        expect(expand).toHaveBeenCalledWith('W-1', 'W-1', { projection: { ...MAPPING, entityType: 'wallet' } });
+        expect(c.growEntityType()).toBe('wallet');
     });
 
     it('the whole Dataset projects the default link (the explicit choice)', async () => {
@@ -3661,7 +3711,7 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         });
         const c = await ready(made);
         await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'A-2'] });
-        expect(c.caseStart()).toEqual({ datasetId: 'transfers', values: ['A-1', 'A-2'] });
+        expect(c.caseStart()).toEqual({ datasetId: 'transfers', values: ['A-1', 'A-2'], entityType: 'account' });
         await c.startFrom({ kind: 'dataset', datasetId: 'transfers' });
         expect(c.caseStart()).toBeNull();
         expect(c.caseLists()).toEqual({ exclusions: [] });

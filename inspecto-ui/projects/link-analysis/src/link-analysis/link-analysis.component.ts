@@ -1612,9 +1612,14 @@ export class LinkAnalysisComponent implements OnInit {
             return;
         }
         let values: string[];
+        // the Entity Type the start names (LA-ONBOARD-DEFECTS-1): the paste's pick, the list's own type, or - for a result
+        // found on the graph - the type the graph was drawn as; never silently the Dataset's primary type
+        let entityType: string | undefined =
+            req.kind === 'paste' ? req.entityType : req.kind === 'found' ? this.lastRun()?.query?.projection?.entityType : undefined;
         if (req.kind === 'list') {
             try {
                 const list = await firstValueFrom(this.inv.getEntityList(req.listId));
+                entityType = list.entityType || undefined;
                 if (!list.members) {
                     this.startNotice.set({ variant: 'warning', text: `The members of ${list.title} are not shown to you, so it cannot start a graph.` });
                     return;
@@ -1629,10 +1634,15 @@ export class LinkAnalysisComponent implements OnInit {
                 return;
             }
         } else values = req.values;
-        const found = await this.drawStart(ds, values);
+        const found = await this.drawStart(ds, values, entityType);
         if (found.length) {
             // a case remembers its start (A-1b): reopening draws it again over the data as it is then
-            this.caseStart.set({ datasetId: ds.id, values: found, ...(req.kind === 'list' ? { listId: req.listId } : {}) });
+            this.caseStart.set({
+                datasetId: ds.id,
+                values: found,
+                ...(entityType ? { entityType } : {}),
+                ...(req.kind === 'list' ? { listId: req.listId } : {}),
+            });
             if (req.kind === 'list') this.caseLists.set({ start: req.listId, exclusions: [] });
             if (req.kind === 'found')
                 this.startNotice.update((n) => (n ? { ...n, text: `Started from ${req.what}. ${n.text}` } : n));
@@ -1663,8 +1673,8 @@ export class LinkAnalysisComponent implements OnInit {
             });
             return;
         }
-        const found = await this.drawStart(ds, [req.seed]);
-        if (found.length) this.caseStart.set({ datasetId: ds.id, values: found });
+        const found = await this.drawStart(ds, [req.seed], req.entityType);
+        if (found.length) this.caseStart.set({ datasetId: ds.id, values: found, entityType: req.entityType });
     }
 
     /**
@@ -1672,12 +1682,14 @@ export class LinkAnalysisComponent implements OnInit {
      * {@link START_MAX_SEEDS}) merged into a NEW graph - the values plus one ring - with the busy neighbours above the Space's
      * hub threshold held (the Grow preview's own `held`), the values marked grown, and the run remembered over the Dataset's
      * mapping, so Grow continues from the ring. Values that read nothing are reported. Returns the values that were drawn.
+     * The mapping is typed by `entityType`, the type the start named (LA-ONBOARD-DEFECTS-1); absent, the Dataset's primary.
      */
-    private async drawStart(ds: StartDataset, values: readonly string[]): Promise<string[]> {
+    private async drawStart(ds: StartDataset, values: readonly string[], entityType?: string): Promise<string[]> {
         const source = this.graphSources.byId('entity-projection');
         if (!source?.expand) return [];
         const wanted = values.slice(0, START_MAX_SEEDS);
-        const q: GraphSourceQuery = { projection: ds.mapping };
+        const projection = entityType ? { ...ds.mapping, entityType } : ds.mapping;
+        const q: GraphSourceQuery = { projection };
         const firstDraw = !this.graph();
         const focusBefore = this.focusHolder();
         this.starting.set(true);
@@ -1702,7 +1714,7 @@ export class LinkAnalysisComponent implements OnInit {
             try {
                 const p = await firstValueFrom(
                     this.inv.previewNeighbors(
-                        neighboursPreviewBody(ds.mapping, found, { direction: 'either', linkKinds: null, threshold: this.growThreshold() }, []),
+                        neighboursPreviewBody(projection, found, { direction: 'either', linkKinds: null, threshold: this.growThreshold() }, []),
                     ),
                 );
                 held = new Map(p.held.map((h) => [h.id, h.contacts]));
@@ -3350,7 +3362,12 @@ export class LinkAnalysisComponent implements OnInit {
             : [...new Set([...drawn, ...grown])].slice(0, START_MAX_SEEDS);
         return {
             ...(lists ? { lists } : {}),
-            start: { datasetId: s.datasetId, ...(s.listId ? { listId: s.listId } : {}), ...(values.length ? { values } : {}) },
+            start: {
+                datasetId: s.datasetId,
+                ...(s.entityType ? { entityType: s.entityType } : {}),
+                ...(s.listId ? { listId: s.listId } : {}),
+                ...(values.length ? { values } : {}),
+            },
         };
     }
 
@@ -3461,17 +3478,24 @@ export class LinkAnalysisComponent implements OnInit {
         const ds = this.startCatalogue().datasets.find((d) => d.id === start.datasetId);
         if (!ds) return false;
         let values = start.values ?? [];
+        let entityType = start.entityType;
         if (start.listId) {
             try {
                 const list = await firstValueFrom(this.inv.getEntityList(start.listId));
                 values = [...new Set([...(list.members ?? []), ...values])];
+                entityType ??= list.entityType || undefined;
             } catch {
                 // the list is gone or unreadable: draw what the case saved
             }
         }
-        const found = await this.drawStart(ds, values);
+        const found = await this.drawStart(ds, values, entityType);
         if (!found.length) return false;
-        this.caseStart.set({ datasetId: ds.id, values: found, ...(start.listId ? { listId: start.listId } : {}) });
+        this.caseStart.set({
+            datasetId: ds.id,
+            values: found,
+            ...(entityType ? { entityType } : {}),
+            ...(start.listId ? { listId: start.listId } : {}),
+        });
         this.caseLists.set({ start: view.lists?.start, exclusions: view.lists?.exclusions ?? [] });
         await this.hideExcludedByCase(view.lists?.exclusions ?? []);
         return true;
@@ -3565,7 +3589,9 @@ export class LinkAnalysisComponent implements OnInit {
             this.investigation.binding()?.entityType ??
             this.profile().investigate?.entityType ??
             this.canvasData()?.nodes.find((n) => n.data.entityType)?.data.entityType ??
-            // the explorer graph drawn by a start: the primary Entity Type of the Dataset it came from (LA-ONBOARD-1 phase 8)
+            // the explorer graph drawn by a start: the type its mapping was drawn as (the Start box's pick,
+            // LA-ONBOARD-DEFECTS-1), else the primary Entity Type of the Dataset it came from (LA-ONBOARD-1 phase 8)
+            this.lastRun()?.query?.projection?.entityType ??
             this.discoverDataset()?.primaryEntityType ??
             null,
     );

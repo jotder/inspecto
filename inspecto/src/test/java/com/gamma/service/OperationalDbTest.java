@@ -9,7 +9,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The one operational-database selection: DuckDB for Personal, PostgreSQL for Standard.
+ * The one operational-database selection: DuckDB for Basic, PostgreSQL for Standard.
  *
  * <p>⛔ Every test here restores the properties it touched rather than clearing them — surefire reuses
  * one JVM per module, and a cleared shared property poisons every later test in it.
@@ -52,7 +52,7 @@ class OperationalDbTest {
                     // to Family without honouring the shared URL now fails here instead of going unnoticed.
                     // The roster is OPEN (MODULE-REORG-P1-FAMILY, 2026-10-08): this module sees the CORE families
                     // only - 12 - and `inspecto-ops` contributes the four Operational Object families (so an
-                    // Enterprise classpath lists 16; the ops module's own test pins its four and the manifest).
+                    // Advanced classpath lists 16; the ops module's own test pins its four and the manifest).
                     // History of the whole roster: 11 -> 12 on 2026-09-07 DELIVERY_RECEIPTS; 12 -> 13 EVENTS (D6);
                     // 13 -> 14 RUN_LEASE (B1); 14 -> 15 INBOX_REGISTRY; 15 -> 16 on 2026-10-07 ALERTS.
                     // ⚠ The count has mirrors outside this file - `tools/check-family-count.mjs` fails the build
@@ -131,7 +131,7 @@ class OperationalDbTest {
     /**
      * ⚠ The driver IS on the test classpath (inspecto-engine pulls it at test scope), so this asserts the
      * reachable half: a fully-specified Postgres selection passes the gate. The refusal path — no driver,
-     * i.e. the shipped Personal bundle — cannot be exercised from a JVM that has the driver, and is
+     * i.e. the shipped Basic bundle — cannot be exercised from a JVM that has the driver, and is
      * covered by the message assertion above plus the missing-URL case.
      */
     @Test

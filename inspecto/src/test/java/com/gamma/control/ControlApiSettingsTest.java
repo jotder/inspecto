@@ -700,7 +700,7 @@ class ControlApiSettingsTest {
      *
      * 🔴 <b>Why this exists.</b> `withCapability` is a NO-OP unless a {@link Subject} is attached, and no test
      * attaches one unless it installs a fake authenticator. Every other test in this class runs
-     * Personal-shaped, so they pass identically whether or not these routes are gated at all — adding or
+     * Basic-shaped, so they pass identically whether or not these routes are gated at all — adding or
      * removing the gate would change no assertion here. `tools/check-authgate-coverage.mjs` flagged
      * `PUT /settings/link-analysis` for exactly that on 2026-09-22, taking the ratchet from 79 to 80.
      *

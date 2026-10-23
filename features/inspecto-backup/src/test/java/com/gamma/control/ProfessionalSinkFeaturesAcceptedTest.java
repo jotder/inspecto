@@ -12,9 +12,9 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The PROFESSIONAL half of `PROCESSOR-RELEASE-READINESS-1` G9 for the two sink features: with this module on
+ * The STANDARD half of `PROCESSOR-RELEASE-READINESS-1` G9 for the two sink features: with this module on
  * the classpath its real {@code BackupEditionFeatures} provider is discovered — no test override — and the
- * save gate that core's {@code EditionFeatureGateTest} proves refusing on Personal accepts a Collector's
+ * save gate that core's {@code EditionFeatureGateTest} proves refusing on Basic accepts a Collector's
  * {@code post_action: MOVE} archive and an enabled DuckLake block.
  */
 class ProfessionalSinkFeaturesAcceptedTest {

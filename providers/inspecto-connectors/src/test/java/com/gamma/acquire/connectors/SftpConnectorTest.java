@@ -298,7 +298,7 @@ class SftpConnectorTest {
                     "ID,AMT,EVENT_DATE\nr" + i + "," + i + ".0,2020-04-0" + i + "\n");
 
         ConnectionRegistry.register(profile());
-        // The MOVE archive is Professional+ (G9); this asserts the Professional behaviour.
+        // The MOVE archive is Standard+ (G9); this asserts the Standard behaviour.
         com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.SINK_ARCHIVE));
         try {
             com.gamma.etl.PipelineConfig cfg = com.gamma.etl.PipelineConfig.load(

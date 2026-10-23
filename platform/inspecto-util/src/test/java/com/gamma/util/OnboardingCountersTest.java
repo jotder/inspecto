@@ -87,6 +87,31 @@ class OnboardingCountersTest {
         assertEquals(Map.of("add_data:file", 1), OnboardingCounters.metrics().get("abandoned"));
     }
 
+    /**
+     * LA-ONBOARD-RESIDUALS-1 item 11: abandoned-step reports come from an open route, so each step keeps at most
+     * {@link OnboardingCounters#ABANDONED_CAP_PER_STEP} lines, across a restart too; another step and the other events still
+     * record. Falsified: without the cap the file holds every report (1 005 lines for the step).
+     */
+    @Test
+    void abandonedStepReportsAreCappedPerStep(@TempDir Path dir) throws Exception {
+        Path f = dir.resolve("c.tsv");
+        OnboardingCounters.install(f);
+        int cap = OnboardingCounters.ABANDONED_CAP_PER_STEP;
+        for (int i = 0; i < cap + 3; i++) OnboardingCounters.record(Event.STEP_ABANDONED, "graph");
+        OnboardingCounters.install(f);   // a restart re-counts the file
+        OnboardingCounters.record(Event.STEP_ABANDONED, "graph");
+        OnboardingCounters.record(Event.STEP_ABANDONED, "graph");
+        OnboardingCounters.record(Event.STEP_ABANDONED, "list");
+        OnboardingCounters.record(Event.LAUNCH);
+
+        long graph = Files.readAllLines(f).stream().filter(l -> l.endsWith("\tstep_abandoned\tgraph")).count();
+        assertEquals(cap, graph);
+        Map<String, Object> m = OnboardingCounters.metrics();
+        assertEquals(Map.of("graph", cap, "list", 1), m.get("abandoned"));
+        assertEquals(true, m.get("abandonedCapReached"));
+        assertEquals(1, m.get("launches"));
+    }
+
     @Test
     void aDamagedLineIsSkipped(@TempDir Path dir) throws Exception {
         Path f = dir.resolve("c.tsv");

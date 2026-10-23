@@ -23,7 +23,7 @@
 
         Reads the Entity List fact log through inspecto-entity-store; lists are authored by inspecto-entity-list, so
         the manifest requires entity-list. THIN like inspecto-scoring: nothing beyond what the core supplies, no shade.
-        Built only under the edition-standard / -enterprise / -preview profiles; absent on Personal (its routes
+        Built only under the edition-standard / -advanced / -preview profiles; absent on Basic (its routes
         answer 503 from the manifest's absentMessage).
     </description>
 

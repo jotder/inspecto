@@ -50,7 +50,7 @@ public final class RequestAttrs {
     /** The client IP resolved against the trusted-proxy list at dispatch start ({@code #ip}, SEC review F3). */
     public static final String ATTR_CLIENT_IP         = "inspecto.clientIp";
     /** The authenticated {@code Subject} (W6), set by {@code ControlApi#dispatch} once an
-     *  {@code Authenticator} validates the request; absent on Personal edition (no Authenticator present)
+     *  {@code Authenticator} validates the request; absent on Basic edition (no Authenticator present)
      *  and on the public bootstrap/health surface. */
     public static final String ATTR_SUBJECT           = "inspecto.subject";
     /** The issuer ({@code iss}) of the token the {@code Subject} was verified from, stamped by the Authenticator. */
@@ -58,7 +58,7 @@ public final class RequestAttrs {
     /** The capability {@code #requireCapability} CHECKED on this exchange — set only when a Subject was
      *  attached, i.e. only when a check actually ran. Read by {@code AuditTrail}: on a 403 it is the
      *  capability that was missing, on a permitted write the one the write was privileged by. Absent on
-     *  Personal (nothing is checked there) and on any route with no gate (compliance plan step 4a/4b). */
+     *  Basic (nothing is checked there) and on any route with no gate (compliance plan step 4a/4b). */
     public static final String ATTR_CAPABILITY        = "inspecto.capability";
     /** SEC-7(b): the capability set applicable to the single resource this response carries, declared by
      *  the route via {@code #resourcePermissions}; {@code Envelope} intersects it with the Subject's
@@ -126,7 +126,7 @@ public final class RequestAttrs {
     }
 
     /** The authenticated {@code Subject}, when {@code ControlApi#dispatch} resolved one for this request
-     *  (W6: Standard edition, security module present). Empty on Personal edition. */
+     *  (W6: Standard edition, security module present). Empty on Basic edition. */
     public static java.util.Optional<Subject> subject(HttpExchange ex) {
         return attr(ex, ATTR_SUBJECT) instanceof Subject s ? java.util.Optional.of(s) : java.util.Optional.empty();
     }
@@ -140,9 +140,9 @@ public final class RequestAttrs {
     /** The acting identity for the audit trail. When the security module authenticated this request
      *  (W6), the resolved {@code Subject}'s id is authoritative. Otherwise, when the request carries
      *  {@code #HEADER_AGENT_SESSION} (S6 — an agent-confirmed apply), the actor is {@code agent:<sessionId>}.
-     *  Otherwise (Personal edition, or a public route no {@code Authenticator} ran on) the actor is the
+     *  Otherwise (Basic edition, or a public route no {@code Authenticator} ran on) the actor is the
      *  caller-supplied {@code X-Actor} header, defaulting to {@code appUser} — the historic auth-free
-     *  behaviour, unchanged. On Standard/Enterprise the header never reaches here: {@code ControlApi}'s
+     *  behaviour, unchanged. On Standard/Advanced the header never reaches here: {@code ControlApi}'s
      *  authenticate stage rejects any {@code X-Actor} outright (SEC-7a spoof guard), so the actor is
      *  always the authenticated {@code Subject}. */
     public static String actor(HttpExchange ex) {

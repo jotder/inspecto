@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Space's data directory. The symptom was a run failing with {@code unknown dataset '<id>'} naming an id
  * the route had just resolved successfully, moments earlier, from the other registry.
  *
- * <p>⚠ <b>Single-Space deployments make the two identical</b> — Personal, and every test — which is why
+ * <p>⚠ <b>Single-Space deployments make the two identical</b> — Basic, and every test — which is why
  * the defect survived: it is a no-op everywhere it was ever exercised.
  *
  * <p><b>How it resolves.</b> {@code SpaceBootstrap} (control-plane module) publishes each Space's config

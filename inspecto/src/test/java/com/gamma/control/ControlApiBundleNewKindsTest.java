@@ -291,7 +291,7 @@ class ControlApiBundleNewKindsTest {
 
             // Re-seated off GET /events/views (EDG-01 cell 6): this test is about the saved-view BUNDLE
             // round-trip, not the events feed, and the feed is now an optional module absent from this
-            // (default, Personal) build. savedViews().list() is what the route returned verbatim.
+            // (default, Basic) build. savedViews().list() is what the route returned verbatim.
             JsonNode list = JSON.valueToTree(c.svc.savedViews().list());
             assertEquals(1, list.size());
             assertEquals("ERROR", list.get(0).get("filters").get("level").asText());

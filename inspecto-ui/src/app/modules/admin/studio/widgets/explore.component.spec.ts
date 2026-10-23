@@ -71,6 +71,13 @@ function create(ds: Dataset = DS, page: DatasetRows = CDR_PAGE, features: Record
                                 ref: '',
                                 content: { name: 'Example — Dhaka cell network' },
                             },
+                            // saved after the fix: the registry stamped `name` with the id, the view's name is its `title`
+                            {
+                                type: 'geo-map-view',
+                                name: 'night-meetings',
+                                ref: '',
+                                content: { name: 'night-meetings', title: 'Night meetings' },
+                            },
                         ]),
                 },
             },
@@ -195,7 +202,11 @@ describe('ExploreComponent', () => {
         c.setVizType('geo-map');
         expect(c.viewBound()).toBe(true);
         expect(c.controls()).toEqual({});
-        expect(c.savedViews()).toEqual([{ id: 'dhaka-network', name: 'Example — Dhaka cell network' }]);
+        // LA-ONBOARD-DEFECTS-1 (5): a view's own name is its title; the stored `name` is the id the registry stamped
+        expect(c.savedViews()).toEqual([
+            { id: 'dhaka-network', name: 'Example — Dhaka cell network' },
+            { id: 'night-meetings', name: 'Night meetings' },
+        ]);
     });
 
     // D-LAE2 (operator 2026-10-20): Link Analysis widgets on dashboards are Standard and up - a UI flag, the routes stay open.

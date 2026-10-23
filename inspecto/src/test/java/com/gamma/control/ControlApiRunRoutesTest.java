@@ -112,7 +112,7 @@ class ControlApiRunRoutesTest {
             assertTrue(registered.get("registered").asBoolean());
             assertEquals("second_etl", registered.get("id").asText());
 
-            // the listing never serves the host's absolute layout (found driving the Enterprise demo, 2026-10-09)
+            // the listing never serves the host's absolute layout (found driving the Advanced demo, 2026-10-09)
             HttpResponse<String> list = send(c.port, "GET", "/runs", null, "Authorization", "Bearer author");
             assertEquals(200, list.statusCode(), list.body());
             JsonNode rows = json(list);

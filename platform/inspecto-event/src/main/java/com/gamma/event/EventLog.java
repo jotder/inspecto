@@ -191,7 +191,7 @@ public final class EventLog implements EventSink {
         if (tap != null) TAPS.remove(tap);
     }
 
-    /** Number of installed taps (the Personal-build test asserts none is installed without the Exchange). */
+    /** Number of installed taps (the Basic-build test asserts none is installed without the Exchange). */
     public static int tapCount() {
         return TAPS.size();
     }

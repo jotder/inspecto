@@ -2,7 +2,7 @@
 #
 # ⛔ NOT MULTI-REPLICA SAFE. The StatefulSet is pinned to replicas: 1 in the template; there is no value
 # to change it. Each pod keeps DuckDB files, Parquet and the Spaces tree on its own volume, and with the
-# default run.lease.backend=heap, run exclusion is per process. Scale-out is the Enterprise partitioned
+# default run.lease.backend=heap, run exclusion is per process. Scale-out is the Advanced partitioned
 # topology (a pod owns Spaces, shared Postgres state, the DB run lease), which this chart does not implement.
 #
 # Image: build it from an unzipped inspecto-deploy bundle with the Dockerfile the bundle ships

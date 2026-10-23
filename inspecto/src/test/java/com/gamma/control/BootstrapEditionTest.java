@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/** {@code /bootstrap}'s edition: Personal without auth, Enterprise when a policy decider is installed. */
+/** {@code /bootstrap}'s edition: Basic without auth, Advanced when a policy decider is installed. */
 class BootstrapEditionTest {
 
     private static final AccessDecider ABSTAINS = (ex, subject, action, route, kind, attrs) -> AccessDecider.Decision.ABSTAIN;

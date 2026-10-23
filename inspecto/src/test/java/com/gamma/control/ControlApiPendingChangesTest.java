@@ -186,7 +186,7 @@ class ControlApiPendingChangesTest {
     void thePolicyRouteIsRefusedOutrightOnABuildWithNoAuthenticator(@TempDir Path cfg, @TempDir Path tmp)
             throws Exception {
         // Operator, 2026-09-28: with no Authenticator the canAdminister wrap is a no-op, so the route itself
-        // refuses — turning four-eyes on OR off. Personal edition cannot change the policy through the API.
+        // refuses — turning four-eyes on OR off. Basic edition cannot change the policy through the API.
         Path root = Files.createDirectories(tmp.resolve("config"));
         Authenticators.forTest(null);
         try (Ctx c = open(cfg, root)) {
@@ -456,7 +456,7 @@ class ControlApiPendingChangesTest {
             PendingChanges.save(root, rec);
             assertEquals(409, send(c, "POST", "/pending-changes/" + late + "/withdraw", "{}", AUTHOR).statusCode());
 
-            // Personal-shaped (no Authenticator, no Subject): refused like approve / decline — no author to be
+            // Basic-shaped (no Authenticator, no Subject): refused like approve / decline — no author to be
             String open = propose(c, "p3");
             Authenticators.forTest(null);
             HttpResponse<String> anon = send(c, "POST", "/pending-changes/" + open + "/withdraw", "{}", null);

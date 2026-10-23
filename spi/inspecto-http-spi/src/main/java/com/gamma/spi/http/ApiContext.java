@@ -110,7 +110,7 @@ public interface ApiContext extends WriteRootProvider {
     static java.util.Optional<Subject> subject(HttpExchange ex) { return RequestAttrs.subject(ex); }
 
     /** AuthZ gate (W6): when a {@link Subject} is attached (Standard edition, authenticated request) it
-     *  must carry {@code capability}, else {@code 403 PERMISSION_DENIED}. A no-op on Personal edition — no
+     *  must carry {@code capability}, else {@code 403 PERMISSION_DENIED}. A no-op on Basic edition — no
      *  {@link Authenticator} is ever present there, so no {@link Subject} is ever attached and every route
      *  stays open, unchanged. */
     static void requireCapability(HttpExchange ex, String capability) {
@@ -119,7 +119,7 @@ public interface ApiContext extends WriteRootProvider {
             // AuditTrail.accessDenied stamps the capability that was MISSING; on a pass, AuditTrail.record
             // stamps the capability this write was PRIVILEGED by. Until 2026-09-15 the name lived only in
             // the exception message below and was gone before the audit event was built (compliance plan
-            // step 4a/4b). ⚠ Deliberately inside the Subject branch: on Personal no check runs, so no
+            // step 4a/4b). ⚠ Deliberately inside the Subject branch: on Basic no check runs, so no
             // capability is stamped — an event claiming "privileged by X" on an edition that checks
             // nothing would tell an auditor something false.
             attr(ex, ATTR_CAPABILITY, capability);
@@ -179,7 +179,7 @@ public interface ApiContext extends WriteRootProvider {
 
         @Override public Object handle(com.sun.net.httpserver.HttpExchange ex, java.util.regex.Matcher m)
                 throws Exception {
-            // The owner is resolved only when a Subject is attached: on Personal nothing is checked, so the
+            // The owner is resolved only when a Subject is attached: on Basic nothing is checked, so the
             // handler keeps answering its own 400/404/409 exactly as before.
             if (owner == null) requireCapability(ex, capability);
             else if (subject(ex).isPresent()) requireCapabilityIn(ex, owner.configRoot(ex, m), capability);
@@ -215,7 +215,7 @@ public interface ApiContext extends WriteRootProvider {
      * AuthZ gate against a NAMED Space's role table: re-runs the active {@link Authenticator} on this
      * request's own credential with {@link Roles#ATTR_CONFIG_ROOT} pointed at {@code configRoot}, and
      * demands {@code capability} of the Subject that yields. A no-op when no Subject is attached
-     * (Personal), like {@link #requireCapability}. Fail-closed: no config root, no authenticator, a
+     * (Basic), like {@link #requireCapability}. Fail-closed: no config root, no authenticator, a
      * credential that no longer resolves, or a different identity → 403. The request's bound-Space
      * attributes ({@code ATTR_CONFIG_ROOT}, held roles) are restored afterwards.
      */
@@ -258,7 +258,7 @@ public interface ApiContext extends WriteRootProvider {
      * only where the module did not.
      *
      * <p>🔴 The exclusion is the whole point, learned the hard way: the first version counted stubs, so
-     * {@code /bootstrap} reported {@code geoLink: true} on a Personal build because the 503 stub had claimed
+     * {@code /bootstrap} reported {@code geoLink: true} on a Basic build because the 503 stub had claimed
      * the pattern. "A route exists" and "the feature is installed" are different questions.
      */
     boolean hasRoute(String method, String pattern);

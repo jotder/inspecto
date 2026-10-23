@@ -486,7 +486,7 @@ class ControlApiReconTest {
     // ⚠ The HAPPY path is NOT here, and cannot be: promoting needs a real Object Engine, which ships in
     // the optional `inspecto-ops` module that a default `mvn test` does not build. It is asserted in
     // `ControlApiReconPromoteTest` in that module. What core owns is the refusals — including the one
-    // below that IS the Personal-edition behaviour rather than an error condition.
+    // below that IS the Basic-edition behaviour rather than an error condition.
 
     @Test
     void promoteWithoutTheRequiredFieldsIs422(@TempDir Path root) throws Exception {
@@ -512,8 +512,8 @@ class ControlApiReconTest {
     }
 
     /**
-     * The Personal edition has no {@code inspecto-ops} module, so the object seam is empty and promotion
-     * answers 503 — <b>by design, not by failure</b>. This whole module's test classpath is the Personal
+     * The Basic edition has no {@code inspecto-ops} module, so the object seam is empty and promotion
+     * answers 503 — <b>by design, not by failure</b>. This whole module's test classpath is the Basic
      * shape, which is what makes the assertion possible here at all.
      *
      * <p>⚠ The status code is load-bearing for the UI: the project's contract is an explained panel for a
@@ -533,7 +533,7 @@ class ControlApiReconTest {
     // ── GET /recon/promoted ─ the gates core owns (BREAK-INCIDENT-RESOLVE-1) ───────────────
     //
     // ⚠ Like promote, the HAPPY path needs a real Object Engine and lives in `inspecto-ops`. Core owns
-    // the refusals — including the 503 that IS the Personal-edition answer rather than a failure.
+    // the refusals — including the 503 that IS the Basic-edition answer rather than a failure.
 
     @Test
     void promotedWithoutAReconciliationIs422(@TempDir Path root) throws Exception {
@@ -570,7 +570,7 @@ class ControlApiReconTest {
         }
     }
 
-    /** The Personal edition has no ops module, so the read answers 503 — the same explained-panel contract
+    /** The Basic edition has no ops module, so the read answers 503 — the same explained-panel contract
      *  promote relies on. ⚠ A 200 with an empty map here would tell the UI every Break is unpromoted. */
     @Test
     void promotedWithoutTheOperationalObjectsModuleIs503(@TempDir Path root) throws Exception {

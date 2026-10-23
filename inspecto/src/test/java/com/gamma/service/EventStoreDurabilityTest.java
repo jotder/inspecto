@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code -Devents.backend}, and this test makes both halves of that a <b>choice</b> rather than an accident.
  *
  * <p>The engine default is {@code memory} — a bounded ring that forgets everything on restart. That is the
- * right default for Personal (zero files, zero configuration), and it is why the Standard/Enterprise
+ * right default for Basic (zero files, zero configuration), and it is why the Standard/Advanced
  * launchers emitted by {@code inspecto/package.ps1} pass {@code -Devents.backend=parquet}: the
  * tamper-evident, append-only audit trail those editions sell cannot be a ring that empties on a restart.
  *
@@ -112,7 +112,7 @@ class EventStoreDurabilityTest {
                 "an events dir resolved outside the space would pool every space's audit trail in the CWD");
     }
 
-    /** The default, unchanged: Personal forgets on restart, and that is the documented behaviour. */
+    /** The default, unchanged: Basic forgets on restart, and that is the documented behaviour. */
     @Test
     void theDefaultBackendDropsTheAuditTrailOnRestart(@TempDir Path dir) {
         SpaceRoot root = SpaceRoot.under(dir);

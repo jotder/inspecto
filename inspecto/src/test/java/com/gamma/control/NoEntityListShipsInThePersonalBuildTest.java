@@ -24,19 +24,19 @@ import static org.junit.jupiter.api.Assertions.*;
  * explorer), so the class name records history. What this still proves is the processor-only classpath: a bundle that
  * lacks the module answers its routes with the 503 "not installed" stub and reports the feature false.
  *
- * SEP-08 — the assertion that makes the Entity List gating REAL rather than claimed, on the DEFAULT (Personal)
+ * SEP-08 — the assertion that makes the Entity List gating REAL rather than claimed, on the DEFAULT (Basic)
  * build, over real HTTP. The sibling of {@link NoGeoLinkShipsInThePersonalBuildTest}.
  *
  * <p>Two facts, each of which a plausible-looking regression would break on its own:
  * <ol>
  *   <li>every {@code /entity-lists*} path answers <b>503 with the edition message</b> — not 404 (which would mean
- *       {@link AbsentModuleRoutes} lost a path), not 200 (which would mean the module is back in Personal);</li>
+ *       {@link AbsentModuleRoutes} lost a path), not 200 (which would mean the module is back in Basic);</li>
  *   <li>{@code /bootstrap} reports {@code features.entityList == false}, so a client hides the surface.</li>
  * </ol>
  * That no {@code RouteModule} leaked onto this classpath is asserted once for every optional module by
  * {@code NoGeoLinkShipsInThePersonalBuildTest}.
  *
- * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Personal
+ * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Basic
  * bundle; a 404 means the stub and the module's surface drifted apart. Both are the defect, not the test.
  */
 class NoEntityListShipsInThePersonalBuildTest {

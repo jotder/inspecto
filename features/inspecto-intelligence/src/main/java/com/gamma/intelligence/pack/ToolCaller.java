@@ -9,13 +9,13 @@ import java.util.function.Supplier;
  * session turn or one direct dispatch ({@code ASSURE-INTELLIGENCE-BUNDLE-1} round 2, 2026-09-29).
  *
  * <p>The tools read it ({@link ToolCapabilities#enforcing}); the in-session gate inside the external eoiagent
- * platform is NOT relied on. {@link #UNRESTRICTED} (capabilities {@code null}) is the Personal edition, where no
+ * platform is NOT relied on. {@link #UNRESTRICTED} (capabilities {@code null}) is the Basic edition, where no
  * Subject exists and nothing is checked anywhere, and it is also what internal system callers bind. <b>Nothing
  * bound means refuse</b>: a tool invoked on a thread that no caller was bound on fails closed.
  */
 public record ToolCaller(Set<String> capabilities) {
 
-    /** No Subject (Personal) or an internal system caller: every capability check passes. */
+    /** No Subject (Basic) or an internal system caller: every capability check passes. */
     public static final ToolCaller UNRESTRICTED = new ToolCaller(null);
 
     private static final ThreadLocal<ToolCaller> CURRENT = new ThreadLocal<>();

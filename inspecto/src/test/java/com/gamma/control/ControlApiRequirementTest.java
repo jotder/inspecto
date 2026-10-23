@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * submit → decide → deliver lifecycle, the fail-closed gates, and — the SEC-7(c) point — the triage
  * transitions enforced server-side on {@code canTriageRequirements} while submission stays open. The
  * capability tests force an {@link Authenticator} via {@link Authenticators#forTest} to stand in for the
- * Standard edition (same technique as {@link ControlApiAuthV1Test}); Personal has none.
+ * Standard edition (same technique as {@link ControlApiAuthV1Test}); Basic has none.
  */
 class ControlApiRequirementTest {
 
@@ -64,7 +64,7 @@ class ControlApiRequirementTest {
         }
     }
 
-    // ── lifecycle + gates (Personal: no Authenticator) ─────────────────────────────
+    // ── lifecycle + gates (Basic: no Authenticator) ─────────────────────────────
 
     @Test
     void submitDecideDeliverLifecycleAndGates(@TempDir Path cfg, @TempDir Path wr) throws Exception {

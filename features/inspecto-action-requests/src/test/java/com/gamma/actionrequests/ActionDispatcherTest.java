@@ -31,14 +31,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@link ActionDispatcher}'s attempt loop against a real in-process {@link HttpServer}: retries under one
  * idempotency key, the terminal statuses, redirect refusal and the per-attempt integrity check.
  *
- * <p>The wire here is {@link LoopbackWire}, a test double of the Professional transport
+ * <p>The wire here is {@link LoopbackWire}, a test double of the Standard transport
  * ({@code HttpWebhookSinkTransport}, which lives downstream in inspecto-notify-channels and cannot be on this
  * module's classpath) with the same {@code Redirect.NEVER} client; that transport's own redirect behaviour is
  * pinned by {@code HttpWebhookSinkTransportTest#exchangeNeverFollowsARedirectToAnotherHost}.
  */
 class ActionDispatcherTest {
 
-    /** JDK HttpClient, redirects NEVER — the shape of the Professional transport, over plain http for the stub. */
+    /** JDK HttpClient, redirects NEVER — the shape of the Standard transport, over plain http for the stub. */
     static class LoopbackWire implements WebhookSinkTransport {
         private final HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
         final List<String> addresses = new CopyOnWriteArrayList<>();

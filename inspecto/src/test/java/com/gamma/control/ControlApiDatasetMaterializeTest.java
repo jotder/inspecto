@@ -126,7 +126,7 @@ class ControlApiDatasetMaterializeTest {
     @Test
     void acceptedWhenTheTwoWriteRootsAgree(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            // The single-space case, which is EVERY Personal deployment: the JVM property and the space's
+            // The single-space case, which is EVERY Basic deployment: the JVM property and the space's
             // config root are the same directory, and MaterializeTask resolves through SpaceConfigRoot's
             // default-space fallback to exactly that. Pinned because the other tests leave the property
             // UNSET, so this is the only one that exercises the fallback actually resolving something.

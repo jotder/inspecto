@@ -287,4 +287,90 @@ class ControlApiInvestigationCategoryListsTest {
             op(c, "case-ld", seedBy, LEAD);   // a holder of canRevealLinkEntities may
         }
     }
+
+    // ── the Dossier over a restricted list (LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1) ─────────────────────────
+
+    @Test
+    void theDossierNamesNoRemovedIdOfARestrictedListAndRoundsItsCounts(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            list(c, "intel", ",\"ownerKind\":\"admin\",\"visibility\":\"restricted\"", ADMIN,
+                    "+447700900123", "+447700900555", "+447700900999");
+            for (String[] who : new String[][]{{ANALYST, "case-an"}, {LEAD, "case-ld"}}) {
+                data(send(c, "POST", "/inv/investigations", create(who[1]), who[0]), 200);
+                op(c, who[1], "{\"op\":\"seed\",\"ids\":[\"alice\"]}", who[0]);
+                op(c, who[1], "{\"op\":\"expand\"}", who[0]);
+                op(c, who[1], "{\"op\":\"excludeBy\",\"listId\":\"intel\",\"reason\":\"policy\"}", who[0]);
+            }
+
+            HttpResponse<String> anRaw = send(c, "GET", "/inv/investigations/case-an/dossier", null, ANALYST);
+            JsonNode an = data(anRaw, 200);
+            assertFalse(anRaw.body().contains(MULE), "the removed member is named nowhere in the analyst's dossier: " + anRaw.body());
+            JsonNode row = an.at("/ledger/2");
+            assertTrue(row.get("text").asText().startsWith("Excluded about 5 entities on Entity List `intel`"), row.toString());
+            assertTrue(row.get("membersHidden").asBoolean(), row.toString());
+            JsonNode neg = an.get("negativeSpace");
+            assertEquals(0, neg.get("excluded").size(), "no id: " + neg);
+            assertEquals(5, neg.get("excludedCount").asInt(), "1 removed reads as 5: " + neg);
+            assertEquals(5, neg.at("/excludedHidden/0/count").asInt(), neg.toString());
+            assertEquals(3, neg.at("/excludedHidden/0/step").asInt(), neg.toString());
+            assertEquals(5, an.at("/summary/excluded").asInt(), an.get("summary").toString());
+            assertTrue(an.at("/renderings/method").asText().contains("about 5 entities"), an.at("/renderings/method").asText());
+            for (String format : List.of("steps", "method", "html")) {
+                HttpResponse<String> r = send(c, "GET", "/inv/investigations/case-an/dossier?format=" + format, null, ANALYST);
+                assertEquals(200, r.statusCode(), r.body());
+                assertFalse(r.body().contains(MULE), format + ": " + r.body());
+            }
+            // render time only: the manifest is over the store, so the analyst's copy still verifies
+            JsonNode verified = data(send(c, "POST", "/inv/investigations/case-an/dossier/verify",
+                    "{\"manifest\":" + an.get("manifest") + "}", ANALYST), 200);
+            assertTrue(verified.get("verified").asBoolean(), verified.toString());
+
+            JsonNode ld = data(send(c, "GET", "/inv/investigations/case-ld/dossier", null, LEAD), 200);
+            assertTrue(ld.at("/ledger/2/text").asText().startsWith("Excluded 1 entity on Entity List `intel`"), ld.at("/ledger/2").toString());
+            assertTrue(ld.at("/ledger/2/text").asText().contains(MULE), "canRevealLinkEntities reads the ids: " + ld.at("/ledger/2"));
+            assertFalse(ld.at("/ledger/2").has("membersHidden"));
+            assertEquals(1, ld.at("/negativeSpace/excludedCount").asInt());
+            assertEquals(MULE, ld.at("/negativeSpace/excluded/0/id").asText());
+            assertFalse(ld.get("negativeSpace").has("excludedHidden"));
+        }
+    }
+
+    // ── Undo names the step it means (LA-GROW-EXCLUDE-UNDO-RACE-1) ─────────────────────────────────────
+
+    @Test
+    void anUndoNamingAStepThatIsNoLongerTheNewestIs409AndUndoesNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            String inv = "/inv/investigations/case-u";
+            data(send(c, "POST", "/inv/investigations", create("case-u"), ANALYST), 200);
+            data(send(c, "POST", inv + "/members", "{\"subject\":\"lead-1\",\"role\":\"lead\"}", ANALYST), 200);
+            op(c, "case-u", "{\"op\":\"seed\",\"ids\":[\"alice\"]}", ANALYST);
+            op(c, "case-u", "{\"op\":\"expand\"}", ANALYST);                                // the analyst's Grow: step 2
+            op(c, "case-u", "{\"op\":\"keep\",\"ids\":[\"bob\"]}", LEAD);                // a team member's step 3
+
+            HttpResponse<String> stale = send(c, "POST", inv + "/undo", "{\"undoes\":2}", ANALYST);
+            assertEquals(409, stale.statusCode(), stale.body());
+            assertTrue(stale.body().contains("CONFLICT_STALE_VERSION") && stale.body().contains("step 3"), stale.body());
+            assertEquals(3, data(send(c, "GET", inv + "/log", null, ANALYST), 200).get("entries").size(), "nothing was undone");
+
+            JsonNode mine = data(send(c, "POST", inv + "/undo", "{\"undoes\":3}", LEAD), 200);
+            assertEquals(3, mine.get("undoes").asInt(), "the step named is the newest: " + mine);
+            JsonNode grow = data(send(c, "POST", inv + "/undo", "{\"undoes\":2}", ANALYST), 200);
+            assertEquals(2, grow.get("undoes").asInt(), grow.toString());
+            JsonNode plain = data(send(c, "POST", inv + "/undo", "", ANALYST), 200);
+            assertEquals(1, plain.get("undoes").asInt(), "without undoes the newest step is undone, as before: " + plain);
+
+            for (String bad : List.of("\"2\"", "0", "-1", "1.5", "true"))
+                assertEquals(422, send(c, "POST", inv + "/undo", "{\"undoes\":" + bad + "}", ANALYST).statusCode(), bad);
+
+            // a Draft's undo takes the same guard
+            op(c, "case-u", "{\"op\":\"seed\",\"ids\":[\"alice\"]}", ANALYST);
+            String draft = data(send(c, "POST", inv + "/drafts", "{}", ANALYST), 201).get("draftId").asText();
+            String drafts = inv + "/drafts/" + draft;
+            int own = data(send(c, "POST", drafts + "/ops", "{\"op\":\"expand\"}", ANALYST), 200).get("step").asInt();
+            assertEquals(409, send(c, "POST", drafts + "/undo", "{\"undoes\":" + (own - 1) + "}", ANALYST).statusCode());
+            assertEquals(own, data(send(c, "POST", drafts + "/undo", "{\"undoes\":" + own + "}", ANALYST), 200).get("undoes").asInt());
+        }
+    }
 }

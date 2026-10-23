@@ -25,7 +25,7 @@ import java.util.TreeSet;
  * <b>Standing detection authority</b> (LA-LIVE-DETECTION-1, slices LD-1..LD-3,
  * {@code docs/archived-documents/plans-archive/la-live-detection-design.md}; operator decision D-LD1 = option A, 2026-10-04).
  *
- * <p>A scheduled sweep has no caller, so the gates a read passes (R3 sharing, the Enterprise PDP) have nothing to
+ * <p>A scheduled sweep has no caller, so the gates a read passes (R3 sharing, the Advanced PDP) have nothing to
  * judge. The sweep therefore acts as a service principal {@code sweep:<investigation id>} that holds NO capability of
  * its own. Its authority is the {@link Authority} recorded beside the Alert Rule binding when the owner ENABLED
  * standing detection, and {@link #decide} RE-DECIDES it before every read: the sweep may read the bound Dataset only
@@ -43,7 +43,7 @@ import java.util.TreeSet;
  *   <li>the owner is still a LEAD of the Investigation;</li>
  *   <li>the masking basis has not TIGHTENED since enable (a higher {@code maskingMode}, a newly masked bound column,
  *       or lineage that can no longer be traced). Loosening never stops a sweep: it reads and returns aggregates only;</li>
- *   <li>the Enterprise PDP, asked as a synthetic Subject built from the recorded owner id, capabilities, data scopes and
+ *   <li>the Advanced PDP, asked as a synthetic Subject built from the recorded owner id, capabilities, data scopes and
  *       IdP attributes ({@link RowScope#visibleAs}), does not DENY the Investigation. ABSTAIN and ALLOW grant nothing.</li>
  * </ol>
  *

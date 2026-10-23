@@ -26,8 +26,8 @@ export interface AuditFilter {
  * The audit trail read (`GET /audit/*`) — CORE, served by every edition.
  *
  * <p>Separate from {@link EventsService} on purpose (EDG-01 cell 6, 2026-09-08). The full `/events*` feed
- * is the optional `inspecto-events` module and 503s on a Personal build, but `EDITIONS.md` §Audit promises
- * Personal "local append-only logs" — so the audit projection stayed in core behind its own narrow routes.
+ * is the optional `inspecto-events` module and 503s on a Basic build, but `EDITIONS.md` §Audit promises
+ * Basic "local append-only logs" — so the audit projection stayed in core behind its own narrow routes.
  * The Audit log screen therefore reads THIS service and must NOT gate on `SessionService.eventsEnabled`.
  *
  * ⛔ Do not add a general event search here, and do not widen {@link AuditEventType}: the backend refuses

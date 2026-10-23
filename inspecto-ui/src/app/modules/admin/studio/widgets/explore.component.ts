@@ -329,11 +329,20 @@ export class ExploreComponent implements OnInit {
         this.run();
     }
 
-    /** The saved views of a kind, as id/name picker choices (names only — no feature service needed). */
+    /** The saved views of a kind, as id/name picker choices (names only — no feature service needed). A view's own name is
+     *  its `title`: the registry stamps `name` with the id on every write (LA-ONBOARD-DEFECTS-1). */
     private loadSavedViews(viewKind: string): void {
         this.componentsApi.list(viewKind as ComponentType).subscribe({
             next: (defs) =>
-                this.savedViews.set(defs.map((d) => ({ id: d.name, name: String(d.content['name'] ?? d.name) }))),
+                this.savedViews.set(
+                    defs.map((d) => {
+                        const title = d.content['title'];
+                        return {
+                            id: d.name,
+                            name: (typeof title === 'string' && title.trim()) || String(d.content['name'] ?? d.name),
+                        };
+                    }),
+                ),
             error: () => this.toastr.warning('Could not load saved views.'),
         });
     }

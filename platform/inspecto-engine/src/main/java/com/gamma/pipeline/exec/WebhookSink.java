@@ -255,7 +255,7 @@ public final class WebhookSink {
         return v.toString();
     }
 
-    /** The first bundled {@link WebhookSinkTransport}, or {@code null} — Personal bundles none. */
+    /** The first bundled {@link WebhookSinkTransport}, or {@code null} — Basic bundles none. */
     public static WebhookSinkTransport discoveredTransport() {
         return ServiceLoader.load(WebhookSinkTransport.class).findFirst().orElse(null);
     }

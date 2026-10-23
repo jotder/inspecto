@@ -268,7 +268,7 @@ class ControlApiInvestigationAlertRuleTest {
         }
     }
 
-    /** Enterprise: a PDP DENY on the Investigation refuses the owner too — measuring it, binding to it, templating it. */
+    /** Advanced: a PDP DENY on the Investigation refuses the owner too — measuring it, binding to it, templating it. */
     @Test
     void anAccessDeciderDenyRefusesTheOwnersMeasuresBindingAndTemplate(@TempDir Path cfg, @TempDir Path root)
             throws Exception {

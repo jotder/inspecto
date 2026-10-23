@@ -544,11 +544,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // here (before start()) so it sees the first terminal batch. Phase 2: also persists each fired
         // alert as a managed ALERT object via the Object Engine above.
         // MODULE-REORG-P7-INCIDENTS slice 1: ops present -> Alert records over its objects; absent
-        // (Personal) -> the events-only no-op records (no ALERT / INCIDENT object is ever written).
+        // (Basic) -> the events-only no-op records (no ALERT / INCIDENT object is ever written).
         java.util.Optional<com.gamma.objects.ObjectAccess> alertObjects =
                 this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access);
         // Slice 2 (operator decision 2026-10-07): the Alert records are the Space's OWN durable store on EVERY
-        // edition (Personal keeps Alert history + restart-safe de-duplication); ops, when present, supplies only
+        // edition (Basic keeps Alert history + restart-safe de-duplication); ops, when present, supplies only
         // the Incident half. Still-active ALERT objects from before the move are adopted once, before the service
         // reads the store (AlertMigration: empty store + ops present; idempotent; the object rows stay).
         this.alertStore = ServiceStores.openAlertStore(root);
@@ -959,7 +959,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return notificationService;
     }
 
-    /** The deployment-default notification preference grid (Phase B6; ses-sns §7) — backs {@code /notifications/preferences/default}, and {@code /notifications/preferences} on Personal. */
+    /** The deployment-default notification preference grid (Phase B6; ses-sns §7) — backs {@code /notifications/preferences/default}, and {@code /notifications/preferences} on Basic. */
     public com.gamma.notify.NotificationPreferences notificationPreferences() {
         return notificationPreferences;
     }
@@ -1581,7 +1581,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     public List<com.gamma.util.BrowsableStore> browsableStores() {
         List<com.gamma.util.BrowsableStore> out = new ArrayList<>();
         // ⚠ The four operational-object stores come from the engine now (EDG-01 cell 7) — core does not
-        // hold them. A Personal build contributes none, so the browser simply lists fewer stores.
+        // hold them. A Basic build contributes none, so the browser simply lists fewer stores.
         objectEngine.ifPresent(e -> out.addAll(e.browsableStores()));
         if (status instanceof com.gamma.util.BrowsableStore b) out.add(b);
         jobService().ifPresent(js -> {
@@ -1638,7 +1638,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             wireJobClaims(created);                                // §5.2: cron arming + authored-pipeline exclusion
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.eventStore(events);                            // event_prune maintenance task (COMPLY-3)
-            created.objects(this.objects().orElse(null));           // recon.run promotion (seam; empty on Personal)
+            created.objects(this.objects().orElse(null));           // recon.run promotion (seam; empty on Basic)
             created.pipelineConfigLookup(this::configFor);         // kpi.completeness: the Collector's file template
             created.start();
             jobs = created;
@@ -1657,7 +1657,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * between them, so sharing one lease would never produce the intended exclusion — it would only ever fire
      * on an accidental name collision between two unrelated units of work. Hence {@code SCOPE_AUTHORED}.
      *
-     * <p>⚠ Heap-backed by default like every other lease, so Personal and single-node Standard get the
+     * <p>⚠ Heap-backed by default like every other lease, so Basic and single-node Standard get the
      * authored-pipeline fix (two differently-named jobs on one flow no longer overlap) without a DB.
      */
     private void wireJobClaims(JobService target) {

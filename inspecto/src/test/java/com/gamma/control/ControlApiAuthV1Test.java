@@ -209,9 +209,9 @@ class ControlApiAuthV1Test {
     }
 
     /**
-     * The other half of step 4b's contract: on Personal no Subject is ever attached, so no capability is
+     * The other half of step 4b's contract: on Basic no Subject is ever attached, so no capability is
      * ever CHECKED — and the AUDIT row must therefore carry none. Absence has to mean "not checked" and
-     * never "checked and passed", or an auditor reading a Personal log would be told writes were gated
+     * never "checked and passed", or an auditor reading a Basic log would be told writes were gated
      * on an edition that gates nothing. No Authenticator is armed here on purpose.
      */
     @Test
@@ -290,7 +290,7 @@ class ControlApiAuthV1Test {
 
     @Test
     void personalBootstrapServesTheInventoryToEveryone(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        // No Authenticator ⇒ Personal: there is no pre-sign-in state, so the full payload stays public.
+        // No Authenticator ⇒ Basic: there is no pre-sign-in state, so the full payload stays public.
         try (Ctx c = open(cfg, root)) {
             JsonNode b = V1Body.of(get(c.port, "/bootstrap").body());
             assertTrue(b.get("spaces").isArray());
@@ -310,7 +310,7 @@ class ControlApiAuthV1Test {
 
     @Test
     void personalEditionUnaffectedWhenNoAuthenticatorIsRegistered(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        // No Authenticators.forTest call — Authenticators.active() resolves empty, exactly like Personal.
+        // No Authenticators.forTest call — Authenticators.active() resolves empty, exactly like Basic.
         try (Ctx c = open(cfg, root)) {
             HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}");
             assertEquals(200, r.statusCode(), "no credential required when no Authenticator is present");
@@ -341,7 +341,7 @@ class ControlApiAuthV1Test {
 
     @Test
     void xActorHeaderIsRejectedOnProfessional(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        // SEC-7(a): with an Authenticator active (Professional), a client-supplied X-Actor is a spoof → 403,
+        // SEC-7(a): with an Authenticator active (Standard), a client-supplied X-Actor is a spoof → 403,
         // even alongside valid credentials — the actor must come from the authenticated Subject.
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
@@ -354,7 +354,7 @@ class ControlApiAuthV1Test {
 
     @Test
     void xActorHeaderStillHonouredOnPersonal(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        // No Authenticator (Personal): X-Actor stays the historic actor mechanism — the reject never fires.
+        // No Authenticator (Basic): X-Actor stays the historic actor mechanism — the reject never fires.
         try (Ctx c = open(cfg, root)) {
             HttpResponse<String> r = get(c.port, "/components/grammar", "X-Actor", "alice");
             assertEquals(200, r.statusCode(), r.body());

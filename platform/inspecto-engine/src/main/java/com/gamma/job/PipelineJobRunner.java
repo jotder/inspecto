@@ -623,7 +623,7 @@ public final class PipelineJobRunner implements Job {
      * the ingest tail, so registering there would register that lane TWICE — the hazard
      * {@code DuckLakeRegistrationSiteContractTest} exists to catch.
      *
-     * <p>⚠ Unconfigured is a no-op, as everywhere else: Personal and single-node Standard have no shared
+     * <p>⚠ Unconfigured is a no-op, as everywhere else: Basic and single-node Standard have no shared
      * lakehouse. ⛔ But when the topology is {@code partitioned} a catalog is REQUIRED, mirroring the ingest
      * path's rule — otherwise this lane would stay the one way to produce invisible output on a deployment
      * that has forbidden it.

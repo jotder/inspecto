@@ -19,10 +19,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The PROFESSIONAL half of `PROCESSOR-RELEASE-READINESS-1` G9 for Alert Rules: with this module on the
+ * The STANDARD half of `PROCESSOR-RELEASE-READINESS-1` G9 for Alert Rules: with this module on the
  * classpath its real {@code OpsEditionFeatures} provider is discovered through
  * {@code META-INF/services/com.gamma.etl.EditionFeatureProvider} — no test override — and the authoring
- * doors that core's {@code EditionFeatureGateTest} proves refused on Personal accept the rule.
+ * doors that core's {@code EditionFeatureGateTest} proves refused on Basic accept the rule.
  */
 class ProfessionalAlertRulesAcceptedTest {
 

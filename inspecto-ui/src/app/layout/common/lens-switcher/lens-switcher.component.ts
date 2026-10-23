@@ -30,7 +30,7 @@ import { Lens, LensService } from 'app/inspecto/api';
             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:chevron-down"></mat-icon>
         </button>
         <mat-menu #menu="matMenu">
-            <!-- constrained to the lenses the subject's grants project onto (all three on Personal) -->
+            <!-- constrained to the lenses the subject's grants project onto (all three on Basic) -->
             @for (l of lens.allowedLenses(); track l.id) {
                 <button
                     mat-menu-item

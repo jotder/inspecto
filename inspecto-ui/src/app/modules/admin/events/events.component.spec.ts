@@ -63,7 +63,7 @@ async function create(
     // The data-table injects the real MatDialog, so a stub must be OVERRIDDEN, not just provided.
     TestBed.overrideProvider(MatDialog, { useValue: dialog });
     await TestBed.compileComponents(); // data-table @defer block
-    // EDG-01 cell 6: SessionService.eventsEnabled defaults to FALSE (the Personal/absent-module state),
+    // EDG-01 cell 6: SessionService.eventsEnabled defaults to FALSE (the Basic/absent-module state),
     // where this screen renders the explained alert and never calls the API. These specs exercise the
     // INSTALLED path, so arm the flag before the component reads it in ngOnInit.
     // ⚠ AFTER overrideProvider, never before: TestBed.inject() INSTANTIATES the test module, and Angular

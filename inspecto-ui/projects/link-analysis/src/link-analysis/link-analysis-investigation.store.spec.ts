@@ -195,6 +195,38 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(store.canvas()?.nodes).toEqual([]);
     });
 
+    it('LA-GROW-EXCLUDE-UNDO-RACE-1: undo names its step; a 409 (a newer step by a team member) re-reads the log', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        logs['inv-1'].entries.push(entry(1, { op: 'seed', params: { ids: ['4471'] } }));
+        sets['inv-1'] = ws(['4471']);
+        await store.open('inv-1');
+        expect(store.undoTarget()).toBe(1); // the op log's Undo means step 1, as this browser read the log
+
+        // meanwhile a team member records step 2; the server refuses the undo of step 1 and undoes nothing
+        logs['inv-1'].entries.push(entry(2, { op: 'keep', params: { ids: ['4471'] } }));
+        inv.undoInvestigation.mockImplementation(() =>
+            throwError(
+                () =>
+                    new HttpErrorResponse({
+                        status: 409,
+                        error: { error: { message: 'step 1 is not the newest step any more: step 2 (keep by lead-1) is' } },
+                    }),
+            ),
+        );
+        const reads = inv.investigationLog.mock.calls.length;
+        expect(await store.undo(1)).toBe(false);
+        expect(inv.undoInvestigation).toHaveBeenCalledWith('inv-1', 1);
+        expect(store.error()).toContain('step 1 is not the newest step any more');
+        expect(inv.investigationLog.mock.calls.length).toBeGreaterThan(reads); // re-read: the screen now shows step 2
+        expect(store.undoTarget()).toBe(2);
+        expect(store.error()).toContain('step 1 is not the newest step any more'); // ...and the refusal stays readable
+
+        logs['inv-1'] = { ...logs['inv-1'], truncated: true };
+        await store.open('inv-1');
+        expect(store.undoTarget()).toBeUndefined(); // a cut log read names no step rather than a wrong one
+    });
+
     it('LA-UI-DRAFT-OPS-1: with a Draft as the working scope, steps and undo go to the Draft, never the main log', async () => {
         const { store, inv, logs, sets } = setup();
         await store.start(P, 'warrant 7');
@@ -218,7 +250,7 @@ describe('InvestigationSessionStore (LA-10)', () => {
             return of(step(2, 'undo'));
         });
         expect(await store.undo()).toBe(true);
-        expect(inv.undoDraft).toHaveBeenCalledWith('inv-1', 'd-1');
+        expect(inv.undoDraft).toHaveBeenCalledWith('inv-1', 'd-1', undefined);
         expect(inv.undoInvestigation).not.toHaveBeenCalled();
         expect(store.canvas()?.nodes).toEqual([]);
 
@@ -365,6 +397,7 @@ describe('InvestigationSessionStore (LA-10)', () => {
         );
         expect(await store.undo()).toBe(false);
         expect(store.error()).toBe('Refused — nothing to undo');
+        expect(inv.undoInvestigation).toHaveBeenLastCalledWith('inv-gone', undefined);
 
         store.forget('inv-gone');
         expect(store.refs()).toEqual([]);

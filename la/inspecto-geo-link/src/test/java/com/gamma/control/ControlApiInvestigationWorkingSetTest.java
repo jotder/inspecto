@@ -38,8 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * LA-20 — the Working Set as a log-defined derived relation ({@code GET /inv/investigations/{id}/working-set}) over
  * real HTTP: the relation's shape and provenance columns, its bounds, the cache (a repeat read is served from it, and
- * a stale read is impossible after an op, an undo or a fork), and the D-E7 gate — owner-only below Enterprise, and an
- * Enterprise {@code AccessDecider} DENY that hides it even from its owner while an ALLOW never widens it.
+ * a stale read is impossible after an op, an undo or a fork), and the D-E7 gate — owner-only below Advanced, and an
+ * Advanced {@code AccessDecider} DENY that hides it even from its owner while an ALLOW never widens it.
  *
  * <p>Fixture: the LA-10 call graph {@code alice–bob, alice–carol, bob–dave, bob–erin, carol–frank}.
  */
@@ -312,7 +312,7 @@ class ControlApiInvestigationWorkingSetTest {
     // ── D-E7 ───────────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Professional and below (no {@code AccessDecider}): OWNER-ONLY. The calls Dataset carries no sharing envelope,
+     * Standard and below (no {@code AccessDecider}): OWNER-ONLY. The calls Dataset carries no sharing envelope,
      * so every Subject can VIEW it — which is exactly why this proves there is no fallback to Dataset sharing.
      */
     @Test
@@ -346,7 +346,7 @@ class ControlApiInvestigationWorkingSetTest {
     }
 
     /**
-     * Enterprise: the edition's {@code AccessDecider} judges the resolved Investigation at the row PEP. A DENY hides it
+     * Advanced: the edition's {@code AccessDecider} judges the resolved Investigation at the row PEP. A DENY hides it
      * even from its owner; an ALLOW does not widen owner-only (the {@code AccessDecider} contract). The real
      * {@code PolicyEngine} is exercised end to end in {@code inspecto-policy}'s {@code ControlApiInvestigationPolicyTest}.
      */

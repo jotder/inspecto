@@ -416,6 +416,93 @@ class ControlApiOnboardingLifecycleTest {
         }
     }
 
+    /**
+     * LA-ONBOARD-DRIFT-1, the schema's side of F-4: a schema written ON ITS OWN that a delimited Pipeline already reads
+     * must keep index selectors, or that Pipeline stops loading. Both doors (/config/write, /config/patch), an existing
+     * schema and one a draft Pipeline names before it exists. The BACKWARD gate is overridden throughout, so only the new
+     * check can refuse. Falsified: with the {@code referencedSchemaSelectorFindings} calls removed, every write here
+     * answers 200.
+     */
+    @Test
+    void aSchemaWrittenAloneUnderADelimitedPipelineMustKeepIndexSelectors(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/config/write", """
+                    {"type":"schema","config":{"raw":{"name":"idx_schema","format":"CSV",
+                       "fields":[{"name":"txn_id","selector":"0","type":"VARCHAR"}]}}}""").statusCode());
+            assertEquals(200, post(c.port, "/config/write", """
+                    {"type":"pipeline","config":{"name":"idx_feed","dirs":{"poll":"in","database":"out"},
+                       "processing":{"schema_file":"idx_schema.toon","threads":1}}}""").statusCode());
+            String before = java.nio.file.Files.readString(root.resolve("idx_schema.toon"));
+
+            HttpResponse<String> named = post(c.port, "/config/write", """
+                    {"type":"schema","overwrite":true,"compatibility":"none","config":{"raw":{"name":"idx_schema","format":"CSV",
+                       "fields":[{"name":"txn_id","selector":"txn_id","type":"VARCHAR"}]}}}""");
+            assertEquals(422, named.statusCode(), named.body());
+            assertTrue(named.body().contains("ERR_SELECTOR_NOT_INDEX") && named.body().contains("idx_feed")
+                    && named.body().contains("selector 'txn_id'"), named.body());
+            HttpResponse<String> patched = post(c.port, "/config/patch", """
+                    {"type":"schema","name":"idx_schema","compatibility":"none","patch":{"raw":{
+                       "fields":[{"name":"txn_id","selector":"txn_id","type":"VARCHAR"}]}}}""");
+            assertEquals(422, patched.statusCode(), patched.body());
+            assertTrue(patched.body().contains("ERR_SELECTOR_NOT_INDEX"), patched.body());
+            assertEquals(before, java.nio.file.Files.readString(root.resolve("idx_schema.toon")), "nothing was written");
+            try (var left = java.nio.file.Files.list(root)) {
+                assertTrue(left.noneMatch(p -> p.getFileName().toString().startsWith(".selector-check-")), "no scratch file is left");
+            }
+
+            // a draft Pipeline names its schema before the schema exists: the schema's first write is judged too
+            assertEquals(200, post(c.port, "/config/write", """
+                    {"type":"pipeline","config":{"name":"later_feed","active":false,"dirs":{"poll":"in","database":"out"},
+                       "processing":{"schema_file":"later_schema.toon","threads":1}}}""").statusCode());
+            HttpResponse<String> first = post(c.port, "/config/write", """
+                    {"type":"schema","config":{"raw":{"name":"later_schema","format":"CSV",
+                       "fields":[{"name":"txn_id","selector":"txn_id","type":"VARCHAR"}]}}}""");
+            assertEquals(422, first.statusCode(), first.body());
+            assertTrue(first.body().contains("later_feed"), first.body());
+            assertEquals(200, post(c.port, "/config/write", """
+                    {"type":"schema","config":{"raw":{"name":"later_schema","format":"CSV",
+                       "fields":[{"name":"txn_id","selector":"0","type":"VARCHAR"}]}}}""").statusCode(), "index selectors write");
+        }
+    }
+
+    /**
+     * LA-ONBOARD-DRIFT-1: the drift check of a delimited schema (index selectors, the shape the suggestion writes and the
+     * load requires) matches each selector to the sample column at that POSITION. It used to look for a column called
+     * {@code "0"}, so an up-to-date schema showed every field missing and every column added.
+     */
+    @Test
+    void anIndexSelectedDelimitedDraftMatchesTheSampleByPosition(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            String rows = "[{\"txn_id\":\"T1\",\"amount\":\"10.5\",\"note\":\"x\"},{\"txn_id\":\"T2\",\"amount\":\"7.25\",\"note\":\"y\"}]";
+            JsonNode upToDate = V1Body.of(post(c.port, "/config/suggest/schema", """
+                    {"config":{"raw":{"fields":[
+                       {"name":"id","selector":"0","type":"VARCHAR"},
+                       {"name":"amt","selector":"1","type":"DOUBLE"},
+                       {"name":"note","selector":"2","type":"VARCHAR"}]}},
+                     "sampleRows":%s}""".formatted(rows)).body()).get("drift");
+            assertFalse(upToDate.get("drifted").asBoolean(), upToDate.toString());
+
+            JsonNode drift = V1Body.of(post(c.port, "/config/suggest/schema", """
+                    {"frontend":"delimited","config":{"raw":{"fields":[
+                       {"name":"id","selector":"0","type":"VARCHAR"},
+                       {"name":"amt","selector":"1","type":"BIGINT"},
+                       {"name":"gone","selector":"5","type":"VARCHAR"}]}},
+                     "sampleRows":%s}""".formatted(rows)).body()).get("drift");
+            assertEquals("note", drift.get("added").get(0).get("name").asText(), drift.toString());
+            assertEquals(1, drift.get("added").size(), drift.toString());
+            assertEquals("gone", drift.get("missing").get(0).get("name").asText(), "a position past the sample is missing");
+            assertEquals(1, drift.get("missing").size(), drift.toString());
+            assertEquals("amt", drift.get("typeChanged").get(0).get("name").asText());
+            assertEquals("DOUBLE", drift.get("typeChanged").get(0).get("suggested").asText());
+
+            // a name-addressed frontend still reads a selector as a column name
+            JsonNode json = V1Body.of(post(c.port, "/config/suggest/schema", """
+                    {"frontend":"json","config":{"raw":{"fields":[{"name":"id","selector":"0","type":"VARCHAR"}]}},
+                     "sampleRows":%s}""".formatted(rows)).body()).get("drift");
+            assertEquals("id", json.get("missing").get(0).get("name").asText(), json.toString());
+        }
+    }
+
     /** A draft still matching its sample reports no drift — the indicator must stay dark. */
     @Test
     void schemaSuggestReportsNoDriftForAnUpToDateDraft(@TempDir Path cfg) throws Exception {

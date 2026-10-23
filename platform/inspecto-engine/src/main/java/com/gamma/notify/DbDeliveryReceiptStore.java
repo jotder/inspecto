@@ -33,9 +33,9 @@ import java.util.Optional;
  * next send asks. This is also EDITIONS `CP-15`'s remaining gap, which is Standard-and-above.
  *
  * <p>⛔ <b>It does not become the default.</b> {@code -Ddelivery.receipts.backend} defaults to {@code none},
- * so a Personal install keeps the lean in-memory store and writes no new database file. That is deliberate
+ * so a Basic install keeps the lean in-memory store and writes no new database file. That is deliberate
  * twice over: this codebase's most repeated trap is a default-ON DB family creating files in the working
- * directory under {@code SpaceRoot.legacy()}, and CP-15 is a "not for Personal" cell.
+ * directory under {@code SpaceRoot.legacy()}, and CP-15 is a "not for Basic" cell.
  *
  * <p>⚠ <b>The status history is a JSON column, not a row per status.</b> {@link DeliveryReceipt#statusAt}
  * is a {@code Map<DeliveryStatus,Long>} precisely because a spam-button click produces {@code delivered}

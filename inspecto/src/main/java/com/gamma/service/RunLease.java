@@ -6,7 +6,7 @@ package com.gamma.service;
  * processes* rather than only within one JVM.
  *
  * <p>Two implementations: {@link PipelineRunGuard} (a binary semaphore per pipeline — the default, and
- * what Personal and single-node Standard keep using unchanged) and {@link DbRunLease} (a row per
+ * what Basic and single-node Standard keep using unchanged) and {@link DbRunLease} (a row per
  * pipeline with a TTL, so a lease abandoned by a dead pod is reclaimable).
  *
  * <h3>⚠ The Space is bound at CONSTRUCTION, never passed per call — and that is the whole design</h3>

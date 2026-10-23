@@ -163,6 +163,15 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             capability: 'canAdminister',
             label: 'Administer the Space (settings / agent governance)',
         },
+        {
+            // LA-GROW-EXCLUDE-RESIDUALS-1 (5): hung under Settings, where its main client gate lives (the Exclusion
+            // categories section); it also offers admin lists as Exclude targets and shows a restricted list's
+            // counts unrounded. The server gates every category-list write on the same capability.
+            id: 'linkgraph.exclusion-categories',
+            kind: 'action',
+            capability: 'canManageExclusionCategories',
+            label: 'Manage category exclusion lists (create, members, attributes)',
+        },
     ],
 };
 

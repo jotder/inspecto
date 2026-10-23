@@ -98,7 +98,7 @@ class PipelineDryRunTest {
     /**
      * A value its declared type cannot hold becomes NULL while the row is KEPT — a real ingest counts it as
      * {@code cast_failures} and reports SUCCESS, so the dry-run must say so instead of reading as clean
-     * (found driving the Enterprise demo, 2026-10-09). The clean run is the negative probe.
+     * (found driving the Advanced demo, 2026-10-09). The clean run is the negative probe.
      */
     @Test
     void warnsWhenADeclaredTypeWouldNullASampleValue(@TempDir Path dir) throws Exception {

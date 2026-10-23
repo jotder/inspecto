@@ -88,7 +88,7 @@ public final class QueryExecutor {
      * never a connection-wide policy, and this statement is framework-built from a {@code -D} property the
      * operator set. It is the same trust boundary the {@code CREATE VIEW} below already relies on.
      *
-     * <p>⚠ <b>Unconfigured is the common case and must stay free.</b> Personal and single-node Standard
+     * <p>⚠ <b>Unconfigured is the common case and must stay free.</b> Basic and single-node Standard
      * have no shared catalog; this is then a no-op and reads behave exactly as before.
      *
      * <p>⛔ <b>A configured-but-unreachable catalog FAILS the query rather than silently returning less.</b>

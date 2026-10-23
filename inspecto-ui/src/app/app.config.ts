@@ -71,7 +71,7 @@ export const appConfig: ApplicationConfig = {
         },
 
         // Read GET /bootstrap once to learn the edition's authMode and (under OIDC) resume a session
-        // from the refresh cookie, before routing runs. Never rejects — a Personal/offline backend just
+        // from the refresh cookie, before routing runs. Never rejects — a Basic/offline backend just
         // reports authMode:'none' and this is a no-op, so the auth-free boot path is unchanged (W6d).
         provideAppInitializer(() => inject(SessionService).init()),
         // SEP-06: optional features register their own viz-embed render hosts.

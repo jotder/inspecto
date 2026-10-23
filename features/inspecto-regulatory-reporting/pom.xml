@@ -27,8 +27,8 @@
         scope guard, as inspecto-case-management does); the approver roster, approver check and the Pending Change
         key it signs with stay in the core.
 
-        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles). THIN: no
-        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Personal)
+        Bundled from the Standard edition up (the Standard, Advanced and Preview profiles). THIN: no
+        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Basic)
         never compiles it.
     </description>
 

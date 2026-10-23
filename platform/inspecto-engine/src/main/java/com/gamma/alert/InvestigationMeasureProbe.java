@@ -9,7 +9,7 @@ import java.util.OptionalDouble;
  * one relation of a Link Analysis Investigation's Working Set.
  *
  * <p>A {@code ServiceLoader} SPI because the Investigation lives in the OPTIONAL {@code inspecto-geo-link} module
- * (Professional and above), which this engine does not depend on. Absent the module no implementation is found,
+ * (Standard and above), which this engine does not depend on. Absent the module no implementation is found,
  * no probe is wired, and Investigation rules are inert — the same "unknown, never fire" a Dataset measure rule
  * degrades to without its probe.
  *

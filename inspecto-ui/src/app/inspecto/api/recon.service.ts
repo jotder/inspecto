@@ -172,7 +172,7 @@ export class ReconApiService {
      * accept an inline draft. An Incident outlives the session, so it must reference a reconciliation
      * someone can still open; the server answers 404 for an unknown id.
      *
-     * ⚠ A **503** here is the expected Personal-edition state (no `inspecto-ops` module), not a failure:
+     * ⚠ A **503** here is the expected Basic-edition state (no `inspecto-ops` module), not a failure:
      * render it as an explained panel, never a toast.
      */
     /** Which Breaks of {@link reconciliation} already have an ACTIVE Incident — see {@link ReconPromotedResult}. */

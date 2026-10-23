@@ -35,11 +35,9 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) *Find paths (server)* stays unlocked on Basic (open explorer route, a Basic feature in… | — |
-| `LA-ONBOARD-DEFECTS-1` | P3 | defect | Inspecto LA explorer defects found by LA-ONBOARD-1 phases 6-8 (2026-10-22): (1) after Add a file in append mode the link index summary co… | — |
-| `LA-GROW-EXCLUDE-RESIDUALS-1` | P3 | feature | what LA-GROW-EXCLUDE-1 left after it shipped (2026-10-22; as-built in okf/product/module/la-core/architecture.md §6.8–§6.9). | — |
-| `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1` | P3 | defect | the Dossier still shows a restricted exclusion list's removed ids and true counts to an analyst who may not see its members. | — |
-| `LA-GROW-EXCLUDE-UNDO-RACE-1` | P3 | defect | in a shared Investigation, a Grow / Exclude Undo can take back a team member's step. | — |
+| `LA-GROW-EXCLUDE-RESIDUALS-1` | P3 | feature | what LA-GROW-EXCLUDE-1 left after it shipped (2026-10-22; as-built in okf/product/module/la-core/architecture.md §6.8–§6.9). | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
+| `LA-ACCESS-NODE-IDS-1` | P3 | defect | an Access profile that denies *Reveal link entities* or *Approve link expansions* changes nothing on screen: the Access-Catalog nodes are… | — |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | an InvestigationStore seam so the Investigation sidecar files can live on Postgres for multi-pod deployments. | demand |
 | `LA-INVESTIGATION-OPS-DEFERRED-1` | P3 | feature | the unbuilt half of the Investigation model. | demand |
 | `LA-A11Y-AUDIT-1` | P3 | chore | what remains of the Link Analysis / Geo accessibility audit is person-only: a screen-reader reading (NVDA / JAWS / VoiceOver: the node-li… | — |

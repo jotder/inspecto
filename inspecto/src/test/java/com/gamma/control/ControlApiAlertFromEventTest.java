@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * MODULE-REORG-P7 ALERT residue retirement - a {@code SEQUENCE_GAP} / conservation-imbalance Event is an Alert on
  * EVERY edition, visible on {@code GET /alerts} and workable through {@code POST /alerts/{id}/ack}. This module's
- * test classpath carries no operational-object module, so this is the Personal shape: before the move the same
+ * test classpath carries no operational-object module, so this is the Basic shape: before the move the same
  * Events produced no ALERT at all here.
  */
 class ControlApiAlertFromEventTest {

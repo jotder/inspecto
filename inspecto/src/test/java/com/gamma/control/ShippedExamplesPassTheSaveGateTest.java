@@ -30,10 +30,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * refusal. The Connections themselves are loaded through {@link ConnectionProfile#load}, the loader the
  * service uses. And no example may carry keys the save would call inert.
  *
- * <p>⚠ This module's tests run as <b>Personal</b> (no Professional module on the classpath), so the two
- * templates that demonstrate a Professional+ feature — the SFTP Collector's {@code post_action: MOVE}
+ * <p>⚠ This module's tests run as <b>Basic</b> (no Standard module on the classpath), so the two
+ * templates that demonstrate a Standard+ feature — the SFTP Collector's {@code post_action: MOVE}
  * archive and the DuckLake sink — are refused with {@code ERR_EDITION_FEATURE} (G9) and nothing else. That
- * exact set is asserted, so a new example leaning on a Professional+ feature is a decision, not an accident.
+ * exact set is asserted, so a new example leaning on a Standard+ feature is a decision, not an accident.
  */
 class ShippedExamplesPassTheSaveGateTest {
 

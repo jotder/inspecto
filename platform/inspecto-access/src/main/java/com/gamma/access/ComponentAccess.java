@@ -29,7 +29,7 @@ import static com.gamma.util.Values.trimOrEmpty;
  * component) have full access, a matching share grants {@code view} or {@code edit}, and everyone
  * else gets a 404 indistinguishable from absence (the SEC-7d contract — no existence leak).
  * Deleting a restricted component is owner-only; changing the envelope itself is owner-only on any
- * component that declares an owner. With no {@link Subject} attached (Personal edition, fail-open)
+ * component that declares an owner. With no {@link Subject} attached (Basic edition, fail-open)
  * everything is allowed, unchanged.
  *
  * <p><b>Role matching.</b> The {@link Subject} is capabilities-only by design (guideline 13 — role
@@ -147,7 +147,7 @@ public final class ComponentAccess {
     }
 
     /** 403 when {@code owner} names someone other than the authenticated caller, unless the caller holds
-     *  canConfigureAccess or canAdminister. No subject (Personal): no check. */
+     *  canConfigureAccess or canAdminister. No subject (Basic): no check. */
     private static void requireOwnerIsCaller(HttpExchange ex, Object owner) {
         if (!(RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s)) return;
         if (s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS) || s.capabilities().contains(Roles.CAN_ADMINISTER)) return;
@@ -183,7 +183,7 @@ public final class ComponentAccess {
     // ── decision ─────────────────────────────────────────────────────────────────
 
     private static int level(HttpExchange ex, Map<String, Object> content) {
-        if (!(RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s)) return OWN;  // Personal: fail-open
+        if (!(RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s)) return OWN;  // Basic: fail-open
         String owner = trimOrEmpty(content.get(OWNER));
         boolean ownerMatch = !owner.isEmpty() && owner.equals(s.id());
         boolean admin = s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS);

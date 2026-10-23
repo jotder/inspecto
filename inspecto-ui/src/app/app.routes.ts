@@ -23,7 +23,7 @@ const OPS_HOME_WITHOUT_EVENTS = 'pipelines';
  *  `LensService` restores synchronously from `localStorage` in its constructor).
  *
  *  ⚠ The Ops home is conditional (EDG-01 cell 6, 2026-09-08): `events` is the optional `inspecto-events`
- *  module's screen, so on a Personal build landing "/" there would drop an Ops user straight onto a pane
+ *  module's screen, so on a Basic build landing "/" there would drop an Ops user straight onto a pane
  *  whose every call 503s — the one place a hidden nav entry cannot save them, because nothing was clicked.
  *  `SessionService.init()` is an APP_INITIALIZER, so the flag is settled before this resolver runs. */
 export function lensHomeRedirect(): string {
@@ -46,8 +46,8 @@ export const appRoutes: Route[] = [
     // UIE-7: `landingGuard` resolves per-Demo-User landing > Space landing > Home and always redirects.
     { path: '', pathMatch: 'full', canActivate: [landingGuard], children: [] },
 
-    // Professional-edition OIDC guest routes (W6d) — shown only when authMode==='oidc' and there's no live
-    // session (authGuard bounces here). No app shell, no guard. On Personal/offline these are simply
+    // Standard-edition OIDC guest routes (W6d) — shown only when authMode==='oidc' and there's no live
+    // session (authGuard bounces here). No app shell, no guard. On Basic/offline these are simply
     // never navigated to. sign-in kicks off Auth-Code+PKCE; auth/callback redeems the returned code.
     {
         path: 'sign-in',
@@ -90,7 +90,7 @@ export const appRoutes: Route[] = [
     //     ]
     // },
 
-    // Inspecto inspector routes. Personal/core edition is auth-free (authGuard is a pass-through there);
+    // Inspecto inspector routes. Basic/core edition is auth-free (authGuard is a pass-through there);
     // the Standard edition (authMode==='oidc') gates entry on a live OIDC session, redirecting to
     // /sign-in when absent (W6d). Session state is resolved by SessionService.init before routing.
     {

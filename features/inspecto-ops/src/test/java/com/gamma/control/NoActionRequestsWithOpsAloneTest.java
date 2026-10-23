@@ -22,7 +22,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * MODULE-REORG-P7: a Professional install WITHOUT inspecto-action-requests - this module's own test class path has
+ * MODULE-REORG-P7: a Standard install WITHOUT inspecto-action-requests - this module's own test class path has
  * {@code inspecto-ops} (the Incident / Case providers of the linked-subject seam) and not the add-on - over real
  * HTTP. Every Action Request route answers 503 naming the missing module, {@code /bootstrap} reports
  * {@code features.actionRequests == false} next to {@code features.ops == true}, the {@code invoke-api} consequence

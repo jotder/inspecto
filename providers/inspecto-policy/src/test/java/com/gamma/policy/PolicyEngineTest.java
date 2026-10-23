@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The Enterprise PDP's own semantics (ABAC A3), exercised through {@link PolicyEngine#decide} on a
+ * The Advanced PDP's own semantics (ABAC A3), exercised through {@link PolicyEngine#decide} on a
  * genuine {@code HttpExchange} (the JDK type has no public constructor — same throwaway-server style
  * as the security module's tests): deny-overrides combining, target matching (a {@code resourceKinds}
  * target never bites at route level), context binding (A1 subject attributes, held roles,

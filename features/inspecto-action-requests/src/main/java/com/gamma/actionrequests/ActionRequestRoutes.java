@@ -142,7 +142,7 @@ public final class ActionRequestRoutes implements RouteModule {
     /**
      * Verification finding 2 — reading needs {@code canWorkIncidents} OR {@code canApproveChanges}, checked
      * literally here because a manifest entry names one capability and this is an either-or. A no-op without a
-     * Subject (Personal), like every capability gate.
+     * Subject (Basic), like every capability gate.
      */
     private static void requireReader(HttpExchange ex) {
         Subject s = ApiContext.subject(ex).orElse(null);
@@ -211,7 +211,7 @@ public final class ActionRequestRoutes implements RouteModule {
      * four-eyes decision — a {@code none-eligible} request stays {@code pending} (fail-closed), this only says so.
      * {@code none-eligible}: no role in the Space's table grants {@code canApproveChanges} (deny grants applied —
      * every edition), or the Authenticator enumerates its principals (Demo) and every holder is a maker.
-     * {@code none-eligible} also with no Authenticator (Personal): no Subject exists, so no one can decide.
+     * {@code none-eligible} also with no Authenticator (Basic): no Subject exists, so no one can decide.
      * When roles grant it but the Authenticator cannot enumerate who holds them (OIDC), the Space's {@link ApproverRoster} answers — empty is
      * {@code none-eligible}, a group or a listed non-maker is {@code ok}.
      * {@code unknown}: enumerating failed, a tampered record, or every enumerated non-maker holder is data-scoped.
@@ -318,7 +318,7 @@ public final class ActionRequestRoutes implements RouteModule {
             ActionRequests.audit(author, authorType, "action-request.no-eligible-approver", rec.get("id")
                     + " has no eligible approver: no one holding canApproveChanges in this Space is outside its "
                     + "makers — it stays pending until it expires unless a role is granted", rec,
-                    // Personal (no Authenticator) is none-eligible by construction — no one can ever decide there —
+                    // Basic (no Authenticator) is none-eligible by construction — no one can ever decide there —
                     // so it is informational, not a warning on every raise
                     Authenticators.active().isPresent() ? EventLevel.WARN : EventLevel.INFO);
         return rec;

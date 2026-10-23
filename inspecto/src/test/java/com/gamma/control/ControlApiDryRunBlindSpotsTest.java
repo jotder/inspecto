@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       has no executor for it and used to skip it — and everything below it — without a word. It now
  *       answers a warning that names the node and what it starved.</li>
  *   <li>A {@code sink.webhook} in a bundle with no {@code WebhookSinkTransport} (this module's test classpath
- *       is Personal-like: it does not depend on {@code inspecto-notify-channels}) used to preview as a
+ *       is Basic-like: it does not depend on {@code inspecto-notify-channels}) used to preview as a
  *       healthy branch, while the job dry run ({@code DryRunSinkWriter}) refuses it. Both now refuse the
  *       same way, through {@code WebhookSink.plan}.</li>
  * </ol>

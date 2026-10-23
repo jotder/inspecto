@@ -4,7 +4,7 @@ import java.util.Optional;
 
 /**
  * Resolves the edition's {@link AccessDecider}, mirroring {@link Authenticators}' "absent module ⇒
- * no-op wins" pattern: Personal/Standard ship no {@code META-INF/services} registration, so
+ * no-op wins" pattern: Basic/Standard ship no {@code META-INF/services} registration, so
  * {@link #active()} is empty and both PEPs (the authorize stage, {@code RowScope}) skip policy
  * evaluation entirely. Typed facade over a {@link SpiSlot}, which owns the caching/first-wins semantics.
  *
@@ -19,7 +19,7 @@ import java.util.Optional;
  * takes no configuration, so no typo can break it — only a packaging fault or {@code LinkageError} can,
  * which is precisely the case PKG-5 made non-fatal on purpose. ⛔ The judgement is that a tenancy boundary
  * is not a feature: losing it silently is worse than refusing to boot. Absence when <em>nothing is
- * registered</em> is still legitimate and still resolves empty — that is the Personal/Standard path.
+ * registered</em> is still legitimate and still resolves empty — that is the Basic/Standard path.
  */
 public final class AccessDeciders {
     private AccessDeciders() {}

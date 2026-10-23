@@ -10,11 +10,11 @@ import java.util.Set;
  * built-in tasks stay exactly where they are: a hard-coded {@code switch} that a reader can see in one
  * screen. Only the {@code default} arm changed — before throwing "unknown maintenance task" it asks the
  * providers on the classpath. So a built-in cannot be shadowed by a provider (the switch wins first), and
- * a Personal bundle with no provider behaves byte-identically to before, except for the tasks that were
+ * a Basic bundle with no provider behaves byte-identically to before, except for the tasks that were
  * deliberately moved out.
  *
  * <p><b>The first implementor</b> is {@code inspecto-backup}'s provider for {@code backup} /
- * {@code backup_verify} / {@code restore} — EDITIONS {@code OPS-06}, "not for Personal".
+ * {@code backup_verify} / {@code restore} — EDITIONS {@code OPS-06}, "not for Basic".
  *
  * <p>⚠ Discovered once per JVM through {@link java.util.ServiceLoader}, like every other SPI here. A task
  * name claimed by two providers is a deployment error and is reported as such at first use, fail-closed:

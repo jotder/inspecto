@@ -34,5 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-GROW-EXCLUDE-RESIDUALS-1` | P3 | feature | what LA-GROW-EXCLUDE-1 left after it shipped (2026-10-22; as-built in okf/product/module/la-core/architecture.md §6.8–§6.9). | — |
-| `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1` | P3 | defect | the Dossier still shows a restricted exclusion list's removed ids and true counts to an analyst who may not see its members. | — |
+| `LA-GROW-EXCLUDE-RESIDUALS-1` | P3 | feature | what LA-GROW-EXCLUDE-1 left after it shipped (2026-10-22; as-built in okf/product/module/la-core/architecture.md §6.8–§6.9). | operator |

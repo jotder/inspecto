@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Why this test exists.</b> The served {@code JobTypeDescriptor} for {@code maintenance} drives the
  * Jobs authoring form, and until 2026-09-09 its description was a hand-written string. Measured then, it
- * was wrong in both directions at once: it advertised four tasks a Personal bundle refuses — the incident
+ * was wrong in both directions at once: it advertised four tasks a Basic bundle refuses — the incident
  * purge plus the three backup tasks, all contributed by optional modules — and hid seven the engine ships.
  * A form that offers a task the dispatch cannot run, or hides one it can, is the defect; deriving the
  * string fixes today's instance, and this test is what stops it recurring.
@@ -97,7 +97,7 @@ class MaintenanceTaskContractTest {
 
         // The default reactor carries no MaintenanceTaskProvider: every optional module depends ON the
         // core, so the arrow points module -> core and a test here never sees one on its classpath. That
-        // makes this the Personal case, and the honest expectation is the built-ins and nothing else.
+        // makes this the Basic case, and the honest expectation is the built-ins and nothing else.
         assertEquals(MaintenanceJob.BUILT_IN_TASKS, MaintenanceJob.availableTasks(),
                 "with no provider installed, the advertised set must be exactly the built-ins — the old "
                         + "description named backup / backup_verify / restore / incident_purge here, all of "

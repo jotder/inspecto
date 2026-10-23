@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * create, list filtering, the 404 existence-hiding contract for shared-away subjects (read AND
  * mutate), view-vs-edit shares (user and role subjects), owner-only envelope changes and deletes,
  * the {@code canConfigureAccess} escape hatch, envelope carry-forward on plain saves, and the
- * fail-open Personal path (no {@link Authenticator} ⇒ envelopes are inert). Uses the
+ * fail-open Basic path (no {@link Authenticator} ⇒ envelopes are inert). Uses the
  * {@link Authenticators#forTest} seam, restored in teardown; role shares match via
  * {@link ComponentAccess#ATTR_HELD_ROLES}, stamped exactly like the security module does.
  */
@@ -225,7 +225,7 @@ class ControlApiComponentSharesTest {
 
     @Test
     void aFirstClaimMayOnlyClaimForTheCaller(@TempDir Path dir) throws Exception {
-        try (Ctx c = open(dir, false)) {   // Personal: no Subject, so no owner is stamped
+        try (Ctx c = open(dir, false)) {   // Basic: no Subject, so no owner is stamped
             assertEquals(200, send(c.port, "POST", "/components/dataset", "{\"id\":\"legacy\"}", null).statusCode());
         }
         try (Ctx c = open(dir, true)) {
@@ -242,7 +242,7 @@ class ControlApiComponentSharesTest {
         }
     }
 
-    // ── Personal edition (fail-open) ────────────────────────────────────────────────
+    // ── Basic edition (fail-open) ────────────────────────────────────────────────
 
     @Test
     void withoutAnAuthenticatorTheEnvelopeIsInert(@TempDir Path dir) throws Exception {

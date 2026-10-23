@@ -731,7 +731,7 @@ public final class GraphRunRoutes implements RouteModule {
 
     /**
      * What distinguishes one caller's row scope from another's, for the result cache's key: a hash of the Subject's data
-     * scopes and attributes (the inputs the Enterprise PDP's row rule reads), {@code ""} with no Subject. Today a shared
+     * scopes and attributes (the inputs the Advanced PDP's row rule reads), {@code ""} with no Subject. Today a shared
      * Working Set does not vary with scope, so this is a tripwire (design §6.1 B), not a partition in use.
      */
     static String scopeFingerprint(HttpExchange ex) {

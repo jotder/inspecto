@@ -37,9 +37,9 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>An Alert Rule's owner is the component's R3 sharing-envelope {@code owner} ({@link ComponentAccess}):
  *       stamped from the authenticated {@link Subject} on create, carried forward by an edit, and changed only
  *       by the owner or an access admin — through {@code /alerts/rules} exactly as through
- *       {@code /components}. With no Subject (Personal) the rule is {@code appUser}, i.e. unowned.</li>
+ *       {@code /components}. With no Subject (Basic) the rule is {@code appUser}, i.e. unowned.</li>
  *   <li>A notification addressed to one Subject is in that Subject's feed and badge count only, and a
- *       broadcast is in everyone's; without a Subject (Personal) everything is shown, as before.</li>
+ *       broadcast is in everyone's; without a Subject (Basic) everything is shown, as before.</li>
  * </ul>
  */
 class ControlApiAlertOwnerTest {

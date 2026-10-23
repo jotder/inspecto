@@ -28,7 +28,8 @@ import java.util.Set;
  * rounded ({@link EntityListFacts#roundedCount}); a Working Set's {@code excludedKeys} lose the keys those steps
  * remembered, with {@code excludedKeysHidden: true}; a log line's count of removed entities is rounded. ⚠ Not hidden: the
  * Working Set delta still names the admitted entities a step removed (the canvas needs them, and the analyst saw them
- * before the step), and the Dossier is unchanged (deferred, BACKLOG).
+ * before the step). The Dossier renders such an {@code excludeBy} with a rounded count and no removed id
+ * ({@code DossierRoutes.restrictedSteps}, LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1).
  */
 final class RestrictedLists {
 

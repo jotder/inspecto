@@ -114,7 +114,17 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         svc.undoInvestigation('inv/1').subscribe();
         const undo = httpMock.expectOne(`${base}/inv/investigations/inv%2F1/undo`);
         expect(undo.request.method).toBe('POST');
+        expect(undo.request.body).toEqual({});
         undo.flush({});
+        // LA-GROW-EXCLUDE-UNDO-RACE-1: the step the caller means, for the server's 409 when another is newest
+        svc.undoInvestigation('inv-1', 3).subscribe();
+        const named = httpMock.expectOne(`${base}/inv/investigations/inv-1/undo`);
+        expect(named.request.body).toEqual({ undoes: 3 });
+        named.flush({});
+        svc.undoDraft('inv-1', 'd-1', 9).subscribe();
+        const draft = httpMock.expectOne(`${base}/inv/investigations/inv-1/drafts/d-1/undo`);
+        expect(draft.request.body).toEqual({ undoes: 9 });
+        draft.flush({});
 
         svc.reorderInvestigation('inv-1', { order: [2, 1] }).subscribe();
         const fork = httpMock.expectOne(`${base}/inv/investigations/inv-1/reorder`);

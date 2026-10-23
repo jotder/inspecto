@@ -141,7 +141,7 @@
                  javax.mail half of that argument moved out with `SmtpEmailChannel` on 2026-09-07 (EDG-01
                  cell 1) — see `inspecto-notify-channels`, which now carries the identical reasoning for
                  its own shade. Removing the dependency also drops a CDDL/GPLv2+CE artifact from the
-                 sidecar Personal ships.
+                 sidecar Basic ships.
                  The core is `provided` above, so it and its deps are excluded by construction; what lands
                  here is exactly the network-client set this module exists to confine. -->
             <plugin>
@@ -164,7 +164,7 @@
                                      CollectorConnectorFactory entries and the two DeliveryStatusAdapter
                                      entries are lost. ⚠ SmtpEmailChannel used to be in this list; it moved
                                      to inspecto-notify-channels on 2026-09-07 (EDG-01 cell 1) because this
-                                     sidecar is bundled in EVERY edition and CP-15 is not for Personal. The
+                                     sidecar is bundled in EVERY edition and CP-15 is not for Basic. The
                                      inbound DeliveryStatusAdapters stay: they are inert without a
                                      configured signing key and DeliveryStatusRoutes 404s an unconfigured
                                      adapter. -->

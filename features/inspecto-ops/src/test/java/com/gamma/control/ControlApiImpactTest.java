@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * WS-10 ({@code ASSURE-IMPACT-LEDGER-1}): {@code PUT /objects/{id}/impact} records an Incident's or Case's typed
  * financial impact, with {@code outstanding} derived on read. One test per gate — 401/403 (capability, before
  * existence-hiding), 400 (malformed), 422 (validation, another key, a wrong object type), 409 (terminal state),
- * 404 (unknown id) — then the happy path, its audit, and the per-currency analytics roll-up. The 503 a Personal
+ * 404 (unknown id) — then the happy path, its audit, and the per-currency analytics roll-up. The 503 a Basic
  * bundle answers is pinned by core's {@code NoOperationalObjectsShipInThePersonalBuildTest}.
  *
  * <p>Armed with seeded-role Subjects ({@link Roles#SEED}), as {@code ControlApiIncidentFinishGateTest} is.

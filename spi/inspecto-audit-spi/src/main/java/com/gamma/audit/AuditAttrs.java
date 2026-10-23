@@ -68,7 +68,7 @@ public final class AuditAttrs {
     /** The capability a {@code withCapability} gate CHECKED on the request. On an {@code ACCESS_DENIED} row
      *  it is the capability that was missing — the answer to "denied WHAT?", which the log did not hold
      *  before. On an {@code AUDIT} row it marks a PRIVILEGED write: the capability the write passed. Absent
-     *  when no check ran (a 401, an ungated route, or Personal, where no Subject is ever attached) — so
+     *  when no check ran (a 401, an ungated route, or Basic, where no Subject is ever attached) — so
      *  absence means "not checked", never "checked and passed". */
     public static final String CAPABILITY = "capability";
 

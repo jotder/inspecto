@@ -29,10 +29,10 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The PERSONAL half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"):
- * this module's test classpath carries no Professional module, so it IS the Personal build, and each of the
- * three Professional+ features is refused with {@code ERR_EDITION_FEATURE} at every door it can come through.
- * The Professional half — the same configs accepted because the real module declares the feature — lives
+ * The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"):
+ * this module's test classpath carries no Standard module, so it IS the Basic build, and each of the
+ * three Standard+ features is refused with {@code ERR_EDITION_FEATURE} at every door it can come through.
+ * The Standard half — the same configs accepted because the real module declares the feature — lives
  * where those modules are: {@code ProfessionalAlertRulesAcceptedTest} (inspecto-ops) and
  * {@code ProfessionalSinkFeaturesAcceptedTest} (inspecto-backup).
  */
@@ -132,7 +132,7 @@ class EditionFeatureGateTest {
                 .get(0).fieldPath());
 
         assertEquals(1, editionFindings("alert", Map.of("name", "a")).size(), "the legacy alert type too");
-        // What stays Personal: every other post-action, and a lake block that is not enabled.
+        // What stays Basic: every other post-action, and a lake block that is not enabled.
         assertEquals(List.of(), editionFindings("pipeline", pipeline("collector", Map.of("connector", "sftp",
                 "post_action", Map.of("on_success", "DELETE")))));
         assertEquals(List.of(), editionFindings("pipeline", pipeline("output",

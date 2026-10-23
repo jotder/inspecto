@@ -142,7 +142,7 @@ export class ReconciliationDetailComponent implements OnInit {
     private readonly liveBreaks = signal<ReconBreak[] | null>(null);
 
     /**
-     * Set once a promote attempt comes back 503 — the Personal edition has no `inspecto-ops` module, so
+     * Set once a promote attempt comes back 503 — the Basic edition has no `inspecto-ops` module, so
      * Incidents do not exist in this bundle. ⚠ That is a deployment state, not a failure: it renders as an
      * explained inline panel and the action hides itself, never a red toast (the Approvals-inbox lesson).
      * It is latched rather than probed, because there is nothing cheap to probe — the first attempt IS the

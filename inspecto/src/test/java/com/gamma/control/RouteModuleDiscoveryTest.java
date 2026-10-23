@@ -86,7 +86,7 @@ class RouteModuleDiscoveryTest {
 
     /**
      * 🔴 The bug the first 3b build shipped, in miniature: a stub occupied a pattern and {@code hasRoute}
-     * counted it, so {@code /bootstrap} reported the module present on a Personal build. A stub must answer
+     * counted it, so {@code /bootstrap} reported the module present on a Basic build. A stub must answer
      * (here: 503) WITHOUT being a "real" route, and a real registration over a stub must be refused rather
      * than silently losing every match to the stub registered before it.
      */

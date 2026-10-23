@@ -210,7 +210,9 @@ picked when you come from *Explore in Link Analysis*), then what to start from:
 * **One entity** - pick the **Entity Type** first (the Dataset's main one is already chosen: accounts for
   transfers, phone numbers for calls), then type the value. As you type, matching values appear with how busy they
   are: *MULE-HUB-01 - 10 links, first seen 3 Sep 2026, last seen 30 Sep 2026*. Any Entity Type works - an account is
-  no longer refused as "not a phone number". A masked type suggests nothing: type the whole value.
+  no longer refused as "not a phone number". A masked type suggests nothing: type the whole value - or, if you may
+  reveal masked values, choose *Show its values* (each look-up is recorded). The Entity Type you pick is what the
+  graph is drawn as, also when it is not the Dataset's main one.
 * **A list** - pick an Entity List (suspects, a watch list).
 * **A paste** - paste values, one per line (commas and semicolons work too).
 * **The whole Dataset** - draws every link at once. When the Dataset holds more entities than the node cap, the

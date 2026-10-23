@@ -421,7 +421,7 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
   /inv/entities/{type}/resolve {key}` (raw value or alias, in the body) answers the alias of the normalised key - the same alias
   the exploration reads mint - or, for an unmasked type, the normalised value. The envelope's `links.self` echoes the request
   path, which is why the rule is enforced at the route.
-* **The Start box's type-ahead** (LA-ONBOARD-1 phase 6, OB-9): `POST /inv/entities/{type}/suggest {prefix?, dataset?, limit?}`
+* **The Start box's type-ahead** (LA-ONBOARD-1 phase 6, OB-9; `reveal` §6.12): `POST /inv/entities/{type}/suggest {prefix?, dataset?, limit?, reveal?}`
   runs over the same union relation, restricted to the type's LINK-END bindings (`source` / `target`; attribute columns never
   start a graph) and optionally one Dataset: values whose raw spelling or normalised key begins with the prefix, busiest
   first, with their link rows and first / last seen, plus `distinct` (Entities matching; a value that normalises to nothing
@@ -1021,8 +1021,17 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
   `protected: null` and `list.removed` rounded (nearest 5, never below 5, 0 stays 0); the log view's "Excluded N entities"
   is rounded; `/replay` (main and Draft) drops the `excludedKeys` those steps remembered and says `excludedKeysHidden: true`.
   ⚠ Not hidden, deliberately: the step's Working Set **delta** still names the admitted entities it removed (the canvas
-  needs them, and the analyst saw them a step earlier), and the **Dossier** (its ledger counts and negative space) is
-  unchanged — BACKLOG `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`.
+  needs them, and the analyst saw them a step earlier).
+- **The Dossier** (`LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`, fixed 2026-10-23) hides the same for that caller, in every
+  form it leaves in (`json`, `steps`, `method`, `html`, the bundle and the hand-off — all go through
+  `DossierRoutes.maskedDossier`): `DossierRoutes.restrictedSteps` hands `GraphDossierBuilder.Input.restrictedSteps` the
+  `RestrictedLists` steps, and each such `excludeBy` renders as *"Excluded about N entities on Entity List `x` (…)
+  (reason: …); which entities is not shown: the list is restricted (the count is rounded)."* in the ledger (row
+  `membersHidden: true`), the undone list and the method statement; `negativeSpace.excluded` drops its ids and
+  `negativeSpace.excludedHidden` carries one row per step `{step, count (rounded), reason, author, basis, membersHidden}`;
+  `excludedCount` and `summary.excluded` add the rounded counts. Render time only: the manifest hashes the store, so the
+  same `/dossier/verify` agrees. ⚠ Still exact, deliberately: the ledger's `entitiesAfter` (the Working Set size after
+  each step) — the same difference the step's delta already shows that analyst.
 - **Grow previews.** `GrowPreview.listLine` rounds a list's `removed` only when the list is restricted (now, sealed, or
   no longer known) and the caller holds neither grant; an open list's count is exact. The Basic explorer's
   `POST /inv/projection/neighbors/preview` refuses `excludeBy` over a restricted list to such a caller (403), because two
@@ -1031,9 +1040,10 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
   `{lists: [{id, title, entityType, ownerKind, autoApply, visibility, size}]}`: live exclusion lists, admin first, then by
   title and id; never members. Read-gated like the Entity List reads (Space access; 503 without a write root). Rate class
   exempt.
-- Tests: `ControlApiInvestigationCategoryListsTest` (geo-link, 5: auto-apply recorded and replayed with an optional, an
+- Tests: `ControlApiInvestigationCategoryListsTest` (geo-link, 7: auto-apply recorded and replayed with an optional, an
   analyst and a retired list beside it; the unsealable list refusing the create with nothing written; the chips in Basic;
-  503; restricted hiding and rounding for an analyst against the true values for a `canRevealLinkEntities` lead).
+  503; restricted hiding and rounding for an analyst against the true values for a `canRevealLinkEntities` lead; the
+  Dossier in all four formats for each of them, its manifest still verifying; the Undo race below).
 
 ### 6.9 Grow, Held and Exclude on the graph (LA-GROW-EXCLUDE-1, SPA, as built 2026-10-22)
 
@@ -1069,8 +1079,20 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   preview counting one would promise removals the Grow does not make. Category lists therefore apply to Investigations
   only (auto-apply on create, §6.8); the explorer's Exclude hides locally and can add to a list.
 - **Undo.** A Grow / Exclude result line offers Undo while the steps it made are still the newest effective steps of the
-  log as last read (`valid()`); it sends the `undo` op once per step. Ctrl+Z runs that Undo first, then the display
-  undo. The explorer's Undo restores the graph snapshot only while the graph is the one the Grow drew.
+  log as last read (`valid()`); it sends the `undo` op once per step, newest first, each naming its step
+  (`{undoes: step}`). Ctrl+Z runs that Undo first, then the display undo. The explorer's Undo restores the graph
+  snapshot only while the graph is the one the Grow drew.
+- **The Undo names the step it means** (`LA-GROW-EXCLUDE-UNDO-RACE-1`, fixed 2026-10-23). In a shared Investigation
+  another lead may record a step after this browser last read the log; the old route undid the newest effective step,
+  so that step was the one taken back. `POST …/undo` (and a Draft's) now takes an optional body `{undoes: step}`
+  (`InvestigationRoutes.expectedUndo`: a whole number from 1, else 422): when the newest effective step is another one
+  the answer is **409 `CONFLICT_STALE_VERSION`** naming it (*"step 2 is not the newest step any more: step 3 (keep by
+  lead-1) is - read the log again; nothing was undone"*) and nothing is written. Checked inside `untilWon`, against the
+  log each attempt reads, so a step that lands while the undo retries is caught too. Without `undoes` the route is
+  unchanged. The SPA always names it: the Grow / Exclude result line (`undoOf`), *switch a list off* (the list's step)
+  and the op log's Undo button (`InvestigationSessionStore.undoTarget`: the newest effective step read; none while
+  the log read was cut, `truncated`). On a refusal the store re-reads the log, so the screen shows the newer step,
+  the refusal stays in the error line and the result line's Undo is no longer offered.
 - **Switch a list off = the `undo` of its step**, so only a list applied by the newest effective step can be switched off;
   a list applied earlier, or in several steps, says why (`listsInForce`). A "skip this list for one Grow" would need an
   `expand` parameter nobody has specified — deferred.
@@ -1082,19 +1104,22 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   profile labels: Telecom *subscribers / calls*, Mobile Money *wallets / transfers*); the technical term (expand, super node,
   exclusion list) stays in the tooltip.
 - **Keyboard.** **G** Grow, **X** Exclude…, **Ctrl+Z** Undo — not in a text field, grid, menu or dialog; listed in the main
-  app's `?` shortcuts help (`shortcuts-help.dialog.ts`). The standalone `la-app` has no `?` help dialog.
-- **Gotchas and deferrals** (open rows in [BACKLOG](../../../../BACKLOG.md)):
-  - *Shared-Investigation Undo race* (`LA-GROW-EXCLUDE-UNDO-RACE-1`): `POST …/undo` takes back the newest effective step
-    and carries no expected step, so a team member's step appended after this browser last read the log is the one undone.
-  - *Dossier* (`LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`): it still lists a restricted list's removed ids and true counts.
+  app's `?` shortcuts help (`shortcuts-help.dialog.ts`) and, since 2026-10-23, the standalone `la-app`'s: its shell
+  opens the same dialog on a bare `?` (never in a text field) with its own list, `LA_APP_SHORTCUTS` (no command palette
+  or triage-list keys, which la-app does not have), passed as the dialog data `{shortcuts}`.
+- **Access Catalog.** `canManageExclusionCategories` has its action node since 2026-10-23: `linkgraph.exclusion-categories`
+  (the id `LensService` reads), under Settings, where the Exclusion categories section is its main client gate.
+- **Gotchas and deferrals** (open rows in [BACKLOG](../../../../BACKLOG.md), `LA-GROW-EXCLUDE-RESIDUALS-1`):
   - *Previews are not audited*: neither preview route writes an audit record or event (read-shaped, rate class EXPENSIVE).
   - *A broken auto-apply list blocks every Investigation create* in the Space (fail closed, the refusal names the list)
     until an administrator fixes or retires it.
-  - No Access-Catalog node carries `canManageExclusionCategories` yet (`LensService` reads the identity capability).
   - The think-aloud test with two new users (`tests-think-aloud-script.md`) was not run (`LA-GROW-EXCLUDE-THINK-ALOUD-1`).
-- Tests: `grow-exclude.spec.ts`, `grow-exclude.store.spec.ts`, the four component specs (axe-clean, hints remembered and
-  blocked storage), and `link-analysis.component.spec.ts` "Grow, Held and Exclude on the graph" (one explorer preview
-  with its body; a 403 shown in the panel; the rail, Basic Grow, Undo, Ctrl+Z, degrading without the routes).
+- Tests: `grow-exclude.spec.ts`, `grow-exclude.store.spec.ts` (each Undo names its step; a refused one is reported, never
+  undone), `link-analysis-investigation.store.spec.ts` (the 409 re-reads the log; `undoTarget`), `inv.service.spec.ts`
+  (the `undoes` body), the four component specs (axe-clean, hints remembered and blocked storage),
+  `link-analysis.component.spec.ts` "Grow, Held and Exclude on the graph" (one explorer preview with its body; a 403
+  shown in the panel; the rail, Basic Grow, Undo, Ctrl+Z, degrading without the routes), `shortcuts-help.dialog.spec.ts`
+  and `la-shell.component.spec.ts` (la-app's `?`), `access-catalog.spec.ts` (the node).
 
 ### 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
 
@@ -1157,10 +1182,14 @@ limits and the commit's write order are in
     browser cannot claim a milestone.
   * **Routes** (`OnboardingRoutes`, core, every edition): `GET /onboarding/metrics` (`canAdminister` in the manifest;
     with no sign-in anyone) answers `{recording, firstLaunch, launches, spacesCreated, firstSpace/Dataset/Graph,
-    guideCompleted, each with *Seconds from the first launch, abandoned {step: n}}`; `POST /onboarding/events` is a
-    `self-limiting` exemption (open to any signed-in caller: a beginner is who reports it) on the standard rate bucket
-    (`ControlApi.isRateLimited`). Pinned by `ControlApiOnboardingCountersTest` (file, vocabulary, 401/403/200, 429),
-    `OnboardingCountersTest`, and the milestone assertions in `ControlApiSpaceSamplesTest` and
+    guideCompleted, each with *Seconds from the first launch, abandoned {step: n}, abandonedCapReached}`;
+    `POST /onboarding/events` is a `self-limiting` exemption (open to any signed-in caller: a beginner is who reports it)
+    on the standard rate bucket (`ControlApi.isRateLimited`). The file keeps at most
+    `OnboardingCounters.ABANDONED_CAP_PER_STEP` (1000) `step_abandoned` lines per step, re-counted from the file at
+    install, so an open route cannot grow it without bound; a report past that answers 200 and is dropped, and
+    `abandonedCapReached` turns true (`LA-ONBOARD-RESIDUALS-1` item 11, 2026-10-23). Pinned by
+    `ControlApiOnboardingCountersTest` (file, vocabulary, 401/403/200, 429), `OnboardingCountersTest` (the cap
+    across a restart), and the milestone assertions in `ControlApiSpaceSamplesTest` and
     `ControlApiOnboardLinkAnalysisTest` (falsified: without the `InvRoutes` record the first graph stays null).
   * **SPA**: `OnboardingEventsService` (`src/app/inspecto/onboarding/`, fire-and-forget, a failure is silent) and the
     la-app **Settings → Getting started counters** section (server audience, read-only, listed when there is no sign-in
@@ -1195,10 +1224,61 @@ limits and the commit's write order are in
 * **Two phase 7 leftovers fixed.** (1) **A case's name came back as its id in My work**: `ComponentStore.write` stamps
   the content's `name` with the id (in-file identity = URL id), so the display name a save wrote under `name` was
   overwritten on every save. The view codec (`link-analysis.service.ts`) now also writes `title` and reads
-  `title ?? name ?? id`; older views read as before. ⚠ The Geo map's saved views use the same `SavedViewStore` pattern
-  and keep the defect (`LA-ONBOARD-DEFECTS-1`). (2) **One purpose vocabulary**: `ENTITY_LIST_PURPOSES` now carries the
+  `title ?? name ?? id`; older views read as before. The Geo map's saved views had the same defect; fixed in §6.12.
+  (2) **One purpose vocabulary**: `ENTITY_LIST_PURPOSES` now carries the
   plain words (*Watch these* · *Never follow these (exclusion)* · *Known good* · *Block*) and `purposeWords()` reads
   them; the Entity Lists page, New list and Add to a list all say it that way (`PURPOSE_WORDS` is gone).
+
+### 6.12 Explorer defects found by the acceptance drive, fixed (LA-ONBOARD-DEFECTS-1, as built 2026-10-23)
+
+Each fix carries a test that fails on the code before it (falsified).
+
+* **The index summary counts the whole index.** After *Add a file* in append mode the summary said "2,215 links between
+  624 entities" for a Dataset of 4,430 rows over 312 accounts: `ScheduledIndexBuild` reported the APPEND build's own
+  `IndexBuilder.Result` (the delta's edges) and the `nodes` table's row count, which after an append holds the parent's
+  rows plus the delta's (an entity in both counts twice; only a COMPACT folds them). The outcome - BUILT and UP_TO_DATE
+  alike - now reports what the published version holds: edges = the manifest's `out` rows, nodes =
+  `IndexBuilder.distinctNodes(versionDir, manifest)` (a `count(DISTINCT id)` over the version's `nodes` files, read only
+  when the manifest has deltas; a failed count falls back to the row count and never fails the build). The index status
+  route's `nodes` (`IndexRoutes`, the manifest row count) is unchanged. Test: `ControlApiOnboardLinkAnalysisTest`
+  "afterAnAppend...".
+* **A start is typed by the Entity Type it names.** `drawStart(ds, values, entityType?)` types the drawn mapping by the
+  Start box's pick (one entity, a paste), the Entity List's own type (a list), or the type the graph on screen was drawn
+  as (*Start from these*); only with none does the Dataset's primary type (`startCatalogue`'s `mapping.entityType`) stand.
+  It was always the primary, so a wallet started over a transfers file was read, normalised and masked as an account.
+  A case saves the type as the optional `start.entityType` (read defensively by `startOf`; older cases read as before),
+  and `growEntityType` (what *Add to a list* types a list by) reads the drawn mapping's type before the primary.
+  Specs: `link-analysis.component.spec.ts` "a start types its mapping...", "a list start is typed by the list...",
+  `link-analysis.service.spec.ts`.
+* **The type-ahead refreshes on returning to *One entity*.** The Start box's suggestions stream read the kind only when
+  another source emitted; the kind is now a source of its own, so a Dataset or type picked while on *A list* is asked
+  for on the way back. Spec: `link-analysis-start-box.component.spec.ts` "switching back to One entity...".
+* **A masked type can be revealed in the type-ahead.** `POST /inv/entities/{type}/suggest` takes an optional
+  `reveal: true`: it needs `canRevealLinkEntities` (403 otherwise, checked in the route as the hand-off does; the route
+  stays a `read-shaped` exemption), lists the masked type's raw values and counts per prefix, answers `revealed: true`
+  and is audited with `revealed` on `LINK_ENTITY_SUGGESTED`. Without the ask nothing changes for anyone. The Start box
+  never asks on its own: on a masked answer it offers someone who may reveal (`LensService.canRevealLinkEntities`) the
+  button *Show its values (you may reveal them; recorded)*; the reveal holds for that Entity Type only. Tests:
+  `ControlApiEntitySuggestTest` "aRevealerAskingReveal...", the start box spec "a masked type: someone who may reveal...".
+* **Saved-view names on the Geo map and in Studio.** The Geo map's view codec (`geo-map.service.ts`) writes `title`
+  and reads `title ?? name ?? id`, as the Link Analysis case codec does (§6.11); the Studio explore Widget's saved-view
+  picker (`explore.component.ts`) shows `content.title` before `content.name`. Specs: `geo-map.service.spec.ts`,
+  `explore.component.spec.ts`.
+* **Sign-out and sign-in in one tab.** `KeepAliveRouteReuseStrategy` keyed a kept page on Space and person, but a
+  sign-out clears the person (`SessionService.onAuthLost`) BEFORE it navigates to sign-in, so the page was kept for
+  "nobody"; the next person landed back on Link Analysis before the session had read their name - "nobody" again - and
+  got the previous person's page. With sign-in on, `shouldDetach` now keeps a page only while someone is signed in: a
+  page left by nobody is destroyed. Without sign-in (Basic) nothing changed. A sign-out therefore also ends what the
+  same person had open. Spec: `keep-alive.strategy.spec.ts` "signing out on the page and in as someone else...".
+* **An Add data import is shared with its Space** (decided here: the smallest correct fix; the alternative, a *Share*
+  control on the import's Dataset card, needs a sharing route - `PUT` on the component cannot drop a `shares` key and
+  the sharing model names roles and users, not "everyone in this Space"). The commit no longer writes `shares: []`, so
+  the entry behaves like every other Dataset in the Space: `owner` (the importer) is provenance, a colleague can view and
+  start from it, and changing it still needs the route's capability (`canAuthorWorkbench` for its columns,
+  `canUploadData` for *Add a file*). A Dataset made private through the component routes stays private. Imports
+  committed before this change keep `shares: []`; nothing migrates them. A person who wants a file to themselves uses
+  the analyst upload (§6.6) into their own Collector. Test: `ControlApiOnboardFilesTest`
+  "withSignInSelfImportIsOffByDefault...".
 
 ## 7. Host registration, Jobs and live detection
 

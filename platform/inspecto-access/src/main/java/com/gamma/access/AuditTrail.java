@@ -65,7 +65,7 @@ public final class AuditTrail {
                     : status >= 400 ? " (refused, HTTP " + status + ")" : "";
             // The capability this request was PRIVILEGED by — present iff a capability check ran and
             // passed on the way in (ApiContext.requireCapability, Subject attached). Its absence on an
-            // AUDIT row therefore means "an ordinary mutation, or Personal where nothing is checked";
+            // AUDIT row therefore means "an ordinary mutation, or Basic where nothing is checked";
             // its presence is what lets "every privileged write, by actor, by capability, in the window"
             // be one /audit/search query instead of a hand-built join (compliance plan step 4b).
             Object capability = RequestAttrs.attr(ex, RequestAttrs.ATTR_CAPABILITY);

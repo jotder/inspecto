@@ -387,7 +387,7 @@ final class ConfigPreviewRoutes implements RouteModule {
             // drifted FROM, and the response stays the pre-B3 full suggestion.
             if (body.get("config") instanceof Map<?, ?>)
                 out.put("drift", driftBody(com.gamma.pipeline.exec.SchemaSuggest.drift(
-                        mapAt(body, "config"), inferred)));
+                        mapAt(body, "config"), inferred, byIndex)));   // LA-ONBOARD-DRIFT-1: an index selector is a position
             return out;
         } catch (IllegalArgumentException badSample) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, badSample.getMessage());

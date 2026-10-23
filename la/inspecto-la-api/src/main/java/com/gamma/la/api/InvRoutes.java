@@ -73,8 +73,8 @@ import static com.gamma.util.SqlIdent.q;
  */
 /*
  * ⚠ Relocated from com.gamma.control (inspecto) on 2026-09-07, EDG-01 cell 3b — EDITIONS CP-09 is "not for
- * Personal", and this class shipped in every bundle because it sat in the core. It now reaches ControlApi only
- * through the public RouteModule SPI (META-INF/services), from a module the Personal build does not include.
+ * Basic", and this class shipped in every bundle because it sat in the core. It now reaches ControlApi only
+ * through the public RouteModule SPI (META-INF/services), from a module the Basic build does not include.
  * The package moved with it so com.gamma.control is not split across two jars. Nothing in the handlers changed.
  */
 public final class InvRoutes implements RouteModule {

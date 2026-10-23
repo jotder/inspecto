@@ -22,7 +22,7 @@ package com.gamma.util;
  * <p><b>Read per call, not cached</b>, for the same reason {@link Topology} is: a cached static cannot
  * be set per test, which is how a flag ends up with no negative coverage.
  *
- * <p>⛔ <b>Unset is not an error.</b> Personal and single-node Standard have no shared catalog and must
+ * <p>⛔ <b>Unset is not an error.</b> Basic and single-node Standard have no shared catalog and must
  * not need one; reads then behave exactly as they did before this class existed. Absence is the default,
  * not a misconfiguration.
  *
@@ -162,7 +162,7 @@ public final class LakehouseCatalog {
      * So the shape of the value has to be refused up front; there is no later moment at which it looks wrong.
      *
      * <p>⚠ <b>Single-node behaviour is deliberately unchanged.</b> A file catalog is the correct and
-     * documented choice when one process owns the lakehouse, which is every Personal and single-node
+     * documented choice when one process owns the lakehouse, which is every Basic and single-node
      * Standard install. This refuses it only where "one process" is false.
      *
      * <p>⚠ <b>{@code postgresql://…} is refused too, and that is not a mis-diagnosis.</b> It reads like a

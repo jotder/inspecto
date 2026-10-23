@@ -36,11 +36,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * MODULE-REORG-P7-INCIDENTS slices 1-2 — the characterisation of {@link AlertService} over its {@link AlertRecords}
- * port. Every scenario runs on the two wirings (Personal: Alert store, no operational objects; with ops: the same
+ * port. Every scenario runs on the two wirings (Basic: Alert store, no operational objects; with ops: the same
  * store PLUS the Incident half over a {@link FakeObjectAccess}) and on both stores (heap {@link InMemoryAlertStore},
  * durable {@link DbAlertStore}), so the Alert behaviour is pinned to be the same on every edition and backend.
  *
- * <p>Slice 2 is the operator decision of 2026-10-07: Personal keeps Alert history and restart-safe de-duplication.
+ * <p>Slice 2 is the operator decision of 2026-10-07: Basic keeps Alert history and restart-safe de-duplication.
  * The intended behaviour change versus slice 1 is pinned here: a new {@link AlertService} over the SAME store does
  * NOT re-fire an Alert that is still open (it used to, once, events-only and for ledger / freshness rules), and its
  * {@code recent()} history is re-seeded from the store. ALERT objects are never written any more
@@ -123,7 +123,7 @@ class AlertRecordsParityTest {
         return new DatasetMeasureProbe.Breaches(keys, keys.size());
     }
 
-    /** The edition wiring: Personal has the Alert store only; with ops the Incident half rides on objects. */
+    /** The edition wiring: Basic has the Alert store only; with ops the Incident half rides on objects. */
     private enum Wiring { PERSONAL, WITH_OPS }
 
     /** The Alert store backend under test. */
@@ -192,7 +192,7 @@ class AlertRecordsParityTest {
                 AlertRecords.of(new InMemoryAlertStore(), Optional.of(new FakeObjectAccess())));
         assertTrue(AlertRecords.incidentsOf(Optional.empty())
                 .openIncident("t", "m", "critical", "s", Map.of("rule", "x"), "rule").isEmpty());
-        // Personal: no ops, the Incident reads answer empty and re-open / link are no-ops — but the Alert half works.
+        // Basic: no ops, the Incident reads answer empty and re-open / link are no-ops — but the Alert half works.
         AlertRecords personal = AlertRecords.of(new InMemoryAlertStore(), Optional.empty());
         String id = personal.openAlert(null, "t", "m", "warning", "scope", Map.of("rule", "r"));
         assertTrue(personal.hasActiveAlert("scope", "r"));
@@ -298,7 +298,7 @@ class AlertRecordsParityTest {
             assertEquals(1, first.evaluate(null, 0).size());
 
             // New instance, the value has recovered: the heal edge exists only if the open Alert is remembered —
-            // and Personal now remembers it too (it did not in slice 1: events-only pinned "no open-Alert memory").
+            // and Basic now remembers it too (it did not in slice 1: events-only pinned "no open-Alert memory").
             AlertService second = w.service(cfg, store(List.of()), measureRule("WARNING"));
             second.measureProbe((d, m) -> OptionalDouble.of(1500.0));
             second.evaluate(null, 1000);

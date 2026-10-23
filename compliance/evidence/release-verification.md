@@ -123,7 +123,7 @@ cannot drift, because neither is derived from the other or from a second resolut
 component carries its purl, the **SHA-256 of the resolved artifact**, and the licence declared in its POM
 chain (`NOASSERTION` when none is declared); the bundle's own jars are listed as first-party components
 hashed **as shipped**. ⚠ Per bundle, never per reactor: the reactor resolves the optional AI stack a
-Personal bundle does not carry (CC9). ⚠ `tools/dependencies.lock` remains the *review* baseline
+Basic bundle does not carry (CC9). ⚠ `tools/dependencies.lock` remains the *review* baseline
 (coordinates only, every module, diffed in CI) — it is not the SBOM and is not offered as one.
 
 **Per-jar SBOMs (P3f, 2026-10-08).** Because the bundle is a set of separately verifiable jars, every jar on `modules.list`

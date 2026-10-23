@@ -158,7 +158,9 @@ final class OnboardImport {
             Map<String, Object> schema = plan.schema(id);
             Map<String, Object> pipeline = plan.pipeline(id, dataRoot, kind, fileName, String.valueOf(draft.get("type")));
             Map<String, Object> dataset = plan.dataset(id, kind, fileName, String.valueOf(draft.get("type")));
-            if (OnboardRoutes.signedIn(ex)) dataset.put(ComponentAccess.SHARES, List.of());   // private to the importer until shared
+            // Shared with the Space like every other Dataset in it (LA-ONBOARD-DEFECTS-1): no `shares` key, so `owner` (the
+            // importer, stamped here) is provenance, not a restriction. It was `shares: []`, private to the importer, and no
+            // screen could share it, so colleagues saw "No Dataset in this Space has a link yet".
             dataset = ComponentAccess.onCreate(ex, dataset);
             try {
                 ComponentRoutes.validateKind(api, "dataset", id, dataset);
@@ -988,6 +990,49 @@ final class OnboardImport {
             job.followOn(s);
             return s;
         } finally {
+            IN_FLIGHT.remove(key);
+        }
+    }
+
+    // ── deleting an import Dataset (LA-ONBOARD-ORPHAN-PIPELINE-1) ──────────────────────────────────────────
+
+    /**
+     * The import Pipeline that the Dataset entry {@code id} being deleted owns, claimed against a concurrent import of
+     * the same id; {@code null} when the entry is not an Add data import or its Pipeline is already gone. Deleting the
+     * entry without retiring the Pipeline left {@code imports/<id>_pipeline.toon} registered with no Dataset over it, so
+     * an entry re-created under the same id (the generic component route) could drive it with Add a file and Run now.
+     * The entry's {@code origin} / {@code importPipeline} are editable, so only the file Add data writes for THIS id is
+     * retired, never another Pipeline the entry names. Under an approval policy over Pipelines or schemas the delete is
+     * refused (409): retiring writes around that policy otherwise. The Dataset's data stays on disk.
+     */
+    static Retirement claimRetirement(ApiContext api, String id, Map<String, Object> content) {
+        Path writeRoot = api.writeRoot();
+        if (writeRoot == null || id == null || !ID.matcher(id).matches()
+                || !"import".equals(String.valueOf(content.get("origin"))) || !id.equals(content.get("importPipeline")))
+            return null;
+        Path dir = writeRoot.resolve(CONFIG_DIR);
+        Path pipelineFile = dir.resolve(id + "_pipeline.toon");
+        if (!Files.isRegularFile(pipelineFile)) return null;
+        PendingChanges.holdRefusing(api, List.of("pipeline", "schema"),
+                "deleting an Add data Dataset retires its Pipeline and schema");
+        String key = writeRoot + "|" + id;
+        if (!IN_FLIGHT.add(key))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is being imported right now; delete it when the run has finished");
+        return new Retirement(writeRoot, id, pipelineFile, dir.resolve(id + "_schema.toon"), HostContext.of(api).service(), key);
+    }
+
+    /** A claimed import Pipeline: {@link #retire} once the Dataset entry is gone, {@link #release} always. */
+    record Retirement(Path writeRoot, String id, Path pipelineFile, Path schemaFile, CollectorService service, String key) {
+
+        /** Unregister the Pipeline and remove its config files and history; the data directory is kept. */
+        void retire() throws IOException {
+            service.unregisterPipeline(pipelineFile);
+            Files.deleteIfExists(pipelineFile);
+            Files.deleteIfExists(schemaFile);
+            PipelineHistory.purge(writeRoot, id);
+        }
+
+        void release() {
             IN_FLIGHT.remove(key);
         }
     }

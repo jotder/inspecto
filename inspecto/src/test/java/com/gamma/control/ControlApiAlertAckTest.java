@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * the Alert-owned store (not the object substrate), so these two routes are how an operator works one on EVERY
  * edition. Every gate: 401 no credential, 403 a Subject without {@code canWorkIncidents}, 200 with it, 404 unknown id,
  * 422 a move illegal from the Alert's state, the state visible on {@code GET /alerts}, an AUDIT row. This module's
- * test classpath carries no operational-object module, so every test here is the Personal shape.
+ * test classpath carries no operational-object module, so every test here is the Basic shape.
  */
 class ControlApiAlertAckTest {
 
@@ -191,7 +191,7 @@ class ControlApiAlertAckTest {
 
     @Test
     void withNoSecurityModuleThePersonalOperatorWorksAnAlertWithAnHonourSystemActor(@TempDir Path dir) throws Exception {
-        try (Ctx c = open(dir)) {   // no Authenticator: Personal
+        try (Ctx c = open(dir)) {   // no Authenticator: Basic
             assertTrue(c.svc.objects().isEmpty(), "the Basic shape: no operational objects");
             String id = firstAlert(c, null).get("id").asText();
             HttpResponse<String> ack = send(c, "POST", "/alerts/" + id + "/ack", null, null);

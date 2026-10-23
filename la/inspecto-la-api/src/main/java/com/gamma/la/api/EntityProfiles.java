@@ -886,12 +886,15 @@ final class EntityProfiles {
      * The Start box's type-ahead (LA-ONBOARD-1 OB-9) over the frame's bindings (the caller keeps only link ends): the values
      * whose raw spelling - or normalised key - begins with {@code prefix}, busiest first ({@code links} = the rows naming the
      * value in a link-end column), each with its first and last seen; and {@code distinct}, the Entities matching. A masked
-     * type lists nothing and is counted only for an empty prefix: a count per prefix would spell a raw value out.
+     * type lists nothing and is counted only for an empty prefix: a count per prefix would spell a raw value out - unless
+     * {@code reveal} (the route has checked {@code canRevealLinkEntities}): then it lists raw values and says {@code revealed}.
      */
-    static Map<String, Object> suggest(Frame f, String prefix, int limit) {
+    static Map<String, Object> suggest(Frame f, String prefix, int limit, boolean reveal) {
         Map<String, Object> out = new LinkedHashMap<>();
+        boolean hidden = f.masked() && !reveal;
         out.put("type", f.type.id());
         out.put("masked", f.masked());
+        out.put("revealed", f.masked() && reveal);
         out.put("datasets", f.datasets());
         out.put("items", List.of());
         out.put("distinct", null);
@@ -900,7 +903,7 @@ final class EntityProfiles {
                     : "none of the type's link columns could be read"));
             return out;
         }
-        if (f.masked() && !prefix.isEmpty()) {
+        if (hidden && !prefix.isEmpty()) {
             out.putAll(notAssessed("the Entity Type is masked: its values are not listed - type the whole value"));
             return out;
         }
@@ -911,7 +914,7 @@ final class EntityProfiles {
         List<String> binds = prefix.isEmpty() ? List.of() : key.isEmpty() ? List.of(prefix) : List.of(prefix, key);
         try {
             out.put("distinct", ColumnProfile.num(f.keys("SELECT COUNT(DISTINCT k) AS n FROM " + KEYS + where, 1, binds).rows().get(0).get("n")));
-            if (f.masked()) {
+            if (hidden) {
                 out.putAll(notAssessed("the Entity Type is masked: its values are not listed - type the whole value"));
                 return out;
             }

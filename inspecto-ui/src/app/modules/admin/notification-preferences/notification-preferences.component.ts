@@ -23,7 +23,7 @@ type Channel = (typeof CHANNELS)[number];
  * each cell is either inherited from the deployment default or overridden by the user, and an overridden
  * cell can be reset to the default; Save sends only the cells that changed, because every cell sent becomes
  * the user's own. Critical categories (e.g. Security) are locked on; email is locked off for a user with no
- * verified email address. Administrators also get the separate "Deployment default" editor. On Personal
+ * verified email address. Administrators also get the separate "Deployment default" editor. On Basic
  * (no sign-in) there is one user and one grid, so there are no markers and no default editor.
  */
 @Component({

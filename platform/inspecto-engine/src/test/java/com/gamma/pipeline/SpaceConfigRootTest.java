@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>The defect these pin: registry-reading job types read the JVM-wide {@code -Dassist.write.root} while
  * their data directory was per-Space, so in a multi-Space deployment a run read one Space's registry and
- * wrote another's data. It was invisible because single-Space deployments — Personal, and every test
+ * wrote another's data. It was invisible because single-Space deployments — Basic, and every test
  * before this one — make the two the same path.
  *
  * <p>⚠ The named-Space cases are the whole point, so they set the space MDC explicitly: that is what

@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialogModule } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 
 /** One documented keyboard shortcut. */
-interface Shortcut {
+export interface Shortcut {
     keys: string[];
     description: string;
 }
@@ -25,9 +25,32 @@ const SHORTCUTS: Shortcut[] = [
 ];
 
 /**
+ * The standalone `la-app` shell's list (LA-GROW-EXCLUDE-RESIDUALS-1 (7)): only what works there — it has no command
+ * palette and no keyboard-navigable triage list.
+ */
+export const LA_APP_SHORTCUTS: Shortcut[] = [
+    { keys: ['?'], description: 'Show this keyboard-shortcuts help' },
+    { keys: ['Esc'], description: 'Close a dialog, or this help' },
+    { keys: ['→'], description: 'Fill sample value into an empty edit box' },
+    { keys: ['/'], description: "Search the page's table (opens and focuses its quick filter)" },
+    { keys: ['G'], description: 'Link Analysis: Grow the graph (opens the Grow panel)' },
+    { keys: ['X'], description: 'Link Analysis: Exclude the selected nodes (outside a list)' },
+    { keys: ['Ctrl', 'Z'], description: 'Link Analysis: Undo the last Grow or Exclude' },
+];
+
+/** True when a key event comes from a text-editing control, where a bare `?` is typed text, not a shortcut. */
+export function isEditingTarget(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true;
+}
+
+/**
  * Keyboard-shortcuts cheat sheet (`docs/superpower/ui-design-review.md` R3). Opened by `?` from the
  * shell; a plain reference dialog, no state. `Ctrl` renders as `Cmd` is left to the OS — the label is
- * kept generic so it reads correctly on both.
+ * kept generic so it reads correctly on both. A shell with fewer shortcuts passes its own list as the
+ * dialog data (`{shortcuts}`); without it the main app's list shows.
  */
 @Component({
     selector: 'inspecto-shortcuts-help-dialog',
@@ -60,5 +83,6 @@ const SHORTCUTS: Shortcut[] = [
     `,
 })
 export class ShortcutsHelpDialog {
-    readonly shortcuts = SHORTCUTS;
+    private readonly data = inject<{ shortcuts?: Shortcut[] } | null>(MAT_DIALOG_DATA, { optional: true });
+    readonly shortcuts = this.data?.shortcuts ?? SHORTCUTS;
 }

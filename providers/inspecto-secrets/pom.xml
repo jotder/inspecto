@@ -14,9 +14,9 @@
     <artifactId>inspecto-secrets</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — file-keystore secrets provider module (Professional edition, optional)</name>
+    <name>Inspecto — file-keystore secrets provider module (Standard edition, optional)</name>
     <description>
-        OPTIONAL Professional-edition SecretsProvider: resolves ${SECRET:...} references from an operator-supplied PKCS12 keystore behind the core SecretsProvider ServiceLoader seam. No third-party dependencies, so it ships as a thin jar. Split out of inspecto-security by MODULE-REORG-1 D-MR6.
+        OPTIONAL Standard-edition SecretsProvider: resolves ${SECRET:...} references from an operator-supplied PKCS12 keystore behind the core SecretsProvider ServiceLoader seam. No third-party dependencies, so it ships as a thin jar. Split out of inspecto-security by MODULE-REORG-1 D-MR6.
     </description>
 
     <dependencies>

@@ -231,7 +231,7 @@ class ControlApiHealthDetailsTest {
     }
 
     /**
-     * The Personal case: nothing is configured, so nothing may report DOWN. This is the falsification arm —
+     * The Basic case: nothing is configured, so nothing may report DOWN. This is the falsification arm —
      * without it the two tests above would pass equally if every family reported DOWN unconditionally.
      *
      * <p>Asserted on {@code events} because it is opened on EVERY boot ({@code CollectorService} calls

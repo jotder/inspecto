@@ -30,7 +30,7 @@ import java.util.LinkedHashMap;
  *       before the handler (so a replay still skips re-execution);</li>
  *   <li>the key is scoped to the caller: {@code method + raw path (carries /api/v1 and /spaces/{id}) + bound
  *       Space + principal + key}, where the principal is the {@link Subject} id, or {@code anon@<client IP>}
- *       when no Subject is attached (Personal edition / a public route);</li>
+ *       when no Subject is attached (Basic edition / a public route);</li>
  *   <li>the entry binds a SHA-256 of the request body — the same key with a different body is
  *       {@code 422 "Idempotency-Key reused with a different request"}, never the cached answer;</li>
  *   <li>only {@link #cacheable} statuses are stored; a response over {@link #MAX_RESPONSE_BYTES}, or a

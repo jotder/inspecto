@@ -16,12 +16,12 @@
 
     <name>Inspecto — geo map + link analysis routes (every edition, optional)</name>
     <description>
-        OPTIONAL Professional-edition control-plane route groups (EDITIONS.md CP-09, "Geo map + link analysis"):
+        OPTIONAL Standard-edition control-plane route groups (EDITIONS.md CP-09, "Geo map + link analysis"):
         GeoRoutes (/geo/projection, /geo/routes) and InvRoutes (/inv/projection, /inv/projection/neighbors,
         /inv/schema/relationships), contributed through the core's public com.gamma.spi.http.RouteModule
         ServiceLoader seam (EDG-01 cell 3a) and registered AFTER the core's built-in route list.
 
-        WHY THIS MODULE EXISTS (EDG-01 cell 3b, 2026-09-07). CP-09 was decided "not for Personal" on
+        WHY THIS MODULE EXISTS (EDG-01 cell 3b, 2026-09-07). CP-09 was decided "not for Basic" on
         2026-09-02 and both route groups nonetheless shipped in every bundle because they sat in the core.
         Dropping THIS jar on the classpath is what makes the five paths exist; without it the core answers
         them with 503 "not installed" (AbsentModuleRoutes) and /bootstrap reports features.geoLink=false,

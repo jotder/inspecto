@@ -40,7 +40,7 @@ export class NavigationService {
 
     /**
      * Drop every entry whose `navFeature` (EDITIONS CP-09 / CP-11 / CP-13) `/bootstrap` does not report true,
-     * at any depth, in place. Hidden — not disabled — so a Personal install never OFFERS a screen whose
+     * at any depth, in place. Hidden — not disabled — so a Basic install never OFFERS a screen whose
      * backend module is absent. The id is declared ON the entry (navigation-data.ts), and the backend reports
      * only features whose routes actually bound — adding an optional module's screen edits neither this
      * service nor the session (MODULE-REORG-1 P1).

@@ -15,7 +15,7 @@ import java.util.Optional;
  * links and tags (EDITIONS {@code CP-11}; EDG-01 cell 7, 2026-09-08).
  *
  * <p>The implementation is {@code com.gamma.ops.ObjectService} in the optional {@code inspecto-ops} module.
- * On the Personal build that module is not bundled, so core holds {@link Optional#empty()} here and every
+ * On the Basic build that module is not bundled, so core holds {@link Optional#empty()} here and every
  * operational-object surface answers 503. Core itself never names an {@code ObjectService},
  * {@code ObjectStore} or {@code OperationalObject}: those types leave with the domain.
  *

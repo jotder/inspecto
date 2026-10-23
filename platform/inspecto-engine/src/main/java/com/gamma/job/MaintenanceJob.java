@@ -80,9 +80,9 @@ import java.time.Instant;
  *   <li>{@code scheduler_audit} — read-only hygiene audit of the Job registry: disabled jobs, duplicate
  *       names/specs, orphan triggers (MNT-4). See {@link SchedulerAuditTask}.</li>
  *   <li>{@code backup} / {@code backup_verify} / {@code restore} — <b>not in the core since 2026-09-07</b>
- *       (EDG-01 cell 2; EDITIONS {@code OPS-06} is "not for Personal"). They are contributed through the
+ *       (EDG-01 cell 2; EDITIONS {@code OPS-06} is "not for Basic"). They are contributed through the
  *       {@link MaintenanceTaskProvider} seam by the optional {@code inspecto-backup} module, which Standard
- *       and Enterprise bundle and Personal does not. On a bundle without it the task is unknown — see the
+ *       and Advanced bundle and Basic does not. On a bundle without it the task is unknown — see the
  *       {@code default} arm of {@link #execute}.</li>
  *   <li>{@code metadata_validate} — read-only cross-component integrity audit: broken references,
  *       duplicate definitions, missing physical data (MNT-7). See {@link MetadataValidateTask}.</li>
@@ -168,7 +168,7 @@ final class MaintenanceJob implements Job {
      * two disagree, the way {@code MapNodeKeyContractTest} pins its pair — because the served
      * {@link JobTypeDescriptor} for {@code maintenance} is built from this list, and a form that offers a
      * task the switch cannot run (or hides one it can) is the defect this exists to prevent. Before
-     * 2026-09-09 that description was a hand-written string: it advertised four tasks Personal refuses and
+     * 2026-09-09 that description was a hand-written string: it advertised four tasks Basic refuses and
      * omitted seven the engine ships.
      *
      * <p>⛔ Adding a {@code case} without adding it here, or the reverse, fails that test by design.
@@ -181,7 +181,7 @@ final class MaintenanceJob implements Job {
 
     /**
      * What <b>this</b> bundle can actually run: the built-ins, plus whatever a
-     * {@link MaintenanceTaskProvider} on the classpath contributed. On a Personal build the contributed
+     * {@link MaintenanceTaskProvider} on the classpath contributed. On a Basic build the contributed
      * half is empty, so the served description names exactly the tasks that will not throw — which is the
      * point. Sorted within the contributed group so the string is deterministic.
      */

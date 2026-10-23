@@ -230,7 +230,7 @@ describe('HomeComponent', () => {
         expect(opsWithEvents.fixture.componentInstance.lensHome()).toBe('events');
     });
 
-    // Personal ships no sign-in and binds every interface — the one thing a new operator must be told.
+    // Basic ships no sign-in and binds every interface — the one thing a new operator must be told.
     it('warns about the open listen address only where there is no authenticator', () => {
         expect(create({ runs: [RUN()], authMode: 'none' }).el.textContent).toContain('every network interface');
         expect(create({ runs: [RUN()], authMode: 'oidc' }).el.textContent).not.toContain('every network interface');

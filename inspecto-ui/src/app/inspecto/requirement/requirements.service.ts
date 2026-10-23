@@ -16,7 +16,7 @@ export type RequirementKpiResult =
 /**
  * Requirement store (UI-6 + SEC-7(c)) — the Business→Builder lifecycle over the dedicated
  * `/requirements*` control-plane routes. Submission is open; the accept/reject (`/decision`) and
- * `/deliver` transitions are enforced server-side on `canTriageRequirements` (a no-op on Personal),
+ * `/deliver` transitions are enforced server-side on `canTriageRequirements` (a no-op on Basic),
  * so the UI's lens gate (`LensService.canTriageRequirements()`) is convenience, not the boundary.
  */
 @Injectable({ providedIn: 'root' })

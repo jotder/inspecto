@@ -19,7 +19,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * REGULATORY-REPORTING-1 - on the DEFAULT (Personal) build, which never compiles the optional
+ * REGULATORY-REPORTING-1 - on the DEFAULT (Basic) build, which never compiles the optional
  * inspecto-regulatory-reporting module, every Regulatory Report path answers <b>503 naming the module</b> (synthesised
  * from its manifest), never 404 (the stub lost a path) and never 200 (the routes crept into the core). The sibling of
  * {@link NoActionRequestsShipsInThePersonalBuildTest}.

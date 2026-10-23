@@ -14,13 +14,13 @@
     <artifactId>inspecto-policy</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — policy engine (Enterprise edition, optional)</name>
+    <name>Inspecto — policy engine (Advanced edition, optional)</name>
     <description>
-        OPTIONAL Enterprise-edition AccessDecider (ABAC A3, docs/superpower/rbac-abac-plan.md §4):
+        OPTIONAL Advanced-edition AccessDecider (ABAC A3, docs/superpower/rbac-abac-plan.md §4):
         evaluates the space's authored Access Policies (access-policies.toon, the shared Conditions
         grammar) at the core's two PEPs -- the route-level authorize stage and the row-level RowScope
         filter. Discovered by the core's ServiceLoader seam (com.gamma.spi.auth.AccessDecider) --
-        dropping THIS jar on the classpath is what turns policy evaluation on; Personal and Professional
+        dropping THIS jar on the classpath is what turns policy evaluation on; Basic and Standard
         never bundle it and keep their existing behaviour byte-identically. Dependency-free beyond the
         core (the condition evaluator is hand-rolled in inspecto-util). Only built as part of the
         reactor under the "edition-advanced" profile (= edition-standard + this module).
@@ -79,7 +79,7 @@
              over /objects (SEC-7d), so it needs a real AccessDecider AND real operational objects.
              🔴 The DIRECTION matters and the opposite one is a latent break: inspecto-ops ships in
              STANDARD, where inspecto-policy is absent, so ops must never depend on policy. This module is
-             Enterprise-only, and every Enterprise reactor also builds inspecto-ops — so the edge is safe
+             Advanced-only, and every Advanced reactor also builds inspecto-ops — so the edge is safe
              this way round only. No cycle. (EDG-01 cell 7, 2026-09-08.) -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
@@ -90,8 +90,8 @@
 
         <!-- inspecto-geo-link (test scope): ControlApiInvestigationPolicyTest asserts that the real PolicyEngine
              judges an Investigation's Working Set relation at the row PEP (LA-20, decision D-E7). Same direction
-             rule as inspecto-ops above: geo-link ships in Standard/Professional, where this module is absent, so
-             geo-link must never depend on policy; every Enterprise reactor also builds geo-link. No cycle. -->
+             rule as inspecto-ops above: geo-link ships in Standard, where this module is absent, so
+             geo-link must never depend on policy; every Advanced reactor also builds geo-link. No cycle. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-geo-link</artifactId>

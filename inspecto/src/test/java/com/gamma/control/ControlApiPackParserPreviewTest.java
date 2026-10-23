@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code POST /parsers/{id}/preview} over a parser a Job Pack contributed requires {@code canAuthorWorkbench}
  * — the capability that authors Pipelines — because it runs third-party code over caller-chosen bytes. A
  * built-in's preview stays open. An {@link Authenticator} is forced via {@link Authenticators#forTest} to
- * stand in for Professional/Enterprise; without a Subject the gate is a no-op (Personal).
+ * stand in for Standard/Advanced; without a Subject the gate is a no-op (Basic).
  *
  * <p>Every refusal is paired with the probe that would otherwise succeed: the SAME request by an author
  * passes, and the same viewer's request against a built-in passes. The pack parser counts its preview
