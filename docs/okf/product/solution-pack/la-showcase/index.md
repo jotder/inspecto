@@ -21,7 +21,7 @@ tags: [product-item, solution-pack]
 | features | current | [Link Analysis showcase — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Link Analysis showcase — user guide](user-guide.md) |
-| admin-guide | current | [Inspecto LA (Link Analysis) showcase: Postgres store and Basic variants](admin-guide-variants-runbook.md) |
+| admin-guide | current | [Inspecto LA: the 30-minute cross-vertical tour (mobile money, audit, claims)](admin-guide-cross-vertical-tour.md) · [Inspecto LA (Link Analysis) showcase: Postgres store and Basic variants](admin-guide-variants-runbook.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | brochure | current | [Link Analysis showcase — brochure](brochure.md) |
@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-showcase` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-SUSPICION-FACTORS-DEMO-1` | P3 | defect | the Suspicion score's per-node "Factors" cannot be shown on any showcase Space (whitepaper claim T2). | — |

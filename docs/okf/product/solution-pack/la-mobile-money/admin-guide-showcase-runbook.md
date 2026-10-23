@@ -20,7 +20,7 @@ Every value is invented. Do not make a precision or detection-rate claim from it
 | 6 | Smoke | `node tools/la-mm-smoke.mjs --base http://127.0.0.1:<PORT>` | `10/10 passed` |
 
 The index build follows five minutes after each `mm_links` run (cron, because the `la.index.build` Job type fires only on a clock or a Pipeline commit, never on another Job's output); trigger `la_index_build`
-as `admin` to skip the wait. A Space path under about 150 characters avoids a Windows "filename too long" on the events store.
+as `mm.manager` to skip the wait (`admin` holds no `canOperateRuns`: 403; rehearsed 2026-10-24). A Space path under about 150 characters avoids a Windows "filename too long" on the events store.
 
 ### Personas (Demo Users; names deliberately differ from `la-showcase`)
 
@@ -105,3 +105,7 @@ expanding three times the working set holds about 219 entities; seed `LOOP-1` fo
 
 Regenerate the corpus byte-identically with `python tools/gen-la-mm-data.py` (`node --test tools/gen-la-mm-data.test.mjs`). Reset a demo by deleting the Space folder and scaffolding again; the seed is idempotent
 and safe to re-run.
+
+## 6. Browser rehearsal, 2026-10-24
+
+Driven in the browser as `mm.analyst`, `mm.manager` and `admin` on a fresh Demo Auth bundle (smoke 10/10): ladder and Connect seeds, Degree, PageRank (client and server, identical order), Find cycles (one, four nodes), Suspicion score (biller first), Structuring (1 entity, 25 legs, 25 payers, 121 726.88), four-eyes approve by `mm.manager`, Alert to Investigation, Dossier build, verify and tamper by upload, embed mint, view and revoke. M-10: the Entity profile of `DORMANT-1` shows opened 2 Nov 2025 and six rows on each of 11 and 12 Oct; the 150.00 prior volume is in `mm_kyc_dataset`, not on the profile, so the 40x is the presenter's arithmetic. Numbers and traps: [the cross-vertical tour](../la-showcase/admin-guide-cross-vertical-tour.md).
