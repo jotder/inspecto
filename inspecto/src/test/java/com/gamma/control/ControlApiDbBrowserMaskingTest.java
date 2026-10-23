@@ -260,6 +260,46 @@ class ControlApiDbBrowserMaskingTest {
         }
     }
 
+    /**
+     * A sibling Dataset's classified column named with a leading blank (" msisdn") reaches the masking through the lineage, which
+     * lower-cased the name but did not trim it: the masked set held " msisdn", every comparison used "msisdn", and a Widget bound
+     * to a saved query grouped and filtered the raw key.
+     */
+    @Test
+    void aSiblingKeyNameWithSurroundingBlanksIsMaskedAsTrimmed(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            Path partition = root.resolve("s1").resolve("data").resolve("spc").resolve("dt=2026");
+            Files.createDirectories(partition);
+            String parquet = partition.resolve("data.parquet").toString().replace("\\", "/");
+            DuckDbUtil.loadDriver();
+            File db = DuckDbUtil.tempDbFile("dbmask_blank_");
+            try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
+                st.execute("COPY (SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) t(\" msisdn\", region))"
+                        + " TO '" + parquet + "' (FORMAT PARQUET)");
+            } finally {
+                DuckDbUtil.deleteTempDb(db);
+            }
+            ComponentStore reg = new ComponentStore(root.resolve("s1").resolve("config").resolve("registry"));
+            reg.write("dataset", "spc_sib", Map.of("physicalRef", "spc",
+                    "columns", List.of(Map.of("name", " msisdn", "classification", "MSISDN"))));
+            reg.write("dataset", "spc_ds", Map.of("physicalRef", "spc"));
+            reg.write("query", "spc_q", Map.of("type", "sql", "datasetId", "spc_ds",
+                    "text", "SELECT \" msisdn\" AS k, region FROM spc_ds"));
+            String count = "\"measures\":[{\"agg\":\"count\"}]";
+            HttpResponse<String> group = as("reader", c, "POST", "/spaces/s1/bi/query",
+                    "{\"dataset\":\"spc_ds\",\"query\":\"spc_q\"," + count + ",\"groupBy\":[\"k\"]}");
+            if (group.statusCode() == 200) {
+                JsonNode rows = V1Body.of(group.body()).get("rows");
+                assertNoRaw(rows.toString());
+                rows.forEach(row -> assertTrue(row.get("k").asText().startsWith("masked:"), row.toString()));
+            } else assertEquals(422, group.statusCode(), group.body());
+            assertEquals(422, as("reader", c, "POST", "/spaces/s1/bi/query", "{\"dataset\":\"spc_ds\",\"query\":\"spc_q\"," + count
+                    + ",\"filters\":[{\"field\":\"k\",\"op\":\"like\",\"value\":\"4417009001%\"}]}").statusCode(),
+                    "a filter on the key name must not bisect it");
+        }
+    }
+
     /** BI-MASKING-ROW-VALUE-LEAKS-1: a rename in FROM, or the row itself as a value, returns the key: refused, or every cell masked. */
     @Test
     void aFromClauseRenameOrTheRowAsAValueIsMaskedWhole(@TempDir Path root) throws Exception {

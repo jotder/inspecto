@@ -157,13 +157,13 @@ final class BiResultMasking {
         Map<String, String> lineage = EvidenceMasker.lineageClassification(datasetId, dataset, store, views);
         for (Map.Entry<String, String> e : lineage.entrySet()) {
             if (EvidenceMasker.UNKNOWN_LINEAGE.equals(e.getKey())) unknown = true;
-            else if (claim.test(e.getValue())) masked.add(e.getKey());
+            else if (claim.test(e.getValue())) masked.add(norm(e.getKey()));
         }
         // The claim-based schema pass, which also sees classes outside SENSITIVE that a masked type claims (IMEI, WALLET).
         for (Map.Entry<String, String> e : EvidenceMasker.schemaClassification(
                 writeRoot, EvidenceMasker.datasetStores(dataset), claim).entrySet()) {
             if (EvidenceMasker.UNKNOWN_LINEAGE.equals(e.getKey())) unknown = true;
-            else masked.add(e.getKey());
+            else masked.add(norm(e.getKey()));
         }
         // BI-QUERY-MASKING-1 (D-M6): a Dataset over another Space's shared snapshot carries the OWNER's classification, judged
         // here under THIS Space's entity types. A ref whose classification is not known (live grant, older snapshot) fails closed.
@@ -174,7 +174,7 @@ final class BiResultMasking {
             if (carried.isEmpty()) { unknown = true; continue; }
             for (Map.Entry<String, String> e : carried.get().entrySet()) {
                 if ("UNKNOWN".equals(e.getValue())) unknown = true;
-                else if (!"NONE".equals(e.getValue()) && claim.test(e.getValue())) masked.add(e.getKey());
+                else if (!"NONE".equals(e.getValue()) && claim.test(e.getValue())) masked.add(norm(e.getKey()));
             }
             if (notBlank(dataset.get("view")) || notBlank(dataset.get("sql"))) unknown = true;   // a rename cannot be traced
         }
@@ -274,6 +274,14 @@ final class BiResultMasking {
         boolean viaText = boundText != null && (unknown || readsKey(boundText));
         readBound(boundText, viaText);
         if (viaText && !boundAll) viaText = false;   // traced: only the masked columns and the names the text gives a key
+        // DuckDB renames a repeated output name in order (k, k_1, k_1_1), so with a repeat the result's names are not the
+        // spec's: a typed value could land on a name judged clean and the key on one nobody tracks (BI-MASKING-GROUPBY-RENAME-1)
+        Set<String> seenGroups = new HashSet<>();
+        for (String g : spec.groupBy())
+            if (!seenGroups.add(g == null ? "" : g.trim().toLowerCase(Locale.ROOT)))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "groupBy repeats '" + g
+                        + "' (names are compared ignoring case): the result's repeated columns would be renamed, and a masked key"
+                        + " could come back under a name this check cannot follow; the caller needs " + REVEAL);
         if (checkFilters)
             for (MeasureCompiler.Filter f : spec.filters()) refuseIfMasked(f.field(), "filtering", viaText);
         for (String field : whenFields(spec.when())) refuseIfMasked(field, "filtering", viaText);
@@ -829,12 +837,24 @@ final class BiResultMasking {
         return types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(c))).findFirst();
     }
 
-    /** True when {@code text} contains any of {@code columns} as a whole identifier, case-insensitively. */
+    /**
+     * True when {@code text} contains any of {@code columns} as a whole identifier, case-insensitively. A masked column whose
+     * name is not one plain word (`"msisdn no"`, an embedded quote, only blanks, a non-ASCII name) cannot be found reliably in
+     * text: DuckDB resolves such names by rules (quoting, case folding) that a scan here would have to copy exactly, and each
+     * copy missed a shape (BI-MASKING-NONWORD-KEY-NAME-1). So when one is masked, any text counts as reading a key: fail
+     * closed, and a traced saved query still keeps its clean columns through the parse tree.
+     */
     private static boolean mentions(String text, Set<String> columns) {
         if (text == null || columns.isEmpty()) return false;
+        for (String c : columns) if (!WORD.matcher(c).matches()) return true;
         var m = WORD.matcher(text);
         while (m.find()) if (columns.contains(m.group().toLowerCase(Locale.ROOT))) return true;
         return false;
+    }
+
+    /** A column name as the masked / declared sets hold it: trimmed and lower-cased, whatever lineage it came through. */
+    private static String norm(String name) {
+        return name.trim().toLowerCase(Locale.ROOT);
     }
 
     private static boolean notBlank(Object o) {

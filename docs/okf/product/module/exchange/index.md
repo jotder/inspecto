@@ -35,4 +35,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
+| `LINEAGE-SIBLING-NAME-TRIM-1` | P1 | defect | EvidenceMasker.lineageClassification lower-cases but does not trim sibling column names, and the snapshot writer lets the lineage overwri… | — |
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |

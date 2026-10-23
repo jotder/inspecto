@@ -196,7 +196,12 @@ an aliased item that reads no key (a `count` stays sortable). A Widget bound to 
 `groupBy` column keeps the alias only when the saved query emits exactly one output of that name (case-insensitive, no
 padding) as a bare key, and it is not a Measure / ratio id or a grain bucket. A Widget filter or order on any name the
 saved text gives a key — even a declared-clean one (`msisdn AS region`) — is refused 422; saved text that cannot be
-traced (no parse, a FROM rename, a multi-column item other than a plain star) makes every name suspect. Trade-off: derived columns in free SQL no longer show
+traced (no parse, a FROM rename, a multi-column item other than a plain star) makes every name suspect. A Widget `groupBy` that repeats a name ignoring case is refused 422 for a caller who cannot reveal (DuckDB renames repeated output
+names in order, `k, k_1, k_1_1`, so the result's names are not the spec's; `BI-MASKING-GROUPBY-RENAME-1`). A masked column whose
+name is not entirely `[A-Za-z0-9_]` (`"msisdn no"`, an embedded quote, only blanks, a non-ASCII name) cannot be found reliably
+in text, so when one is masked any text counts as reading a key (fail closed; a traced saved query still keeps its clean
+columns through the parse tree; `BI-MASKING-NONWORD-KEY-NAME-1`). Names that reach the masking through lineage (sibling
+Datasets, pipeline schema, shared snapshots) are trimmed and lower-cased like the Dataset's own. Trade-off: derived columns in free SQL no longer show
 per-value aliases. Deliberately not covered: the text of a SAVED query is its author's (an author can still order by
 the key); structured-BI calculated columns are Dataset config. Tests: `ControlApiDbBrowserMaskingTest` (rename / row /
 dictionary / oracle probes), `ControlApiBiQueryMaskingTest.aSavedQueryThatRenamesTheKeyInFromOrReadsTheRowMasksEveryCell`.

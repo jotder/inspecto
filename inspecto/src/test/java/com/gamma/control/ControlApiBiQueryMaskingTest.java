@@ -683,6 +683,86 @@ class ControlApiBiQueryMaskingTest {
         }
     }
 
+    /** BI-MASKING-GROUPBY-RENAME-1: DuckDB renames repeated output names in order (k, k_1, k_1_1), so the names are not the spec's. */
+    @Test
+    void aGroupByThatRepeatsANameIgnoringCaseIsRefusedForAViewer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("query", "c1_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT '" + A + "' AS k, msisdn AS k_1 FROM calls_ds"));
+            String count = "\"measures\":[{\"agg\":\"count\"}]";
+            for (String probe : List.of(
+                    "\"query\":\"c1_q\"," + count + ",\"groupBy\":[\"k\",\"K\",\"k_1\"]",   // k_1 = the typed constant, k_1_1 = the key
+                    count + ",\"groupBy\":[\"msisdn\",\"MSISDN\"]",                           // the structured path: msisdn_1 raw
+                    count + ",\"groupBy\":[\"region\",\"region\"]")) {
+                HttpResponse<String> r = bi(c, "viewer", "calls_ds", probe);
+                assertEquals(422, r.statusCode(), probe + " -> " + r.body());
+                assertNoRaw(r.body());
+            }
+            assertEquals(200, bi(c, "viewer", "calls_ds", count + ",\"groupBy\":[\"region\",\"amount\"]").statusCode(),
+                    "two different names stay allowed");
+        }
+    }
+
+    /** BI-MASKING-NONWORD-KEY-NAME-1: a classified column named "msisdn no" is unseen by a word scan of the text. */
+    @Test
+    void aKeyColumnWhoseNameIsNotOneWordIsStillMasked(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("odd_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) AS t(\"msisdn no\", region)", "2026-07-08T00:00:00Z"));
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("dataset", "odd_ds", Map.of("view", "odd_view", "columns", List.of(
+                    Map.of("name", "msisdn no", "classification", "MSISDN"), Map.of("name", "region"))));
+            reg.write("query", "oddk_q", Map.of("type", "sql", "datasetId", "odd_ds",
+                    "text", "SELECT \"msisdn no\" AS k, region FROM odd_ds"));
+            reg.write("query", "oddmax_q", Map.of("type", "sql", "datasetId", "odd_ds",
+                    "text", "SELECT max(\"msisdn no\") AS m FROM odd_ds"));
+            // The saved queries run raw for nobody who cannot reveal.
+            for (Map.Entry<String, String> e : Map.of("oddk_q", "k", "oddmax_q", "m").entrySet()) {
+                HttpResponse<String> r = post(c, "viewer", "/queries/" + e.getKey() + "/run", null);
+                assertEquals(200, r.statusCode(), e.getKey() + " -> " + r.body());
+                assertNoRaw(r.body());
+                V1Body.of(r.body()).get("rows").forEach(row ->
+                        assertTrue(row.get(e.getValue()).asText().startsWith("masked:"), e.getKey() + " -> " + row));
+            }
+            // Other names that are no plain word: an embedded double quote, only whitespace, a non-ASCII letter whose lower case
+            // depends on its position (Java's final sigma), each reached by a text that never spells the name literally.
+            Map<String, String[]> odd = Map.of(
+                    "odd2_ds", new String[]{"\"a\"\"b\"","SELECT \"a\"\"b\" AS k, region FROM odd2_ds", "a\"b"},
+                    "odd3_ds", new String[]{"Σ", "SELECT odd3_ds.Σ AS k, region FROM odd3_ds", "Σ"},
+                    "odd4_ds", new String[]{"\" \"", "SELECT \" \" AS k, region FROM odd4_ds", " "},
+                    // only a quote: folds to "" once the quotes are dropped
+                    "odd5_ds", new String[]{"\"\"\"\"", "SELECT \"\"\"\" AS k, region FROM odd5_ds", "\""},
+                    // İ: the stored name is lower-cased as a whole string (i + U+0307), the text per code point (i)
+                    "odd6_ds", new String[]{"\"msisdn İ\"", "SELECT \"msisdn İ\" AS k, region FROM odd6_ds", "msisdn İ"});
+            for (Map.Entry<String, String[]> e : odd.entrySet()) {
+                String ds = e.getKey();
+                new ViewStore(c.root.resolve("views")).write(new ViewDefinition(ds + "_view", "flow-x", List.of(),
+                        "SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) AS t(" + e.getValue()[0] + ", region)",
+                        "2026-07-08T00:00:00Z"));
+                reg.write("dataset", ds, Map.of("view", ds + "_view", "columns", List.of(
+                        Map.of("name", e.getValue()[2], "classification", "MSISDN"), Map.of("name", "region"))));
+                reg.write("query", ds + "_q", Map.of("type", "sql", "datasetId", ds, "text", e.getValue()[1]));
+                HttpResponse<String> r = post(c, "viewer", "/queries/" + ds + "_q/run", null);
+                assertEquals(200, r.statusCode(), ds + " -> " + r.body());
+                assertNoRaw(r.body());
+                V1Body.of(r.body()).get("rows").forEach(row ->
+                        assertTrue(row.get("k").asText().startsWith("masked:"), ds + " -> " + row));
+            }
+
+            // A Widget over the saved query may not bisect, rank or aggregate the key under the name k.
+            String count = "\"measures\":[{\"agg\":\"count\"}]";
+            for (String probe : List.of(
+                    count + ",\"filters\":[{\"field\":\"k\",\"op\":\"like\",\"value\":\"4417009001%\"}]",
+                    count + ",\"groupBy\":[\"k\"],\"orderBy\":[{\"field\":\"k\",\"dir\":\"desc\"}]",
+                    "\"measures\":[{\"agg\":\"max\",\"field\":\"k\"}]")) {
+                assertEquals(422, bi(c, "viewer", "odd_ds", "\"query\":\"oddk_q\"," + probe).statusCode(), probe);
+                assertEquals(200, bi(c, "revealer", "odd_ds", "\"query\":\"oddk_q\"," + probe).statusCode(), "a revealer: " + probe);
+            }
+        }
+    }
+
     @Test
     void aKpiMeasureThatReturnsARawKeyIsRefusedForAViewer(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
