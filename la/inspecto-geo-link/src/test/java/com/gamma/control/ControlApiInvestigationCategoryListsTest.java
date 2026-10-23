@@ -190,6 +190,25 @@ class ControlApiInvestigationCategoryListsTest {
         }
     }
 
+    @Test
+    void anAutoApplyListThatCannotBeSealedSaysSoOnItsChipBeforeAnyCreateIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            list(c, "vips", ",\"ownerKind\":\"admin\",\"autoApply\":true", null, "+447700900123");
+            list(c, "optional", ",\"ownerKind\":\"admin\"", null, "+447700900124");
+            JsonNode before = data(send(c, "GET", "/inv/exclusion-lists", null, null), 200).get("lists");
+            for (JsonNode l : before) assertFalse(l.has("problem"), "a sealable list has no problem: " + l);
+            String handsetOnly = "{\"maskingMode\":\"none\",\"entityTypes\":[{\"id\":\"handset\",\"label\":\"Handset\","
+                    + "\"normaliser\":\"default\",\"masked\":false,\"classifications\":[\"HANDSET\"]}]}";
+            data(send(c, "PUT", "/settings/link-analysis", handsetOnly, null), 200);
+            JsonNode after = data(send(c, "GET", "/inv/exclusion-lists", null, null), 200).get("lists");
+            for (JsonNode l : after) {
+                if ("vips".equals(l.get("id").asText()))
+                    assertTrue(l.get("problem").asText().contains("no longer in force"), l.toString());
+                else assertFalse(l.has("problem"), "only an auto-apply list can refuse a create: " + l);
+            }
+        }
+    }
+
     // ── GET /inv/exclusion-lists ───────────────────────────────────────────────────────────────────────
 
     @Test

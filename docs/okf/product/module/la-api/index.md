@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-EDITION-PLACEMENT-1` | P3 | feature | the three open Link Analysis edition moves: D-LAE3 masking on Basic (partly overtaken by 7c6d77c80 and LA-ONBOARD-1 OB-6: close, or also… | operator |
+| `LA-EDITION-PLACEMENT-1` | P3 | feature | build D-LAE4: Entity profile pages Standard and up. | — |

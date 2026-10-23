@@ -18,6 +18,8 @@ export interface ExclusionListChip {
     autoApply: boolean;
     visibility: ExclusionVisibility;
     size: number;
+    /** Why this auto-apply list would refuse every new Investigation (Entity Type out of force, too many members); absent when it seals. */
+    problem?: string;
 }
 
 /** `POST /entity-lists` for a category list: purpose `exclusion`, `ownerKind: admin`. */

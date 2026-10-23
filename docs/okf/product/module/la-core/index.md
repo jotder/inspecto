@@ -35,7 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |
-| `LA-GROW-EXCLUDE-RESIDUALS-1` | P3 | feature | what LA-GROW-EXCLUDE-1 left after it shipped (2026-10-22; as-built in okf/product/module/la-core/architecture.md §6.8–§6.9). | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `LA-INVESTIGATION-OPS-DEFERRED-1` | P3 | feature | the unbuilt half of the Investigation model. | demand |
@@ -45,4 +44,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-I2-GAPS-RESIDUALS-1` | P3 | feature | what the i2-gap lanes left (2026-10-18). The canvas-styling, visual-query and entity-merge plans are fully shipped and archived (la-canva… | — |
 | `LA-DAILY-INGEST-1` | P2 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | operator |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | rehearse the technical / security review demo (T1–T13) with a sceptical second person and record it in the demo runbook. | operator |
-| `LA-EDITION-PLACEMENT-1` | P3 | feature | the three open Link Analysis edition moves: D-LAE3 masking on Basic (partly overtaken by 7c6d77c80 and LA-ONBOARD-1 OB-6: close, or also… | operator |
+| `LA-EDITION-PLACEMENT-1` | P3 | feature | build D-LAE4: Entity profile pages Standard and up. | — |
