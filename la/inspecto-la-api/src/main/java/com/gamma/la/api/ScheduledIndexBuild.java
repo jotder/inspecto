@@ -199,7 +199,7 @@ public final class ScheduledIndexBuild {
                         BucketFunction.NAME, IndexRoutes.installSizing(), duckdbOrNull(), SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS));
                 switch (plan.recommended()) {
                     case NONE -> {
-                        return last != null ? last : done("UP_TO_DATE", "none", "the index already covers the Dataset", live);
+                        return last != null ? last : done("UP_TO_DATE", "none", "the index already covers the Dataset", live, store.current().orElse(null));
                     }
                     case APPEND -> mode = IndexBuilder.Mode.APPEND;
                     case COMPACT -> mode = IndexBuilder.Mode.COMPACT;
@@ -244,9 +244,10 @@ public final class ScheduledIndexBuild {
         return switch (v.status()) {
             case COMPLETED -> {
                 IndexBuilder.Result res = v.result();
-                int deltas = res != null && res.manifest() != null ? res.manifest().deltas().size() : 0;
-                yield new Outcome("BUILT", m, null, "index version " + (res == null ? "?" : res.version()) + " published",
-                        res == null ? 0L : res.edges(), res == null ? 0L : res.nodes(), deltas);
+                String published = "index version " + (res == null ? "?" : res.version()) + " published";
+                // what the index now holds, not what this build added: an APPEND's Result counts only its delta (LA-ONBOARD-DEFECTS-1)
+                yield res == null || res.manifest() == null ? new Outcome("BUILT", m, null, published, 0L, 0L, 0)
+                        : done("BUILT", m, published, res.manifest(), res.directory());
             }
             case FAILED -> new Outcome("FAILED", m, null, "the build failed (" + v.failure() + "); nothing was published", 0L, 0L, 0);
             case CANCELLED -> new Outcome("FAILED", m, CANCELLED, "the build was cancelled; nothing was published", 0L, 0L, 0);
@@ -279,9 +280,17 @@ public final class ScheduledIndexBuild {
         }
     }
 
-    private static Outcome done(String result, String mode, String message, IndexManifest m) {
+    /** The edges and DISTINCT nodes the version {@code dir} holds (its main plus every delta). */
+    private static Outcome done(String result, String mode, String message, IndexManifest m, Path dir) {
         long edges = m.tables().containsKey("out") ? m.tables().get("out").rows() : 0L;
         long nodes = m.tables().containsKey("nodes") ? m.tables().get("nodes").rows() : 0L;
+        if (dir != null && !m.deltas().isEmpty()) {
+            try {
+                nodes = IndexBuilder.distinctNodes(dir, m);
+            } catch (RuntimeException uncountable) {
+                // the build stands; only the count falls back to the node rows, which over-count an entity in two deltas
+            }
+        }
         return new Outcome(result, mode, null, message, edges, nodes, m.deltas().size());
     }
 

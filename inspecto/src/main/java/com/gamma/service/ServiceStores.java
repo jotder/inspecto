@@ -289,7 +289,7 @@ final class ServiceStores {
         } catch (RuntimeException e) {
             log.warn("Could not open Parquet event store at {} — falling back to in-memory: {}",
                     dir, e.getMessage());
-            // 🔴 The audit trail the Standard/Enterprise launchers ask for by passing -Devents.backend=parquet.
+            // 🔴 The audit trail the Standard/Advanced launchers ask for by passing -Devents.backend=parquet.
             // Degrading it to a bounded ring loses the trail on restart, which is exactly EVENTS-DURABLE-1.
             StoreHealth.degraded(root.id(), "events", dir.toAbsolutePath().toString(),
                     "audit trail fell back to the in-memory ring — nothing survives a restart: " + e.getMessage());
@@ -501,7 +501,7 @@ final class ServiceStores {
 
     /**
      * The Space's Alert records ({@code MODULE-REORG-P7-INCIDENTS} slice 2), gated by {@code -Dalerts.backend}:
-     * {@code db} (the DEFAULT on every edition - Personal keeps Alert history and restart-safe de-duplication;
+     * {@code db} (the DEFAULT on every edition - Basic keeps Alert history and restart-safe de-duplication;
      * the Space's own DuckDB file, or PostgreSQL through {@code -Dinspecto.db=postgres}) or {@code memory} (explicit
      * opt-out, lost on restart). ⚠ Never writes into the working directory: a single-tenant
      * ({@link SpaceRoot#legacy()}) root with no {@code -Dassist.write.root} has no directory of its own, so the

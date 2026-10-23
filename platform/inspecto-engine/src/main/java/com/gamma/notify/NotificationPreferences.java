@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The <b>deployment default</b> notification preference grid — which {@link NotificationCategory} is
- * delivered over which channel ({@link #IN_APP} / {@link #EMAIL} / any SPI channel id). On Personal (no
+ * delivered over which channel ({@link #IN_APP} / {@link #EMAIL} / any SPI channel id). On Basic (no
  * Subject) it is the one user's grid. With authentication each Subject may hold a sparse override on top of
  * it ({@link NotificationPreferenceOverrides}, ses-sns-adapter-design §7); editing THIS grid needs
  * {@code canAdminister}.

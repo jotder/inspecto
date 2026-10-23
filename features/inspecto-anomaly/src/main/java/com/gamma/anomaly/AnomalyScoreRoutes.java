@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
  * <ol>
  *   <li>{@code canWorkIncidents} — an Anomaly Score is read while working the Incident its Alert Rule raised.</li>
  *   <li>Unknown model, a model the caller's data scopes exclude (SEC-7d: a data-scoped caller reads only a model
- *       carrying a scope it holds), a row the Enterprise PDP denies ({@link RowScope}), or no score for that entity
+ *       carrying a scope it holds), a row the Advanced PDP denies ({@link RowScope}), or no score for that entity
  *       → <b>404</b>, all indistinguishable (existence-hiding).</li>
  * </ol>
  * The entity key travels as a bound parameter. It is echoed as the Space {@code masked:} token ({@code keyMasked:

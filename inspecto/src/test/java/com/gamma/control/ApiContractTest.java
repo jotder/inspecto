@@ -221,10 +221,10 @@ class ApiContractTest {
      * The 73 absent-module stubs are precisely those modules answering 503. It is the same structural fact
      * {@code MaintenanceTaskContractTest} records for maintenance-task providers.
      *
-     * <p>⚠ <b>So the printed percentage is an UPPER BOUND on the shipped Enterprise surface.</b> A full
-     * Enterprise bundle registers these 266 plus whatever the optional modules contribute, against the
+     * <p>⚠ <b>So the printed percentage is an UPPER BOUND on the shipped Advanced surface.</b> A full
+     * Advanced bundle registers these 266 plus whatever the optional modules contribute, against the
      * same 24 documented operations — real coverage there is lower than the figure this test prints. Do
-     * not quote it as the Enterprise number.
+     * not quote it as the Advanced number.
      */
     @Test
     void openApiCoverageOfTheLiveSurfaceIsMeasuredAndRatcheted(@TempDir Path cfg) throws Exception {

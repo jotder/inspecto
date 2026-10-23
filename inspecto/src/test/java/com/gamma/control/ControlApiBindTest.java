@@ -15,9 +15,9 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>⚠ The load-bearing case here is {@link #defaultIsEveryInterface()}. The default is the WILDCARD
  * address by deliberate call (2026-08-29) — narrowing it would make every already-deployed Standard and
- * Enterprise install unreachable on upgrade — so a future change that quietly "hardens" the default
+ * Advanced install unreachable on upgrade — so a future change that quietly "hardens" the default
  * must fail this test rather than surprise an operator. {@code docs/EDITIONS.md} states the exposure
- * plainly for exactly this reason: Personal ships no authenticator, so an unrestricted bind there
+ * plainly for exactly this reason: Basic ships no authenticator, so an unrestricted bind there
  * serves an unauthenticated control plane to the whole network.
  */
 class ControlApiBindTest {

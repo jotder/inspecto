@@ -50,10 +50,11 @@ describe('KeepAliveRouteReuseStrategy wiring', () => {
 });
 
 describe('KeepAliveRouteReuseStrategy', () => {
-    function setup() {
+    function setup(mode: 'none' | 'oidc' = 'oidc') {
         destroyed = 0;
         const space = signal<string | null>('la-showcase');
         const actor = signal<string | null>('fm.analyst');
+        const authMode = signal<'none' | 'oidc'>(mode);
         TestBed.configureTestingModule({
             providers: [
                 provideRouter([
@@ -63,10 +64,10 @@ describe('KeepAliveRouteReuseStrategy', () => {
                 ]),
                 { provide: RouteReuseStrategy, useClass: KeepAliveRouteReuseStrategy },
                 { provide: SpacesService, useValue: { currentSpaceId: space } },
-                { provide: SessionService, useValue: { actor } },
+                { provide: SessionService, useValue: { actor, authMode } },
             ],
         });
-        return { space, actor };
+        return { space, actor, authMode };
     }
 
     it('keeps the flagged page, with what it had open, across a visit to another page and back', async () => {
@@ -120,5 +121,36 @@ describe('KeepAliveRouteReuseStrategy', () => {
 
         expect(fresh).not.toBe(page);
         expect(destroyed).toBe(1);
+    });
+
+    /**
+     * LA-ONBOARD-DEFECTS-1 (6), the sign-in acceptance drive: signing out ON the page clears the person first, then
+     * navigates to sign-in, so the page was kept for "nobody"; the next person signed in and came back before the session
+     * had read their name - "nobody" again - and was shown the previous person's page until a reload.
+     */
+    it("signing out on the page and in as someone else never shows the previous person's page", async () => {
+        const { actor } = setup();
+        const harness = await RouterTestingHarness.create();
+        const page = await harness.navigateByUrl('/link-analysis', KeptPage);
+        page.open.set('Investigation Mule hub');
+
+        actor.set(null); // SessionService.onAuthLost, before it navigates to /sign-in
+        await harness.navigateByUrl('/settings', OtherPage);
+        expect(destroyed).toBe(1); // left by nobody: destroyed, not kept
+
+        // the next person is signed in; their name is still being read when the app lands on Link Analysis
+        const fresh = await harness.navigateByUrl('/link-analysis', KeptPage);
+        expect(fresh).not.toBe(page);
+        expect(fresh.open()).toBe('');
+    });
+
+    it('without sign-in (Basic) the page is kept as before, though no person is named', async () => {
+        const { actor } = setup('none');
+        actor.set(null);
+        const harness = await RouterTestingHarness.create();
+        const page = await harness.navigateByUrl('/link-analysis', KeptPage);
+        await harness.navigateByUrl('/settings', OtherPage);
+        expect(await harness.navigateByUrl('/link-analysis', KeptPage)).toBe(page);
+        expect(destroyed).toBe(0);
     });
 });

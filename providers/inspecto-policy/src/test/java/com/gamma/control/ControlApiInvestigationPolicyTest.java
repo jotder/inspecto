@@ -28,11 +28,11 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * LA-20 / D-E7 on the Enterprise edition, end to end: with {@code inspecto-policy} AND {@code inspecto-geo-link} on
+ * LA-20 / D-E7 on the Advanced edition, end to end: with {@code inspecto-policy} AND {@code inspecto-geo-link} on
  * the classpath the core discovers the real {@code PolicyEngine} on its own (nothing here forces a decider), and an
  * authored Access Policy targeting {@code resourceKinds: [investigation]} judges an Investigation's Working Set
  * relation — and, through the one shared gate {@code InvestigationRoutes.open}, EVERY Investigation route: a
- * DENY is a 404 even for the Investigation's owner, and with no policy the Professional rule (owner-only) remains.
+ * DENY is a 404 even for the Investigation's owner, and with no policy the Standard rule (owner-only) remains.
  */
 class ControlApiInvestigationPolicyTest {
 

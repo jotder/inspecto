@@ -1817,7 +1817,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *
      * <p>⛔ Reads are not covered, and that is a decision, not an omission: reads are not capability-gated on
      * any edition (operator, 2026-09-15, re-affirmed for compliance 2026-09-16). ⚠ Say the rest precisely
-     * (2026-09-17): the "Space/ABAC layer" that confidentiality rests on is the ENTERPRISE-only
+     * (2026-09-17): the "Space/ABAC layer" that confidentiality rests on is the ADVANCED-only
      * {@code inspecto-policy} engine, and {@link AccessDeciders} reads its absence as ALLOW — so on Standard
      * an authenticated subject reads every hosted Space. {@code compliance/controls-matrix.md} CC6 says so. Absent-module stubs go through {@link #stub}, never here, so they are exempt by
      * construction.

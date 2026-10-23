@@ -102,7 +102,7 @@ public final class InvestigationMembers {
                 : Optional.empty();
     }
 
-    /** The role map as the API and the Enterprise PDP see it: {@code subject → "lead"|"analyst"|"reviewer"}. */
+    /** The role map as the API and the Advanced PDP see it: {@code subject → "lead"|"analyst"|"reviewer"}. */
     public static Map<String, Object> asWire(Map<String, Role> roles) {
         Map<String, Object> out = new LinkedHashMap<>();
         roles.forEach((s, r) -> out.put(s, r.wire()));

@@ -8,7 +8,7 @@ import com.gamma.intelligence.action.AgentApprovals;
 import java.util.Map;
 
 /**
- * P0/P3 configuration: always {@link DeploymentProfile#OFFLINE} (Personal/air-gap default — the
+ * P0/P3 configuration: always {@link DeploymentProfile#OFFLINE} (Basic/air-gap default — the
  * embedded-intelligence pack has no hosted-provider companion module yet, mirrors
  * {@code inspecto-agent-hosted} as a later phase). {@code MCP_TOOLS} stays off.
  *

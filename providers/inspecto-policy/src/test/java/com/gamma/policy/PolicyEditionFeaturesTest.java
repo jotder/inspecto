@@ -9,8 +9,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * SEC-08 (operator 2026-09-02, built 2026-10-06): PII masking is Enterprise-only. This module ships only in the
- * Enterprise (and Preview) flavours, and its ServiceLoader-declared provider is what makes {@code quality.pii.mask}
+ * SEC-08 (operator 2026-09-02, built 2026-10-06): PII masking is Advanced-only. This module ships only in the
+ * Advanced (and Preview) flavours, and its ServiceLoader-declared provider is what makes {@code quality.pii.mask}
  * present — so a mask step saves clean here.
  */
 class PolicyEditionFeaturesTest {

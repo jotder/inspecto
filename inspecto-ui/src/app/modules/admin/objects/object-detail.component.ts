@@ -114,7 +114,7 @@ export class ObjectDetailComponent implements OnInit {
 
     /**
      * `bootstrap.features.events` — the correlation timeline reads the optional `inspecto-events` module
-     * (EDITIONS CP-13, EDG-01 cell 6). False on Personal, where the Events tab explains itself rather than
+     * (EDITIONS CP-13, EDG-01 cell 6). False on Basic, where the Events tab explains itself rather than
      * showing "no events recorded", which would be a lie about the data.
      */
     readonly eventsEnabled = this.session.eventsEnabled;

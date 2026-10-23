@@ -31,7 +31,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The Enterprise edition end-to-end (ABAC A3): with {@code inspecto-policy} on the classpath the
+ * The Advanced edition end-to-end (ABAC A3): with {@code inspecto-policy} on the classpath the
  * core's {@code ServiceLoader} seam discovers {@code PolicyEngine} on its own — nothing here forces
  * a decider — and authored Access Policies bite at both PEPs over real HTTP: a route-level deny is a
  * 403 before the handler, a row-level deny is the SEC-7d 404/filtered contract, an unreadable doc

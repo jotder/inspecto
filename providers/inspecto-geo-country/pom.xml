@@ -14,9 +14,9 @@
     <artifactId>inspecto-geo-country</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — geo-country resolver module (Professional edition, optional)</name>
+    <name>Inspecto — geo-country resolver module (Standard edition, optional)</name>
     <description>
-        OPTIONAL Professional-edition GeoCountryResolver: a MaxMind .mmdb country lookup behind the core GeoCountryResolver ServiceLoader seam (D12). Reads the operator-supplied -Dgeoip.db. Shaded as a sidecar jar so maxmind-db rides with it. Split out of inspecto-security by MODULE-REORG-1 D-MR6.
+        OPTIONAL Standard-edition GeoCountryResolver: a MaxMind .mmdb country lookup behind the core GeoCountryResolver ServiceLoader seam (D12). Reads the operator-supplied -Dgeoip.db. Shaded as a sidecar jar so maxmind-db rides with it. Split out of inspecto-security by MODULE-REORG-1 D-MR6.
     </description>
 
     <properties>

@@ -44,7 +44,7 @@ import { PolicyFormData, PolicyFormDialog } from './policy-form.dialog';
  *   <li><b>Why denied:</b> <code>GET /access/explain</code> for the caller's own session.</li>
  * </ul>
  *
- * Enforcement is Enterprise-only — on Personal/Professional the explainer and the impact preview say so.
+ * Enforcement is Advanced-only — on Basic/Standard the explainer and the impact preview say so.
  */
 @Component({
     selector: 'app-access-policies',

@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * Per-reader read state for the in-app feed (operator decision 2026-09-25): each reader — the authenticated
- * Subject, or on Personal the fallback {@code appUser} / {@code X-Actor} identity — marks ITS OWN
+ * Subject, or on Basic the fallback {@code appUser} / {@code X-Actor} identity — marks ITS OWN
  * notifications read or unread, so one reader's read never changes another's feed or badge. The
  * {@link NotificationStore} stays the one shared feed; this is an overlay keyed by {@code (reader, id)}.
  *

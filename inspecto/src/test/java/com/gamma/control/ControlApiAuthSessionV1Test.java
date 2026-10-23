@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Real-HTTP tests for the W6d backend-mediated session routes ({@code /auth/*}): code exchange sets
  * the {@code httpOnly}+{@code SameSite=Strict} refresh cookie and returns only the access token;
  * refresh rotates the cookie; logout clears it; the Origin gate rejects cross-site calls; and — the
- * Personal-edition invariant — with no {@link TokenRelay} on the classpath every route is a
+ * Basic-edition invariant — with no {@link TokenRelay} on the classpath every route is a
  * {@code 503 CAPABILITY_UNAVAILABLE}. A fake relay stands in for {@code inspecto-oidc}'s Keycloak
  * implementation via {@link TokenRelays#forTest} (same rationale as {@code ControlApiAuthV1Test}).
  */
@@ -78,7 +78,7 @@ class ControlApiAuthSessionV1Test {
 
     @Test
     void personalEditionAnswers503OnEveryAuthRoute(@TempDir Path cfg) throws Exception {
-        try (Ctx c = open(cfg)) {   // no TokenRelays.forTest — Personal: no relay found
+        try (Ctx c = open(cfg)) {   // no TokenRelays.forTest — Basic: no relay found
             for (String path : List.of("/auth/exchange", "/auth/refresh", "/auth/logout")) {
                 HttpResponse<String> r = post(c.port, "" + path, "{}");
                 assertEquals(503, r.statusCode(), path);

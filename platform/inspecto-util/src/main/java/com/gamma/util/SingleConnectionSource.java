@@ -13,7 +13,7 @@ import java.sql.SQLException;
  * Every operational store owns its own single-writer-locked DuckDB file; a second concurrent connection
  * to that file fails to take the lock. So DuckDB gets exactly one connection and callers queue on it,
  * which is precisely what the stores did before this seam existed (every {@code Db*Store} method was
- * {@code synchronized} on the store). Personal and Standard single-node behaviour is therefore
+ * {@code synchronized} on the store). Basic and Standard single-node behaviour is therefore
  * byte-identical to the pre-pool code.
  *
  * <p>Reentrancy comes free from {@code synchronized} being reentrant: a nested {@link #with} on the same

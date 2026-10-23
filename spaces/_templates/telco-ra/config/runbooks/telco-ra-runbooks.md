@@ -8,8 +8,8 @@ synthetic. Called numbers use the fictional `+1-555-01xx` range.
 - **Money is `DECIMAL(18,4)` end to end,** so a tolerance compares exact amounts, not float noise.
 - **Timestamps are naive.** `EVENT_TS`, `EFFECTIVE_FROM` and `EFFECTIVE_TO` carry no zone, so every feed must be
   delivered in one agreed timezone. A feed in another zone moves calls across tariff changes and days.
-- **Edition:** the template needs **Professional or Enterprise**, because it ships Alert Rules
-  (`alert.dispatch`). A Personal build lists it in the gallery as not available. The confirmed and recovered
+- **Edition:** the template needs **Standard or Advanced**, because it ships Alert Rules
+  (`alert.dispatch`). A Basic build lists it in the gallery as not available. The confirmed and recovered
   KPIs also need the ops module (`objects.analytics`).
 
 ## Findings: leakage vs data quality

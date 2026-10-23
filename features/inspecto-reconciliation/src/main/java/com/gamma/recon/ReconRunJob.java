@@ -181,7 +181,7 @@ public final class ReconRunJob implements Job {
     /**
      * Open a managed {@link ObjectType#INCIDENT} for a reconciliation breach, deduped to one open Incident
      * per reconciliation (correlationId = the reconciliation id) so a nightly schedule doesn't hand the
-     * operator a clone every run. No-op when no seam is wired (a Personal build has none). Best-effort: a failure here
+     * operator a clone every run. No-op when no seam is wired (a Basic build has none). Best-effort: a failure here
      * is logged to the run and never fails the run itself (the signal is already the durable ledger fact).
      */
     private void openIncident(JobContext ctx, String reconId, long missingLeft, long missingRight,

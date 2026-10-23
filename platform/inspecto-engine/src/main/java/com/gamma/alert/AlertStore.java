@@ -19,7 +19,7 @@ import java.util.UUID;
  * (DuckDB per Space by default, PostgreSQL through {@code -Dinspecto.db=postgres}) — the OperationalDb family
  * {@code ALERTS}.
  *
- * <p>⚠ Alerts are available on EVERY edition, Personal included; this store does not depend on the optional
+ * <p>⚠ Alerts are available on EVERY edition, Basic included; this store does not depend on the optional
  * operational-object module.
  */
 public interface AlertStore extends AutoCloseable {

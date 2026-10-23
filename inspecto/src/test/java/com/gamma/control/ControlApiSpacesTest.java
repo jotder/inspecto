@@ -149,7 +149,7 @@ class ControlApiSpacesTest {
     }
 
     /**
-     * A Standard/Enterprise server that hosts ZERO spaces must still answer its recovery route. Reachable in
+     * A Standard/Advanced server that hosts ZERO spaces must still answer its recovery route. Reachable in
      * production by deleting the last space (there is no last-space guard); {@code main()} refuses to boot an
      * empty {@code -Dspaces.root}, so this is the delete path, not a fresh install. The gate used to resolve
      * {@code writeRoot()} for every authenticated request, which calls {@code SpaceManager.current()} and

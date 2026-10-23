@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>This test <b>moved here from {@code ControlApiTest.metricsEndpointIsOpenAndReflectsARun}</b> rather than
  * being deleted. Its assertions are the contract a scraper depends on and they are still true — just no
- * longer true of the DEFAULT (Personal) build, where the module is absent and the core's
+ * longer true of the DEFAULT (Basic) build, where the module is absent and the core's
  * {@code AbsentModuleRoutes} answers 503 instead. The two halves are deliberately paired: this class proves
  * the exposition WITH the module, {@code NoExchangeShipsInThePersonalBuildTest} proves the 503 WITHOUT it.
  * A path that drifted out of step would fail one of them.
@@ -82,7 +82,7 @@ class MetricsExpositionTest {
     }
 
     /**
-     * The shape claim {@code ControlApiVersionedSurfaceTest} can no longer make on the Personal build: the
+     * The shape claim {@code ControlApiVersionedSurfaceTest} can no longer make on the Basic build: the
      * exposition is RAW text in Prometheus' own content type, never the v1 JSON envelope. That exemption is
      * the whole reason {@code /metrics} is an infra route.
      */

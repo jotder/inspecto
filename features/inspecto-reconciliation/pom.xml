@@ -28,10 +28,10 @@
         The "reconciliation" config component kind itself stays in the core (ComponentStore): authoring a Reconciliation
         is generic component CRUD, executing it is this module.
 
-        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles); on Personal
+        Bundled from the Standard edition up (the Standard, Advanced and Preview profiles); on Basic
         the core answers the /recon paths with 503 "not installed" (AbsentModuleRoutes), /bootstrap reports
         features.reconciliation=false and recon.run is an unknown Job Type. THIN: no shade, no sidecar classifier. Built
-        only under the edition profiles, so a routine "mvn -o clean test" (= Personal) never compiles it.
+        only under the edition profiles, so a routine "mvn -o clean test" (= Basic) never compiles it.
     </description>
 
     <dependencies>

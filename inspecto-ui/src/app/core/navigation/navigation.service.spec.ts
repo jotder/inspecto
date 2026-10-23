@@ -111,7 +111,7 @@ describe('NavigationService — optional-module nav entries', () => {
      * EDG-01 cell 6 (EDITIONS CP-13): the Events entry follows `inspecto-events`.
      *
      * ⛔ The third assertion is the one that matters most — `audit` must SURVIVE. The Audit log reads the
-     * core `/audit/*` routes, which every edition serves, and EDITIONS §Audit promises Personal "local
+     * core `/audit/*` routes, which every edition serves, and EDITIONS §Audit promises Basic "local
      * append-only logs"; hiding it here would take away a documented capability. It is also the adjacent
      * nav id, so a filter written slightly too wide would catch it and nothing else would notice.
      */

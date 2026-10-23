@@ -14,7 +14,7 @@ import java.util.ServiceLoader;
  * Pending Change.
  *
  * <p>The Entity List store (the Identity Fact log) lives in the optional {@code inspecto-entity-list} module, which
- * provides the one implementation through {@link ServiceLoader}. Without it (Personal) there is no provider: a model
+ * provides the one implementation through {@link ServiceLoader}. Without it (Basic) there is no provider: a model
  * naming a {@code watchList} is refused at save and fails its run. It is never silently left unfed.
  */
 public interface WatchListFeed {
@@ -43,7 +43,7 @@ public interface WatchListFeed {
     /**
      * A score run's feed, the one path every score kind takes (ANALYTICS-CORE-1 M7): add {@code highKeys} to
      * {@code listId}, expiring {@code ttlHours} after {@code now}, as actor {@code job:<jobType>:<modelId>}. With no
-     * provider installed (Personal) the run fails naming the model, never left silently unfed; no keys writes nothing.
+     * provider installed (Basic) the run fails naming the model, never left silently unfed; no keys writes nothing.
      *
      * @param kind the model's component kind, as the refusal names it ({@code risk-score}, {@code anomaly-model})
      */

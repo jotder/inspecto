@@ -156,7 +156,7 @@ export class ObjectMailComponent implements OnInit {
         : ['Case', 'Incident', 'Findings', 'Disposition'];
     readonly priorities = INCIDENT_PRIORITIES;
     /**
-     * "Me" — the signed-in Subject id when there is one, else Personal's placeholder ({@link currentOperator}).
+     * "Me" — the signed-in Subject id when there is one, else Basic's placeholder ({@link currentOperator}).
      * A getter over the session signal, so the folder counts (a `computed`) follow the session rather than a
      * value frozen at construction.
      */

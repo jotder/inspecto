@@ -203,6 +203,13 @@ final class ConfigWriteRoutes implements RouteModule {
                 return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                         "error", "mapping reads columns the schema no longer declares; not written", "findings", findings));
             }
+            // LA-ONBOARD-DRIFT-1: a delimited Pipeline already reading this schema needs index selectors.
+            List<Finding> selectors = SaveGate.referencedSchemaSelectorFindings(writeRoot, target, draft);
+            if (!selectors.isEmpty()) {
+                findings.addAll(selectors);
+                return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
+                        "error", "a Pipeline that reads this schema addresses columns by position; not written", "findings", findings));
+            }
         }
 
         // Schema compatibility save-gate (ELT amendment §3.4.2, D-10): a schema OVERWRITE is diffed
@@ -420,6 +427,13 @@ final class ConfigWriteRoutes implements RouteModule {
                 findings.addAll(drift);
                 return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                         "error", "mapping reads columns the schema no longer declares; not written", "findings", findings));
+            }
+            // LA-ONBOARD-DRIFT-1: as /config/write.
+            List<Finding> selectors = SaveGate.referencedSchemaSelectorFindings(writeRoot, target, merged);
+            if (!selectors.isEmpty()) {
+                findings.addAll(selectors);
+                return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
+                        "error", "a Pipeline that reads this schema addresses columns by position; not written", "findings", findings));
             }
         }
 

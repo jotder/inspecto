@@ -93,7 +93,7 @@ class TelcoFraudTemplateGoldenTest {
 
     @BeforeEach
     void arm() {
-        // Alert Rules are Professional+: a Personal build refuses the whole template at seed time (G9). Investigations: the
+        // Alert Rules are Standard+: a Basic build refuses the whole template at seed time (G9). Investigations: the
         // viewer's tiles are masked by default, which is Standard (in Basic a Space stating no masking_mode masks nothing).
         com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH,
                 com.gamma.etl.EditionFeatures.INVESTIGATIONS));

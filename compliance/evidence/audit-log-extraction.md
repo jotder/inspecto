@@ -62,7 +62,7 @@ the attributes); JSON additionally carries `payload`.
 
 *History:* before 2026-08-28 the CSV silently dropped every audit attribute — an audit CSV looked
 complete (right row count, right timestamps) while omitting everything the audit records. Filed as
-AUDIT-CSV-1 / matrix G10; fixed by the audit-shaped projection, which since EDG-01 cell 6 (2026-09-08) lives in **core** at `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java` (`/audit/export?format=csv`). ⚠ It was moved there deliberately: the general `/events*` feed became the optional `inspecto-observability` module (EDITIONS CP-13), and leaving the audit CSV inside it would have made this evidence unobtainable on the Personal edition. `AuditLogRoutes` is fail-closed to the `AUDIT`/`ACCESS_DENIED` types, so it serves the audit projection and nothing wider.
+AUDIT-CSV-1 / matrix G10; fixed by the audit-shaped projection, which since EDG-01 cell 6 (2026-09-08) lives in **core** at `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java` (`/audit/export?format=csv`). ⚠ It was moved there deliberately: the general `/events*` feed became the optional `inspecto-observability` module (EDITIONS CP-13), and leaving the audit CSV inside it would have made this evidence unobtainable on the Basic edition. `AuditLogRoutes` is fail-closed to the `AUDIT`/`ACCESS_DENIED` types, so it serves the audit projection and nothing wider.
 
 ## 4. The extraction
 
@@ -70,9 +70,9 @@ All routes are `GET` and read-only. Substitute your host, and authenticate as yo
 requires.
 
 🔴 **Which routes exist depends on the edition (EDG-01 cell 6, 2026-09-08).** The `/audit/*` routes
-below are **core — every edition, Personal included**, because this evidence must be obtainable on
+below are **core — every edition, Basic included**, because this evidence must be obtainable on
 any deployment. The wider `/events/*` feed is the optional `inspecto-observability` module (EDITIONS
-CP-13): on Personal it answers **503 naming the module**, so an auditor's procedure must not depend
+CP-13): on Basic it answers **503 naming the module**, so an auditor's procedure must not depend
 on it. Everything an audit needs is under `/audit/*`; the `/events/*` calls further down are
 **Standard edition and above** and are for operational triage, not for this evidence pack.
 
@@ -97,7 +97,7 @@ closed type set is what keeps this route an audit read rather than a general eve
 ### Standard edition and above only — the operational feed
 
 ⚠ Everything in this subsection is served by the optional `inspecto-observability` module and **503s on
-Personal**. Do not build an evidence procedure on it.
+Basic**. Do not build an evidence procedure on it.
 
 **Paging the full retained history** (buffer **and** Parquet, newest first, stable under concurrent
 writes because it is keyset-paginated on `(ts, eventId)`):
@@ -112,7 +112,7 @@ legacy shape serves only the **live-tail ring**, so it silently answers from a s
 
 **A single record:** `GET /events/{eventId}`.
 
-⛔ **Recording is never edition-gated.** `EventStore`/`EventLog` stay in core, so a Personal
+⛔ **Recording is never edition-gated.** `EventStore`/`EventLog` stay in core, so a Basic
 deployment writes exactly the same audit trail — it simply reads it back through `/audit/*` instead
 of the feed. §5's chain-of-custody argument is unaffected.
 

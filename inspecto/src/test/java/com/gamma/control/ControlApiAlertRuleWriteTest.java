@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ControlApiAlertRuleWriteTest {
 
-    /** Alert Rules are Professional+ (G9) — this class tests the Professional behaviour; the Personal refusal is
+    /** Alert Rules are Standard+ (G9) — this class tests the Standard behaviour; the Basic refusal is
      *  {@code EditionFeatureGateTest}'s. */
     @BeforeEach
     void professionalBuild() {

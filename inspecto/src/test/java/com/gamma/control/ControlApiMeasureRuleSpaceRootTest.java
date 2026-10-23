@@ -41,7 +41,7 @@ class ControlApiMeasureRuleSpaceRootTest {
     void isolate() {
         inheritedWriteRoot = System.getProperty("assist.write.root");
         System.clearProperty("assist.write.root");
-        // Alert Rules are Professional+ (control.alert.dispatch); this module's tests run as Personal.
+        // Alert Rules are Standard+ (control.alert.dispatch); this module's tests run as Basic.
         com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
     }
 

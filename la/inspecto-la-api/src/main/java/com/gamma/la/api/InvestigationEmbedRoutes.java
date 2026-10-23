@@ -99,7 +99,7 @@ public final class InvestigationEmbedRoutes implements RouteModule {
         Map<String, InvestigationMembers.Role> roles = InvestigationMemberStore.roles(inv.store(), id, inv.header().get("owner"));
         Map<String, Object> resource = new LinkedHashMap<>(InvestigationRoutes.resource(inv, roles));
         resource.put("classification", classification);
-        if (!RowScope.allowed(ex, "embed", "investigation", resource))   // Enterprise PDP, action embed: a policy can forbid sharing
+        if (!RowScope.allowed(ex, "embed", "investigation", resource))   // Advanced PDP, action embed: a policy can forbid sharing
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "denied by access policy");
 
         Instant now = Instant.now();

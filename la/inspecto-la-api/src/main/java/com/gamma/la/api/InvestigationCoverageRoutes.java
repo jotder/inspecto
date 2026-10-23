@@ -52,7 +52,7 @@ import java.util.TreeMap;
  * Dataset's stores and which expected days each delivered nothing. Without that evidence the response says
  * {@code assessed:false}, never "no gaps".
  *
- * <p>Access: {@link InvestigationRoutes#openForRead} (owner or a linked-Case member — LA-24/A9 —, R3 Dataset gate, Enterprise PDP) and the R3 gate again on
+ * <p>Access: {@link InvestigationRoutes#openForRead} (owner or a linked-Case member — LA-24/A9 —, R3 Dataset gate, Advanced PDP) and the R3 gate again on
  * the Dataset read. An open read — it persists nothing — audited best-effort as {@code LINK_INVESTIGATION_COVERAGE}.
  */
 public final class InvestigationCoverageRoutes implements RouteModule {

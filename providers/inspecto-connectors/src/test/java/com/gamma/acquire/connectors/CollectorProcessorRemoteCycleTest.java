@@ -61,7 +61,7 @@ class CollectorProcessorRemoteCycleTest {
 
     @BeforeEach
     void startServer(@TempDir Path tmp) throws Exception {
-        // The MOVE archive is Professional+ (G9); this class asserts the Professional behaviour.
+        // The MOVE archive is Standard+ (G9); this class asserts the Standard behaviour.
         com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.SINK_ARCHIVE));
         serverRoot = Files.createDirectories(tmp.resolve("sftproot"));
         sshd = SshServer.setUpDefaultServer();

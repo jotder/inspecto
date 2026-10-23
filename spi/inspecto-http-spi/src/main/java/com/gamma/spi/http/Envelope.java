@@ -15,7 +15,7 @@ import java.util.Map;
  * the request arrived under {@code /api/v1} ({@link ApiContext#v1}, derived from the URI); legacy
  * (unversioned) responses stay byte-for-byte unchanged. {@code permissions} carries the authenticated
  * {@link Subject}'s resolved capability grants (W6) and is present only when the security module
- * attached one (Standard edition, authenticated request); absent on Personal / anonymous requests.
+ * attached one (Standard edition, authenticated request); absent on Basic / anonymous requests.
  * SEC-7(b): when the route declared a per-resource applicable set
  * ({@link ApiContext#resourcePermissions}), the array is refined to {@code grants ∩ applicable} —
  * the per-resource ∩ resource-state derivation design §8 describes; routes that declare nothing keep

@@ -80,7 +80,7 @@ export interface PolicyWarning {
     message: string;
 }
 
-/** `GET /access/policies` — authored policies plus the engine's seed policies (Enterprise only);
+/** `GET /access/policies` — authored policies plus the engine's seed policies (Advanced only);
  *  `error` set ⇔ the authored doc is unreadable (the engine denies, fail-closed) until fixed.
  *  `etag` is the response header (the `If-Match` a save echoes), not a body field. */
 export interface PoliciesDoc {
@@ -141,7 +141,7 @@ export interface PolicyEvaluation {
 }
 
 /** `GET /access/explain` — a "why denied?" dry-run for the caller's own session. `enabled:false`
- *  when there is no policy engine (Personal/Professional) or no authenticated subject. */
+ *  when there is no policy engine (Basic/Standard) or no authenticated subject. */
 export interface ExplainResult {
     enabled: boolean;
     reason?: string;
@@ -178,7 +178,7 @@ export class AccessService {
     }
 
     /** The effective policies — authored rows tagged `source:authored`, plus the engine's seed
-     *  policies tagged `source:seed` (Enterprise only). */
+     *  policies tagged `source:seed` (Advanced only). */
     policies(): Observable<PoliciesDoc> {
         return this.http
             .get<PoliciesDoc>(apiUrl('/access/policies'), { observe: 'response' })

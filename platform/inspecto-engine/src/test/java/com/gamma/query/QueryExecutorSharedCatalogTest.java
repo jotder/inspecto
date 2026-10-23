@@ -142,7 +142,7 @@ class QueryExecutorSharedCatalogTest {
     }
 
     // The falsification arm. Without it this would pass against a method that ALWAYS returned
-    // postgres_scanner, which would fail every unconfigured Personal read on a host that has no
+    // postgres_scanner, which would fail every unconfigured Basic read on a host that has no
     // extension at all.
     @Test
     void anUnconfiguredNodeNamesNoExtension() {

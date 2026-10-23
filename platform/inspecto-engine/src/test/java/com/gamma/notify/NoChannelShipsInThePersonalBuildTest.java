@@ -11,18 +11,18 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * EDG-01 cell 1 — the assertion that makes the gating REAL rather than claimed.
  *
- * <p>This test runs in the DEFAULT reactor, which is the **Personal** build (⚠ there is no
- * {@code -Pedition-basic}; Personal is "no profile"). On that classpath
+ * <p>This test runs in the DEFAULT reactor, which is the **Basic** build (⚠ there is no
+ * {@code -Pedition-basic}; Basic is "no profile"). On that classpath
  * {@link ServiceLoader#load(Class)} over {@link NotificationChannel} must find **nothing**, because
  * `EDITIONS.md` `CP-15` says delivery channels are not in the edition and — since 2026-09-07 — the build
  * finally agrees.
  *
  * <p>🔴 <b>What it would have caught.</b> Until 2026-09-07 `inspecto-engine` carried
  * `META-INF/services/com.gamma.notify.NotificationChannel` naming `WebhookChannel`, and `inspecto-engine`
- * is an unconditional dependency of the app — so the webhook transport shipped in every Personal bundle,
- * needing only {@code -Dnotify.webhook.url} to start delivering. `SmtpEmailChannel` reached Personal by a
+ * is an unconditional dependency of the app — so the webhook transport shipped in every Basic bundle,
+ * needing only {@code -Dnotify.webhook.url} to start delivering. `SmtpEmailChannel` reached Basic by a
  * second route: it lived in `inspecto-connectors`, whose sidecar `package.ps1` copies into EVERY edition
- * by explicit decision. Both are now in `inspecto-notify-channels`, a Standard+/Enterprise-only module.
+ * by explicit decision. Both are now in `inspecto-notify-channels`, a Standard-and-up module.
  *
  * <p>⚠ <b>Why the assertion is on the SPI and not on a class being absent.</b> A test that greps for a
  * missing class would pass for the wrong reason the moment someone renamed it. What matters is the
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * the question this asks too.
  *
  * <p>⛔ Do not "fix" a failure here by deleting this test. A non-empty result means an external transport
- * is back on the Personal classpath, which is the defect, not the test.
+ * is back on the Basic classpath, which is the defect, not the test.
  */
 class NoChannelShipsInThePersonalBuildTest {
 
@@ -49,7 +49,7 @@ class NoChannelShipsInThePersonalBuildTest {
 
     /**
      * The other half of the same fact: in-app delivery is **intrinsic** to {@link NotificationService} and
-     * is not a channel, so Personal losing every channel does not leave it with no notifications at all.
+     * is not a channel, so Basic losing every channel does not leave it with no notifications at all.
      * ⚠ Without this, the test above would also pass on a build where notifications were broken entirely.
      */
     @Test

@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * EDG-01 cell 7 — the Personal-side falsification the largest extraction never got.
+ * EDG-01 cell 7 — the Basic-side falsification the largest extraction never got.
  *
  * <p>Seven cells moved a feature out of the core behind {@code ServiceLoader}. Six had a test proving the
  * core refuses correctly without the module; cell 7 — {@code inspecto-ops}, and at <b>42 stubbed paths</b> (the 7 Case-management paths moved to inspecto-case-management, MODULE-REORG-P7, and are asserted by {@code NoCaseManagementShipsInThePersonalBuildTest})
@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <ol>
  *   <li><b>404</b> on any path — {@code provides.routes} of the ops manifest lost an entry, or a route module
  *       renamed a path and only one side was updated;</li>
- *   <li><b>200</b> on any path — {@code inspecto-ops} has leaked onto the Personal classpath;</li>
+ *   <li><b>200</b> on any path — {@code inspecto-ops} has leaked onto the Basic classpath;</li>
  *   <li>{@code /bootstrap}'s {@code features.ops} turning true — the stubs started counting as routes.
  *       ⚠ That is a real regression shape, not a hypothetical: it is the bug cell 3b shipped and fixed,
  *       and it works only because {@link ApiContext#stub} keeps stubs invisible to
@@ -71,7 +71,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       belt-and-braces, it is the only assertion that covers those rows.</li>
  * </ul>
  *
- * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Personal
+ * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Basic
  * bundle; a 404 means the stub and the module's surface drifted apart. Both are the defect, not the test.
  */
 class NoOperationalObjectsShipInThePersonalBuildTest {

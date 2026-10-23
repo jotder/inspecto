@@ -76,13 +76,13 @@ describe('ObjectCreateDialog', () => {
         expect(c.tagSuggestions()).toEqual([]);
     });
 
-    // "Me" is the signed-in Subject: nothing in the SPA writes the Personal `inspecto.operator` key, so on a
+    // "Me" is the signed-in Subject: nothing in the SPA writes the Basic `inspecto.operator` key, so on a
     // signed-in edition the old fallback offered a literal "operator" that is nobody.
     it('offers the signed-in subject as an assignee, not the Personal placeholder', () => {
         const { c } = create();
         TestBed.inject(SessionService).actor.set('ana');
         expect(c.assigneeOptions()).toEqual(['ana', 'dana']);
-        TestBed.inject(SessionService).actor.set(null); // Personal: no session identity
+        TestBed.inject(SessionService).actor.set(null); // Basic: no session identity
         expect(c.assigneeOptions()).toEqual(['dana', 'operator']);
     });
 

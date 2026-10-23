@@ -81,7 +81,7 @@ public final class ServiceBootstrap {
         // *_caserule, *_workflow — are registered by the optional inspecto-ops module now (EDG-01 cell 7):
         // every one of them parsed into a com.gamma.ops type, so the loaders could not stay in mandatory
         // core. ⚠ *_rca is NOT one of them and is still loaded above: RcaTemplate is core vocabulary.
-        // On a Personal build no engine is present and these documents are simply not read.
+        // On a Basic build no engine is present and these documents are simply not read.
         List<Path> opsConfigs = resolveBySuffix(paths, ".toon");   // resolved OUTSIDE the lambda: it throws IOException
         svc.objectEngine().ifPresent(engine -> engine.loadConfigs(opsConfigs));
         return svc;
@@ -177,7 +177,7 @@ public final class ServiceBootstrap {
         boolean armable = com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.ALERT_DISPATCH);
         for (com.gamma.pipeline.ComponentRegistry.Component c :
                 new com.gamma.pipeline.ComponentStore(registryRoot).list("alert-rule")) {
-            // G9: a rule copied onto a Personal install's disk is refused here, by name — never armed.
+            // G9: a rule copied onto a Basic install's disk is refused here, by name — never armed.
             if (!armable) {
                 log.warn("Not arming alert rule '{}': {}", c.name(),
                         com.gamma.etl.EditionFeatures.refusal(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));

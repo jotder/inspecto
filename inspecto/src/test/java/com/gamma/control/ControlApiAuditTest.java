@@ -211,11 +211,11 @@ class ControlApiAuditTest {
      * The audit read-out, re-seated off HTTP (EDG-01 cell 6, 2026-09-08). These tests are about the AUDIT
      * TRAIL, not the events feed — they only ever used {@code GET /api/v1/events?limit=200} as a convenient
      * way to see what was recorded. The feed moved to the optional {@code inspecto-observability} module, so on
-     * this (default, Personal) build that path now answers 503; reading the store directly keeps the
+     * this (default, Basic) build that path now answers 503; reading the store directly keeps the
      * assertions and drops the accidental dependency on an edition-gated surface.
      *
      * <p>⛔ This is the point of the cell that must NOT be lost: audit events are still RECORDED on
-     * Personal. Had these tests been deleted rather than re-seated, nothing would prove that.
+     * Basic. Had these tests been deleted rather than re-seated, nothing would prove that.
      *
      * <p>{@code page(200, null, null)} is the exact store call the v1 route made — newest-first over the
      * full retained history, not the live-tail ring — so the rows seen here are the rows it served.

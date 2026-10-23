@@ -11,12 +11,12 @@ import java.util.ServiceLoader;
  * <ul>
  *   <li>{@code ${ENV:NAME}} → the {@code NAME} environment variable</li>
  *   <li>{@code ${SYS:prop}} → the {@code prop} JVM system property</li>
- *   <li>{@code ${FILE:/path}} and {@code ${KEYSTORE:alias}} → <b>Standard + Enterprise only (SEC-07,
+ *   <li>{@code ${FILE:/path}} and {@code ${KEYSTORE:alias}} → <b>Standard + Advanced only (SEC-07,
  *       2026-09-06)</b>: served by a {@link SecretsProvider} the {@code inspecto-secrets} edition module
  *       registers via ServiceLoader (mounted-file secrets; a {@code SecretKeyEntry} from the keystore named by
- *       {@code secrets.keystore.path/type/password}). A bundle without that module — Personal — REFUSES the
+ *       {@code secrets.keystore.path/type/password}). A bundle without that module — Basic — REFUSES the
  *       scheme with an {@link IllegalStateException} naming the edition, never a silent {@code null}. A
- *       Vault/KMS scope is the Enterprise follow-on, gated on a client policy.</li>
+ *       Vault/KMS scope is the Advanced follow-on, gated on a client policy.</li>
  *   <li>{@code ${NAME}} → environment {@code NAME}, falling back to system property {@code NAME}</li>
  *   <li>anything else → returned unchanged (a literal — discouraged, but tolerated)</li>
  * </ul>
@@ -81,7 +81,7 @@ public final class SecretResolver {
         throw new IllegalStateException(refusal(scope));
     }
 
-    /** The Personal-edition refusal for a scheme no bundled provider serves — what an operator reads in a connection test. */
+    /** The Basic-edition refusal for a scheme no bundled provider serves — what an operator reads in a connection test. */
     static String refusal(String scope) {
         return "secret scheme ${" + scope + ":…} is not available in this edition: mounted-file and keystore secrets"
                 + " are Standard and Advanced features (inspecto-secrets module) — use ${ENV:NAME} or ${SYS:prop} here";

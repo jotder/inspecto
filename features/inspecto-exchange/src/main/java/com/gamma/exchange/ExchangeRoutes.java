@@ -42,13 +42,13 @@ import java.util.NoSuchElementException;
  *
  * <p>Fail-closed: every route 409s in single-tenant mode (no {@code _shared} dir, no one to share with —
  * mirroring {@link SpaceRoutes#requireMultiSpace}). Reads are open; writes are capability-gated
- * ({@link ApiContext#withCapability}) — a no-op on Personal edition (no {@link Subject}), enforced on
+ * ({@link ApiContext#withCapability}) — a no-op on Basic edition (no {@link Subject}), enforced on
  * Standard. Every mutation emits an {@code EXCHANGE_*} signal (audit rides the central {@code AuditTrail}).
  */
 /*
  * ⚠ Relocated from com.gamma.control (inspecto) on 2026-09-07, EDG-01 cell 4 — EDITIONS SEC-10 is "not for
- * Personal", and this class shipped in every bundle because it sat in the core. It reaches ControlApi only
- * through the public RouteModule SPI (META-INF/services), from a module the Personal build does not include,
+ * Basic", and this class shipped in every bundle because it sat in the core. It reaches ControlApi only
+ * through the public RouteModule SPI (META-INF/services), from a module the Basic build does not include,
  * and it installs the SharedRefResolver seam that used to be wired in ControlApi's constructor. It joined the
  * com.gamma.exchange package it already served, so no package is split across jars. Handlers are unchanged.
  */

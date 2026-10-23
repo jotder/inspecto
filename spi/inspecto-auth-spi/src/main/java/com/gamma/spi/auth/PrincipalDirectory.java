@@ -10,7 +10,7 @@ import java.io.IOException;
  * saved). An edition seam like {@link TokenRelay}: an implementation arrives via
  * {@code META-INF/services/com.gamma.spi.auth.PrincipalDirectory}; the core ships none.
  *
- * <p><b>Offline editions have no directory.</b> Personal and Standard (and the demo build) run without an IAM, so
+ * <p><b>Offline editions have no directory.</b> Basic and Standard (and the demo build) run without an IAM, so
  * nothing registers an implementation and the check degrades to the id-shape check alone — the same standing as
  * {@code POST /objects/{id}/assign}. A registered directory is authoritative and fails CLOSED: a user it does not
  * know, or a lookup that throws, refuses the save.

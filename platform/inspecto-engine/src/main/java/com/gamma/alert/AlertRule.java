@@ -135,7 +135,7 @@ public record AlertRule(String name, String metric, String comparator, double th
     private static final java.util.regex.Pattern KEY_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     /**
-     * The owner of a rule no authenticated {@code Subject} authored — a Personal-edition rule, a hand-edited
+     * The owner of a rule no authenticated {@code Subject} authored — a Basic-edition rule, a hand-edited
      * registry file with no {@code owner:}, a Decision Rule's {@code create-alert} consequence. The same
      * placeholder identity the auth-free core already uses ({@code ApiContext.actor}), and it means
      * <b>unowned</b>: its alerts route to everyone, exactly as before owner routing (DUCKLE-C1 residual 2).

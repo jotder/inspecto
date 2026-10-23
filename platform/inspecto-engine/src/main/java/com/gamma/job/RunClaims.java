@@ -58,7 +58,7 @@ public interface RunClaims {
     /**
      * The no-op default: every claim is granted. ⚠ This is what a <b>bare test constructor</b> gets, and
      * it means the in-process {@code LockingRunner} is the only exclusion — i.e. exactly the behaviour
-     * before phase B. The live host always wires a real lease, so Personal and single-node Standard get
+     * before phase B. The live host always wires a real lease, so Basic and single-node Standard get
      * the heap-backed guard rather than this.
      */
     RunClaims GRANT_ALL = key -> () -> { };

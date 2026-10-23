@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * ANOMALY-UI-FINDINGS-1 (j): the contract the SPA's hide-on-503 path (the entity anomaly panel) leans on, pinned on the
- * DEFAULT (Personal) build over real HTTP: with the Anomaly module absent every {@code /anomaly-scores*} path
+ * DEFAULT (Basic) build over real HTTP: with the Anomaly module absent every {@code /anomaly-scores*} path
  * answers 503 {@code CAPABILITY_UNAVAILABLE} naming the module. The SPA hides the panel on that 503 (there is no
  * {@code /bootstrap} feature flag for Anomaly). {@code anomaly-model} is a component KIND, not a module route: with
  * the module absent {@code GET /components/anomaly-model} is an ordinary empty list (200), not a 503.

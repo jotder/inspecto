@@ -1,8 +1,8 @@
-# Third-party native code and models in the Enterprise bundle
+# Third-party native code and models in the Advanced bundle
 
-**Scope.** The native libraries and the model file that the Enterprise bundle carries inside
-`inspecto-intelligence.jar` (the shaded sidecar, `ASSURE-INTELLIGENCE-BUNDLE-1`, 2026-09-29). Personal and
-Professional bundles do not stage that jar, so none of this ships there.
+**Scope.** The native libraries and the model file that the Advanced bundle carries inside
+`inspecto-intelligence.jar` (the shaded sidecar, `ASSURE-INTELLIGENCE-BUNDLE-1`, 2026-09-29). Basic and
+Standard bundles do not stage that jar, so none of this ships there.
 
 **Why this file exists.** The SBOM (`tools/sbom.mjs`, see [release-verification.md](release-verification.md))
 records **one licence per Maven artifact**, read from its POM. Four of the artifacts below embed native

@@ -194,7 +194,7 @@ class ControlApiNotificationsTest {
         }
     }
 
-    /** Personal edition: no Subject, so the reader is the historic fallback identity — {@code appUser}, or the
+    /** Basic edition: no Subject, so the reader is the historic fallback identity — {@code appUser}, or the
      *  honour-system {@code X-Actor} — the same convention the audit trail's actor uses. */
     @Test
     void withoutASubjectTheReaderIsTheFallbackActor(@TempDir Path dir) throws Exception {

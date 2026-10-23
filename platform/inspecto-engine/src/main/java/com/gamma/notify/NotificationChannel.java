@@ -5,8 +5,8 @@ import com.gamma.api.PublicApi;
 /**
  * SPI for an <em>external</em> notification delivery channel — the seam editions plug Email (SendGrid /
  * Amazon SES / Mailgun / SMTP) or webhooks into. Discovered via {@link java.util.ServiceLoader}, so the
- * lean Personal core ships <b>no</b> channel (in-app delivery is intrinsic to {@link NotificationService})
- * and a Standard/Enterprise build adds one by dropping its module on the classpath — the editions pattern,
+ * lean Basic core ships <b>no</b> channel (in-app delivery is intrinsic to {@link NotificationService})
+ * and a Standard/Advanced build adds one by dropping its module on the classpath — the editions pattern,
  * never an {@code if (edition==…)} branch.
  *
  * <p>Delivery is gated per category by {@link NotificationPreferences} keyed on {@link #id()}, except for

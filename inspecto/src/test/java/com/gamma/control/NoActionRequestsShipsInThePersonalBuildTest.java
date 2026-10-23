@@ -22,12 +22,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * MODULE-REORG-P7 - the assertion that makes the Action Requests gating REAL rather than claimed, on the DEFAULT
- * (Personal) build, over real HTTP. The sibling of {@link NoCaseManagementShipsInThePersonalBuildTest}.
+ * (Basic) build, over real HTTP. The sibling of {@link NoCaseManagementShipsInThePersonalBuildTest}.
  *
  * <p>Three facts, each of which a plausible-looking regression would break on its own:
  * <ol>
  *   <li>every Action Request path answers <b>503 with the edition message</b> naming the module - not 404 (the stub
- *       lost a path), not 200 (the module is back in Personal, or the routes crept into the core again);</li>
+ *       lost a path), not 200 (the module is back in Basic, or the routes crept into the core again);</li>
  *   <li>{@code /bootstrap} reports {@code features.actionRequests == false}, present and false;</li>
  *   <li>the {@code invoke-api} Decision Rule consequence is listed and applied as {@code unavailable}, naming the
  *       module through its manifest - never executed, never an unexplained "unknown action".</li>

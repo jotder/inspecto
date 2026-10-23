@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * what the gated {@code /events/search} serves and cell 6 would gate nothing at all. So every widening is
  * probed — a foreign type, a blank type, an absent type — and each must be a 400.
  *
- * <p>Runs in the DEFAULT (Personal) build, which is where it matters: this is the bundle where the feed is
+ * <p>Runs in the DEFAULT (Basic) build, which is where it matters: this is the bundle where the feed is
  * absent and this route is the only audit read there is.
  */
 class AuditLogRoutesTest {
@@ -51,7 +51,7 @@ class AuditLogRoutesTest {
                 .GET().build(), BodyHandlers.ofString());
     }
 
-    /** The compliance read Personal keeps: EDITIONS §Audit promises it "local append-only logs". */
+    /** The compliance read Basic keeps: EDITIONS §Audit promises it "local append-only logs". */
     @Test
     void bothAuditableTypesAreReadableOnThePersonalBuild(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

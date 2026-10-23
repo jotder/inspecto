@@ -40,7 +40,7 @@ class SpiSlotFailClosedTest {
     /** An SPI with a provider that constructs normally. */
     public interface Working {}
 
-    /** An SPI nothing registers — stands in for Personal, which ships no Authenticator registration. */
+    /** An SPI nothing registers — stands in for Basic, which ships no Authenticator registration. */
     public interface Unregistered {}
 
     public static final class BrokenProvider implements Broken {
@@ -90,7 +90,7 @@ class SpiSlotFailClosedTest {
 
     /**
      * ⚠ The half that is easy to break while fixing the other: <b>never-registered must stay empty.</b>
-     * Personal ships no {@code META-INF/services} entry, and that absence is legitimate — a fix that threw
+     * Basic ships no {@code META-INF/services} entry, and that absence is legitimate — a fix that threw
      * on both cases would stop the auth-free edition booting at all. Registered-but-broken and
      * never-registered are different facts and the posture must tell them apart.
      */

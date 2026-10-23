@@ -14,17 +14,17 @@
     <artifactId>inspecto-oidc</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — OIDC authenticator module (Professional edition, optional)</name>
+    <name>Inspecto — OIDC authenticator module (Standard edition, optional)</name>
     <description>
-        OPTIONAL Professional-edition Authenticator (W6, docs/EDITIONS.md "Security direction"): an OIDC
+        OPTIONAL Standard-edition Authenticator (W6, docs/EDITIONS.md "Security direction"): an OIDC
         resource server that validates IAM-issued (Keycloak/WSO2/Okta/Entra) JWTs via Nimbus JOSE+JWT
         + JWKS and resolves claims -> Roles -> Capabilities (docs/superpower/rbac-groundwork.md).
         Discovered by the core's ServiceLoader seam (com.gamma.spi.auth.Authenticator) -- dropping THIS
         jar on the classpath (+ -Dauth.oidc.issuer / -Dauth.oidc.jwksUri) is what turns authentication
-        on. The Personal edition never bundles it and stays auth-free -- exactly how inspecto-connectors
+        on. The Basic edition never bundles it and stays auth-free -- exactly how inspecto-connectors
         and inspecto-agent-hosted isolate their own optional dependencies from the lean core. Only built
         as part of the reactor under the "edition-standard" profile (see the parent pom's profile-scoped
-        &lt;modules&gt;), so a routine "mvn -o clean test" (Personal) never touches this module at all.
+        &lt;modules&gt;), so a routine "mvn -o clean test" (Basic) never touches this module at all.
     </description>
 
     <properties>
@@ -126,7 +126,7 @@
             <!-- SEC-SIDECAR-BOOT-1 (2026-09-07). This module shipped as a 16 KB THIN jar with zero
                  com/nimbusds classes, while OidcAuthenticator has nine direct Nimbus imports and
                  ControlApi resolves the Authenticator SPI DURING STARTUP through an unguarded
-                 ServiceLoader (SpiSlot). Every Standard and Enterprise bundle therefore failed to boot.
+                 ServiceLoader (SpiSlot). Every Standard and Advanced bundle therefore failed to boot.
                  Nothing went red: the module's own tests have Nimbus on the compile classpath, and the
                  core-side auth tests inject a lambda via Authenticators.forTest - both halves green, the
                  join untested. Same shape as CONNECTORS-BUNDLE-1, same fix.

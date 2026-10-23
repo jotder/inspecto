@@ -70,7 +70,7 @@ export class DashboardComponent implements OnInit {
 
     /**
      * `bootstrap.features.events` — the recent-activity feed comes from the optional `inspecto-events`
-     * module (EDITIONS CP-13, EDG-01 cell 6). False on Personal, where the tile renders an explained
+     * module (EDITIONS CP-13, EDG-01 cell 6). False on Basic, where the tile renders an explained
      * `<inspecto-alert>` instead of a silently missing section.
      */
     readonly eventsEnabled = this.session.eventsEnabled;

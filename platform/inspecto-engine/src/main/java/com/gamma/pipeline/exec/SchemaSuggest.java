@@ -113,8 +113,21 @@ public final class SchemaSuggest {
      *
      * <p>A field with no declared type contributes no {@code typeChanged}: nothing to have changed FROM
      * (again matching the compatibility gate's treatment of an absent old type).
+     *
+     * <p>Name-addressed: every selector names a sample column. See {@link #drift(Map, List, boolean)}.
      */
     public static Drift drift(Map<String, Object> draft, List<Field> inferred) {
+        return drift(draft, inferred, false);
+    }
+
+    /**
+     * {@link #drift(Map, List)} for a frontend whose selectors may be zero-based column <b>positions</b> — delimited and
+     * fixed-width ({@code byIndex}, {@code PipelineConfig.selectsByColumnIndex}): a selector of digits there names the
+     * sample column at that position in {@code inferred}'s order (the order {@link #infer} returns, the sample's own),
+     * not a column called {@code "0"}. Keying it on the name instead reported every field of a registrable delimited
+     * schema missing and every sample column added ({@code LA-ONBOARD-DRIFT-1}). Any other selector is still a name.
+     */
+    public static Drift drift(Map<String, Object> draft, List<Field> inferred, boolean byIndex) {
         Map<String, Field> bySampleColumn = new LinkedHashMap<>();
         for (Field f : inferred) bySampleColumn.put(f.name(), f);
 
@@ -129,12 +142,14 @@ public final class SchemaSuggest {
             String key = selector.isEmpty() ? name : selector;
             String declared = text(df.get("type"));
 
-            Field match = bySampleColumn.get(key);
+            Field match = byIndex && key.matches("\\d{1,9}")
+                    ? (Integer.parseInt(key) < inferred.size() ? inferred.get(Integer.parseInt(key)) : null)
+                    : bySampleColumn.get(key);
             if (match == null) {
                 missing.add(new Field(name, declared));
                 continue;
             }
-            claimed.add(key);
+            claimed.add(match.name());
             if (!declared.isEmpty() && !declared.equalsIgnoreCase(match.type()))
                 typeChanged.add(new TypeChange(name, declared, match.type()));
         }

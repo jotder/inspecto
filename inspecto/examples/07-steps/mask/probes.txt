@@ -1,8 +1,8 @@
 # Per-example Control API probes for serve-example.{ps1,sh}.
 # One endpoint path per line; blank lines and lines starting with '#' are ignored.
 #
-# STEP: mask (transform.mask, catalog quality.pii.mask) - ENTERPRISE ONLY (board SEC-08). Personal, Standard and
-# Professional refuse it at save and at run with ERR_EDITION_FEATURE; serve this with an Enterprise build.
+# STEP: mask (transform.mask, catalog quality.pii.mask) - ADVANCED ONLY (board SEC-08). Basic and
+# Standard refuse it at save and at run with ERR_EDITION_FEATURE; serve this with an Advanced build.
 #   steps[1]: - mask: { classifications: [ACCOUNT], dataset: orders, mode: partial, keep_last: 2 }
 # The columns are chosen BY CLASSIFICATION: write/registry/datasets/orders.toon (seeded into out/write, the
 # registry) classifies ORDER_ID as ACCOUNT, so ORDER_ID is masked to **01, **02, ... and every other column passes

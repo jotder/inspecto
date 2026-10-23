@@ -32,7 +32,7 @@ const LENSES: LensMeta[] = [
  * **Capability seam (RBAC groundwork, 2026-07-03; the promised re-derivation landed with RBAC R2,
  * 2026-07-23 — `docs/superpower/rbac-abac-plan.md` §3):** panes gate on the named **capability**
  * signals below, never on `readOnly`/lens identity directly. A Lens is a *view*, not a permission
- * (GLOSSARY §1-A). On Personal (`authMode 'none'`) every capability derives from the self-selected
+ * (GLOSSARY §1-A). On Basic (`authMode 'none'`) every capability derives from the self-selected
  * lens — the honor-system preview, byte-identical to before. Under OIDC each capability additionally
  * requires the matching grant in {@link SessionService.capabilities} — the *effective* set
  * `/bootstrap` reports after the backend's role/Access-Profile enforcement — and the "View as"
@@ -53,7 +53,7 @@ export class LensService {
      *  the stored choice. */
     private readonly preferredLens = signal<Lens>(this.restore());
 
-    /** The lenses this subject may view as. Honor system (Personal): all three. Under OIDC the
+    /** The lenses this subject may view as. Honor system (Basic): all three. Under OIDC the
      *  subject's roles project onto lenses via the effective grants (rbac-groundwork §3 taxonomy):
      *  Builder needs `canAuthorWorkbench`, Ops needs `canOperateRuns`, Business (read-only) is
      *  always available. The switcher iterates this. */
@@ -121,7 +121,7 @@ export class LensService {
      *
      * ⚠ The lens still suppresses these **in honor-system mode**. The exemption is justified by the
      * subject's *identity*, and off-OIDC there is no identity — {@link granted} short-circuits true for
-     * everyone, so the lens is the only signal there is. Without this clause, Personal mode's Business
+     * everyone, so the lens is the only signal there is. Without this clause, Basic mode's Business
      * lens would start showing Connections and Requirements affordances, breaking the "View as" preview
      * whose entire job is showing what a business user sees. Fix the OIDC bug; leave the preview alone.
      */

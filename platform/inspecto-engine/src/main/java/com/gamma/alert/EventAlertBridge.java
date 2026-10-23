@@ -19,7 +19,7 @@ import java.util.Map;
  * <p>MODULE-REORG-P7 ALERT residue retirement (2026-10-08): this was {@code com.gamma.ops.EventObjectBridge}, which
  * wrote ALERT <em>objects</em> and so existed only where the optional operational-object module did. It now writes
  * the Alert-owned store through {@link AlertService#raiseFromEvent}, so a gap or imbalance is an Alert on EVERY
- * edition (Personal included) and is read from {@code GET /alerts}.
+ * edition (Basic included) and is read from {@code GET /alerts}.
  *
  * <p>De-duplication: a still-active Alert for the same {@code (pipeline, expected key)} / {@code (pipeline, node)}
  * suppresses a duplicate, so a re-report after a restart does not hand an operator a clone. Never throws.

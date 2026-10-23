@@ -132,7 +132,7 @@ class ControlApiHttpsTest {
         return client.send(HttpRequest.newBuilder(URI.create(url)).GET().build(), BodyHandlers.ofString());
     }
 
-    // ── the baseline: no keystore means plain HTTP, unchanged (Personal) ──────────────────────────
+    // ── the baseline: no keystore means plain HTTP, unchanged (Basic) ──────────────────────────
 
     @Test
     void plainHttpIsTheDefaultWhenNoKeystoreIsConfigured(@TempDir Path dir) throws Exception {

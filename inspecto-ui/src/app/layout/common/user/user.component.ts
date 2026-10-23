@@ -32,7 +32,7 @@ export class UserComponent implements OnInit, OnDestroy {
     static ngAcceptInputType_showAvatar: BooleanInput;
     private session = inject(SessionService);
 
-    /** Personal/offline is auth-free — the whole menu is hidden rather than offer a no-op Sign out. */
+    /** Basic/offline is auth-free — the whole menu is hidden rather than offer a no-op Sign out. */
     readonly signedInEdition = this.session.authMode;
     /** The signed-in principal from `bootstrap.session.actor` (wired 2026-09-15 — this used to be a
      *  hardcoded '' fed by a `UserService.user$` that nothing ever populated), named by its display name

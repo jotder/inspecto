@@ -26,7 +26,7 @@ export class MenuService {
     private readonly navigation = inject(NavigationService);
     private readonly toastr = inject(ToastrService);
     private readonly store = signal<Record<string, MenuTree>>(this.load());
-    /** Personal favorites overlay (per Space), client-local — never sent to the server. */
+    /** Basic favorites overlay (per Space), client-local — never sent to the server. */
     private readonly favorites = signal<Record<string, string[]>>(loadMenuFavorites());
 
     constructor() {

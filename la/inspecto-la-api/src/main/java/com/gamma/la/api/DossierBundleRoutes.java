@@ -45,7 +45,7 @@ import static com.gamma.la.core.InvestigationEvaluator.sha256;
  * agrees is the one thing that needs the server — this verify route.
  *
  * <p><b>Gates.</b> The export is a read, so it is judged exactly as the Dossier is ({@link InvestigationRoutes#openForRead}:
- * owner or Case member, R3 Dataset visibility on every included snapshot, the Enterprise PDP). It carries only the
+ * owner or Case member, R3 Dataset visibility on every included snapshot, the Advanced PDP). It carries only the
  * sealed log, so four-eyes (D-U7) holds by construction: a PENDING sensitive expand never entered the log and is
  * absent; only an approved one — which names who requested and who approved it — appears. It persists nothing, so it
  * takes no capability; both routes are audited, because handing evidence outside the system is an act the trail

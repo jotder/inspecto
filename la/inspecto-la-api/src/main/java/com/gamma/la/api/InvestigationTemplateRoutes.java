@@ -78,7 +78,7 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  *
  * <p><b>Access.</b> Owner-only, like the Investigation: the template's creator owns it, and anyone else gets a 404
  * indistinguishable from absence. Saving one opens the source Investigation through
- * {@link InvestigationRoutes#open} (owner, R3 Dataset gate, Enterprise PDP); instantiating one applies the R3
+ * {@link InvestigationRoutes#open} (owner, R3 Dataset gate, Advanced PDP); instantiating one applies the R3
  * Dataset gate to the NEW binding through {@code InvRoutes.relationFor}. Writes are gated on
  * {@code canManageIncidents}, as every Investigation write is.
  */
@@ -278,7 +278,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
      * {@code GET /inv/investigation-templates} — the caller's own templates, newest first, as SUMMARIES
      * {@code {id, title, createdAt, dataset, investigation, parameters, ops}} ({@code parameters} and {@code ops} are counts).
      * Owner-only exactly as {@link #openTemplate}: another owner's template is not listed, so the list says nothing a 404
-     * would not (a Personal host with no Subject lists all). Gates: 503 without a write root. A template document that cannot
+     * would not (a Basic host with no Subject lists all). Gates: 503 without a write root. A template document that cannot
      * be read is skipped, never listed half-parsed. Sharing is not built (D-LD6).
      */
     @SuppressWarnings("unchecked")

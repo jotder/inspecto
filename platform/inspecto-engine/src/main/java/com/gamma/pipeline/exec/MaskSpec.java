@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * The {@code transform.mask} config (catalog {@code quality.pii.mask}, SEC-08 Enterprise-only, operator 2026-10-06):
+ * The {@code transform.mask} config (catalog {@code quality.pii.mask}, SEC-08 Advanced-only, operator 2026-10-06):
  * which columns are masked, and how. One place for the shape rules, so the compiler, the save gate and the run
  * cannot disagree.
  *

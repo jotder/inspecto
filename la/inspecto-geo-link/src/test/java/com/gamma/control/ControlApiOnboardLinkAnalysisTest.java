@@ -161,4 +161,35 @@ class ControlApiOnboardLinkAnalysisTest {
             assertTrue(List.of("BUILT", "UP_TO_DATE").contains(now.get("index").get("result").asText()), now.get("index").toString());
         }
     }
+
+    /**
+     * LA-ONBOARD-DEFECTS-1 (1): after Add a file in append mode the index summary says what the index now HOLDS - every link
+     * and each entity once - not what the appended batch added ("2,215 links between 624 entities" for 4,430 rows over 312
+     * accounts). Red on the old code: the APPEND build's own counts were reported (200 edges, the node rows of both builds).
+     */
+    @Test
+    void afterAnAppendTheIndexSummaryCountsTheWholeDatasetAndEachEntityOnce(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode first = data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200).get("index");
+            assertEquals("BUILT", first.get("result").asText(), first.toString());
+            assertEquals(200, first.get("edges").asLong(), first.toString());
+            long entities = first.get("nodes").asLong();
+            assertTrue(entities > 0 && entities <= 42, "at most the 42 accounts the fixture names: " + first);
+
+            JsonNode app = data(send(c, "POST", "/datasets/" + id + "/files?name=again.csv&mode=append",
+                    transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals(400, app.get("rowsAfter").asLong(), app.toString());
+            JsonNode ix = app.get("index");
+            assertEquals("BUILT", ix.get("result").asText(), ix.toString());
+            assertEquals(400, ix.get("edges").asLong(), "every link the Dataset holds: " + ix);
+            assertEquals(entities, ix.get("nodes").asLong(), "the same accounts, each counted once: " + ix);
+
+            JsonNode now = data(send(c, "POST", "/datasets/" + id + "/run", new byte[0]), 200).get("index");
+            assertEquals("UP_TO_DATE", now.get("result").asText(), now.toString());
+            assertEquals(400, now.get("edges").asLong(), now.toString());
+            assertEquals(entities, now.get("nodes").asLong(), "an index that is already current counts each entity once too: " + now);
+        }
+    }
 }

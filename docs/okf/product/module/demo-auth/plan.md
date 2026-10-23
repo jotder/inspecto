@@ -35,4 +35,3 @@ give the same roles. It must never be able to reach a customer bundle.
 * `MODULE-REORG-P3-THIN-JARS` packaging defect (1): `package.ps1 -Edition Advanced -DemoAuth -Ui la-app`
   fails at the jlink step because the derived module set expects `inspecto-oidc.jar`; `-NoRuntime` works around
   it ([BACKLOG](../../../../BACKLOG.md)).
-* `LA-EDITIONS-RESIDUALS-1` (7): a jlink advisory fires for demo builds.

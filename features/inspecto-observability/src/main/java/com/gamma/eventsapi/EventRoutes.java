@@ -26,13 +26,13 @@ import java.util.Map;
  * Operational Event Viewer routes ({@code /events*}, v4.2.0 Phase 1): the append-only "what
  * happened" feed (recent / filtered search / by-id), CSV-or-JSON export, and saved filter views.
  *
- * <p>EDITIONS {@code CP-13} "not for Personal", second half — EDG-01 <b>cell 6</b>, 2026-09-08. Cell 5
+ * <p>EDITIONS {@code CP-13} "not for Basic", second half — EDG-01 <b>cell 6</b>, 2026-09-08. Cell 5
  * moved the {@code /metrics} exposition and left this half in core, so CP-13 was half true. The operator's
  * call was to move the feed <b>whole</b>: the audit CSV is not a route of its own but a
  * {@code ?format=csv&type=AUDIT} branch inside {@link #exportEvents}, so gating the export alone would
  * mean an {@code if} inside a core route — the one mechanism EDITIONS §Assembly bans.
  *
- * <p>⚠ <b>This is a visible product change, unlike cell 5.</b> Personal loses the Events <i>screen</i>, not
+ * <p>⚠ <b>This is a visible product change, unlike cell 5.</b> Basic loses the Events <i>screen</i>, not
  * an endpoint nobody browses. Absent this module the core's {@code AbsentModuleRoutes} answers every
  * {@code /events*} path with 503 naming the module, {@code /bootstrap} reports
  * {@code features.events=false}, the UI drops the nav entry, and the Ops lens home falls back to
@@ -40,7 +40,7 @@ import java.util.Map;
  *
  * <p>⛔ <b>Recording is NOT gated.</b> {@code EventStore}/{@code EventLog} stay in {@code inspecto-event}
  * and every edition still writes the audit trail — that is a compliance obligation, not a feature
- * (AUDIT-CSV-1 / compliance G10). What Personal loses is reading the feed back over HTTP.
+ * (AUDIT-CSV-1 / compliance G10). What Basic loses is reading the feed back over HTTP.
  *
  * <p>Extracted verbatim from {@code ControlApi}: identical routes, order, statuses and CSV shape.
  */

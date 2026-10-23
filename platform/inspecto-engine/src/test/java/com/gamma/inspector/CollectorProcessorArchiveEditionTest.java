@@ -12,9 +12,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The run-time backstop of `PROCESSOR-RELEASE-READINESS-1` G9 for the CLI entry points the pipeline registry
- * does not guard: on a Personal build (this module's classpath) a remote Collector with the Professional+
+ * does not guard: on a Basic build (this module's classpath) a remote Collector with the Standard+
  * {@code post_action: MOVE} archive is refused with {@code ERR_EDITION_FEATURE} before any connector opens —
- * never acquired with the move silently skipped. The Professional run of the same shape is
+ * never acquired with the move silently skipped. The Standard run of the same shape is
  * {@code CollectorProcessorRemoteCycleTest}'s.
  */
 class CollectorProcessorArchiveEditionTest {

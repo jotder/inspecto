@@ -69,7 +69,7 @@ final class PipelineRunGuard implements RunLease {
      * the same semantics — in-heap, per process, unshared — because for the heap guard that is <em>correct</em>:
      * one instance per Space, one process, so "this process's baseline" and "the baseline" are the same thing.
      * It moved so that the shared implementation can make it shared, without the scheduler knowing which it has.
-     * ⛔ Personal and single-node Standard therefore behave byte-identically to before the move.
+     * ⛔ Basic and single-node Standard therefore behave byte-identically to before the move.
      */
     private final Map<String, Long> lastRunAtMs = new ConcurrentHashMap<>();
 

@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ControlApiSinkDuckLakeSharedTableTest {
 
-    /** DuckLake registration is Professional+ (G9) — this class tests the Professional behaviour; the Personal refusal is
+    /** DuckLake registration is Standard+ (G9) — this class tests the Standard behaviour; the Basic refusal is
      *  {@code EditionFeatureGateTest}'s. */
     @BeforeEach
     void professionalBuild() {

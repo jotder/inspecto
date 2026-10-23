@@ -8,7 +8,7 @@ import java.util.Set;
  * Carries only the resolved grants — never raw JWT claims or role names, which stay internal to the
  * {@link Authenticator} that derived them (guideline 13: the contract speaks in capability verbs,
  * never roles). Set on the exchange as {@code ApiContext#ATTR_SUBJECT} once per request by
- * {@link ControlApi#dispatch}; absent entirely on Personal edition (no {@link Authenticator} present,
+ * {@link ControlApi#dispatch}; absent entirely on Basic edition (no {@link Authenticator} present,
  * so nothing ever attaches one).
  *
  * <p><b>Data scopes (SEC-7d).</b> {@link #dataScopes()} carries the caller's resolved data-visibility
@@ -20,7 +20,7 @@ import java.util.Set;
  * <p><b>Attributes (ABAC A1).</b> {@link #attributes()} is the additive subject-attribute map policy
  * conditions bind as {@code subject.*} — IdP claims <em>allowlisted</em> in the space's
  * {@code roles.toon} {@code identity.attributeClaims} (never the raw token), populated by the
- * Standard/Enterprise {@link Authenticator}. Always empty in core and on every pre-A1 caller; nothing
+ * Standard/Advanced {@link Authenticator}. Always empty in core and on every pre-A1 caller; nothing
  * capability-gated may ever read it (grants stay capability-verbs-only).
  *
  * <p><b>Email (ses-sns-adapter-design §7).</b> {@link #email()} is the IdP's <em>verified</em> email

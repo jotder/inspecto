@@ -112,7 +112,7 @@ class ControlApiAgentInvokeTest {
 
     @Test
     void createAlertConsequenceAuthorsARealAlertRule(@TempDir Path cfg, @TempDir Path wr) throws Exception {
-        // Alert Rules are Professional+ (G9): this asserts the Professional behaviour.
+        // Alert Rules are Standard+ (G9): this asserts the Standard behaviour.
         com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
         try (Ctx c = open(cfg, wr)) {
             String rule = "{\"name\":\"breach\",\"targetType\":\"pipeline\",\"target\":\"orders\","
@@ -177,7 +177,7 @@ class ControlApiAgentInvokeTest {
         /**
      * Audit read-outs, re-seated off HTTP (EDG-01 cell 6, 2026-09-08). These tests are about agent-attributed audit stamping,
      * not the events feed — the feed was only ever a convenient way to see what got recorded. It moved to
-     * the optional {@code inspecto-observability} module, so on this (default, Personal) build {@code /events}
+     * the optional {@code inspecto-observability} module, so on this (default, Basic) build {@code /events}
      * answers 503; reading the store keeps every assertion and drops the accidental dependency on an
      * edition-gated surface. {@code page(200, null, null)} is the exact call the v1 route made.
      */

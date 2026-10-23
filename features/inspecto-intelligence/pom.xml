@@ -117,7 +117,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <!-- ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): Enterprise stages this SHADED `sidecar` artifact as
+                <!-- ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): Advanced stages this SHADED `sidecar` artifact as
                      inspecto-intelligence.jar. A thin jar would be present but unable to link (eoiagent,
                      LangChain4j, onnxruntime missing) - the same trap PKG-5 closed for inspecto-agent. -->
                 <executions>

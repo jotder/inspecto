@@ -116,7 +116,7 @@ export class TagsComponent implements OnInit {
         },
     ];
 
-    // ⚠ Nothing to load without the module: /tags* 503s on a Personal build.
+    // ⚠ Nothing to load without the module: /tags* 503s on a Basic build.
     ngOnInit(): void {
         this.loadRegistry();
     }

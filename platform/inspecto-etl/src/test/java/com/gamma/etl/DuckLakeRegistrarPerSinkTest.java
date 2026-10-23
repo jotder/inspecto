@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DuckLakeRegistrarPerSinkTest {
 
-    /** DuckLake registration is Professional+ (G9); this class tests the Professional behaviour. */
+    /** DuckLake registration is Standard+ (G9); this class tests the Standard behaviour. */
     @BeforeEach
     void professionalBuild() {
         EditionFeatures.overrideForTest(java.util.Set.of(EditionFeatures.SINK_DUCKLAKE));

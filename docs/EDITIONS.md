@@ -10,8 +10,10 @@
 > no profile), `package.ps1 -Edition Basic|Standard|Advanced|Preview`, `offerings/<edition>.toon` (basic, standard, advanced, preview),
 > `edition.properties`, `/bootstrap` `edition` (`basic`/`standard`/`advanced`). The old ids were dropped, not aliased.
 > Text below that records history under the old names was renamed with them; read "Basic" in an entry dated before
-> 2026-10-17 as "Personal" (it then carried no Link Analysis). Editions stay **build flavours plus capability gates,
-> never branches**.
+> 2026-10-17 as "Personal" (it then carried no Link Analysis). Code comments, pom descriptions, compliance evidence
+> and examples were swept too (2026-10-19, 2026-10-23); `tools/check-vocabulary.mjs` rule `edition-old-name` fails a
+> main Java or SPA source line, comments included, that names an old edition. Test identifiers keep the old names.
+> Editions stay **build flavours plus capability gates, never branches**.
 
 ## Inspecto LA feature placement (LA-EDITIONS-1 §2, decided 2026-10-17)
 

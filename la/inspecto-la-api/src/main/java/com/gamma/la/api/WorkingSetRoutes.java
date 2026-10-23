@@ -45,15 +45,15 @@ import java.util.Map;
  * consulted, so a cached relation can never be served to a caller the gate would refuse:
  * <ol>
  *   <li>{@link InvestigationRoutes#open} — owner-only (anyone else: 404, the same answer as absence) and the R3
- *       Dataset gate. On Professional and below, where no {@code AccessDecider} is on the classpath, that is the
+ *       Dataset gate. On Standard and below, where no {@code AccessDecider} is on the classpath, that is the
  *       whole rule: OWNER-ONLY, fail closed. ⛔ There is deliberately no fallback to {@code ComponentAccess}
  *       Dataset sharing — being able to view the Dataset does NOT make someone else's Investigation readable.</li>
- *   <li>{@link RowScope#visible} with {@code resourceKind = "investigation"} — the Enterprise PDP
+ *   <li>{@link RowScope#visible} with {@code resourceKind = "investigation"} — the Advanced PDP
  *       ({@code inspecto-policy}'s {@code PolicyEngine}) judges the resolved Investigation; a {@code DENY} is a 404,
  *       even for the owner — applied inside {@link InvestigationRoutes#open}, so EVERY Investigation route obeys
  *       it, not only this one. {@code ALLOW}/{@code ABSTAIN} fall through to rule 1 — the {@code AccessDecider}
- *       contract that a policy allow never widens an existing gate — so on Enterprise the effective rule is
- *       owner AND not policy-denied. With no Subject attached (Personal) nothing is enforced, as everywhere else in
+ *       contract that a policy allow never widens an existing gate — so on Advanced the effective rule is
+ *       owner AND not policy-denied. With no Subject attached (Basic) nothing is enforced, as everywhere else in
  *       the control plane.</li>
  * </ol>
  *

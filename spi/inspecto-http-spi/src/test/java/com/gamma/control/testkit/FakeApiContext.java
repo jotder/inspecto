@@ -89,7 +89,7 @@ public final class FakeApiContext implements ApiContext {
         throw new UnsupportedOperationException("FakeApiContext cannot replay: that needs the real dispatcher");
     }
 
-    /** Dispatch with no Subject (the Personal-edition shape: no capability check runs). */
+    /** Dispatch with no Subject (the Basic-edition shape: no capability check runs). */
     public Object dispatch(String method, String path, Map<String, Object> body) throws Exception {
         return dispatch(method, path, body, null);
     }

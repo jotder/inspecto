@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatAutocompleteTrigger } from '@angular/material/autocomplete';
 import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
+import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { pickerSet } from '@inspecto/core/testing/pen-field';
 import { EntityProfileService, EntitySuggestions } from '@inspecto/link-analysis/api/entity-profile.service';
@@ -94,10 +95,14 @@ class Host {
     exploreClicks = 0;
 }
 
-function create(suggest = vi.fn((..._a: unknown[]) => of(answer()))) {
+function create(suggest = vi.fn((..._a: unknown[]) => of(answer())), mayReveal = false) {
     TestBed.configureTestingModule({
         imports: [Host],
-        providers: [provideNoopAnimations(), { provide: EntityProfileService, useValue: { suggestEntities: suggest } }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: EntityProfileService, useValue: { suggestEntities: suggest } },
+            { provide: LensService, useValue: { canRevealLinkEntities: computed(() => mayReveal) } },
+        ],
     });
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
@@ -180,6 +185,65 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         await settle();
         fixture.detectChanges();
         expect(q(el, 'start-suggest-note')?.textContent).toContain('masked: type the whole value');
+    });
+
+    it('a masked type offers no reveal to someone who may not reveal', async () => {
+        const { fixture, el } = create(vi.fn(() => of(answer({ masked: true, items: [], assessed: false }))));
+        await settle();
+        fixture.detectChanges();
+        expect(q(el, 'start-reveal')).toBeNull();
+    });
+
+    /**
+     * LA-ONBOARD-DEFECTS-1 (4): a masked type suggested nothing even to someone who may reveal. They are now offered its
+     * values; the ask goes to the server as `reveal` (checked and audited there) and is not carried to another type.
+     */
+    it('a masked type: someone who may reveal asks for its values, and the type-ahead lists them', async () => {
+        const suggest = vi.fn((_t: unknown, req: unknown) =>
+            of(
+                (req as { reveal?: boolean }).reveal
+                    ? answer({ masked: true, revealed: true })
+                    : answer({ masked: true, items: [], assessed: false }),
+            ),
+        );
+        const { fixture, box, el } = create(suggest, true);
+        await settle();
+        fixture.detectChanges();
+        expect(box.suggested()).toEqual([]);
+        (q(el, 'start-reveal') as HTMLButtonElement).click();
+        await settle();
+        fixture.detectChanges();
+        expect(suggest).toHaveBeenLastCalledWith('account', {
+            prefix: '',
+            dataset: 'transfers',
+            limit: 8,
+            reveal: true,
+        });
+        expect(box.suggested().map((s) => s.value)).toEqual(['MULE-HUB-01']);
+        expect(q(el, 'start-suggest-note')?.textContent).toContain('shown because you may reveal them');
+        expect(q(el, 'start-reveal')).toBeNull();
+        await expectNoA11yViolations(el);
+        pickerSet(fixture, '[data-testid="start-type"]', 'msisdn');
+        await settle();
+        expect(suggest).toHaveBeenLastCalledWith('msisdn', { prefix: '', dataset: 'transfers', limit: 8 });
+    });
+
+    /**
+     * LA-ONBOARD-DEFECTS-1 (3): the type-ahead did not refresh when switching back to *One entity* - the kind was read only
+     * when another source emitted, so a Dataset picked while on *A list* left the box with no suggestions on return.
+     */
+    it('switching back to One entity asks the type-ahead again for the Dataset picked meanwhile', async () => {
+        const { fixture, box, suggest } = create();
+        await settle();
+        kind(fixture, 'list');
+        pickerSet(fixture, '[data-testid="start-dataset"]', 'calls');
+        await settle();
+        suggest.mockClear();
+        kind(fixture, 'entity');
+        await settle();
+        fixture.detectChanges();
+        expect(suggest).toHaveBeenLastCalledWith('msisdn', { prefix: '', dataset: 'calls', limit: 8 });
+        expect(box.suggested().map((s) => s.value)).toEqual(['MULE-HUB-01']);
     });
 
     it('a list: picks an Entity List and starts from it; a missing pick is said', async () => {

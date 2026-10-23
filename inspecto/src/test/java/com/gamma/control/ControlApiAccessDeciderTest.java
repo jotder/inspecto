@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * The core's ABAC A3 route-level PEP in isolation (no policy module — a fake {@link AccessDecider} via
  * {@link AccessDeciders#forTest}): the authorize stage 403s an explicit route-level DENY, ALLOW and
  * ABSTAIN fall through to the existing gates, and the decider is never consulted without a Subject.
- * The Enterprise engine's own semantics live in {@code inspecto-policy}'s tests.
+ * The Advanced engine's own semantics live in {@code inspecto-policy}'s tests.
  *
  * <p>⚠ <b>Split from {@code inspecto-ops} 2026-09-25</b> ({@code EDITION-GATED-TESTS-IN-WRONG-HOME-1}):
  * these three cases only ever used {@code GET /objects} as "some authenticated read route", so they run

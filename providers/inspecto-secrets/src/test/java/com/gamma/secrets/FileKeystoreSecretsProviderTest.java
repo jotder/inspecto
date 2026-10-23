@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * SEC-07: with this edition module on the classpath, {@code ${FILE}} / {@code ${KEYSTORE}} resolve through the
  * core {@link SecretResolver} exactly as they did when the arms lived in the core — discovered by ServiceLoader,
- * not wired by hand. (The Personal refusal is pinned in inspecto-acquire's {@code SecretResolverTest}.)
+ * not wired by hand. (The Basic refusal is pinned in inspecto-acquire's {@code SecretResolverTest}.)
  */
 class FileKeystoreSecretsProviderTest {
 
