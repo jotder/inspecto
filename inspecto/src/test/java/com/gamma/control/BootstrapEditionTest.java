@@ -15,6 +15,7 @@ class BootstrapEditionTest {
     @AfterEach
     void restore() {
         AccessDeciders.forTest(null);
+        com.gamma.spi.auth.Authenticators.forTest(null);
         System.clearProperty("auth.mode");
     }
 
@@ -22,6 +23,14 @@ class BootstrapEditionTest {
     void authFreeCoreIsPersonalEvenWithADecider() {
         AccessDeciders.forTest(ABSTAINS);
         assertEquals("basic", BootstrapRoutes.edition());
+    }
+
+    /** One definition of "people sign in" (LA-ONBOARD-RESIDUALS-1 item 2): an installed Authenticator counts, as it does for the masking default. */
+    @Test
+    void anInstalledAuthenticatorMeansSignInEvenWithoutAuthMode() {
+        com.gamma.spi.auth.Authenticators.forTest(ex -> java.util.Optional.empty());
+        assertEquals("standard", BootstrapRoutes.edition());
+        assertEquals(EditionMaskingDefault.signsIn(), !"basic".equals(BootstrapRoutes.edition()));
     }
 
     @Test

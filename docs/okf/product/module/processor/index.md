@@ -40,4 +40,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `BI-MASKING-FREE-SQL-ORACLES-1` | P1 | defect | a caller without canRevealLinkEntities can still TEST a masked key's value through free SQL, with every output cell masked — found by the… | operator |
 | `LA-ONBOARD-RETIRE-GAPS-1` | P3 | defect | small gaps left by c392cda7a (LA-ONBOARD-ORPHAN-PIPELINE-1, LA-ONBOARD-DRIFT-1, LA-SAMPLE-GALLERY-DEMOAUTH-1; 2026-10-23): (1) the Parse… | operator |
-| `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) *Find paths (server)* stays unlocked on Basic (open explorer route, a Basic feature in… | — |
+| `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |

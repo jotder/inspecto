@@ -107,7 +107,7 @@ final class BootstrapRoutes implements RouteModule {
      * policy module) is installed — the edition's defining extra, not a property guess (edition names: LA-EDITIONS-1 ED-2).
      */
     static String edition() {
-        if ("none".equalsIgnoreCase(System.getProperty("auth.mode", "none"))) return "basic";
+        if (!EditionMaskingDefault.signsIn()) return "basic";   // one definition of "people sign in", shared with the masking default
         return AccessDeciders.active().isPresent() ? "advanced" : "standard";
     }
 

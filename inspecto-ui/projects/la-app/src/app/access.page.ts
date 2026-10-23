@@ -18,8 +18,11 @@ import { AccessRolesComponent } from 'app/modules/admin/access/access-roles.comp
                 title="Access"
                 subtitle="What each role may do in this Space. Who holds a role is set in the identity provider."
             />
-            <app-access-roles />
+            <app-access-roles [labels]="roleLabels" />
         </section>
     `,
 })
-export class AccessPageComponent {}
+export class AccessPageComponent {
+    /** `pipeline-developer` is a Pipeline word, which an Inspecto LA screen does not use; the id is unchanged. */
+    protected readonly roleLabels = { 'pipeline-developer': 'Data builder' };
+}

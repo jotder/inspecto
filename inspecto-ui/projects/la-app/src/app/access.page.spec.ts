@@ -11,7 +11,7 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { AccessPageComponent } from './access.page';
 
 describe('AccessPageComponent (the roles editor on its own page)', () => {
-    async function render(canConfigure: boolean) {
+    async function render(canConfigure: boolean, extra: { name: string; capabilities: string[]; source: string }[] = []) {
         TestBed.configureTestingModule({
             providers: [
                 provideNoopAnimations(),
@@ -26,6 +26,7 @@ describe('AccessPageComponent (the roles editor on its own page)', () => {
                             of({
                                 roles: [
                                     { name: 'fraud-analyst', capabilities: ['canWorkIncidents'], source: 'authored' },
+                                    ...extra,
                                 ],
                             }),
                         profiles: () => of([]),
@@ -40,6 +41,12 @@ describe('AccessPageComponent (the roles editor on its own page)', () => {
         fixture.detectChanges();
         return fixture.nativeElement as HTMLElement;
     }
+
+    it('shows a plain label for pipeline-developer, never the Pipeline role id', async () => {
+        const el = await render(true, [{ name: 'pipeline-developer', capabilities: ['canWorkIncidents'], source: 'seed' }]);
+        expect(el.textContent).toContain('Data builder');
+        expect(el.textContent).not.toContain('pipeline-developer');
+    });
 
     it('names its region, owns the one h1 and lists the roles', async () => {
         const el = await render(true);

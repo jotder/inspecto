@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 import { OnboardingEventsService, OnboardingMetrics } from 'app/inspecto/onboarding/onboarding-events.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -73,18 +73,20 @@ describe('Getting started counters in Settings (LA-ONBOARD-1 OB-13)', () => {
 });
 
 describe('This Space → Add data in Settings (LA-ONBOARD-1 OB-7, phase 8)', () => {
-    function make(signIn: boolean, admin: boolean) {
+    function make(signIn: boolean, admin: boolean, refuse = false) {
         const setDataSettings = vi.fn(() =>
-            of({ selfImport: true, selfImportDefault: false, selfImportInForce: true }),
+            refuse
+                ? throwError(() => ({ status: 403, error: { error: 'Refused' } }))
+                : of({ selfImport: true, selfImportDefault: false, selfImportInForce: true }),
         );
+        const dataSettings = vi.fn(() => of({ selfImport: null, selfImportDefault: false, selfImportInForce: false }));
         TestBed.configureTestingModule({
             imports: [AddDataSettingsComponent],
             providers: [
                 {
                     provide: OnboardService,
                     useValue: {
-                        dataSettings: () =>
-                            of({ selfImport: null, selfImportDefault: false, selfImportInForce: false }),
+                        dataSettings,
                         setDataSettings,
                     },
                 },
@@ -94,7 +96,7 @@ describe('This Space → Add data in Settings (LA-ONBOARD-1 OB-7, phase 8)', () 
         });
         const f = TestBed.createComponent(AddDataSettingsComponent);
         f.detectChanges();
-        return { f, el: f.nativeElement as HTMLElement, setDataSettings };
+        return { f, el: f.nativeElement as HTMLElement, setDataSettings, dataSettings };
     }
 
     it('an administrator turns Add data on for the Space (no violations)', async () => {
@@ -108,6 +110,20 @@ describe('This Space → Add data in Settings (LA-ONBOARD-1 OB-7, phase 8)', () 
         expect(setDataSettings).toHaveBeenCalledWith(true);
         expect(el.querySelector('[data-testid="la-self-import-why"]')?.textContent).toContain('On.');
         await expectNoA11yViolations(el);
+    });
+
+    it('offers Try again after a refused change, and reads the setting afresh', () => {
+        const { f, el, dataSettings } = make(true, true, true);
+        (el.querySelector('[data-testid="la-self-import"] button, [data-testid="la-self-import"] input') as HTMLElement).click();
+        f.detectChanges();
+        const retry = el.querySelector('[data-testid="la-self-import-retry"]') as HTMLButtonElement;
+        expect(retry).not.toBeNull();
+        expect(dataSettings).toHaveBeenCalledTimes(1);
+        retry.click();
+        f.detectChanges();
+        expect(dataSettings).toHaveBeenCalledTimes(2);
+        expect(el.querySelector('[data-testid="la-self-import"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="la-self-import-retry"]')).toBeNull();
     });
 
     it('anyone else sees it read-only, and why', () => {
