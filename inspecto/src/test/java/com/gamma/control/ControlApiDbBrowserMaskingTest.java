@@ -259,4 +259,96 @@ class ControlApiDbBrowserMaskingTest {
             }
         }
     }
+
+    /** BI-MASKING-ROW-VALUE-LEAKS-1: a rename in FROM, or the row itself as a value, returns the key: refused, or every cell masked. */
+    @Test
+    void aFromClauseRenameOrTheRowAsAValueIsMaskedWhole(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            for (String probe : List.of(
+                    "SELECT m FROM calls t(m)",
+                    "SELECT CAST(m AS BIGINT) AS v FROM calls t(m)",
+                    "SELECT unnest AS amount FROM calls, unnest([CAST(msisdn AS BIGINT)])",
+                    "SELECT c AS region FROM calls c",
+                    "SELECT region, main.calls AS j FROM calls",
+                    "SELECT to_json(c) AS j FROM calls c",
+                    "SELECT CAST(c['msisdn'] AS BIGINT) AS v FROM calls c",
+                    "SELECT value AS region FROM calls UNPIVOT (value FOR col IN (msisdn))")) {
+                HttpResponse<String> r = as("reader", c, "POST", "/spaces/s1/db/query", query("calls", probe));
+                if (r.statusCode() == 200) {
+                    JsonNode rows = V1Body.of(r.body()).get("rows");
+                    assertNoRaw(rows.toString());
+                    rows.forEach(row -> row.forEach(cell ->
+                            assertTrue(cell.isNull() || cell.asText().startsWith("masked:"), probe + " -> " + row)));
+                } else assertEquals(422, r.statusCode(), probe + " -> " + r.body());
+            }
+        }
+    }
+
+    /** BI-MASKING-ROW-VALUE-LEAKS-1: an oracle through a FROM rename or the row as a value is refused. */
+    @Test
+    void anOracleThroughAFromRenameOrTheRowIsRefused(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            for (String probe : List.of(
+                    "SELECT region FROM calls t(m) WHERE m = '" + A + "'",
+                    "SELECT region FROM calls c WHERE c['msisdn'] = '" + A + "'",
+                    "SELECT region FROM calls c WHERE struct_extract(c, 'msi' || 'sdn') = '" + A + "'",
+                    "SELECT region FROM calls WHERE to_json(calls) LIKE '%4417009001%'",
+                    "SELECT region FROM calls c ORDER BY c",
+                    "SELECT region FROM calls, unnest([msisdn]) u(x) WHERE x = '" + A + "'",
+                    "SELECT region FROM calls WHERE to_json(main.calls) LIKE '%4417009001%'",
+                    "SELECT msisdn, row_number() OVER (ORDER BY msisdn DESC) AS r FROM calls",
+                    "SELECT msisdn, count(*) OVER (PARTITION BY msisdn) AS n FROM calls")) {
+                assertEquals(422, as("reader", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), probe);
+                assertEquals(200, as("revealer", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), "a revealer: " + probe);
+            }
+        }
+    }
+
+    /**
+     * BI-MASKING-ROW-VALUE-LEAKS-1: the Space alias of a value is the same in every query, so a DERIVED value aliased the same
+     * way decodes the key one digit at a time ({@code substr(msisdn,1,1)} next to {@code '4'}), and a rank over it the order.
+     * Only a key selected bare keeps its Space alias; a derived cell gets an alias nothing else shares.
+     */
+    @Test
+    void aDerivedValueOfAKeyCannotBeMatchedAgainstAKnownValue(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            JsonNode rows = V1Body.of(as("reader", c, "POST", "/spaces/s1/db/query", query("calls",
+                    "SELECT msisdn, substr(msisdn, 1, 1) AS d, '4' AS k, CAST(msisdn AS BIGINT) % 10 AS r, '1' AS one "
+                            + "FROM calls")).body()).get("rows");
+            assertEquals(3, rows.size(), rows.toString());
+            String spaceAlias = "masked:[0-9a-f]{16}";
+            for (JsonNode row : rows) {
+                assertTrue(row.get("msisdn").asText().matches(spaceAlias), "the bare key keeps its alias: " + row);
+                // a digit, a rank, or a value the caller typed: none may carry a Space alias, or '4' decodes the first digit
+                for (String col : List.of("d", "k", "r", "one")) {
+                    assertTrue(row.get(col).asText().startsWith("masked:"), row.toString());
+                    assertFalse(row.get(col).asText().matches(spaceAlias), col + " must not be linkable: " + row);
+                }
+            }
+            // A typed full-number guess reached through a lateral alias is not the bare column: no Space alias to compare.
+            JsonNode guess = V1Body.of(as("reader", c, "POST", "/spaces/s1/db/query", query("calls",
+                    "SELECT '" + A + "' AS msisdn, msisdn AS k")).body()).get("rows").get(0);
+            assertFalse(guess.get("k").asText().matches(spaceAlias), "a typed guess must not get the key's alias: " + guess);
+            assertFalse(guess.get("msisdn").asText().matches(spaceAlias), guess.toString());
+            // ...nor through an output NAME built at run time, which no text rule sees.
+            JsonNode built = V1Body.of(as("reader", c, "POST", "/spaces/s1/db/query", query("calls",
+                    "SELECT unnest(json_transform('{\"ms' || 'isdn\":\"" + A + "\"}', '{\"ms' || 'isdn\":\"VARCHAR\"}'))"))
+                    .body()).get("rows").get(0);
+            assertFalse(built.get("msisdn").asText().matches(spaceAlias), "a built name must not get the key's alias: " + built);
+            // ...nor by an item that expands to several columns, which shifts the bare key's position onto the guess.
+            for (String shift : List.of(
+                    "SELECT * REPLACE ('" + A + "' AS region), msisdn FROM calls",
+                    "SELECT unnest({'a': 1, 'b': '" + A + "'}), msisdn FROM calls")) {
+                JsonNode s = V1Body.of(as("reader", c, "POST", "/spaces/s1/db/query", query("calls", shift)).body()).get("rows");
+                s.forEach(row -> row.forEach(cell ->
+                        assertFalse(cell.asText().matches(spaceAlias), "a shifted position must not get the alias: " + shift + " -> " + row)));
+            }
+            // The bare key keeps the Space alias: one id, one alias (the A rows match each other and the table browser).
+            JsonNode table = V1Body.of(as("reader", c, "GET", "/spaces/s1/db/table?name=calls", null).body()).get("rows");
+            assertEquals(Set.copyOf(column(table, "msisdn")), Set.copyOf(column(rows, "msisdn")));
+        }
+    }
 }

@@ -116,8 +116,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/auth/exchange` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:49` |
 | POST | `/auth/logout` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:51` |
 | POST | `/auth/refresh` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:50` |
-| POST | `/bi/query` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:51` |
-| POST | `/bi/templates/([^/]+)/apply` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:55` |
+| POST | `/bi/query` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:54` |
+| POST | `/bi/templates/([^/]+)/apply` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:58` |
 | POST | `/bundle/export` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:146` |
 | POST | `/bundle/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:149` |
 | POST | `/bundle/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:147` |

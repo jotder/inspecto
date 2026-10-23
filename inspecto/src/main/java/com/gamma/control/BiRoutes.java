@@ -20,9 +20,12 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
 
@@ -103,8 +106,12 @@ final class BiRoutes implements RouteModule {
                 spec.dataset(), dataset, BiResultMasking.mayReveal(ex));
         String queryId = ApiContext.str(body, "query");
         String boundText = queryId == null ? null : boundQueryWith(ex, store, queryId, spec);
+        // the saved query's own text, inside the WITH .. AS ( .. ) wrapper boundQueryWith built: masking parses THIS (the
+        // wrapper never parses as one statement, so a rename or row value in the saved text would go unseen)
+        String boundQuery = boundText == null ? null
+                : boundText.substring(("WITH \"" + BOUND + "\" AS (").length(), boundText.length() - 2);
         // The chart's cosmetic category order over a masked key is dropped (not refused) for a caller who cannot reveal.
-        MeasureCompiler.Spec stripped = masking.stripCosmeticOrder(spec, boundText);
+        MeasureCompiler.Spec stripped = masking.stripCosmeticOrder(spec, boundQuery);
         if (stripped != spec) {
             spec = stripped;
             probe = spec.withLimit(spec.limit() + 1);
@@ -127,12 +134,20 @@ final class BiRoutes implements RouteModule {
                         "error", "bound query '" + queryId + "' failed the SQL safety check", "findings", boundFindings));
         }
 
-        masking.vet(spec, true, boundText);
+        masking.vet(spec, true, boundQuery);
         QueryExecutor.Request req = new QueryExecutor.Request(spec.dataset(), relationSql, sql.sql(),
                 spec.limit(), 0, List.of(), List.of(), sql.params());
         try {
             QueryExecutor.Result raw = QueryExecutor.run(req);
-            QueryExecutor.Result shown = masking.apply(raw, boundText == null ? spec.groupBy() : null, boundText);
+            // only a raw groupBy column may keep the Space alias: not a Measure / ratio id, not a grain bucket (any case)
+            Set<String> grained = new HashSet<>();
+            if (spec.grains() != null) for (String g : spec.grains().keySet()) grained.add(g.toLowerCase(Locale.ROOT));
+            Set<String> grantable = new HashSet<>();
+            for (String g : spec.groupBy()) grantable.add(g.toLowerCase(Locale.ROOT));
+            grantable.removeAll(grained);
+            for (MeasureCompiler.Measure m : spec.measures()) grantable.remove(m.id().toLowerCase(Locale.ROOT));
+            for (MeasureCompiler.Ratio rt : spec.ratios()) grantable.remove(rt.id().toLowerCase(Locale.ROOT));
+            QueryExecutor.Result shown = masking.apply(raw, boundText == null ? spec.groupBy() : null, boundText, boundQuery, grantable);
             return response(shown, echoSql, masking.describe());
         } catch (SQLException e) {
             throw ServerFaults.datasetRead("BI query failed", spec.dataset(), dataset, e, api);
