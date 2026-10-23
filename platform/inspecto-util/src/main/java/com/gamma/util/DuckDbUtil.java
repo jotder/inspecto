@@ -108,6 +108,7 @@ public final class DuckDbUtil {
     public static void applyDuckDbSettings(Connection conn, String memoryLimit,
                                            String tempDirectory, String maxTempDirectorySize)
             throws SQLException {
+        applyCorrectnessSettings(conn);
         try (Statement st = conn.createStatement()) {
             if (notBlank(tempDirectory))
                 st.execute("SET temp_directory=" + SqlIdent.sqlStr(tempDirectory.replace('\\', '/')));
@@ -115,6 +116,21 @@ public final class DuckDbUtil {
                 st.execute("SET memory_limit=" + SqlIdent.sqlStr(memoryLimit));
             if (notBlank(maxTempDirectorySize))
                 st.execute("SET max_temp_directory_size=" + SqlIdent.sqlStr(maxTempDirectorySize));
+        }
+    }
+
+    /**
+     * Engine-correctness settings every analytics connection gets, whatever else it is configured with.
+     *
+     * <p>{@code disabled_optimizers = 'window_self_join'} (DuckDB 2.0.0, {@code DUCKDB-2-MIGRATION-1}): that rewrite
+     * turns {@code count(*) OVER (PARTITION BY …)} into a self-join against an aggregate over a COPY of the scan, and
+     * on 2.0.0 the copied {@code read_parquet} scan loses the hive-partition pruning — rows of pruned partitions are
+     * counted (a day-1 window silently sees day 2). 1.5.6 is unaffected; disabling the rewrite is harmless there.
+     * Pinned by {@code DuckDbWindowSelfJoinWorkaroundTest}; remove only when that test passes without it.
+     */
+    public static void applyCorrectnessSettings(Connection conn) throws SQLException {
+        try (Statement st = conn.createStatement()) {
+            st.execute("SET disabled_optimizers = 'window_self_join'");
         }
     }
 
@@ -132,7 +148,14 @@ public final class DuckDbUtil {
      * @throws SQLException if DuckDB cannot open or create the database
      */
     public static Connection openConnection(File dbFile) throws SQLException {
-        return DriverManager.getConnection(jdbcUrl(dbFile));
+        Connection conn = DriverManager.getConnection(jdbcUrl(dbFile));
+        try {
+            applyCorrectnessSettings(conn);
+        } catch (SQLException | RuntimeException e) {
+            conn.close();
+            throw e;
+        }
+        return conn;
     }
 
     /** Hidden spill directory name under a Space's data root; dot-prefixed so dataset scans skip it. */

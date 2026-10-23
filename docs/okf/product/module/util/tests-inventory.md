@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.util`](../../../../../product-map/module/util.toon).
 
-37 test class(es): 37 unit, 0 real-HTTP control-plane, 0 IT.
+38 test class(es): 38 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -38,6 +38,7 @@ mvn -o test -pl platform/inspecto-util -Dtest=ModuleBuildIdTest,ModuleManifestsT
 | `DuckDbInMemorySealTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/DuckDbInMemorySealTest.java` | {@code ENGINE-INMEMORY-UNSEALED-1}: {@link DuckDbUtil#openInMemory} is sealed by default — no extension |
 | `DuckDbPendingQueryPreambleTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/DuckDbPendingQueryPreambleTest.java` | {@link DuckDbUtil#withoutPendingQueryPreamble} against the REAL driver, so a DuckDB upgrade that rewords |
 | `DuckDbSettingsTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/DuckDbSettingsTest.java` | Covers the 3.10.0 scratch-relocation primitives: the temp DB is created in the requested |
+| `DuckDbWindowSelfJoinWorkaroundTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/DuckDbWindowSelfJoinWorkaroundTest.java` | DuckDB 2.0.0's {@code window_self_join} rewrite loses hive-partition pruning in the scan it copies, so a |
 | `FileBackupTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/FileBackupTest.java` |  |
 | `FileMoverByDateTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/FileMoverByDateTest.java` | {@link FileMoverByDate}: date-pattern moves, dry-run, duplicate skip, source validation. <!-- vocab-allow: quoted Javadoc --> |
 | `FileWalkerTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/FileWalkerTest.java` |  |

@@ -1752,6 +1752,9 @@ class TelcoRerateGoldenTest {
     }
 
     private static void registerViews(Statement st, Path space) throws Exception {
+        // the harness opens a raw connection, so it takes the engine's correctness settings itself (DuckDB 2.0's
+        // window_self_join counts pruned hive partitions - DuckDbWindowSelfJoinWorkaroundTest)
+        com.gamma.util.DuckDbUtil.applyCorrectnessSettings(st.getConnection());
         for (String feed : FEED_COLUMNS.keySet()) {
             List<String> files = new ArrayList<>();
             try (Stream<Path> w = Files.walk(space.resolve("data").resolve(feed).resolve("database"))) {
