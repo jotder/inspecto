@@ -166,20 +166,22 @@ class SqlSandboxTest {
     }
 
     /**
-     * Design T2: a bare {@code ?} is refused AT PREPARE; an explicit {@code ::VARCHAR} binds. ⚠ The trap is
-     * that string concatenation "fixes" the naive form — in a route whose whole input is author-written SQL.
+     * Design T2, as of DuckDB 2.0 ({@code DUCKDB-2-MIGRATION-1}): 1.5 refused a bare {@code ?} at prepare and
+     * only {@code ?::VARCHAR} bound; 2.0 binds both. Every caller keeps the explicit cast ({@code SqlAst},
+     * {@code SqlGuard}), so the author's SQL is always a BOUND VALUE. ⚠ The trap stays: never string-concatenate
+     * author SQL into this statement.
      */
     @Test
-    void serializeNeedsAnExplicitVarcharCastOnItsBindParameter() throws Exception {
+    void serializeBindsItsParameterAsAValueWithOrWithoutTheCast() throws Exception {
         try (SqlSandbox sb = SqlSandbox.open(POLICY)) {
             sb.seal();
-            SQLException e = assertThrows(SQLException.class, () -> {
-                try (var ps = sb.preparedStatement("SELECT json_serialize_sql(?)")) {
-                    ps.setString(1, "SELECT 1");
-                    ps.executeQuery().close();
+            try (var ps = sb.preparedStatement("SELECT json_serialize_sql(?)")) {
+                ps.setString(1, "SELECT a FROM t WHERE b > 1");
+                try (ResultSet rs = ps.executeQuery()) {
+                    assertTrue(rs.next());
+                    assertTrue(rs.getString(1).contains("\"error\":false"), "T2 (2.0): a bare ? binds as a value");
                 }
-            }, "T2: a bare bind parameter is refused");
-            assertTrue(e.getMessage().contains("must be a VARCHAR"), e.getMessage());
+            }
 
             try (var ps = sb.preparedStatement("SELECT json_serialize_sql(?::VARCHAR)")) {
                 ps.setString(1, "SELECT a FROM t WHERE b > 1");
@@ -192,11 +194,12 @@ class SqlSandboxTest {
     }
 
     /**
-     * Design T3: {@code skip_null/skip_empty} yields a ONE-WAY AST that deserialize refuses. The obvious
-     * payload optimisation silently breaks the write path — so the route must never slim the AST.
+     * Design T3, as of DuckDB 2.0: on 1.5 {@code skip_null/skip_empty} gave a ONE-WAY tree that deserialize
+     * refused; 2.0 deserializes it. The decision does not change (operator 2026-10-05, re-assess before any
+     * change): the route never slims the tree and never deserializes (Q2) — this pins the engine fact only.
      */
     @Test
-    void slimmedAstDoesNotDeserialize() throws Exception {
+    void slimmedAstDeserializesOnDuckDb2() throws Exception {
         String sql = "SELECT t.a FROM t JOIN r ON t.k = r.k WHERE t.a > 1 AND r.b IS NOT NULL";
         try (SqlSandbox sb = SqlSandbox.open(POLICY)) {
             sb.seal();
@@ -206,20 +209,20 @@ class SqlSandboxTest {
                         "SELECT json_serialize_sql('" + sql + "', skip_null := true, skip_empty := true)");
                 assertTrue(slim.length() < full.length(), "the slim form is smaller: " + slim.length()
                         + " vs " + full.length());
-                SQLException e = assertThrows(SQLException.class,
-                        () -> scalar(st, "SELECT json_deserialize_sql('" + slim.replace("'", "''") + "'::JSON)"),
-                        "T3: the slimmed AST is one-way");
-                assertTrue(e.getMessage().contains("cte_map"), e.getMessage());
+                String back = scalar(st, "SELECT json_deserialize_sql('" + slim.replace("'", "''") + "'::JSON)");
+                assertTrue(back.contains("JOIN") && back.contains("IS NOT NULL"), "T3 (2.0): the slim tree round-trips: " + back);
             }
         }
     }
 
     /**
-     * Design T4: nodes carry {@code query_location} (a START offset) and nothing marking an END — so
-     * text-splicing an edit into the author's SQL has no reliable span to replace.
+     * Design T4, as of DuckDB 2.0: 1.5 nodes carried only {@code query_location} (a START offset); 2.0 adds
+     * {@code query_location_length}, so a node's span in the author's text is now knowable. NOT adopted
+     * (operator 2026-10-05: re-assess before any change) — the tree stays read-only and nothing splices by
+     * offset. This pins the engine fact, and fails if a further span-like key appears.
      */
     @Test
-    void astCarriesStartOffsetsButNoEndOffsets() throws Exception {
+    void astCarriesStartOffsetsAndALengthOnDuckDb2() throws Exception {
         try (SqlSandbox sb = SqlSandbox.open(POLICY)) {
             sb.seal();
             try (Statement st = sb.statement()) {
@@ -228,8 +231,9 @@ class SqlSandboxTest {
                 var m = java.util.regex.Pattern.compile("\"([A-Za-z_]+)\":").matcher(ast);
                 while (m.find()) keys.add(m.group(1));
                 assertTrue(keys.contains("query_location"), "T4: start offsets exist: " + keys);
+                assertTrue(keys.contains("query_location_length"), "T4 (2.0): a length beside each start: " + keys);
                 for (String k : keys) {
-                    assertFalse(k.equals("query_location") ? false
+                    assertFalse(k.equals("query_location") || k.equals("query_location_length") ? false
                                     : k.matches("(?i).*(location|offset|end|length|len|stop|span).*"),
                             "T4: an end/span-like key appeared, splicing may now be possible: " + k
                                     + " in " + keys);

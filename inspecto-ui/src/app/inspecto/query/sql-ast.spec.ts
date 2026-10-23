@@ -11,9 +11,9 @@ import {
     sameSqlStructure,
 } from './sql-ast';
 
-// ── Fixtures: the exact shapes DuckDB's json_serialize_sql emits (measured on 1.5.x, and the key names
-//    pinned against the real engine by SqlAstContractTest). `query_location` values are arbitrary here —
-//    the reader never looks at them.
+// ── Fixtures: the exact shapes DuckDB's json_serialize_sql emits (measured on 2.0.0.0, and the key names
+//    pinned against the real engine by SqlAstContractTest). `query_location` / `query_location_length`
+//    values are arbitrary here — the reader never looks at them.
 const col = (...names: string[]): SqlAstNode => ({
     class: 'COLUMN_REF',
     type: 'COLUMN_REF',
@@ -21,24 +21,18 @@ const col = (...names: string[]): SqlAstNode => ({
     query_location: 1,
     column_names: names,
 });
-const constant = (id: string, value: unknown, typeInfo: unknown = null): SqlAstNode => ({
+const constant = (kind: string, text: string): SqlAstNode => ({
     class: 'CONSTANT',
     type: 'VALUE_CONSTANT',
     alias: '',
     query_location: 2,
-    value: { type: { id, type_info: typeInfo }, is_null: false, value },
+    query_location_length: 1,
+    literal: { kind, text },
 });
-const int = (v: number) => constant('INTEGER', v);
-const str = (v: string) => constant('VARCHAR', v);
-const bool = (v: boolean): SqlAstNode => ({
-    class: 'CAST',
-    type: 'OPERATOR_CAST',
-    alias: '',
-    query_location: 2 ** 64 - 1, // DuckDB's "no location" — beyond what a JS number holds exactly
-    child: str(v ? 't' : 'f'),
-    cast_type: { id: 'BOOLEAN', type_info: null },
-    try_cast: false,
-});
+const int = (v: number) => constant('INTEGER', String(v));
+const str = (v: string) => constant('STRING', v);
+const bool = (v: boolean) => constant('BOOLEAN', v ? 'true' : 'false');
+const nul = () => constant('NULL_LITERAL', '');
 const cmp = (type: string, left: SqlAstNode, right: SqlAstNode): SqlAstNode => ({
     class: 'COMPARISON',
     type,
@@ -71,17 +65,20 @@ const between = (input: SqlAstNode, lower: SqlAstNode, upper: SqlAstNode): SqlAs
     lower,
     upper,
 });
-const fn = (name: string, ...children: SqlAstNode[]): SqlAstNode => ({
+const fn = (name: string, ...operands: SqlAstNode[]): SqlAstNode => ({
     class: 'FUNCTION',
     type: 'FUNCTION',
     alias: '',
     query_location: 7,
     function_name: name,
     schema: '',
-    children,
     filter: null,
     is_operator: true,
+    arguments: operands.map((expression) => ({ name: '', expression })),
+    qualified_name: { path: [name] },
 });
+/** `a NOT IN (…)`: 2.0 parses it as OPERATOR_NOT over COMPARE_IN. */
+const notIn = (...children: SqlAstNode[]) => op('OPERATOR_NOT', op('COMPARE_IN', ...children));
 
 describe('sql-ast reader vs the committed contract (Q5)', () => {
     it('handles exactly the node types the contract pins — no more, no fewer', () => {
@@ -129,30 +126,41 @@ describe('predicateRows — the read-only table (design Step 2)', () => {
         ]);
     });
 
-    it('renders IN, BETWEEN, LIKE, decimals, booleans, NULL and qualified names', () => {
-        const nul: SqlAstNode = {
-            class: 'CONSTANT',
-            type: 'VALUE_CONSTANT',
-            value: { type: { id: 'NULL', type_info: null }, is_null: true },
-        };
+    it('renders IN, NOT IN, BETWEEN, LIKE, decimals, booleans, NULL and qualified names', () => {
         const rows = predicateRows(
             and(
                 op('COMPARE_IN', col('a'), int(1), int(2)),
+                notIn(col('a2'), int(3)),
                 between(col('b'), int(1), int(5)),
                 fn('!~~', col('c'), str('x%')),
-                cmp('COMPARE_EQUAL', col('d'), constant('DECIMAL', 15, { scale: 1 })),
+                cmp('COMPARE_EQUAL', col('d'), constant('NUMERIC', '1.5')),
                 cmp('COMPARE_EQUAL', col('e'), bool(false)),
-                cmp('COMPARE_EQUAL', col('t', 'f'), nul),
+                cmp('COMPARE_EQUAL', col('t', 'f'), nul()),
             ),
         );
         expect(rows.map((r) => `${r.left} ${r.operator} ${r.right}`)).toEqual([
             'a in 1, 2',
+            'a2 not in 3',
             'b between 1 and 5',
             "c not like 'x%'",
             'd = 1.5',
             'e = FALSE',
             't.f = NULL',
         ]);
+    });
+
+    it("keeps a number's own digits — 2.0 carries the author's text, so nothing is rounded", () => {
+        const rows = predicateRows(
+            and(
+                cmp('COMPARE_EQUAL', col('a'), constant('INTEGER', '99999999999999999999')),
+                cmp('COMPARE_EQUAL', col('b'), constant('NUMERIC', '0.000001')),
+            ),
+        );
+        expect(rows.map((r) => r.right)).toEqual(['99999999999999999999', '0.000001']);
+    });
+
+    it('shows a literal of a kind it does not know as unshown, never guessed', () => {
+        expect(predicateRows(cmp('COMPARE_EQUAL', col('a'), constant('HEX', 'ff')))[0].kind).toBe('unshown');
     });
 
     it('marks a part it cannot show as such — the row is kept, never dropped', () => {
@@ -224,14 +232,14 @@ describe('astToConditionGroup — bounded recognition (design Step 3)', () => {
         ['a qualified name', cmp('COMPARE_EQUAL', col('t', 'a'), int(1))],
         ['a wildcard mid-pattern', fn('~~', col('a'), str('x%y'))],
         ['NOT LIKE', fn('!~~', col('a'), str('x%'))],
-        ['NOT IN', op('COMPARE_NOT_IN', col('a'), int(1))],
+        ['NOT IN', notIn(col('a'), int(1))],
         ['text compared with <', cmp('COMPARE_LESSTHAN', col('a'), str('x'))],
         [
             'one column as text AND number',
             and(cmp('COMPARE_EQUAL', col('a'), str('x')), cmp('COMPARE_EQUAL', col('a'), int(1))),
         ],
         ['a list value holding a comma', op('COMPARE_IN', col('a'), str('x,y'))],
-        ['a NULL literal', cmp('COMPARE_EQUAL', col('a'), constant('NULL', null))],
+        ['a NULL literal', cmp('COMPARE_EQUAL', col('a'), nul())],
     ])('refuses %s rather than guessing', (_label, ast) => {
         expect('unsupported' in astToConditionGroup(ast)).toBe(true);
     });
@@ -240,7 +248,11 @@ describe('astToConditionGroup — bounded recognition (design Step 3)', () => {
 describe('sameSqlStructure — the admission test for editing (design Step 3/4)', () => {
     it('ignores source offsets (a re-spelled predicate has different ones)', () => {
         const a = cmp('COMPARE_EQUAL', col('a'), int(1));
-        const b = { ...cmp('COMPARE_EQUAL', { ...col('a'), query_location: 99 }, int(1)), query_location: 42 };
+        const b = {
+            ...cmp('COMPARE_EQUAL', { ...col('a'), query_location: 99, query_location_length: 7 }, int(1)),
+            query_location: 42,
+            query_location_length: 5,
+        };
         expect(sameSqlStructure(a, b)).toBe(true);
     });
 

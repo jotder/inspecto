@@ -15,9 +15,14 @@ import { ColumnMeta, ColumnType, Condition, ConditionGroup, Operator } from './q
  *   <li>**Only what we read is a contract (Q5).** {@link READ_NODE_TYPES} and {@link LIKE_FUNCTIONS} must
  *       equal `contracts/sql-ast.contract.json`, which `SqlAstContractTest` pins against the real engine.
  *       ⛔ Reading a new node type or key means adding it to the contract in the same change.
- *       ⛔ Never read `query_location`: a start offset with no end drives nothing, and a CAST node carries
- *       2^64-1 there, which a JavaScript number cannot hold exactly.</li>
+ *       ⛔ Never read `query_location` / `query_location_length`: offsets are positions in the author's
+ *       text, and the tree is read-only (Q2), so nothing here may splice by them.</li>
  * </ul>
+ *
+ * <p>The shape is **DuckDB 2.0's** (`DUCKDB-2-MIGRATION-1`; operator 2026-10-05: rewrite for 2.0 only, no 1.x
+ * fallback): a constant is `literal: {kind, text}` with the author's exact text, a function's operands are
+ * `arguments: [{name, expression}]`, `TRUE`/`FALSE` are `BOOLEAN` literals, and `x NOT IN (…)` is an
+ * `OPERATOR_NOT` over a `COMPARE_IN`.
  *
  * ⚠ "AST" is an implementation word. No user-facing string built here may say it — the surface says
  * *condition* (GLOSSARY; design §11).
@@ -53,29 +58,15 @@ export const READ_NODE_TYPES: ReadonlySet<string> = new Set([
     'OPERATOR_IS_NULL',
     'OPERATOR_IS_NOT_NULL',
     'COMPARE_IN',
-    'COMPARE_NOT_IN',
+    'OPERATOR_NOT',
     'COMPARE_BETWEEN',
     'FUNCTION',
     'COLUMN_REF',
     'VALUE_CONSTANT',
-    'OPERATOR_CAST',
 ]);
 
-const NUMERIC_TYPES = new Set([
-    'TINYINT',
-    'SMALLINT',
-    'INTEGER',
-    'BIGINT',
-    'HUGEINT',
-    'UTINYINT',
-    'USMALLINT',
-    'UINTEGER',
-    'UBIGINT',
-    'UHUGEINT',
-    'FLOAT',
-    'DOUBLE',
-    'DECIMAL',
-]);
+/** The literal kinds read as numbers. Their `text` is the author's own digits, so nothing is rounded. */
+const NUMERIC_KINDS = new Set(['INTEGER', 'NUMERIC']);
 
 // ── small readers ───────────────────────────────────────────────────────────────────────────────────
 
@@ -95,6 +86,16 @@ function isConjunction(n: SqlAstNode | null): boolean {
 function conjunctionOp(n: SqlAstNode): 'AND' | 'OR' {
     return typeOf(n) === 'CONJUNCTION_OR' ? 'OR' : 'AND';
 }
+/** A function's operands: DuckDB 2.0 wraps each as `{name, expression}`. */
+function args(n: SqlAstNode): SqlAstNode[] {
+    return Array.isArray(n['arguments']) ? nodes((n['arguments'] as unknown[]).map((a) => obj(a)?.['expression'])) : [];
+}
+/** `x NOT IN (…)` parses as `OPERATOR_NOT` over one `COMPARE_IN`: that `COMPARE_IN`, or `null`. */
+function negatedIn(n: SqlAstNode): SqlAstNode | null {
+    if (typeOf(n) !== 'OPERATOR_NOT') return null;
+    const kids = nodes(n['children']);
+    return kids.length === 1 && typeOf(kids[0]) === 'COMPARE_IN' ? kids[0] : null;
+}
 function columnNames(n: SqlAstNode | null): string[] | null {
     if (typeOf(n) !== 'COLUMN_REF') return null;
     const names = n!['column_names'];
@@ -108,38 +109,16 @@ interface Literal {
 }
 
 function literal(n: SqlAstNode | null): Literal | null | 'null' {
-    if (typeOf(n) === 'OPERATOR_CAST') {
-        // `TRUE`/`FALSE` parse as a VARCHAR 't'/'f' CAST to BOOLEAN.
-        const target = obj(n!['cast_type'])?.['id'];
-        const child = literal(obj(n!['child']));
-        if (target === 'BOOLEAN' && child && child !== 'null' && (child.text === 't' || child.text === 'f')) {
-            return { type: 'boolean', text: child.text === 't' ? 'TRUE' : 'FALSE' };
-        }
-        return null;
-    }
     if (typeOf(n) !== 'VALUE_CONSTANT') return null;
-    const value = obj(n!['value']);
-    if (!value) return null;
-    if (value['is_null'] === true) return 'null';
-    const t = obj(value['type']);
-    const id = typeof t?.['id'] === 'string' ? (t['id'] as string) : '';
-    const raw = value['value'];
-    if (id === 'VARCHAR' && typeof raw === 'string') return { type: 'string', text: raw };
-    if (id === 'DECIMAL' && typeof raw === 'number') {
-        const scale = Number(obj(t!['type_info'])?.['scale'] ?? 0);
-        return { type: 'number', text: decimalText(raw, scale) };
-    }
-    if (NUMERIC_TYPES.has(id) && typeof raw === 'number') return { type: 'number', text: String(raw) };
-    return null;
-}
-
-/** DuckDB serializes a DECIMAL as its unscaled integer plus a scale: 15 with scale 1 is 1.5. */
-function decimalText(unscaled: number, scale: number): string {
-    if (!Number.isInteger(scale) || scale <= 0) return String(unscaled);
-    const digits = Math.abs(unscaled)
-        .toString()
-        .padStart(scale + 1, '0');
-    return `${unscaled < 0 ? '-' : ''}${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
+    const lit = obj(n!['literal']);
+    const kind = typeof lit?.['kind'] === 'string' ? (lit['kind'] as string) : '';
+    const text = lit?.['text'];
+    if (kind === 'NULL_LITERAL') return 'null';
+    if (typeof text !== 'string') return null;
+    if (kind === 'STRING') return { type: 'string', text };
+    if (kind === 'BOOLEAN' && (text === 'true' || text === 'false')) return { type: 'boolean', text: text.toUpperCase() };
+    if (NUMERIC_KINDS.has(kind)) return { type: 'number', text };
+    return null; // HEX, BLOB and any kind this reader does not know: "cannot be shown", never guessed
 }
 
 /** An operand as display text, or `null` when it is something this view does not show. */
@@ -208,10 +187,11 @@ function describeLeaf(n: SqlAstNode): { left: string; operator: string; right: s
             ? { left, operator: t === 'OPERATOR_IS_NULL' ? 'is null' : 'is not null', right: '' }
             : null;
     }
-    if (t === 'COMPARE_IN' || t === 'COMPARE_NOT_IN') {
-        const [first, ...rest] = kids.map(operandText);
+    const notIn = negatedIn(n);
+    if (t === 'COMPARE_IN' || notIn) {
+        const [first, ...rest] = nodes((notIn ?? n)['children']).map(operandText);
         if (first == null || rest.length === 0 || rest.some((x) => x === null)) return null;
-        return { left: first, operator: t === 'COMPARE_IN' ? 'in' : 'not in', right: rest.join(', ') };
+        return { left: first, operator: notIn ? 'not in' : 'in', right: rest.join(', ') };
     }
     if (t === 'COMPARE_BETWEEN') {
         const left = operandText(obj(n['input']));
@@ -222,8 +202,9 @@ function describeLeaf(n: SqlAstNode): { left: string; operator: string; right: s
             : null;
     }
     if (t === 'FUNCTION' && typeof n['function_name'] === 'string' && LIKE_FUNCTIONS.has(n['function_name'])) {
-        const left = kids.length === 2 ? operandText(kids[0]) : null;
-        const right = kids.length === 2 ? operandText(kids[1]) : null;
+        const ops = args(n);
+        const left = ops.length === 2 ? operandText(ops[0]) : null;
+        const right = ops.length === 2 ? operandText(ops[1]) : null;
         return left !== null && right !== null ? { left, operator: LIKE_LABELS[n['function_name']], right } : null;
     }
     return null;
@@ -337,16 +318,17 @@ function toCondition(n: SqlAstNode, types: Map<string, ColumnType>): Condition {
             value2: hi.text,
         });
     }
-    if (t === 'FUNCTION' && n['function_name'] === '~~' && kids.length === 2) {
-        const name = field(kids[0]);
-        const pattern = value(kids[1]);
+    const ops = t === 'FUNCTION' ? args(n) : [];
+    if (t === 'FUNCTION' && n['function_name'] === '~~' && ops.length === 2) {
+        const name = field(ops[0]);
+        const pattern = value(ops[1]);
         if (pattern.type !== 'string') throw new Unsupported(REFUSE('a pattern that is not text'));
         const like = likeOperator(pattern.text);
         if (!like) throw new Unsupported(REFUSE('a pattern with wildcards the editor cannot express'));
         typed(types, name, 'string');
         return condition(types, { kind: 'condition', field: name, operator: like.op, value: like.value });
     }
-    if (t === 'COMPARE_NOT_IN') throw new Unsupported(REFUSE('"not in"'));
+    if (negatedIn(n)) throw new Unsupported(REFUSE('"not in"'));
     if (t === 'FUNCTION' && typeof n['function_name'] === 'string' && LIKE_FUNCTIONS.has(n['function_name'])) {
         throw new Unsupported(REFUSE(`"${LIKE_LABELS[n['function_name']]}"`));
     }
@@ -367,7 +349,7 @@ function likeOperator(pattern: string): { op: Operator; value: string } | null {
 
 // ── the admission test + the comment check ─────────────────────────────────────────────────────────
 
-/** Whether two trees are the same predicate — deep equality with every `query_location` ignored. */
+/** Whether two trees are the same predicate — deep equality with every `query_location` / `_length` ignored. */
 export function sameSqlStructure(a: unknown, b: unknown): boolean {
     if (Array.isArray(a) || Array.isArray(b)) {
         return (
@@ -382,7 +364,7 @@ export function sameSqlStructure(a: unknown, b: unknown): boolean {
     if (!oa || !ob) return a === b;
     const keys = (o: SqlAstNode) =>
         Object.keys(o)
-            .filter((k) => k !== 'query_location')
+            .filter((k) => k !== 'query_location' && k !== 'query_location_length')
             .sort();
     const ka = keys(oa);
     const kb = keys(ob);

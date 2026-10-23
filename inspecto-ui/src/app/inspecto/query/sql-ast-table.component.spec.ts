@@ -9,12 +9,12 @@ const col = (n: string): SqlAstNode => ({ class: 'COLUMN_REF', type: 'COLUMN_REF
 const int = (v: number): SqlAstNode => ({
     class: 'CONSTANT',
     type: 'VALUE_CONSTANT',
-    value: { type: { id: 'INTEGER', type_info: null }, is_null: false, value: v },
+    literal: { kind: 'INTEGER', text: String(v) },
 });
 const str = (v: string): SqlAstNode => ({
     class: 'CONSTANT',
     type: 'VALUE_CONSTANT',
-    value: { type: { id: 'VARCHAR', type_info: null }, is_null: false, value: v },
+    literal: { kind: 'STRING', text: v },
 });
 const cmp = (type: string, left: SqlAstNode, right: SqlAstNode): SqlAstNode => ({
     class: 'COMPARISON',

@@ -12,13 +12,14 @@
     { "type": "OPERATOR_IS_NULL", "class": "OPERATOR", "reads": ["children"], "example": "a IS NULL" },
     { "type": "OPERATOR_IS_NOT_NULL", "class": "OPERATOR", "reads": ["children"], "example": "a IS NOT NULL" },
     { "type": "COMPARE_IN", "class": "OPERATOR", "reads": ["children"], "example": "a IN (1, 2)" },
-    { "type": "COMPARE_NOT_IN", "class": "OPERATOR", "reads": ["children"], "example": "a NOT IN (1, 2)" },
+    { "type": "OPERATOR_NOT", "class": "OPERATOR", "reads": ["children"], "example": "a NOT IN (1, 2)" },
     { "type": "COMPARE_BETWEEN", "class": "BETWEEN", "reads": ["input", "lower", "upper"], "example": "a BETWEEN 1 AND 5" },
-    { "type": "FUNCTION", "class": "FUNCTION", "reads": ["function_name", "children"], "example": "a LIKE 'x%'" },
+    { "type": "FUNCTION", "class": "FUNCTION", "reads": ["function_name", "arguments"], "example": "a LIKE 'x%'" },
     { "type": "COLUMN_REF", "class": "COLUMN_REF", "reads": ["column_names"], "example": "a = 1" },
-    { "type": "VALUE_CONSTANT", "class": "CONSTANT", "reads": ["value.type.id", "value.is_null", "value.value"], "example": "a = 'x'" },
-    { "type": "VALUE_CONSTANT", "class": "CONSTANT", "reads": ["value.type.id", "value.type.type_info.scale", "value.value"], "example": "a = 1.5" },
-    { "type": "OPERATOR_CAST", "class": "CAST", "reads": ["child", "cast_type.id"], "example": "a = TRUE" }
+    { "type": "VALUE_CONSTANT", "class": "CONSTANT", "reads": ["literal.kind", "literal.text"], "example": "a = 'x'" },
+    { "type": "VALUE_CONSTANT", "class": "CONSTANT", "reads": ["literal.kind", "literal.text"], "example": "a = 1.5" },
+    { "type": "VALUE_CONSTANT", "class": "CONSTANT", "reads": ["literal.kind", "literal.text"], "example": "a = TRUE" },
+    { "type": "VALUE_CONSTANT", "class": "CONSTANT", "reads": ["literal.kind", "literal.text"], "example": "a = NULL" }
   ],
   "likeFunctions": [
     { "name": "~~", "example": "a LIKE 'x%'" },

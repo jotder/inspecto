@@ -20,7 +20,7 @@ const statusIs = (value: string, loc = 1): SqlAstNode => ({
         type: 'VALUE_CONSTANT',
         alias: '',
         query_location: loc,
-        value: { type: { id: 'VARCHAR', type_info: null }, is_null: false, value },
+        literal: { kind: 'STRING', text: value },
     },
 });
 
@@ -135,7 +135,7 @@ describe('PipelineFilterPredicateComponent — "What gets kept" on a Filter Step
     it('tier 2: a predicate the editor cannot represent says why, and offers no editor', () => {
         const fn: SqlAstNode = {
             ...statusIs('x'),
-            left: { class: 'FUNCTION', type: 'FUNCTION', function_name: 'lower', children: [] },
+            left: { class: 'FUNCTION', type: 'FUNCTION', function_name: 'lower', arguments: [] },
         };
         answers["lower(STATUS) = 'x'"] = () => of({ ok: true, ast: fn });
         const f = render("lower(STATUS) = 'x'");
