@@ -153,3 +153,22 @@ export function bundleModules(edition) {
 export function editionOnlyModules(edition) {
     return bundleModules(edition).filter((m) => m.from !== 'all');
 }
+
+/**
+ * The demo build (`package.ps1 -DemoAuth`, DEMO-AUTH-1) swaps the sign-in trio for ONE jar: inspecto-oidc, inspecto-secrets and
+ * inspecto-geo-country leave the bundle and DEMO_JAR takes the OIDC jar's place. Read by tools/offering-classpath.mjs (the demo
+ * modules.list) and tools/jlink-modules.mjs (the staged jars the demo runtime must be derived from).
+ */
+export const DEMO_JAR = 'inspecto-demo-auth.jar';
+export const DEMO_REPLACES = ['inspecto-oidc', 'inspecto-secrets', 'inspecto-geo-country'];
+
+/**
+ * Does this bundle NEED the PostgreSQL JDBC driver at package time? Only when it carries a module that talks to Postgres:
+ * `inspecto-la-store-pg` (Advanced and Preview). Basic and Standard carry none; the `postgresql.jar` sidecar they may also stage
+ * is an optional extra there (inert until INSPECTO_DB_URL / a postgres sink asks for it) and never fails a package.
+ * The demo build (`demo`) is loopback + DuckDB (`-Dobjects.backend=db`): its la-store-pg jar is inert, so it needs no driver either.
+ * (PACKAGE-DEMOAUTH-ADVANCED-1; operator 2026-10-23: the next release ships without Postgres.)
+ */
+export function needsPostgresDriver(edition, { demo = false } = {}) {
+    return !demo && bundleModules(edition).some((m) => m.artifactId === 'inspecto-la-store-pg');
+}

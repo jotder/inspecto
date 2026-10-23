@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-57 test file(s). Run one, or all:
+58 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -51,13 +51,14 @@ node --test tools/
 | `tools/gen-la-mm-data.test.mjs` | Determinism of tools/gen-la-mm-data.py. Run: node --test tools/gen-la-mm-data.test.mjs |
 | `tools/gen-la-showcase-data.test.mjs` | Determinism of tools/gen-la-showcase-data.py. Run: node --test tools/gen-la-showcase-data.test.mjs |
 | `tools/java-closure.test.mjs` | Fixture test for tools/java-closure.mjs — each blind spot that bit the D-1 closure script must now be SEEN. |
-| `tools/jlink-modules.test.mjs` |  |
+| `tools/jlink-modules.test.mjs` | ── PACKAGE-DEMOAUTH-ADVANCED-1: the demo bundle's module set follows the bundle it really stages ───────────────────────────── |
 | `tools/la-audit-smoke.test.mjs` | node --test tools/la-audit-smoke.test.mjs  -  the pure helpers of the la-audit smoke runner (no server). |
 | `tools/la-claims-smoke.test.mjs` | node --test tools/la-claims-smoke.test.mjs  -  the claims smoke's pure verdicts and its dry run (no server). |
 | `tools/la-demo-burst.test.mjs` | node --test tools/la-demo-burst.test.mjs - runBurst against a fake server with the real limits (pool 18 slots, queue 5, bucket 20). |
 | `tools/la-demo-figures.test.mjs` | node --test tools/la-demo-figures.test.mjs - verdicts on fixtures shaped like GET /inv/value-measures, plus a fake-server run. |
 | `tools/la-demo-smoke.test.mjs` | Unit test for the pure assertion helpers of tools/la-demo-smoke.mjs, plus a stub-server run. node --test tools/la-demo-smoke.test.mjs |
 | `tools/la-mm-smoke.test.mjs` | node --test tools/la-mm-smoke.test.mjs  -  the pure verdicts of the mobile-money smoke runner, plus a dry run (no server). |
+| `tools/maven-repo.test.mjs` | Run: node --test tools/maven-repo.test.mjs |
 | `tools/offering-classpath.test.mjs` | Fixture test for tools/offering-classpath.mjs. Run: node --test tools/offering-classpath.test.mjs |
 | `tools/precommit.test.mjs` | Fixture test for tools/precommit.mjs. Run: node --test tools/precommit.test.mjs |
 | `tools/product-map-import.test.mjs` | Fixture test for tools/product-map-import.mjs. Run: node --test tools/product-map-import.test.mjs |

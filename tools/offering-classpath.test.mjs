@@ -193,3 +193,40 @@ test('Preview carries every module every other edition ships, on the plain and t
     const built = new Set([...pom.defaults, ...pom.profiles['edition-preview']]);
     for (const m of bundleModules('Preview')) assert.ok(built.has(m.dir.split('/').pop().replace(/^inspecto-/, '')), `pom edition-preview + default reactor lack ${m.dir}`);
 });
+
+// ── PACKAGE-DEMOAUTH-ADVANCED-1: the PostgreSQL driver is needed only by a bundle that carries a Postgres module ───────────────
+import { needsPostgresDriver } from './bundle-modules.mjs';
+import { stagedClasspath } from './offering-classpath.mjs';
+
+test('needsPostgresDriver: only a bundle carrying inspecto-la-store-pg (Advanced, Preview) - never Basic, Standard or the demo build', () => {
+    assert.equal(needsPostgresDriver('Basic'), false);
+    assert.equal(needsPostgresDriver('Standard'), false);
+    assert.equal(needsPostgresDriver('Advanced'), true);
+    assert.equal(needsPostgresDriver('Preview'), true);
+    assert.equal(needsPostgresDriver('Advanced', { demo: true }), false);
+    assert.equal(needsPostgresDriver('Preview', { demo: true }), false);
+});
+
+test('the answer follows the module table: it is exactly the editions whose bundle lists inspecto-la-store-pg', () => {
+    for (const ed of EDITIONS) assert.equal(needsPostgresDriver(ed), bundleModules(ed).some((m) => m.artifactId === 'inspecto-la-store-pg'), ed);
+});
+
+test('--needs-pg answers yes/no for package.ps1', () => {
+    const ask = (...a) => execFileSync('node', [SCRIPT, ...a], { encoding: 'utf8' }).trim();
+    assert.equal(ask('--edition', 'Standard', '--needs-pg'), 'no');
+    assert.equal(ask('--edition', 'Advanced', '--needs-pg'), 'yes');
+    assert.equal(ask('--edition', 'Advanced', '--needs-pg', '--demo'), 'no');
+});
+
+test('stagedClasspath: postgresql.jar leaves the list when it was not staged and nothing needs it; a bundle that needs it keeps it (and verifyBundle names it)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cp-'));
+    const jars = ['inspecto.jar', 'postgresql.jar'];
+    writeFileSync(join(dir, 'inspecto.jar'), '');
+    assert.deepEqual(stagedClasspath(jars, dir, false), ['inspecto.jar']);
+    assert.deepEqual(stagedClasspath(jars, dir, true), jars);
+    assert.match(verifyBundle(stagedClasspath(jars, dir, true), dir).join('\n'), /postgresql\.jar is on the classpath list but not staged/);
+    writeFileSync(join(dir, 'postgresql.jar'), '');
+    assert.deepEqual(stagedClasspath(jars, dir, false), jars);
+    assert.deepEqual(verifyBundle(stagedClasspath(jars, dir, false), dir), []);
+    rmSync(dir, { recursive: true, force: true });
+});

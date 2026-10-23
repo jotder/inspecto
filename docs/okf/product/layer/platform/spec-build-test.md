@@ -228,8 +228,24 @@ Verified by building both flavors 2026-08-27 (Basic 169.3 MB, Advanced 170.3 MB,
 | `inspecto-policy.jar` (ABAC `AccessDecider` SPI) | — | ✅ Advanced only |
 | `inspecto-connectors.jar` (shaded sidecar — `CONNECTORS-BUNDLE-1`) | ✅ | ✅ |
 | the **seven** EDG-01 sidecars (`notify-channels` shaded, `backup`, `geo-link`, `exchange`, `metrics`, `events`, `ops`) | — | ✅ Standard+ |
-| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Standard+ |
+| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Standard+ when Maven's local repository holds it; **required** only by a bundle that carries `inspecto-la-store-pg` (Advanced, Preview, not `-DemoAuth`) — see *Packaging prerequisites* below |
 | **`inspecto-agent` / `inspecto-intelligence`** | **never** | **never** |
+
+> **Packaging prerequisites (`PACKAGE-DEMOAUTH-ADVANCED-1`, 2026-10-23).** (1) **Maven's local repository is resolved, never assumed**:
+> `tools/maven-repo.mjs` = `$M2_REPO`, else `<localRepository>` in `~/.m2/settings.xml`, else `~/.m2/repository` (the same function
+> `tools/sbom.mjs` uses); `package.ps1` used to read `%USERPROFILE%\.m2` and failed on a box whose repository is `C:/.m2/repository`.
+> (2) **The PostgreSQL driver is needed only by a bundle that carries a Postgres module** — `needsPostgresDriver()` in
+> `tools/bundle-modules.mjs` (`inspecto-la-store-pg`: Advanced and Preview; the `-DemoAuth` build is loopback + DuckDB, so no). Basic,
+> Standard and the demo bundle do not fail at the `postgresql.jar` step without it: the driver rides along when the repository holds
+> it (`modules.list` then names it, `tools/offering-classpath.mjs` drops it from the list when it was not staged) and is skipped with
+> a note when it does not; Advanced/Preview fail there with a message naming the repository path and the fix. ⚠ Not the whole
+> story: `inspecto-connectors` (every edition) shades the driver at compile scope, so Maven needs it to build at all and
+> `tools/sbom.mjs` hashes it from the repository for every edition; a repository without it fails the SBOM step (`no hash`) after
+> the skip, which is correct and cannot arise on a box that has built the connectors sidecar. (3) **The jlink module set follows the
+> bundle**: `node tools/jlink-modules.mjs --edition Advanced --demo --staged-dir …` expects `inspecto-demo-auth.jar` where the
+> OIDC, secrets and geo-country jars were (`DEMO_JAR` / `DEMO_REPLACES` in `bundle-modules.mjs`). (4) `-DemoAuth -NoBuild` fails
+> at the top, naming `mvn package -pl :inspecto-demo-auth -am -DskipTests`, when that jar was never built. Tests:
+> `tools/maven-repo.test.mjs`, `tools/offering-classpath.test.mjs`, `tools/jlink-modules.test.mjs`.
 
 > ⚠ **Staged-jar totals** (added 2026-09-09 — this table listed 3 of the 12): Basic stages **2**
 > jars, Standard **11**, Advanced **12**. The complete enumerations in code are `package.ps1`'s
