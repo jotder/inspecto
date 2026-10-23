@@ -56,8 +56,10 @@ the poll tree, with its error CSV when there is one. Reasons: `field_mismatch`, 
 With `processing.duplicate_check.enabled`, a zero-byte marker under `dirs.markers` (mirroring the poll path)
 means "already processed" and the file is skipped. `duplicate_check.retention_days` (default 90) controls marker cleanup; `0` or
 less deletes every marker on the next cleanup. A same-name re-delivery with changed content is skipped
-too (the engine emits a `DUPLICATE_SKIPPED` delivery anomaly, see [BACKLOG](../../../../BACKLOG.md)
-`LA-DAILY-INGEST-1`); deliver corrections under a new name.
+too (the engine emits a `DUPLICATE_SKIPPED` delivery anomaly); deliver corrections under a new name, or state
+`collector.duplicate: {mode: checksum, algorithm: SHA256, on_change: reprocess}` so a changed same-name file is
+re-ingested and replaces its partition (the shipped `la-daily-feed` template does; [plan-ingestion](plan-ingestion.md)
+§*Corrected same-name day*).
 
 ## Start-up warnings (`ConfigValidator`)
 
