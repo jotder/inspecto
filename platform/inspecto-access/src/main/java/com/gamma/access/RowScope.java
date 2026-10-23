@@ -15,7 +15,7 @@ import com.gamma.spi.auth.SweepExchange;
  * out-of-scope row is invisible, indistinguishable from absence" — to any policy-scoped list/by-id
  * endpoint, driven by the edition's {@link AccessDecider}. A host route builds the resolved row's
  * attribute map (its {@code kind}, {@code id}, and domain attributes) and filters/404s on
- * {@link #visible}. With no decider on the classpath (Personal/Standard) every row is visible and
+ * {@link #visible}. With no decider on the classpath (Basic/Standard) every row is visible and
  * only the pre-existing scoping (data scopes, sharing) applies — byte-identical behaviour.
  *
  * <p>Only {@code DENY} hides a row; {@code ALLOW}/{@code ABSTAIN} leave the existing filters in

@@ -1,8 +1,8 @@
-# EXAMPLE Enterprise access policy - deny one persona's Investigation read
+# EXAMPLE Advanced access policy - deny one persona's Investigation read
 
-> **This is an illustrative example, not shipped configuration.** It is inert here. The Enterprise policy decision point
+> **This is an illustrative example, not shipped configuration.** It is inert here. The Advanced policy decision point
 > (`providers/inspecto-policy`) reads `access-policies.toon` from the Space config root; it is not loaded in other editions.
-> Activate it on an Enterprise build with `PUT /access/policies` (`canConfigureAccess`) using the JSON below.
+> Activate it on an Advanced build with `PUT /access/policies` (`canConfigureAccess`) using the JSON below.
 > Effect (DR-S8): `ra.analyst` - a reviewer member of the seeded Investigation - gets 404 on every `/inv/investigations/*`
 > route (the PDP can only narrow, and answers as absence). Not tested for a persona-based `when`: the repository's own
 > test (`ControlApiInvestigationPolicyTest`) denies by Dataset. Check with `POST /access/policies/preview` first.

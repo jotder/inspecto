@@ -10,8 +10,8 @@ import java.nio.file.Path;
 import java.security.KeyStore;
 
 /**
- * The Standard + Enterprise {@link SecretsProvider} (SEC-07, gated 2026-09-06): the {@code ${FILE:/path}} and
- * {@code ${KEYSTORE:alias}} secret schemes. Lives in this edition module so that a Personal bundle — which does
+ * The Standard + Advanced {@link SecretsProvider} (SEC-07, gated 2026-09-06): the {@code ${FILE:/path}} and
+ * {@code ${KEYSTORE:alias}} secret schemes. Lives in this edition module so that a Basic bundle — which does
  * not carry it — refuses those schemes with a clear message from {@link SecretResolver}, while {@code ${ENV}} /
  * {@code ${SYS}} stay in the core for every edition. Registered under {@code META-INF/services}.
  *

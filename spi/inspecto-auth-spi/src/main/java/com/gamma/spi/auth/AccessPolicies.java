@@ -16,7 +16,7 @@ import java.util.Set;
  *
  * <p>This class is the CONTRACT only — the vocabulary and the parsed shapes the {@link AccessDecider} SPI
  * speaks. Storing, validating and serving the documents is {@code AccessPolicyStore} (core, any edition can
- * read them); <em>evaluation and enforcement</em> are the Enterprise policy engine's job (A3's
+ * read them); <em>evaluation and enforcement</em> are the Advanced policy engine's job (A3's
  * {@code PolicyEngine implements AccessDecider} in {@code inspecto-policy}).
  *
  * <p><b>Fail-closed</b> (enforced by {@code AccessPolicyStore}): conditions are parsed at load time, so a doc that no longer parses — TOON

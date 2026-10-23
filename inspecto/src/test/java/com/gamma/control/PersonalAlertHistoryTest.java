@@ -21,9 +21,9 @@ import java.util.OptionalDouble;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * MODULE-REORG-P7-INCIDENTS slice 2 (operator decision 2026-10-07): <b>Personal keeps Alert history and
+ * MODULE-REORG-P7-INCIDENTS slice 2 (operator decision 2026-10-07): <b>Basic keeps Alert history and
  * restart-safe de-duplication</b>. This module's test classpath carries no {@code inspecto-ops}, so a service built
- * here IS the Personal shape — no operational objects, no Incidents, no Cases — and its Alerts must still survive a
+ * here IS the Basic shape — no operational objects, no Incidents, no Cases — and its Alerts must still survive a
  * restart: the second service over the same Space directory shows the first one's Alert on {@code GET /alerts} and
  * does NOT re-fire it. The reactor pins {@code -Dalerts.backend=memory}; this test selects the durable default
  * explicitly (it is what every shipped edition runs).

@@ -78,7 +78,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
     static final String FULL = "full-refresh", INCREMENTAL = "partition-incremental";
     static final int BATCH = 1000;
 
-    /** Who a run acts as. {@code open} = no authenticator (Personal / an open dev server): sharing envelopes are
+    /** Who a run acts as. {@code open} = no authenticator (Basic / an open dev server): sharing envelopes are
      *  not enforced (as {@code ComponentAccess}), and no one holds {@code canAdminister}. */
     public record Author(String id, Set<String> roles, Set<String> capabilities, boolean open) {
         public static final Author OPEN = new Author(null, Set.of(), Set.of(), true);

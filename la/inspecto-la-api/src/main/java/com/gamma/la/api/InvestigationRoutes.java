@@ -108,7 +108,7 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  * lead may grant {@code analyst} / {@code reviewer} / {@code lead} (see {@link InvestigationMembers} and
  * {@link InvestigationMemberRoutes}). Every member READS; only a lead writes the main log (a lead-only {@link #open}).
  * Anyone else gets a 404 indistinguishable from absence (the R3 answer). An Investigation with no
- * {@code members.jsonl} behaves exactly as owner-only always did. The Enterprise PDP can only NARROW the member rule.
+ * {@code members.jsonl} behaves exactly as owner-only always did. The Advanced PDP can only NARROW the member rule.
  * With no Subject attached nothing is enforced,
  * as everywhere else in the control plane. Every route additionally applies the R3 Dataset gate: a bound
  * Dataset the caller can no longer view reads as absent, and every Dataset READ goes through the same
@@ -340,7 +340,7 @@ public final class InvestigationRoutes implements RouteModule {
      * {@code GET /inv/investigations?limit&offset} — the Investigations the caller may READ, newest first: each one is
      * judged by {@link #openForRead} itself, so the list can never show what a read would refuse — the owner's own,
      * plus those shared READ-ONLY with a member of an open linked Case (LA-24), minus any whose bound Dataset the
-     * caller cannot view (R3) or the Enterprise PDP denies (D-E7). Gates: write root 503 → a bad limit/offset 422.
+     * caller cannot view (R3) or the Advanced PDP denies (D-E7). Gates: write root 503 → a bad limit/offset 422.
      * Each item: {@code {id, title, dataset, owner, createdAt, headStep, caseRef?, access: owner|case-member}}; the
      * title is masked per the Space's {@code maskingMode} as the log masks it (D-U6). Read-shaped: no capability.
      */
@@ -2386,7 +2386,7 @@ public final class InvestigationRoutes implements RouteModule {
     /**
      * Open one Investigation: 503 without a write root; 422 for an unsafe id; 404 when it does not exist, when
      * a Subject other than its owner asks (indistinguishable from absence), when its bound Dataset exists but
-     * the caller can no longer view it (R3), or when the Enterprise PDP denies it (D-E7).
+     * the caller can no longer view it (R3), or when the Advanced PDP denies it (D-E7).
      *
      * <p>🔴 The D-E7 policy check lives HERE, the one gate every Investigation route opens through — log, ops,
      * undo, reorder, replay, the Working Set and the Dossier. It first shipped only on the Working Set route, so a
@@ -2397,7 +2397,7 @@ public final class InvestigationRoutes implements RouteModule {
         return open(api, ex, id, Need.LEAD, false);
     }
 
-    /** What the caller needs of the Investigation (D7-1; design §9). Every need still passes R3 and the Enterprise PDP. */
+    /** What the caller needs of the Investigation (D7-1; design §9). Every need still passes R3 and the Advanced PDP. */
     private enum Need {
         /** Any member (lead, analyst, reviewer) reads. */
         READ,
@@ -2410,7 +2410,7 @@ public final class InvestigationRoutes implements RouteModule {
     /**
      * The four-eyes APPROVER gate (D-U7): someone other than the owner must be able to reach a pending request to
      * decide it. Where the Investigation has a membership record only a lead or reviewer may; without one, as before,
-     * any Subject holding {@code canApproveLinkExpansions}. R3 and the Enterprise PDP still judge the approver.
+     * any Subject holding {@code canApproveLinkExpansions}. R3 and the Advanced PDP still judge the approver.
      */
     private static Inv openForApproval(ApiContext api, HttpExchange ex, String id) throws IOException {
         return open(api, ex, id, Need.APPROVE, false);
@@ -2421,7 +2421,7 @@ public final class InvestigationRoutes implements RouteModule {
      * record the owner is the sole lead), OR a member of its linked Case ({@link InvestigationCaseRoutes#grants}, decided
      * live on every read). Only the read routes (log, Working Set, Dossier, measures, coverage (A9), Graph Runs, the Case
      * link itself) open through this; every write stays on {@link #open}, lead-only.
-     * R3 and the Enterprise PDP below still judge a member, so they can only narrow the grant.
+     * R3 and the Advanced PDP below still judge a member, so they can only narrow the grant.
      */
     public static Inv openForRead(ApiContext api, HttpExchange ex, String id) throws IOException {
         return open(api, ex, id, Need.READ, true);
@@ -2464,14 +2464,14 @@ public final class InvestigationRoutes implements RouteModule {
         if (ds.isPresent() && !ComponentAccess.canView(ex, ds.get()))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + dataset + "'");
         Inv inv = new Inv(store, writeRoot, id, header);
-        if (!RowScope.visible(ex, "investigation", resource(inv, roles)))   // Enterprise PDP (D-E7); a DENY reads as absence
+        if (!RowScope.visible(ex, "investigation", resource(inv, roles)))   // Advanced PDP (D-E7); a DENY reads as absence
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         if (roleRefusal != null) throw roleRefusal;
         return inv;
     }
 
     /**
-     * What the Enterprise PDP judges: the Investigation's id, owner, bound Dataset, (for a fork) parent, and
+     * What the Advanced PDP judges: the Investigation's id, owner, bound Dataset, (for a fork) parent, and
      * {@code members} — the current role map {@code subject → lead|analyst|reviewer} (D7-1), so a policy can key on it.
      * The PDP can only NARROW access: it is consulted after the member rule, a DENY hides the Investigation even from
      * a lead, and an ALLOW or ABSTAIN grants nothing.
@@ -2632,7 +2632,7 @@ public final class InvestigationRoutes implements RouteModule {
      * requests, across every Investigation in the Space, that the caller could decide. Each Investigation is judged by
      * {@link #openForApproval} itself — the gate {@code approve}/{@code deny} open through — so the inbox never shows a
      * request a decision would refuse (a member whose role cannot approve, a non-member where a membership record exists,
-     * R3, the Enterprise PDP); and the caller's OWN requests are left out, since four-eyes refuses them anyway.
+     * R3, the Advanced PDP); and the caller's OWN requests are left out, since four-eyes refuses them anyway.
      * Gates: {@code canApproveLinkExpansions} (the route) → write root 503 → an authenticated Subject 403 (without one,
      * "not the requester" cannot be decided) → a bad {@code status} or {@code limit} 422. Entity ids, titles and purposes
      * are masked per each Space's {@code maskingMode} (D-U6). Bounded by {@code limit}, with the TRUE {@code total}.

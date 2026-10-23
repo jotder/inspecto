@@ -26,7 +26,7 @@ import java.util.function.Supplier;
  * {@code https} Connection (onboarded under the admin-only {@code canOnboardConnections}), a host, no tunnel or
  * proxy, the bearer token resolved from its secret reference at send time — and the resolved URL must still be
  * the {@code targetUrl} the approver read, or nothing is sent. The wire is the edition's
- * {@link WebhookSinkTransport} (Professional / Enterprise; Personal bundles none, and the request fails naming
+ * {@link WebhookSinkTransport} (Standard / Advanced; Basic bundles none, and the request fails naming
  * the edition). On top of that, the {@link EgressPolicy}: before EVERY attempt the host is resolved once, every
  * address is checked against the deny-by-default classes (loopback, link-local, private, CGNAT, multicast, this
  * host…) less the Space's {@link EgressAllowlist egress allowlist}, and the wire connects to THAT address (never

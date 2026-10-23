@@ -20,7 +20,7 @@
         (id asn1), its grammar resolver and its streaming record ingester, over the asn-facade API of the nested
         providers/asn-parser/asn-decoders reactor. Discovered through the engine's com.gamma.parse.ParserPlugin ServiceLoader
         seam. All three classes live in the module-owned package com.gamma.telecom.asn1 (no package is shared with another
-        module); com.gamma.telecom.asn1.Asn1RecordIngester is the class name pipelines persist. Professional and above only - the Personal edition does not ship it, and
+        module); com.gamma.telecom.asn1.Asn1RecordIngester is the class name pipelines persist. Standard and above only - the Basic edition does not ship it, and
         the Step Processor catalog then reports parser.asn1.ber as not installed instead of delivered.
     </description>
 

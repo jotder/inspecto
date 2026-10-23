@@ -7,9 +7,9 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * The {@code sink.webhook} node's wire — the Professional/Enterprise provider of the engine's
+ * The {@code sink.webhook} node's wire — the Standard/Advanced provider of the engine's
  * {@link WebhookSinkTransport} SPI, registered through {@code META-INF/services} in this module only, so
- * Personal (which bundles no {@code inspecto-notify-channels}) has none and the sink refuses naming the edition.
+ * Basic (which bundles no {@code inspecto-notify-channels}) has none and the sink refuses naming the edition.
  *
  * <p>It is {@link WebhookChannel}'s POST ({@link WebhookEgress#post}), not a second HTTP client: same JSON
  * content type, same bearer header, same "non-2xx is a failure", no redirects — and the same egress policy

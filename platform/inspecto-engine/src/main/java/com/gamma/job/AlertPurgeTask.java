@@ -6,7 +6,7 @@ import java.time.Instant;
 /**
  * The {@code alert_purge} maintenance task (MODULE-REORG-P7-INCIDENTS, "retention of resolved Alert rows"): physically
  * delete {@code RESOLVED} Alert rows whose own {@code closedAt} is older than {@code retention_days}, so the
- * Alert-owned store stops growing without bound on every edition (Personal included).
+ * Alert-owned store stops growing without bound on every edition (Basic included).
  *
  * <p>A <b>base</b> task - an Alert exists on every edition, so this is a case of {@link MaintenanceJob}'s switch like
  * {@code event_prune}, not a module-contributed provider. Alerts carry no module gate.

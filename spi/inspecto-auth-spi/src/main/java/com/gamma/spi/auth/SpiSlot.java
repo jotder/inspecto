@@ -45,7 +45,7 @@ public final class SpiSlot<T> {
      * wide-open control plane, which is precisely what {@link ControlApi}'s constructor says it prevents.
      *
      * <p>⚠ The distinction under {@code failClosed} is <b>registered-but-broken</b> vs <b>not
-     * registered</b>, and it has to be: Personal ships no {@code META-INF/services} entry at all, and that
+     * registered</b>, and it has to be: Basic ships no {@code META-INF/services} entry at all, and that
      * absence is legitimate and must stay empty. Only a provider that announced itself and then failed to
      * construct propagates.
      *

@@ -31,8 +31,8 @@
         With this module absent, Case objects load and list inertly, an install without it still raises and works
         Incidents, and the Case routes answer 503 (stubs synthesised from this module's manifest).
 
-        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles). THIN: no
-        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Personal)
+        Bundled from the Standard edition up (the Standard, Advanced and Preview profiles). THIN: no
+        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Basic)
         never compiles it.
     </description>
 

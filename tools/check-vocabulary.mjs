@@ -14,7 +14,8 @@
 //      only where it is WELDED to another word (`flowStore`, `FLOW_CONSERVATION`); `flow-message` bans
 //      the BARE word inside the text a user reads (string literals, template text), and spares a
 //      contract token by shape. See SOURCE_RULES for why each restraint is what makes its rule
-//      possible at all. Between them: an identifier and a message are covered, a comment is not.
+//      possible at all. Between them: an identifier and a message are covered, a comment is not —
+//      except by `edition-old-name` (2026-10-23), which reads the raw line for the retired edition names.
 //
 // Makes the glossary enforceable instead of aspirational: fails the build when a user-facing doc uses a
 // ⛔ banned synonym or commits a known concept-confusion. Born from the 2026-07-07 USER_GUIDE audit, whose
@@ -517,6 +518,19 @@ const SOURCE_RULES = [
         re: PACK_TERM_RE,
         msg: 'An Industry pack word in core Link Analysis (AC-09). The core says the NEUTRAL word; the pack relabels it through its term files (`META-INF/inspecto/industry-packs/<id>/industry-pack-terms.toon`, keyed by a canonical concept key) and the UI reads the Space\'s Domain Profile. Use the neutral label here, or look the term up from the active profile.',
     },
+    {
+        // LA-EDITIONS-RESIDUALS-1 (2026-10-23): the editions are Basic / Standard / Advanced (LA-EDITIONS-1 ED-2,
+        // 2026-10-17); the old names were dropped, not aliased. Two sweeps took them out of the comments; this rule
+        // keeps them out. Unlike every rule above it reads the RAW line, comments included — a stale edition name
+        // in a Javadoc misleads the next reader as surely as one in a message. It is a bare-word rule and can
+        // afford to be: the three words are capitalised, so `\b` keeps camel-case identifiers
+        // (`NoGeoLinkShipsInThePersonalBuildTest`, a test class a comment cites) and the lower-case English
+        // senses out, and the BACKLOG ids (`PROFESSIONAL-BUNDLE-1`) are upper case. Measured after the sweep:
+        // two hits in scope, both vendor or demo-data senses, allowlisted below.
+        id: 'edition-old-name',
+        re: /\b(?:Personal|Professional|Enterprise)\b/g,
+        msg: 'The editions are **Basic / Standard / Advanced** (GLOSSARY *Edition*; LA-EDITIONS-1 ED-2, 2026-10-17): Personal → Basic, Professional → Standard, Enterprise → Advanced. If the word is not the edition (a vendor\'s product tier, demo data), put `vocab-allow` on the line or allowlist the file.',
+    },
 ];
 
 /**
@@ -642,6 +656,12 @@ const SOURCE_ALLOW = {
         'The template half of the same toolbox ("Max flow / min cut", "circular flow, forwarding loops").',
     'inspecto-ui/projects/link-analysis/src/link-analysis/pattern-packs.ts::flow-message':
         'The "Circular flow" MOTIF label — a money-movement pattern, the same sanctioned sense as the `circular-flow.toon` pattern packs (which CONFIG_PATH_RULES spares by name).',
+
+    // ── edition-old-name: the word that is not an Inspecto edition ──────────────────────────────────
+    'inspecto-ui/src/app/modules/admin/design-system/design-system.component.html::edition-old-name':
+        'ag-Grid\'s own product tier ("Community ag-Grid; no Enterprise tree-data") — the vendor\'s name, not an Inspecto edition.',
+    'inspecto-ui/src/app/modules/admin/design-system/design-system.component.ts::edition-old-name':
+        'Demo chart data: an "Enterprise" customer subgroup of a fraud category — not an Inspecto edition.',
 };
 
 /** Committed paths matching a pathspec (repo-relative, forward slashes), or null outside a git checkout. */

@@ -26,7 +26,7 @@ describe('lensHomeRedirect (W4 per-lens home page)', () => {
     /**
      * EDG-01 cell 6 (EDITIONS CP-13): `LENS_HOME.ops` names `events`, whose whole data source is the
      * optional `inspecto-events` module. Hiding the nav entry cannot protect `/` — nothing is clicked
-     * there — so on a Personal build the Ops lens must land somewhere that exists.
+     * there — so on a Basic build the Ops lens must land somewhere that exists.
      *
      * ⚠ Both directions, and only the Ops lens moves: a fallback applied to every lens would pass the
      * first assertion alone.

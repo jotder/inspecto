@@ -14,9 +14,9 @@
     <artifactId>inspecto-ops</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — Operational objects (Professional edition, optional)</name>
+    <name>Inspecto — Operational objects (Standard edition, optional)</name>
     <description>
-        OPTIONAL Professional-edition operational objects (EDITIONS.md CP-11): Alerts -> Incidents -> Cases ->
+        OPTIONAL Standard-edition operational objects (EDITIONS.md CP-11): Alerts -> Incidents -> Cases ->
         Tasks, their notes, links, tags, RCA templates, findings and workflow — the com.gamma.ops
         domain, its four DuckDB-backed stores, the /objects, /notes and /tags route families, the
         object-analytics and case-rule Job Types, and the incident_purge maintenance task.
@@ -28,12 +28,12 @@
         CollectorService built the ObjectService and wired its event bridge). So core reaches it through the
         com.gamma.objects.ObjectAccess seam and an ObjectEngineProvider, never by naming a type here.
 
-        WHAT PERSONAL LOSES, DELIBERATELY (operator decision 2026-09-08). Two EDITIONS rows were amended in
+        WHAT BASIC LOSES, DELIBERATELY (operator decision 2026-09-08). Two EDITIONS rows were amended in
         the same change rather than left to contradict the build:
-          * OPS-01 no longer lists `objects` among the operational stores Personal carries.
-          * SP-CTL-02's gap watchdog raised the EVENT on Personal but no longer promoted it to an
+          * OPS-01 no longer lists `objects` among the operational stores Basic carries.
+          * SP-CTL-02's gap watchdog raised the EVENT on Basic but no longer promoted it to an
             ALERT object (EventObjectBridge lived here). Since 2026-10-08 the bridge is EventAlertBridge in the
-            core and raises a stored Alert on every edition, so that row is whole on Personal again.
+            core and raises a stored Alert on every edition, so that row is whole on Basic again.
         Event RECORDING is untouched in every edition; only the promotion and the managed objects are gated.
 
         NOT IN THIS MODULE: /alerts and /alerts/rules. That is AlertsService over config-authored alert
@@ -41,7 +41,7 @@
         in core and reaches this module through the seam.
 
         Built only under the "edition-standard"/"edition-advanced" profiles, so a routine "mvn -o clean
-        test" (= Personal, the DEFAULT build) never compiles it.
+        test" (= Basic, the DEFAULT build) never compiles it.
     </description>
 
     <dependencies>

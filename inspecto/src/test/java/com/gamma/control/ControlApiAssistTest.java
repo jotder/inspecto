@@ -149,7 +149,7 @@ class ControlApiAssistTest {
     /**
      * The gate runs BEFORE {@code assistAgentOr503}: a caller without the capability sees 403 whether or not
      * the optional module is present. Pinned because the opposite order would make the refusal depend on
-     * packaging — 503 on Personal, 403 on Standard — and an auditor reading "no agent → 503" would be told
+     * packaging — 503 on Basic, 403 on Standard — and an auditor reading "no agent → 503" would be told
      * the route is protected by absence, which is not protection.
      */
     @Test

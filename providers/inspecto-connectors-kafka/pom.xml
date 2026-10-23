@@ -19,7 +19,7 @@
         OPTIONAL Kafka consumer CollectorConnector (a Stream-type Collector, ACQ-5), discovered via the core's
         CollectorConnectorFactory ServiceLoader seam. Split out of inspecto-connectors (MODULE-REORG-1 P7) because
         kafka-clients is the one connector footprint that is distinct (the object stores use only the JDK HTTP client
-        and gson; DB export is entangled with the SSH tunnel). Professional and above only - the Personal edition
+        and gson; DB export is entangled with the SSH tunnel). Standard and above only - the Basic edition
         does not ship it.
     </description>
 

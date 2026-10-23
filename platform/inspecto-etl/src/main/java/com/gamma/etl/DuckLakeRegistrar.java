@@ -74,7 +74,7 @@ public final class DuckLakeRegistrar {
         if (outputPaths.isEmpty()) return;
         List<Registration> plan = plan(outputPaths, cfg);
         // G9 backstop for a lane the pipeline registry does not guard (the job lane, the CLI entry points):
-        // DuckLake registration is Professional+, so a Personal build fails the batch rather than skip it.
+        // DuckLake registration is Standard+, so a Basic build fails the batch rather than skip it.
         for (Registration r : plan)
             if (r.duckLake() != null && Boolean.parseBoolean(String.valueOf(r.duckLake().get("enabled"))))
                 EditionFeatures.require(EditionFeatures.SINK_DUCKLAKE);

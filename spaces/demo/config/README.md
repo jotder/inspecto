@@ -112,7 +112,7 @@ pipelines → `flows/<name>.toon`.
 
 Both feeds land through ordinary pipelines (`seed-inbox` copies the CSVs into the inboxes; a poll cycle
 later the stores exist), and the saved views open from Studio → Link Analysis → **Saved views**. The
-Dataset projection route needs a Professional/Enterprise build (`features.geoLink`); the Personal build
+Dataset projection route needs a Standard/Advanced build (`features.geoLink`); the Basic build
 hides the menu entry and the route 503s.
 
 **Demo 1 — Revenue assurance on roaming (TAP) between partner operators** (`roaming_tap`, 1 864 records,

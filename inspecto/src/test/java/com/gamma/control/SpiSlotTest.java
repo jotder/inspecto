@@ -41,7 +41,7 @@ class SpiSlotTest {
      * Optional and every later lookup returned it — the opposite of the documented teardown contract.
      *
      * <p>⚠ This probe re-arms a slot whose provider genuinely RESOLVES, so pinned-empty and
-     * scanned-present are distinguishable. Keep both: the one above pins the Personal-edition path, this
+     * scanned-present are distinguishable. Keep both: the one above pins the Basic-edition path, this
      * one pins that the seam is actually released.
      */
     @Test

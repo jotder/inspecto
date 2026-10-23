@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * ({@link com.gamma.la.api.InvRoutes#relationFor}: unknown → 404, not viewable → the SAME 404).
  *
  * <p><b>No core-level gate covers {@code /geo/*}.</b> Neither route carries {@code withCapability}, the core
- * {@code ControlApi} knows the paths only for the Personal absent-stub and the {@code features.geoLink} probe, and
+ * {@code ControlApi} knows the paths only for the Basic absent-stub and the {@code features.geoLink} probe, and
  * the per-Dataset {@code owner}/{@code shares} check lives in {@code ComponentAccess.canView}, which only the route
  * calls. Before this test the Geo routes resolved the Dataset and built its relation SQL without that call, so any
  * authenticated caller could read points and routes out of a Dataset it had been denied.

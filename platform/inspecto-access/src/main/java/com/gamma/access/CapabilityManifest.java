@@ -144,7 +144,7 @@ public final class CapabilityManifest {
             // AssistRoutes — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). ⛔ A PAIR: the settings
             // are server-wide and /test makes a real outbound call to whatever baseUrl was last saved, so
             // gating either alone leaves the other as the injection point or the trigger. Live in every
-            // Standard/Enterprise bundle — inspecto-agent IS staged, unlike inspecto-intelligence.
+            // Standard/Advanced bundle — inspecto-agent IS staged, unlike inspecto-intelligence.
             new Entry("POST", "/assist/settings", Roles.CAN_ADMINISTER),
             new Entry("POST", "/assist/settings/test", Roles.CAN_AUTHOR_WORKBENCH),
             // AuditLogRoutes (ASSURE-AUDIT-CHAIN-1) — the tamper-evidence reads are gated like the anchor write: a

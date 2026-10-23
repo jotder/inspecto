@@ -4,7 +4,7 @@ import java.util.Optional;
 
 /**
  * Resolves the edition's {@link Authenticator}, mirroring {@code com.gamma.acquire.CollectorConnectors}'
- * "absent module ⇒ no-op wins" pattern: Personal ships no {@code META-INF/services} registration, so
+ * "absent module ⇒ no-op wins" pattern: Basic ships no {@code META-INF/services} registration, so
  * {@link #active()} is empty and {@link ControlApi#dispatch} skips authentication entirely. Typed
  * facade over a {@link SpiSlot}, which owns the caching/first-wins semantics.
  *
@@ -20,7 +20,7 @@ public final class Authenticators {
 
     // 🔴 failClosed: for THIS spi, absent means every route serves unauthenticated, so a registered
     // inspecto-oidc that refuses to construct (a typo in -Dauth.oidc.jwksUri) must propagate rather
-    // than resolve empty. Personal registers no provider at all and still resolves empty, unchanged.
+    // than resolve empty. Basic registers no provider at all and still resolves empty, unchanged.
     private static final SpiSlot<Authenticator> SLOT = new SpiSlot<>(Authenticator.class, true);
 
     public static Optional<Authenticator> active() {
@@ -30,7 +30,7 @@ public final class Authenticators {
     /** Test seam: force {@link #active()} to a specific value for the rest of this JVM's tests, bypassing
      *  the classpath scan (the core's own test classpath carries no {@code Authenticator} registration,
      *  so a real Standard-edition gate can only be exercised this way). Production code never calls this;
-     *  a test must restore {@code null} in its teardown so later test classes see Personal behaviour again. */
+     *  a test must restore {@code null} in its teardown so later test classes see Basic behaviour again. */
     public static void forTest(Authenticator a) {
         SLOT.forTest(a);
     }

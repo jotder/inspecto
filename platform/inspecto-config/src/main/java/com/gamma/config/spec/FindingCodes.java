@@ -73,7 +73,7 @@ public final class FindingCodes {
      *  rule, not an arming one: refused regardless of {@code active}, so it has no {@code WARN_} twin. */
     public static final String ERR_SINK_DUCKLAKE_SHARED_TABLE = "ERR_SINK_DUCKLAKE_SHARED_TABLE";
 
-    /** A Professional+ feature this build does not include — Alert Rules, the {@code post_action: MOVE}
+    /** A Standard+ feature this build does not include — Alert Rules, the {@code post_action: MOVE}
      *  archive, DuckLake registration ({@code com.gamma.etl.EditionFeatures}, `PROCESSOR-RELEASE-READINESS-1`
      *  G9). Refused regardless of {@code active}: activating does not change the edition. */
     public static final String ERR_EDITION_FEATURE = "ERR_EDITION_FEATURE";

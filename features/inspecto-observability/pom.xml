@@ -14,12 +14,12 @@
     <artifactId>inspecto-observability</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — Observability: /metrics + /events* (Professional edition, optional)</name>
+    <name>Inspecto — Observability: /metrics + /events* (Standard edition, optional)</name>
     <description>
         MODULE-REORG-1 P7 (D-MR5): the former inspecto-metrics (GET /metrics) and inspecto-events (the /events*
         feed) merged into this one module; both RouteModules and their ServiceLoader lines live here.
 
-        OPTIONAL Professional-edition metrics EXPOSITION (EDITIONS.md CP-13): GET /metrics, the Prometheus text
+        OPTIONAL Standard-edition metrics EXPOSITION (EDITIONS.md CP-13): GET /metrics, the Prometheus text
         endpoint, contributed through the core's public com.gamma.spi.http.RouteModule ServiceLoader seam.
 
         WHY ONLY THE EXPOSITION (EDG-01 cell 5, 2026-09-07). MetricRegistry is called by nine classes across
@@ -29,11 +29,11 @@
         not by choice.
 
         The gap it closes is real: /metrics sits in ControlApi.PUBLIC_PATHS (unauthenticated -- scrapers carry
-        no token) while Personal ships no authenticator and binds every interface by default, so a Personal
+        no token) while Basic ships no authenticator and binds every interface by default, so a Basic
         install served its full operational telemetry to any host that could reach the port.
 
         Built only under the "edition-standard"/"edition-advanced" profiles, so a routine "mvn -o clean
-        test" (= Personal, the DEFAULT build) never compiles it.
+        test" (= Basic, the DEFAULT build) never compiles it.
     </description>
 
     <dependencies>

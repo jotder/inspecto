@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
  * The entity's latest score with its factors. Gates, fail-closed:
  * <ol>
  *   <li>{@code canWorkIncidents} — a Risk Score is read while working the Incident it raised.</li>
- *   <li>Unknown model, a model the caller's data scopes exclude, a row the Enterprise PDP denies
+ *   <li>Unknown model, a model the caller's data scopes exclude, a row the Advanced PDP denies
  *       ({@link RowScope}), or no score for that entity → <b>404</b>, all indistinguishable (existence-hiding,
  *       the SEC-7d rule {@code ObjectRoutes} applies).</li>
  * </ol>

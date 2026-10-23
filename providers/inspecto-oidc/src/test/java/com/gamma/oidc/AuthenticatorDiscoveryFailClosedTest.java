@@ -82,7 +82,7 @@ class AuthenticatorDiscoveryFailClosedTest {
      *
      * <p>{@code OptionalSpi.all} catches {@code ServiceConfigurationError} and skips the provider with a
      * warning, so a misconfigured Standard build used to resolve <b>no Authenticator at all</b> —
-     * indistinguishable, at {@code ControlApi.dispatch}, from an auth-free Personal build. Its warning
+     * indistinguishable, at {@code ControlApi.dispatch}, from an auth-free Basic build. Its warning
      * even read <em>"the product runs without it and its routes answer 503"</em>, which is true of a
      * feature module and false of this one: there are no "its routes", only every route, unauthenticated.
      *
@@ -111,7 +111,7 @@ class AuthenticatorDiscoveryFailClosedTest {
     }
 
     /**
-     * ⚠ The other half of fail-closed, and the one easy to break while fixing the first: <b>Personal must
+     * ⚠ The other half of fail-closed, and the one easy to break while fixing the first: <b>Basic must
      * still resolve empty.</b> It registers no provider at all, which is a legitimate absence — the
      * distinction is registered-but-broken vs never-registered. A fix that threw on both would stop the
      * auth-free edition booting at all.
@@ -124,6 +124,6 @@ class AuthenticatorDiscoveryFailClosedTest {
                 "no registration is an absence, not a failure — this is the Basic edition's path");
     }
 
-    /** An SPI no module registers — stands in for Personal, which ships no Authenticator registration. */
+    /** An SPI no module registers — stands in for Basic, which ships no Authenticator registration. */
     interface NeverRegistered {}
 }

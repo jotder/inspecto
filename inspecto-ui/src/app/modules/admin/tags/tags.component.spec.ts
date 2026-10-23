@@ -61,7 +61,7 @@ async function create(
         ],
     });
     await TestBed.compileComponents(); // data-table @defer block
-    // EDG-01 cell 7: opsEnabled defaults FALSE (the Personal/absent-module state), where this
+    // EDG-01 cell 7: opsEnabled defaults FALSE (the Basic/absent-module state), where this
     // pane renders the explained alert instead of its content. These specs assert the INSTALLED
     // path, so arm it before the component reads it.
     TestBed.inject(SessionService).opsEnabled.set(true);

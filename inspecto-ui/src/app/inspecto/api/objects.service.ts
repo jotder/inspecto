@@ -376,7 +376,7 @@ export class ObjectsService {
     /**
      * Assign an object to a person — POST /objects/{id}/assign (`canWorkIncidents`, operator 2026-09-26), the
      * narrower route than the `canAdminister` {@link update} for exactly this edit. The server records the
-     * signed-in Subject as the actor when there is one; `actor` counts only without one (Personal).
+     * signed-in Subject as the actor when there is one; `actor` counts only without one (Basic).
      */
     assign(id: string, assignee: string, actor?: string): Observable<OperationalObject> {
         return this.http.post<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/assign`), {

@@ -322,7 +322,7 @@ public final class ReconRoutes implements RouteModule {
      * carrying a second legacy predicate that would re-introduce the key-only grain it replaces.
      *
      * <p>Gates, in order: write root unset → 503 · missing {@code reconciliation}/{@code key} → 422 ·
-     * unknown reconciliation → 404 · no operational-object engine (a Personal build has none) → 503.
+     * unknown reconciliation → 404 · no operational-object engine (a Basic build has none) → 503.
      * The last is why the UI must render an explained panel rather than a toast.
      *
      * @return {@code {incidentId, deduped, reconciliation, key}}; {@code deduped} means an active Incident

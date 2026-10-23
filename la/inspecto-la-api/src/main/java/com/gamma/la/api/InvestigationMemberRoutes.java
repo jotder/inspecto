@@ -37,7 +37,7 @@ import java.util.function.UnaryOperator;
  *
  * <p>Gates (mutating routes): {@code canManageIncidents} 403 → write root 503 → 422 id → NON-MEMBER 404 (the same body
  * as an unknown id) → a member who is not a lead 403 (a member already knows the Investigation exists, so this leaks
- * nothing) → R3 / Enterprise PDP 404 → 422 body → the last lead cannot be revoked or demoted 422 → append. The lead
+ * nothing) → R3 / Advanced PDP 404 → 422 body → the last lead cannot be revoked or demoted 422 → append. The lead
  * check, made again UNDER the Investigation's lock against the roles as they stand, is the real gate; the capability is the
  * Case-work precedent every Investigation write follows.
  */

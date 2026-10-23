@@ -10,7 +10,7 @@ import java.util.Optional;
 /**
  * {@link AlertRecords} over an {@link AlertStore} for the Alerts and, when the operational-object module is
  * present, over {@link ObjectAccess} for the Incident half. No ops module: the Incident reads answer empty and the
- * Incident writes are no-ops — Personal keeps Alerts and no Incidents.
+ * Incident writes are no-ops — Basic keeps Alerts and no Incidents.
  */
 final class StoredAlertRecords implements AlertRecords {
 

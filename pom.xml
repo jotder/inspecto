@@ -71,7 +71,7 @@
              does not list it) - only `package.ps1 -DemoAuth` stages it, for offline demo builds. -->
         <module>providers/inspecto-demo-auth</module>
         <!-- LA-EDITIONS-1 phase 3 (2026-10-17): the Link Analysis EXPLORER ships in BASIC, so these are default-reactor
-             modules now (they were Professional-only). Entity Lists first: inspecto-geo-link depends on it. The
+             modules now (they were Standard-only). Entity Lists first: inspecto-geo-link depends on it. The
              Investigation surface stays gated off in Basic by the `investigations` edition feature (inspecto-ops). -->
         <module>features/inspecto-entity-list</module>
         <module>la/inspecto-la-core</module>

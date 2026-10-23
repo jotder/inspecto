@@ -20,19 +20,19 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * MODULE-REORG-P7 - the assertion that makes the Case Management gating REAL rather than claimed, on the DEFAULT (Personal)
+ * MODULE-REORG-P7 - the assertion that makes the Case Management gating REAL rather than claimed, on the DEFAULT (Basic)
  * build, over real HTTP. The sibling of {@link NoGeoLinkShipsInThePersonalBuildTest}.
  *
  * <p>Two facts, each of which a plausible-looking regression would break on its own:
  * <ol>
  *   <li>every Case Management path ({@code /cases*}, {@code /objects/{id}/merge|split}) answers <b>503 with the edition message</b> — not 404 (which would mean
- *       {@link AbsentModuleRoutes} lost a path), not 200 (which would mean the module is back in Personal);</li>
+ *       {@link AbsentModuleRoutes} lost a path), not 200 (which would mean the module is back in Basic);</li>
  *   <li>{@code /bootstrap} reports {@code features.cases == false}, so a client hides the surface.</li>
  * </ol>
  * That no {@code RouteModule} leaked onto this classpath is asserted once for every optional module by
  * {@code NoGeoLinkShipsInThePersonalBuildTest}.
  *
- * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Personal
+ * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Basic
  * bundle; a 404 means the stub and the module's surface drifted apart. Both are the defect, not the test.
  */
 class NoCaseManagementShipsInThePersonalBuildTest {

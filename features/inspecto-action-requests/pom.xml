@@ -29,8 +29,8 @@
         and the Pending Change hold stay in the core and work with this module absent. It REQUIRES the notify-channels
         provider for the outbound wire (WebhookSinkTransport); without it creating a request answers 503.
 
-        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles). THIN: no
-        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Personal)
+        Bundled from the Standard edition up (the Standard, Advanced and Preview profiles). THIN: no
+        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Basic)
         never compiles it.
     </description>
 

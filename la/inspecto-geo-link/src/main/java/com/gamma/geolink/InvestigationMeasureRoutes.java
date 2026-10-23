@@ -44,7 +44,7 @@ import java.util.function.UnaryOperator;
  * </ul>
  *
  * <p><b>Access.</b> Both open through {@link InvestigationRoutes#open}: owner-only, the R3 Dataset gate and the
- * Enterprise PDP (D-E7) — so a non-owner's binding is refused as a 404, before any capability question is asked
+ * Advanced PDP (D-E7) — so a non-owner's binding is refused as a 404, before any capability question is asked
  * of the body. The binding route is additionally gated on {@code canAuthorAlertRules}, as {@code POST /alerts/rules}
  * is. A sweep carries no caller, so the gate is carried to evaluation time by a BINDING recorded beside the
  * Investigation (the rule's canonical hash and the owner): {@link WorkingSetMeasures#value} evaluates nothing else.

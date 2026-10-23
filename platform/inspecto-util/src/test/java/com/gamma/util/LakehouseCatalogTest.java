@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The shared-catalog config surface (scale-out phase C, §5.4 bullet 5).
  *
- * <p><b>What matters here, in order.</b> That <b>absence is the default</b> — Personal and single-node
+ * <p><b>What matters here, in order.</b> That <b>absence is the default</b> — Basic and single-node
  * Standard have no shared catalog and must not need one, so an unconfigured deployment must read as "no
  * catalog", never as an error. That a <b>half-configured pair is refused</b>, because a catalog with no
  * data path cannot be attached and a data path with no catalog names nothing, and either half alone would

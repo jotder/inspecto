@@ -38,7 +38,7 @@ import java.util.TreeSet;
  * {@code assessed:false}, never "no changes".
  *
  * <p><b>Access:</b> exactly {@code GET …/coverage} — {@link InvestigationRoutes#openForRead} (owner or linked-Case member,
- * R3 Dataset gate, Enterprise PDP), a read with no capability gate; the feature gate is {@code geoLink}. Persists nothing.
+ * R3 Dataset gate, Advanced PDP), a read with no capability gate; the feature gate is {@code geoLink}. Persists nothing.
  */
 public final class InvestigationDataChangesRoutes implements RouteModule {
 

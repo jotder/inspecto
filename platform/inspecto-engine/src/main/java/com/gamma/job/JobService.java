@@ -408,7 +408,7 @@ public final class JobService implements AutoCloseable {
         this.packs.scanAtStartup();
         for (JobConfig c : this.configs) {
             // DEMO-SPACE-PERSONAL-UNBOOTABLE-1 (2026-09-15): a job whose TYPE is not registered on this
-            // classpath — an optional module's type on a Personal/core boot, or a Job Pack that is not
+            // classpath — an optional module's type on a Basic/core boot, or a Job Pack that is not
             // installed — is skipped with a WARN naming the type, and the SPACE STILL BOOTS. Before this the
             // IllegalArgumentException escaped the constructor, SpaceManager logged "Skipping space dir …
             // failed to load" and the whole space vanished from GET /spaces because of one sample job.
@@ -467,7 +467,7 @@ public final class JobService implements AutoCloseable {
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("maintenance", "Maintenance",
                 // DERIVED, never hand-written (2026-09-09). This description drives the Jobs authoring
                 // form, so a hand-maintained list is a form that lies: the string here used to advertise
-                // four tasks a Personal bundle REFUSES (incident_purge + the three backup tasks, all
+                // four tasks a Basic bundle REFUSES (incident_purge + the three backup tasks, all
                 // contributed by optional modules) and to hide seven the engine ships (dedup_prune,
                 // event_prune, partition_prune, receipt_prune, reference_compact, retire_superseded,
                 // heartbeat). MaintenanceJob.availableTasks() reports the built-in switch plus whatever
@@ -617,7 +617,7 @@ public final class JobService implements AutoCloseable {
         // Both call ObjectService.evaluateCaseRule / the analytics rollups, which the ObjectAccess seam
         // deliberately does not expose — they are whole operational-object features, not narrow consumers,
         // so they moved into the optional inspecto-ops module and register through the ServiceLoader
-        // JobTypeProvider loop below. On a Personal build they are simply unknown Job Types.
+        // JobTypeProvider loop below. On a Basic build they are simply unknown Job Types.
         // sample.hello — the inert reference Job (see SampleHelloJob). Its declaration is deliberately a
         // tour of the parameter contract (job-parameter-contract §7.2): every tier, a group, options, a
         // multi list, bounds, a secret, and a deduced date. Authors read this to learn the form.

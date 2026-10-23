@@ -286,7 +286,7 @@ public final class DossierRoutes implements RouteModule {
     }
 
     /** Through the ONE Investigation gate ({@link InvestigationRoutes#open}: 503 → 422 unsafe id → 403 → 404 absent,
-     *  not the owner, R3 or an Enterprise policy DENY), keeping the header's raw bytes for the manifest. */
+     *  not the owner, R3 or an Advanced policy DENY), keeping the header's raw bytes for the manifest. */
     static Opened open(ApiContext api, HttpExchange ex, String id) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
         String raw = inv.store().header(id).orElse(null);

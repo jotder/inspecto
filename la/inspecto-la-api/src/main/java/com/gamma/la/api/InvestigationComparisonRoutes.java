@@ -31,7 +31,7 @@ import java.util.Map;
  * through append, undo, fork, Draft rebase, template and Dossier replay - a wider change for evidence a reader can re-run by
  * asking again. The Dossier carries it as an explicitly UNSEALED section instead ({@link DossierRoutes}).
  *
- * <p>Access: {@link InvestigationRoutes#openForRead} (owner or linked-Case member, R3, Enterprise PDP) and the R3 gate again on
+ * <p>Access: {@link InvestigationRoutes#openForRead} (owner or linked-Case member, R3, Advanced PDP) and the R3 gate again on
  * the Dataset read. Masked exactly as the Working Set is ({@link EntityMasking}, applied at render over raw ids; every id
  * in the answer is one the Working Set already holds, so the diff names nothing the analyst could not already see).
  * Persists nothing; audited best-effort as {@code LINK_INVESTIGATION_COMPARED}.

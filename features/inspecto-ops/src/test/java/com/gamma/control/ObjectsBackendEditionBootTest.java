@@ -24,11 +24,11 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code OBJECTS-BACKEND-DEFAULT-MEMORY-1} (operator decision 2026-09-25), through the real boot path —
  * {@code SpaceManager.discover}, the way every {@code serve.*} launcher starts — once per edition setting:
  * <ul>
- *   <li><b>Professional</b> (and Personal/Preview): no {@code -Dobjects.backend} ⇒ the Space's own
+ *   <li><b>Standard</b> (and Basic/Preview): no {@code -Dobjects.backend} ⇒ the Space's own
  *       {@code duckdb/} files, and an Incident survives a restart.</li>
- *   <li><b>Enterprise</b>: {@code serve.*} passes {@code -Dobjects.backend=postgres}; with no PostgreSQL URL the
+ *   <li><b>Advanced</b>: {@code serve.*} passes {@code -Dobjects.backend=postgres}; with no PostgreSQL URL the
  *       boot is refused, naming the property — and an unreachable one is never papered over with memory.</li>
- *   <li><b>Enterprise {@code -DemoAuth}</b>: {@code serve-demo.*} passes {@code -Dobjects.backend=db} with
+ *   <li><b>Advanced {@code -DemoAuth}</b>: {@code serve-demo.*} passes {@code -Dobjects.backend=db} with
  *       {@code -Dauth.mode=demo}; it boots on DuckDB. (It also passes {@code -Djobs.backend=duckdb}, R2-08 —
  *       pinned by the launcher-text case below.)</li>
  * </ul>
@@ -64,7 +64,7 @@ class ObjectsBackendEditionBootTest {
 
     @Test
     void professionalDefault_isTheSpaceDuckdb_andAnIncidentSurvivesARestart(@TempDir Path root) throws Exception {
-        System.clearProperty("objects.backend");          // the engine default — what a Professional bundle runs
+        System.clearProperty("objects.backend");          // the engine default — what a Standard bundle runs
         seedSpace(root, "s1");
 
         String id;
@@ -89,7 +89,7 @@ class ObjectsBackendEditionBootTest {
 
     @Test
     void enterpriseWithoutAPostgresUrl_refusesToBoot_namingTheProperty(@TempDir Path root) throws Exception {
-        System.setProperty("objects.backend", "postgres");   // what the Enterprise serve.sh/serve.bat pass
+        System.setProperty("objects.backend", "postgres");   // what the Advanced serve.sh/serve.bat pass
         seedSpace(root, "s1");
         IllegalStateException boom = assertThrows(IllegalStateException.class, () -> SpaceManager.discover(root));
         assertTrue(boom.getMessage().contains("-Dinspecto.db.url"), boom.getMessage());
@@ -140,7 +140,7 @@ class ObjectsBackendEditionBootTest {
      * {@code serve-demo.*} used to carry its own hand-kept jar list, and {@code inspecto-intelligence.jar} was missing from it, so
      * the bundle shipped the jar and every {@code /agent/*} call answered 503 (the 2026-09-30 live check). Since MODULE-REORG-P3d
      * there is NO list to forget a jar from: the demo launchers read the bundle's {@code modules.list}, which
-     * {@code tools/offering-classpath.mjs --demo} writes from the Enterprise Offering (the OIDC trio replaced by the demo jar).
+     * {@code tools/offering-classpath.mjs --demo} writes from the Advanced Offering (the OIDC trio replaced by the demo jar).
      * This pins that wiring; the generator's completeness is held by tools/offering-classpath.test.mjs and check-sbom-modules.
      */
     @Test

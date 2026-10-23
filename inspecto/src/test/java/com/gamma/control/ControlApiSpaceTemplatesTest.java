@@ -101,7 +101,7 @@ class ControlApiSpaceTemplatesTest {
     }
 
     /**
-     * A Personal build (no {@code alert.dispatch}) lists a template that ships Alert Rules as NOT creatable, naming
+     * A Basic build (no {@code alert.dispatch}) lists a template that ships Alert Rules as NOT creatable, naming
      * the missing feature — the same verdict {@code POST /spaces} answers with its 422 — so the gallery never
      * offers a create that is certain to fail. With the feature present the same template is creatable.
      */
@@ -118,7 +118,7 @@ class ControlApiSpaceTemplatesTest {
                 threshold: 10
                 """);
         try {
-            com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of());   // Personal
+            com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of());   // Basic
             try (Ctx c = open(root)) {
                 JsonNode t = json(send(c.port, "GET", "/spaces/templates", null)).get(0);
                 assertFalse(t.get("creatable").asBoolean(), t.toString());

@@ -464,7 +464,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
     });
 
     it('explains a 503 in place and withdraws the action instead of toasting', async () => {
-        // A Personal bundle carries no inspecto-ops module, so Incidents do not exist. That is a
+        // A Basic bundle carries no inspecto-ops module, so Incidents do not exist. That is a
         // deployment state, not a failure — the Approvals-inbox lesson.
         const promote = vi.fn(() => throwError(() => ({ status: 503 })));
         const { fixture, c, toastr } = await create({ promote });

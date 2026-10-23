@@ -182,7 +182,7 @@ class DuckLakeRegistrarTest {
     }
 
     // The falsification arm. Without it the test above would pass against a method that ALWAYS threw,
-    // which would turn every Personal/Standard DuckLake hiccup into a failed batch.
+    // which would turn every Basic/Standard DuckLake hiccup into a failed batch.
     @Test
     void theSameFailureIsToleratedOnASingleNode() {
         System.setProperty(Topology.PROPERTY, "single");
@@ -252,7 +252,7 @@ class DuckLakeRegistrarTest {
     }
 
     // The falsification arm. Without it the three above would pass against a method that ALWAYS threw,
-    // which would break every Personal and single-node Standard install — where a file catalog is the
+    // which would break every Basic and single-node Standard install — where a file catalog is the
     // correct and documented choice.
     @Test
     void aFileCatalogIsPerfectlyFineOnASingleNode() {
@@ -289,7 +289,7 @@ class DuckLakeRegistrarTest {
     }
 
     // The falsification arm. Without it the test above would pass against a method that ALWAYS returned the
-    // option, which would turn off a genuine single-node optimisation for every Personal install.
+    // option, which would turn off a genuine single-node optimisation for every Basic install.
     @Test
     void inliningIsLeftAloneOnASingleNode() {
         System.setProperty(Topology.PROPERTY, "single");
@@ -374,7 +374,7 @@ class DuckLakeRegistrarTest {
     }
 
     // The falsification arms. Without these the three above would pass against a method that ALWAYS threw,
-    // which would break every Personal and single-node Standard install that has no DuckLake block at all —
+    // which would break every Basic and single-node Standard install that has no DuckLake block at all —
     // i.e. almost all of them, since the lakehouse is an optional sidecar there.
     @Test
     void anAbsentDuckLakeBlockIsPerfectlyFineOnASingleNode() {

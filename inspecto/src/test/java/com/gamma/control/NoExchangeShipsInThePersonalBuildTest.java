@@ -21,15 +21,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * EDG-01 cell 4 — the assertion that makes the SEC-10 gating REAL rather than claimed, on the DEFAULT
- * (Personal) build, over real HTTP.
+ * (Basic) build, over real HTTP.
  *
  * <p>Six facts, each of which a plausible regression breaks on its own:
  * <ol>
  *   <li>all twelve {@code /exchange} paths answer <b>503 with the edition message</b> — not 404 (the stub
- *       lost a path), not 200 (the module is back in Personal);</li>
+ *       lost a path), not 200 (the module is back in Basic);</li>
  *   <li>{@code /bootstrap} reports {@code features.exchange == false}, so the SPA's Share affordances stay
  *       hidden. ⚠ This is the flag that was <em>wrong</em> until this cell: it read
- *       {@code containerRoot() != null} alone, so a Personal install with {@code -Dspaces.root} advertised an
+ *       {@code containerRoot() != null} alone, so a Basic install with {@code -Dspaces.root} advertised an
  *       Exchange it did not have and the Share button 404'd on click;</li>
  *   <li>{@code SharedRefResolver.global()} is still the fail-closed {@code NONE} — the install moved into the
  *       module, so no {@code shared/<owner>/<item>} ref resolves here;</li>
@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *       unauthenticated scrape surface that made EDG-01 P1 in the first place.</li>
  * </ol>
  *
- * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Personal
+ * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Basic
  * bundle; a 404 means the stub and the module's surface drifted apart.
  */
 class NoExchangeShipsInThePersonalBuildTest {
@@ -137,7 +137,7 @@ class NoExchangeShipsInThePersonalBuildTest {
     /**
      * EDG-01 cell 5 (EDITIONS {@code CP-13}): {@code GET /metrics} — an INFRA path, served at the bare URL
      * with no {@code /api/v1} prefix and deliberately unauthenticated, because a Prometheus scraper carries
-     * no token. That combination is exactly why it mattered: Personal ships no authenticator and binds every
+     * no token. That combination is exactly why it mattered: Basic ships no authenticator and binds every
      * interface, so this route served the deployment's full telemetry to anything that could reach the port.
      *
      * <p>⚠ Only the EXPOSITION is gated. {@code MetricRegistry} is called by nine classes across three modules
@@ -157,7 +157,7 @@ class NoExchangeShipsInThePersonalBuildTest {
 
     /**
      * EDG-01 <b>cell 6</b> (EDITIONS {@code CP-13}, second half): the whole {@code /events*} feed is the
-     * optional {@code inspecto-observability} module, so on the default (Personal) build every path 503s naming it.
+     * optional {@code inspecto-observability} module, so on the default (Basic) build every path 503s naming it.
      *
      * <p>⚠ Concrete URLs, not the patterns — a stub is only real if a real request reaches it. The catch-all
      * {@code /events/([^/]+)} is registered last for a reason, so {@code /events/search},
@@ -190,7 +190,7 @@ class NoExchangeShipsInThePersonalBuildTest {
      * the audit trail is a compliance obligation (AUDIT-CSV-1 / compliance G10), not an edition feature.
      *
      * <p>So this asserts the pair that matters together — a mutating request still writes its {@code AUDIT}
-     * event to the store on a Personal build, while the HTTP surface that would read it back refuses. If a
+     * event to the store on a Basic build, while the HTTP surface that would read it back refuses. If a
      * future change gated {@code EventStore} along with the routes, every {@code /events*} path would still
      * 503 and the cell-6 status-code test above would still pass; only this one would fail.
      */
@@ -243,7 +243,7 @@ class NoExchangeShipsInThePersonalBuildTest {
 
     /**
      * ⛔ The deliberate non-change. Deriving the grantable vocabulary from registered routes would make a role
-     * or policy file authored on Standard fail validation on Personal — a portability break, and a
+     * or policy file authored on Standard fail validation on Basic — a portability break, and a
      * per-edition difference in a validator. The capabilities stay; nothing is behind them here.
      */
     @Test

@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Access Policies over real HTTP ({@code GET/PUT /access/policies} — ABAC A2,
  * {@code docs/superpower/rbac-abac-plan.md} §4): authorable allow/deny statements whose {@code when}
  * conditions parse-gate at authoring time ({@code Conditions} → 422, never a stored time bomb),
- * behind the shared write gates. Evaluation is the Enterprise policy engine's job (A3) — these routes
+ * behind the shared write gates. Evaluation is the Advanced policy engine's job (A3) — these routes
  * only author and serve the documents.
  */
 class ControlApiAccessPoliciesTest {
@@ -147,8 +147,8 @@ class ControlApiAccessPoliciesTest {
 
     @Test
     void authoredPoliciesCarryAnAuthoredSourceBadge(@TempDir Path dir) throws Exception {
-        // Seed rows only appear when the Enterprise engine supplies them (ControlApiPolicyEnforcementTest);
-        // on the core/Personal classpath every row is authored, tagged so the UI can render source badges.
+        // Seed rows only appear when the Advanced engine supplies them (ControlApiPolicyEnforcementTest);
+        // on the core/Basic classpath every row is authored, tagged so the UI can render source badges.
         try (Ctx c = open(dir, dir.resolve("cfg"))) {
             JsonNode saved = json(send(c.port, "PUT", "/access/policies",
                     "{\"policies\":[{\"name\":\"x\",\"effect\":\"deny\",\"when\":\"subject.id == 'nobody'\"}]}"));
@@ -159,7 +159,7 @@ class ControlApiAccessPoliciesTest {
 
     @Test
     void explainReportsDisabledWithoutAPolicyEngine(@TempDir Path dir) throws Exception {
-        // Core/Personal ship no AccessDecider — /access/explain is a no-op that says so, never a 500.
+        // Core/Basic ship no AccessDecider — /access/explain is a no-op that says so, never a 500.
         try (Ctx c = open(dir, null)) {
             JsonNode r = json(send(c.port, "GET", "/access/explain?route=/objects", null));
             assertFalse(r.get("enabled").asBoolean());
@@ -169,7 +169,7 @@ class ControlApiAccessPoliciesTest {
 
     @Test
     void previewValidatesTheDraftAndReportsDisabledWithoutAPolicyEngine(@TempDir Path dir) throws Exception {
-        // S4 on Personal: the draft still passes the PUT's 422 gate, but there is nothing to evaluate
+        // S4 on Basic: the draft still passes the PUT's 422 gate, but there is nothing to evaluate
         try (Ctx c = open(dir, dir.resolve("cfg"))) {
             assertEquals(422, send(c.port, "POST", "/access/policies/preview",
                     "{\"policies\":[{\"name\":\"deny-all\",\"effect\":\"deny\"}]}").statusCode());

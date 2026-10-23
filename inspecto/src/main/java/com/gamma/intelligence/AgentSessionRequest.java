@@ -14,7 +14,7 @@ import java.util.Set;
  *
  * <p>{@code capabilities} are the authenticated caller's control-plane capabilities. Every tool the session
  * runs is checked against them — the same check {@code POST /agent/tools/{name}} makes (2026-09-29). It is
- * {@code null} when no Subject is attached (Personal, which checks nothing anywhere).
+ * {@code null} when no Subject is attached (Basic, which checks nothing anywhere).
  */
 public record AgentSessionRequest(String role, Map<String, Object> page, String goalKind,
                                   Set<String> capabilities) {
@@ -24,7 +24,7 @@ public record AgentSessionRequest(String role, Map<String, Object> page, String 
         capabilities = capabilities == null ? null : Set.copyOf(capabilities);
     }
 
-    /** No Subject (Personal): unrestricted tools. */
+    /** No Subject (Basic): unrestricted tools. */
     public AgentSessionRequest(String role, Map<String, Object> page, String goalKind) {
         this(role, page, goalKind, null);
     }

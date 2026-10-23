@@ -25,18 +25,18 @@ import static org.junit.jupiter.api.Assertions.*;
  * lacks the module answers its routes with the 503 "not installed" stub and reports the feature false.
  *
  * EDG-01 cell 3b — the assertion that makes the CP-09 gating REAL rather than claimed, on the DEFAULT
- * (Personal) build, over real HTTP.
+ * (Basic) build, over real HTTP.
  *
  * <p>Three facts, each of which a plausible-looking regression would break on its own:
  * <ol>
  *   <li>every geo/inv path answers <b>503 with the edition message</b> — not 404 (which would mean
- *       {@link AbsentModuleRoutes} lost a path), not 200 (which would mean the module is back in Personal);</li>
+ *       {@link AbsentModuleRoutes} lost a path), not 200 (which would mean the module is back in Basic);</li>
  *   <li>{@code /bootstrap} reports {@code features.geoLink == false}, so the SPA hides the entries;</li>
  *   <li>{@code ServiceLoader} finds NO {@code RouteModule} except the test-tree one — the module has not
  *       leaked onto this classpath.</li>
  * </ol>
  *
- * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Personal
+ * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Basic
  * bundle; a 404 means the stub and the module's surface drifted apart. Both are the defect, not the test.
  */
 class NoGeoLinkShipsInThePersonalBuildTest {

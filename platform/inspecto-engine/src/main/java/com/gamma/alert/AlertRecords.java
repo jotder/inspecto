@@ -11,11 +11,11 @@ import java.util.Optional;
  * The port through which {@link AlertService} keeps its <b>persisted Alert records</b> and the Incident lookups
  * that sit beside them (MODULE-REORG-P7-INCIDENTS, slices 1 and 2, 2026-10-07).
  *
- * <p>Slice 1 made this the one seam. Slice 2 (operator decision 2026-10-07: Personal keeps Alert history and
+ * <p>Slice 1 made this the one seam. Slice 2 (operator decision 2026-10-07: Basic keeps Alert history and
  * restart-safe de-duplication) moved the Alert records <b>out of the generic object substrate</b> into the
  * Alert-owned {@link AlertStore}; {@link StoredAlertRecords} is the only implementation. The Incident half —
  * the active-Incident index, re-open, and the {@code ESCALATED_FROM} reference — still goes to the optional
- * operational-object module when it is present and is skipped when it is not (Personal has Alerts but no
+ * operational-object module when it is present and is skipped when it is not (Basic has Alerts but no
  * Incidents).
  *
  * <p>Naming: not "store" (the {@link AlertStore} is the physical backend) and not "ledger" (the Signal / batch

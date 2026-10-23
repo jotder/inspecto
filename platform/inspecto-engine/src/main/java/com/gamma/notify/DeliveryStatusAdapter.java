@@ -9,8 +9,8 @@ import java.util.Optional;
 /**
  * SPI for an <em>inbound</em> provider callback that reports what happened to a message we sent
  * (BACKLOG D8) — the counterpart to {@link NotificationChannel}, which sends. Discovered via
- * {@link java.util.ServiceLoader} exactly like the channels, so the lean Personal core ships none and a
- * Standard/Enterprise build adds one by dropping its module on the classpath.
+ * {@link java.util.ServiceLoader} exactly like the channels, so the lean Basic core ships none and a
+ * Standard/Advanced build adds one by dropping its module on the classpath.
  *
  * <p><b>Correlation is ours, not the provider's.</b> We mint a {@code deliveryId} and embed it in the
  * outbound message (an SMTP {@code Message-ID} of {@code <inspecto.{deliveryId}@{domain}>}, or an

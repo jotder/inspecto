@@ -66,7 +66,7 @@ interface AuditRow {
 })
 export class AuditLogsComponent implements OnInit {
     // ⚠ AuditService, NOT EventsService (EDG-01 cell 6, 2026-09-08). The full /events* feed is the
-    // optional inspecto-events module and 503s on Personal, but EDITIONS §Audit promises Personal
+    // optional inspecto-events module and 503s on Basic, but EDITIONS §Audit promises Basic
     // "local append-only logs" — so this screen reads the CORE /audit/* routes every edition serves,
     // and it deliberately does NOT gate on SessionService.eventsEnabled.
     private api = inject(AuditService);

@@ -33,10 +33,10 @@
         risk.score.produced subscriber (by event-type string), the CapabilityManifest rows, the EvidenceMasker
         (com.gamma.mask) and AbsentModuleRoutes (503 stub).
 
-        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles) next to
-        inspecto-entity-list; on Personal the core answers the /risk-scores paths with 503 "not installed",
+        Bundled from the Standard edition up (the Standard, Advanced and Preview profiles) next to
+        inspecto-entity-list; on Basic the core answers the /risk-scores paths with 503 "not installed",
         /bootstrap reports features.scoring=false and risk.score is an unknown Job Type. THIN: no shade, no sidecar
-        classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Personal) never compiles it.
+        classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Basic) never compiles it.
     </description>
 
     <dependencies>

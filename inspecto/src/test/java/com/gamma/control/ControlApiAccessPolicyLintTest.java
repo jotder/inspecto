@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Save-time guards for the policy-authoring failure modes F1–F9
  * ({@code docs/archived-documents/plans-archive/policy-authoring-ux-design.md} §1, §4 — operator D1, 2026-09-25: guard all
- * nine at save time). Each test is one failure mode; the ones that need the Enterprise engine (F6's
+ * nine at save time). Each test is one failure mode; the ones that need the Advanced engine (F6's
  * seed names, F7's lockout simulation) live in {@code ControlApiPolicyEnforcementTest}. Every probe
  * here is a document the pre-guard code ACCEPTED (200) or loaded silently — the red run proves it.
  */
@@ -68,7 +68,7 @@ class ControlApiAccessPolicyLintTest {
     void f1_anUnreadableDocNamesThePolicyAndCheck_andARolesSaveCannotMakeItUnreadable(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             // (a) a hand edit with a bad value: the GET's error names the policy and what is wrong,
-            // not a generic "unreadable" (D5 — the caller holds canConfigureAccess: Personal, no Subject).
+            // not a generic "unreadable" (D5 — the caller holds canConfigureAccess: Basic, no Subject).
             writeDoc(c, Map.of("name", "freeze-contractors", "effect", "block"));
             JsonNode broken = json(send(c.port, "GET", "/access/policies", null, null));
             String error = broken.get("error").asText();
@@ -216,7 +216,7 @@ class ControlApiAccessPolicyLintTest {
     @Test
     void f8_upgradePath_anOnDiskDocWithAStrayKeyLoadsUnreadableNamingTheKey(@TempDir Path dir) throws Exception {
         // D4 (taken on recommendation): a doc that loaded before the guard, with a stray key, is
-        // unreadable after it — fail-closed (deny-all on Enterprise), and the error names the fix.
+        // unreadable after it — fail-closed (deny-all on Advanced), and the error names the fix.
         try (Ctx c = open(dir)) {
             writeDoc(c, Map.of("name", "contractor-freeze", "effect", "deny",
                     "target", Map.of("actions", List.of("write")), "wen", "subject.id == 'carl'"));

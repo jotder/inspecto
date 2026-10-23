@@ -10,8 +10,8 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * The Professional+ features whose code ships in every build but whose USE the edition board
- * ({@code docs/EDITIONS.md}) reserves for Professional and Enterprise — {@code PROCESSOR-RELEASE-READINESS-1}
+ * The Standard+ features whose code ships in every build but whose USE the edition board
+ * ({@code docs/EDITIONS.md}) reserves for Standard and Advanced — {@code PROCESSOR-RELEASE-READINESS-1}
  * G9, operator decision 2026-09-24 ("gate the code"):
  * <ul>
  *   <li>{@link #ALERT_DISPATCH} — Alert Rules ({@code SP-CTL-07}); declared by {@code inspecto-ops}, whose
@@ -21,10 +21,10 @@ import java.util.TreeMap;
  *       the {@code backup} maintenance task.</li>
  *   <li>{@link #SINK_DUCKLAKE} — DuckLake catalog registration, {@code ducklake.enabled: true}
  *       ({@code SP-SNK-03}); declared by {@code inspecto-backup} too — it has no module of its own, and
- *       rides with the storage module every Professional bundle ships.</li>
+ *       rides with the storage module every Standard bundle ships.</li>
  * </ul>
  *
- * <p>A feature is present when an {@link EditionFeatureProvider} on the classpath names it. Personal
+ * <p>A feature is present when an {@link EditionFeatureProvider} on the classpath names it. Basic
  * bundles neither module, so all three are absent there and every door refuses them with
  * {@code ERR_EDITION_FEATURE}: the save gate, the Alert Rule routes, and — for a config that arrives on
  * disk instead — the boot-time Alert Rule load, the pipeline registry, the Collector's acquisition and the
@@ -41,7 +41,7 @@ public final class EditionFeatures {
     /**
      * The PII masking Step ({@code steps:} kind {@code mask}, node {@code transform.mask}) — ENTERPRISE only
      * (board SEC-08, operator 2026-09-02; built 2026-10-06). Declared by {@code inspecto-policy}, the one module
-     * only the Enterprise (and Preview) flavours bundle.
+     * only the Advanced (and Preview) flavours bundle.
      */
     public static final String PII_MASK = "quality.pii.mask";
     /**

@@ -119,7 +119,7 @@ public final class NotificationService implements NotificationAccess, AutoClosea
      * Wire delivery-status tracking (BACKLOG D8): a receipt is written per <em>external</em> destination
      * before the transport is called, and its {@code deliveryId} is handed to the transport to embed.
      *
-     * <p>A setter rather than a sixth constructor: this is optional (Standard/Enterprise) and four public
+     * <p>A setter rather than a sixth constructor: this is optional (Standard/Advanced) and four public
      * constructors already exist. {@code null} — the default — means no receipts are written and delivery
      * behaves exactly as before.
      *

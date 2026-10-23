@@ -12,7 +12,7 @@ import java.util.Optional;
  * contributed via {@code META-INF/services/com.gamma.spi.auth.Authenticator} and discovered by
  * {@link Authenticators}. The auth-free core ships <b>no</b> implementation: an absent module means
  * {@link Authenticators#active()} is empty and {@link ControlApi#dispatch} enforces nothing at all —
- * Personal edition stays byte-for-byte unchanged.
+ * Basic edition stays byte-for-byte unchanged.
  */
 @PublicApi(since = "4.0.0")
 public interface Authenticator {

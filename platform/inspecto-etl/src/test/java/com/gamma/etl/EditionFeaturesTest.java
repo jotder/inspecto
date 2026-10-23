@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@link EditionFeatures} (`PROCESSOR-RELEASE-READINESS-1` G9): with no {@link EditionFeatureProvider} on the
- * classpath — this module's, like a Personal bundle's — the three Professional+ features are absent, a parsed
+ * classpath — this module's, like a Basic bundle's — the three Standard+ features are absent, a parsed
  * pipeline using them is refused, and the DuckLake registrar's backstop fails the batch with
  * {@code ERR_EDITION_FEATURE} instead of registering. A declared feature lifts each refusal.
  */
@@ -94,7 +94,7 @@ class EditionFeaturesTest {
                 .stream().map(EditionFeatures.Refusal::feature).toList());
     }
 
-    /** SEC-08 (2026-10-06): a mask step is Enterprise-only — refused in a draft's chain AND inside a route branch. */
+    /** SEC-08 (2026-10-06): a mask step is Advanced-only — refused in a draft's chain AND inside a route branch. */
     @Test
     void aMaskStepIsRefusedOutsideEnterpriseEvenInsideABranch() {
         Map<String, Object> draft = new LinkedHashMap<>();

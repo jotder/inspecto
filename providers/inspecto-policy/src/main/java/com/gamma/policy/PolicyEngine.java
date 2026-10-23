@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The Enterprise PDP (ABAC A3, {@code docs/superpower/rbac-abac-plan.md} §4): evaluates the bound
+ * The Advanced PDP (ABAC A3, {@code docs/superpower/rbac-abac-plan.md} §4): evaluates the bound
  * space's authored Access Policies ({@link AccessPolicies} — already parsed, mtime-fresh) against a
  * {@code subject.* / resource.* / env.*} attribute context assembled per decision. Registered via
  * {@code META-INF/services/com.gamma.spi.auth.AccessDecider}; dropping this jar on the classpath is

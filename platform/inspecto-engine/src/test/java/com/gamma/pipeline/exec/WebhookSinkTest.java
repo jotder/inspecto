@@ -162,7 +162,7 @@ class WebhookSinkTest {
 
     // ── refusals: each names its fix, none sends a byte ─────────────────────────
 
-    /** EDG-01: Personal ships no transport, and a webhook write says which edition it needs. */
+    /** EDG-01: Basic ships no transport, and a webhook write says which edition it needs. */
     @Test
     void withNoTransportTheWriteRefusesNamingTheEdition() {
         IllegalStateException e = assertThrows(IllegalStateException.class,

@@ -26,7 +26,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * {@code transform.mask} (catalog {@code quality.pii.mask}, SEC-08 Enterprise-only, operator 2026-10-06). Columns are
+ * {@code transform.mask} (catalog {@code quality.pii.mask}, SEC-08 Advanced-only, operator 2026-10-06). Columns are
  * chosen by the registry Dataset's classification (own + lineage, strictest-wins) or by name. The leak probes plant
  * raw values and look for them in every table the run leaves behind and in every refusal.
  */
@@ -161,7 +161,7 @@ class RowShaperMaskTest {
         assertTrue(refusals.get(3).getMessage().contains("'vault'"), refusals.get(3).getMessage());
     }
 
-    /** 🔒 SEC-08: outside Enterprise the Step refuses at run with ERR_EDITION_FEATURE, before touching a value. */
+    /** 🔒 SEC-08: outside Advanced the Step refuses at run with ERR_EDITION_FEATURE, before touching a value. */
     @Test
     void refusedOutsideEnterprise() throws Exception {
         EditionFeatures.overrideForTest(Set.of());

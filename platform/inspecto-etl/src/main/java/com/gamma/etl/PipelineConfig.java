@@ -310,7 +310,7 @@ public final class PipelineConfig {
         public static final String PROFILE = "profile";
         /** Salted one-way column hash ({@code transform.hash}). No legacy spelling — {@code steps:} only. */
         public static final String HASH = "hash";
-        /** PII masking ({@code transform.mask}) — Enterprise only (SEC-08). No legacy spelling — {@code steps:} only. */
+        /** PII masking ({@code transform.mask}) — Advanced only (SEC-08). No legacy spelling — {@code steps:} only. */
         public static final String MASK = "mask";
         /** Branch tree. Legacy spelling: the top-level {@code route:} block. */
         public static final String ROUTE = "route";

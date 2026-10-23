@@ -21,7 +21,7 @@ import java.util.Objects;
  *
  * <h3>⚠ Absent the file, NOTHING changes</h3>
  * No {@code partition.toon} ⇒ {@link #hostsEverything()} ⇒ this pod boots every Space it can see, exactly
- * as before. ⛔ That default is load-bearing: Personal and single-node Standard must never need this file,
+ * as before. ⛔ That default is load-bearing: Basic and single-node Standard must never need this file,
  * and must never behave differently for its absence.
  *
  * <h3>🔴 Why this does NOT copy {@code SchedulerSettings.read}'s fail-soft idiom</h3>
@@ -106,7 +106,7 @@ final class SpacePartition {
         return new SpacePartition(parsed, self);
     }
 
-    /** True when no map applies, so every discovered Space is hosted (Personal / single-node Standard). */
+    /** True when no map applies, so every discovered Space is hosted (Basic / single-node Standard). */
     boolean hostsEverything() {
         return assignments.isEmpty();
     }

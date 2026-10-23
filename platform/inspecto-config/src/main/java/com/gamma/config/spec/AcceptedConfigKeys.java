@@ -48,8 +48,8 @@ import java.util.TreeSet;
  * {@code caserule.evaluate} and {@code objects.analytics} — and {@code spaces/demo} commits a config using
  * the latter), <b>config-derived</b> for {@code sql.template} (the {@code $name} tokens in the authored
  * SQL <i>are</i> its parameter contract), and <b>edition-varying</b> ({@code maintenance}'s task list is
- * derived from whatever the classpath contributed, so a static table would 422 valid Enterprise configs on
- * a Personal build). ⚠ Nor could a ratchet read it: this module depends only on {@code inspecto-api}, and
+ * derived from whatever the classpath contributed, so a static table would 422 valid Advanced configs on
+ * a Basic build). ⚠ Nor could a ratchet read it: this module depends only on {@code inspecto-api}, and
  * the registry is a per-{@code JobService} runtime object, not a compile-time table.
  * ⚠ Measured 2026-09-17: <b>34 of 34</b> committed job configs carry at least one non-frame key, across 34
  * distinct param keys — a frame-only census would refuse every one of them, and a top-level-only census

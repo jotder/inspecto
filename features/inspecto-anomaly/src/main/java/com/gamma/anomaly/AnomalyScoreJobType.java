@@ -143,7 +143,7 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
      * Design §9: the live-membership test of the model's {@code exclusion} Entity List, which
      * {@link AnomalyScoreEvaluator#evaluate} applies BEFORE the entity cap, the baselines and the peer-cohort medians
      * (the caller logs the count as {@code excluded} — never silent). No {@code exclusionList} excludes nothing; one
-     * with no installed provider (Personal) or naming a list that is not a live exclusion list fails the run, before
+     * with no installed provider (Basic) or naming a list that is not a live exclusion list fails the run, before
      * anything is read or written.
      */
     static Predicate<String> exclusion(Optional<WatchListFeed> provider, Path writeRoot, AnomalyModel model,
@@ -156,7 +156,7 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
 
     /**
      * Design §9: add every {@code high} entity to the model's {@code watch} Entity List, expiring {@code ttlHours}
-     * after {@code now}. No {@code watchList} is a no-op; one with no installed provider (Personal) fails the run —
+     * after {@code now}. No {@code watchList} is a no-op; one with no installed provider (Basic) fails the run —
      * the scores are already written, and the failure says the feed did not happen.
      */
     static int feedWatchList(Optional<WatchListFeed> provider, Path writeRoot, Path dataDir, AnomalyModel model,

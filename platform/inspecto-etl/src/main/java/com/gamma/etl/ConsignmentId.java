@@ -20,7 +20,7 @@ import java.util.List;
  * (same second — the manifest clobbers) or did not (one second apart — two manifests, two registry rows,
  * and for a multi-file batch two differently-named output files that are <em>both</em> visible, i.e.
  * duplicate rows on read). ⚠ It flipped between clobber and duplication on clock alignment, and the clock
- * is host-zone. This bites <b>Standard</b>, not only Enterprise: a T4 standby taking over from a paused
+ * is host-zone. This bites <b>Standard</b>, not only Advanced: a T4 standby taking over from a paused
  * owner double-executes.
  *
  * <h3>What goes into the digest, and why exactly this (operator decision, 2026-09-12)</h3>

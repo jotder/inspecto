@@ -111,7 +111,7 @@ public final class RiskScoreJobType implements JobTypeProvider {
 
     /**
      * ASSURE-ENTITY-LISTS-1: add every {@code high} entity to the model's {@code watch} Entity List, expiring
-     * {@code ttlHours} after {@code now}. No {@code watchList} is a no-op; one with no installed provider (Personal)
+     * {@code ttlHours} after {@code now}. No {@code watchList} is a no-op; one with no installed provider (Basic)
      * fails the run. The scores are already written, and the failure says the feed did not happen.
      */
     static int feedWatchList(Path writeRoot, Path dataDir, RiskScoreModel model, String runId, Instant now,

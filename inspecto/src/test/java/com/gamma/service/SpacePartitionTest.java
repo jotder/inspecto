@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * partition map cannot be honoured.
  *
  * <p>🔴 The load-bearing case is the FIRST one: with no {@code partition.toon}, every Space boots exactly
- * as before. Personal and single-node Standard must never need this file.
+ * as before. Basic and single-node Standard must never need this file.
  */
 class SpacePartitionTest {
 

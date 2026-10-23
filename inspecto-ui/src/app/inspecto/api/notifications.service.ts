@@ -186,7 +186,7 @@ export class NotificationsService {
     /**
      * Save the caller's OWN override (PUT /notifications/preferences, self-service) — send only the cells that
      * changed, since every cell sent becomes an override; `null` resets one. Returns the effective grid. On
-     * Personal (no sign-in) this writes the single grid.
+     * Basic (no sign-in) this writes the single grid.
      */
     savePreferences(changes: PrefChange[]): Observable<NotificationPrefRow[]> {
         return this.http.put<NotificationPrefRow[]>(apiUrl('/notifications/preferences'), {

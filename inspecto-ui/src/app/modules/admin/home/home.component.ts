@@ -53,8 +53,8 @@ const CLOSED_INCIDENT = new Set(['RESOLVED', 'ARCHIVED']);
  * here; the Lens landing route (`LENS_HOME`) becomes this page's primary action rather than the root
  * target, so all three Lenses and a fresh install share one front door.
  *
- * ⛔ **Nothing here branches on the edition string.** Every difference between a Personal and an
- * Enterprise Home is driven by `SessionService`'s module flags (derived from what actually registered)
+ * ⛔ **Nothing here branches on the edition string.** Every difference between a Basic and an
+ * Advanced Home is driven by `SessionService`'s module flags (derived from what actually registered)
  * and by the subject's capabilities — the shell's standing rule
  * (`docs/okf/product/layer/product/plan-surfaces.md` §3.2). The `edition` field is inert and unread.
  *
@@ -96,7 +96,7 @@ export class HomeComponent implements OnInit {
     readonly lens = inject(LensService);
 
     // ── Identity + shell context ────────────────────────────────────────────────────────────────
-    /** Only ever a real principal: `SessionService.actor` is null on Personal and while signed out. Named by
+    /** Only ever a real principal: `SessionService.actor` is null on Basic and while signed out. Named by
      *  its display name when the session has one, else its id (R2-16 — `SessionService.actorName`). */
     readonly actorName = this.session.actorName;
     /** Only worth naming where there is more than one — in a single-Space install it is noise, and the
@@ -117,7 +117,7 @@ export class HomeComponent implements OnInit {
     readonly lensLabel = computed(() => LensService.LENSES.find((l) => l.id === this.lens.currentLens())?.label ?? '');
     readonly lensIcon = computed(() => LensService.LENSES.find((l) => l.id === this.lens.currentLens())?.icon ?? '');
 
-    /** Personal ships no authenticator and binds every interface by default, so the control plane —
+    /** Basic ships no authenticator and binds every interface by default, so the control plane —
      *  config writes included — is reachable by anyone who can reach the port (EDITIONS, the listen
      *  -address note). Shown only there, and dismissible per browser. */
     readonly showBindNotice = computed(

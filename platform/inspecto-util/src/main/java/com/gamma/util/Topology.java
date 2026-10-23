@@ -9,7 +9,7 @@ package com.gamma.util;
  * <b>silent split-brain</b>: two nodes each holding their own in-memory truth and neither aware of the other.
  * So in {@link Mode#PARTITIONED} a degradation is a <b>boot failure</b> instead. See {@link StoreHealth}.
  *
- * <p>⚠ {@code partitioned} covers Standard's two-node T4 standby as well as Enterprise's N pods — it is
+ * <p>⚠ {@code partitioned} covers Standard's two-node T4 standby as well as Advanced's N pods — it is
  * "more than one process shares this state", not "a Kubernetes cluster". D2 refused the cluster engine, and
  * D12 chose this name over {@code mode=cluster} for exactly that reason.
  *

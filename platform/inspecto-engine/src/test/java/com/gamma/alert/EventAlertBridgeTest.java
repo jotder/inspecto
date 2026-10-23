@@ -21,7 +21,7 @@ class EventAlertBridgeTest {
 
     private final AlertStore store = new InMemoryAlertStore();
 
-    /** Personal-shaped: Alert records over the store, NO operational-object module. */
+    /** Basic-shaped: Alert records over the store, NO operational-object module. */
     private AlertService service(AlertStore s) {
         return new AlertService(List.of(), null, null, AlertRecords.of(s, Optional.empty()), AlertRecords.NO_INCIDENTS);
     }

@@ -88,7 +88,7 @@ public final class UploadRoutes implements RouteModule {
         return root.resolve("audit").resolve("la-uploads").resolve("records").resolve(collector.replaceAll("[^A-Za-z0-9._-]", "_"));
     }
 
-    /** Whether the caller may act on every upload (Space administrator, or no Subject at all as on Personal). */
+    /** Whether the caller may act on every upload (Space administrator, or no Subject at all as on Basic). */
     private static boolean isAdmin(HttpExchange ex) {
         return ApiContext.subject(ex).map(s -> s.capabilities().contains("canAdminister")).orElse(true);
     }

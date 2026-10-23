@@ -21,7 +21,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * MODULE-REORG-P7: a Professional install WITHOUT inspecto-case-management - this module's own test class path has
+ * MODULE-REORG-P7: a Standard install WITHOUT inspecto-case-management - this module's own test class path has
  * {@code inspecto-ops} and not the add-on - over real HTTP. Incidents keep working and a Case object is still an
  * ordinary, inert row the generic handlers list and move through its lifecycle, while every Case-management route
  * answers 503 naming the missing module and {@code /bootstrap} reports {@code features.cases == false} next to

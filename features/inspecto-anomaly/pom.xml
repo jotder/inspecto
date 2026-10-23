@@ -16,7 +16,7 @@
 
     <name>Inspecto — Anomaly Detection (optional)</name>
     <description>
-        OPTIONAL add-on module (ANOMALY-DETECTION-1, add-on anomalyDetection, Professional and above per D-AD4): the
+        OPTIONAL add-on module (ANOMALY-DETECTION-1, add-on anomalyDetection, Standard and above per D-AD4): the
         anomaly-model component kind (AnomalyModel, validated fail closed by AnomalyKindValidator, with the reserved
         anomaly_scores_ output stores), the pure scorer (AnomalyScorer: robust z, weighted RMS, 0-100 per D-AD6) and the
         anomaly.score Job Type (AnomalyScoreJobType / AnomalyScoreEvaluator) writing anomaly_scores_{model} and _latest
@@ -28,7 +28,7 @@
         helper with inspecto-scoring through the engine (D-AD5) - it does NOT depend on inspecto-scoring. It depends on
         inspecto-entity-list for the WatchListFeed seam (watchList / exclusionList). The read and preview routes are
         AnomalyScoreRoutes (GET /anomaly-scores/{model}/{entityKey}, POST /anomaly-scores/preview). THIN: no shade.
-        Built only under the edition-standard / -enterprise / -preview profiles.
+        Built only under the edition-standard / -advanced / -preview profiles.
     </description>
 
     <dependencies>

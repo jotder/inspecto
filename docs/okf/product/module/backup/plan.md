@@ -34,7 +34,6 @@ EDITIONS `OPS-06` and `EDG-01` cell 2 ([EDITIONS](../../../../EDITIONS.md)). The
 
 - `PATH-2` residual, a LEAVE recorded in [BACKLOG](../../../../BACKLOG.md): the restore zip-slip jail is pinned by test; no further work.
 - `INGEST-RAW-SOURCE-COPIES-RETENTION-1` (BACKLOG): a raw source file inside a backup is a residual of the never-store-values decision.
-- `LA-EDITIONS-RESIDUALS-1` item (7) (BACKLOG): comments in this module still use the old edition names.
 
 ## Refused
 
