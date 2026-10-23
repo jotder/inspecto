@@ -40,7 +40,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (82 open rows
 * [Partner settlement](solution-pack/partner-settlement/index.md) - `solution-pack.partner-settlement` · 6 doc(s) · 1 open row(s)
 * [Payment fraud starter](solution-pack/payment-fraud/index.md) - `solution-pack.payment-fraud` · 5 doc(s) · 0 open row(s)
 * [Telecom bypass (SIM-box)](solution-pack/telco-bypass/index.md) - `solution-pack.telco-bypass` · 6 doc(s) · 1 open row(s)
-* [Telecom fraud](solution-pack/telco-fraud/index.md) - `solution-pack.telco-fraud` · 6 doc(s) · 4 open row(s)
+* [Telecom fraud](solution-pack/telco-fraud/index.md) - `solution-pack.telco-fraud` · 6 doc(s) · 3 open row(s)
 * [Telecom revenue assurance](solution-pack/telco-ra/index.md) - `solution-pack.telco-ra` · 5 doc(s) · 0 open row(s)
 * [Telecom re-rating (tariff validation)](solution-pack/telco-rerating/index.md) - `solution-pack.telco-rerating` · 6 doc(s) · 1 open row(s)
 
@@ -48,7 +48,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (82 open rows
 
 * [Feature modules](layer/features/index.md) - `layer.features` · 2 doc(s) · 0 open row(s)
 * [Link Analysis modules](layer/la/index.md) - `layer.la` · 2 doc(s) · 1 open row(s)
-* [Platform](layer/platform/index.md) - `layer.platform` · 40 doc(s) · 18 open row(s)
+* [Platform](layer/platform/index.md) - `layer.platform` · 40 doc(s) · 19 open row(s)
 * [Product host](layer/product/index.md) - `layer.product` · 51 doc(s) · 9 open row(s)
 * [Providers](layer/providers/index.md) - `layer.providers` · 2 doc(s) · 0 open row(s)
 * [Service contracts (SPI)](layer/spi/index.md) - `layer.spi` · 2 doc(s) · 0 open row(s)

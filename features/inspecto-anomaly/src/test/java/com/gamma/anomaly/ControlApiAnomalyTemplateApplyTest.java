@@ -38,7 +38,10 @@ class ControlApiAnomalyTemplateApplyTest {
     private final HttpClient client = HttpClient.newHttpClient();
 
     @AfterEach
-    void tearDown() { Authenticators.forTest(null); }
+    void tearDown() {
+        Authenticators.forTest(null);
+        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    }
 
     private static void copy(Path src, Path dst) throws Exception {
         try (Stream<Path> walk = Files.walk(src)) {
@@ -86,6 +89,39 @@ class ControlApiAnomalyTemplateApplyTest {
             HttpResponse<String> r = post(api.port(), "{\"id\":\"mm1\",\"template\":\"mm\"}");
             assertEquals(200, r.statusCode(), r.body());
             assertTrue(Files.isRegularFile(root.resolve("mm1/config/registry/anomaly-models/mm_wallet_activity.toon")));
+        } finally {
+            api.close();
+            spaces.close();
+            if (saved == null) System.clearProperty("assist.safety.roots");
+            else System.setProperty("assist.safety.roots", saved);
+        }
+    }
+
+    /**
+     * TELCO-FRAUD-STORY-GAPS-1 (live, 2026-10-23): the WHOLE shipped telco-fraud template was refused at create on any
+     * edition with Anomaly Detection - "template dataset 'tf_subscriber_anomaly_latest' is refused ... reserved prefix
+     * 'anomaly_scores_'" - because its dashboard-tile Dataset read the model's store under another id. The golden test
+     * runs in a module without this validator, so only a live create found it.
+     */
+    @Test
+    void theShippedTelcoFraudTemplateAppliesWithAnomalyDetectionPresent(@TempDir Path root) throws Exception {
+        copy(Path.of("..", "..", "spaces", "_templates", "telco-fraud"), root.resolve("_templates").resolve("tf"));
+        // the Standard+ features the pack's Alert Rules and Case Rule need (as TelcoFraudTemplateGoldenTest does)
+        com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH,
+                com.gamma.etl.EditionFeatures.INVESTIGATIONS));
+        Authenticators.forTest(ex -> Optional.of(new Subject("admin-1", Set.of(Roles.CAN_ADMINISTER,
+                Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_ONBOARD_CONNECTIONS,
+                Roles.CAN_MANAGE_INCIDENTS, "canWorkIncidents"))));
+        String saved = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", "");
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        try {
+            api.start();
+            assertEquals(200, post(api.port(), "{\"id\":\"first\"}").statusCode());
+            HttpResponse<String> r = post(api.port(), "{\"id\":\"tf1\",\"template\":\"tf\"}");
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(Files.isRegularFile(root.resolve("tf1/config/registry/anomaly-models/tf_subscriber_usage.toon")));
         } finally {
             api.close();
             spaces.close();

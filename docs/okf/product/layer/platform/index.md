@@ -37,6 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | Linux / macOS native licences are checked by hash, but not exercised or fully verified. | — |
 | `ASSURE-OPERABILITY-1` | P2 | feature | the generic operability half (WS-01/02/04/26, wave 4, item 4.5, of the archived plan; wave map in okf/product/layer/product/plan-assuranc… | operator |
+| `PACKAGE-DEMOAUTH-ADVANCED-1` | P3 | defect | package.ps1 -Edition Advanced -DemoAuth does not finish on a stock box (found 2026-10-23 by TELCO-FRAUD-STORY-GAPS-1). | — |
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
 | — | P2 | feature | Postgres multi-user | operator |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

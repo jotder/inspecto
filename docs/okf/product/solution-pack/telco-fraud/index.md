@@ -35,6 +35,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1` | P3 | feature | the three telco-fraud pack items that wait on a customer or a model change; nothing here is buildable today. | demand |
-| `TELCO-FRAUD-STORY-GAPS-1` | P3 | feature | the telco-fraud story has beats the template cannot run, plus small UI rough edges. | — |
 | `PACK-IRSF-WANGIRI-1` | P3 | feature | interconnect / wholesale fraud from CDRs: IRSF, Wangiri, flash-call / CLI patterns | — |
 | `TELCO-BYPASS-SIMBOX-1` | P3 | feature | bypass / SIM-box detection from CDRs | — |

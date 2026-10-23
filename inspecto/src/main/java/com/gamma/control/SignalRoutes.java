@@ -54,30 +54,45 @@ final class SignalRoutes implements RouteModule {
     /**
      * {@code GET /signals/count?type=&since=&until=} → {@code {count, datasets, capped}}: how many Signals of
      * {@code type} landed in the window, and how many DISTINCT {@code payload.dataset} values they name
-     * ({@code datasets}; 0 when the type carries none). ⚠ The type filter is applied over the ledger page
-     * (an in-store filter exists for the SIGNAL event type only), so a window holding more than
-     * {@code EventQuery.MAX_LIMIT} signals reports a LOWER BOUND and says so with {@code capped: true} — an
-     * honest floor, never a silently truncated exact figure.
+     * ({@code datasets}; 0 when the type carries none). {@code type} may list several comma-separated types
+     * (each exact or a {@code prefix.*} glob): a Dataset named by more than one of them counts ONCE — the Home
+     * tile reads {@code dataset.write,job.dataset.produced} in one call (TELCO-FRAUD-STORY-GAPS-1). ⚠ The type
+     * filter is applied over the ledger page (an in-store filter exists for the SIGNAL event type only), so a
+     * window holding more than {@code EventQuery.MAX_LIMIT} signals of ANY type reports a LOWER BOUND and says
+     * so with {@code capped: true} — an honest floor, never a silently truncated exact figure.
      */
     private Object count(ApiContext api, HttpExchange e) {
         String type = ApiContext.query(e, "type");
-        if (type == null || type.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type is required");
+        List<String> types = type == null ? List.of()
+                : java.util.Arrays.stream(type.split(",")).map(String::trim).filter(t -> !t.isEmpty()).toList();
+        if (types.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type is required");
         Long since = parseEpochMs(ApiContext.query(e, "since"), "since");
         Long until = parseEpochMs(ApiContext.query(e, "until"), "until");
         int page = com.gamma.audit.EventQuery.MAX_LIMIT;
-        List<Signal> found = Signals.query(HostContext.of(api).service().events(), type, since, until, null, null, page);
+        // the raw SIGNAL page (no type filter) — its size is what says whether the window was cut
+        List<Signal> window = Signals.query(HostContext.of(api).service().events(), null, since, until, null, null, page);
+        Map<String, Object> out = tally(window, types, page);
+        out.put("type", type);
+        return out;
+    }
+
+    /** {@code {count, datasets, capped}} over one raw Signal page; package-private so the cap is testable with a
+     *  small page (the default in-memory ledger holds fewer than {@code EventQuery.MAX_LIMIT} events). */
+    static Map<String, Object> tally(List<Signal> window, List<String> types, int page) {
+        int count = 0;
         java.util.Set<String> datasets = new java.util.HashSet<>();
-        for (Signal sig : found) {
+        for (Signal sig : window) {
+            if (types.stream().noneMatch(t -> Signals.matchesType(sig.type(), t))) continue;
+            count++;
             Object ds = sig.payload() == null ? null : sig.payload().get("dataset");
             if (ds != null && !String.valueOf(ds).isBlank()) datasets.add(String.valueOf(ds));
         }
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("type", type);
-        out.put("count", found.size());
+        out.put("count", count);
         out.put("datasets", datasets.size());
-        // capped when the underlying SIGNAL page was full — the type filter may have dropped some, so the
-        // count of THIS type is at least what we saw
-        out.put("capped", found.size() >= page);
+        // capped when the underlying SIGNAL page was full: signals of these types may lie beyond it, so the
+        // count is at least what we saw (the old test on the FILTERED size almost never fired)
+        out.put("capped", window.size() >= page);
         return out;
     }
 

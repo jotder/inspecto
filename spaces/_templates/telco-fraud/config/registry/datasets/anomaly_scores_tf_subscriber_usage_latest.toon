@@ -1,4 +1,4 @@
-name: tf_subscriber_anomaly_latest
+name: anomaly_scores_tf_subscriber_usage_latest
 physicalRef: anomaly_scores_tf_subscriber_usage_latest
 columns[5]{name,type,classification}:
   entity_key,string,MSISDN
