@@ -11,7 +11,8 @@
 // The result is held against tools/jlink-modules.lock (per edition) — `--write-lock` refreshes it.
 //
 // Modes
-//   --edition <e> --staged-dir <dir> [--emit]          compute, print, compare to the lock (exit 1 on mismatch)
+//   --edition <e> --staged-dir <dir> [--demo] [--emit]  compute, print, compare to the lock (exit 1 on mismatch)
+//                                                      --demo: the -DemoAuth bundle (the OIDC trio swapped for inspecto-demo-auth.jar)
 //   --edition <e> --staged-dir <dir> --write-lock      rewrite that edition's lock section
 //   --check                                            no jars needed: a well-formed section for EVERY edition,
 //                                                      extra.txt names are real JDK modules
@@ -21,7 +22,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { bundleModules, coreModules, EDITIONS } from './bundle-modules.mjs';
+import { bundleModules, coreModules, EDITIONS, DEMO_JAR, DEMO_REPLACES } from './bundle-modules.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const LOCK_FILE = join(HERE, 'jlink-modules.lock');
@@ -102,14 +103,20 @@ export function missingSections(lock) {
     return EDITIONS.filter((e) => !lock[e]).map((e) => `no [${e}] section — package that edition and run --write-lock`);
 }
 
-/** The jar file names an edition's bundle must stage (first-party: the edition's modules + the core thin jars, P3d stage 2); PG sidecar is scanned when present. */
-export function expectedJars(edition) {
-    return [...bundleModules(edition), ...coreModules()].map((m) => m.bundleFile);
+/**
+ * The jar file names an edition's bundle must stage (first-party: the edition's modules + the core thin jars, P3d stage 2); the PG
+ * sidecar is scanned when present. `demo`: the -DemoAuth bundle follows what package.ps1 really stages - the OIDC, secrets and
+ * geo-country jars are removed and inspecto-demo-auth.jar takes their place (PACKAGE-DEMOAUTH-ADVANCED-1).
+ */
+export function expectedJars(edition, { demo = false } = {}) {
+    const mods = [...bundleModules(edition), ...coreModules()];
+    if (!demo) return mods.map((m) => m.bundleFile);
+    return [...mods.filter((m) => !DEMO_REPLACES.includes(m.artifactId)).map((m) => m.bundleFile), DEMO_JAR];
 }
 
 /** Throws when a jar the edition should stage is absent: --ignore-missing-deps would hide it. */
-export function requireJars(edition, present) {
-    const missing = expectedJars(edition).filter((j) => !present.includes(j));
+export function requireJars(edition, present, { demo = false } = {}) {
+    const missing = expectedJars(edition, { demo }).filter((j) => !present.includes(j));
     if (missing.length) throw new Error(`staged dir lacks ${missing.length} expected jar(s) for ${edition}: ${missing.join(', ')} — jdeps would under-report`);
 }
 
@@ -134,9 +141,9 @@ export function runJdeps(jars, tool = javaTool('jdeps')) {
     return parseJdepsOutput(r.stdout);
 }
 
-export function computeSet({ edition, stagedDir, jdeps = runJdeps, extraText }) {
+export function computeSet({ edition, stagedDir, jdeps = runJdeps, extraText, demo = false }) {
     const present = readdirSync(stagedDir).filter((f) => f.endsWith('.jar'));
-    requireJars(edition, present);
+    requireJars(edition, present, { demo });
     const jars = present.sort().map((f) => join(stagedDir, f));
     const fromJdeps = jdeps(jars);
     const extra = parseExtra(extraText).map((e) => e.module);
@@ -159,8 +166,8 @@ export function main(argv) {
     }
     const edition = arg(argv, '--edition');
     const stagedDir = arg(argv, '--staged-dir');
-    if (!EDITIONS.includes(edition) || !stagedDir) { console.error('usage: --edition <Basic|Standard|Advanced|Preview> --staged-dir <dir> [--write-lock|--emit]  |  --check'); return 2; }
-    const r = computeSet({ edition, stagedDir, extraText });
+    if (!EDITIONS.includes(edition) || !stagedDir) { console.error('usage: --edition <Basic|Standard|Advanced|Preview> --staged-dir <dir> [--demo] [--write-lock|--emit]  |  --check'); return 2; }
+    const r = computeSet({ edition, stagedDir, extraText, demo: argv.includes('--demo') });
     console.log(`jdeps over ${r.jars.length} jars: ${r.jdeps.join(',')}`);
     console.log(`extra (hand, with WHY): ${r.extra.join(',')}`);
     console.log(`computed set (${r.all.length}): ${r.all.join(',')}`);

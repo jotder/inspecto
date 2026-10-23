@@ -22,7 +22,8 @@
 # inspecto-oidc.jar; modules.list puts it on the classpath and edition.properties makes serve.sh/serve.bat
 # turn on -Dauth.mode=oidc. Standard/Advanced also bundle the PostgreSQL JDBC driver as
 # postgresql.jar (PG-1) — listed in modules.list, inert until -Dinspecto.db=postgres; the fat
-# JAR stays driver-free. (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle).
+# JAR stays driver-free. The driver is read from Maven's real local repository (tools/maven-repo.mjs) and is REQUIRED only by a
+# bundle that carries inspecto-la-store-pg (Advanced, Preview - not -DemoAuth); Standard and the demo build skip it when absent. (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle).
 # The embedded jlink runtime's module set (below) is VERIFIED sufficient for inspecto-oidc too
 # (PKG-4, 2026-07-07): jdeps on inspecto-oidc.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
 # java.base/java.sql/java.net.http/jdk.httpserver, and RS256/ES256 resolve via SunRsaSign/SunEC
@@ -234,6 +235,12 @@ if ($DemoAuth) {
     # LA-EDITIONS-1 ED-3: Preview is "everything with demo sign-in", so it takes -DemoAuth as Advanced does.
     if ($Edition -ne 'Advanced' -and $Edition -ne 'Preview') { throw "-DemoAuth builds an Advanced-capability demo; pass -Edition Advanced or -Edition Preview (got '$Edition')." }
     $bundleDir = Join-Path $sandboxRoot 'inspecto-demo'
+    # PACKAGE-DEMOAUTH-ADVANCED-1: -NoBuild builds nothing, and the demo-auth jar is built by the demo step (a module no edition
+    # carries) - so say so up front, before any staging, instead of dying on a missing directory at the end of the staging steps.
+    if ($NoBuild -and -not (Get-ChildItem (Join-Path $sandboxRoot 'providers\inspecto-demo-auth\target') -Filter 'inspecto-demo-auth-*.jar' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch '(sources|javadoc|tests)\.jar$' })) {
+        throw "-DemoAuth -NoBuild: providers\inspecto-demo-auth\target holds no inspecto-demo-auth jar. Build it first (mvn package -pl :inspecto-demo-auth -am -DskipTests) or drop -NoBuild."
+    }
 }
 
 # MODULE-REORG-1 P3a: ONE build id for every jar of this bundle - the git short sha, stamped into each jar's manifest
@@ -1177,15 +1184,25 @@ if ($SignJars) {
 # the driver rides the bundle as postgresql.jar, auto-detected by serve.sh/serve.bat exactly like
 # inspecto-oidc.jar. Basic ships DuckDB only — OperationalDb.verifySelectable fails a
 # -Dinspecto.db=postgres boot there, naming this sidecar as the thing to drop in.
+# PACKAGE-DEMOAUTH-ADVANCED-1 (operator 2026-10-23: the next release ships WITHOUT Postgres): the driver is looked up in Maven's REAL local
+# repository (tools/maven-repo.mjs: $env:M2_REPO, else <localRepository> in ~/.m2/settings.xml, else ~/.m2/repository - never assumed
+# to be %USERPROFILE%\.m2) and is REQUIRED only by a bundle that carries a Postgres module (tools/bundle-modules.mjs
+# needsPostgresDriver: inspecto-la-store-pg, i.e. Advanced and Preview, not the -DemoAuth build). Everywhere else it rides along when
+# the repository holds it and is skipped with a note when not - Basic, Standard and the demo bundle package without it.
 if ($Edition -ne 'Basic') {
     $pgVersion = ([xml](Get-Content (Join-Path $sandboxRoot 'pom.xml'))).project.properties.'postgresql.version'
     if (-not $pgVersion) { throw "postgresql.version not found in the parent pom — cannot bundle the driver" }
-    $pgJar = Join-Path $env:USERPROFILE ".m2\repository\org\postgresql\postgresql\$pgVersion\postgresql-$pgVersion.jar"
-    if (-not (Test-Path $pgJar)) {
-        throw "PostgreSQL driver $pgVersion not in the local Maven repo ($pgJar). Run a build once (it is a test-scope dependency) or fetch it, then re-package."
+    $pgArgs = @('--edition', $Edition, '--needs-pg'); if ($DemoAuth) { $pgArgs += '--demo' }
+    $pgNeeded = ((& node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') @pgArgs) -join '').Trim() -eq 'yes'
+    $pgJar = ((& node (Join-Path $sandboxRoot 'tools\maven-repo.mjs') --pg-driver $pgVersion) | Select-Object -First 1)
+    if (Test-Path -LiteralPath $pgJar) {
+        Copy-Item $pgJar "$bundleDir\postgresql.jar"
+        Write-Host "Bundled PostgreSQL JDBC driver $pgVersion → postgresql.jar" -ForegroundColor Green
+    } elseif ($pgNeeded) {
+        throw "$Edition bundle carries a PostgreSQL module (inspecto-la-store-pg) but the PostgreSQL driver $pgVersion is not in the local Maven repository ($pgJar). Run a build once (inspecto-connectors depends on it) or fetch it (mvn -o dependency:get -Dartifact=org.postgresql:postgresql:$pgVersion), or point M2_REPO at the repository that holds it, then re-package."
+    } else {
+        Write-Host "PostgreSQL JDBC driver $pgVersion not in the local Maven repository ($pgJar) - NOT bundled; this bundle carries no Postgres module, so nothing needs it." -ForegroundColor Yellow
     }
-    Copy-Item $pgJar "$bundleDir\postgresql.jar"
-    Write-Host "Bundled PostgreSQL JDBC driver $pgVersion → postgresql.jar" -ForegroundColor Green
 }
 
 # ── step 3a-bis: SBOM per PACKAGED BUNDLE — CycloneDX + SPDX from ONE resolution (COMPLY-1, matrix G1) ──
@@ -1213,7 +1230,7 @@ if ($DemoAuth) {
         if ($LASTEXITCODE -ne 0) { throw "mvn build of inspecto-demo-auth failed" }
         Pop-Location
     }
-    $demoJar = Get-ChildItem (Join-Path $sandboxRoot 'providers\inspecto-demo-auth\target') -Filter 'inspecto-demo-auth-*.jar' |
+    $demoJar = Get-ChildItem (Join-Path $sandboxRoot 'providers\inspecto-demo-auth\target') -Filter 'inspecto-demo-auth-*.jar' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notmatch '(sources|javadoc|tests)\.jar$' } | Select-Object -First 1
     if (-not $demoJar) { throw "no inspecto-demo-auth jar under providers\inspecto-demo-auth\target - build it first or drop -NoBuild" }
     Remove-Item (Join-Path $bundleDir 'inspecto-oidc.jar') -ErrorAction SilentlyContinue
@@ -2119,7 +2136,10 @@ if (-not $NoRuntime) {
     # for Basic the hand list was the incomplete one (it lacked java.security.jgss and jdk.jfr). FAIL CLOSED: a
     # lock mismatch, a missing lock section or no set at all stops the package instead of linking a guessed runtime.
     # An intended change: re-run with --write-lock (see the tool's header) and commit the lock.
-    $derivedOut = & node (Join-Path $sandboxRoot 'tools\jlink-modules.mjs') --edition $Edition --staged-dir $bundleDir --emit 2>&1
+    # PACKAGE-DEMOAUTH-ADVANCED-1: a -DemoAuth bundle stages inspecto-demo-auth.jar where the OIDC trio was; --demo makes the tool expect
+    # (and derive from) exactly that, instead of demanding jars the demo step removed.
+    $jlinkArgs = @('--edition', $Edition, '--staged-dir', $bundleDir, '--emit'); if ($DemoAuth) { $jlinkArgs += '--demo' }
+    $derivedOut = & node (Join-Path $sandboxRoot 'tools\jlink-modules.mjs') @jlinkArgs 2>&1
     $derivedExit = $LASTEXITCODE
     $derivedOut | ForEach-Object { Write-Host "  [jlink-modules] $_" -ForegroundColor DarkGray }
     $derivedLine = $derivedOut | Where-Object { "$_" -like 'JLINK_MODULES=*' } | Select-Object -Last 1

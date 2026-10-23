@@ -32,7 +32,7 @@
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EDITIONS, PG_SIDECAR, bundleModules, editionOnlyModules, coreModules } from './bundle-modules.mjs';
+import { EDITIONS, PG_SIDECAR, DEMO_JAR, DEMO_REPLACES, bundleModules, editionOnlyModules, coreModules, needsPostgresDriver } from './bundle-modules.mjs';
 import { gather, idOf } from './check-offerings.mjs';
 
 /** The marker file name and the list file name the launchers read (inspecto/package.ps1 here-strings). */
@@ -41,9 +41,8 @@ export const EDITION_FILE = 'edition.properties';
 /** P3d stage 2: the product jar + the core thin jars ONLY (no optional module, no sidecar) - for the one-shot tools (ura.*, the examples), which never carried the optional modules. */
 export const CORE_LIST = 'core.list';
 
-/** The demo build's replacement jar (the build-time check lives in package.ps1's `if ($DemoAuth)` block). */
-export const DEMO_JAR = 'inspecto-demo-auth.jar';
-const DEMO_REPLACES = ['inspecto-oidc', 'inspecto-secrets', 'inspecto-geo-country'];
+/** The demo build's replacement jar (the build-time check lives in package.ps1's `if ($DemoAuth)` block); defined in bundle-modules.mjs. */
+export { DEMO_JAR };
 
 /** artifactId -> classpath position. Every shipped module must appear exactly once; the third-party driver follows. */
 export const CLASSPATH_ORDER = [
@@ -136,6 +135,14 @@ export const coreList = () => coreModules().map((m) => `${m.artifactId}\t${m.dir
 /** The core-only classpath: inspecto.jar then the core thin jars (CORE_MODULES order). */
 export const coreClasspath = () => ['inspecto.jar', ...coreModules().map((m) => m.bundleFile)];
 
+/**
+ * The classpath for a STAGED bundle: the sidecar `postgresql.jar` is optional on a bundle that needs no driver (needsPostgresDriver), so
+ * it leaves the list when package.ps1 did not stage it; a bundle that needs it keeps it, and verifyBundle then names the missing jar.
+ */
+export function stagedClasspath(jars, dir, needsPg) {
+    return needsPg || existsSync(join(dir, PG_SIDECAR)) ? jars : jars.filter((j) => j !== PG_SIDECAR);
+}
+
 /** modules.list text: one jar per line, LF. */
 export const renderList = (jars) => jars.join('\n') + '\n';
 /** edition.properties text. */
@@ -159,9 +166,11 @@ function main() {
         const demo = a.includes('--demo');
         const g = gather(join(dirname(fileURLToPath(import.meta.url)), '..'));
         if (a.includes('--list-mvn')) { process.stdout.write(mvnModules(edition, g) + '\n'); return; }
-        const jars = classpath(edition, { demo, g });
+        if (a.includes('--needs-pg')) { process.stdout.write(needsPostgresDriver(normalizeEdition(edition), { demo }) ? 'yes\n' : 'no\n'); return; }
+        let jars = classpath(edition, { demo, g });
         const bundle = val('--bundle');
         if (bundle) {
+            jars = stagedClasspath(jars, bundle, needsPostgresDriver(normalizeEdition(edition), { demo }));
             const problems = verifyBundle(jars, bundle);
             if (problems.length) throw new Error(`the staged bundle and the Offering classpath disagree:\n  ${problems.join('\n  ')}`);
             writeFileSync(join(bundle, MODULES_LIST), renderList(jars));

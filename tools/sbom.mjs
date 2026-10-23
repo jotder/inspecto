@@ -30,7 +30,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
+import { m2Repo } from './maven-repo.mjs';
 import { bundleModules, coreModules, editionProfile, EDITIONS, PG_SIDECAR } from './bundle-modules.mjs';
 import { cdxComponent, generatePerModule } from './sbom-modules.mjs';
 
@@ -68,17 +68,9 @@ const SHIPPED = Object.fromEntries(modules.map((m) => [m.artifactId, m.bundleFil
 const plModules = modules.map((m) => m.dir);
 const profile = editionProfile(edition);
 
-// The local repository Maven itself uses: M2_REPO, else <localRepository> in ~/.m2/settings.xml (a moved repo, e.g.
-// C:/.m2/repository, left every artifact unresolved and failed the SBOM with "no hash"), else ~/.m2/repository.
-function m2Repo() {
-    if (process.env.M2_REPO) return process.env.M2_REPO;
-    const settings = join(homedir(), '.m2', 'settings.xml');
-    if (existsSync(settings)) {
-        const m = readFileSync(settings, 'utf8').match(/<localRepository>\s*([^<]+?)\s*<\/localRepository>/);
-        if (m && !m[1].includes('${')) return m[1];
-    }
-    return join(homedir(), '.m2', 'repository');
-}
+// The local repository Maven itself uses (M2_REPO, else <localRepository> in ~/.m2/settings.xml - a moved repo, e.g.
+// C:/.m2/repository, left every artifact unresolved and failed the SBOM with "no hash" - else ~/.m2/repository):
+// tools/maven-repo.mjs, shared with package.ps1 (PACKAGE-DEMOAUTH-ADVANCED-1).
 const M2 = m2Repo();
 const rootPom = readFileSync(join(repoRoot, 'pom.xml'), 'utf8');
 const projectVersion =

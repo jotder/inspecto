@@ -375,7 +375,7 @@ jobs:
       # jlink lock guard (MODULE-REORG-P3-THIN-JARS): the derived runtime module set is the ONLY source package.ps1
       # uses, so every edition must have a well-formed lock section. No build; the JDK-name check is skipped without a JDK.
       - name: Guard — jlink module lock covers every edition
-        run: node tools/jlink-modules.mjs --check && node --test tools/jlink-modules.test.mjs
+        run: node tools/jlink-modules.mjs --check && node --test tools/jlink-modules.test.mjs tools/maven-repo.test.mjs
 
       # Offerings matrix guard (MODULE-REORG-1 P6b): docs/EDITIONS.md's offerings-matrix block (modules x editions, add-ons,
       # deployment posture, jar counts) is GENERATED from offerings/*.toon + manifests + bundle-modules.mjs. No build needed.

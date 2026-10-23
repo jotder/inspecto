@@ -64,3 +64,31 @@ test('computeSet unions jdeps with extra and enforces jars', () => {
     const r = computeSet({ edition: 'Basic', stagedDir: dir, jdeps: () => ['java.base', 'java.sql'], extraText: 'jdk.zipfs # why\n' });
     assert.deepEqual(r.all, ['java.base', 'java.sql', 'jdk.zipfs']);
 });
+
+// ── PACKAGE-DEMOAUTH-ADVANCED-1: the demo bundle's module set follows the bundle it really stages ─────────────────────────────
+import { DEMO_JAR, DEMO_REPLACES } from './bundle-modules.mjs';
+
+test('demo: the OIDC trio is no longer expected, inspecto-demo-auth.jar is', () => {
+    const plain = expectedJars('Advanced');
+    const demo = expectedJars('Advanced', { demo: true });
+    for (const a of DEMO_REPLACES) assert.ok(plain.includes(`${a}.jar`) && !demo.includes(`${a}.jar`), a);
+    assert.ok(demo.includes(DEMO_JAR) && !plain.includes(DEMO_JAR));
+    assert.equal(demo.length, plain.length - DEMO_REPLACES.length + 1);
+});
+
+test('demo: requireJars accepts exactly the swapped set and still fails closed on a missing jar', () => {
+    const demo = expectedJars('Advanced', { demo: true });
+    assert.doesNotThrow(() => requireJars('Advanced', demo, { demo: true }));
+    assert.throws(() => requireJars('Advanced', expectedJars('Advanced'), { demo: true }), new RegExp(DEMO_JAR.replace(/\./g, '\.')));
+    assert.throws(() => requireJars('Advanced', demo.slice(1), { demo: true }), /would under-report/);
+    // the old behaviour (the bug): a demo staged dir judged against the non-demo set lacks the three removed jars
+    assert.throws(() => requireJars('Advanced', demo), /lacks 3 expected jar\(s\)/);
+});
+
+test('demo: computeSet over a demo staged dir works with demo=true (and fails without it)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jlink-demo-'));
+    for (const j of expectedJars('Advanced', { demo: true })) writeFileSync(join(dir, j), '');
+    const r = computeSet({ edition: 'Advanced', stagedDir: dir, jdeps: () => ['java.base'], extraText: '', demo: true });
+    assert.deepEqual(r.all, ['java.base']);
+    assert.throws(() => computeSet({ edition: 'Advanced', stagedDir: dir, jdeps: () => [], extraText: '' }), /lacks 3 expected jar/);
+});
