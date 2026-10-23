@@ -38,14 +38,14 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | Linux / macOS native licences are checked by hash, but not exercised or fully verified. | — |
 | `ASSURE-OPERABILITY-1` | P2 | feature | the generic operability half (WS-01/02/04/26, wave 4, item 4.5, of the archived plan; wave map in okf/product/layer/product/plan-assuranc… | operator |
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
-| — | P2 | feature | Postgres multi-user | — |
-| `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | Two test groups cannot run on the shared User profile, so a green reactor does not cover them. | — |
+| — | P2 | feature | Postgres multi-user | operator |
+| `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `DUCKDB-2-DECIMAL-WIDENING-AUDIT-1` | P3 | chore | DuckDB 2.0 widens DECIMAL(18,4) ± DECIMAL(18,4) to DECIMAL(19,4) (1.5 capped at 18); only partner-settlement is pinned. | — |
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Decisioning add-on | — |
 | `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
-| `SCALEOUT-HELM-NPOD-1` | P2 | feature | The only Helm chart is a replicas-1 StatefulSet; there is no N-pod topology, no ingress template, no per-pod Space assignment. | operator |
+| `SCALEOUT-HELM-NPOD-1` | P2 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | D14 and D16 SIGNED yes 2026-10-20 (operator, accepted the recommended answer); D15 stays open (operator-signed 2026-10-18 per the index,… | operator |
-| `SCALEOUT-LIVE-HALVES-1` | P3 | chore | The live halves of spike S5 (pg_duckdb view queried from psql) and of an end-to-end S1 run across N processes are still owed; D13 has no… | — |
+| `SCALEOUT-LIVE-HALVES-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `MODULE-REORG-P4-3` | P3 | feature | a disabled module's in-flight work and long-lived subscriptions (the only P4 residue). | — |
 | `MODULE-REORG-P3-THIN-JARS` | P3 | feature | thin per-module jars + Offering-driven launcher classpath. | — |
 | `CODEGRAPH-AFFECTED-UNUSABLE-1` | P3 | chore | codegraph affected over-reports to uselessness; only the upstream defect is open. | external |
