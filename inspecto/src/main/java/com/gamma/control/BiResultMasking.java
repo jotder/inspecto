@@ -389,11 +389,18 @@ final class BiResultMasking {
         if (!engaged()) return r;
         Set<String> bareNames = null;
         if (boundQuery != null) {
-            bareNames = bareKeyNames(selectNode(boundQuery));
-            Set<String> g = new HashSet<>();
-            for (String s : grantable) g.add(s.trim().toLowerCase(Locale.ROOT));
-            bareNames.retainAll(g);
-            if (boundTraced(boundQuery)) dimensions = new ArrayList<>(g);   // judged like a structured spec (boundKeys added below)
+            // The traced rule needs a known lineage and a traced text. Otherwise every column is withheld and nothing keeps the
+            // alias: DuckDB renames repeated names (k, k_1, k_1_1), so a name granted from an untraced text could be a chosen value,
+            // and with an unknown lineage a grain bucket would escape the name rule.
+            boolean traced = boundTraced(boundQuery) && !unknown;
+            bareNames = new HashSet<>();
+            if (traced) {
+                Set<String> g = new HashSet<>();
+                for (String s : grantable) g.add(s.trim().toLowerCase(Locale.ROOT));
+                bareNames = bareKeyNames(selectNode(boundQuery));
+                bareNames.retainAll(g);
+                dimensions = new ArrayList<>(g);   // judged like a structured spec (boundKeys added below)
+            }
         } else boundKeys = Set.of();
         JsonNode tree = dimensions == null ? selectNode(sqlText) : null;
         // COLUMNS('msi.*') names the key by pattern, so the text need not spell it

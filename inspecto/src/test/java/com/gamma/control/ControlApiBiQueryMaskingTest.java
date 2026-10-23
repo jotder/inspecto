@@ -381,6 +381,20 @@ class ControlApiBiQueryMaskingTest {
                     + "\"filters\":[{\"field\":\"region\",\"op\":\"like\",\"value\":\"4417009001%\"}]";
             assertEquals(422, bi(c, "viewer", "declared_ds", probe).statusCode());
             assertEquals(200, bi(c, "revealer", "declared_ds", probe).statusCode());
+
+            // A grain bucket of a date over that untraceable lineage is not shown raw through a bound Widget either.
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("dob_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('" + A + "', DATE '1980-01-15'), ('" + B + "', DATE '1980-01-20')) AS t(msisdn, dob)",
+                    "2026-07-08T00:00:00Z"));
+            reg.write("dataset", "sib2_ds", Map.of("physicalRef", "dob_view",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+            reg.write("dataset", "un_ds", Map.of("view", "dob_view"));
+            reg.write("query", "un_q", Map.of("type", "sql", "datasetId", "un_ds", "text", "SELECT * FROM un_ds"));
+            JsonNode grain = V1Body.of(bi(c, "viewer", "un_ds", "\"query\":\"un_q\",\"measures\":[{\"agg\":\"count\"}],"
+                    + "\"groupBy\":[\"dob\"],\"grains\":{\"dob\":\"month\"}").body());
+            assertFalse(grain.get("rows").isEmpty(), grain.toString());
+            assertTrue(column(grain.get("rows"), "dob").stream().allMatch(s -> s.startsWith("masked:")),
+                    "an untraceable lineage withholds the grain bucket: " + grain.get("rows"));
         }
     }
 
@@ -624,7 +638,10 @@ class ControlApiBiQueryMaskingTest {
                     "dup2_q", new String[]{"SELECT *, msisdn AS region FROM calls_ds", "region_1"},
                     "dup3_q", new String[]{"SELECT region AS k, msisdn AS k FROM calls_ds", "k_1"},
                     "dup4_q", new String[]{"SELECT msisdn AS k, '" + A + "' AS k, msisdn AS k_1 FROM calls_ds", "k_1_1"},
-                    "dup5_q", new String[]{"SELECT true, msisdn AS \"true\", region FROM calls_ds", "true_1"});
+                    "dup5_q", new String[]{"SELECT true, msisdn AS \"true\", region FROM calls_ds", "true_1"},
+                    // DuckDB renames the 2nd k to k_1 and the author's own k_1 to k_1_1: the typed constant lands on k_1
+                    "dup6_q", new String[]{"SELECT msisdn AS k, '" + B + "' AS k, msisdn AS k_1 FROM calls_ds", "k_1"},
+                    "dup7_q", new String[]{"SELECT substr(msisdn, 1, 1) AS d, substr(msisdn, 1, 1) AS d, msisdn AS d_1 FROM calls_ds", "d_1"});
             for (Map.Entry<String, String[]> e : dedup.entrySet()) {
                 reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()[0]));
                 HttpResponse<String> r = bi(c, "viewer", "calls_ds", "\"query\":\"" + e.getKey()
