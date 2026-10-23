@@ -117,7 +117,7 @@ class ColumnProfileGoldenTest {
         assertEquals(List.of(
                 "id rows=5 nonNull=5 nulls=0 distinct=5",
                 "msisdn rows=5 nonNull=4 nulls=1 distinct=3",
-                "day rows=5 nonNull=4 nulls=1 distinct=2",          // approximate: the sketch merges two of the 3 dates
+                "day rows=5 nonNull=4 nulls=1 distinct=3",          // approximate; DuckDB 1.5's sketch merged two of the 3 dates, 2.0's does not
                 "amount rows=5 nonNull=4 nulls=1 distinct=3"), figures("SELECT * FROM src", ColumnProfile.AS_VARCHAR));
     }
 
@@ -126,7 +126,7 @@ class ColumnProfileGoldenTest {
         assertEquals(List.of(
                 "id rows=5 nonNull=5 nulls=0 distinct=5",
                 "msisdn rows=5 nonNull=4 nulls=1 distinct=2",
-                "day rows=5 nonNull=4 nulls=1 distinct=2",          // approximate: the sketch merges two of the 3 dates
+                "day rows=5 nonNull=4 nulls=1 distinct=3",          // approximate; DuckDB 1.5's sketch merged two of the 3 dates, 2.0's does not
                 "amount rows=5 nonNull=4 nulls=1 distinct=3"), figures("SELECT * FROM src", KEY));
     }
 

@@ -204,16 +204,23 @@ class PartitionWriterLayoutSpikeTest {
     }
 
     /**
-     * File size cannot be capped by the COPY itself in a partitioned write: DuckDB (the pinned duckdb_jdbc) rejects
-     * FILE_SIZE_BYTES together with PARTITION_BY. So the 128-512 MB target is met by the BUCKET COUNT (bytes / target),
-     * not by a size option. Version-pinned: if a DuckDB upgrade lifts this, this test fails and the finding is stale.
+     * DuckDB 1.5 rejected FILE_SIZE_BYTES together with PARTITION_BY, so the 128-512 MB target is met by the BUCKET
+     * COUNT (bytes / target), not by a size option. DuckDB 2.0 ({@code DUCKDB-2-MIGRATION-1}) LIFTS that: the COPY
+     * accepts both and splits a partition into several files. Pinned so the writer's design can be revisited
+     * deliberately — the bucket-count rule is unchanged until it is. Version-pinned: fails if the option is refused again.
      */
     @Test
-    void fileSizeBytesCannotBeCombinedWithPartitionBy(@TempDir Path tmp) throws Exception {
+    void fileSizeBytesCombinesWithPartitionByOnDuckDb2(@TempDir Path tmp) throws Exception {
         try (Connection c = open(); Statement s = c.createStatement()) {
             corpus(s, 20_000, 500);
-            var e = assertThrows(java.sql.SQLException.class, () -> sortedCopy(s, tmp.resolve("split"), 2_000, ", FILE_SIZE_BYTES '100KB'"));
-            assertTrue(e.getMessage().contains("FILE_SIZE_BYTES and PARTITION_BY"), e.getMessage());
+            sortedCopy(s, tmp.resolve("split"), 2_000, ", FILE_SIZE_BYTES '1KB'");   // below one row group: every row group rotates the file
+            List<Path> files;
+            try (var walk = Files.walk(tmp.resolve("split"))) {
+                files = walk.filter(p -> p.toString().endsWith(".parquet")).toList();
+            }
+            long dirs = files.stream().map(Path::getParent).distinct().count();
+            assertTrue(files.size() > dirs, "FILE_SIZE_BYTES splits at least one partition into several files: "
+                    + files.size() + " files in " + dirs + " partitions");
         }
     }
 

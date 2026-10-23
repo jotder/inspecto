@@ -27,7 +27,8 @@ import java.util.regex.Pattern;
  *
  * <p>{@link #scrub} does not look for the value — it cannot know it. It strips every QUOTED literal ({@code '…'} and
  * {@code "…"}, SQL-doubled quotes included), any line a caret ({@code ^}) line points at (an unquoted echo, as
- * {@code strptime} gives) and the tail of DuckDB's CSV {@code Original Line:} context generically,
+ * {@code strptime} gives), the tail of DuckDB's CSV {@code Original Line:} context and DuckDB 2.0's
+ * {@code LINE n:} source echo generically,
  * so any engine error shape that quotes the cell or echoes the line is covered. ⚠ The cost is that a quoted
  * identifier in an error (a column name in {@code "…"}) is fingerprinted too; unquoted context survives.
  */
@@ -49,6 +50,9 @@ public final class FailureText {
                     + "(convert|parse|cast)");
     private static final Pattern CARET_ECHO =Pattern.compile("(?m)^([^\\n]*)(\\r?\\n[ \\t]*\\^[ \\t]*)$");
     private static final Pattern ORIGINAL_LINE =Pattern.compile("(?im)(original line\\s*:)[^\\n]*");
+    /** DuckDB 2.0's source echo under a runtime error ({@code LINE 1: SELECT … ('it''s SECRET…}): cut off at a fixed
+     *  width, so a literal in it can lose its closing quote and slip past {@link #QUOTED}. The whole line goes. */
+    private static final Pattern SOURCE_ECHO =Pattern.compile("(?m)^(LINE \\d+:)[^\\n]*");
 
     private static final Map<Path, byte[]> SALTS = new ConcurrentHashMap<>();
 
@@ -81,6 +85,13 @@ public final class FailureText {
             ol.appendReplacement(sb, Matcher.quoteReplacement(ol.group(1) + " <" + fp(salt, line) + ">"));
         }
         ol.appendTail(sb);
+        Matcher se = SOURCE_ECHO.matcher(sb.toString());
+        sb = new StringBuilder();
+        while (se.find()) {
+            String line = se.group().substring(se.end(1) - se.start()).trim();
+            se.appendReplacement(sb, Matcher.quoteReplacement(se.group(1) + " <" + fp(salt, line) + ">"));
+        }
+        se.appendTail(sb);
         // An UNQUOTED echo of the value, pointed at by a caret line under it (strptime: "SECRETVAL\n^").
         Matcher ca = CARET_ECHO.matcher(sb.toString());
         sb = new StringBuilder();

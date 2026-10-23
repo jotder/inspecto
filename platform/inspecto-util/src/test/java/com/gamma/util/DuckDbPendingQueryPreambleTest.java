@@ -26,8 +26,14 @@ class DuckDbPendingQueryPreambleTest {
             failure = assertThrows(SQLException.class,
                     () -> st.execute("CREATE TABLE u AS SELECT * FROM t WHERE EVENT_TS IS NOT NULL"));
         }
-        assertTrue(failure.getMessage().startsWith(DuckDbUtil.PENDING_QUERY_PREAMBLE),
-                "the driver no longer writes the preamble this seam strips: " + failure.getMessage());
+        // DuckDB 2.0 (DUCKDB-2-MIGRATION-1): the driver no longer writes the pending-query preamble, so the
+        // message already starts with the error itself; the strip stays as a sanitiser and must keep it intact.
+        assertFalse(failure.getMessage().contains(DuckDbUtil.PENDING_QUERY_PREAMBLE),
+                "the driver writes the preamble again - re-check every caller of the strip: " + failure.getMessage());
+        assertTrue(failure.getMessage().startsWith("Binder Error: "), failure.getMessage());
+        assertEquals("Binder Error: y",
+                DuckDbUtil.withoutPendingQueryPreamble(DuckDbUtil.PENDING_QUERY_PREAMBLE + "Binder Error: y"),
+                "a preamble, should one appear, is still stripped");
 
         String stripped = DuckDbUtil.withoutPendingQueryPreamble("test run failed: " + failure.getMessage());
         assertTrue(stripped.startsWith("test run failed: Binder Error: "), stripped);
