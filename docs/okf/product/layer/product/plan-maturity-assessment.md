@@ -247,9 +247,9 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Server-side Measures: `MeasureCompiler` with window, recency and ratio Measures, plus 4 test classes (`platform/inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`). The plan's "no server Measure entity" line is stale.
   - Analytics Kernel: Musts M1–M10, Shoulds S1–S8 and Coulds C1–C6, C8 and C9 are built, among them forecasting with backtest, k-means, logistic regression, isolation forest, change-point and cohort/funnel (`module/analytics/plan.md`). 41 unit test classes. A CI duplication ratchet guards it (`tools/check-data-ops-duplication.mjs`).
   - BI publication: the `publish.postgres` Job (`PostgresPublishJobType.java`) does full or partition-incremental refresh into Postgres for an external BI tool (EDITIONS JOB-06).
-  - Masking on BI results: `BiResultMasking` and `ControlApiBiQueryMaskingTest` cover `/bi/query`, `/queries/{id}/run`, `/datasets/{id}/rows`, share queries, `/db/*` and Report exports (BACKLOG `BI-QUERY-MASKING-1`, built 2026-10-13; the row stays open for residuals).
+  - Masking on BI results: `BiResultMasking` and `ControlApiBiQueryMaskingTest` cover `/bi/query`, `/queries/{id}/run`, `/datasets/{id}/rows`, share queries, `/db/*` and Report exports (BACKLOG `BI-QUERY-MASKING-1`, built 2026-10-13, closed 2026-10-23 after its security review; open free-SQL channels: P1 `BI-MASKING-ROW-VALUE-LEAKS-1`, P1 `BI-MASKING-FREE-SQL-ORACLES-1`).
   - UI tests: 41 Studio spec files and 32 viz spec files. The only e2e file is `inspecto-ui/src/e2e/backend-smoke.spec.ts`, and it self-skips without `E2E_BASE_URL`. Nightly `MixedLoadBenchmark` drives 4 `/bi/query` readers during ingest (local p95 528–639 ms).
-  - Open rows: P2 `ANALYTICS-CORE-1`, P2 `BI-QUERY-MASKING-1` (residuals), P2 `AUTHORING-REDESIGN-1`, P3 `ANALYTICS-STEPS-TS-1`, P3 `PREDICTIVE-*` (design only), P3 `PACK-SALES-MARKETING-1`.
+  - Open rows: P2 `ANALYTICS-CORE-1`, P1 `BI-MASKING-FREE-SQL-ORACLES-1` (free-SQL key oracles, hold: operator), P2 `AUTHORING-REDESIGN-1`, P3 `ANALYTICS-STEPS-TS-1`, P3 `PREDICTIVE-*` (design only), P3 `PACK-SALES-MARKETING-1`.
 - **Strengths vs market:**
   - Integrated BI over the platform's own lake, with classification-driven masking of result rows. Assurance vendors usually bundle dashboards without per-viewer key masking *(general market)*.
   - Explainable statistical analytics in-process, with no external ML runtime (refusals W1–W2), which suits air-gapped buyers.
@@ -268,7 +268,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 | Integration with the enterprise BI tool | Comply | `publish.postgres` Job (JOB-06, Standard and up) |
 | Predictive / ML analytics | Partial | Kernel primitives are built. Predictive add-on surfaces are design-only (`PREDICTIVE-ANALYTICS-1`). |
 
-- **To reach the next level:** (1) Add a real UI e2e leg in CI against a seeded server, covering dashboards, reports and shares. (2) Close the `BI-QUERY-MASKING-1` residuals and the dashboard-sharing RBAC gap. (3) Correct the stale counts in `plan-studio.md` (viz count, Measures).
+- **To reach the next level:** (1) Add a real UI e2e leg in CI against a seeded server, covering dashboards, reports and shares. (2) Close the free-SQL masking rows (`BI-MASKING-ROW-VALUE-LEAKS-1`, `BI-MASKING-FREE-SQL-ORACLES-1`) and the dashboard-sharing RBAC gap. (3) Correct the stale counts in `plan-studio.md` (viz count, Measures).
 
 #### cap.identity — Identity, access & security (module.access, module.oidc, module.policy, module.secrets, module.auth-spi)
 - **What it is (customer view):** SSO through the customer's IdP (OIDC), role- and attribute-based authorization with row and Space scoping, a policy editor with impact preview, an access-review view, secret references, TLS, and classification-driven masking.
@@ -280,7 +280,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Route gating: a mutating route with neither a capability nor a recorded exemption fails the boot (`UndeclaredMutatingRouteTest`, `RouteInventoryTest`; `compliance/evidence/route-gating.md`). In `processor/api-routes.md`, 140 of 178 mutating routes declare a capability. The other 38 are previews, auth or self-service routes.
   - Masking: `AuditReadMasking`, `BiResultMasking`, `ObjectReadMasking`, `NotificationContentMasking`, `BiReportRowMasking` in `inspecto/src/main/java/com/gamma/control/`, each with a real-HTTP test. The `quality.pii.mask` Step is gated to Advanced (SEC-08 🟡).
   - HTTPS is proven at TLS 1.3, including fail-closed on a broken keystore (`ControlApiHttpsTest`, 5 tests, mutation-proven). BFF sessions use an httpOnly, SameSite=Strict cookie (SEC-5).
-  - Open rows: P2 `BI-QUERY-MASKING-1` (residuals) and P3 `IMPORT-WHOLE-SPACE-SPLIT-1` (demand). Untracked in the plan: `SEC-SIDECAR-BOOT-1` (a Standard bundle cannot boot without an IdP), and `permissions[]` emitted but never read.
+  - Open rows: P1 `BI-MASKING-FREE-SQL-ORACLES-1` (free-SQL key oracles, hold: operator) and P3 `IMPORT-WHOLE-SPACE-SPLIT-1` (demand). Untracked in the plan: `SEC-SIDECAR-BOOT-1` (a Standard bundle cannot boot without an IdP), and `permissions[]` emitted but never read.
 - **Strengths vs market:**
   - Policy-as-config ABAC with an impact preview and self-lockout refusal, plus maker-checker on access changes. The competitive matrix (§3) notes that none of the six vendors publicly shows four-eyes on configuration.
   - Masking is driven by field classification across BI, audit, operational objects and notifications, not configured screen by screen.
@@ -371,7 +371,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 |---|---|---|
 | SSO / OIDC | ✅ live-proven | WSO2 7.3.0 and Keycloak (`module/oidc/plan.md`). Standard and Advanced only; Basic is auth-free by design and binds every interface unless `-Dcontrol.bind` is set (`EDITIONS.md` §Matrix). |
 | RBAC / ABAC | ✅ RBAC Standard and up, ABAC Advanced | SEC-03/04/05/06. Route gating is enforced at boot (`compliance/evidence/route-gating.md`). |
-| Masking | 🟡 Advanced | SEC-08. Read masking across BI, audit, objects and notifications. `BI-QUERY-MASKING-1` is P2 and open for residuals. |
+| Masking | 🟡 Advanced | SEC-08. Read masking across BI, audit, objects and notifications. `BI-QUERY-MASKING-1` closed 2026-10-23; free-SQL key channels stay open as P1 `BI-MASKING-ROW-VALUE-LEAKS-1` and `BI-MASKING-FREE-SQL-ORACLES-1`. |
 | Audit chain | ✅ tamper-evident, not tamper-proof | `ASSURE-AUDIT-CHAIN-1`: a per-Space hash chain with MAC-signed daily anchors, checked by `GET /audit/verify` (`AuditVerifier`, `ControlApiAuditChainTest`). Not WORM, not non-repudiable, and events are dropped after 50k buffered on sustained flush failure (controls-matrix AU-9). ⚠ `EDITIONS.md` SEC-09 still says "not tamper-evident", which is stale. |
 | HA / DR | 🔴 runbook plus a laptop-scale drill | `layer/platform/admin-guide-ha-dr-drill.md`. Lease takeover took about 60 s in a two-process, one-machine drill (2026-10-10). The two-host drill, standby promote and partition test were **not run**. Single-node is the stated posture (NFR-8). Helm is a replicas-1 StatefulSet (`SCALEOUT-HELM-NPOD-1`, P2). Postgres multi-user is P2. |
 | Backup / restore | 🟡 built, no drill | OPS-06 (Standard and up). `rto-rpo-statement.md` §4 has no drill and no committed targets (G6 half-open). |
@@ -953,7 +953,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Entity resolution is analyst-asserted or imported identity pairs plus merged traversal (`user-guide-link-analysis.md` §8.2–8.3). There is no probabilistic or ML entity resolution at scale, which is Quantexa's core (general market). **No row.**
   - It runs on a single host: measured to 10^8 edges, with 5×10^8 and 10^9 unmeasured (`LA-INDEX-SCALE-MEASURE-1`, P3). The two-host HA drill has not run (`ASSURE-OPERABILITY-1`, P2, platform). Embed links are not supported on the Postgres store.
   - Retention purge and legal hold were declined (D-U8; BACKLOG §6 standing refusal). Regulated buyers who need retention schedules or right-to-erasure will flag this.
-  - Daily-feed completeness is open under `LA-DAILY-INGEST-1` (P2): no native Hive/Kerberos and no SCD2 as-of join. The whitepaper's "All read surfaces masked — NOT YET" row is partly stale: `OBJECT-READ-MASKING-RESIDUALS-1` closed 2026-10-18, but P2 `BI-QUERY-MASKING-1` (platform) is still open.
+  - Daily-feed completeness is open under `LA-DAILY-INGEST-1` (P2): no native Hive/Kerberos and no SCD2 as-of join. The whitepaper's "All read surfaces masked — NOT YET" row is partly stale: `OBJECT-READ-MASKING-RESIDUALS-1` closed 2026-10-18, and `BI-QUERY-MASKING-1` closed 2026-10-23, but free SQL can still test a key (P1 `BI-MASKING-FREE-SQL-ORACLES-1`).
 - **RFP stance on the 5 most-asked requirements for this category:**
 
 | Requirement | Stance | Evidence or caveat |

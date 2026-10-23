@@ -135,7 +135,9 @@ file-writing Job types. `BI-QUERY-MASKING-1` closed 2026-10-23 after its securit
   the caller, a 422 keeps the driver's text only when every error type it names is compile-time (`Parser` / `Binder` /
   `Catalog`, raised before any row is read); any other answers a fixed sentence (`BiResultMasking.scrub`), on
   `/queries/{id}/run`, `/bi/query`, `/datasets/{id}/rows`, `/db/table` + `/db/query`, rule simulate, `/kpis/{id}/value`
-  and the public share. A revealer, an unclassified Dataset and `maskingMode none` keep the full text.
+  and the public share. A revealer, an unclassified Dataset and `maskingMode none` keep the full text. ⚠ The compile-time
+  rule holds because `SqlGuard` refuses the PIVOT forms that read data: in raw DuckDB 2.0 a PIVOT Binder error lists raw
+  values as "Candidate bindings", so relaxing the guard for PIVOT reopens this.
 - **The `$parameter` oracle** is refused whenever the saved query reads a key by any route the result masking recognises,
   not only by name (`WHERE COLUMNS('msi.*') LIKE $p` was a bisection).
 - **A calculated column naming `__base`** (the alias `DatasetRelation.withCalculated` gives the row it is computed over:
