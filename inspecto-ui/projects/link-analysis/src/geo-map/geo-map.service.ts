@@ -27,8 +27,11 @@ export interface GeoMapView {
 @Injectable({ providedIn: 'root' })
 export class GeoMapService {
     private store = new SavedViewStore<GeoMapView>(inject(ComponentsService), 'geo-map-view', {
+        // The registry stamps `name` with the id on every write (ComponentStore.write), so the view's own name travels as
+        // `title` too, as a Link Analysis case does (LA-ONBOARD-DEFECTS-1); `name` stays for older readers.
         toContent: (v) => ({
             name: v.name,
+            title: v.name,
             description: v.description,
             sourceId: v.sourceId,
             query: v.query,
@@ -38,6 +41,7 @@ export class GeoMapService {
         }),
         fromContent: (id, content) => {
             const c = content as {
+                title?: string;
                 name?: string;
                 description?: string;
                 sourceId?: GeoSourceId;
@@ -48,7 +52,7 @@ export class GeoMapService {
             };
             return {
                 id,
-                name: c.name ?? id,
+                name: (typeof c.title === 'string' && c.title.trim()) || c.name || id,
                 description: c.description,
                 sourceId: c.sourceId ?? 'dataset',
                 query: c.query ?? {},

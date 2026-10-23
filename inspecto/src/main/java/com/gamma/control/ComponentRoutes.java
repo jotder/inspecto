@@ -475,12 +475,19 @@ final class ComponentRoutes implements RouteModule {
                     + String.join(", ", consumers) + " — revoke the grant(s) first");
         requireNoStrandedObjects(api, type, current.content(), null);
         if ("runbook".equals(type)) requireNoLinkingAlertRules(store, id);
-        PendingChanges.hold(api, ex, type, id, null, current.content());   // maker-checker: a delete is a change
+        // LA-ONBOARD-ORPHAN-PIPELINE-1: an Add data Dataset takes its import Pipeline with it.
+        OnboardImport.Retirement retirement = "dataset".equals(type) ? OnboardImport.claimRetirement(api, id, current.content()) : null;
         boolean removed;
         try {
-            removed = store.delete(type, id);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
+            PendingChanges.hold(api, ex, type, id, null, current.content());   // maker-checker: a delete is a change
+            try {
+                removed = store.delete(type, id);
+            } catch (IllegalArgumentException e) {
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
+            }
+            if (retirement != null) retirement.retire();
+        } finally {
+            if (retirement != null) retirement.release();
         }
         // R2-03: state an optional module keeps beside the registry (a Reconciliation's run state) is deleted with
         // the component, or a re-created component of the same id would inherit it — the module's ComponentDeleteHook.
@@ -494,7 +501,8 @@ final class ComponentRoutes implements RouteModule {
                 throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, jail.getMessage());
             }
         }
-        return Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed);
+        if (retirement == null) return Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed);
+        return Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed, "retiredPipeline", id);
     }
 
     /**

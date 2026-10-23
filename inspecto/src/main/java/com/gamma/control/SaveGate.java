@@ -235,6 +235,109 @@ final class SaveGate {
     }
 
     /**
+     * {@link #selectorFindings} from the SCHEMA's side ({@code LA-ONBOARD-DRIFT-1}): a schema written on its own, to
+     * {@code schemaFile}, that a delimited / fixed-width Pipeline under {@code writeRoot} already reads must keep
+     * zero-based column INDEX selectors, or that Pipeline stops loading at its next reload. Only the Pipeline write was
+     * judged before. Judged by the load itself, as there: each Pipeline whose {@code processing.schema_file} or
+     * {@code processing.schemas[].schema_file} resolves (beside the Pipeline) to {@code schemaFile} is parsed with that
+     * reference pointed at the candidate schema, written to a scratch file beside the target and removed after. A
+     * schema whose every selector is already an index costs nothing. A Pipeline that cannot be read is skipped: its own
+     * save and load report it.
+     */
+    static List<Finding> referencedSchemaSelectorFindings(Path writeRoot, Path schemaFile, Map<String, Object> schema) {
+        if (!hasNameSelector(schema)) return List.of();
+        Path target = schemaFile.toAbsolutePath().normalize();
+        Path scratch = target.resolveSibling(".selector-check-" + java.util.UUID.randomUUID() + ".toon");
+        List<Finding> out = new ArrayList<>();
+        try (java.util.stream.Stream<Path> walk = java.nio.file.Files.walk(writeRoot, 4)) {
+            List<Path> pipelines = walk.filter(java.nio.file.Files::isRegularFile)
+                    .filter(f -> f.getFileName().toString().endsWith("_pipeline.toon"))
+                    .filter(f -> !writeRoot.relativize(f).startsWith("registry")).sorted().toList();
+            for (Path p : pipelines) {
+                Map<String, Object> retargeted;
+                try {
+                    retargeted = retargetSchemaRefs(ConfigLoader.filesystem().decode(p.toString()), p.getParent(), target, scratch);
+                } catch (RuntimeException unreadable) {
+                    continue;
+                }
+                if (retargeted == null) continue;
+                if (!java.nio.file.Files.exists(scratch))
+                    com.gamma.util.AtomicFiles.write(scratch, com.gamma.config.io.ConfigCodec.toToon(schema)
+                            .getBytes(java.nio.charset.StandardCharsets.UTF_8), ".sel-");
+                try {
+                    PipelineConfig.fromMap(retargeted, p.getParent());
+                } catch (PipelineConfig.SelectorNotIndexException refused) {
+                    out.add(new Finding(Severity.ERROR, "raw.fields", "Pipeline '" + p.getFileName().toString()
+                            .replaceFirst("_pipeline\\.toon$", "") + "' reads this schema by column position: "
+                            + refused.getMessage().replaceFirst("^Config error in <config>: \\S+ ", ""),
+                            FindingCodes.ERR_SELECTOR_NOT_INDEX,
+                            "write the schema's raw.fields selectors as zero-based column indexes (0, 1, 2, ...)"));
+                } catch (Exception notThisCheck) {
+                    // Not the selector refusal: the Pipeline's own save and load report it.
+                }
+            }
+        } catch (java.io.IOException | java.io.UncheckedIOException unreadable) {
+            // The tree cannot be walked (a folder mid-walk too): nothing can be said about who reads this schema.
+        } finally {
+            try {
+                java.nio.file.Files.deleteIfExists(scratch);
+            } catch (java.io.IOException ignored) {
+                // a leftover scratch file is not a config (no _pipeline / _schema suffix) and is replaced next time
+            }
+        }
+        return out;
+    }
+
+    /** Whether any {@code raw.fields[].selector} is not a zero-based index (a blank one counts, as the load counts it). */
+    private static boolean hasNameSelector(Map<String, Object> schema) {
+        if (!(schema.get("raw") instanceof Map<?, ?> raw) || !(raw.get("fields") instanceof List<?> fields)) return false;
+        for (Object o : fields)
+            if (o instanceof Map<?, ?> f && !String.valueOf(f.get("selector")).trim().matches("\\d+")) return true;
+        return false;
+    }
+
+    /**
+     * A copy of the Pipeline map {@code raw} with every schema reference that resolves beside {@code dir} to
+     * {@code target} pointed at {@code scratch}, or {@code null} when none does.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> retargetSchemaRefs(Map<String, Object> raw, Path dir, Path target, Path scratch) {
+        if (!(raw.get("processing") instanceof Map<?, ?> procRaw)) return null;
+        Map<String, Object> proc = new java.util.LinkedHashMap<>((Map<String, Object>) procRaw);
+        String to = scratch.toString().replace('\\', '/');
+        boolean hit = false;
+        if (proc.get("schema_file") instanceof String ref && resolvesTo(ref, dir, target)) {
+            proc.put("schema_file", to);
+            hit = true;
+        }
+        if (proc.get("schemas") instanceof List<?> entries) {
+            List<Object> copy = new ArrayList<>();
+            for (Object e : entries) {
+                if (e instanceof Map<?, ?> m && m.get("schema_file") instanceof String ref && resolvesTo(ref, dir, target)) {
+                    Map<String, Object> entry = new java.util.LinkedHashMap<>((Map<String, Object>) m);
+                    entry.put("schema_file", to);
+                    copy.add(entry);
+                    hit = true;
+                } else copy.add(e);
+            }
+            proc.put("schemas", copy);
+        }
+        if (!hit) return null;
+        Map<String, Object> out = new java.util.LinkedHashMap<>(raw);
+        out.put("processing", proc);
+        return out;
+    }
+
+    private static boolean resolvesTo(String ref, Path dir, Path target) {
+        if (ref.isBlank() || ref.startsWith("schema/")) return false;   // a registry schema is never a /config write target
+        try {
+            return dir.resolve(ref.trim()).toAbsolutePath().normalize().equals(target);
+        } catch (RuntimeException badPath) {
+            return false;
+        }
+    }
+
+    /**
      * The {@code webhook:} block, judged at save as {@code WebhookSink.plan} judges it at run time: it must
      * parse (an authored {@code url:}/{@code token:} or an unknown key is refused by the parser, and the
      * pipeline would then not load at all), and its {@code connection} must name a Connection this Space

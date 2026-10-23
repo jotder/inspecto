@@ -35,7 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) *Find paths (server)* stays unlocked on Basic (open explorer route, a Basic feature in… | — |
-| `LA-ONBOARD-DEFECTS-1` | P3 | defect | Inspecto LA explorer defects found by LA-ONBOARD-1 phases 6-8 (2026-10-22): (1) after Add a file in append mode the link index summary co… | — |
 | `LA-GROW-EXCLUDE-RESIDUALS-1` | P3 | feature | what LA-GROW-EXCLUDE-1 left after it shipped (2026-10-22; as-built in okf/product/module/la-core/architecture.md §6.8–§6.9). | — |
 | `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1` | P3 | defect | the Dossier still shows a restricted exclusion list's removed ids and true counts to an analyst who may not see its members. | — |
 | `LA-GROW-EXCLUDE-UNDO-RACE-1` | P3 | defect | in a shared Investigation, a Grow / Exclude Undo can take back a team member's step. | — |

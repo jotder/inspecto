@@ -335,6 +335,26 @@ public final class IndexBuilder {
         }
     }
 
+    /**
+     * The distinct nodes a PUBLISHED version holds. Its {@code nodes} table is folded per build, so after an APPEND it holds the
+     * parent's rows plus the delta's, and an entity in both is two rows: {@link TableStats#rows()} then over-counts (LA-ONBOARD-DEFECTS-1).
+     * A version with no delta needs no query: its rows are already distinct.
+     */
+    public static long distinctNodes(Path versionDir, IndexManifest man) {
+        TableStats nodes = man.tables().get("nodes");
+        if (man.deltas().isEmpty()) return nodes == null ? 0L : nodes.rows();
+        List<Path> files = parquetFiles(versionDir.resolve("nodes"), Integer.MAX_VALUE);
+        if (files.isEmpty()) return 0L;
+        try (Connection c = open(null, null, null, List.of(versionDir));
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT count(DISTINCT id) FROM " + SqlViews.parquet(fileList(files), false, SqlViews.Hive.OFF))) {
+            rs.next();
+            return rs.getLong(1);
+        } catch (SQLException e) {
+            throw new IndexBuildException("cannot count the nodes of " + versionDir.getFileName() + ": " + e.getMessage(), e);
+        }
+    }
+
     // --------------------------------------------------------------------------------------------- one build run
 
     private static final class Run {

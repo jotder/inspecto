@@ -461,6 +461,24 @@ public final class SpaceManager implements AutoCloseable {
         return SpaceSamples.shipped(tpl);
     }
 
+    /** A template's Demo User roster, and the gallery's name for the sign-in it needs ({@link #missingFeatures}). */
+    static final String DEMO_USERS = "demo-users.toon", DEMO_AUTH = "demo-auth";
+
+    /**
+     * Whether people can sign in as the Demo Users of {@code config}: the installed Authenticator names its principals
+     * from a Space's config (only Demo Auth does; OIDC cannot say who exists). A roster it cannot read still counts -
+     * the sign-in is there, and the Space's own load reports the table.
+     */
+    private static boolean demoUsersSignIn(Path config) {
+        return com.gamma.spi.auth.Authenticators.active().map(a -> {
+            try {
+                return a.principals(config).isPresent();
+            } catch (RuntimeException unreadableRoster) {
+                return true;
+            }
+        }).orElse(false);
+    }
+
     /**
      * The edition features a template's {@code config/} uses that THIS build lacks — the same refusals the seed
      * gate answers with a 422 on {@code POST /spaces}, so the gallery can say so before the operator names a
@@ -469,11 +487,16 @@ public final class SpaceManager implements AutoCloseable {
      * the pipeline loader refuses on this build). One entry per feature, {@code {feature, message}}; empty when
      * this build can create the template. ⚠ No legacy per-file alert config is read here: nothing loads one at
      * runtime (only registry {@code alert-rules/} are armed) and the seed gate does not refuse one, so counting it
-     * would mark a creatable template uncreatable.
+     * would mark a creatable template uncreatable. A template carrying a Demo User roster ({@code demo-users.toon}) needs
+     * the Demo Auth sign-in ({@code demo-auth}, {@code LA-SAMPLE-GALLERY-DEMOAUTH-1}); the gallery alone reports that one -
+     * the seed gate does not refuse it, so such a Space can still be created through the API without its sign-in.
      */
     static List<Map<String, String>> missingFeatures(Path config) throws IOException {
         java.util.TreeMap<String, String> missing = new java.util.TreeMap<>();
         if (!Files.isDirectory(config)) return List.of();
+        if (Files.isRegularFile(config.resolve(DEMO_USERS)) && !demoUsersSignIn(config))   // LA-SAMPLE-GALLERY-DEMOAUTH-1
+            missing.put(DEMO_AUTH, "Demo User sign-in (config/" + DEMO_USERS + ") needs a demo build with Demo Auth — "
+                    + "this server does not include it");
         String alert = com.gamma.etl.EditionFeatures.ALERT_DISPATCH;
         try (Stream<Path> s = Files.walk(config)) {
             for (Path p : s.filter(Files::isRegularFile).filter(f -> f.toString().endsWith(".toon")).toList()) {

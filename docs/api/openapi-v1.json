@@ -12517,7 +12517,7 @@
         "tags" : [ "inv" ],
         "summary" : "List the values of an Entity Type that start a graph (the Start box type-ahead)",
         "operationId" : "postInvEntitySuggest",
-        "description" : "LA-ONBOARD-1 OB-9. Body {prefix?: a raw prefix (empty or absent = every value), dataset?: one Dataset id, limit?: 1..20 (default 8)}. Reads only the type's link-end columns (a source or target of a mapping the Space knows: a Dataset's defaultLinkMapping, a saved view or an index) on Datasets the caller may view, optionally one Dataset's. Answers {type, masked, datasets, items [{value, links (rows naming it in a link column), firstSeen, lastSeen}], distinct (Entities matching), truncated, assessed, reason}, busiest first. A type masked under the Space's maskingMode lists no value and is counted only for an empty prefix. The prefix travels in the body only. Gated by the geoLink feature and a write root; no capability. Rate-limited like the Entity profile. Audited as LINK_ENTITY_SUGGESTED (the prefix and values are never recorded).",
+        "description" : "LA-ONBOARD-1 OB-9. Body {prefix?: a raw prefix (empty or absent = every value), dataset?: one Dataset id, limit?: 1..20 (default 8), reveal?: true to list a masked type's raw values (needs canRevealLinkEntities)}. Reads only the type's link-end columns (a source or target of a mapping the Space knows: a Dataset's defaultLinkMapping, a saved view or an index) on Datasets the caller may view, optionally one Dataset's. Answers {type, masked, revealed, datasets, items [{value, links (rows naming it in a link column), firstSeen, lastSeen}], distinct (Entities matching), truncated, assessed, reason}, busiest first. A type masked under the Space's maskingMode lists no value and is counted only for an empty prefix, unless the caller sends reveal: true and holds canRevealLinkEntities (LA-ONBOARD-DEFECTS-1; revealed: true, audited). The prefix travels in the body only. Gated by the geoLink feature and a write root; no capability unless reveal is asked. Rate-limited like the Entity profile. Audited as LINK_ENTITY_SUGGESTED (the prefix and values are never recorded).",
         "parameters" : [ {
           "name" : "entityType",
           "in" : "path",
@@ -12534,7 +12534,8 @@
                 "properties" : {
                   "prefix" : { "type" : "string", "description" : "The start of a raw value; empty lists the busiest." },
                   "dataset" : { "type" : "string", "description" : "Only this Dataset's link columns." },
-                  "limit" : { "type" : "integer", "minimum" : 1, "maximum" : 20 }
+                  "limit" : { "type" : "integer", "minimum" : 1, "maximum" : 20 },
+                  "reveal" : { "type" : "boolean", "description" : "List a masked type's raw values; needs canRevealLinkEntities." }
                 }
               }
             }
@@ -12542,13 +12543,16 @@
         },
         "responses" : {
           "200" : {
-            "description" : "{type, masked, datasets, items, distinct, truncated, assessed, reason}."
+            "description" : "{type, masked, revealed, datasets, items, distinct, truncated, assessed, reason}."
+          },
+          "403" : {
+            "description" : "reveal: true without canRevealLinkEntities."
           },
           "404" : {
             "description" : "No such Entity Type in force."
           },
           "422" : {
-            "description" : "A prefix that is not a string or is longer than input.id_length, a blank dataset, or a limit outside 1..20."
+            "description" : "A prefix that is not a string or is longer than input.id_length, a blank dataset, a limit outside 1..20, or a reveal that is not a boolean."
           },
           "503" : {
             "description" : "No write root."
@@ -13398,7 +13402,7 @@
       "post" : {
         "summary" : "Report a step only the browser sees (LA-ONBOARD-1 OB-13)",
         "operationId" : "postOnboardingEvents",
-        "description" : "Open to any caller, rate-limited (standard bucket). Body {event: guide_completed | step_abandoned, step?} with step one of space, data, columns, graph, list, add_data:file, add_data:columns, add_data:create (required for step_abandoned). 422 for any other word; only the two words and a timestamp are kept. guide_completed is written once per installation.",
+        "description" : "Open to any caller, rate-limited (standard bucket). Body {event: guide_completed | step_abandoned, step?} with step one of space, data, columns, graph, list, add_data:file, add_data:columns, add_data:create (required for step_abandoned). 422 for any other word; only the two words and a timestamp are kept. guide_completed is written once per installation; step_abandoned at most 1000 times per step (later reports answer 200 and are dropped).",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -13419,7 +13423,7 @@
       "get" : {
         "summary" : "What the onboarding counters say (LA-ONBOARD-1 OB-13)",
         "operationId" : "getOnboardingMetrics",
-        "description" : "canAdminister; with no sign-in anyone. Always on, local, never sent anywhere: {recording, firstLaunch, launches, spacesCreated, firstSpace, firstSpaceSeconds, firstDataset, firstDatasetSeconds, firstGraph, firstGraphSeconds, guideCompleted, guideCompletedSeconds, abandoned {step: count}}. Times are ISO instants, *Seconds count from the first launch; null when it has not happened. recording is false when the server has no document home.",
+        "description" : "canAdminister; with no sign-in anyone. Always on, local, never sent anywhere: {recording, firstLaunch, launches, spacesCreated, firstSpace, firstSpaceSeconds, firstDataset, firstDatasetSeconds, firstGraph, firstGraphSeconds, guideCompleted, guideCompletedSeconds, abandoned {step: count}, abandonedCapReached}. abandonedCapReached is true once a step holds the most abandoned-step lines kept (1000 per step; later reports are dropped). Times are ISO instants, *Seconds count from the first launch; null when it has not happened. recording is false when the server has no document home.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped onboarding metrics."

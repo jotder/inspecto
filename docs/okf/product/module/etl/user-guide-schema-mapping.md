@@ -197,8 +197,15 @@ catalog and by persisting `fields[]`.
   a 400. The grammar editor's onward link passes its active frontend through `SchemaEditorData.frontend`
   (`plugin` for a plugin grammar). The save gate backs it: a pipeline write whose delimited/fixed-width schema still selects by name is
   refused `ERR_SELECTOR_NOT_INDEX` (active or not — it would not load), with the load's own message.
-  ⚠ The drift diff (`config` in the body) still joins the draft's selector to the sample's column NAME, so
-  an index-selected draft reads as fully drifted there.
+  The drift diff (`config` in the body) follows the same rule (`LA-ONBOARD-DRIFT-1`, 2026-10-23): for an
+  index-addressed frontend (delimited, the default, and fixed-width) a selector of digits is the sample column
+  at that POSITION, so an up-to-date index-selected draft is not drifted; any other selector is still a column
+  name. ⚠ The Parse pane's drift check sends no `frontend`, so the server reads it as delimited — a json schema
+  whose key is all digits would be matched by position there. A **schema written on its own**
+  (`/config/write` or `/config/patch`, type `schema`) that a delimited / fixed-width Pipeline already names
+  (`schema_file` or `schemas[].schema_file`, resolved beside that Pipeline, a draft whose schema does not exist
+  yet included) is refused `ERR_SELECTOR_NOT_INDEX` when a selector is a name — judged by loading each such
+  Pipeline against the candidate schema (`SaveGate.referencedSchemaSelectorFindings`), before the BACKWARD gate.
 - **Inference (a separate, upstream endpoint):** `POST /parsers/{id}/preview` (`ParserRoutes.java:34,58-71`)
   runs a DuckDB `auto_detect` sniff and returns per-column types (`ParserRoutes.java:111-113`). Stateless —
   writes nothing.

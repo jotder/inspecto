@@ -66,6 +66,8 @@ export interface CaseLists {
 /** The start a case re-draws when it opens. */
 export interface CaseStart {
     datasetId: string;
+    /** The Entity Type the start named (LA-ONBOARD-DEFECTS-1); absent = the Dataset's primary type (older cases). */
+    entityType?: string;
     values?: string[];
     listId?: string;
 }
@@ -184,5 +186,11 @@ function startOf(v: unknown): CaseStart | undefined {
     const values = ids(r['values']);
     const listId = typeof r['listId'] === 'string' && r['listId'] ? r['listId'] : undefined;
     if (!values.length && !listId) return undefined;
-    return { datasetId: r['datasetId'], ...(values.length ? { values } : {}), ...(listId ? { listId } : {}) };
+    const entityType = typeof r['entityType'] === 'string' && r['entityType'] ? r['entityType'] : undefined;
+    return {
+        datasetId: r['datasetId'],
+        ...(entityType ? { entityType } : {}),
+        ...(values.length ? { values } : {}),
+        ...(listId ? { listId } : {}),
+    };
 }

@@ -138,6 +138,73 @@ class ControlApiSpaceTemplatesTest {
         }
     }
 
+    /**
+     * LA-SAMPLE-GALLERY-DEMOAUTH-1: a template whose people sign in as Demo Users ({@code config/demo-users.toon}) is NOT
+     * creatable on a server without that sign-in (Basic, or OIDC, which cannot name its principals), naming
+     * {@code demo-auth}; the shipped {@code la-audit}, {@code la-claims} and {@code la-mobile-money} are such templates and
+     * {@code la-sample} is not. With an Authenticator that names its principals from a Space's config (Demo Auth) the same
+     * template is creatable. Falsified: without the roster check every one of them lists {@code creatable: true}.
+     */
+    @Test
+    void galleryCountsTheDemoUserSignInATemplateNeeds(@TempDir Path root) throws Exception {
+        seedTemplate(root);
+        Files.writeString(root.resolve("_templates/starter/config/demo-users.toon"), "users[0]:\n");
+        for (String shipped : java.util.List.of("la-audit", "la-claims", "la-mobile-money", "la-sample")) {
+            Path src = Path.of("..", "spaces", "_templates", shipped);
+            Path dst = root.resolve("_templates").resolve(shipped);
+            Files.createDirectories(dst);
+            Files.copy(src.resolve("template.toon"), dst.resolve("template.toon"));
+            try (java.util.stream.Stream<Path> walk = Files.walk(src.resolve("config"))) {
+                for (Path p : walk.sorted().toList()) {
+                    Path t = dst.resolve("config").resolve(src.resolve("config").relativize(p).toString());
+                    if (Files.isDirectory(p)) Files.createDirectories(t);
+                    else Files.copy(p, t);
+                }
+            }
+        }
+        try {
+            try (Ctx c = open(root)) {
+                for (JsonNode t : json(send(c.port, "GET", "/spaces/templates", null))) {
+                    boolean needsDemo = !"la-sample".equals(t.get("id").asText());
+                    boolean named = false;
+                    for (JsonNode m : t.get("missingFeatures")) named |= "demo-auth".equals(m.get("feature").asText());
+                    assertEquals(needsDemo, named, t.toString());
+                    if (needsDemo) assertFalse(t.get("creatable").asBoolean(), t.toString());
+                }
+            }
+            // OIDC: an Authenticator that cannot say who exists is not a Demo User sign-in
+            com.gamma.spi.auth.Authenticators.forTest(ex -> java.util.Optional.of(
+                    new com.gamma.spi.auth.Subject("oidc-user", java.util.Set.of("canAdminister"))));
+            try (Ctx c = open(root)) {
+                JsonNode starter = find(json(send(c.port, "GET", "/spaces/templates", null)), "starter");
+                assertFalse(starter.get("creatable").asBoolean(), starter.toString());
+            }
+            com.gamma.spi.auth.Authenticators.forTest(new com.gamma.spi.auth.Authenticator() {
+                @Override
+                public java.util.Optional<com.gamma.spi.auth.Subject> authenticate(com.sun.net.httpserver.HttpExchange ex) {
+                    return java.util.Optional.of(new com.gamma.spi.auth.Subject("demo", java.util.Set.of("canAdminister")));
+                }
+
+                @Override
+                public java.util.Optional<java.util.Map<String, java.util.List<String>>> principals(Path configRoot) {
+                    return java.util.Optional.of(java.util.Map.of());
+                }
+            });
+            try (Ctx c = open(root)) {
+                JsonNode starter = find(json(send(c.port, "GET", "/spaces/templates", null)), "starter");
+                assertTrue(starter.get("creatable").asBoolean(), "a Demo User sign-in is installed: " + starter);
+                assertEquals(0, starter.get("missingFeatures").size(), starter.toString());
+            }
+        } finally {
+            com.gamma.spi.auth.Authenticators.forTest(null);
+        }
+    }
+
+    private static JsonNode find(JsonNode list, String id) {
+        for (JsonNode t : list) if (id.equals(t.get("id").asText())) return t;
+        throw new AssertionError("no template " + id + " in " + list);
+    }
+
     @Test
     void createFromTemplateRewritesSpaceTokensAndBoots(@TempDir Path root) throws Exception {
         seedTemplate(root);
