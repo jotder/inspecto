@@ -1108,7 +1108,10 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   opens the same dialog on a bare `?` (never in a text field) with its own list, `LA_APP_SHORTCUTS` (no command palette
   or triage-list keys, which la-app does not have), passed as the dialog data `{shortcuts}`.
 - **Access Catalog.** `canManageExclusionCategories` has its action node since 2026-10-23: `linkgraph.exclusion-categories`
-  (the id `LensService` reads), under Settings, where the Exclusion categories section is its main client gate.
+  (the id `LensService` reads), under Settings, where the Exclusion categories section is its main client gate. Since
+  `LA-ACCESS-NODE-IDS-1` (2026-10-23) `canRevealLinkEntities` / `canApproveLinkExpansions` read their nodes' ids
+  `linkgraph.reveal` / `linkgraph.approve`; `access-lens-parity.spec.ts` fails on any node/lens id drift
+  (detail: `module/access/admin-guide-auth-security.md`).
 - **Gotchas and deferrals** (open rows in [BACKLOG](../../../../BACKLOG.md), `LA-GROW-EXCLUDE-RESIDUALS-1`):
   - *Previews are not audited*: neither preview route writes an audit record or event (read-shaped, rate class EXPENSIVE).
   - *A broken auto-apply list blocks every Investigation create* in the Space (fail closed, the refusal names the list)
