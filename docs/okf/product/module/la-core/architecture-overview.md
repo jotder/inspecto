@@ -82,8 +82,8 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
   and local onboarding counters (`GET /onboarding/metrics`). Investigations need the runtime add-on
   `laInvestigations`; without it LA runs at the Explorer level with locked, not hidden, actions
   ([architecture §3.4, §6.10, §6.11](architecture.md)).
-- **Analyst upload status and delete.** `GET /inv/uploads`, `GET /inv/uploads/{collector}` (own uploads with their
-  ingest state) and `DELETE /inv/uploads/{collector}/{file}` (withdraw a file not yet picked up, under the Pipeline's
+- **Analyst upload status and delete.** `GET /inv/uploads` (the Collectors that accept uploads),
+  `GET /inv/uploads/{collector}` (own uploads with their ingest state; an administrator sees every upload) and `DELETE /inv/uploads/{collector}/{file}` (withdraw a file not yet picked up, under the Pipeline's
   run claim); a metadata record per upload is kept 90 days ([architecture §6.6](architecture.md)).
 
 ## 5. Configuration

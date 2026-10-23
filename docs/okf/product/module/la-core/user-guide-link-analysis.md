@@ -2389,8 +2389,9 @@ Detail: [user guide manual](user-guide-manual.md) §4.5.
 
 The first screen of Link Analysis is the **Start from...** box: pick the **Dataset**, then start from **One entity**
 (Entity Type first, then the value, with a type-ahead from `POST /inv/entities/{type}/suggest`, busiest first),
-**A list** (an Entity List, at most 25 members), **A paste** (values one per line; values not in the Dataset are
-reported) or **The whole Dataset** (warned first when it holds more Entities than the projection node cap). A start
+**A list** (an Entity List), **A paste** (values one per line; values not in the Dataset are
+reported) or **The whole Dataset** (warned first when it holds more Entities than the projection node cap). A list or
+paste draws its first 25 values and reports the rest as "N more values not drawn". A start
 draws through the neighbours read, one per value, holds busy neighbours above the Space's hub threshold and marks the
 starting entities as grown, so **Grow** continues from the ring. On the Investigations level, **One entity** seeds an
 Investigation (a Domain Profile that investigates the type binds its own mapping); a list or a paste is drawn and queued
