@@ -155,7 +155,10 @@ fails keeps the driver's text in its Run record (a two-step author channel throu
 themselves are masked); two view-backed Datasets over the same view do not share a classification (`EvidenceMasker` matches
 siblings by `physicalRef`; a pipeline-produced view is classified by its schema). Free-SQL shapes the same review found
 already filed (the row as a value, renames in FROM, a decodable alias, a sort on an aliased key) are
-`BI-MASKING-ROW-VALUE-LEAKS-1`.
+`BI-MASKING-ROW-VALUE-LEAKS-1`. ⚠ Still open, found by the review's independent verification and filed as
+`BI-MASKING-FREE-SQL-ORACLES-1` (an operator call): free SQL can still TEST a key while every output cell is masked - a saved
+query's own `WHERE msisdn = '..'` (its author's text is not vetted the way `/db/query` text is), and a run-time error as a
+yes / no answer (`CASE WHEN msisdn = '..' THEN error('x') END`: R2 withholds the text, not the failure).
 
 **SQL shapes the position model cannot prove fail closed (`BI-MASKING-SQL-SHAPE-LEAKS-1`, fixed 2026-10-23, verified on
 DuckDB 2.0.0.0).** Free SQL (a saved query, `/db/query`) is read through `json_serialize_sql`. An item that can expand to several

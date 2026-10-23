@@ -267,3 +267,11 @@ Analysis reveal); a Report Job run that fails keeps the driver text in its Run r
 a calculated column; Report rows themselves are masked); two view-backed Datasets over the same view do not share a
 classification (`EvidenceMasker` matches siblings by `physicalRef`; a pipeline-produced view is classified by its schema).
 Tests: `ControlApiBiMaskingReviewTest` (each fails on the code before this section).
+
+Independent verification of this section (2026-10-23) confirmed R1..R6 (each test fails on the previous code) and found two
+channels the review did not close, filed as `BI-MASKING-FREE-SQL-ORACLES-1` (hold: operator): a saved query's own predicate
+(`WHERE msisdn = '..'` saved and run by an author without the reveal capability answers a count; section 11.5 trusted the
+author's text, `/db/query` does not), and a run-time error as a yes / no answer (`CASE WHEN msisdn = '..' THEN error('x')
+END` on `/db/query`: R2 withholds the text, not the failure). Neither is closed by masking the output; the direction recorded
+on the row is to let a non-revealer's free SQL name a masked key only as a bare selected or grouped column or `count`
+argument.
