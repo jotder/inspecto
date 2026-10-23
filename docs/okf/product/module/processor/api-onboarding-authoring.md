@@ -414,10 +414,13 @@ re-draft with `?delimiter=…`), because the columns were read with it. Order:
    (422 "nothing was imported … nothing was kept").
 4. The Dataset entry: `{physicalRef: <id>/database, description, origin: import, kind, importPipeline, importFormat,
    eventDate (= the link's time), columns:[{name, type: string|number|date|timestamp|boolean, classification?}],
-   primaryEntityType, defaultLinkMapping, identifyingColumn}`; with sign-in `owner` is the importer and `shares: []`.
+   primaryEntityType, defaultLinkMapping, identifyingColumn}`; with sign-in `owner` is the importer, as provenance:
+   no `shares` key, so the Dataset is shared with its Space like every other Dataset in it (`LA-ONBOARD-DEFECTS-1`,
+   2026-10-23; it was `shares: []`, private to the importer, and no screen could share it).
 5. Follow-on work **inside the same run** (DT-16) unless `pipeline.automation` is present (a Space whose Jobs do it;
    that feature does not exist yet, so every edition does it in-run today): the link index through the
-   `LinkIndexBuilder` SPI (`index:{result: BUILT|UP_TO_DATE|REFUSED|FAILED|SKIPPED|NOT_AVAILABLE, …}`; the owner
+   `LinkIndexBuilder` SPI (`index:{result: BUILT|UP_TO_DATE|REFUSED|FAILED|SKIPPED|NOT_AVAILABLE, edges, nodes, …}`,
+   `edges` and `nodes` = what the index holds after the run, every entity once - after an append too; the owner
    is the importer, a full build is allowed) and every enabled Expectation whose target is the Pipeline
    (`expectations:[{name, status, violations}]`). Neither failing undoes the import; both are reported.
 

@@ -421,7 +421,7 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
   /inv/entities/{type}/resolve {key}` (raw value or alias, in the body) answers the alias of the normalised key - the same alias
   the exploration reads mint - or, for an unmasked type, the normalised value. The envelope's `links.self` echoes the request
   path, which is why the rule is enforced at the route.
-* **The Start box's type-ahead** (LA-ONBOARD-1 phase 6, OB-9): `POST /inv/entities/{type}/suggest {prefix?, dataset?, limit?}`
+* **The Start box's type-ahead** (LA-ONBOARD-1 phase 6, OB-9; `reveal` §6.12): `POST /inv/entities/{type}/suggest {prefix?, dataset?, limit?, reveal?}`
   runs over the same union relation, restricted to the type's LINK-END bindings (`source` / `target`; attribute columns never
   start a graph) and optionally one Dataset: values whose raw spelling or normalised key begins with the prefix, busiest
   first, with their link rows and first / last seen, plus `distinct` (Entities matching; a value that normalises to nothing
@@ -1199,10 +1199,61 @@ limits and the commit's write order are in
 * **Two phase 7 leftovers fixed.** (1) **A case's name came back as its id in My work**: `ComponentStore.write` stamps
   the content's `name` with the id (in-file identity = URL id), so the display name a save wrote under `name` was
   overwritten on every save. The view codec (`link-analysis.service.ts`) now also writes `title` and reads
-  `title ?? name ?? id`; older views read as before. ⚠ The Geo map's saved views use the same `SavedViewStore` pattern
-  and keep the defect (`LA-ONBOARD-DEFECTS-1`). (2) **One purpose vocabulary**: `ENTITY_LIST_PURPOSES` now carries the
+  `title ?? name ?? id`; older views read as before. The Geo map's saved views had the same defect; fixed in §6.12.
+  (2) **One purpose vocabulary**: `ENTITY_LIST_PURPOSES` now carries the
   plain words (*Watch these* · *Never follow these (exclusion)* · *Known good* · *Block*) and `purposeWords()` reads
   them; the Entity Lists page, New list and Add to a list all say it that way (`PURPOSE_WORDS` is gone).
+
+### 6.12 Explorer defects found by the acceptance drive, fixed (LA-ONBOARD-DEFECTS-1, as built 2026-10-23)
+
+Each fix carries a test that fails on the code before it (falsified).
+
+* **The index summary counts the whole index.** After *Add a file* in append mode the summary said "2,215 links between
+  624 entities" for a Dataset of 4,430 rows over 312 accounts: `ScheduledIndexBuild` reported the APPEND build's own
+  `IndexBuilder.Result` (the delta's edges) and the `nodes` table's row count, which after an append holds the parent's
+  rows plus the delta's (an entity in both counts twice; only a COMPACT folds them). The outcome - BUILT and UP_TO_DATE
+  alike - now reports what the published version holds: edges = the manifest's `out` rows, nodes =
+  `IndexBuilder.distinctNodes(versionDir, manifest)` (a `count(DISTINCT id)` over the version's `nodes` files, read only
+  when the manifest has deltas; a failed count falls back to the row count and never fails the build). The index status
+  route's `nodes` (`IndexRoutes`, the manifest row count) is unchanged. Test: `ControlApiOnboardLinkAnalysisTest`
+  "afterAnAppend...".
+* **A start is typed by the Entity Type it names.** `drawStart(ds, values, entityType?)` types the drawn mapping by the
+  Start box's pick (one entity, a paste), the Entity List's own type (a list), or the type the graph on screen was drawn
+  as (*Start from these*); only with none does the Dataset's primary type (`startCatalogue`'s `mapping.entityType`) stand.
+  It was always the primary, so a wallet started over a transfers file was read, normalised and masked as an account.
+  A case saves the type as the optional `start.entityType` (read defensively by `startOf`; older cases read as before),
+  and `growEntityType` (what *Add to a list* types a list by) reads the drawn mapping's type before the primary.
+  Specs: `link-analysis.component.spec.ts` "a start types its mapping...", "a list start is typed by the list...",
+  `link-analysis.service.spec.ts`.
+* **The type-ahead refreshes on returning to *One entity*.** The Start box's suggestions stream read the kind only when
+  another source emitted; the kind is now a source of its own, so a Dataset or type picked while on *A list* is asked
+  for on the way back. Spec: `link-analysis-start-box.component.spec.ts` "switching back to One entity...".
+* **A masked type can be revealed in the type-ahead.** `POST /inv/entities/{type}/suggest` takes an optional
+  `reveal: true`: it needs `canRevealLinkEntities` (403 otherwise, checked in the route as the hand-off does; the route
+  stays a `read-shaped` exemption), lists the masked type's raw values and counts per prefix, answers `revealed: true`
+  and is audited with `revealed` on `LINK_ENTITY_SUGGESTED`. Without the ask nothing changes for anyone. The Start box
+  never asks on its own: on a masked answer it offers someone who may reveal (`LensService.canRevealLinkEntities`) the
+  button *Show its values (you may reveal them; recorded)*; the reveal holds for that Entity Type only. Tests:
+  `ControlApiEntitySuggestTest` "aRevealerAskingReveal...", the start box spec "a masked type: someone who may reveal...".
+* **Saved-view names on the Geo map and in Studio.** The Geo map's view codec (`geo-map.service.ts`) writes `title`
+  and reads `title ?? name ?? id`, as the Link Analysis case codec does (§6.11); the Studio explore Widget's saved-view
+  picker (`explore.component.ts`) shows `content.title` before `content.name`. Specs: `geo-map.service.spec.ts`,
+  `explore.component.spec.ts`.
+* **Sign-out and sign-in in one tab.** `KeepAliveRouteReuseStrategy` keyed a kept page on Space and person, but a
+  sign-out clears the person (`SessionService.onAuthLost`) BEFORE it navigates to sign-in, so the page was kept for
+  "nobody"; the next person landed back on Link Analysis before the session had read their name - "nobody" again - and
+  got the previous person's page. With sign-in on, `shouldDetach` now keeps a page only while someone is signed in: a
+  page left by nobody is destroyed. Without sign-in (Basic) nothing changed. A sign-out therefore also ends what the
+  same person had open. Spec: `keep-alive.strategy.spec.ts` "signing out on the page and in as someone else...".
+* **An Add data import is shared with its Space** (decided here: the smallest correct fix; the alternative, a *Share*
+  control on the import's Dataset card, needs a sharing route - `PUT` on the component cannot drop a `shares` key and
+  the sharing model names roles and users, not "everyone in this Space"). The commit no longer writes `shares: []`, so
+  the entry behaves like every other Dataset in the Space: `owner` (the importer) is provenance, a colleague can view and
+  start from it, and changing it still needs the route's capability (`canAuthorWorkbench` for its columns,
+  `canUploadData` for *Add a file*). A Dataset made private through the component routes stays private. Imports
+  committed before this change keep `shares: []`; nothing migrates them. A person who wants a file to themselves uses
+  the analyst upload (§6.6) into their own Collector. Test: `ControlApiOnboardFilesTest`
+  "withSignInSelfImportIsOffByDefault...".
 
 ## 7. Host registration, Jobs and live detection
 

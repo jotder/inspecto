@@ -10,7 +10,7 @@ import {
     output,
     signal,
 } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
@@ -19,6 +19,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { catchError, combineLatest, debounceTime, distinctUntilChanged, map, of, startWith, switchMap } from 'rxjs';
+import { LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import {
@@ -137,6 +138,18 @@ const KINDS: { value: StartKind; label: string }[] = [
                                 <mat-hint data-testid="start-suggest-note">{{ note }}</mat-hint>
                             }
                         </mat-form-field>
+                        @if (offerReveal()) {
+                            <div>
+                                <button
+                                    mat-button
+                                    type="button"
+                                    data-testid="start-reveal"
+                                    (click)="revealSuggestions.set(true)"
+                                >
+                                    Show its values (you may reveal them; recorded)
+                                </button>
+                            </div>
+                        }
                         <mat-autocomplete #suggestions="matAutocomplete">
                             @for (s of suggested(); track s.value) {
                                 <mat-option [value]="s.value">
@@ -328,6 +341,7 @@ const KINDS: { value: StartKind; label: string }[] = [
 })
 export class LinkAnalysisStartBoxComponent {
     private readonly profiles = inject(EntityProfileService);
+    private readonly lens = inject(LensService);
     private readonly destroyRef = inject(DestroyRef);
 
     /** What can be started from: the Datasets with a link and the Entity Types their link ends hold. */
@@ -419,20 +433,36 @@ export class LinkAnalysisStartBoxComponent {
             const type = d?.primaryEntityType ?? d?.types[0] ?? this.catalogue().types[0]?.id ?? '';
             this.form.controls.entityType.setValue(type);
         });
+        // A reveal asked for one Entity Type is not carried to the next.
+        this.form.controls.entityType.valueChanges
+            .pipe(takeUntilDestroyed())
+            .subscribe(() => this.revealSuggestions.set(false));
     }
 
     // ── one entity: the type-ahead ──
 
+    /** A masked type's values were asked for by someone who may reveal them (LA-ONBOARD-DEFECTS-1); the server audits it. */
+    readonly revealSuggestions = signal(false);
+
+    // The kind is a source too: switching back to One entity re-asks (LA-ONBOARD-DEFECTS-1), else the answer from before the
+    // switch - or none, when the type or Dataset changed meanwhile - stayed.
     private readonly suggestions = toSignal(
         combineLatest([
             this.form.controls.value.valueChanges.pipe(startWith(''), debounceTime(250), distinctUntilChanged()),
             this.form.controls.entityType.valueChanges.pipe(startWith('')),
             this.form.controls.dataset.valueChanges.pipe(startWith('')),
+            this.form.controls.kind.valueChanges.pipe(startWith(this.form.controls.kind.value)),
+            toObservable(this.revealSuggestions),
         ]).pipe(
-            switchMap(([prefix, type, dataset]) =>
-                type && dataset && this.kind() === 'entity'
+            switchMap(([prefix, type, dataset, kind, reveal]) =>
+                type && dataset && kind === 'entity'
                     ? this.profiles
-                          .suggestEntities(type, { prefix: prefix.trim(), dataset, limit: 8 })
+                          .suggestEntities(type, {
+                              prefix: prefix.trim(),
+                              dataset,
+                              limit: 8,
+                              ...(reveal ? { reveal: true } : {}),
+                          })
                           .pipe(catchError(() => of(null as EntitySuggestions | null)))
                     : of(null as EntitySuggestions | null),
             ),
@@ -445,9 +475,16 @@ export class LinkAnalysisStartBoxComponent {
     readonly suggestNote = computed(() => {
         const s = this.suggestions();
         if (!s) return '';
+        if (s.masked && s.revealed)
+            return 'This Entity Type is masked: its values are shown because you may reveal them, and each look-up is recorded.';
         if (s.masked) return 'This Entity Type is masked: type the whole value - nothing is suggested.';
         if (s.assessed && !s.items.length) return `No ${this.typeLabel()} in ${this.datasetName()} starts like this.`;
         return '';
+    });
+    /** A masked type suggests nothing; someone who may reveal is offered its values (an explicit, audited ask). */
+    readonly offerReveal = computed(() => {
+        const s = this.suggestions();
+        return !!s?.masked && !s.revealed && this.lens.canRevealLinkEntities();
     });
     readonly line = (s: EntitySuggestion): string => suggestionLine(s);
 

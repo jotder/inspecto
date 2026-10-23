@@ -2,7 +2,7 @@
   ACTIVE PLAN — docs/superpower/
   Created 2026-10-05 by consolidating eight Link Analysis (LA) plan/design docs into ONE tracker; 2026-10-22 it also took the
   open items of six more archived LA plans (last section). This is the ONLY place that lists unbuilt LA work, besides
-  the BACKLOG rows LA-ONBOARD-RESIDUALS-1 and LA-ONBOARD-DEFECTS-1 (LA-ONBOARD-1 closed 2026-10-22, plan archived). How LA works today: docs/okf/product/module/la-core/user-guide-link-analysis.md. How to use it:
+  the BACKLOG row LA-ONBOARD-RESIDUALS-1 (LA-ONBOARD-1 closed 2026-10-22, plan archived; LA-ONBOARD-DEFECTS-1 closed 2026-10-23). How LA works today: docs/okf/product/module/la-core/user-guide-link-analysis.md. How to use it:
   docs/okf/product/module/la-core/user-guide-manual.md. Retire sections (distil into the OKF concept, rows to BACKLOG §3.12) as
   each ships; archive this file when nothing is open.
 -->
