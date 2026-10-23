@@ -1,9 +1,13 @@
 # BI result masking - design (`BI-QUERY-MASKING-1`)
 
+> **ARCHIVED 2026-10-23 — `BI-QUERY-MASKING-1` CLOSED after its security review (section 12).** As built:
+> [`okf/product/module/processor/spec-queries.md`](../../okf/product/module/processor/spec-queries.md) § *Classified entity keys
+> are masked in BI result rows*. The status lines below are history.
+>
 > **Status: DESIGN + first slice + gap-closure slice built 2026-10-12 (lane), awaiting operator security review before any push.**
 > Gap closure (section 11): `/db` routes, Report exports, KPI values, Rule Template simulate, numeric key derivations and the
 > `$parameter` oracle are covered; Exchange snapshots stay open on decision D-M6 (section 11.6).
-> Decision D7 of [`parked-rows-scoping-2026-10-12.md`](../archived-documents/plans-archive/parked-rows-scoping-2026-10-12.md): classified entity keys in BI
+> Decision D7 of [`parked-rows-scoping-2026-10-12.md`](parked-rows-scoping-2026-10-12.md): classified entity keys in BI
 > result rows are MASKED unless the caller holds the reveal capability. This is a security change that alters what
 > every dashboard, report and share viewer sees; it is written to be reviewed line by line.
 
@@ -241,3 +245,25 @@ As built: the snapshot meta carries `classification` per column (`NONE` when cle
 * `query_author` was checked 2026-10-13: it returns a validated SQL draft and never executes it, so it returns no rows (not a hole).
   Any Job type other than the Report Job that writes rows to a file still needs the 11.2 seam wired in.
 * Built 2026-10-13: `REPORT_READY` carries `aliasedColumns` (the output columns holding an alias), via `ReportRowMasking.Masked`.
+
+## 12. Security review (2026-10-23, lane E) - findings and the fix for each
+
+The row's remaining gate was a security review of the built masking. Each consumer path was attacked as a viewer without
+`canRevealLinkEntities` (and, for free SQL, as an author without it) on DuckDB 2.0.0.0. Findings already filed as
+`BI-MASKING-ROW-VALUE-LEAKS-1` (the row as a value, renames in FROM, a decodable alias, sort on an aliased key in a saved
+query) belong to that row and its own lane; they are not repeated here. What this review adds:
+
+| # | Path | Finding (reproduced) | Fix (session decision unless noted) |
+|---|---|---|---|
+| R1 | `/bi/query` with a bound Query | the masking read the bound text as `WITH "__bound_query" AS (...)`, which does not parse, so an opaque reference in the saved query (`SELECT #1 AS x FROM calls_ds`, a star that renames) was never seen: `x` came back RAW and a filter on it was allowed | the masking reads the saved query's own text: when it names a key, holds an opaque reference, or the lineage is untraceable, every output column is masked and a filter / order on an undeclared column is refused, exactly as for a text that names the key |
+| R2 | every route that runs SQL (`/queries/{id}/run`, `/bi/query`, `/datasets/{id}/rows`, `/db/table`, `/db/query`, rule simulate, KPI value, public share) | the 422 carried DuckDB's own text, and a run-time error QUOTES the value: `error(msisdn)` answers `Invalid Input Error: 4417..`, a failed `CAST(msisdn AS DATE)` (free SQL or a calculated column) names the string | while masking is in force for the caller, only a compile-time error (`Parser` / `Binder` / `Catalog`, raised before any row is read) keeps its text; any other answers a fixed sentence. A revealer, an unclassified Dataset and `maskingMode none` keep the full text |
+| R3 | `/queries/{id}/run` with caller `parameters` | the `$parameter` oracle refusal looked only for the key's NAME, so `WHERE CAST(calls_ds AS VARCHAR) LIKE $p` or `WHERE #1 LIKE $p` let a viewer bisect | refused whenever the text reads a key by any route the result masking recognises (name, opaque reference, untraceable lineage) |
+| R4 | `/datasets/{id}/rows`, `/bi/query` over a calculated column | `DatasetRelation` wraps the base as `__base`; a calculated column `concat(__base)` or `__base` is the whole row, raw key included, and the name rule never saw it | a calculated column whose expression names `__base` is masked like one naming a masked column |
+| R5 | `POST /public/dashboards/{token}/query` on an install where nobody signs in | `MaskingDefault` makes the Space's unstated mode `none` there (`LA-ONBOARD-1` OB-6, A-16: "anyone could reveal anyway"), so a public link handed classified keys RAW to an anonymous holder, who cannot reveal anything | the public share reads the mode the Space STATES, else the shipped `typed`, never the sign-in default. A Space that states `maskingMode: none` keeps raw shares (D-M2, its explicit choice). Session decision, recorded for the operator to overturn |
+| R6 | public share, a chart over a masked key | the SPA's share viewer sends the chart's cosmetic category order (`cosmetic: true`); `/bi/query` drops it for a non-revealer, the public route refused it, so every bar / line tile grouped by a masked key failed on a shared link (fail-closed, not a leak) | the public route drops the cosmetic order as `/bi/query` does, before compiling |
+
+Not changed, stated: a reveal is not audited per BI read (D-P8 / D-M4 stand; A-16's "reveal audited" is the explicit Link
+Analysis reveal); a Report Job run that fails keeps the driver text in its Run record (an author-only two-step channel through
+a calculated column; Report rows themselves are masked); two view-backed Datasets over the same view do not share a
+classification (`EvidenceMasker` matches siblings by `physicalRef`; a pipeline-produced view is classified by its schema).
+Tests: `ControlApiBiMaskingReviewTest` (each fails on the code before this section).

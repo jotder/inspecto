@@ -1367,8 +1367,9 @@ data origin decides the entry points (phase 2).
   add-on stays masked. `LinkAnalysisSettings.effectiveMaskingMode` (entity-store, the one seam every masking reader and
   `GET /settings/link-analysis` `maskingModeInForce` share) asks this `MaskingDefault` ServiceLoader provider, read live; with
   no provider on the classpath (entity-store / la-api unit tests) the shipped `typed` holds. A stated mode always wins. It is
-  the Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, public dashboard shares, Report Job exports)
-  follows it too. ⚠ Tests: no test classpath sets `auth.mode`, so every test without an armed `Authenticators.forTest` runs
+  the Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, Report Job exports) follows it too; a public
+  dashboard share reads only a STATED mode, else `typed`, since its anonymous holder cannot reveal (`BI-QUERY-MASKING-1`
+  review, 2026-10-23). ⚠ Tests: no test classpath sets `auth.mode`, so every test without an armed `Authenticators.forTest` runs
   as "no sign-in" (`none` by default); a test relying on the `typed` default sets `-Dauth.mode=oidc` or arms an
   Authenticator (the `investigations` pin no longer matters). With no sign-in there is no Subject, so the capability behind an
   audited reveal is never checked and anyone may reveal; a stated mode stops a casual glance, not a user.

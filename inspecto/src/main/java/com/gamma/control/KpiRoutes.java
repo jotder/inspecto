@@ -77,8 +77,9 @@ final class KpiRoutes implements RouteModule {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "kpi '" + id + "': no dataset '" + kpi.dataset() + "'");
         // BI-QUERY-MASKING-1: a Measure that returns a raw key (min / max / sum / avg of a masked column) is refused unless
         // the caller may reveal it.
-        BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), kpi.dataset(), dataset,
-                BiResultMasking.mayReveal(ex)).vetMeasure(kpi.measure());
+        BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), kpi.dataset(),
+                dataset, BiResultMasking.mayReveal(ex));
+        masking.vetMeasure(kpi.measure());
         KpiEvaluator.Result r;
         try {
             String relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
@@ -90,7 +91,7 @@ final class KpiRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw ServerFaults.datasetRead("kpi evaluation failed", kpi.dataset(), dataset, e, api);
+            throw masking.scrub(ServerFaults.datasetRead("kpi evaluation failed", kpi.dataset(), dataset, e, api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }

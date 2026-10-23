@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * (a request with no Subject is unrestricted, which would make a swapped capability invisible).
  *
  * <p>Users: {@code viewer} holds nothing, {@code revealer} holds {@code canRevealLinkEntities}, {@code author} holds
- * {@code canAuthorWorkbench} (to issue a share). Design: {@code docs/superpower/bi-query-masking-design.md}.
+ * {@code canAuthorWorkbench} (to issue a share). Design: {@code docs/archived-documents/plans-archive/bi-query-masking-design.md}.
  */
 class ControlApiBiQueryMaskingTest {
 

@@ -114,14 +114,48 @@ execution, so grouping and `countDistinct` are unchanged. A column classified `P
 Fail closed: an untraceable lineage masks every column the Dataset does not declare; a calculated column naming a masked
 column is masked; a saved query's string output is masked when its text names a masked column. A viewer's filter, `when`,
 order, or `min / max / sum / avg` over a masked column answers 422 (inference channels); a public share recipient never
-reveals. Design, path inventory and the open decisions D-M1..D-M7:
-[`bi-query-masking-design.md`](../../../../superpower/bi-query-masking-design.md). Tests:
-`ControlApiBiQueryMaskingTest`, `ExplorationMaskingSpaceKeyTest`.
+reveals. Design record (path inventory, decisions D-M1..D-M7, the security review in section 12):
+[`bi-query-masking-design.md`](../../../../archived-documents/plans-archive/bi-query-masking-design.md). Tests:
+`ControlApiBiQueryMaskingTest`, `ControlApiBiMaskingReviewTest`, `ExplorationMaskingSpaceKeyTest`.
 Also covered since 2026-10-13: `/db/table` and `/db/query`, scheduled Report exports (`ReportRowMasking`), Exchange snapshots
 (D-M6 (a)), numeric key derivations. **2026-10-18:** a column classified `PII` stays unmasked in `typed` mode by decision (the
 telecom pack does not claim `PII`; use `maskingMode: all`); a table Widget's `limit` is a server-side row limit, so a top-N
 tile is masked like any other result. Retired to BACKLOG §6: D-M5 `revealKeys`, D-M4, live-mode Exchange grants, other
-file-writing Job types. Open on `BI-QUERY-MASKING-1`: only the operator's security review.
+file-writing Job types. `BI-QUERY-MASKING-1` closed 2026-10-23 after its security review (below).
+
+**Security review (2026-10-23, `BI-QUERY-MASKING-1` closed).** Every BI consumer was attacked as a viewer without
+`canRevealLinkEntities` (and free SQL as an author without it) on DuckDB 2.0.0.0; what it found and how each now behaves:
+- **A Widget bound to a saved Query** (`/bi/query` with `query`): the masking reads the saved query's OWN text. It used to read
+  the `WITH "__bound_query" AS (` prefix, which does not parse, so `SELECT #1 AS x` or a renaming star went unseen and `x`
+  came back raw (a filter on it was an oracle). When that text reads a key (names it, holds a star / `#n`, or the lineage is
+  untraceable) every output column is masked and a filter or order on an undeclared column answers 422
+  (`BiResultMasking.applyBound`).
+- **Error text.** DuckDB quotes the offending VALUE in a run-time error: `error(msisdn)` answers `Invalid Input Error:
+  4417..`, a failed `CAST(msisdn AS DATE)` (free SQL, or a calculated column) names the string. While masking is in force for
+  the caller, a 422 keeps the driver's text only when every error type it names is compile-time (`Parser` / `Binder` /
+  `Catalog`, raised before any row is read); any other answers a fixed sentence (`BiResultMasking.scrub`), on
+  `/queries/{id}/run`, `/bi/query`, `/datasets/{id}/rows`, `/db/table` + `/db/query`, rule simulate, `/kpis/{id}/value`
+  and the public share. A revealer, an unclassified Dataset and `maskingMode none` keep the full text.
+- **The `$parameter` oracle** is refused whenever the saved query reads a key by any route the result masking recognises,
+  not only by name (`WHERE COLUMNS('msi.*') LIKE $p` was a bisection).
+- **A calculated column naming `__base`** (the alias `DatasetRelation.withCalculated` gives the row it is computed over:
+  `concat(__base)` is the whole row) is masked like one naming a masked column.
+- **The public share on an install where nobody signs in.** The sign-in `MaskingDefault` makes an unstated mode `none` there
+  ("anyone could reveal anyway", `LA-ONBOARD-1` OB-6), which handed classified keys raw to an anonymous link holder.
+  `BiResultMasking.forPublicShare` reads the mode the Space STATES, else the shipped `typed`; a stated `none` keeps raw shares
+  (D-M2). Session decision 2026-10-23, open to the operator's overturn.
+- **The public share and a chart over a masked key.** The share viewer sends the chart's cosmetic category order; the public
+  route now drops it as `/bi/query` does instead of answering 422 (every bar / line tile grouped by a masked key failed on a
+  shared link).
+Consumer matrix, pinned by `ControlApiBiMaskingReviewTest`: `/bi/query`, `/queries/{id}/run`, `/datasets/{id}/rows` and the
+public share are masked for a viewer and raw for a revealer; the public share stays masked when a revealer's credential rides
+along; a stated `none` opens every path; Report exports are always masked (`ReportJobMaskingTest`). Not changed, stated: a
+reveal is not audited per BI read (D-P8 / D-M4; the audited reveal is Link Analysis's explicit one); a Report Job Run that
+fails keeps the driver's text in its Run record (a two-step author channel through a calculated column; the Report rows
+themselves are masked); two view-backed Datasets over the same view do not share a classification (`EvidenceMasker` matches
+siblings by `physicalRef`; a pipeline-produced view is classified by its schema). Free-SQL shapes the same review found
+already filed (the row as a value, renames in FROM, a decodable alias, a sort on an aliased key) are
+`BI-MASKING-ROW-VALUE-LEAKS-1`.
 
 **SQL shapes the position model cannot prove fail closed (`BI-MASKING-SQL-SHAPE-LEAKS-1`, fixed 2026-10-23, verified on
 DuckDB 2.0.0.0).** Free SQL (a saved query, `/db/query`) is read through `json_serialize_sql`. An item that can expand to several
