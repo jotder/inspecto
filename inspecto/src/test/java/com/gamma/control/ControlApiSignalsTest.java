@@ -80,6 +80,52 @@ class ControlApiSignalsTest {
         }
     }
 
+    /** TELCO-FRAUD-STORY-GAPS-1: the Home tile asks for two Dataset-write types in ONE call, so a Dataset named by
+     *  both counts once; the old route read the list as one literal type and counted nothing. */
+    @Test
+    void countsSeveralTypesInOneCallAndADatasetNamedByBothCountsOnce(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            com.gamma.event.EventLog log = c.spaces().space(com.gamma.service.SpaceId.of("acme")).orElseThrow().service().eventLog();
+            log.emit(signal("dataset.write", "tf_cdr"));
+            log.emit(signal("job.dataset.produced", "tf_cdr"));       // the same Dataset, the other way
+            log.emit(signal("job.dataset.produced", "tf_irsf_offenders"));
+            log.emit(signal("job.run.succeeded", null));             // another type: not counted
+
+            String base = "/spaces/acme/signals/count?type=";
+            JsonNode both = JSON.readTree(send(c.port, "GET", base + "dataset.write,%20job.dataset.produced", null).body()).get("data");
+            assertEquals(3, both.get("count").asInt(), both.toString());
+            assertEquals(2, both.get("datasets").asInt(), "tf_cdr written both ways counts once: " + both);
+            assertFalse(both.get("capped").asBoolean());
+
+            JsonNode one = JSON.readTree(send(c.port, "GET", base + "job.dataset.produced", null).body()).get("data");
+            assertEquals(2, one.get("count").asInt(), "a single type is unchanged: " + one);
+            assertEquals(2, one.get("datasets").asInt());
+            assertEquals(422, send(c.port, "GET", base + "%20,%20", null).statusCode(), "a list of blanks is no type");
+        }
+    }
+
+    /** {@code capped} reads the RAW signal page: a window full of other types may hide some of the asked type.
+     *  The old route tested the filtered size, so a full page of job signals reported an exact-looking 0. (Driven
+     *  through {@code tally} with a small page: the default in-memory ledger holds fewer than MAX_LIMIT events.) */
+    @Test
+    void capsWhenTheWindowIsFullEvenIfFewSignalsAreOfTheAskedType() {
+        List<com.gamma.signal.Signal> full = List.of(sig("job.run.started", null), sig("job.run.started", null), sig("dataset.write", "a"));
+        java.util.Map<String, Object> r = SignalRoutes.tally(full, List.of("dataset.write"), 3);
+        assertEquals(1, r.get("count"));
+        assertEquals(true, r.get("capped"), "the page was full, so the figure is a floor: " + r);
+        assertEquals(false, SignalRoutes.tally(full, List.of("dataset.write"), 4).get("capped"), "a page with room is exact");
+    }
+
+    private static com.gamma.signal.Signal sig(String type, String dataset) {
+        return new com.gamma.signal.Signal(null, type, null, null, com.gamma.signal.Ref.of("job", "t"), null, null,
+                null, "acme", null, null, dataset == null ? java.util.Map.of() : java.util.Map.of("dataset", dataset), 0);
+    }
+
+    private static com.gamma.audit.Event signal(String type, String dataset) {
+        return sig(type, dataset).toEvent();
+    }
+
     @Test
     void queriesSignalsWithTypeAndSeverityFilters(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

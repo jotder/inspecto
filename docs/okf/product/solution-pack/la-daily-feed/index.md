@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-DAILY-INGEST-1` | P2 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | — |
+| `LA-DAILY-INGEST-1` | P2 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | operator |

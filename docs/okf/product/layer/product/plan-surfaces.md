@@ -357,6 +357,21 @@ tolerated) and SUMS `count` and `datasets`; `capped` is the OR. The two types co
 write is never double-counted, but a Dataset written both ways counts once per type — `datasets` is an upper
 bound. Exact distinct-across-types would need a route change (several `type` values returning names); not built.
 
+✅ **One count over both types, exact distinct Datasets** (2026-10-23, `TELCO-FRAUD-STORY-GAPS-1`). `type` on
+`GET /signals/count` now takes a comma-separated list (each entry exact or a `prefix.*` glob; blanks dropped, an
+all-blank list is the same 422 as none). The route reads the raw Signal page of the window once, keeps the Signals
+matching ANY entry, and counts distinct `payload.dataset` across them, so a Dataset written both ways counts once.
+Home makes ONE call, `type=dataset.write,job.dataset.produced`, and shows the server's figure as is (no client sum).
+`capped` now tests the RAW page size (the window held `EventQuery.MAX_LIMIT` Signals of any type), not the filtered
+count: the old test almost never fired, so a window flooded with other Signals reported an exact-looking floor.
+Pinned by `ControlApiSignalsTest` (`countsSeveralTypesInOneCall…`, `capsWhenTheWindowIsFull…`) and
+`home.component.spec.ts`. **Live 2026-10-23** (Advanced `-DemoAuth` bundle, a fresh `telco-fraud` Space, the three
+sample feeds, 14 detection Jobs): the tile read *14 / 14 writes*; two Jobs re-run with Home open moved it to
+*14 / 16 writes* on the next tick with no reload (distinct Datasets held). The same drive found a fresh Space's Home
+stuck on the first-run panel (*Nothing has been onboarded yet*) beside 14 finished Jobs until a reload, because the
+run list was read once at init: the 30 s tick now re-reads the run list too while the page is on the first-run panel
+(and stops once it is operational).
+
 Two guest routes and one public share route sit outside the shell; the
 rest hang off a shelled route with the login guard and an initial-data resolver, with roughly 40 lazily
 loaded children. Breadcrumbs are a shared component fed by each detail pane rather than derived from

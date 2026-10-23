@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * (a request with no Subject is unrestricted, which would make a swapped capability invisible).
  *
  * <p>Users: {@code viewer} holds nothing, {@code revealer} holds {@code canRevealLinkEntities}, {@code author} holds
- * {@code canAuthorWorkbench} (to issue a share). Design: {@code docs/superpower/bi-query-masking-design.md}.
+ * {@code canAuthorWorkbench} (to issue a share). Design: {@code docs/archived-documents/plans-archive/bi-query-masking-design.md}.
  */
 class ControlApiBiQueryMaskingTest {
 
@@ -623,7 +623,8 @@ class ControlApiBiQueryMaskingTest {
                     "dup1_q", new String[]{"SELECT msisdn, msisdn FROM calls_ds", "msisdn_1"},
                     "dup2_q", new String[]{"SELECT *, msisdn AS region FROM calls_ds", "region_1"},
                     "dup3_q", new String[]{"SELECT region AS k, msisdn AS k FROM calls_ds", "k_1"},
-                    "dup4_q", new String[]{"SELECT msisdn AS k, '" + A + "' AS k, msisdn AS k_1 FROM calls_ds", "k_1_1"});
+                    "dup4_q", new String[]{"SELECT msisdn AS k, '" + A + "' AS k, msisdn AS k_1 FROM calls_ds", "k_1_1"},
+                    "dup5_q", new String[]{"SELECT true, msisdn AS \"true\", region FROM calls_ds", "true_1"});
             for (Map.Entry<String, String[]> e : dedup.entrySet()) {
                 reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()[0]));
                 HttpResponse<String> r = bi(c, "viewer", "calls_ds", "\"query\":\"" + e.getKey()

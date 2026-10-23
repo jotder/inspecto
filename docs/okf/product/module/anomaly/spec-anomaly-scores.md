@@ -72,9 +72,17 @@ ownership marker `.anomaly-score-output` (`com.gamma.alert.ScoreOutputDirs`, sha
 Dataset accepted over a scores store is the identity shape (`id = physicalRef`, nothing else).
 Store-clash gate (`AnomalyKindValidator.requireStorable`, `ANOMALY-TF-STORE-CLASH-1`): a model is storable when a
 registered Dataset's `physicalRef` is exactly its own `latestDataset()` / `scoresDataset()` and carries no `path`
-override (the telco-fraud pack's `tf_subscriber_anomaly_latest` tile Dataset). Safe because the output name is the
+override (the telco-fraud pack's tile Dataset). Safe because the output name is the
 reserved prefix + this model's id, so it can never name a foreign model's or unrelated store, and reading one's own
 output is harmless; an id clash, an unowned existing directory and a `path` override stay refused.
+⚠ The Dataset save gate (`requireNotReserved`) still accepts ONLY the identity shape, so a pack's read Dataset over
+its own model's store must BE the identity Dataset: `anomaly_scores_<model>_latest` with the same `physicalRef` (it may
+carry `columns`). The telco-fraud tile Dataset first shipped as `tf_subscriber_anomaly_latest` and made the WHOLE template
+uncreatable on every edition with Anomaly Detection (422 at `POST /spaces`, found live 2026-10-23,
+`TELCO-FRAUD-STORY-GAPS-1`); it is now `anomaly_scores_tf_subscriber_usage_latest`. The pending Alert Rule's
+`ensureLatestDataset` finds it registered and leaves it (classification kept). Pinned by
+`ControlApiAnomalyTemplateApplyTest.theShippedTelcoFraudTemplateAppliesWithAnomalyDetectionPresent` (applies the whole shipped
+template where this validator is on the classpath; the golden test's module has none).
 
 **Save-time gates (422), in Risk Score order:** `fromMap` (structure, unknown keys, every Feature compiled) →
 `AnomalyKindValidator` (`ComponentKindValidator` SPI: every named column — key, measure, filters, `time`, peers
@@ -252,7 +260,7 @@ factor (`measure: max(score)`) — a documented pattern, no code.
 ## Deliberate deferrals
 
 `ANOMALY-DETECTION-RESIDUALS-1` closed 2026-10-18. **The dashboard tile is BUILT:** the telco-fraud template ships
-`tf_subscriber_anomaly_latest` (a Dataset over the derived store `anomaly_scores_tf_subscriber_usage_latest`, `entity_key`
+`anomaly_scores_tf_subscriber_usage_latest` (the identity Dataset over the derived store of that name, `entity_key`
 classified MSISDN) and the table Widget `tf_unusual_subscribers_top10` on `telco_fraud_overview` (group by `entity_key`,
 `band`; `max(score)`; `tableSort` `max_score` desc; `limit: 10`). A table Widget's `options.limit` is now a SERVER-side row
 limit (`table.plugin.ts`), so `/bi/query` returns, and masks, only the top rows; no Widget-level filter was needed, because the

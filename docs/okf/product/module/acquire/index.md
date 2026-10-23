@@ -36,4 +36,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P3 | feature | Unpack (11) absent codecs | demand |
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |
-| `SCALEOUT-U1-REMOTE-ACQUIRE-1` | P3 | feature | Remote acquisition (U1) is not distributed: two pods would both fetch the same remote file. | — |
+| `SCALEOUT-U1-REMOTE-ACQUIRE-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

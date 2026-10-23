@@ -301,8 +301,10 @@ none and no Authenticator: Basic); wherever people sign in the shipped `typed` h
 add-on. The seam is `LinkAnalysisSettings.effectiveMaskingMode`, which every masking reader and `GET /settings/link-analysis`
 `maskingModeInForce` go through; it asks the `MaskingDefault` provider the control plane ships (`EditionMaskingDefault`), so
 the API and the SPA agree. Pinned by `ControlApiMaskingDefaultBySignInTest`.
-⚠ It is the Space's ONE masking mode, so on Basic the BI reads (`BiResultMasking`: queries, KPIs, the DB browser, public
-dashboard shares and Report Job exports) are unmasked by default too. A Space that STATES a mode keeps it in every edition. Such a mode still masks entity ids in explorer answers, but with no
+⚠ It is the Space's ONE masking mode, so on Basic the BI reads (`BiResultMasking`: queries, KPIs, the DB browser and
+Report Job exports) are unmasked by default too. The exception is a public dashboard share: its holder is anonymous and
+cannot reveal, so it masks under the shipped `typed` unless the Space states a mode (`BI-QUERY-MASKING-1` review, 2026-10-23).
+A Space that STATES a mode keeps it in every edition. Such a mode still masks entity ids in explorer answers, but with no
 sign-in there is no Subject, so the capability an audited reveal needs (`canRevealLinkEntities`) is never checked and
 anyone may reveal. Masking on Basic stops a casual glance; it is not access control. Enforced masking (and the audited
 reveal on an Investigation) starts in Standard.

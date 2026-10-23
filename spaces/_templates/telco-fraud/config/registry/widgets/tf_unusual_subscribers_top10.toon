@@ -1,5 +1,5 @@
 vizType: table
-datasetId: tf_subscriber_anomaly_latest
+datasetId: anomaly_scores_tf_subscriber_usage_latest
 controls:
   x[2]{field}:
     entity_key

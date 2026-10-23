@@ -18,3 +18,6 @@ list the calls in the report so they can be overturned. Hold only when hard to r
 outward-facing, or reversing a recorded operator decision.
 
 Related: [[push-and-branch-policy]].
+
+## Release scope (2026-10-23)
+- The next release ships **without Postgres**. Postgres-dependent work (Investigation store on Postgres, multi-pod scale-out, Postgres multi-user, PG test env) is postponed: rows carry `hold: operator`. Do not start it; do not make the release depend on a PostgreSQL driver.

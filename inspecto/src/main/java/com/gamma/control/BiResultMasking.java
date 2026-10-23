@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.entitystore.MaskTokens;
@@ -36,7 +37,7 @@ import java.util.regex.Pattern;
 
 /**
  * Masking of classified entity keys in BI RESULT ROWS (BI-QUERY-MASKING-1, operator decision 2026-10-12; design
- * {@code docs/superpower/bi-query-masking-design.md}). The ONE helper every Dataset-reading BI route calls
+ * {@code docs/archived-documents/plans-archive/bi-query-masking-design.md}). The ONE helper every Dataset-reading BI route calls
  * ({@code /bi/query}, {@code /queries/{id}/run}, {@code /datasets/{id}/rows}, the public share query).
  *
  * <p><b>Which columns</b> - the Space's {@code maskingMode} ({@link LinkAnalysisSettings}), the same setting Link Analysis
@@ -51,7 +52,7 @@ import java.util.regex.Pattern;
  * {@code countDistinct} ran over the raw values.
  *
  * <p><b>Caller</b> - raw only for a holder of {@link #REVEAL}; a request with no Subject (Basic, no auth module) is
- * unrestricted like every capability gate, EXCEPT the public share route, which passes {@code reveal=false} always.
+ * unrestricted like every capability gate, EXCEPT the public share route ({@link #forPublicShare}), which never reveals.
  *
  * <p><b>Inference channels refused (422) for a caller who cannot reveal:</b> a filter, a {@code when} condition or an
  * ordering on a masked column (a prefix filter bisects raw values; an order leaks rank), and any measure over one that
@@ -67,6 +68,13 @@ final class BiResultMasking {
 
     /** A masked cell that is not a bare key: one value for every such cell, so it links to nothing (BI-MASKING-ROW-VALUE-LEAKS-1). */
     static final String UNLINKABLE = "masked:withheld";
+
+    /** The alias {@code DatasetRelation.withCalculated} gives the relation a calculated column is computed over. */
+    private static final Set<String> CALC_BASE = Set.of("__base");
+
+    /** A DuckDB error type ({@code Conversion Error:}); only {@link #COMPILE_TIME} ones are raised before any row is read. */
+    private static final Pattern ERROR_TYPE = Pattern.compile("([A-Za-z]+) Error:");
+    private static final Set<String> COMPILE_TIME = Set.of("Parser", "Binder", "Catalog");
 
     private final Path writeRoot;
     private final String mode;
@@ -106,10 +114,28 @@ final class BiResultMasking {
         return ApiContext.subject(ex).map(s -> s.capabilities().contains(REVEAL)).orElse(true);
     }
 
-    /** The masking for a read over {@code datasetId}; {@code reveal} is {@link #mayReveal} (false for a public share). */
+    /** The masking for a read over {@code datasetId}; {@code reveal} is {@link #mayReveal}. */
     static BiResultMasking of(Path writeRoot, ComponentStore store, ViewStore views, String datasetId,
                               Map<String, Object> dataset, boolean reveal) {
-        String mode = LinkAnalysisSettings.forRoot(writeRoot).effectiveMaskingMode();
+        return of(writeRoot, store, views, datasetId, dataset, reveal,
+                LinkAnalysisSettings.forRoot(writeRoot).effectiveMaskingMode());
+    }
+
+    /**
+     * The public share query: never reveals, and reads the mode the Space STATES, else the shipped {@code typed} - never the
+     * sign-in default ({@link com.gamma.entitystore.MaskingDefault}), whose {@code none} rests on "whoever uses this install
+     * may reveal anyway", which an anonymous link holder cannot (BI-QUERY-MASKING-1 review R5, session decision 2026-10-23).
+     * A Space that states {@code none} keeps raw shares (D-M2).
+     */
+    static BiResultMasking forPublicShare(Path writeRoot, ComponentStore store, ViewStore views, String datasetId,
+                                          Map<String, Object> dataset) {
+        String stated = LinkAnalysisSettings.forRoot(writeRoot).maskingMode();
+        return of(writeRoot, store, views, datasetId, dataset, false,
+                stated != null ? stated : ConfigSpecs.LINK_ANALYSIS_MASKING_MODES.get(0));
+    }
+
+    private static BiResultMasking of(Path writeRoot, ComponentStore store, ViewStore views, String datasetId,
+                                      Map<String, Object> dataset, boolean reveal, String mode) {
         if ("none".equals(mode))
             return new BiResultMasking(writeRoot, mode, reveal, Set.of(), false, Set.of(), "masking is off for this Space (maskingMode none)");
         List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
@@ -155,11 +181,13 @@ final class BiResultMasking {
         // A view or virtual Dataset over a store with classified columns: a rename cannot be traced (EvidenceMasker's rule).
         if (!lineage.isEmpty() && (notBlank(dataset.get("view")) || notBlank(dataset.get("sql")))) unknown = true;
 
-        // A calculated column that names a masked column carries it (run twice so a chain of two is followed).
+        // A calculated column that names a masked column carries it (run twice so a chain of two is followed), and so does one
+        // that names the row it is computed over (review R4: concat(__base) is the whole row, raw key included).
         if (dataset.get("calculated") instanceof List<?> calc)
             for (int pass = 0; pass < 2; pass++)
                 for (Object o : calc)
-                    if (o instanceof Map<?, ?> c && c.get("name") != null && mentions(String.valueOf(c.get("expr")), masked))
+                    if (o instanceof Map<?, ?> c && c.get("name") != null
+                            && (mentions(String.valueOf(c.get("expr")), masked) || mentions(String.valueOf(c.get("expr")), CALC_BASE)))
                         masked.add(String.valueOf(c.get("name")).trim().toLowerCase(Locale.ROOT));
         declared.removeAll(masked);
         String basis = unknown
@@ -211,9 +239,10 @@ final class BiResultMasking {
             untraceable |= star && list.size() > 1;   // a star's names collide with the other items' unseen
             for (JsonNode item : list) {
                 untraceable |= multiColumn(item) && !("STAR".equals(item.path("type").asText()) && !patternStar(item));
-                // a key-reading item DuckDB names itself (upper(msisdn)): its output name is not known here
+                // an item DuckDB names itself (upper(msisdn), true, NULL): its output name is not known here, and an
+                // alias elsewhere that equals it makes DuckDB rename the key copy (true_1)
                 untraceable |= item.path("alias").asText("").isEmpty() && !"COLUMN_REF".equals(item.path("type").asText())
-                        && !"STAR".equals(item.path("type").asText()) && refsKey(item, aliases);
+                        && !"STAR".equals(item.path("type").asText());
             }
         }
         if (untraceable) boundAll = true;
@@ -236,12 +265,13 @@ final class BiResultMasking {
      * 422 when the spec filters, conditions or orders on a masked column, or returns a raw key through
      * {@code min / max / sum / avg} or a statistic. A no-op unless {@link #engaged}. {@code checkFilters=false} is for the public share
      * route, whose flat {@code filters} are the SHARED DASHBOARD'S stored ones, not the recipient's.
-     * {@code boundText} is a bound saved query's text (a Widget over a Query): its output names are the author's, so
-     * when it names a masked column every column not declared clean is treated as possibly masked.
+     * {@code boundText} is a bound saved query's own text (a Widget over a Query; never the {@code WITH} prefix, which does
+     * not parse): its output names are the author's, so when it reads a key ({@link #readsKey}) every column not declared
+     * clean is treated as possibly masked.
      */
     void vet(MeasureCompiler.Spec spec, boolean checkFilters, String boundText) {
         if (!engaged()) return;
-        boolean viaText = boundText != null && (unknown || mentions(boundText, masked) || opaqueRefs(boundText));
+        boolean viaText = boundText != null && (unknown || readsKey(boundText));
         readBound(boundText, viaText);
         if (viaText && !boundAll) viaText = false;   // traced: only the masked columns and the names the text gives a key
         if (checkFilters)
@@ -265,7 +295,7 @@ final class BiResultMasking {
      */
     MeasureCompiler.Spec stripCosmeticOrder(MeasureCompiler.Spec spec, String boundText) {
         if (!engaged() || spec.measures().isEmpty()) return spec;   // no measure: the compiler's key-order fallback would leak, so vet refuses
-        boolean viaText = boundText != null && (unknown || mentions(boundText, masked) || opaqueRefs(boundText));
+        boolean viaText = boundText != null && (unknown || readsKey(boundText));
         readBound(boundText, viaText);
         if (viaText && !boundAll) viaText = false;   // traced: only the masked columns and the names the text gives a key
         List<MeasureCompiler.Sort> kept = new ArrayList<>();
@@ -730,14 +760,43 @@ final class BiResultMasking {
     /**
      * The {@code $parameter} oracle: a caller-supplied parameter value is substituted into a saved query's text, so
      * {@code WHERE msisdn LIKE $prefix} bisects a masked key exactly as a filter would. Refused when the caller supplies any
-     * value and the query text names a masked column (or the lineage is untraceable). Declared defaults stay the author's.
+     * value and the query text reads a key ({@link #readsKey}: by name, or through an opaque reference such as {@code #1};
+     * review R3) or the lineage is untraceable. Declared defaults stay the author's.
      */
     void vetParameterValues(String queryText, java.util.Collection<String> suppliedNames) {
         if (!engaged() || suppliedNames.isEmpty()) return;
-        if (unknown || mentions(queryText, masked))
+        if (unknown || readsKey(queryText))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "parameter value(s) " + suppliedNames
                     + " are refused: the query reads a masked key (or its lineage is untraceable), and a caller-supplied value "
                     + "could be compared with its raw values; the caller needs " + REVEAL);
+    }
+
+    /** {@code sql} reads a key by a route the result masking recognises: it names a masked column, or holds an opaque reference. */
+    private boolean readsKey(String sql) {
+        return mentions(sql, masked) || opaqueRefs(sql);
+    }
+
+    /**
+     * {@code fault} (a 422 built from a failed run's DuckDB text) as this caller may see it. DuckDB QUOTES the offending value
+     * in a run-time error ({@code error(msisdn)} answers {@code Invalid Input Error: 4417..}, a failed cast names the string),
+     * so while masking is in force the text survives only when every error type it names is raised before any row is read
+     * (Parser / Binder / Catalog); any other answers a fixed sentence (review R2). A revealer, an unclassified Dataset and
+     * {@code maskingMode none} keep the full text; a non-422 (the no-data 409) is untouched.
+     */
+    ApiException scrub(ApiException fault) {
+        if (!engaged() || fault.status != 422 || compileTimeOnly(fault.getMessage())) return fault;
+        return new ApiException(422, fault.errorCode, "the query failed while reading the data; the database's error text is "
+                + "withheld because it can quote a stored value of a masked key (a caller with " + REVEAL + " sees it)");
+    }
+
+    private static boolean compileTimeOnly(String message) {
+        var m = ERROR_TYPE.matcher(message == null ? "" : message);
+        boolean any = false;
+        while (m.find()) {
+            if (!COMPILE_TIME.contains(m.group(1))) return false;
+            any = true;
+        }
+        return any;
     }
 
     private String alias(String raw) {

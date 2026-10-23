@@ -110,9 +110,10 @@ final class QueryRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {          // unsafe projection/sort identifier
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException sql) {
-            throw datasetId == null
-                    ? new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + ServerFaults.sqlMessage(sql.getMessage(), api))
-                    : ServerFaults.datasetRead("query failed", datasetId, datasetContent, sql, api);
+            if (datasetId == null)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + ServerFaults.sqlMessage(sql.getMessage(), api));
+            // A run-time error can quote a stored key (error(msisdn), a failed cast): withheld while masking is in force.
+            throw masking.scrub(ServerFaults.datasetRead("query failed", datasetId, datasetContent, sql, api));
         } catch (IOException io) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", io);
         }

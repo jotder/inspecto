@@ -38,7 +38,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | Consignment addressing | demand |
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | operator |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
-| — | P2 | feature | Postgres multi-user | — |
+| — | P2 | feature | Postgres multi-user | operator |
 | `OPSTORE-BULK-INSERT-1` | P2 | defect | row-at-a-time JDBC inserts into a file-backed DuckDB run at hundreds of rows/s, on 1.5.6 AND 2.0. | — |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | report DuckDB 2.0.0's window_self_join hive-pruning defect upstream, then drop the workaround when it is fixed. | external |
 | `DUCKDB-2-DECIMAL-WIDENING-AUDIT-1` | P3 | chore | DuckDB 2.0 widens DECIMAL(18,4) ± DECIMAL(18,4) to DECIMAL(19,4) (1.5 capped at 18); only partner-settlement is pinned. | — |

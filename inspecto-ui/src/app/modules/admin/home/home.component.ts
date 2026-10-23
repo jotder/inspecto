@@ -26,7 +26,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { ToastrService } from 'ngx-toastr';
-import { catchError, forkJoin, interval, of } from 'rxjs';
+import { interval } from 'rxjs';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One row of the "Needs attention" list — the three sources normalised onto one shape. */
@@ -66,6 +66,8 @@ const CLOSED_INCIDENT = new Set(['RESOLVED', 'ARCHIVED']);
  */
 /** How often the Home counted tiles re-read their server counts. */
 const COUNT_REFRESH_MS = 30_000;
+/** The signal types that name a Dataset write, counted together by `GET /signals/count`. */
+const DATASET_WRITE_TYPES = 'dataset.write,job.dataset.produced';
 
 @Component({
     selector: 'inspecto-home',
@@ -211,26 +213,7 @@ export class HomeComponent implements OnInit {
 
     load(): void {
         this.loading.set(true);
-        this.jobs.recentRuns(25).subscribe({
-            next: (r) => {
-                this.runs.set(r);
-                this.runsUnavailable.set(false);
-                this.loading.set(false);
-            },
-            error: (err) => {
-                // No run history is an expected deployment state (the DuckDB jobs backend is opt-in),
-                // so it explains itself in place rather than toasting. Connectivity stays the banner's job.
-                this.runs.set([]);
-                this.runsUnavailable.set(true);
-                this.loading.set(false);
-                // ⚠ The hand-rolled 404/503/0 test missed 502 — behind the dev proxy a stopped
-                // backend surfaces as a gateway error, and the pane toasted red over a panel that
-                // already explained itself. One shared rule now (UI-10).
-                if (!isFeatureAbsent(err)) {
-                    this.toastr.error(apiErrorMessage(err, 'Could not load recent runs'));
-                }
-            },
-        });
+        this.loadRuns();
 
         // Gate on the flag first: an absent ops module 503s on every path, so asking at all would only
         // produce an error to swallow (the dashboard's precedent).
@@ -257,9 +240,37 @@ export class HomeComponent implements OnInit {
         this.loadCounts();
         // The page stays open while work lands: a count read once at init showed 0 beside 17 fresh Dataset writes
         // (TELCO-FRAUD-STORY-GAPS-1 d). Re-read both on a slow tick — two cheap counts, never a client-side sweep.
+        // A page still on the first-run panel re-reads the run list too: a live drive (2026-10-23) left a fresh
+        // Space's Home on "Nothing has been onboarded yet" beside 14 finished Jobs until a reload.
         interval(COUNT_REFRESH_MS)
             .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe(() => this.loadCounts());
+            .subscribe(() => {
+                if (this.firstRun()) this.loadRuns();
+                this.loadCounts();
+            });
+    }
+
+    private loadRuns(): void {
+        this.jobs.recentRuns(25).subscribe({
+            next: (r) => {
+                this.runs.set(r);
+                this.runsUnavailable.set(false);
+                this.loading.set(false);
+            },
+            error: (err) => {
+                // No run history is an expected deployment state (the DuckDB jobs backend is opt-in),
+                // so it explains itself in place rather than toasting. Connectivity stays the banner's job.
+                this.runs.set([]);
+                this.runsUnavailable.set(true);
+                this.loading.set(false);
+                // ⚠ The hand-rolled 404/503/0 test missed 502 — behind the dev proxy a stopped
+                // backend surfaces as a gateway error, and the pane toasted red over a panel that
+                // already explained itself. One shared rule now (UI-10).
+                if (!isFeatureAbsent(err)) {
+                    this.toastr.error(apiErrorMessage(err, 'Could not load recent runs'));
+                }
+            },
+        });
     }
 
     private loadCounts(): void {
@@ -268,21 +279,13 @@ export class HomeComponent implements OnInit {
             error: () => this.breached.set(null),
         });
         // Two signal types name a Dataset write: `dataset.write` (Consignment/Materialize) and
-        // `job.dataset.produced` (sql.template Jobs — a polled Collector emits neither). `/signals/count` takes one
-        // type and returns no names, so sum the two; a Dataset written both ways counts once per type (an upper bound).
+        // `job.dataset.produced` (sql.template Jobs — a polled Collector emits neither). Ask for both in ONE count,
+        // so a Dataset written both ways counts once (summing two calls double-counted it; TELCO-FRAUD-STORY-GAPS-1).
         const since = Date.now() - 24 * 3_600_000;
-        const read = (type: string) => this.events.signalCount(type, since).pipe(catchError(() => of(null)));
-        forkJoin([read('dataset.write'), read('job.dataset.produced')]).subscribe(([a, b]) =>
-            this.datasetsWritten.set(
-                a || b
-                    ? {
-                          count: (a?.count ?? 0) + (b?.count ?? 0),
-                          datasets: (a?.datasets ?? 0) + (b?.datasets ?? 0),
-                          capped: !!(a?.capped || b?.capped),
-                      }
-                    : null,
-            ),
-        );
+        this.events.signalCount(DATASET_WRITE_TYPES, since).subscribe({
+            next: (w) => this.datasetsWritten.set(w),
+            error: () => this.datasetsWritten.set(null),
+        });
     }
 
     openLensHome(): void {

@@ -22,7 +22,6 @@ interface Stubs {
     breached?: number;
     breachedError?: unknown;
     writes?: { count: number; datasets: number; capped: boolean };
-    produced?: { count: number; datasets: number; capped: boolean };
     writesError?: unknown;
     runs?: unknown[];
     runsError?: { status: number };
@@ -60,10 +59,10 @@ function create(s: Stubs = {}) {
         ),
     };
     const events = {
-        signalCount: vi.fn((type: string) =>
+        signalCount: vi.fn((_type: string) =>
             s.writesError
                 ? throwError(() => s.writesError)
-                : of((type === 'dataset.write' ? s.writes : s.produced) ?? { count: 0, datasets: 0, capped: false }),
+                : of(s.writes ?? { count: 0, datasets: 0, capped: false }),
         ),
     };
     const session = {
@@ -280,7 +279,25 @@ describe('HomeComponent', () => {
             try {
                 const { events } = create({ runs: [RUN()] });
                 vi.advanceTimersByTime(30000);
-                expect(events.signalCount).toHaveBeenCalledTimes(4);
+                expect(events.signalCount).toHaveBeenCalledTimes(2);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        /** Live 2026-10-23: a fresh Space's Home stayed on the first-run panel beside 14 finished Jobs until a reload. */
+        it('leaves the first-run panel on the tick once runs exist, and stops re-reading runs after', () => {
+            vi.useFakeTimers();
+            try {
+                const { fixture, el, jobs } = create({ runs: [] });
+                expect(el.textContent).toContain('Nothing has been onboarded yet');
+                jobs.recentRuns.mockImplementation(() => of([RUN()]));
+                vi.advanceTimersByTime(30_000);
+                fixture.detectChanges();
+                expect(el.textContent).not.toContain('Nothing has been onboarded yet');
+                expect(el.querySelector('[data-testid="tile-datasets-written"]')).not.toBeNull();
+                vi.advanceTimersByTime(30_000);
+                expect(jobs.recentRuns).toHaveBeenCalledTimes(2); // operational Home: the run list is not polled
             } finally {
                 vi.useRealTimers();
             }
@@ -299,19 +316,15 @@ describe('HomeComponent', () => {
             expect(w).not.toContain('at least');
         });
 
-        it('counts a write recorded only as job.dataset.produced, and sums both types', () => {
-            const only = create({ runs: [RUN()], produced: { count: 5, datasets: 2, capped: false } });
-            const t1 = only.el.querySelector('[data-testid="tile-datasets-written"]')?.textContent ?? '';
-            expect(t1).toContain('2');
-            expect(t1).toContain('5 writes');
-            expect(only.events.signalCount).toHaveBeenCalledWith('job.dataset.produced', expect.any(Number));
-            const both = create({
-                runs: [RUN()],
-                writes: { count: 3, datasets: 1, capped: false },
-                produced: { count: 5, datasets: 2, capped: true },
-            });
-            const t2 = both.el.querySelector('[data-testid="tile-datasets-written"]')?.textContent ?? '';
-            expect(t2).toContain('8 writes (at least)');
+        /** TELCO-FRAUD-STORY-GAPS-1: two calls summed per type counted a Dataset written both ways twice; one
+         *  call over both types lets the server count each Dataset once, and the tile shows its figure as is. */
+        it('asks for both write types in ONE count and shows the distinct Datasets the server returns', () => {
+            const { el, events } = create({ runs: [RUN()], writes: { count: 5, datasets: 2, capped: false } });
+            expect(events.signalCount).toHaveBeenCalledTimes(1);
+            expect(events.signalCount).toHaveBeenCalledWith('dataset.write,job.dataset.produced', expect.any(Number));
+            const t = el.querySelector('[data-testid="tile-datasets-written"]')?.textContent ?? '';
+            expect(t).toContain('2');
+            expect(t).toContain('5 writes');
         });
 
         it('says "at least" when the ledger count is capped', () => {
@@ -327,20 +340,14 @@ describe('HomeComponent', () => {
                     writes: { count: 2, datasets: 1, capped: false },
                 });
                 expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('2 writes');
-                events.signalCount.mockImplementation((t: string) =>
-                    of(
-                        t === 'dataset.write'
-                            ? { count: 17, datasets: 9, capped: false }
-                            : { count: 0, datasets: 0, capped: false },
-                    ),
-                );
+                events.signalCount.mockImplementation(() => of({ count: 17, datasets: 9, capped: false }));
                 vi.advanceTimersByTime(30_000);
                 fixture.detectChanges();
-                expect(events.signalCount).toHaveBeenCalledTimes(4);
+                expect(events.signalCount).toHaveBeenCalledTimes(2);
                 expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('17 writes');
                 fixture.destroy();
                 vi.advanceTimersByTime(60_000);
-                expect(events.signalCount).toHaveBeenCalledTimes(4); // the tick dies with the page
+                expect(events.signalCount).toHaveBeenCalledTimes(2); // the tick dies with the page
             } finally {
                 vi.useRealTimers();
             }

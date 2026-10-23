@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | Two test groups cannot run on the shared User profile, so a green reactor does not cover them. | — |
+| `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

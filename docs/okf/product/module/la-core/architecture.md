@@ -1108,7 +1108,10 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   opens the same dialog on a bare `?` (never in a text field) with its own list, `LA_APP_SHORTCUTS` (no command palette
   or triage-list keys, which la-app does not have), passed as the dialog data `{shortcuts}`.
 - **Access Catalog.** `canManageExclusionCategories` has its action node since 2026-10-23: `linkgraph.exclusion-categories`
-  (the id `LensService` reads), under Settings, where the Exclusion categories section is its main client gate.
+  (the id `LensService` reads), under Settings, where the Exclusion categories section is its main client gate. Since
+  `LA-ACCESS-NODE-IDS-1` (2026-10-23) `canRevealLinkEntities` / `canApproveLinkExpansions` read their nodes' ids
+  `linkgraph.reveal` / `linkgraph.approve`; `access-lens-parity.spec.ts` fails on any node/lens id drift
+  (detail: `module/access/admin-guide-auth-security.md`).
 - **Gotchas and deferrals** (open rows in [BACKLOG](../../../../BACKLOG.md), `LA-GROW-EXCLUDE-RESIDUALS-1`):
   - *Previews are not audited*: neither preview route writes an audit record or event (read-shaped, rate class EXPENSIVE).
   - *A broken auto-apply list blocks every Investigation create* in the Space (fail closed, the refusal names the list)
@@ -1367,8 +1370,9 @@ data origin decides the entry points (phase 2).
   add-on stays masked. `LinkAnalysisSettings.effectiveMaskingMode` (entity-store, the one seam every masking reader and
   `GET /settings/link-analysis` `maskingModeInForce` share) asks this `MaskingDefault` ServiceLoader provider, read live; with
   no provider on the classpath (entity-store / la-api unit tests) the shipped `typed` holds. A stated mode always wins. It is
-  the Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, public dashboard shares, Report Job exports)
-  follows it too. ⚠ Tests: no test classpath sets `auth.mode`, so every test without an armed `Authenticators.forTest` runs
+  the Space's one mode, so `BiResultMasking` (BI queries, KPIs, DB browser, Report Job exports) follows it too; a public
+  dashboard share reads only a STATED mode, else `typed`, since its anonymous holder cannot reveal (`BI-QUERY-MASKING-1`
+  review, 2026-10-23). ⚠ Tests: no test classpath sets `auth.mode`, so every test without an armed `Authenticators.forTest` runs
   as "no sign-in" (`none` by default); a test relying on the `typed` default sets `-Dauth.mode=oidc` or arms an
   Authenticator (the `investigations` pin no longer matters). With no sign-in there is no Subject, so the capability behind an
   audited reveal is never checked and anyone may reveal; a stated mode stops a casual glance, not a user.
