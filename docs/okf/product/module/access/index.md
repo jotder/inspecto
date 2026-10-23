@@ -34,5 +34,9 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `BI-MASKING-GROUPBY-RENAME-1` | P1 | defect | a Widget's case-duplicate groupBy (k, K, k_1) makes DuckDB rename the outputs in order (k, k_1, k_1_1), so a granted bare-key name carrie… | — |
+| `BI-MASKING-NONWORD-KEY-NAME-1` | P1 | defect | a classified column whose name is not one plain word ("msisdn no", non-ASCII) is unseen by the token check readsKey / mentions (words of… | — |
+| `DATASET-CALC-NAME-COLLISION-1` | P2 | defect | a calculated column named like a base column ({name:"region", expr:"upper(msisdn)"}) is renamed region_1 by DuckDB and served raw (same r… | — |
+| `BI-MASKING-CALC-DERIVED-ALIAS-1` | P2 | defect | a calculated column derived from a key (substr(msisdn,1,4), coalesce('4417', msisdn)) keeps the linkable Space alias, so a Dataset author… | — |
 | `BI-MASKING-STRUCTURED-RESIDUALS-1` | P1 | defect | three masking holes outside free SQL, found by the review of BI-MASKING-ROW-VALUE-LEAKS-1 (2026-10-23, DuckDB 2.0; they predate it — re-r… | — |
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |
