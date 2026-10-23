@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-357 test class(es): 131 unit, 226 real-HTTP control-plane, 0 IT.
+358 test class(es): 131 unit, 227 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -74,6 +74,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuditTest.java` | Integration tests for the security audit trail emitted centrally from {@link ControlApi#dispatch}: |
 | `ControlApiAuthSessionV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuthSessionV1Test.java` | Real-HTTP tests for the W6d backend-mediated session routes ({@code /auth/*}): code exchange sets |
 | `ControlApiAuthV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuthV1Test.java` | Real-HTTP tests for W6's AuthN/AuthZ gate in {@link ControlApi#dispatch}. The core ships no |
+| `ControlApiBiMaskingReviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiMaskingReviewTest.java` | BI-QUERY-MASKING-1 security review (2026-10-23; {@code docs/archived-documents/plans-archive/bi-query-masking-design.md} section 12): one test per |
 | `ControlApiBindTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBindTest.java` | GAP-1 (deployment-topology-plan §10): {@code -Dcontrol.bind} restricts the control plane's listen |
 | `ControlApiBiQueryAdversarialTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiQueryAdversarialTest.java` |  |
 | `ControlApiBiQueryMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiQueryMaskingTest.java` | BI-QUERY-MASKING-1: classified entity keys in BI result rows are masked unless the caller holds |

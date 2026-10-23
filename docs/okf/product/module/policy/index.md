@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `BI-QUERY-MASKING-1` | P2 | defect | /bi/query and /queries/{id}/run return a classified entity key raw to any viewer (decided 2026-10-12, operator: its own gated, reviewed r… | — |
+| `BI-MASKING-FREE-SQL-ORACLES-1` | P1 | defect | a caller without canRevealLinkEntities can still TEST a masked key's value through free SQL, with every output cell masked — found by the… | operator |

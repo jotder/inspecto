@@ -102,9 +102,11 @@ final class BiRoutes implements RouteModule {
         BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")),
                 spec.dataset(), dataset, BiResultMasking.mayReveal(ex));
         String queryId = ApiContext.str(body, "query");
-        String boundText = queryId == null ? null : boundQueryWith(ex, store, queryId, spec);
+        // The saved query's own rendered text: the masking reads it (the WITH prefix below does not parse on its own).
+        String boundQuery = queryId == null ? null : boundQueryText(ex, store, queryId, spec);
+        String boundText = boundQuery == null ? null : "WITH \"" + BOUND + "\" AS (" + boundQuery + ") ";
         // The chart's cosmetic category order over a masked key is dropped (not refused) for a caller who cannot reveal.
-        MeasureCompiler.Spec stripped = masking.stripCosmeticOrder(spec, boundText);
+        MeasureCompiler.Spec stripped = masking.stripCosmeticOrder(spec, boundQuery);
         if (stripped != spec) {
             spec = stripped;
             probe = spec.withLimit(spec.limit() + 1);
@@ -127,15 +129,16 @@ final class BiRoutes implements RouteModule {
                         "error", "bound query '" + queryId + "' failed the SQL safety check", "findings", boundFindings));
         }
 
-        masking.vet(spec, true, boundText);
+        masking.vet(spec, true, boundQuery);
         QueryExecutor.Request req = new QueryExecutor.Request(spec.dataset(), relationSql, sql.sql(),
                 spec.limit(), 0, List.of(), List.of(), sql.params());
         try {
             QueryExecutor.Result raw = QueryExecutor.run(req);
-            QueryExecutor.Result shown = masking.apply(raw, boundText == null ? spec.groupBy() : null, boundText);
+            QueryExecutor.Result shown = boundQuery == null ? masking.apply(raw, spec.groupBy(), null)
+                    : masking.applyBound(raw, boundQuery);
             return response(shown, echoSql, masking.describe());
         } catch (SQLException e) {
-            throw ServerFaults.datasetRead("BI query failed", spec.dataset(), dataset, e, api);
+            throw masking.scrub(ServerFaults.datasetRead("BI query failed", spec.dataset(), dataset, e, api));
         }
     }
 
@@ -169,12 +172,12 @@ final class BiRoutes implements RouteModule {
     private static final String BOUND = "__bound_query";
 
     /**
-     * The {@code WITH "__bound_query" AS (<rendered query text>) } prefix that puts {@code spec} over the saved
-     * query {@code queryId}'s result ({@link #overBound} then compiles {@code SELECT … FROM "__bound_query"}). The query must
+     * The saved query {@code queryId}'s rendered text, which the route wraps as {@code WITH "__bound_query" AS (<text>) } to
+     * put {@code spec} over its result ({@link #overBound} then compiles {@code SELECT … FROM "__bound_query"}). The query must
      * exist and be visible (else 404, like a dataset), be {@code type:sql} with text, and read the SAME
      * dataset the spec names (the dataset view it references is the one registered for the run).
      */
-    private static String boundQueryWith(HttpExchange ex, ComponentStore store, String queryId, MeasureCompiler.Spec spec) {
+    private static String boundQueryText(HttpExchange ex, ComponentStore store, String queryId, MeasureCompiler.Spec spec) {
         Map<String, Object> query;
         try {
             query = store.get("query", queryId).map(ComponentRegistry.Component::content).orElse(null);
@@ -199,8 +202,7 @@ final class BiRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
-        resolved = resolved.strip().replaceAll(";+$", "").strip();
-        return "WITH \"" + BOUND + "\" AS (" + resolved + ") ";
+        return resolved.strip().replaceAll(";+$", "").strip();
     }
 
     /** {@code spec} re-pointed at the bound query's CTE. */

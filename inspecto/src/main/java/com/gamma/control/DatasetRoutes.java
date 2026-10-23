@@ -158,17 +158,18 @@ final class DatasetRoutes implements RouteModule {
                 ApiContext.parseIntOr(ApiContext.query(ex, "limit"), DEFAULT_ROW_LIMIT)));
         // The view is named after the Dataset id; QueryExecutor quotes it on CREATE VIEW the same way.
         String sql = "SELECT * FROM " + SqlIdent.q(id);
+        // BI-QUERY-MASKING-1: classified entity keys are masked in the rows unless the caller may reveal them.
+        BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), id, dataset,
+                BiResultMasking.mayReveal(ex));
         QueryExecutor.Result r;
         try {
             r = QueryExecutor.run(new QueryExecutor.Request(id, relationSql, sql, limit, 0, List.of(), List.of()));
         } catch (SQLException e) {
-            throw ServerFaults.datasetRead("dataset read failed", id, dataset, e, api);
+            // a calculated column's failed cast quotes the stored key: withheld while masking is in force
+            throw masking.scrub(ServerFaults.datasetRead("dataset read failed", id, dataset, e, api));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
-        // BI-QUERY-MASKING-1: classified entity keys are masked in the rows unless the caller may reveal them.
-        BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), id, dataset,
-                BiResultMasking.mayReveal(ex));
         QueryExecutor.Result raw = r;
         r = masking.apply(raw, raw.columns().stream().map(ResultSetDescriptor.Column::name).toList(), null);
         List<Map<String, Object>> columns = new ArrayList<>();

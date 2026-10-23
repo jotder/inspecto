@@ -115,6 +115,10 @@ final class ShareRoutes implements RouteModule {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'"));
 
+        // BI-QUERY-MASKING-1: a public recipient is anonymous, so it NEVER reveals (reveal=false whatever the request carries),
+        // and an unstated masking mode is the shipped `typed` here even where nobody signs in (review R5).
+        BiResultMasking masking = BiResultMasking.forPublicShare(api.writeRoot(), store,
+                new ViewStore(api.writeRoot().resolve("views")), datasetId, dataset);
         // SHARE-SAVED-FILTER-1: the filter is the shared Dashboard's STORED one, never the caller's — a recipient
         // can neither drop it (seeing more than the Dashboard shows) nor swap in another.
         Map<String, Object> fenced = new LinkedHashMap<>(body);
@@ -126,7 +130,8 @@ final class ShareRoutes implements RouteModule {
             filters.addAll(DashboardDateRange.terms(dashboard, dataset,
                     DashboardDateRange.today(java.time.ZoneId.systemDefault())));
             fenced.put("filters", filters);
-            spec = MeasureCompiler.parse(fenced, 500, 10_000);
+            // The chart's cosmetic category order over a masked key is dropped, as /bi/query drops it (review R6).
+            spec = masking.stripCosmeticOrder(MeasureCompiler.parse(fenced, 500, 10_000), null);
             sql = MeasureCompiler.compile(spec.withLimit(spec.limit() + 1));   // one past the cap, so truncated is exact
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
@@ -134,11 +139,8 @@ final class ShareRoutes implements RouteModule {
 
         List<Finding> findings = SqlGuard.check(sql.sql());
         if (!findings.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "compiled query failed the SQL safety check");
-        // BI-QUERY-MASKING-1: a public recipient is anonymous, so it NEVER reveals (reveal=false whatever the request carries).
         // The flat filters are the shared Dashboard's own stored ones (trusted); the recipient's own `when`, order and
         // measures are vetted.
-        BiResultMasking masking = BiResultMasking.of(api.writeRoot(), store, new ViewStore(api.writeRoot().resolve("views")),
-                datasetId, dataset, false);
         masking.vet(spec, false, null);
         String relationSql;
         try {
@@ -159,7 +161,7 @@ final class ShareRoutes implements RouteModule {
             if (maskingBlock != null) out.put("masking", maskingBlock);
             return out;
         } catch (SQLException e) {
-            throw ServerFaults.datasetRead("query failed", datasetId, dataset, e, api);
+            throw masking.scrub(ServerFaults.datasetRead("query failed", datasetId, dataset, e, api));
         }
     }
 

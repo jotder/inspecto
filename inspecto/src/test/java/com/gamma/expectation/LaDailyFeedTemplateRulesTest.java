@@ -98,6 +98,12 @@ class LaDailyFeedTemplateRulesTest {
         assertEquals("pipeline.commit", index.onSignal());
         assertEquals("daily_xdr_dataset", index.params().get("dataset"));
         assertEquals("true", index.params().get("allow_full"), "the first build is a full one");
+        // LA-DAILY-INGEST-1 roadmap residual: the T5 / scale parameters reach the Job from the .toon, not only from a map
+        assertEquals("admin", index.params().get("owner"), "the seed gate re-stamps it to the applier on an authenticated server");
+        assertEquals("600", index.params().get("timeout_seconds"));
+        assertEquals("300", index.params().get("wait_seconds"), "a time budget, not the six-wait bound");
+        assertTrue(Long.parseLong(index.params().get("wait_seconds")) <= Long.parseLong(index.params().get("timeout_seconds")),
+                "a wait longer than the timeout is clamped to it, so the shipped wait must fit inside it");
         com.gamma.job.JobConfig band = com.gamma.job.JobConfig.load(jobs.resolve("la_rows_band_evaluate_job.toon").toString());
         assertEquals("expectation.evaluate", band.type());
         assertEquals("pipeline.commit", band.onSignal());

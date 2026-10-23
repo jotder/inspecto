@@ -121,7 +121,8 @@ final class RuleRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "rule template failed: " + ServerFaults.sqlMessage(sql.getMessage(), api));
+            ApiException fault = new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "rule template failed: " + ServerFaults.sqlMessage(sql.getMessage(), api));
+            throw masking == null ? fault : masking.scrub(fault);   // a run-time error can quote a stored key
         } catch (IOException io) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", io);
         }
