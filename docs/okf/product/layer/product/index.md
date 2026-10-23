@@ -40,6 +40,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `LA-SAMPLE-GALLERY-DEMOAUTH-1` | P3 | defect | on Basic the *New from sample* dialog lists la-audit, la-claims and la-mobile-money as creatable because the template gallery reports the… | — |
 | `UI-THEME-NULL-TOKENS-1` | P3 | defect | themes.scss rebuilds each Material M2 theme without its _mat-system key, so Material 22 token functions return null; 3fa647719 restored o… | — |
+| `LA-ACCESS-NODE-IDS-1` | P3 | defect | an Access profile that denies *Reveal link entities* or *Approve link expansions* changes nothing on screen: the Access-Catalog nodes are… | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
 | `DOCS-FUNCTIONALITY-HUBS-1` | P3 | chore | decide whether functionality/ Product Map Items get their own hubs or stay sections of their module's features slot (none exist yet, so n… | operator |

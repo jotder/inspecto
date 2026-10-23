@@ -1,4 +1,5 @@
 import { NextStepsDialog } from './next-steps.dialog';
+import { LA_APP_SHORTCUTS, ShortcutsHelpDialog } from 'app/inspecto/shortcuts-help.dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -170,5 +171,16 @@ describe('la-app shell and landing page', () => {
         expect(button.getAttribute('aria-label')).toBe('What can I do next?');
         button.click();
         expect(open).toHaveBeenCalledWith(NextStepsDialog, expect.anything());
+    });
+
+    it('opens the keyboard-shortcuts help on ? - its own list - but not while typing in a field', async () => {
+        const el = await render();
+        const open = vi.spyOn(TestBed.inject(MatDialog), 'open').mockReturnValue({} as never);
+        const input = document.createElement('input');
+        el.appendChild(input);
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
+        expect(open).not.toHaveBeenCalled();
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
+        expect(open).toHaveBeenCalledWith(ShortcutsHelpDialog, expect.objectContaining({ data: { shortcuts: LA_APP_SHORTCUTS } }));
     });
 });

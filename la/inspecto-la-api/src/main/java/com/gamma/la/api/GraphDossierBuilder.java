@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.EntityListFacts;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.InvestigationTime;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +12,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import static com.gamma.la.core.InvestigationEvaluator.canonical;
@@ -56,9 +58,19 @@ final class GraphDossierBuilder {
     /** One included evidence snapshot: its id and the raw bytes it is stored as. */
     record Snapshot(String id, String raw) {}
 
-    /** Everything the builder reads, already fetched from the store. Set files absent from disk map to null. */
+    /**
+     * Everything the builder reads, already fetched from the store. Set files absent from disk map to null.
+     * {@code restrictedSteps}: the list-op steps over a restricted exclusion list this reader may not see the members of
+     * ({@link RestrictedLists}, LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1) - their {@code excludeBy} lines and negative space
+     * name no removed id and round the count. Rendering only: the manifest and integrity never read it.
+     */
     record Input(String id, String headerRaw, List<String> logLines, Map<Integer, String> setFiles,
-                 List<Snapshot> snapshots, int at) {}
+                 List<Snapshot> snapshots, int at, Set<Integer> restrictedSteps) {
+        Input(String id, String headerRaw, List<String> logLines, Map<Integer, String> setFiles,
+              List<Snapshot> snapshots, int at) {
+            this(id, headerRaw, logLines, setFiles, snapshots, at, Set.of());
+        }
+    }
 
     // ── build ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -125,6 +137,10 @@ final class GraphDossierBuilder {
             }
         }
         Map<String, Object> ws = state.toMap();
+        // LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1: the excludeBy steps whose removed ids this reader may not see.
+        Set<Integer> hidden = new java.util.HashSet<>();
+        for (Integer step : in.restrictedSteps())
+            if (step >= 1 && step <= log.size() && "excludeBy".equals(log.get(step - 1).get("op"))) hidden.add(step);
 
         List<Map<String, Object>> snapshots = new ArrayList<>();
         for (Snapshot s : in.snapshots()) snapshots.add(parse(s.raw()));
@@ -133,10 +149,11 @@ final class GraphDossierBuilder {
         dossier.put("summary", summary(in, header, state));
         dossier.put("topology", topology(state));
         dossier.put("scores", scores(in.snapshots(), snapshots));
-        List<Map<String, Object>> ledger = ledger(log, entityCounts, removedBy, mergedBy);
+        List<Map<String, Object>> ledger = ledger(log, entityCounts, removedBy, mergedBy, hidden);
         dossier.put("ledger", ledger);
-        Map<String, Object> negative = negativeSpace(log, state, in.snapshots(), snapshots, removedBy, mergedBy);
+        Map<String, Object> negative = negativeSpace(log, state, in.snapshots(), snapshots, removedBy, mergedBy, hidden);
         dossier.put("negativeSpace", negative);
+        if (!hidden.isEmpty()) castMap((Map<?, ?>) dossier.get("summary")).put("excluded", negative.get("excludedCount"));
         Map<String, Object> integrity = new LinkedHashMap<>();
         integrity.put("intact", failures.isEmpty());
         integrity.put("stepsChecked", log.size());
@@ -153,7 +170,7 @@ final class GraphDossierBuilder {
         Map<String, Object> renderings = new LinkedHashMap<>();
         renderings.put("json", jsonRendering(header, log, negative));
         renderings.put("steps", stepsRendering(ledger, negative));
-        renderings.put("method", methodStatement(in, header, state, log, negative, integrity, manifest, removedBy, mergedBy));
+        renderings.put("method", methodStatement(in, header, state, log, negative, integrity, manifest, removedBy, mergedBy, hidden));
         dossier.put("renderings", renderings);
 
         List<Map<String, Object>> entities = castList(ws.get("entities"));
@@ -379,7 +396,7 @@ final class GraphDossierBuilder {
 
     private static List<Map<String, Object>> ledger(List<Map<String, Object>> log, List<Integer> entityCounts,
                                                     Map<Integer, List<String>> removedBy,
-            Map<Integer, Map<String, List<String>>> mergedBy) {
+            Map<Integer, Map<String, List<String>>> mergedBy, Set<Integer> hidden) {
         Map<Integer, Integer> undoneBy = undoneBy(log);
         List<Map<String, Object>> out = new ArrayList<>();
         for (int i = 0; i < log.size(); i++) {
@@ -391,7 +408,8 @@ final class GraphDossierBuilder {
             row.put("author", e.get("author"));
             row.put("kind", e.get("kind"));
             row.put("op", "undo".equals(e.get("kind")) ? "undo" : e.get("op"));
-            row.put("text", render(e, removedBy.get(step), mergedBy.get(step)));
+            row.put("text", line(e, step, removedBy, mergedBy, hidden));
+            if (hidden.contains(step)) row.put("membersHidden", true);
             row.put("undoneBy", undoneBy.get(step));
             row.put("entitiesAfter", entityCounts.get(i));
             row.put("workingSetHash", e.get("workingSetHash"));
@@ -413,9 +431,14 @@ final class GraphDossierBuilder {
     private static Map<String, Object> negativeSpace(List<Map<String, Object>> log, InvestigationEvaluator.State s,
                                                      List<Snapshot> ids, List<Map<String, Object>> snaps,
                                                      Map<Integer, List<String>> removedBy,
-            Map<Integer, Map<String, List<String>>> mergedBy) {
+            Map<Integer, Map<String, List<String>>> mergedBy, Set<Integer> hidden) {
         List<Map<String, Object>> excluded = new ArrayList<>();
+        Map<Integer, Integer> withheld = new TreeMap<>();   // a restricted list's step -> how many it still excludes
         for (var x : s.excluded.entrySet()) {
+            if (hidden.contains(x.getValue().step())) {
+                withheld.merge(x.getValue().step(), 1, Integer::sum);
+                continue;
+            }
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", x.getKey());
             m.put("step", x.getValue().step());
@@ -431,7 +454,7 @@ final class GraphDossierBuilder {
         Map<Integer, Integer> undoneBy = undoneBy(log);
         List<Map<String, Object>> undone = new ArrayList<>();
         undoneBy.forEach((step, by) -> undone.add(Map.of("step", step, "undoneBy", by,
-                "text", render(log.get(step - 1), removedBy.get(step), mergedBy.get(step)))));
+                "text", line(log.get(step - 1), step, removedBy, mergedBy, hidden))));
         List<Map<String, Object>> truncated = new ArrayList<>();
         for (Map<String, Object> e : log)
             if (e.get("read") instanceof Map<?, ?> r && Boolean.TRUE.equals(r.get("truncated"))) {
@@ -450,8 +473,25 @@ final class GraphDossierBuilder {
                     "computedAt", String.valueOf(snap.get("createdAt")), "nodes", sizeOf(snap.get("nodes"))));
         }
         Map<String, Object> m = new LinkedHashMap<>();
+        // LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1: a restricted list's exclusions as one rounded count per step, never an id.
+        List<Map<String, Object>> hiddenRows = new ArrayList<>();
+        int hiddenTotal = 0;
+        for (var w : withheld.entrySet()) {
+            Map<String, Object> by = log.get(w.getKey() - 1);
+            int n = EntityListFacts.roundedCount(w.getValue());
+            hiddenTotal += n;
+            Map<String, Object> h = new LinkedHashMap<>();
+            h.put("step", w.getKey());
+            h.put("count", n);
+            h.put("reason", castMap((Map<?, ?>) by.get("params")).get("reason"));
+            h.put("author", by.get("author"));
+            h.put("basis", "stated rule (" + InvestigationRoutes.listClause(by) + ")");
+            h.put("membersHidden", true);
+            hiddenRows.add(h);
+        }
         m.put("excluded", excluded);
-        m.put("excludedCount", excluded.size());
+        m.put("excludedCount", excluded.size() + hiddenTotal);
+        if (!hiddenRows.isEmpty()) m.put("excludedHidden", hiddenRows);
         m.put("undone", undone);
         m.put("truncated", truncated);
         m.put("hidden", new ArrayList<>(s.hidden));
@@ -521,7 +561,7 @@ final class GraphDossierBuilder {
                                           List<Map<String, Object>> log, Map<String, Object> negative,
                                           Map<String, Object> integrity, Map<String, Object> manifest,
                                           Map<Integer, List<String>> removedBy,
-            Map<Integer, Map<String, List<String>>> mergedBy) {
+            Map<Integer, Map<String, List<String>>> mergedBy, Set<Integer> hidden) {
         StringBuilder b = new StringBuilder();
         b.append("Method statement — Investigation ").append(in.id());
         if (header.get("title") != null) b.append(" (").append(header.get("title")).append(")");
@@ -549,7 +589,7 @@ final class GraphDossierBuilder {
         Map<Integer, Integer> undoneBy = undoneBy(log);
         for (int i = 0; i < log.size(); i++) {
             Map<String, Object> e = log.get(i);
-            b.append("  ").append(i + 1).append(". ").append(render(e, removedBy.get(i + 1), mergedBy.get(i + 1)));
+            b.append("  ").append(i + 1).append(". ").append(line(e, i + 1, removedBy, mergedBy, hidden));
             if (undoneBy.containsKey(i + 1)) b.append(" (undone by step ").append(undoneBy.get(i + 1)).append(")");
             b.append(" — ").append(e.get("author")).append(", ").append(e.get("at")).append("\n");
         }
@@ -576,13 +616,18 @@ final class GraphDossierBuilder {
     private static List<String> negativeLines(Map<String, Object> negative) {
         List<String> out = new ArrayList<>();
         List<Map<String, Object>> excluded = castList(negative.get("excluded"));
-        if (excluded.isEmpty()) out.add("- Excluded: none.");
+        List<Map<String, Object>> withheld = castList(negative.get("excludedHidden"));
+        if (excluded.isEmpty() && withheld.isEmpty()) out.add("- Excluded: none.");
         else {
-            out.add("- Excluded: " + excluded.size() + " entit" + (excluded.size() == 1 ? "y" : "ies") + ", gone from "
-                    + "display, traversal and counts:");
+            int n = ((Number) negative.get("excludedCount")).intValue();
+            out.add("- Excluded: " + (withheld.isEmpty() ? "" : "about ") + n + " entit" + (n == 1 ? "y" : "ies")
+                    + ", gone from display, traversal and counts:");
             for (Map<String, Object> x : excluded)
                 out.add("    " + x.get("id") + " — step " + x.get("step") + ", reason: " + x.get("reason") + ", by "
                         + x.get("author") + ", " + x.get("basis"));
+            for (Map<String, Object> w : withheld)
+                out.add("    about " + w.get("count") + " entities — step " + w.get("step") + ", reason: " + w.get("reason")
+                        + ", by " + w.get("author") + ", " + w.get("basis") + "; which entities is not shown: the list is restricted");
         }
         for (Map<String, Object> u : castList(negative.get("undone")))
             out.add("- Undone: step " + u.get("step") + " (" + u.get("text") + ") by step " + u.get("undoneBy") + ".");
@@ -608,6 +653,20 @@ final class GraphDossierBuilder {
     }
 
     // ── plain-language step text ───────────────────────────────────────────────────────────────────────
+
+    /**
+     * One step as {@link #render} writes it, except an {@code excludeBy} over a restricted list this reader may not see
+     * the members of ({@code hidden}, LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1): its line names the list and a rounded count,
+     * never an id - as the log view does.
+     */
+    static String line(Map<String, Object> e, int step, Map<Integer, List<String>> removedBy,
+                       Map<Integer, Map<String, List<String>>> mergedBy, Set<Integer> hidden) {
+        if (!hidden.contains(step)) return render(e, removedBy.get(step), mergedBy.get(step));
+        int n = EntityListFacts.roundedCount(removedBy.getOrDefault(step, List.of()).size());
+        return "Excluded about " + n + " entities on " + InvestigationRoutes.listClause(e) + " (reason: "
+                + castMap((Map<?, ?>) e.get("params")).get("reason") + "); which entities is not shown: the list is restricted"
+                + " (the count is rounded).";
+    }
 
     /**
      * One step as a plain-language line. ⚠ Mirrors {@code InvestigationRoutes.render} with ONE deliberate

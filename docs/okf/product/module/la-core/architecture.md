@@ -1021,8 +1021,17 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
   `protected: null` and `list.removed` rounded (nearest 5, never below 5, 0 stays 0); the log view's "Excluded N entities"
   is rounded; `/replay` (main and Draft) drops the `excludedKeys` those steps remembered and says `excludedKeysHidden: true`.
   ⚠ Not hidden, deliberately: the step's Working Set **delta** still names the admitted entities it removed (the canvas
-  needs them, and the analyst saw them a step earlier), and the **Dossier** (its ledger counts and negative space) is
-  unchanged — BACKLOG `LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`.
+  needs them, and the analyst saw them a step earlier).
+- **The Dossier** (`LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`, fixed 2026-10-23) hides the same for that caller, in every
+  form it leaves in (`json`, `steps`, `method`, `html`, the bundle and the hand-off — all go through
+  `DossierRoutes.maskedDossier`): `DossierRoutes.restrictedSteps` hands `GraphDossierBuilder.Input.restrictedSteps` the
+  `RestrictedLists` steps, and each such `excludeBy` renders as *"Excluded about N entities on Entity List `x` (…)
+  (reason: …); which entities is not shown: the list is restricted (the count is rounded)."* in the ledger (row
+  `membersHidden: true`), the undone list and the method statement; `negativeSpace.excluded` drops its ids and
+  `negativeSpace.excludedHidden` carries one row per step `{step, count (rounded), reason, author, basis, membersHidden}`;
+  `excludedCount` and `summary.excluded` add the rounded counts. Render time only: the manifest hashes the store, so the
+  same `/dossier/verify` agrees. ⚠ Still exact, deliberately: the ledger's `entitiesAfter` (the Working Set size after
+  each step) — the same difference the step's delta already shows that analyst.
 - **Grow previews.** `GrowPreview.listLine` rounds a list's `removed` only when the list is restricted (now, sealed, or
   no longer known) and the caller holds neither grant; an open list's count is exact. The Basic explorer's
   `POST /inv/projection/neighbors/preview` refuses `excludeBy` over a restricted list to such a caller (403), because two
@@ -1031,9 +1040,10 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
   `{lists: [{id, title, entityType, ownerKind, autoApply, visibility, size}]}`: live exclusion lists, admin first, then by
   title and id; never members. Read-gated like the Entity List reads (Space access; 503 without a write root). Rate class
   exempt.
-- Tests: `ControlApiInvestigationCategoryListsTest` (geo-link, 5: auto-apply recorded and replayed with an optional, an
+- Tests: `ControlApiInvestigationCategoryListsTest` (geo-link, 7: auto-apply recorded and replayed with an optional, an
   analyst and a retired list beside it; the unsealable list refusing the create with nothing written; the chips in Basic;
-  503; restricted hiding and rounding for an analyst against the true values for a `canRevealLinkEntities` lead).
+  503; restricted hiding and rounding for an analyst against the true values for a `canRevealLinkEntities` lead; the
+  Dossier in all four formats for each of them, its manifest still verifying; the Undo race below).
 
 ### 6.9 Grow, Held and Exclude on the graph (LA-GROW-EXCLUDE-1, SPA, as built 2026-10-22)
 
@@ -1069,8 +1079,20 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   preview counting one would promise removals the Grow does not make. Category lists therefore apply to Investigations
   only (auto-apply on create, §6.8); the explorer's Exclude hides locally and can add to a list.
 - **Undo.** A Grow / Exclude result line offers Undo while the steps it made are still the newest effective steps of the
-  log as last read (`valid()`); it sends the `undo` op once per step. Ctrl+Z runs that Undo first, then the display
-  undo. The explorer's Undo restores the graph snapshot only while the graph is the one the Grow drew.
+  log as last read (`valid()`); it sends the `undo` op once per step, newest first, each naming its step
+  (`{undoes: step}`). Ctrl+Z runs that Undo first, then the display undo. The explorer's Undo restores the graph
+  snapshot only while the graph is the one the Grow drew.
+- **The Undo names the step it means** (`LA-GROW-EXCLUDE-UNDO-RACE-1`, fixed 2026-10-23). In a shared Investigation
+  another lead may record a step after this browser last read the log; the old route undid the newest effective step,
+  so that step was the one taken back. `POST …/undo` (and a Draft's) now takes an optional body `{undoes: step}`
+  (`InvestigationRoutes.expectedUndo`: a whole number from 1, else 422): when the newest effective step is another one
+  the answer is **409 `CONFLICT_STALE_VERSION`** naming it (*"step 2 is not the newest step any more: step 3 (keep by
+  lead-1) is - read the log again; nothing was undone"*) and nothing is written. Checked inside `untilWon`, against the
+  log each attempt reads, so a step that lands while the undo retries is caught too. Without `undoes` the route is
+  unchanged. The SPA always names it: the Grow / Exclude result line (`undoOf`), *switch a list off* (the list's step)
+  and the op log's Undo button (`InvestigationSessionStore.undoTarget`: the newest effective step read; none while
+  the log read was cut, `truncated`). On a refusal the store re-reads the log, so the screen shows the newer step,
+  the refusal stays in the error line and the result line's Undo is no longer offered.
 - **Switch a list off = the `undo` of its step**, so only a list applied by the newest effective step can be switched off;
   a list applied earlier, or in several steps, says why (`listsInForce`). A "skip this list for one Grow" would need an
   `expand` parameter nobody has specified — deferred.
@@ -1082,19 +1104,22 @@ built as recommended). How it reads to a user: [user guide §5.4](user-guide-man
   profile labels: Telecom *subscribers / calls*, Mobile Money *wallets / transfers*); the technical term (expand, super node,
   exclusion list) stays in the tooltip.
 - **Keyboard.** **G** Grow, **X** Exclude…, **Ctrl+Z** Undo — not in a text field, grid, menu or dialog; listed in the main
-  app's `?` shortcuts help (`shortcuts-help.dialog.ts`). The standalone `la-app` has no `?` help dialog.
-- **Gotchas and deferrals** (open rows in [BACKLOG](../../../../BACKLOG.md)):
-  - *Shared-Investigation Undo race* (`LA-GROW-EXCLUDE-UNDO-RACE-1`): `POST …/undo` takes back the newest effective step
-    and carries no expected step, so a team member's step appended after this browser last read the log is the one undone.
-  - *Dossier* (`LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1`): it still lists a restricted list's removed ids and true counts.
+  app's `?` shortcuts help (`shortcuts-help.dialog.ts`) and, since 2026-10-23, the standalone `la-app`'s: its shell
+  opens the same dialog on a bare `?` (never in a text field) with its own list, `LA_APP_SHORTCUTS` (no command palette
+  or triage-list keys, which la-app does not have), passed as the dialog data `{shortcuts}`.
+- **Access Catalog.** `canManageExclusionCategories` has its action node since 2026-10-23: `linkgraph.exclusion-categories`
+  (the id `LensService` reads), under Settings, where the Exclusion categories section is its main client gate.
+- **Gotchas and deferrals** (open rows in [BACKLOG](../../../../BACKLOG.md), `LA-GROW-EXCLUDE-RESIDUALS-1`):
   - *Previews are not audited*: neither preview route writes an audit record or event (read-shaped, rate class EXPENSIVE).
   - *A broken auto-apply list blocks every Investigation create* in the Space (fail closed, the refusal names the list)
     until an administrator fixes or retires it.
-  - No Access-Catalog node carries `canManageExclusionCategories` yet (`LensService` reads the identity capability).
   - The think-aloud test with two new users (`tests-think-aloud-script.md`) was not run (`LA-GROW-EXCLUDE-THINK-ALOUD-1`).
-- Tests: `grow-exclude.spec.ts`, `grow-exclude.store.spec.ts`, the four component specs (axe-clean, hints remembered and
-  blocked storage), and `link-analysis.component.spec.ts` "Grow, Held and Exclude on the graph" (one explorer preview
-  with its body; a 403 shown in the panel; the rail, Basic Grow, Undo, Ctrl+Z, degrading without the routes).
+- Tests: `grow-exclude.spec.ts`, `grow-exclude.store.spec.ts` (each Undo names its step; a refused one is reported, never
+  undone), `link-analysis-investigation.store.spec.ts` (the 409 re-reads the log; `undoTarget`), `inv.service.spec.ts`
+  (the `undoes` body), the four component specs (axe-clean, hints remembered and blocked storage),
+  `link-analysis.component.spec.ts` "Grow, Held and Exclude on the graph" (one explorer preview with its body; a 403
+  shown in the panel; the rail, Basic Grow, Undo, Ctrl+Z, degrading without the routes), `shortcuts-help.dialog.spec.ts`
+  and `la-shell.component.spec.ts` (la-app's `?`), `access-catalog.spec.ts` (the node).
 
 ### 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
 

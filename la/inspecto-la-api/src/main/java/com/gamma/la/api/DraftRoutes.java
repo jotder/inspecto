@@ -77,7 +77,7 @@ public final class DraftRoutes implements RouteModule {
         api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/ops", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> ops(api, e, m.group(1), m.group(2), api.body(e))));
         api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/undo", ApiContext.withCapability("canManageIncidents",
-                (e, m) -> undo(api, e, m.group(1), m.group(2))));
+                (e, m) -> undo(api, e, m.group(1), m.group(2), api.body(e))));
         api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/discard", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> discard(api, e, m.group(1), m.group(2))));
         api.get("/inv/investigations/([^/]+)/drafts/([^/]+)/conflicts", (e, m) -> conflicts(api, e, m.group(1), m.group(2)));
@@ -424,11 +424,11 @@ public final class DraftRoutes implements RouteModule {
         return withDraftId(investigations.appendOpOn(api, ex, o.view(), body), draftId);
     }
 
-    private Object undo(ApiContext api, HttpExchange ex, String invId, String draftId) throws IOException {
+    private Object undo(ApiContext api, HttpExchange ex, String invId, String draftId, Map<String, Object> body) throws IOException {
         Opened o = openDraft(api, ex, invId, draftId, Act.WRITE);
         requireLive(o);
         requireIntact(o);
-        return withDraftId(investigations.undoOn(ex, o.view()), draftId);
+        return withDraftId(investigations.undoOn(ex, o.view(), body), draftId);   // optional {undoes}, as the main log's
     }
 
     @SuppressWarnings("unchecked")

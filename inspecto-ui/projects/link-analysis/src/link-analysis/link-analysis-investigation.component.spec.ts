@@ -454,7 +454,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         button('Undo').click();
         await fixture.whenStable();
         fixture.detectChanges();
-        expect(inv.undoInvestigation).toHaveBeenCalledWith('inv-1');
+        expect(inv.undoInvestigation).toHaveBeenCalledWith('inv-1', 2); // names the newest step the log it read holds (UNDO-RACE-1)
         expect(el.querySelector('[aria-label="Annotations"]')).toBeNull();
         expect(el.querySelector('[aria-label="Notes on this entity"]')).toBeNull();
     });

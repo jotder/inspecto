@@ -54,6 +54,11 @@ import java.util.function.UnaryOperator;
  * manifest carries only hashes, over the RAW store, so {@code verify} is unaffected; a reader holding a masked dossier
  * verifies custody through the route, not by re-hashing the masked lists.
  *
+ * <p><b>Restricted lists (GE-8, LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1).</b> For a caller holding neither
+ * {@code canManageExclusionCategories} nor {@code canRevealLinkEntities}, an {@code excludeBy} over a restricted list
+ * names no removed id anywhere in the dossier (ledger, negative space, the three renderings) and its count is rounded
+ * ({@link #restrictedSteps}). Render time only, like masking: the manifest is unchanged, so {@code verify} agrees.
+ *
  * <p>⚠ {@code open()} duplicates {@code InvestigationRoutes.open} rather than sharing it, to leave that class
  * untouched under a parallel lane; fold them together later (as {@code relationFor} is already duplicated there).
  */
@@ -119,7 +124,7 @@ public final class DossierRoutes implements RouteModule {
     @SuppressWarnings("unchecked")
     static Masked maskedDossier(HttpExchange ex, Opened inv, List<String> log, int at, List<String> snapshotIds, boolean reveal)
             throws IOException {
-        GraphDossierBuilder.Input in = input(inv, log, at, snapshots(ex, inv, snapshotIds, true));
+        GraphDossierBuilder.Input in = input(inv, log, at, snapshots(ex, inv, snapshotIds, true), restrictedSteps(ex, inv, log, at));
         Map<String, Object> built = GraphDossierBuilder.build(in);
         // D-U6: the dossier is masked as it leaves — the manifest (hashes only) is unaffected, and custody is
         // verified against the store by /dossier/verify, which never sees a pseudonym.
@@ -248,9 +253,29 @@ public final class DossierRoutes implements RouteModule {
 
     static GraphDossierBuilder.Input input(Opened inv, List<String> log, int at,
                                                    List<GraphDossierBuilder.Snapshot> snaps) throws IOException {
+        return input(inv, log, at, snaps, java.util.Set.of());
+    }
+
+    static GraphDossierBuilder.Input input(Opened inv, List<String> log, int at, List<GraphDossierBuilder.Snapshot> snaps,
+                                           java.util.Set<Integer> restrictedSteps) throws IOException {
         Map<Integer, String> sets = new HashMap<>();
         for (int step = 1; step <= at; step++) sets.put(step, inv.store().set(inv.id(), step).orElse(null));
-        return new GraphDossierBuilder.Input(inv.id(), inv.headerRaw(), log, sets, snaps, at);
+        return new GraphDossierBuilder.Input(inv.id(), inv.headerRaw(), log, sets, snaps, at, restrictedSteps);
+    }
+
+    /**
+     * The list-op steps of the first {@code at} over a restricted exclusion list this caller may not see the members of
+     * (GE-8, {@link RestrictedLists}); empty for a holder of either grant. LA-GROW-EXCLUDE-DOSSIER-RESTRICTED-1: the
+     * Dossier hides what such a step removed exactly as the step answers and the log view do.
+     */
+    static java.util.Set<Integer> restrictedSteps(HttpExchange ex, Opened inv, List<String> log, int at) throws IOException {
+        if (com.gamma.entitystore.EntityListFacts.seesRestricted(ex)) return java.util.Set.of();
+        List<Map<String, Object>> prefix = new ArrayList<>();
+        for (String line : log.subList(0, at)) {
+            @SuppressWarnings("unchecked") Map<String, Object> e = ApiContext.JSON.readValue(line, Map.class);
+            prefix.add(e);
+        }
+        return RestrictedLists.of(ex, inv.writeRoot(), prefix).steps();
     }
 
     /**

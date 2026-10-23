@@ -201,6 +201,10 @@ export class InvestigationSessionStore {
         const base = this.activeDraftId() ? this.draftBaseStep() : 0;
         return this.effectiveSteps().some((e) => e.step > base);
     });
+    /** The step the op log's Undo means: the newest effective one this browser read (none while the log read was cut). */
+    readonly undoTarget = computed<number | undefined>(() =>
+        this.log()?.truncated ? undefined : this.effectiveSteps().at(-1)?.step,
+    );
     /** The projection the Investigation is bound to, rebuilt from its header (+ the remembered entity type). */
     readonly binding = computed<EntityProjection | null>(() => {
         const h = this.header();
@@ -671,16 +675,25 @@ export class InvestigationSessionStore {
         );
     }
 
-    async undo(): Promise<boolean> {
+    /**
+     * Undo the newest effective step. `undoes` names the step the caller means (LA-GROW-EXCLUDE-UNDO-RACE-1): when another
+     * step is the newest by now — a team member's — the server refuses (409) and the log is read again, so the screen shows
+     * what is newest instead of undoing it.
+     */
+    async undo(undoes?: number): Promise<boolean> {
         const id = this.activeId();
         if (!id) return false;
-        return this.run('Undo failed.', async () => {
+        const done = await this.run('Undo failed.', async () => {
             const draft = this.activeDraftId();
             this.lastStep.set(
-                await firstValueFrom(draft ? this.inv.undoDraft(id, draft) : this.inv.undoInvestigation(id)),
+                await firstValueFrom(
+                    draft ? this.inv.undoDraft(id, draft, undoes) : this.inv.undoInvestigation(id, undoes),
+                ),
             );
             await this.refresh(id);
         });
+        if (!done && undoes != null && this.activeId() === id) await this.refresh(id).catch(() => undefined);
+        return done;
     }
 
     /** Make a Draft (or, with null, the main log) the working scope. The scope changes only once its log and Working

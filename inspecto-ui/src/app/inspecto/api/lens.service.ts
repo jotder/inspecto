@@ -277,7 +277,8 @@ export class LensService {
 
     /** May create, edit and retire the Space's CATEGORY exclusion lists (admin-owned: VIPs, politicians, defence …;
      *  LA-GROW-EXCLUDE-1 GE-11). {@link identityCapability}; analyst lists need {@link canManageIncidents} instead. The
-     *  server gates the writes — this only decides whether an admin list is offered as a target. No Access-Catalog node yet. */
+     *  server gates the writes — this only decides whether an admin list is offered as a target. Its Access-Catalog node
+     *  hangs under Settings (`linkgraph.exclusion-categories`). */
     readonly canManageExclusionCategories = computed(() =>
         this.identityCapability('canManageExclusionCategories', 'linkgraph.exclusion-categories'),
     );

@@ -8,6 +8,7 @@ import { UserComponent } from 'app/layout/common/user/user.component';
 import { ConnectivityBannerComponent } from '@inspecto/core/components/connectivity-banner.component';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
+import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
 import { LA_PRODUCT_NAME } from './la-brand';
 import { LA_APP_SETTINGS_NAV, visibleLaNav } from './la-nav';
 import { NextStepsDialog } from './next-steps.dialog';
@@ -48,6 +49,7 @@ function readExpanded(): boolean {
     ],
     host: {
         class: 'flex h-full min-h-screen w-full flex-col [--shell-chrome-height:3rem] md:flex-row md:[--shell-chrome-height:0rem]',
+        '(document:keydown)': 'onKeydown($event)',
     },
     template: `
         <aside
@@ -159,6 +161,13 @@ export class LaShellComponent {
     /** *What can I do next?* (UC-15 rule 4). */
     protected openNextSteps(): void {
         this.dialog.open(NextStepsDialog, { width: '560px', maxHeight: '90vh', autoFocus: 'first-tabbable' });
+    }
+
+    /** `?` (a bare press, never while editing text) opens the keyboard-shortcuts help, as in the main app. */
+    protected onKeydown(event: KeyboardEvent): void {
+        if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey || isEditingTarget(event.target)) return;
+        event.preventDefault();
+        this.dialog.open(ShortcutsHelpDialog, { width: '460px', autoFocus: false, data: { shortcuts: LA_APP_SHORTCUTS } });
     }
 
     protected toggle(): void {

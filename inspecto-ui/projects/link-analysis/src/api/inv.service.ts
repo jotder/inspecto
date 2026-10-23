@@ -1753,9 +1753,12 @@ export class InvService {
         return this.http.post<InvestigationStepResult>(invPath(id, 'ops'), op);
     }
 
-    /** Reverts the latest effective op (a recorded log edit). 409 when there is nothing to undo. */
-    undoInvestigation(id: string): Observable<InvestigationStepResult> {
-        return this.http.post<InvestigationStepResult>(invPath(id, 'undo'), {});
+    /**
+     * Reverts the latest effective op (a recorded log edit). 409 when there is nothing to undo. `undoes` names the step
+     * the caller means to revert: 409 when another step is the newest by now — a team member's (LA-GROW-EXCLUDE-UNDO-RACE-1).
+     */
+    undoInvestigation(id: string, undoes?: number): Observable<InvestigationStepResult> {
+        return this.http.post<InvestigationStepResult>(invPath(id, 'undo'), undoes == null ? {} : { undoes });
     }
 
     /** D-E4: re-ordering FORKS — the answer is a NEW Investigation; the original is untouched. */
@@ -1911,9 +1914,12 @@ export class InvService {
         return this.http.post<InvestigationStepResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/ops`), op);
     }
 
-    /** Revert the Draft's latest effective op (only its OWN ops). */
-    undoDraft(id: string, draftId: string): Observable<InvestigationStepResult> {
-        return this.http.post<InvestigationStepResult>(invPath(id, `drafts/${encodeURIComponent(draftId)}/undo`), {});
+    /** Revert the Draft's latest effective op (only its OWN ops); `undoes` as for the main log. */
+    undoDraft(id: string, draftId: string, undoes?: number): Observable<InvestigationStepResult> {
+        return this.http.post<InvestigationStepResult>(
+            invPath(id, `drafts/${encodeURIComponent(draftId)}/undo`),
+            undoes == null ? {} : { undoes },
+        );
     }
 
     draftConflicts(id: string, draftId: string): Observable<DraftConflictReport> {

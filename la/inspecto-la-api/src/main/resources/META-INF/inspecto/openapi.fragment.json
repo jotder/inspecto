@@ -520,7 +520,7 @@
         "tags" : [ "inv" ],
         "summary" : "POST /inv/investigations/{investigationId}/undo (generated skeleton)",
         "operationId" : "postInvInvestigationsByInvestigationIdUndo",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Revert the newest effective step of the main log (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now - a team member's - the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -529,6 +529,19 @@
             "type" : "string"
           }
         } ],
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "undoes" : { "type" : "integer", "minimum" : 1, "description" : "The step the caller means to undo; 409 when it is not the newest effective step." }
+                }
+              }
+            }
+          }
+        },
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -2125,7 +2138,7 @@
         "tags" : [ "inv" ],
         "summary" : "POST /inv/investigations/{investigationId}/drafts/{draftId}/undo (generated skeleton)",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdUndo",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Revert the newest effective step of the Draft's own ops (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2141,6 +2154,19 @@
             "type" : "string"
           }
         } ],
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "undoes" : { "type" : "integer", "minimum" : 1, "description" : "The step the caller means to undo; 409 when it is not the newest effective step." }
+                }
+              }
+            }
+          }
+        },
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

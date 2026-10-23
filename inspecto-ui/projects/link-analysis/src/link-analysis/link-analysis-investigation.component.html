@@ -645,7 +645,7 @@
                     mat-button
                     class="ml-auto"
                     [disabled]="!canWrite() || store.busy() || !store.canUndo()"
-                    (click)="store.undo()"
+                    (click)="store.undo(store.undoTarget())"
                     aria-label="Undo the latest step"
                 >
                     <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>

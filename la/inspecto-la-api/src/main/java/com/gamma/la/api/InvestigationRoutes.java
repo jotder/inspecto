@@ -72,7 +72,9 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  *       fact seq — see {@link #sealResolution}.</li>
  *   <li>{@code POST /inv/investigations/{id}/expand/preview} — the Grow preview (LA-GROW-EXCLUDE-1): a dry run of that
  *       expand body, answering its counts and appending nothing — see {@link #previewExpand}.</li>
- *   <li>{@code POST /inv/investigations/{id}/undo} — real undo: a log edit that reverts the latest op.</li>
+ *   <li>{@code POST /inv/investigations/{id}/undo} — real undo: a log edit that reverts the latest op. An optional body
+ *       {@code {undoes: step}} names the step the caller means to revert; 409 when another step is the newest by now
+ *       (LA-GROW-EXCLUDE-UNDO-RACE-1).</li>
  *   <li>{@code POST /inv/investigations/{id}/reorder} — re-ordering FORKS (D-E4): a new Investigation with explicit
  *       parent lineage; the original log, its Working Sets and any Artifact anchored to them are untouched.</li>
  *   <li>{@code POST /inv/investigations/{id}/replay} — full evaluation from the sealed log, with the equivalence
@@ -150,7 +152,7 @@ public final class InvestigationRoutes implements RouteModule {
         api.post("/inv/investigations/([^/]+)/expand/preview", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> previewExpand(api, e, m.group(1), api.body(e))));
         api.post("/inv/investigations/([^/]+)/undo", ApiContext.withCapability("canManageIncidents",
-                (e, m) -> undo(api, e, m.group(1))));
+                (e, m) -> undo(api, e, m.group(1), api.body(e))));
         api.post("/inv/investigations/([^/]+)/reorder", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> reorder(api, e, m.group(1), api.body(e))));
         api.post("/inv/investigations/([^/]+)/replay", (e, m) -> replay(api, e, m.group(1), api.body(e)));
@@ -610,21 +612,44 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /** {@code POST /inv/investigations/{id}/undo} — revert the latest effective op; 409 when there is none. */
-    private Object undo(ApiContext api, HttpExchange ex, String id) throws IOException {
-        return undoOn(ex, open(api, ex, id));
+    private Object undo(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        return undoOn(ex, open(api, ex, id), body);
     }
 
-    /** The undo, over an opened view. A Draft undoes only its OWN ops: the main prefix it forked from is not its to revert. */
-    Object undoOn(HttpExchange ex, Inv inv) throws IOException {
+    /**
+     * The undo, over an opened view. A Draft undoes only its OWN ops: the main prefix it forked from is not its to revert.
+     *
+     * <p>{@code body.undoes} (optional, LA-GROW-EXCLUDE-UNDO-RACE-1): the step the caller means to revert, as its screen last
+     * read the log. In a shared Investigation another lead may have recorded a step since; without the guard that step is
+     * the one undone. With it, a newest effective step other than {@code undoes} is refused {@code 409
+     * CONFLICT_STALE_VERSION}, naming the step that is newest, and nothing is written. Checked against the log each attempt
+     * reads, so a step that lands while this undo retries is caught too. Without {@code undoes} the route behaves as before.
+     */
+    Object undoOn(HttpExchange ex, Inv inv, Map<String, Object> body) throws IOException {
+        Integer expected = expectedUndo(body);
         return untilWon(() -> {
             List<Map<String, Object>> log = readLog(inv);
             int own = inv.draft() == null ? 0 : inv.draft().baseStep();
             int target = InvestigationEvaluator.undoTarget(log.subList(Math.min(own, log.size()), log.size()));
             if (target < 0) throw new ApiException(409, ErrorCodes.CONFLICT, "nothing to undo");
+            if (expected != null && expected != target) {
+                Map<String, Object> newest = log.stream().filter(e -> ((Number) e.get("step")).intValue() == target).findFirst().orElseThrow();
+                throw new ApiException(409, ErrorCodes.CONFLICT_STALE_VERSION, "step " + expected + " is not the newest step any more: step "
+                        + target + " (" + newest.get("op") + " by " + newest.get("author") + ") is - read the log again; nothing was undone");
+            }
             Map<String, Object> entry = entry(log.size() + 1, "undo", ex);
             entry.put("undoes", target);
             return masked(inv, commit(ex, inv, log, entry, stateBefore(inv, log)));
         });
+    }
+
+    /** The optional {@code undoes} of an undo body: a positive whole number, or null when absent; 422 otherwise. */
+    static Integer expectedUndo(Map<String, Object> body) {
+        Object v = body == null ? null : body.get("undoes");
+        if (v == null) return null;
+        if (!(v instanceof Integer || v instanceof Long) || ((Number) v).longValue() < 1 || ((Number) v).longValue() > Integer.MAX_VALUE)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "undoes must be the step number to undo (a whole number from 1), got '" + v + "'");
+        return ((Number) v).intValue();
     }
 
     /**

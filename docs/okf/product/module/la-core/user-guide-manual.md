@@ -399,7 +399,9 @@ A profile (*Generic graph, Financial crime, Telecom, Supply chain, Cyber*) renam
 *subscribers* and *calls*; Mobile Money: *wallets* and *transfers*). On an open Investigation's canvas every change is one
 **recorded** step of the log (an existing op — `expand`, `exclude`, `excludeBy` or `undo` — so replay and the Dossier
 are unchanged); on the explorer graph (Basic, or the query graph) it is **not recorded**. Every change ends with a
-one-line result and **Undo** (also **Ctrl+Z**).
+one-line result and **Undo** (also **Ctrl+Z**). In a shared Investigation an Undo only ever takes back the step it
+names: if a team member recorded a newer step since your screen last read the log, the Undo is refused, nothing is
+undone, and the log shows their step.
 
 **Grow** (tool rail, or **G**) adds the next ring of linked items — the *expand* op. It grows from the selection, else
 from the Investigation's outer ring (the explorer: the nodes not grown yet, the first 25).
@@ -439,7 +441,8 @@ recorded override). On the explorer, Remove held hides them locally. A first-tim
 with who keeps it (*Category* / *Analyst*) and how many it removed; **Switch off** undoes a list's step (only the
 latest step can be; on an older one the button says why) and **Switch on** applies a list that is
 not in force. **Show what was removed** lists the excluded items with why and the step; a **restricted** list's
-members are never listed to an analyst — its count is rounded (nearest 5, at least 5). With no list yet the panel
+members are never listed to an analyst — its count is rounded (nearest 5, at least 5), here, in the op log and in
+the Dossier (which says *about N entities* for that step and names none of them). With no list yet the panel
 offers *Create your first list* and names the category lists the administrator set up. Without *Manage incidents*
 every switch says why it is held.
 
@@ -447,7 +450,8 @@ every switch says why it is held.
 and name this chapter. **Got it** dismisses a hint for good in this browser (a private window shows it again).
 
 Keyboard: **G** Grow, **X** Exclude…, **Ctrl+Z** undoes the last Grow or Exclude (then the display undo). Not in a text
-field, a grid, a menu or a dialog. The `?` shortcuts help lists all three.
+field, a grid, a menu or a dialog. The `?` shortcuts help lists all three, in the full app and in the standalone
+Link Analysis app.
 
 ---
 

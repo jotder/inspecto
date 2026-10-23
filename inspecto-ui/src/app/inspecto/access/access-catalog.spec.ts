@@ -40,7 +40,7 @@ describe('access-catalog derivation', () => {
         expect(workbench.children!.map((c) => c.id)).toEqual(['pipelines', 'runs', 'workbench.author']);
         expect(workbench.children![0].kind).toBe('pane');
         expect(workbench.children![0].link).toBe('/pipelines');
-        // runs carries its operate action; settings (a pane) carries all four of its actions
+        // runs carries its operate action; settings (a pane) carries all five of its actions
         const runs = workbench.children![1];
         expect(runs.children!.map((c) => c.id)).toEqual(['runs.operate']);
         expect(runs.children![0].capability).toBe('canOperateRuns');
@@ -49,6 +49,7 @@ describe('access-catalog derivation', () => {
             'menus.curate',
             'connections.onboard',
             'space.administer',
+            'linkgraph.exclusion-categories', // the id LensService.canManageExclusionCategories reads
         ]);
     });
 

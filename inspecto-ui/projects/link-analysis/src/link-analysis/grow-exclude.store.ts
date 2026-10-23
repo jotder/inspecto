@@ -255,7 +255,7 @@ export class GrowExcludeStore {
     async switchOff(listId: string): Promise<boolean> {
         const l = this.inForce().find((x) => x.listId === listId);
         if (!l || l.switchOffWhyNot) return false;
-        if (!(await this.investigation.undo())) return false;
+        if (!(await this.investigation.undo(l.step))) return false;
         this.lastChange.set({ text: `Switched “${l.title}” off — its step was undone (recorded).` });
         return true;
     }
@@ -358,9 +358,10 @@ export class GrowExcludeStore {
     }
 
     /**
-     * The Undo of the recorded steps `made`: the `undo` op once per step (it always takes back the NEWEST effective step,
-     * GE-12), so it is offered only while `made` are still the newest steps — a step recorded after them would be the one
-     * undone instead.
+     * The Undo of the recorded steps `made`: the `undo` op once per step, newest first (it always takes back the NEWEST
+     * effective step, GE-12), so it is offered only while `made` are still the newest steps. Each `undo` names its step
+     * (LA-GROW-EXCLUDE-UNDO-RACE-1): a team member's step recorded after this browser last read the log is refused (409),
+     * never undone.
      */
     private undoOf(made: number[]): Pick<LastChange, 'undo' | 'valid'> {
         if (!made.length) return {};
@@ -368,7 +369,7 @@ export class GrowExcludeStore {
         return {
             valid: still,
             undo: async () => {
-                for (let i = 0; i < made.length; i++) if (!(await this.investigation.undo())) break;
+                for (const step of [...made].reverse()) if (!(await this.investigation.undo(step))) break;
                 const n = made.length;
                 this.lastChange.set(
                     this.investigation.error()

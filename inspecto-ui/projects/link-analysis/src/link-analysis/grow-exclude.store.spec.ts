@@ -60,11 +60,15 @@ function create(inv: Partial<Record<keyof InvService, unknown>> = {}, steps: Inv
             session.lastStep.set(answer.status === 'pending' ? answer : { ...answer, step: record(op.op) });
             return true;
         }),
-        // the real undo takes back the NEWEST effective op step
-        undo: vi.fn(async () => {
+        // the real undo takes back the NEWEST effective op step, and refuses (409) when it is not the one named
+        undo: vi.fn(async (undoes?: number) => {
             const all = session.log()?.entries ?? [];
             const last = [...all].reverse().find((e) => e.kind === 'op' && e.undoneBy == null);
             if (!last) return false;
+            if (undoes != null && undoes !== last.step) {
+                session.error.set(`Refused — step ${undoes} is not the newest step any more`);
+                return false;
+            }
             const at2 = Math.max(...all.map((e) => e.step)) + 1;
             session.log.set({
                 ...session.log()!,
@@ -150,7 +154,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         ]);
         expect(store.lastChange()?.text).toBe('Grew 2 steps: 3 numbers and 5 calls added; 1 busy number held.');
         expect(await store.undoLast()).toBe(true);
-        expect(session.undo).toHaveBeenCalledTimes(2);
+        expect(session.undo.mock.calls).toEqual([[2], [1]]); // each undo names its step, newest first
         expect(store.lastChange()?.text).toBe('Undone (2 steps).');
         expect(await store.undoLast()).toBe(false); // nothing of ours left: the screen's own Undo runs
     });
@@ -164,6 +168,20 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         expect(await store.undoLast()).toBe(false); // the screen's own Undo runs instead
         expect(session.undo).not.toHaveBeenCalled();
         expect(store.lastChange()?.text).toContain('Grew one step');
+    });
+
+    it('LA-GROW-EXCLUDE-UNDO-RACE-1: a step a team member recorded after this browser read the log is refused, never undone', async () => {
+        const { store, session } = create();
+        await store.growInvestigation(CTX, REQ, {});
+        expect(store.undoable()).toBe(true); // the log as this browser read it: the Grow (step 1) is the newest
+        // ...but on the server a team member has recorded step 2 since, so an undo of step 1 is refused
+        session.undo.mockImplementationOnce(async (undoes?: number) => {
+            session.error.set(`Refused — step ${undoes} is not the newest step any more: step 2 (keep by lead-1) is`);
+            return false;
+        });
+        expect(await store.undoLast()).toBe(true);
+        expect(session.undo.mock.calls).toEqual([[1]]);
+        expect(store.lastChange()?.text).toContain('step 1 is not the newest step any more');
     });
 
     it('a Grow held for four-eyes says so and offers no Undo', async () => {
@@ -227,7 +245,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         expect(await store.switchOff('old')).toBe(false);
         expect(session.undo).not.toHaveBeenCalled();
         expect(await store.switchOff('cc')).toBe(true);
-        expect(session.undo).toHaveBeenCalledTimes(1);
+        expect(session.undo.mock.calls).toEqual([[2]]); // the undo names the list's step
         expect(await store.switchOn('test', TERMS)).toBe(true);
         expect(applied).toEqual([{ op: 'excludeBy', listId: 'test', reason: 'Switched on from Hidden by lists' }]);
         expect(store.lastChange()?.text).toBe('Switched “test” on: 4 numbers removed.');
