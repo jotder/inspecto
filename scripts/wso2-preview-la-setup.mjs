@@ -24,6 +24,22 @@ export const USERS = [
   ['fm.manager', 'Demo FM', 'Manager', ['manager', 'fraud-manager']],
   ['fm.analyst', 'Demo FM', 'Analyst', ['operations', 'fraud-analyst']],
   ['admin', 'Demo', 'Admin', ['super', 'admin', 'fraud-analyst', 'la-settings']],
+  // la-claims (insurance claims showcase): the Space's own roles are siu-analyst / siu-manager; la-viewer is read-only
+  ['siu.analyst', 'Demo SIU', 'Analyst', ['siu-analyst']],
+  ['siu.manager', 'Demo SIU', 'Manager', ['siu-manager']],
+  ['partner.reviewer', 'Demo Partner', 'Reviewer', ['la-viewer']],
+  ['outsider', 'Demo', 'Outsider', ['la-viewer']],
+  // la-mobile-money
+  ['mm.analyst', 'Demo MM', 'Analyst', ['mm-analyst']],
+  ['mm.manager', 'Demo MM', 'Manager', ['mm-manager']],
+  ['mm.reviewer', 'Demo MM', 'Reviewer', ['mm-viewer']],
+  ['mm.outsider', 'Demo MM', 'Outsider', ['mm-viewer']],
+  // la-audit
+  ['audit.admin', 'Demo Audit', 'Admin', ['admin', 'audit-lead', 'audit-settings']],
+  ['audit.lead', 'Demo Lead', 'Auditor', ['audit-lead']],
+  ['audit.manager', 'Demo Audit', 'Manager', ['audit-manager']],
+  ['audit.committee', 'Demo Audit', 'Committee', ['audit-committee']],
+  ['audit.outsider', 'Demo', 'Outsider', ['audit-committee']],
 ];
 const GROUPS = [...new Set(USERS.flatMap((u) => u[3]))];
 const auth = 'Basic ' + Buffer.from('admin:admin').toString('base64');
