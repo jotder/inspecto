@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-358 test class(es): 131 unit, 227 real-HTTP control-plane, 0 IT.
+359 test class(es): 131 unit, 228 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -132,6 +132,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiGeoIpTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiGeoIpTest.java` | GeoIP on the audit trail and trigger T5 over real HTTP (ses-sns-adapter-design §6/§8, decision D12): an |
 | `ControlApiGovernanceComponentsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiGovernanceComponentsTest.java` | ASSURE-WORKFLOW-SLA-1 — the {@code workflow}, {@code sla-policy} and {@code escalation-rule} component kinds: written |
 | `ControlApiGraphSaveArmingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiGraphSaveArmingTest.java` | The arming pre-checks on the GRAPH editor's save route, over real HTTP. |
+| `ControlApiGzipTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiGzipTest.java` | PERF-P4-1: response compression negotiated at the single choke point ({@link ApiContext#respondJson} / |
 | `ControlApiHeadRequestTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiHeadRequestTest.java` | {@code HEAD-RESPONSE-STREAM-CLOSED-1}: a HEAD request must be answered with headers only. Writing a |
 | `ControlApiHealthDetailsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiHealthDetailsTest.java` | Real-HTTP tests for {@code GET /health/details} (System Maintenance MNT-15). |
 | `ControlApiHttpsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiHttpsTest.java` | {@code SEC-4} — HTTPS over the pure-JDK {@code HttpsServer} + keystore. A **Must (S)** that the security |

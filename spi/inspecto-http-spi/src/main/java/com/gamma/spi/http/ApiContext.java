@@ -438,7 +438,7 @@ public interface ApiContext extends WriteRootProvider {
         byte[] bytes = JSON.writeValueAsBytes(payload);
         ex.getResponseHeaders().set("Content-Type", "application/json");
         Idempotency.capture(ex, status, bytes);   // cache the pre-compression body for a keyed-write replay (W5)
-        bytes = maybeGzip(ex, bytes);
+        if (status != 204 && status != 304) bytes = maybeGzip(ex, bytes);
         if ("HEAD".equals(ex.getRequestMethod())) {   // headers only: a body on HEAD makes the JDK warn, then the write throws
             ex.sendResponseHeaders(status, -1);
             return HANDLED;
@@ -451,21 +451,45 @@ public interface ApiContext extends WriteRootProvider {
     /** Gzip {@code bytes} (setting {@code Content-Encoding}) when large enough and the client
      *  negotiated it via {@code Accept-Encoding: gzip}; otherwise return them untouched. */
     private static byte[] maybeGzip(HttpExchange ex, byte[] bytes) throws IOException {
-        if (bytes.length < GZIP_MIN_BYTES) return bytes;
-        String accept = ex.getRequestHeaders().getFirst("Accept-Encoding");
-        if (accept == null || !accept.toLowerCase(java.util.Locale.ROOT).contains("gzip")) return bytes;
+        if (bytes.length < GZIP_MIN_BYTES || "false".equalsIgnoreCase(System.getProperty("control.gzip"))) return bytes;
+        // The representation now depends on Accept-Encoding, so every cache must key on it (PERF-P4-1).
+        ex.getResponseHeaders().add("Vary", "Accept-Encoding");
+        if (!acceptsGzip(ex.getRequestHeaders().getFirst("Accept-Encoding"))) return bytes;
         var out = new java.io.ByteArrayOutputStream(Math.max(64, bytes.length / 4));
         try (var gz = new java.util.zip.GZIPOutputStream(out)) {
             gz.write(bytes);
         }
         ex.getResponseHeaders().set("Content-Encoding", "gzip");
+        // A strong ETag promises byte-identity, which the gzipped variant is not: weaken it. ETags.matches()
+        // ignores the W/ prefix, so a client revalidating with the weak tag still gets its 304 (P4-2/P4-3).
+        String etag = ex.getResponseHeaders().getFirst("ETag");
+        if (etag != null && !etag.startsWith("W/")) ex.getResponseHeaders().set("ETag", "W/" + etag);
         return out.toByteArray();
+    }
+
+    /** True when an {@code Accept-Encoding} value lists {@code gzip} (or {@code *}) with a non-zero q-value. */
+    private static boolean acceptsGzip(String accept) {
+        if (accept == null) return false;
+        for (String part : accept.split(",")) {
+            String[] seg = part.trim().toLowerCase(java.util.Locale.ROOT).split(";");
+            if (!seg[0].trim().equals("gzip") && !seg[0].trim().equals("*")) continue;
+            boolean zero = false;
+            for (int i = 1; i < seg.length; i++) {
+                String p = seg[i].trim();
+                if (p.startsWith("q=")) {
+                    try { zero = Double.parseDouble(p.substring(2)) <= 0; } catch (NumberFormatException e) { zero = false; }
+                }
+            }
+            if (!zero) return true;
+        }
+        return false;
     }
 
     /** Write {@code text} with an explicit {@code Content-Type} (e.g. {@code text/csv}); returns {@link #HANDLED}. */
     static Object respondText(HttpExchange ex, String text, String contentType) throws IOException {
-        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = maybeGzip(ex, text.getBytes(StandardCharsets.UTF_8));
         ex.getResponseHeaders().set("Content-Type", contentType);
+        if ("HEAD".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(200, -1); return HANDLED; }
         ex.sendResponseHeaders(200, bytes.length);
         ex.getResponseBody().write(bytes);
         return HANDLED;
