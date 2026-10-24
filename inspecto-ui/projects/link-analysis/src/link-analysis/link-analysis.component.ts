@@ -6,6 +6,7 @@ import {
     DestroyRef,
     ElementRef,
     Injector,
+    OnDestroy,
     OnInit,
     ViewChild,
     afterNextRender,
@@ -57,6 +58,7 @@ import {
     EntityListSummary,
     IndexSource,
     InvService,
+    MaskingNote,
     MultiProjectionMappingSummary,
 } from '@inspecto/link-analysis/api/inv.service';
 import { OfferShareDialog, OfferShareResult } from '@inspecto/core/components/offer-share.dialog';
@@ -110,7 +112,7 @@ import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.comp
 import { ExcludeDialogData, ExcludeDialogResult, LinkAnalysisExcludeDialog } from './link-analysis-exclude.dialog';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
-import { G6GraphData, EntityProjection, GraphSourceId, GraphSourceQuery, NodeRule, toGraphml } from '@inspecto/core/graph';
+import { G6GraphData, EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery, NodeRule, toGraphml } from '@inspecto/core/graph';
 import { LinkAnalysisGlossaryComponent } from './link-analysis-glossary.component';
 import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules.component';
 import {
@@ -427,7 +429,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         '(document:keydown)': 'onHistoryKeydown($event)',
     },
 })
-export class LinkAnalysisComponent implements OnInit {
+export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private fb = inject(FormBuilder);
     /**
      * `bootstrap.features.ops` — cross-entity tags and comments are
@@ -1467,6 +1469,13 @@ export class LinkAnalysisComponent implements OnInit {
      *  cleared after the first query run, found or not. */
     private pendingPivot?: ElementObjectRef;
 
+    ngOnDestroy(): void {
+        // a pending debounced push must not send after the page is gone; its callers settle (resolve) so none hangs
+        if (this.pushTimer) clearTimeout(this.pushTimer);
+        this.pushTimer = null;
+        this.pushWaiters.splice(0).forEach((w) => w());
+    }
+
     ngOnInit(): void {
         // Each list degrades independently — a failing lookup must not blank the pane.
         this.datasetsLoaded = new Promise((resolve) =>
@@ -2081,13 +2090,28 @@ export class LinkAnalysisComponent implements OnInit {
     }
 
     /** PERF-P10a-1/3: identical (Space, viewer, source, query) answers are served from the client; see graph-query-cache.ts. */
-    private readonly queryCache = new GraphQueryCache<G6GraphData>(
+    private readonly queryCache = new GraphQueryCache<{ g: G6GraphData; masking: MaskingNote | null }>(
         () => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}`,
     );
     /** "As of" line for a graph served from the cache; null when the server just answered. */
     readonly cachedAsOf = signal<number | null>(null);
     private pushTimer: ReturnType<typeof setTimeout> | null = null;
     private pushWaiters: (() => void)[] = [];
+
+    /**
+     * The masking badge is a side effect of each read (InvService.masking), so the note the read was served under
+     * is kept with the cached graph and re-applied on a hit: the badge always describes the graph on screen.
+     */
+    private async cachedQuery(sourceId: GraphSourceId, source: GraphSource, q: GraphSourceQuery, force = false) {
+        const hit = await this.queryCache.get(
+            sourceId,
+            q,
+            async () => ({ g: await source.query(q), masking: this.inv.masking() }),
+            force,
+        );
+        if (hit.fromCache && hit.value.masking) this.inv.masking.set(hit.value.masking);
+        return hit;
+    }
 
     /** The Refresh bypass: re-run the last query against the server, ignoring the cache. */
     async refreshFromServer(): Promise<void> {
@@ -2106,8 +2130,8 @@ export class LinkAnalysisComponent implements OnInit {
         this.clearResults();
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         try {
-            const hit = await this.queryCache.get(sourceId, q, () => source.query(q), force);
-            const g = hit.value;
+            const hit = await this.cachedQuery(sourceId, source, q, force);
+            const g = hit.value.g;
             this.cachedAsOf.set(hit.fromCache ? hit.fetchedAt : null);
             this.growExclude.reset(); // a new graph: an Undo of the old one's Grow must not bring it back
             this.graph.set(g);
@@ -2204,8 +2228,8 @@ export class LinkAnalysisComponent implements OnInit {
         const q: GraphSourceQuery = { ...run.query, filter: hasConditions(w) ? cloneGroup(w) : undefined };
         this.pushing.set(true);
         try {
-            const hit = await this.queryCache.get(run.sourceId, q, () => source.query(q));
-            const next = hit.value;
+            const hit = await this.cachedQuery(run.sourceId, source, q);
+            const next = hit.value.g;
             this.cachedAsOf.set(hit.fromCache ? hit.fetchedAt : null);
             const truncated = !!(next as ProjectedGraph).truncated;
             this.graph.set(markStranded(prev, next));

@@ -18,7 +18,7 @@ import { BehaviorSubject, delay, of, throwError } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
-import { InvService, RecursivePathsRequest } from '@inspecto/link-analysis/api/inv.service';
+import { InvService, MaskingNote, RecursivePathsRequest } from '@inspecto/link-analysis/api/inv.service';
 import { EntityProfileService, EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
 import { PipelinesService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -4152,5 +4152,50 @@ describe('LinkAnalysisComponent - smart data fetch (PERF-P10a)', () => {
         c.clearFilter();
         fixture.detectChanges();
         expect(queried).toHaveLength(n);
+    });
+});
+
+describe('LinkAnalysisComponent - cache keeps the masking badge honest, and a destroyed page sends nothing (PERF-P10a review)', () => {
+    it('a cache hit restores the masking note of the cached result, not of the last read', async () => {
+        const { fixture, queried } = create();
+        fixture.detectChanges();
+        const inv = TestBed.inject(InvService);
+        const masked = { maskingMode: 'mask', masked: true } as unknown as MaskingNote;
+        const open = { maskingMode: 'none', masked: false } as unknown as MaskingNote;
+        inv.masking.set(masked); // what the first read's response set
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        inv.masking.set(open); // a later, unmasked read
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'D' });
+        vi.useFakeTimers();
+        try {
+            const p = c.pushFilter();
+            await vi.advanceTimersByTimeAsync(PUSH_FILTER_DEBOUNCE_MS);
+            await p;
+        } finally {
+            vi.useRealTimers();
+        }
+        expect(queried).toHaveLength(2);
+        expect(inv.masking()).toBe(open);
+        await c.loadView({ id: 'v', name: 'v', sourceId: 'entity-projection', query: queried[0] as never }); // first query: cache hit
+        expect(queried).toHaveLength(2);
+        expect(inv.masking()).toBe(masked);
+    });
+
+    it('destroying the page cancels a pending debounced push and settles its callers', async () => {
+        const { fixture, queried } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        vi.useFakeTimers();
+        try {
+            const p = c.pushFilter();
+            fixture.destroy();
+            await p; // resolves, no hang
+            await vi.advanceTimersByTimeAsync(PUSH_FILTER_DEBOUNCE_MS * 2);
+        } finally {
+            vi.useRealTimers();
+        }
+        expect(queried).toHaveLength(1);
     });
 });
