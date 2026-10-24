@@ -1005,9 +1005,21 @@ public final class InvRoutes implements RouteModule {
             }
         }
 
+        // PERF-P4-2: the conditional read. Every gate above (write root, body, R3 view gate, filter, four-eyes, alias) has run
+        // for THIS request; only now may a cached body or a 304 answer it. The read is still audited.
+        ProjectionCache.Key cacheKey = ProjectionCache.key(ex, neighborsOf != null ? "neighbors" : "projection", writeRoot,
+                api.dataRoot(), datasetId, relationSql, body, limit, mask);
+        ProjectionCache.Hit hit = ProjectionCache.get(cacheKey);
+        if (hit != null) {
+            audit(ex, datasetId, neighborsOf, hit.rows(), hit.truncated(), null);
+            if (ProjectionCache.notModified(ex, hit.etag())) return ProjectionCache.respond304(ex, hit.etag());
+            ProjectionCache.tag(ex, cacheKey);
+            return hit.body();
+        }
+
         // D-3 step 6: a one-hop neighbours read is answered from the edge index when - and only when - it can answer exactly
         // (IndexedNeighbors). The view gate and the four-eyes refusal above have run; a fallback below is the unchanged flat
-        // read. Disabled by default (index.enabled), so the default response gains nothing but `source`.
+        // read. On by default since 2026-10-10 (only `index.enabled: false` switches it off).
         IndexedRead.Outcome<IndexedNeighbors.Result> indexed = null;
         if (neighborsOf != null) {
             indexed = IndexedNeighbors.attempt(writeRoot, api.dataRoot(), relationSql, new IndexedNeighbors.Request(datasetId, sourceCol,
@@ -1024,6 +1036,9 @@ public final class InvRoutes implements RouteModule {
                 out.put("source", indexed.source());
                 audit(ex, datasetId, neighborsOf, rows.size(), indexed.result().truncated(), indexed);
                 if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13
+                ProjectionCache.READS.increment();
+                ProjectionCache.put(cacheKey, out, rows.size(), indexed.result().truncated());
+                ProjectionCache.tag(ex, cacheKey);
                 return out;
             }
         }
@@ -1046,6 +1061,7 @@ public final class InvRoutes implements RouteModule {
         String sql = edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols, neighborFilter, filter);
 
         try {
+            ProjectionCache.READS.increment();
             DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
                     datasetId, relationSql, sql, limit, 0, List.of(), List.of(), binds));
             List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
@@ -1059,6 +1075,8 @@ public final class InvRoutes implements RouteModule {
             if (indexed != null) out.put("source", indexed.source());
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated(), indexed);
             if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13: a graph was drawn
+            ProjectionCache.put(cacheKey, out, rows.size(), r.truncated());
+            ProjectionCache.tag(ex, cacheKey);
             return out;
         } catch (SQLException e) {
             throw DatasetReadFault.of("projection failed", datasetId, writeRoot, e);

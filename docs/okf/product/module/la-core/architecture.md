@@ -355,6 +355,17 @@ carry, so a column no Entity Type claims is raw on the query graph but seeded id
 entity's expansion is the thing read - an Investigation `expand` (held for approval) and `/inv/projection/neighbors` of ONE node, judged
 on that node's real counted degree (distinct links; over the threshold = 403). Traversals still judge their declared `maxEdgeYield`.
 
+**Conditional projection read (PERF-P4-2, 2026-10-24).** The flat `/inv/projection` and `/inv/projection/neighbors` (not `list`,
+not `/multi`) answer with `ETag` + `Cache-Control: private, no-cache`; a repeat with a matching `If-None-Match` gets `304` and no
+Dataset read (`ProjectionCache`: LRU 64, TTL 60 s, process-local). It is consulted only AFTER every gate of the read (write root,
+body 422, R3 view 404, filter, four-eyes, alias resolution), and the read is still audited on a hit. The key (and so the ETag)
+hashes: route, Space, viewer (Subject id, capabilities, data scopes, attributes, held roles), canonical body, resolved limit, the
+Dataset registry entry and relation SQL, its FRESH input fingerprint, the LA settings in force (masking mode, Entity Types,
+thresholds, index, caps), the Space masking key, and for neighbours each mapping's published index version. Only a `files:`
+fingerprint is cached - a view, a Postgres store, too many files or a timed-out listing is read every time. Gotcha: an in-place
+rewrite of a file that keeps BOTH size and mtime (ms) is not seen until the TTL ends. The executor's outer `LIMIT n+1` is
+already planned by DuckDB as a Top-N over the group-by (no full sort), so the projection needs no inner limit.
+
 
 **Reference rows (`POST /inv/reference-rows`, 2026-10-11).** Body `{dataset, keyCol, keys[1..500], columns?, investigationId?}`
 → `{dataset, keyCol, columns, rows:[{key, row}], matchedKeys, unresolved, rawKeysRefused, truncated, masking{…, maskedColumns}}`. The node
