@@ -337,13 +337,32 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
         flushBrush(): void;
     };
     const stub = () => ({
-        setData: vi.fn(),
+        // The elements the graph holds are the last data set; a removed node loses its states, a returning one starts bare.
+        setData: vi.fn(function (this: { held: Set<string> }, d: { nodes: { id: string }[] }) {
+            this.held = new Set(d.nodes.map((n) => String(n.id)));
+            for (const id of [...applied.keys()]) if (!this.held.has(id)) applied.delete(id);
+        }),
         draw: vi.fn(() => Promise.resolve()),
         render: vi.fn(() => Promise.resolve()),
-        setElementState: vi.fn((_s: Record<string, string[]>) => Promise.resolve()),
+        // G6 5.1.1 faithful: every id is looked up first; an unknown one throws and the WHOLE batch is dropped.
+        setElementState: vi.fn(function (this: { held: Set<string> }, states: Record<string, string[]>) {
+            for (const id of Object.keys(states))
+                if (!this.held.has(id)) return Promise.reject(new Error('Unknown element type of id: ' + id));
+            for (const id of Object.keys(states)) applied.set(id, states[id]);
+            return Promise.resolve();
+        }),
         destroy: vi.fn(),
+        held: new Set<string>(),
     });
+    const applied = new Map<string, string[]>();
+    /** The ids the canvas actually paints as selected. */
+    const painted = () =>
+        [...applied]
+            .filter(([, st]) => st.includes(SELECTED_STATE))
+            .map(([id]) => id)
+            .sort();
     function host() {
+        applied.clear();
         TestBed.configureTestingModule({
             imports: [GraphViewComponent],
             providers: [{ provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } }],
@@ -352,6 +371,7 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
         const comp = fixture.componentInstance as unknown as Internals;
         vi.spyOn(comp as unknown as { create(): void }, 'create').mockImplementation(() => undefined);
         const graph = stub();
+        graph.held = new Set(['a', 'b', 'c', 'd']);
         comp.ready = true;
         comp.graph = graph;
         comp.interaction = { boxSelect: true };
@@ -397,7 +417,7 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
         expect((comp as unknown as { selSet: Set<string> }).selSet).toEqual(new Set(['b']));
         return Promise.resolve().then(() => {
             const calls = graph.setElementState.mock.calls.map((c) => c[0]);
-            expect(Object.assign({}, ...calls)).toEqual({ a: [], b: [SELECTED_STATE] });
+            expect(Object.assign({}, ...calls)).toEqual({ b: [SELECTED_STATE] }); // a left the graph: never sent, G6 would reject the batch
         });
     });
 
@@ -420,6 +440,40 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
         expect(Object.assign({}, ...graph.setElementState.mock.calls.map((c) => c[0]))).toEqual({
             a: [SELECTED_STATE],
         });
+    });
+
+    it('a selected node dropped by the data, with a new selection in the same change, paints the new selection', async () => {
+        const { comp } = host();
+        select(comp, ['a']);
+        comp.data = {
+            nodes: ['b', 'c'].map((id) => ({ id, data: { label: id, kind: 'DATASET' } })),
+            edges: [],
+        } as unknown as G6GraphData;
+        comp.selection = ['b'];
+        comp.ngOnChanges({ data: {}, selection: {} });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(painted()).toEqual(['b']);
+    });
+
+    it('one data change that removes a selected node and brings another selected one back paints the returning one', async () => {
+        const { comp } = host();
+        comp.data = {
+            nodes: ['a', 'b'].map((id) => ({ id, data: { label: id, kind: 'DATASET' } })),
+            edges: [],
+        } as unknown as G6GraphData;
+        comp.ngOnChanges({ data: {} });
+        await Promise.resolve();
+        select(comp, ['a', 'c']); // c is not in the graph yet
+        await Promise.resolve();
+        comp.data = {
+            nodes: ['b', 'c'].map((id) => ({ id, data: { label: id, kind: 'DATASET' } })),
+            edges: [],
+        } as unknown as G6GraphData;
+        comp.ngOnChanges({ data: {} });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(painted()).toEqual(['c']);
     });
 
     it('styleKey does not move with the selection', () => {
@@ -490,6 +544,16 @@ describe('graphSignature (PERF-P2)', () => {
         const edgeKind = base();
         (edgeKind.edges[0].data as { kind: string }).kind = 'sms';
         expect(graphSignature(edgeKind)).not.toBe(sig);
+    });
+
+    it('moves when only an edge provenance or a node provenance changes (the tooltips read both)', () => {
+        const sig = graphSignature(base());
+        const e = base();
+        (e.edges[0].data as { provenance?: string[] }).provenance = ['ds1'];
+        expect(graphSignature(e)).not.toBe(sig);
+        const n = base();
+        (n.nodes[0].data as { provenance?: string[] }).provenance = ['ds1'];
+        expect(graphSignature(n)).not.toBe(sig);
     });
 
     it('tells null, empty and absent apart', () => {

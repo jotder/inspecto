@@ -501,6 +501,7 @@ export function graphSignature(data: G6GraphData | null | undefined): string {
         add(d.weight);
         add(d.simulated);
         add(d.derived);
+        add((d.provenance as string[] | undefined)?.join('|'));
         attrs(d.attrs);
         add('|');
     }
@@ -979,12 +980,16 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         // Only nodes the graph holds carry a state: one that left the data and comes back must be selected again.
         const want = new Set([...this.selSet].filter((id) => this.renderedNodeIds.has(id)));
         const prev = this.selectedStateIds;
-        const touched = [...prev].filter((id) => !want.has(id)).concat([...want].filter((id) => !prev.has(id)));
+        // G6 5.1.1 looks up EVERY id first and throws on an unknown one, dropping the WHOLE batch: so only ids the graph
+        // holds are ever sent. An id that left the data is simply forgotten (its element, and its state, are gone).
+        const removed = [...prev].filter((id) => !want.has(id) && this.renderedNodeIds.has(id));
+        const touched = removed.concat([...want].filter((id) => !prev.has(id)));
         this.selectedStateIds = new Set(want);
         if (!touched.length) return;
         const states: Record<string, string[]> = {};
         for (const id of touched) states[id] = want.has(id) ? [SELECTED_STATE] : [];
-        void graph.setElementState(states, false).catch(() => undefined); // an id the graph no longer holds is not an error
+        // Every id is rendered, so the batch cannot be rejected for an unknown element; a failure here is a real one.
+        void graph.setElementState(states, false).catch(() => undefined);
     }
 
     /**
