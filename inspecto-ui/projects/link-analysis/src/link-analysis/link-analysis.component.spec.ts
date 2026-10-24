@@ -30,6 +30,7 @@ import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { CANVAS_MIN_PX, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
 import { PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { SpacesService } from '@inspecto/core/api';
@@ -4156,17 +4157,20 @@ describe('LinkAnalysisComponent - smart data fetch (PERF-P10a)', () => {
 });
 
 describe('LinkAnalysisComponent - cache keeps the masking badge honest, and a destroyed page sends nothing (PERF-P10a review)', () => {
-    it('a cache hit restores the masking note of the cached result, not of the last read', async () => {
-        const { fixture, queried } = create();
-        fixture.detectChanges();
+    /** Make the fake source behave like InvService.noted: each read sets the note its response carried (or none). */
+    function notes(map: (q: unknown) => MaskingNote | null) {
+        const src = TestBed.inject(GraphSourcesService).byId('entity-projection')!;
         const inv = TestBed.inject(InvService);
-        const masked = { maskingMode: 'mask', masked: true } as unknown as MaskingNote;
-        const open = { maskingMode: 'none', masked: false } as unknown as MaskingNote;
-        inv.masking.set(masked); // what the first read's response set
-        await runQuery(fixture);
-        const c = fixture.componentInstance;
-        inv.masking.set(open); // a later, unmasked read
-        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'D' });
+        const orig = src.query.bind(src);
+        src.query = async (q) => {
+            const r = await orig(q);
+            const n = map(q);
+            if (n) inv.masking.set(n);
+            return r;
+        };
+        return inv;
+    }
+    async function pushOnce(c: LinkAnalysisComponent): Promise<void> {
         vi.useFakeTimers();
         try {
             const p = c.pushFilter();
@@ -4175,11 +4179,53 @@ describe('LinkAnalysisComponent - cache keeps the masking badge honest, and a de
         } finally {
             vi.useRealTimers();
         }
+    }
+    const MASKED = { maskingMode: 'mask', masked: true } as unknown as MaskingNote;
+    const OPEN = { maskingMode: 'none', masked: false } as unknown as MaskingNote;
+
+    it('a cache hit restores the masking note of the cached result, not of the last read', async () => {
+        const { fixture, queried } = create();
+        fixture.detectChanges();
+        const inv = notes((q) => ((q as { filter?: unknown }).filter ? OPEN : MASKED));
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'D' });
+        await pushOnce(c);
         expect(queried).toHaveLength(2);
-        expect(inv.masking()).toBe(open);
-        await c.loadView({ id: 'v', name: 'v', sourceId: 'entity-projection', query: queried[0] as never }); // first query: cache hit
+        expect(inv.masking()).toBe(OPEN);
+        await c.loadView({ id: 'v', name: 'v', sourceId: 'entity-projection', query: queried[0] as never }); // cache hit
         expect(queried).toHaveLength(2);
-        expect(inv.masking()).toBe(masked);
+        expect(inv.masking()).toBe(MASKED);
+    });
+
+    it('a read with NO masking note is cached as "no note": its hit clears the badge', async () => {
+        const { fixture, queried } = create();
+        fixture.detectChanges();
+        const inv = notes((q) => ((q as { filter?: unknown }).filter ? null : MASKED));
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'D' });
+        await pushOnce(c); // no-note read
+        const pushed = c.lastRun()!.query;
+        expect(inv.masking()).toBeNull();
+        await c.loadView({ id: 'v', name: 'v', sourceId: 'entity-projection', query: queried[0] as never }); // masked hit
+        expect(inv.masking()).toBe(MASKED);
+        await c.loadView({ id: 'w', name: 'w', sourceId: 'entity-projection', query: pushed }); // no-note hit
+        expect(queried).toHaveLength(2);
+        expect(inv.masking()).toBeNull();
+    });
+
+    it('a change of the masking mode in force makes the next identical query a fresh fetch', async () => {
+        const { fixture, queried } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        await c.run();
+        expect(queried).toHaveLength(1);
+        const settings = TestBed.inject(LinkAnalysisSettingsService);
+        settings.limits.set({ ...settings.limits(), maskingModeInForce: 'mask' } as never);
+        await c.run();
+        expect(queried).toHaveLength(2);
     });
 
     it('destroying the page cancels a pending debounced push and settles its callers', async () => {

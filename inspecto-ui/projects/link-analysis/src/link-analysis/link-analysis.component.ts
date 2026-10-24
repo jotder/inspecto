@@ -1469,7 +1469,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      *  cleared after the first query run, found or not. */
     private pendingPivot?: ElementObjectRef;
 
+    private destroyed = false;
+
     ngOnDestroy(): void {
+        this.destroyed = true;
         // a pending debounced push must not send after the page is gone; its callers settle (resolve) so none hangs
         if (this.pushTimer) clearTimeout(this.pushTimer);
         this.pushTimer = null;
@@ -2091,7 +2094,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     /** PERF-P10a-1/3: identical (Space, viewer, source, query) answers are served from the client; see graph-query-cache.ts. */
     private readonly queryCache = new GraphQueryCache<{ g: G6GraphData; masking: MaskingNote | null }>(
-        () => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}`,
+        () => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}|${this.limits.limits().maskingModeInForce ?? ''}`,
     );
     /** "As of" line for a graph served from the cache; null when the server just answered. */
     readonly cachedAsOf = signal<number | null>(null);
@@ -2106,10 +2109,20 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const hit = await this.queryCache.get(
             sourceId,
             q,
-            async () => ({ g: await source.query(q), masking: this.inv.masking() }),
+            async () => {
+                // per read: a read that sets no note is stored as "no note", never the previous read's
+                const before = this.inv.masking();
+                this.inv.masking.set(null);
+                try {
+                    return { g: await source.query(q), masking: this.inv.masking() };
+                } catch (err) {
+                    this.inv.masking.set(before);
+                    throw err;
+                }
+            },
             force,
         );
-        if (hit.fromCache && hit.value.masking) this.inv.masking.set(hit.value.masking);
+        if (hit.fromCache) this.inv.masking.set(hit.value.masking);
         return hit;
     }
 
@@ -2239,7 +2252,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             const n = next.edges.length.toLocaleString();
             this.pushState.set(truncated ? `${n} links · truncated — refine and push again` : `${n} links · complete`);
         } catch (err) {
-            this.toastr.error(apiErrorMessage(err, 'Pushing the predicate to the server failed.'));
+            if (!this.destroyed) this.toastr.error(apiErrorMessage(err, 'Pushing the predicate to the server failed.'));
         } finally {
             this.pushing.set(false);
         }

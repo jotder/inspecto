@@ -1,9 +1,9 @@
 import { GraphSourceQuery } from '@inspecto/core/graph';
 
 /**
- * Staleness window: within this time a re-run does not see a new pipeline run or a Space masking-mode change (the
- * client has no signal for either; an Entity List write, a Space or user change, and Refresh do drop it).
- * PERF-P10a-1: how long a folded graph answer is served without asking the server again (no Dataset freshness token exists client-side). */
+ * PERF-P10a-1: staleness window. Within this time a re-run does not see a new pipeline run (the client has no signal
+ * for it). A change of Space, user or the Space's masking mode in force (LinkAnalysisSettingsService), an Entity List
+ * write, and Refresh do drop the cache. How long a folded graph answer is served without asking the server again (no Dataset freshness token exists client-side). */
 export const GRAPH_CACHE_TTL_MS = 60_000;
 /** Bound on kept answers; the least recently used goes first. */
 export const GRAPH_CACHE_MAX_ENTRIES = 20;
