@@ -49,6 +49,37 @@ public final class DraftCheckpoints {
         }
     }
 
+    /**
+     * The change token a cache of a whole answer is keyed on (PERF-P4-3): {@link #sig}'s size, plus the mtime in NANOSECONDS (not
+     * milliseconds), the file's {@code fileKey} where the platform has one (it changes when a file is replaced), and a hash of
+     * the last line (a tail read, never the whole file). It proves "no append, no replace, no in-app rewrite" - every in-app
+     * write (append, truncate after a failed append/promote, rebase swap) changes the size or the mtime. It CANNOT prove that
+     * nobody edited the file out of band keeping size, nanosecond mtime, fileKey and last line; a cache keyed on it therefore
+     * revalidates by content on a short TTL (see {@code WorkingSetRoutes}), so such an edit is stale for at most that bound.
+     */
+    public static String strongSig(Path file) {
+        try {
+            if (!Files.isRegularFile(file)) return "absent";
+            java.nio.file.attribute.BasicFileAttributes a = Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class);
+            return a.size() + ":" + a.lastModifiedTime().to(java.util.concurrent.TimeUnit.NANOSECONDS) + ":" + a.fileKey() + ":" + lastLineHash(file, a.size());
+        } catch (IOException e) {
+            return "unreadable:" + System.nanoTime();   // never equal to a later reading: forces a miss
+        }
+    }
+
+    private static String lastLineHash(Path file, long size) throws IOException {
+        int window = (int) Math.min(size, 65536);
+        byte[] buf = new byte[window];
+        try (java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(file, java.nio.file.StandardOpenOption.READ)) {
+            ch.read(java.nio.ByteBuffer.wrap(buf), size - window);
+        }
+        int end = window;
+        while (end > 0 && buf[end - 1] == '\n') end--;
+        int start = end;
+        while (start > 0 && buf[start - 1] != '\n') start--;
+        return Integer.toHexString(java.util.Arrays.hashCode(java.util.Arrays.copyOfRange(buf, start, end)));
+    }
+
     /** The state of {@code log} (the whole list: main prefix + own entries) - the checkpoint when it is still current, else one fold. */
     public static InvestigationEvaluator.State stateOf(Path draftDir, List<Map<String, Object>> log) {
         return stateOf(keyOf(draftDir), sig(draftDir.resolve("log.jsonl")), log);

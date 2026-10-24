@@ -3,7 +3,12 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.audit.Event;
+import com.gamma.event.EventLog;
+import com.gamma.la.api.DraftAdmission;
+import com.gamma.la.api.WorkingSetRoutes;
 import com.gamma.la.core.FsInvestigationStore;
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -60,6 +65,9 @@ class ControlApiWorkingSetEtagTest {
     void reset() {
         Authenticators.forTest(null);
         AccessDeciders.forTest(null);
+        WorkingSetRoutes.CLOCK_MS = System::currentTimeMillis;
+        WorkingSetRoutes.TRUST_MS = WorkingSetRoutes.WORKING_SET_TRUST_MS;
+        DraftAdmission.setHeavyLimit(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 3)));
     }
 
     private static void subjects() {
@@ -143,6 +151,10 @@ class ControlApiWorkingSetEtagTest {
             String tag = etag(get(c, path, OWNER, null));
             assertNotEquals(tag, etag(get(c, path + "&limit=1", OWNER, null)), "the page is part of the tag");
             assertNotEquals(tag, etag(get(c, path + "&at=1", OWNER, null)), "the pin is part of the tag");
+            assertNotEquals(tag, etag(get(c, path + "&limit=1&offset=1", OWNER, null)), "the offset is part of the tag");
+            String paged = etag(get(c, path + "&limit=1", OWNER, null));
+            assertNotEquals(paged, etag(get(c, path + "&limit=1&offset=1", OWNER, null)), "a different page of the same size");
+            assertEquals(200, get(c, path + "&limit=1&offset=1", OWNER, paged).statusCode(), "another page never answers 304");
             assertEquals(304, get(c, path, OWNER, "\"nope\", " + tag).statusCode(), "a tag list matches any member");
             assertEquals(200, get(c, path, OWNER, "\"nope\"").statusCode(), "a stale tag is a full 200");
         }
@@ -277,6 +289,155 @@ class ControlApiWorkingSetEtagTest {
             assertEquals(reads, FsInvestigationStore.LOG_READS.sum());
             System.out.println("PERF-P4-3 timing: log of ~300 ops, cold 200 = " + coldMs + " ms (" + cold.body().length()
                     + " bytes), warm 304 = " + warmMs + " ms (0 bytes, 0 log reads)");
+        }
+    }
+
+    private static String sha256OfFile(Path log) throws Exception {
+        return "sha256:" + java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(log)));
+    }
+
+    @Test
+    void theBodyKeyIsTheLogsRealSha256OnAMissAndOnAHit(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "none")) {
+            seeded(c);
+            String expected = sha256OfFile(root.resolve("audit/snapshots/investigations/inv-a/log.jsonl"));
+            JsonNode miss = JSON.readTree(get(c, INV + "/working-set?of=entities", OWNER, null).body()).get("data");
+            assertEquals(expected, miss.get("key").asText(), "on a miss");
+            long reads = WorkingSetRoutes.FULL_READS.sum();
+            JsonNode hit = JSON.readTree(get(c, INV + "/working-set?of=entities", OWNER, null).body()).get("data");
+            assertTrue(hit.get("cached").asBoolean());
+            assertEquals(reads, WorkingSetRoutes.FULL_READS.sum(), "a hit within the trust window reads no content");
+            assertEquals(expected, hit.get("key").asText(), "on a hit within the trust window");
+        }
+    }
+
+    @Test
+    void anOutOfBandSameSizeSameMtimeEditIsStaleForAtMostTheTrustWindowThenFullyRevalidated(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong(1_000_000);
+        WorkingSetRoutes.CLOCK_MS = now::get;
+        try (Ctx c = open(cfg, root, "none")) {
+            seeded(c);
+            ok(c, "POST", INV + "/ops", "{\"op\":\"hide\",\"ids\":[\"b\"]}", OWNER);       // step 3: the line the probe rewrites
+            ok(c, "POST", INV + "/ops", "{\"op\":\"annotate\",\"ids\":[\"a\"],\"note\":\"tail\"}", OWNER);   // step 4: the last line stays intact
+            String path = INV + "/working-set?of=entities";
+            HttpResponse<String> first = get(c, path, OWNER, null);
+            String tag = etag(first);
+            assertTrue(first.body().contains("\"entityId\":\"b\",\"type\":null,\"hop\":1,\"seedId\":\"a\",\"opSeq\":2,\"hidden\":true"), first.body());
+
+            // out-of-band: hide b -> hide c in the middle of the log, SAME size, mtime put back, last line untouched
+            Path log = root.resolve("audit/snapshots/investigations/inv-a/log.jsonl");
+            java.nio.file.attribute.FileTime mtime = Files.getLastModifiedTime(log);
+            String text = Files.readString(log);
+            String edited = text.replaceFirst("\"ids\":\\[\"b\"\\]", "\"ids\":[\"c\"]");
+            assertNotEquals(text, edited, "the probe found its line");
+            assertEquals(text.length(), edited.length());
+            Files.writeString(log, edited);
+            Files.setLastModifiedTime(log, mtime);
+            assertEquals(mtime, Files.getLastModifiedTime(log));
+
+            // inside the window the token cannot tell: stale, and that is the documented bound
+            assertEquals(304, get(c, path, OWNER, tag).statusCode());
+
+            long fullBefore = WorkingSetRoutes.FULL_READS.sum();
+            now.addAndGet(WorkingSetRoutes.WORKING_SET_TRUST_MS + 1);
+            HttpResponse<String> revalidated = get(c, path, OWNER, tag);
+            assertEquals(200, revalidated.statusCode(), "after the window the old tag no longer validates");
+            assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - fullBefore, "one full content read for the window");
+            assertNotEquals(tag, etag(revalidated), "same token, different content: the tag moved");
+            assertTrue(revalidated.body().contains("\"entityId\":\"c\",\"type\":null,\"hop\":1,\"seedId\":\"a\",\"opSeq\":2,\"hidden\":true"), revalidated.body());
+            assertEquals(sha256OfFile(log), JSON.readTree(revalidated.body()).get("data").get("key").asText());
+
+            // the rest of the new window trusts the re-seeded entry: no more full reads
+            for (int i = 0; i < 3; i++) assertEquals(304, get(c, path, OWNER, etag(revalidated)).statusCode());
+            assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - fullBefore, "exactly once per window");
+            // an unchanged log re-validated in the next window keeps its tag (and costs one read per window)
+            now.addAndGet(WorkingSetRoutes.WORKING_SET_TRUST_MS + 1);
+            assertEquals(304, get(c, path, OWNER, etag(revalidated)).statusCode());
+            assertEquals(2, WorkingSetRoutes.FULL_READS.sum() - fullBefore);
+            assertEquals(304, get(c, path, OWNER, etag(revalidated)).statusCode());
+            assertEquals(2, WorkingSetRoutes.FULL_READS.sum() - fullBefore);
+        }
+    }
+
+    @Test
+    void anErrorNeverCarriesAnEtagAndAConditionalRequestStillGetsTheError(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "none")) {
+            seeded(c);
+            String good = etag(get(c, INV + "/working-set?of=entities", OWNER, null));
+            for (String bad : List.of("&at=99", "&offset=-1", "&limit=x")) {
+                String path = INV + "/working-set?of=entities" + bad;
+                HttpResponse<String> r = get(c, path, OWNER, null);
+                assertEquals(422, r.statusCode(), bad);
+                assertTrue(r.headers().firstValue("ETag").isEmpty(), "an error has no ETag: " + bad);
+                for (String inm : List.of(good, "*")) {
+                    HttpResponse<String> again = get(c, path, OWNER, inm);
+                    assertEquals(422, again.statusCode(), bad + " If-None-Match " + inm);
+                    assertTrue(again.headers().firstValue("ETag").isEmpty());
+                }
+            }
+
+            // 429: a Draft's cold relation under a full heavy-job cap
+            DraftAdmission.setHeavyLimit(1);
+            String draft = ok(c, "POST", DRAFTS, "{}", OWNER).get("draftId").asText();
+            ok(c, "POST", INV + "/ops", "{\"op\":\"hide\",\"ids\":[\"b\"]}", OWNER);   // main moved: the Draft's relation is cold
+            java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+            Thread holder = new Thread(() -> {
+                try {
+                    DraftAdmission.heavy("test holder", () -> {
+                        started.countDown();
+                        try { release.await(60, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                        return null;
+                    });
+                } catch (Exception ignored) { }
+            });
+            holder.setDaemon(true);
+            holder.start();
+            assertTrue(started.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            try {
+                String dpath = DRAFTS + "/" + draft + "/working-set?of=entities";
+                for (String inm : new String[] {null, good, "*"}) {
+                    HttpResponse<String> r = get(c, dpath, OWNER, inm);
+                    assertEquals(429, r.statusCode(), "If-None-Match " + inm + " -> " + r.body());
+                    assertTrue(r.headers().firstValue("ETag").isEmpty(), "a 429 has no ETag");
+                }
+            } finally {
+                release.countDown();
+            }
+        }
+    }
+
+    @Test
+    void aConditionalReadIsAuditedWithTheSameFieldsAsTheFullReadForMainAndDraft(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        java.util.List<Event> seen = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.function.Consumer<Event> sub = seen::add;
+        EventLog.current().addSubscriber(sub);
+        try (Ctx c = open(cfg, root, "none")) {
+            seeded(c);
+            String draft = ok(c, "POST", DRAFTS, "{}", OWNER).get("draftId").asText();
+            for (String path : List.of(INV + "/working-set?of=entities&limit=2", DRAFTS + "/" + draft + "/working-set?of=links")) {
+                String tag = etag(get(c, path, OWNER, null));   // miss: warms the entry
+                seen.clear();
+                assertEquals(200, get(c, path, OWNER, null).statusCode());
+                assertEquals(304, get(c, path, OWNER, tag).statusCode());
+                List<Event> reads = seen.stream().filter(e -> LinkEventTypes.LINK_INVESTIGATION_WORKING_SET_READ.equals(e.type())).toList();
+                assertEquals(2, reads.size(), path);
+                Map<String, String> full = new java.util.TreeMap<>(reads.get(0).attributes());
+                Map<String, String> cond = new java.util.TreeMap<>(reads.get(1).attributes());
+                assertEquals("true", cond.remove("notModified"), "the 304 is marked");
+                assertFalse(full.containsKey("notModified"));
+                assertEquals(full, cond, "the same audit fields on 200 and 304: " + path);
+                for (String k : List.of("investigationId", "relation", "rows", "total", "truncated", "cached", "key"))
+                    assertTrue(cond.containsKey(k), k + " on the 304 audit of " + path);
+                assertEquals(path.contains("/drafts/"), cond.containsKey("draftId"), "a Draft read says so, even on a 304");
+            }
+        } finally {
+            EventLog.current().removeSubscriber(sub);
         }
     }
 }

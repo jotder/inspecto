@@ -184,7 +184,9 @@ public final class LinkEventTypes {
     /** An Investigation's Working Set was read as a derived relation ({@code GET /inv/investigations/{id}/working-set},
      *  LA-20). {@code relation} (entities | links | excluded), {@code rows} served, {@code total},
      *  {@code truncated}, {@code cached} and the relation {@code key} (the sealed log's hash) — the LA-04
-     *  query-audit shape, so a read of the relation is as visible as the projection it replaces. */
+     *  query-audit shape, so a read of the relation is as visible as the projection it replaces. Also {@code at} (when pinned)
+     *  and {@code draftId} (a Draft read). A conditional read answered {@code 304} (PERF-P4-3) carries the SAME fields plus
+     *  {@code notModified=true}. */
     public static final String LINK_INVESTIGATION_WORKING_SET_READ = "LINK_INVESTIGATION_WORKING_SET_READ";
 
     /** An Investigation's op log was saved as an <b>Investigation Template</b> ({@code POST

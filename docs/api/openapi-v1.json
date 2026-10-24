@@ -8810,8 +8810,13 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "$ref" : "#/components/parameters/IfNoneMatch"
         } ],
         "responses" : {
+          "304" : {
+            "$ref" : "#/components/responses/NotModified"
+          },
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
           }
@@ -11694,8 +11699,13 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "$ref" : "#/components/parameters/IfNoneMatch"
         } ],
         "responses" : {
+          "304" : {
+            "$ref" : "#/components/responses/NotModified"
+          },
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
           }

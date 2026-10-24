@@ -474,7 +474,7 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     @Override
     public String logToken(Scope scope) {
-        return DraftCheckpoints.sig(logDir(scope).resolve("log.jsonl"));
+        return DraftCheckpoints.strongSig(logDir(scope).resolve("log.jsonl"));
     }
 
     // ── Drafts ──────────────────────────────────────────────────────────────────────────────────────────

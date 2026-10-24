@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-41 test class(es): 41 unit, 0 real-HTTP control-plane, 0 IT.
+42 test class(es): 42 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -65,4 +65,5 @@ mvn -o test -pl la/inspecto-la-api -Dtest=CaseHistoryRoutesContractTest,ColumnPr
 | `StandingDetectionTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/StandingDetectionTest.java` | LD-2/LD-3: the pure re-decision of a standing-detection sweep's authority (no PDP registered: ABSTAIN). |
 | `ValueMeasureRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/ValueMeasureRoutesContractTest.java` | {@link ValueMeasureRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |
 | `ValueMeasuresPackKeysTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/ValueMeasuresPackKeysTest.java` | An Industry pack's {@code measure.<id>} terms may name exactly the Value Measures (the core's list is a mirror). |
+| `WorkingSetEtagTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/WorkingSetEtagTest.java` | PERF-P4-3: every ingredient of the Working Set tag moves the tag ALONE. The store is a stub whose cache key and tokens are |
 | `WorkingSetRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/WorkingSetRoutesContractTest.java` | {@link WorkingSetRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |

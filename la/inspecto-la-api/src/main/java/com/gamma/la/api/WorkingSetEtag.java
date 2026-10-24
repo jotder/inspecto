@@ -46,9 +46,9 @@ final class WorkingSetEtag {
         return mode + "|" + types + "|" + columns;
     }
 
-    /** The strong tag for one request's answer. {@code token} is {@link #logToken} read once by the caller. */
-    static String of(InvestigationRoutes.Inv inv, String token, String of, int limit, int offset, int at) {
-        String raw = String.join("\u0000", inv.cacheKey(), token, of, Integer.toString(limit), Integer.toString(offset),
+    /** The strong tag for one request answer. {@code token} is {@link #logToken} read once by the caller; {@code contentKey} is the relation key (the log SHA-256 last verified), so a tag never outlives a content re-validation that found a different log. */
+    static String of(InvestigationRoutes.Inv inv, String token, String contentKey, String of, int limit, int offset, int at) {
+        String raw = String.join("\u0000", inv.cacheKey(), token, contentKey, of, Integer.toString(limit), Integer.toString(offset),
                 Integer.toString(at), inv.draft() == null ? "" : inv.draft().draftId(), maskingProfile(inv));
         return "\"" + hash(raw) + "\"";
     }

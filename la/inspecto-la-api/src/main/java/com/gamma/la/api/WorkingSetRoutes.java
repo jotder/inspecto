@@ -33,13 +33,30 @@ import java.util.Map;
  * ({@link InvestigationEvaluator}, D-E3), so it needs no Dataset read.
  *
  * <p><b>Cache (a functional requirement — six tiles = six re-runs per view).</b> The relation is a pure function of
- * the log, so it is cached under a key that IS the log: the Investigation's directory plus the SHA-256 of the log's
- * committed bytes (every line up to the last newline — the head step and every seal fingerprint are inside it).
- * ⇒ Invalidation needs no hook in the write path: an op or an undo appends a line, which changes the key; a fork is
- * a different directory, so a different relation; a log edited on disk hashes differently too. The file is read on
- * every request — what the cache saves is the JSON parse of every sealed row, the fold, and the row building.
- * ⛔ A cheaper stat-only key (size / mtime) was rejected: an append-only file's size is monotone only while nobody
- * rewrites it, and the replay equivalence check exists precisely because someone might.
+ * the log, so it is cached per log under the store's change token ({@code InvestigationStore#logToken}: size, mtime in
+ * nanoseconds, fileKey and a hash of the last line for the filesystem store; append-only rows and a non-decreasing
+ * Draft version for the Postgres store). A hit reads no log, hashes nothing and parses nothing. An op or an undo appends
+ * a line and a fork is a different directory, so both move the token; every in-app rewrite (a truncate after a failed
+ * promote or Draft append, a rebase swap) changes the size or the mtime too.
+ * <ul>
+ *   <li><b>What the token proves:</b> no append, replace or in-app rewrite since the entry was built.</li>
+ *   <li><b>What it cannot prove:</b> that nobody edited the file out of band keeping its size, its nanosecond mtime, its
+ *       fileKey AND its last line. The replay equivalence check exists precisely because someone might.</li>
+ *   <li><b>The bound:</b> an entry is trusted for at most {@link #TRUST_MS} ({@link #WORKING_SET_TRUST_MS}, 30 s). After
+ *       that the next read does the FULL content check - read every committed line, SHA-256 it, compare with the entry's
+ *       {@code key} - and either re-seeds the entry (same content) or rebuilds it (different content). So such an edit is
+ *       stale for at most the TTL, never indefinitely, and the answer's {@code key} and ETag always name the content
+ *       that was last verified.</li>
+ *   <li><b>Drafts:</b> a Draft's entry is also keyed on the main log's token, so any main-log append invalidates every
+ *       Draft relation of that Investigation (they rebuild cold under the heavy-job cap and can answer 429). A cheaper key
+ *       would need the main prefix's content, i.e. a read of the log - the cost this cache exists to avoid.</li>
+ * </ul>
+ *
+ * <p><b>Conditional GET (PERF-P4-3).</b> The ETag is built from the token, the verified content {@code key}, the table,
+ * the page, the pin and the masking profile, and a matching {@code If-None-Match} answers a bodiless 304. It is decided
+ * AFTER the caller's gate and after the relation was obtained without error: an error response (422, 429, ...) never
+ * carries an ETag and a conditional request that would be an error returns that error. The 304 writes the same audit
+ * event as the 200 (plus {@code notModified}).
  *
  * <p><b>Who may evaluate it (D-E7, decided 2026-09-23).</b> The gate runs on EVERY request, BEFORE the cache is
  * consulted, so a cached relation can never be served to a caller the gate would refuse:
@@ -86,6 +103,25 @@ public final class WorkingSetRoutes implements RouteModule {
 
     private static final int CACHE_ENTRIES = 32;
 
+    /** How long a cached relation is trusted on its change token alone before the next read re-validates by content. */
+    public static final long WORKING_SET_TRUST_MS = 30_000;
+
+    /** TEST SEAM: the trust window (default {@link #WORKING_SET_TRUST_MS}). */
+    public static volatile long TRUST_MS = WORKING_SET_TRUST_MS;
+
+    /** TEST SEAM: the clock the trust window is measured on. */
+    public static volatile java.util.function.LongSupplier CLOCK_MS = System::currentTimeMillis;
+
+    /** TEST SEAM: full content reads (a miss, or a re-validation after the trust window) - a hit within the window adds none. */
+    public static final java.util.concurrent.atomic.LongAdder FULL_READS = new java.util.concurrent.atomic.LongAdder();
+
+    /** A cached relation and when it was last verified against the log's content. */
+    private static final class Cached {
+        final Relation rel;
+        volatile long validatedMs;
+        Cached(Relation rel, long validatedMs) { this.rel = rel; this.validatedMs = validatedMs; }
+    }
+
     public static final Map<String, List<String>> COLUMNS = Map.of(
             "entities", List.of("entityId", "type", "hop", "seedId", "opSeq", "hidden", "kept", "identity", "highConnectivity", "contacts", "expanded"),
             "links", List.of("source", "target", "kind", "count", "opSeq"),
@@ -94,10 +130,10 @@ public final class WorkingSetRoutes implements RouteModule {
     /** One evaluated relation at one log head. Immutable once cached. */
     public record Relation(String key, int headStep, String workingSetHash, Map<String, List<Map<String, Object>>> tables) {}
 
-    /** Access-ordered LRU, bounded; keyed by {@code <dir>\0<sha256 of the committed log>}. */
-    private static final Map<String, Relation> CACHE = new LinkedHashMap<>(16, 0.75f, true) {
+    /** Access-ordered LRU, bounded; keyed by {@code <dir>\0<hash of the store's change token>[@at]}; see the class javadoc for the trust bound. */
+    private static final Map<String, Cached> CACHE = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Relation> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<String, Cached> eldest) {
             return size() > CACHE_ENTRIES;
         }
     };
@@ -129,23 +165,16 @@ public final class WorkingSetRoutes implements RouteModule {
         int at = intParam(ex, "at", -1);
         if (ApiContext.query(ex, "at") != null && at < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at must be >= 0");
 
-        // PERF-P4-3: the caller's gate (open / R3 / PDP) has already passed, so a matching If-None-Match may answer 304 here -
-        // before the log is read, hashed, evaluated or masked. The tag is derived from the store's change token, not the log.
+        // PERF-P4-3: the caller's gate (open / R3 / PDP) has already passed. The relation comes from the cache (no log read
+        // within the trust window); only then - nothing has failed - is the ETag derived and a matching If-None-Match answered 304.
         String token = WorkingSetEtag.logToken(inv);
-        String etag = WorkingSetEtag.of(inv, token, of, limit, offset, at);
-        ex.getResponseHeaders().set("ETag", etag);
-        if (WorkingSetEtag.isFresh(ex, etag)) {
-            String relationName = of;
-            emit(ex, id, b -> b.attr("investigationId", id).attr("relation", relationName).attr("cached", true).attr("notModified", true));
-            ex.sendResponseHeaders(304, -1);   // -1 => no body, as 304 requires
-            return ApiContext.HANDLED;
-        }
-
         boolean[] cached = {false};
         Relation rel = relation(inv, at, cached, token);
+        String etag = WorkingSetEtag.of(inv, token, rel.key(), of, limit, offset, at);
         List<Map<String, Object>> all = rel.tables().get(of);
         List<Map<String, Object>> rows = all.subList(Math.min(offset, all.size()), (int) Math.min((long) offset + limit, all.size()));
         boolean truncated = (long) offset + rows.size() < all.size();
+        boolean notModified = WorkingSetEtag.isFresh(ex, etag);
 
         String relation = of;
         emit(ex, id, b -> {
@@ -153,8 +182,14 @@ public final class WorkingSetRoutes implements RouteModule {
                     .attr("total", all.size()).attr("truncated", truncated).attr("cached", cached[0])
                     .attr("key", rel.key()).attr("at", at < 0 ? null : at);
             if (inv.draft() != null) b.attr("draftId", inv.draft().draftId());
+            if (notModified) b.attr("notModified", true);
             return b;
         });
+        if (notModified) {
+            ex.getResponseHeaders().set("ETag", etag);
+            ex.sendResponseHeaders(304, -1);   // -1 => no body, as 304 requires
+            return ApiContext.HANDLED;
+        }
 
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("step", rel.headStep());
@@ -199,6 +234,7 @@ public final class WorkingSetRoutes implements RouteModule {
             cols.add("linkId");
             masked.put("columns", cols);
         }
+        ex.getResponseHeaders().set("ETag", etag);   // only a fully built 200 carries a tag
         return masked;
     }
 
@@ -223,15 +259,18 @@ public final class WorkingSetRoutes implements RouteModule {
      */
     static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut, String token) throws IOException {
         String tokenKey = WorkingSetEtag.relationKey(inv, token, at);
+        Cached known;
         synchronized (CACHE) {
-            Relation hit = CACHE.get(tokenKey);
-            if (hit != null) {
-                cachedOut[0] = true;
-                return hit;
-            }
+            known = CACHE.get(tokenKey);
         }
-        // The store hands back COMMITTED lines only (a line being appended right now is not one), each followed by one '\n':
-        // exactly the bytes the log file holds for them, so the key is the same on every backend.
+        if (known != null && CLOCK_MS.getAsLong() - known.validatedMs < TRUST_MS) {
+            cachedOut[0] = true;
+            return known.rel;
+        }
+        // A miss, or the trust window ran out: read the committed lines. The store hands back COMMITTED lines only (a line being
+        // appended right now is not one), each followed by one '\n': exactly the bytes the log file holds for them, so the key is
+        // the same on every backend.
+        FULL_READS.increment();
         java.io.ByteArrayOutputStream joined = new java.io.ByteArrayOutputStream();
         if (inv.draft() != null) {   // D7-3: the main prefix the Draft forked from, then the Draft's own lines - the key hashes BOTH
             List<String> main = inv.store().log(InvestigationStore.Scope.main(inv.id()));
@@ -241,7 +280,13 @@ public final class WorkingSetRoutes implements RouteModule {
         for (String line : inv.store().log(inv.scope())) joined.writeBytes((line + "\n").getBytes(StandardCharsets.UTF_8));
         byte[] bytes = joined.toByteArray();
         int end = bytes.length;
-        String key = inv.cacheKey() + "\u0000" + sha256(bytes, end) + (at < 0 ? "" : "@" + at);
+        String hash = sha256(bytes, end) + (at < 0 ? "" : "@" + at);
+        if (known != null && known.rel.key().equals(hash)) {   // the same content as when it was built: trust it for another window
+            known.validatedMs = CLOCK_MS.getAsLong();
+            cachedOut[0] = true;
+            return known.rel;
+        }
+        String key = inv.cacheKey() + "\u0000" + hash;
         if (inv.draft() == null) return build(tokenKey, key, bytes, end, at);
         final byte[] draftBytes = bytes;
         final int draftEnd = end;
@@ -277,7 +322,7 @@ public final class WorkingSetRoutes implements RouteModule {
         }
         Relation rel = new Relation(key.substring(key.indexOf('\u0000') + 1), headStep, s.hash(), tables(s));
         synchronized (CACHE) {
-            CACHE.put(tokenKey, rel);
+            CACHE.put(tokenKey, new Cached(rel, CLOCK_MS.getAsLong()));
         }
         return rel;
     }
