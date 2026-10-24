@@ -6,8 +6,13 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { G6GraphData } from './catalog-graph';
 import {
     DENSE_EDGE_LABEL_CAP,
+    GRAPH_DEFAULT_LAYOUT_SPACING,
+    GRAPH_DEFAULT_NODE_SIZE,
+    GRAPH_LAYOUT_SPACINGS,
     GRAPH_LAYOUTS,
+    GRAPH_NODE_SIZES,
     GraphDisplayOptions,
+    HOST_NODE_SIZE,
     GraphViewComponent,
     NODE_DBLCLICK_DELAY_MS,
     SELECTED_STATE,
@@ -89,6 +94,56 @@ describe('GraphViewComponent', () => {
     it('bubble sets honour the same singleton rule as hulls', () => {
         const hulls = new Map([['0', ['a']]]); // a community of one gets no shape
         expect(buildPluginList({ hulls, bubbleSets: true }, ['swatch-a'])).toEqual([]);
+    });
+});
+
+describe('layoutConfig node size and spacing (operator 2026-10-24)', () => {
+    it('with neither given, every layout is exactly what it was before they existed', () => {
+        expect(layoutConfig('force')).toEqual({ type: 'd3-force', collide: { radius: 28 } });
+        expect(layoutConfig('dagre')).toEqual({ type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 });
+        expect(layoutConfig('radial')).toEqual({ type: 'radial', unitRadius: 120, preventOverlap: true });
+        expect(layoutConfig('concentric')).toEqual({
+            type: 'concentric',
+            sortBy: 'degree',
+            preventOverlap: true,
+            nodeSize: 40,
+        });
+        expect(layoutConfig('fruchterman')).toEqual({ type: 'fruchterman', gravity: 5, speed: 5 });
+        expect(layoutConfig('org')['getWidth' as never]).toBeDefined();
+        // spacing 1 and the host's own node size is the same as passing nothing
+        for (const l of GRAPH_LAYOUTS) {
+            const none = JSON.stringify(layoutConfig(l.id), (_k, v) => (typeof v === 'function' ? v() : v));
+            const one = JSON.stringify(layoutConfig(l.id, { nodeSize: 32, spacing: 1 }), (_k, v) =>
+                typeof v === 'function' ? v() : v,
+            );
+            expect(one, l.id).toBe(none);
+        }
+    });
+
+    it('spacing multiplies the distances: force link and charge, layered gaps, radial radius, tree gaps', () => {
+        expect(layoutConfig('force', { spacing: 4 })).toMatchObject({
+            link: { distance: 120 },
+            manyBody: { strength: -120 },
+        });
+        expect(layoutConfig('dagre', { spacing: 4 })).toMatchObject({ nodesep: 72, ranksep: 240 });
+        expect(layoutConfig('radial', { spacing: 2 })).toMatchObject({ unitRadius: 240 });
+        expect(layoutConfig('force-cluster', { spacing: 3 })).toMatchObject({ kr: 60 });
+        expect(layoutConfig('dendrogram', { spacing: 2 })).toMatchObject({ nodeSep: 72, rankSep: 240 });
+        expect((layoutConfig('mindmap', { spacing: 2 })['getHGap'] as () => number)()).toBe(120);
+        expect(layoutConfig('fruchterman', { spacing: 2 })).toMatchObject({ gravity: 2.5 });
+        expect(layoutConfig('concentric', { spacing: 2 })).toMatchObject({ nodeSpacing: 40 });
+    });
+
+    it('the collision radius and tree box follow the node size, so small nodes keep a small gap', () => {
+        expect(layoutConfig('force', { nodeSize: 20 })).toMatchObject({ collide: { radius: 18 } });
+        expect((layoutConfig('mindmap', { nodeSize: 20 })['getWidth'] as () => number)()).toBe(20);
+        expect(layoutConfig('concentric', { nodeSize: 20 })).toMatchObject({ nodeSize: 25 });
+    });
+
+    it('offers the node sizes and spacings the Display menu shows, with the defaults among them', () => {
+        expect(GRAPH_NODE_SIZES.map((s) => s.value)).toContain(GRAPH_DEFAULT_NODE_SIZE);
+        expect(GRAPH_LAYOUT_SPACINGS.map((s) => s.value)).toContain(GRAPH_DEFAULT_LAYOUT_SPACING);
+        expect(GRAPH_DEFAULT_NODE_SIZE).toBeLessThan(HOST_NODE_SIZE); // small by default
     });
 });
 

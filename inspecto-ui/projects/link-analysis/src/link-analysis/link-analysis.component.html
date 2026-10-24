@@ -459,7 +459,41 @@
                                 >(else hover-only above {{ denseEdgeLabelCap }} links)</span
                             ></mat-checkbox
                         >
+                        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node size</span>
+                        <div class="flex items-center gap-1.5" role="group" aria-label="Node size">
+                            @for (z of nodeSizeOptions; track z.value) {
+                                <button
+                                    type="button"
+                                    class="rounded border px-2 py-0.5 text-xs"
+                                    [class.ring-2]="nodeSize() === z.value"
+                                    [attr.aria-pressed]="nodeSize() === z.value"
+                                    [attr.data-node-size]="z.value"
+                                    (click)="setNodeSize(z.value)"
+                                >
+                                    {{ z.label }}
+                                </button>
+                            }
+                        </div>
+                        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node spacing</span>
+                        <div class="flex items-center gap-1.5" role="group" aria-label="Node spacing">
+                            @for (z of spacingOptions; track z.value) {
+                                <button
+                                    type="button"
+                                    class="rounded border px-2 py-0.5 text-xs"
+                                    [class.ring-2]="layoutSpacing() === z.value"
+                                    [attr.aria-pressed]="layoutSpacing() === z.value"
+                                    [attr.data-spacing]="z.value"
+                                    (click)="setLayoutSpacing(z.value)"
+                                >
+                                    {{ z.label }}
+                                </button>
+                            }
+                        </div>
                         <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node colors</span>
+                        <span class="text-secondary text-xs"
+                            >Types without a choice here get an automatic color and shape. The most common type stays
+                            neutral.</span
+                        >
                         @for (k of nodeKinds(); track k) {
                             <div class="flex items-center gap-1.5">
                                 <span class="w-24 truncate text-sm" [title]="k">{{ k }}</span>
@@ -1096,7 +1130,7 @@
                             [typeLabels]="entityTypeLabels()"
                             [edgeKinds]="legendLinkKinds()"
                             [hiddenEdgeKinds]="hiddenLinkKinds()"
-                            [edgeColors]="edgeColors()"
+                            [edgeColors]="displayOptions().edgeColors"
                             (edgeKindToggle)="toggleLinkKind($event)"
                             [highConnectivity]="hubsDrawn()"
                             [unexpanded]="unexpandedDrawn()"

@@ -191,9 +191,13 @@ import {
     DENSE_EDGE_LABEL_CAP,
     EdgePattern,
     GRAPH_EDGE_PATTERNS,
+    GRAPH_DEFAULT_LAYOUT_SPACING,
+    GRAPH_DEFAULT_NODE_SIZE,
     GRAPH_EDGE_SIZES,
+    GRAPH_LAYOUT_SPACINGS,
     GRAPH_LAYOUTS,
     GRAPH_NODE_SHAPES,
+    GRAPH_NODE_SIZES,
     GraphDisplayOptions,
     GraphEmphasis,
     GraphLayoutId,
@@ -260,6 +264,7 @@ import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analys
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
+import { autoStyle } from './auto-style';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
 import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
@@ -302,6 +307,8 @@ interface PresentationSnapshot {
     edgePatterns: Record<string, EdgePattern>;
     edgeSizes: Record<string, number>;
     nodeRules: NodeRule[];
+    nodeSize: number;
+    layoutSpacing: number;
     layoutId: GraphLayoutId;
 }
 
@@ -1145,7 +1152,16 @@ export class LinkAnalysisComponent implements OnInit {
         return ws && canvas ? buildServerIdMap(ws, this.investigation.binding() ?? undefined, canvas) : null;
     });
 
-    readonly displayOptions = computed<GraphDisplayOptions>(
+    /** Node size in px: small by default, never scaled by degree or value; changed only from the Display menu. */
+    readonly nodeSize = signal(GRAPH_DEFAULT_NODE_SIZE);
+    /** How far the layout spreads nodes (a multiplier on its distances); wide by default; changed from the Display menu. */
+    readonly layoutSpacing = signal(GRAPH_DEFAULT_LAYOUT_SPACING);
+
+    /**
+     * What the analyst chose, and only that: this is what a saved view keeps. The automatic look ({@link displayOptions})
+     * is derived from the drawn graph every time, so it is never written into a view.
+     */
+    readonly chosenDisplay = computed<GraphDisplayOptions>(
         () => ({
             nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
             edgeLabels: this.edgeLabels() && !this.lodLabelsOff(),
@@ -1156,19 +1172,52 @@ export class LinkAnalysisComponent implements OnInit {
             edgePatterns: this.edgePatterns(),
             edgeSizes: this.edgeSizes(),
             ...(this.nodeRules().length ? { nodeRules: this.nodeRules() } : {}),
+            ...(this.nodeSize() !== GRAPH_DEFAULT_NODE_SIZE ? { nodeSize: this.nodeSize() } : {}),
+            ...(this.layoutSpacing() !== GRAPH_DEFAULT_LAYOUT_SPACING ? { layoutSpacing: this.layoutSpacing() } : {}),
         }),
+        { equal: (a, b) => stableKey(a) === stableKey(b) },
+    );
+
+    /**
+     * The automatic colour, shape and line pattern per node type and link type of the graph the canvas DRAWS from (an
+     * open Investigation's Working Set, else the query graph; before the legend hides a link kind, so hiding one does not
+     * re-colour the others). The most common of each stays neutral. It sits UNDER the analyst's own per-kind choices.
+     */
+    readonly autoStyleOf = computed(() => autoStyle(this.canvasSource()), {
+        equal: (a, b) => stableKey(a) === stableKey(b),
+    });
+
+    /** What the canvas and the legend are given: the analyst's choices over the automatic look, with the size and spacing. */
+    readonly displayOptions = computed<GraphDisplayOptions>(
+        () => {
+            const chosen = this.chosenDisplay();
+            const auto = this.autoStyleOf();
+            return {
+                ...chosen,
+                nodeColors: { ...auto.nodeColors, ...chosen.nodeColors },
+                edgeColors: { ...auto.edgeColors, ...chosen.edgeColors },
+                nodeShapes: { ...auto.nodeShapes, ...chosen.nodeShapes },
+                edgePatterns: { ...auto.edgePatterns, ...chosen.edgePatterns },
+                nodeSize: this.nodeSize(),
+                layoutSpacing: this.layoutSpacing(),
+            };
+        },
         { equal: (a, b) => stableKey(a) === stableKey(b) },
     );
     readonly swatches = ICON_COLOR_SWATCHES;
     readonly shapeOptions = GRAPH_NODE_SHAPES;
     readonly patternOptions = GRAPH_EDGE_PATTERNS;
     readonly sizeOptions = GRAPH_EDGE_SIZES;
+    readonly nodeSizeOptions = GRAPH_NODE_SIZES;
+    readonly spacingOptions = GRAPH_LAYOUT_SPACINGS;
     /** True when any display option deviates from the defaults (tints the paint-brush button). */
     readonly displayCustomized = computed<boolean>(
         () =>
             this.nodeLabels() ||
             this.edgeLabels() ||
             this.allEdgeLabels() ||
+            this.nodeSize() !== GRAPH_DEFAULT_NODE_SIZE ||
+            this.layoutSpacing() !== GRAPH_DEFAULT_LAYOUT_SPACING ||
             Object.keys(this.nodeColors()).length > 0 ||
             Object.keys(this.edgeColors()).length > 0 ||
             Object.keys(this.nodeShapes()).length > 0 ||
@@ -1211,7 +1260,10 @@ export class LinkAnalysisComponent implements OnInit {
     readonly tableMode = signal<'links' | 'nodes'>('links');
 
     // ── canvas overlays: legend (kind → colour → count) and the working set tiles ──
-    readonly legendItems = computed<LegendItem[]>(() => legendItemsFor(this.displayed(), this.nodeColors()));
+    // The legend names the colour the canvas paints: the analyst's choice, else the automatic one.
+    readonly legendItems = computed<LegendItem[]>(() =>
+        legendItemsFor(this.displayed(), this.displayOptions().nodeColors),
+    );
     /** Entity Type id → its registry label, for the legend rows; empty until (and unless) the registry answers. */
     readonly entityTypeLabels = signal<Record<string, string>>({});
     private entityTypeLabelsAsked = false;
@@ -1499,7 +1551,9 @@ export class LinkAnalysisComponent implements OnInit {
                 });
             });
         // LA-ONBOARD-1 phase 3: `?view=<id>` opens that saved view, drawing its graph (the first-run sample lands here).
-        // Consumed once, like `seed`: the param is dropped so a reload does not draw it over the analyst's work.
+        // The param STAYS (operator 2026-10-24): it is how a browser refresh reopens the view that was open, exactly as
+        // `?investigation=` does. The page writes it when a view is opened or saved and Close drops it; a view the page
+        // itself opened (it already holds that id) is not loaded a second time.
         this.route.queryParamMap
             .pipe(
                 map((p) => p.get('view')),
@@ -1507,20 +1561,27 @@ export class LinkAnalysisComponent implements OnInit {
                 takeUntilDestroyed(this.destroyRef),
             )
             .subscribe((viewId) => {
-                if (!viewId) return;
+                const open = this.openViewId();
+                if (!viewId && open) {
+                    // Back on the kept-alive page through a link without the param (the nav rail): the view is still
+                    // open, so put its id back - a reload then reopens it. Not when the link brings its own thing to
+                    // open (an Alert's `?investigation=`, a `?seed=`): that is about to replace the view, and both
+                    // must not be in the address.
+                    const q = this.route.snapshot.queryParamMap;
+                    if (!q.has('investigation') && !q.has('seed')) this.setViewParam(open);
+                    return;
+                }
+                if (!viewId || viewId === open) return;
                 this.viewsService.list().subscribe({
                     next: (all) => {
                         const v = all.find((x) => x.id === viewId);
                         if (v) void this.loadView(v);
-                        else this.toastr.info('That saved view is not in this Space.', 'Not found');
+                        else {
+                            this.toastr.info('That saved view is not in this Space.', 'Not found');
+                            this.setViewParam(null);
+                        }
                     },
                     error: () => undefined,
-                });
-                void this.router.navigate([], {
-                    relativeTo: this.route,
-                    queryParams: { view: null },
-                    queryParamsHandling: 'merge',
-                    replaceUrl: true,
                 });
             });
         // LA-ONBOARD-1 phases 4 + 6: `?dataset=<id>` alone (Add data's "Explore in Link Analysis") preselects that Dataset in
@@ -1600,6 +1661,7 @@ export class LinkAnalysisComponent implements OnInit {
     async startFrom(req: StartRequest): Promise<void> {
         const ds = this.startCatalogue().datasets.find((d) => d.id === req.datasetId);
         if (!ds || this.starting()) return;
+        this.forgetOpenView(); // the Start box, Discover's "Start from these" and a Dataset all draw something new
         this.startNotice.set(null);
         if (req.kind === 'dataset') {
             this.sourceId.set('entity-projection');
@@ -1657,6 +1719,7 @@ export class LinkAnalysisComponent implements OnInit {
      * ring over a Dataset that links its type (F-8: it drew the whole Dataset); on the Investigations level seed an Investigation.
      */
     async startFromEntity(req: InvestigateRequest): Promise<void> {
+        this.forgetOpenView(); // what is drawn next is not the saved view
         if (this.investigationsEnabled()) {
             await this.prepareInvestigation(req);
             return;
@@ -1908,8 +1971,17 @@ export class LinkAnalysisComponent implements OnInit {
             this.loadError.set(q.error);
             return;
         }
+        this.forgetOpenView(); // a query the analyst ran is not the saved view any more
         await this.execute(this.sourceId(), q);
     }
+
+    /**
+     * An Investigation canvas replaces whatever the page drew, and an Investigation has its own `?investigation=`:
+     * the two must not both be reopened on refresh.
+     */
+    private readonly forgetViewForInvestigation = effect(() => {
+        if (this.investigation.canvas()) untracked(() => this.forgetOpenView());
+    });
 
     /** A fresh graph (or none) clears the canvas emphasis + presentation filters and the analysis toolbox's results. */
     private clearResults(): void {
@@ -1985,6 +2057,8 @@ export class LinkAnalysisComponent implements OnInit {
         )
             return;
         this.clearDraft();
+        this.openViewId.set(null);
+        this.setViewParam(null); // Close drops what a refresh would reopen
         this.investigation.close();
         this.investigation.clearQueuedSeeds();
         this.pendingInvestigation.set(null);
@@ -2391,6 +2465,18 @@ export class LinkAnalysisComponent implements OnInit {
         this.edgeSizes.set(size != null ? { ...rest, [kind]: size } : rest);
     }
 
+    /** Pick the node size in px (undoable). The size is the analyst's alone: nothing scales it. */
+    setNodeSize(size: number): void {
+        this.recordHistory();
+        this.nodeSize.set(size);
+    }
+
+    /** Pick how far the layout spreads nodes (undoable); the layout re-runs. */
+    setLayoutSpacing(spacing: number): void {
+        this.recordHistory();
+        this.layoutSpacing.set(spacing);
+    }
+
     /** Replace the conditional-formatting rules (undoable). */
     setNodeRules(rules: NodeRule[]): void {
         this.recordHistory();
@@ -2427,6 +2513,8 @@ export class LinkAnalysisComponent implements OnInit {
             edgePatterns: this.edgePatterns(),
             edgeSizes: this.edgeSizes(),
             nodeRules: this.nodeRules(),
+            nodeSize: this.nodeSize(),
+            layoutSpacing: this.layoutSpacing(),
             layoutId: this.layoutId(),
         };
     }
@@ -2447,6 +2535,8 @@ export class LinkAnalysisComponent implements OnInit {
         this.edgePatterns.set(s.edgePatterns);
         this.edgeSizes.set(s.edgeSizes);
         this.nodeRules.set(s.nodeRules);
+        this.nodeSize.set(s.nodeSize);
+        this.layoutSpacing.set(s.layoutSpacing);
         this.pickedLayout.set(s.layoutId);
     }
 
@@ -2501,6 +2591,8 @@ export class LinkAnalysisComponent implements OnInit {
         this.edgePatterns.set(display?.edgePatterns ?? {});
         this.edgeSizes.set(display?.edgeSizes ?? {});
         this.nodeRules.set(display?.nodeRules ?? []);
+        this.nodeSize.set(display?.nodeSize ?? GRAPH_DEFAULT_NODE_SIZE);
+        this.layoutSpacing.set(display?.layoutSpacing ?? GRAPH_DEFAULT_LAYOUT_SPACING);
     }
 
     // ── canvas tools: fit · fullscreen · collapse/expand ──
@@ -3307,6 +3399,7 @@ export class LinkAnalysisComponent implements OnInit {
         try {
             await firstValueFrom(this.viewsService.save(view, { update: this.views().some((v) => v.id === view.id) }));
             this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
+            this.rememberOpenView(view.id); // what is on screen is now this saved view: a refresh reopens it
             this.saveForm.reset({ name: '', description: '' });
             this.saveTrigger?.closeMenu();
             this.toastr.success(`Saved the case “${view.name}”.`);
@@ -3331,7 +3424,7 @@ export class LinkAnalysisComponent implements OnInit {
             description,
             sourceId: this.sourceId(),
             query: q,
-            display: this.displayOptions(), // styling travels with the view; reapplied on load
+            display: this.chosenDisplay(), // what the analyst chose travels with the view (the automatic look is derived afresh); reapplied on load
             layout: this.layoutId(),
             profile: this.profileId() === 'generic' ? undefined : this.profileId(),
             view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
@@ -3425,6 +3518,7 @@ export class LinkAnalysisComponent implements OnInit {
             );
             this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
             this.clearDraft();
+            this.rememberOpenView(view.id); // the draft is a saved view now
             const warning = draftSavedWarning(view.id, integrity);
             if (warning) this.toastr.warning(warning);
             else this.toastr.success(`Saved “${view.name}”.`);
@@ -3450,6 +3544,43 @@ export class LinkAnalysisComponent implements OnInit {
         this.draftIfMatch = undefined;
     }
 
+    /**
+     * The id of the SAVED view this page has open, or null: an imported draft, a query run from the Start box and
+     * nothing at all are all null. It is mirrored into `?view=` so a refresh reopens the view (an unsaved graph is not
+     * restorable: it is only what a query drew, and the query is the view).
+     */
+    readonly openViewId = signal<string | null>(null);
+
+    /** Put (or with null drop) `?view=` in the address without adding a history entry. */
+    private setViewParam(id: string | null): void {
+        void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { view: id },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+        });
+    }
+
+    /**
+     * A saved view is now what this page shows: remember it for a refresh. Not while an Investigation canvas is on screen:
+     * that is reopened by its own `?investigation=`, and both must not be reopened on refresh.
+     */
+    private rememberOpenView(id: string): void {
+        if (this.investigation.canvas()) return;
+        this.openViewId.set(id);
+        this.setViewParam(id);
+    }
+
+    /**
+     * What is on screen is no longer a saved view (a query was run, an entity was investigated, an Investigation was
+     * opened, a draft was imported), so a refresh must not reopen the old one over it. A no-op when no view is open.
+     */
+    private forgetOpenView(): void {
+        if (!this.openViewId()) return;
+        this.openViewId.set(null);
+        this.setViewParam(null);
+    }
+
     async loadView(view: LinkAnalysisView): Promise<void> {
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
@@ -3461,7 +3592,11 @@ export class LinkAnalysisComponent implements OnInit {
         this.overlaysStated = { legend: view.view?.legend, workingSet: view.view?.workingSet };
         this.applyOverlayStart();
         this.queryPanel?.patchFormFromView(view);
-        this.investigation.restore(view.investigations ?? []);
+        this.investigation.restore(view.investigations ?? []); // closes any open Investigation, synchronously
+        // The imported draft (and only it) is not saved yet, so there is nothing for a refresh to reopen. After the
+        // restore, because a view cannot be remembered while an Investigation canvas is still on screen.
+        if (this.importDraft()?.id === view.id) this.forgetOpenView();
+        else this.rememberOpenView(view.id);
         if (view.start && (await this.drawCaseStart(view))) return;
         await this.execute(view.sourceId, view.query);
         if (view.lists) this.caseLists.set({ start: view.lists.start, exclusions: view.lists.exclusions ?? [] });

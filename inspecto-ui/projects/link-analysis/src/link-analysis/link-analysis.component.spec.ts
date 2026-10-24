@@ -666,12 +666,69 @@ describe('LinkAnalysisComponent', () => {
     });
 
     // LA-ONBOARD-1 phase 3: the first-run sample lands on /link-analysis?view=<id> with its graph drawn.
-    it('?view= opens that saved view and clears the param', async () => {
+    it('?view= opens that saved view and KEEPS the param, so a browser refresh reopens it (operator 2026-10-24)', async () => {
         const view: LinkAnalysisView = { id: 'ring', name: 'Ring', sourceId: 'entity-projection', query: {} };
         const { fixture } = create({ views: [view], queryParams: { view: 'ring' } });
         const load = vi.spyOn(fixture.componentInstance, 'loadView').mockResolvedValue(undefined);
         const navigate = await consume(fixture);
         expect(load).toHaveBeenCalledWith(view);
+        expect(navigate).not.toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: null } }));
+    });
+
+    it('?view= naming the view this page already has open does not load it a second time', async () => {
+        const view: LinkAnalysisView = { id: 'ring', name: 'Ring', sourceId: 'entity-projection', query: {} };
+        const { fixture } = create({ views: [view], queryParams: { view: 'ring' } });
+        fixture.componentInstance.openViewId.set('ring'); // the page wrote the param itself when it opened the view
+        const load = vi.spyOn(fixture.componentInstance, 'loadView').mockResolvedValue(undefined);
+        await consume(fixture);
+        expect(load).not.toHaveBeenCalled();
+    });
+
+    it('opening a saved view writes ?view=<id> and remembers it; an imported draft does neither', async () => {
+        const { fixture } = create({});
+        const c = fixture.componentInstance;
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        await c.loadView({ id: 'ring', name: 'Ring', sourceId: 'entity-projection', query: {} });
+        expect(c.openViewId()).toBe('ring');
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { view: 'ring' }, queryParamsHandling: 'merge', replaceUrl: true }),
+        );
+        navigate.mockClear();
+        c.importDraft.set({ id: 'imported', content: {}, targetExists: false } as never);
+        await c.loadView({ id: 'imported', name: 'Imported', sourceId: 'entity-projection', query: {} });
+        expect(c.openViewId()).toBeNull(); // nothing saved for a refresh to reopen
+        expect(navigate).not.toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: 'imported' } }));
+        // ...and the previous view's id is dropped from the address too, or a refresh would reopen it over the draft
+        expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: null } }));
+    });
+
+    it('back on the kept-alive page without ?view=, the open view\'s id is put back in the address', async () => {
+        const { fixture } = create({});
+        fixture.componentInstance.openViewId.set('ring');
+        const navigate = await consume(fixture);
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { view: 'ring' }, queryParamsHandling: 'merge', replaceUrl: true }),
+        );
+    });
+
+    it('an incoming ?investigation= link does not get the open view\'s ?view= put back beside it', async () => {
+        const { fixture } = create({ queryParams: { investigation: 'inv-1' } });
+        const c = fixture.componentInstance;
+        vi.spyOn(c.investigation, 'adopt').mockResolvedValue(true);
+        c.openViewId.set('ring'); // the kept-alive page still has a view open when the Alert's link arrives
+        const navigate = await consume(fixture);
+        expect(navigate).not.toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: 'ring' } }));
+    });
+
+    it('Close drops the remembered view and ?view= from the address', async () => {
+        const { fixture } = create({});
+        const c = fixture.componentInstance;
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        c.openViewId.set('ring');
+        await c.closeOpenWork();
+        expect(c.openViewId()).toBeNull();
         expect(navigate).toHaveBeenCalledWith(
             [],
             expect.objectContaining({ queryParams: { view: null }, queryParamsHandling: 'merge', replaceUrl: true }),
@@ -706,6 +763,16 @@ describe('LinkAnalysisComponent', () => {
         await consume(fixture);
         expect(load).not.toHaveBeenCalled();
         expect(info).toHaveBeenCalledWith('That saved view is not in this Space.', 'Not found');
+    });
+
+    it('?view= naming a view that is gone also drops the param, so a refresh does not repeat the warning', async () => {
+        const { fixture } = create({ views: [], queryParams: { view: 'gone' } });
+        vi.spyOn(fixture.componentInstance, 'loadView').mockResolvedValue(undefined);
+        const navigate = await consume(fixture);
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { view: null }, queryParamsHandling: 'merge', replaceUrl: true }),
+        );
     });
 
     it('opens no Investigation without ?investigation=', async () => {
@@ -2643,6 +2710,177 @@ describe('LinkAnalysisComponent - header is the toolbar, the footer carries the 
     });
 });
 
+describe('LinkAnalysisComponent - display: node size, spacing and the automatic look (operator 2026-10-24)', () => {
+    const KINDS: G6GraphData = {
+        nodes: [
+            ...Array.from({ length: 6 }, (_, i) => ({ id: `a${i}`, data: { label: `a${i}`, kind: 'account' } })),
+            ...Array.from({ length: 2 }, (_, i) => ({ id: `d${i}`, data: { label: `d${i}`, kind: 'device' } })),
+        ],
+        edges: [
+            { id: 'e1', source: 'a0', target: 'a1', data: { kind: 'pays' } },
+            { id: 'e2', source: 'a1', target: 'a2', data: { kind: 'pays' } },
+            { id: 'e3', source: 'a0', target: 'd0', data: { kind: 'uses' } },
+        ],
+    } as never;
+
+    async function drawn() {
+        const made = create({ graph: KINDS });
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        made.fixture.detectChanges();
+        return made.fixture.componentInstance;
+    }
+
+    it('a query the analyst runs replaces the saved view, so a refresh must not reopen the old one over it', async () => {
+        const { fixture } = create({ graph: KINDS });
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        c.openViewId.set('ring');
+        await runQuery(fixture);
+        expect(c.openViewId()).toBeNull();
+        expect(navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { view: null }, queryParamsHandling: 'merge', replaceUrl: true }),
+        );
+    });
+
+    it('the legend is given the colours the canvas paints for LINK types too, not only the analyst\'s own choices', async () => {
+        const made = create({ graph: KINDS });
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        made.fixture.detectChanges();
+        const c = made.fixture.componentInstance;
+        const legend = made.fixture.debugElement.query(By.css('inspecto-link-analysis-legend')).componentInstance as {
+            edgeColors: () => Record<string, string>;
+        };
+        expect(c.edgeColors()).toEqual({}); // the analyst chose nothing...
+        expect(legend.edgeColors()).toEqual(c.displayOptions().edgeColors); // ...yet the legend shows the automatic link colour
+        expect(Object.keys(legend.edgeColors())).toEqual(['uses']);
+    });
+
+    it('builds the automatic look from the graph the canvas DRAWS: an open Investigation\'s Working Set, not the query graph', () => {
+        const { fixture } = create({ graph: KINDS });
+        const c = fixture.componentInstance;
+        const workingSet = {
+            nodes: [
+                ...Array.from({ length: 5 }, (_, i) => ({ id: `w${i}`, data: { label: `w${i}`, kind: 'wallet' } })),
+                { id: 'g0', data: { label: 'g0', kind: 'agent' } },
+            ],
+            edges: [{ id: 'we', source: 'w0', target: 'g0', data: { kind: 'cashes' } }],
+        };
+        Object.defineProperty(c.investigation, 'canvas', { value: () => workingSet });
+        expect(Object.keys(c.autoStyleOf().nodeColors)).toEqual(['agent']); // `wallet` is the most common type THERE
+        expect(c.autoStyleOf().nodeColors['device']).toBeUndefined(); // the query graph's types play no part
+    });
+
+    it('does not remember a saved view while an Investigation canvas is on screen: it has its own ?investigation=', () => {
+        const { fixture } = create({});
+        const c = fixture.componentInstance;
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        Object.defineProperty(c.investigation, 'canvas', { value: () => ({ nodes: [], edges: [] }) });
+        (c as unknown as { rememberOpenView(id: string): void }).rememberOpenView('ring');
+        expect(c.openViewId()).toBeNull();
+        expect(navigate).not.toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: 'ring' } }));
+    });
+
+    it('opening a saved view closes an open Investigation FIRST, then remembers the view (it is not remembered over a canvas)', async () => {
+        const { fixture } = create({});
+        const c = fixture.componentInstance;
+        vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        let canvasOpen = true;
+        Object.defineProperty(c.investigation, 'canvas', {
+            value: () => (canvasOpen ? { nodes: [], edges: [] } : null),
+        });
+        vi.spyOn(c.investigation, 'restore').mockImplementation(() => {
+            canvasOpen = false; // what the real restore() does: close() first
+        });
+        await c.loadView({
+            id: 'ring',
+            name: 'Ring',
+            sourceId: 'entity-projection',
+            query: {},
+            investigations: [{ id: 'inv-1' } as never],
+        });
+        expect(c.openViewId()).toBe('ring');
+    });
+
+    it('opening another saved view while an imported draft is still up remembers that saved view', async () => {
+        const { fixture } = create({});
+        const c = fixture.componentInstance;
+        vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        c.importDraft.set({ id: 'imported', content: {}, targetExists: false } as never);
+        await c.loadView({ id: 'other', name: 'Other', sourceId: 'entity-projection', query: {} });
+        expect(c.openViewId()).toBe('other'); // only the draft's own id is "not saved yet"
+    });
+
+    it('investigating an entity drops the remembered view at once, before anything is drawn', () => {
+        const { fixture } = create({});
+        const c = fixture.componentInstance;
+        vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        c.openViewId.set('ring');
+        void c.startFromEntity({ seed: '966501', entityType: 'msisdn' } as never).catch(() => undefined);
+        expect(c.openViewId()).toBeNull(); // the synchronous part of startFromEntity
+    });
+
+    it('starts small and wide, and a saved view keeps only what was changed from that', async () => {
+        const c = await drawn();
+        expect(c.displayOptions().nodeSize).toBe(20);
+        expect(c.displayOptions().layoutSpacing).toBe(4);
+        expect(c.chosenDisplay().nodeSize).toBeUndefined();
+        expect(c.chosenDisplay().layoutSpacing).toBeUndefined();
+        expect(c.displayCustomized()).toBe(false);
+    });
+
+    it('size and spacing are the analyst\'s alone: set from the Display menu, saved with the view, undoable', async () => {
+        const c = await drawn();
+        c.setNodeSize(28);
+        c.setLayoutSpacing(2);
+        expect(c.displayOptions()).toMatchObject({ nodeSize: 28, layoutSpacing: 2 });
+        expect(c.chosenDisplay()).toMatchObject({ nodeSize: 28, layoutSpacing: 2 });
+        expect(c.displayCustomized()).toBe(true);
+        c.undoPresentation();
+        expect(c.layoutSpacing()).toBe(4);
+        c.undoPresentation();
+        expect(c.nodeSize()).toBe(20);
+    });
+
+    it('opening a view restores its size and spacing, and a view that never set them gets the defaults', async () => {
+        const c = await drawn();
+        await c.loadView({
+            id: 'v', name: 'V', sourceId: 'entity-projection', query: {},
+            display: { nodeLabels: false, edgeLabels: false, nodeColors: {}, edgeColors: {}, nodeShapes: {}, edgePatterns: {}, edgeSizes: {}, nodeSize: 40, layoutSpacing: 1 },
+        });
+        expect(c.nodeSize()).toBe(40);
+        expect(c.layoutSpacing()).toBe(1);
+        await c.loadView({ id: 'plain', name: 'Plain', sourceId: 'entity-projection', query: {} });
+        expect(c.nodeSize()).toBe(20);
+        expect(c.layoutSpacing()).toBe(4);
+    });
+
+    it('gives the less common node and link types a look of their own and leaves the most common neutral', async () => {
+        const c = await drawn();
+        const d = c.displayOptions();
+        expect(Object.keys(d.nodeColors)).toEqual(['device']); // `account` is the most common node type
+        expect(Object.keys(d.nodeShapes)).toEqual(['device']);
+        expect(Object.keys(d.edgeColors)).toEqual(['uses']); // `pays` is the most common link type
+        expect(Object.keys(d.edgePatterns)).toEqual(['uses']);
+        expect(c.legendItems().find((i) => i.kind === 'device')?.color).toBe(d.nodeColors['device']);
+    });
+
+    it('lets the analyst\'s own choice win over the automatic look, and never saves the automatic one', async () => {
+        const c = await drawn();
+        const auto = c.displayOptions().nodeColors['device'];
+        c.setNodeColor('device', c.swatches.find((s) => s !== auto)!);
+        expect(c.displayOptions().nodeColors['device']).not.toBe(auto);
+        expect(c.chosenDisplay().nodeColors).toEqual({ device: c.displayOptions().nodeColors['device'] });
+        c.setNodeColor('device', null);
+        expect(c.displayOptions().nodeColors['device']).toBe(auto); // back to automatic
+        expect(c.chosenDisplay().nodeColors).toEqual({});
+        expect(c.chosenDisplay().edgeColors).toEqual({}); // the automatic link look is not in what a view keeps either
+    });
+});
+
 describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', () => {
     const drawn = async (opts: Parameters<typeof create>[0] = {}) => {
         const made = create(opts);
@@ -3604,6 +3842,16 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await settle(fixture);
         await fixture.componentInstance.startFrom({ kind: 'dataset', datasetId: 'transfers' });
         expect(queried).toEqual([{ projection: MAPPING }]);
+    });
+
+    it('Start from a Dataset replaces the graph, so a refresh must not reopen the saved view over it', async () => {
+        const { fixture } = create({ features: BASIC, datasets: [TRANSFERS] });
+        const navigate = await settle(fixture);
+        const c = fixture.componentInstance;
+        c.openViewId.set('ring');
+        await c.startFrom({ kind: 'dataset', datasetId: 'transfers' });
+        expect(c.openViewId()).toBeNull();
+        expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: null } }));
     });
 
     it('?dataset= alone preselects that Dataset in the Start box and clears the param', async () => {

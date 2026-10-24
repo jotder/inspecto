@@ -227,7 +227,41 @@ export interface GraphDisplayOptions {
     edgeSizes: Record<string, number>;
     /** Conditional formatting: ordered rules colouring the nodes that satisfy an attribute predicate (first match wins). */
     nodeRules?: NodeRule[];
+    /**
+     * Node diameter in px (an icon tile scales with it). It never follows degree or any attribute: the analyst sets it.
+     * Absent = {@link HOST_NODE_SIZE}, what the catalog and pipeline graphs have always drawn.
+     */
+    nodeSize?: number;
+    /**
+     * How far apart the layout spreads nodes, as a multiplier on its distances (1 = the layout's own spacing).
+     * Absent = 1. A change re-runs the layout.
+     */
+    layoutSpacing?: number;
 }
+
+/** The node size every graph drew before {@link GraphDisplayOptions.nodeSize} existed. */
+export const HOST_NODE_SIZE = 32;
+/** The node size Link Analysis starts at: small, so a busy graph stays readable. */
+export const GRAPH_DEFAULT_NODE_SIZE = 20;
+/** The layout spacing Link Analysis starts at: wide, because small nodes on a busy graph should not touch. */
+export const GRAPH_DEFAULT_LAYOUT_SPACING = 4;
+
+/** The node sizes the Display menu offers. */
+export const GRAPH_NODE_SIZES: readonly { value: number; label: string }[] = [
+    { value: 12, label: 'Tiny' },
+    { value: 20, label: 'Small' },
+    { value: 28, label: 'Medium' },
+    { value: 40, label: 'Large' },
+];
+
+/** The layout spacings the Display menu offers (a multiplier on the layout's own distances). */
+export const GRAPH_LAYOUT_SPACINGS: readonly { value: number; label: string }[] = [
+    { value: 1, label: 'Compact' },
+    { value: 2, label: 'Roomy' },
+    { value: 3, label: 'Spacious' },
+    { value: 4, label: 'Wide' },
+    { value: 5, label: 'Widest' },
+];
 
 /**
  * Above this many edges, link labels are hidden until hovered/clicked. 20: at the canvas' 9px label size a
@@ -320,58 +354,74 @@ export const GRAPH_LAYOUTS: readonly {
     { id: 'fishbone', label: 'Fishbone', tree: true },
 ];
 
-/** The G6 layout options for an id; `null`/`dagre` = the default LR layered layout (unchanged). */
-export function layoutConfig(id: GraphLayoutId | null): Record<string, unknown> {
+/**
+ * The G6 layout options for an id; `null`/`dagre` = the default LR layered layout.
+ *
+ * <p>`nodeSize` and `spacing` (both from {@link GraphDisplayOptions}) scale the layout's distances: with neither given
+ * (spacing 1, the host's own node size) every layout is byte-for-byte what it was before they existed, so the catalog
+ * and pipeline graphs are untouched. `grid`, `circular` and `mds` carry no spacing parameter in G6 and ignore both.
+ */
+export function layoutConfig(
+    id: GraphLayoutId | null,
+    opts: { nodeSize?: number; spacing?: number } = {},
+): Record<string, unknown> {
+    const node = opts.nodeSize ?? HOST_NODE_SIZE;
+    const k = opts.spacing ?? 1;
+    const scaled = (n: number): number => Math.round(n * k);
     switch (id) {
         case 'grid':
             return { type: 'grid' };
-        case 'force':
-            return { type: 'd3-force', collide: { radius: 28 } };
+        case 'force': {
+            // d3's own link distance (30) and charge (-30) are what `k` multiplies; collide keeps a gap round each node.
+            const base = { type: 'd3-force', collide: { radius: Math.round(node * 0.875) } };
+            return k === 1 ? base : { ...base, link: { distance: 30 * k }, manyBody: { strength: -30 * k } };
+        }
         case 'force-cluster':
-            return { type: 'force-atlas2', kr: 20, preventOverlap: true };
+            return { type: 'force-atlas2', kr: scaled(20), preventOverlap: true };
         case 'radial':
-            return { type: 'radial', unitRadius: 120, preventOverlap: true };
+            return { type: 'radial', unitRadius: scaled(120), preventOverlap: true };
         case 'concentric':
             return {
                 type: 'concentric',
                 sortBy: 'degree',
                 preventOverlap: true,
-                nodeSize: 40,
+                nodeSize: Math.round(node * 1.25),
+                ...(k === 1 ? {} : { nodeSpacing: scaled(20) }),
             };
         case 'circular':
             return { type: 'circular' };
         case 'mds':
             return { type: 'mds' };
         case 'fruchterman':
-            return { type: 'fruchterman', gravity: 5, speed: 5 };
+            return { type: 'fruchterman', gravity: 5 / k, speed: 5 };
         case 'mindmap':
             return {
                 type: 'mindmap',
                 direction: 'H',
-                getHeight: () => 32,
-                getWidth: () => 32,
-                getVGap: () => 12,
-                getHGap: () => 60,
+                getHeight: () => node,
+                getWidth: () => node,
+                getVGap: () => scaled(12),
+                getHGap: () => scaled(60),
             };
         case 'org':
             return {
                 type: 'compact-box',
                 direction: 'TB',
-                getHeight: () => 32,
-                getWidth: () => 60,
-                getVGap: () => 30,
-                getHGap: () => 20,
+                getHeight: () => node,
+                getWidth: () => Math.round(node * 1.875),
+                getVGap: () => scaled(30),
+                getHGap: () => scaled(20),
             };
         case 'radial-tree':
-            return { type: 'dendrogram', radial: true, nodeSep: 40, rankSep: 120 };
+            return { type: 'dendrogram', radial: true, nodeSep: scaled(40), rankSep: scaled(120) };
         // The same G6 engine as `radial-tree`, laid out left-to-right instead of around a centre.
         case 'dendrogram':
-            return { type: 'dendrogram', radial: false, nodeSep: 36, rankSep: 120 };
+            return { type: 'dendrogram', radial: false, nodeSep: scaled(36), rankSep: scaled(120) };
         case 'fishbone':
-            return { type: 'fishbone', direction: 'LR', hGap: 60, vGap: 40 };
+            return { type: 'fishbone', direction: 'LR', hGap: scaled(60), vGap: scaled(40) };
         case 'dagre':
         default:
-            return { type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 };
+            return { type: 'antv-dagre', rankdir: 'LR', nodesep: scaled(18), ranksep: scaled(60) };
     }
 }
 
@@ -571,8 +621,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             this.create();
             return;
         }
-        if (changes['layout'] || changes['plugins'] || changes['interaction']) {
-            const layoutKey = stableKey(this.layout ?? null);
+        if (changes['layout'] || changes['plugins'] || changes['interaction'] || changes['display']) {
+            const layoutKey = this.layoutKey();
             const pluginKey = this.pluginKey();
             if (layoutKey !== this.prevLayoutKey || pluginKey !== this.prevPluginKey) {
                 this.create();
@@ -742,6 +792,14 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.hostEl?.nativeElement.querySelectorAll('.tooltip').forEach((el) => el.remove());
     }
 
+    /**
+     * Signature of what the LAYOUT depends on: the engine, and the node size and spacing it scales its distances by.
+     * Those are fixed at construction, so a change in any of them rebuilds the graph and re-runs the layout.
+     */
+    private layoutKey(): string {
+        return stableKey([this.layout ?? null, this.display?.nodeSize ?? null, this.display?.layoutSpacing ?? null]);
+    }
+
     /** Signature of the inputs that affect PAINT ONLY. */
     private styleKey(): string {
         return stableKey([this.emphasis ?? null, this.display ?? null, this.selection ?? null]);
@@ -749,7 +807,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /** Record what the live graph now reflects, so the next `ngOnChanges` can classify against it. */
     private snapshotKeys(): void {
-        this.prevLayoutKey = stableKey(this.layout ?? null);
+        this.prevLayoutKey = this.layoutKey();
         this.prevPluginKey = this.pluginKey();
         this.prevDataKey = stableKey(this.data ?? null);
         this.prevStyleKey = this.styleKey();
@@ -920,7 +978,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 // otherwise the per-kind shape (the catalog metadata graph).
                 type: (d) => (iconOf(d) ? 'rect' : (this.display?.nodeShapes[kindOf(d)] ?? nodeShape(kindOf(d)))),
                 style: {
-                    size: (d) => (iconOf(d) ? [46, 34] : 32),
+                    // Never scaled by degree or value: the analyst's size (Display menu), else the host's own 32.
+                    size: (d) => {
+                        const n = this.display?.nodeSize ?? HOST_NODE_SIZE;
+                        return iconOf(d) ? [Math.round(n * 1.44), Math.round(n * 1.06)] : n;
+                    },
                     radius: 8,
                     fill: () => this.styleNodeFill,
                     stroke: (d) => this.nodeColorOf(d),
@@ -954,8 +1016,14 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                               ]
                             : [],
                     iconSrc: (d) => iconOf(d),
-                    iconWidth: 22,
-                    iconHeight: 22,
+                    iconWidth: Math.max(
+                        10,
+                        Math.round(((this.display?.nodeSize ?? HOST_NODE_SIZE) * 22) / HOST_NODE_SIZE),
+                    ),
+                    iconHeight: Math.max(
+                        10,
+                        Math.round(((this.display?.nodeSize ?? HOST_NODE_SIZE) * 22) / HOST_NODE_SIZE),
+                    ),
                     // `label` is G6's own on/off switch for the label shape. A `labelText` mapper that
                     // returns `undefined` does NOT clear a label: G6 reads that as "no change" and the
                     // previous text stays on the canvas, so turning labels off left them showing.
@@ -1001,7 +1069,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 // The density rule's reveal: set on hover/click by revealEdgeLabels(), over the base style.
                 state: { labelled: { label: true } },
             },
-            layout: layoutConfig(this.layout) as LayoutOptions,
+            layout: layoutConfig(this.layout, {
+                nodeSize: this.display?.nodeSize,
+                spacing: this.display?.layoutSpacing,
+            }) as LayoutOptions,
             behaviors: buildBehaviors(
                 this.interaction,
                 this.plugins,
