@@ -384,6 +384,44 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
         expect(graph.draw).not.toHaveBeenCalled();
     });
 
+    it('data and selection changing in ONE change still refresh the selection and its states', () => {
+        const { comp, graph } = host();
+        select(comp, ['a']);
+        graph.setElementState.mockClear();
+        comp.data = {
+            nodes: ['b', 'c'].map((id) => ({ id, data: { label: id, kind: 'DATASET' } })),
+            edges: [],
+        } as unknown as G6GraphData;
+        comp.selection = ['b'];
+        comp.ngOnChanges({ data: {}, selection: {} });
+        expect((comp as unknown as { selSet: Set<string> }).selSet).toEqual(new Set(['b']));
+        return Promise.resolve().then(() => {
+            const calls = graph.setElementState.mock.calls.map((c) => c[0]);
+            expect(Object.assign({}, ...calls)).toEqual({ a: [], b: [SELECTED_STATE] });
+        });
+    });
+
+    it('a node that leaves the data and comes back is selected again', async () => {
+        const { comp, graph } = host();
+        select(comp, ['a']);
+        const withNodes = (ids: string[]) =>
+            ({
+                nodes: ids.map((id) => ({ id, data: { label: id, kind: 'DATASET' } })),
+                edges: [],
+            }) as unknown as G6GraphData;
+        comp.data = withNodes(['b']);
+        comp.ngOnChanges({ data: {} }); // a leaves the data while the selection still lists it
+        await Promise.resolve();
+        graph.setElementState.mockClear();
+        comp.data = withNodes(['a', 'b']);
+        comp.ngOnChanges({ data: {} });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(Object.assign({}, ...graph.setElementState.mock.calls.map((c) => c[0]))).toEqual({
+            a: [SELECTED_STATE],
+        });
+    });
+
     it('styleKey does not move with the selection', () => {
         const { comp } = host();
         const before = comp.styleKey();
@@ -452,6 +490,15 @@ describe('graphSignature (PERF-P2)', () => {
         const edgeKind = base();
         (edgeKind.edges[0].data as { kind: string }).kind = 'sms';
         expect(graphSignature(edgeKind)).not.toBe(sig);
+    });
+
+    it('tells null, empty and absent apart', () => {
+        const withAttr = (v: string | null | undefined) => {
+            const g = base();
+            (node(g, 0)['attrs'] as Record<string, unknown>)['risk'] = v;
+            return graphSignature(g);
+        };
+        expect(new Set([withAttr(null), withAttr(''), withAttr(undefined)]).size).toBe(3);
     });
 
     it('moves when a node or an edge is added or removed', () => {

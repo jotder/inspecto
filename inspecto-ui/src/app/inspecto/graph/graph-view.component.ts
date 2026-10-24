@@ -464,7 +464,7 @@ export function graphSignature(data: G6GraphData | null | undefined): string {
     let a = 2166136261;
     let b = 5381;
     const add = (v: unknown): void => {
-        const t = v === undefined || v === null ? '' : String(v);
+        const t = v === undefined ? 'u' : v === null ? 'n' : 'v' + String(v);
         a = fnv(a, t + '\u0001');
         b = fnv(b, '\u0002' + t);
     };
@@ -678,6 +678,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             this.create();
             return;
         }
+        // Refresh first: a data change below returns early, and its own state sync must already see the new selection.
+        if (changes['selection']) this.selSet = new Set(this.selection ?? []);
         // `tooltips` and `fill` are read once, at construction and on the host class binding.
         if (changes['tooltips'] || changes['fill'] || changes['entityIcons']) {
             this.create();
@@ -703,10 +705,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             if (styleKey !== this.prevStyleKey) this.redraw(styleKey);
         }
         // A selection is NEVER a restyle (PERF-P1): G6's `selected` state style paints it, and only the diff is applied.
-        if (changes['selection']) {
-            this.selSet = new Set(this.selection ?? []);
-            this.syncSelectionState();
-        }
+        if (changes['selection']) this.syncSelectionState();
     }
 
     ngOnDestroy(): void {
@@ -977,7 +976,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private syncSelectionState(): void {
         const graph = this.graph;
         if (!graph) return;
-        const want = this.selSet;
+        // Only nodes the graph holds carry a state: one that left the data and comes back must be selected again.
+        const want = new Set([...this.selSet].filter((id) => this.renderedNodeIds.has(id)));
         const prev = this.selectedStateIds;
         const touched = [...prev].filter((id) => !want.has(id)).concat([...want].filter((id) => !prev.has(id)));
         this.selectedStateIds = new Set(want);
@@ -1227,8 +1227,6 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     y: ev.client?.y ?? ev.nativeEvent?.clientY ?? 0,
                 });
         });
-        // The brush's own release handler runs first (behaviours register before this), so this flushes its final ids.
-        graph.on(CommonEvent.POINTER_UP, () => this.flushBrush());
         graph.on(CanvasEvent.CLICK, () => {
             // The click that ends a box select must not clear what the box just selected.
             if (this.interaction?.boxSelect && Date.now() - this.brushedAt > 250 && this.selSet.size > 0) {
@@ -1247,6 +1245,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const host = this.hostEl.nativeElement;
         void graph.render().then(() => {
             demotePositiveTabindex(host);
+            // Registered AFTER render(): G6 binds the behaviours there, so the brush's own release handler (which emits its
+            // final ids, brush-select has immediately:false) runs first and this flush then emits them without a frame's wait.
+            graph.on(CommonEvent.POINTER_UP, () => this.flushBrush());
             this.selectedStateIds = new Set(); // a fresh instance carries no states
             this.syncSelectionState();
         });
