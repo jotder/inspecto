@@ -31,6 +31,8 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { CANVAS_MIN_PX, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
+import { PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
+import { SpacesService } from '@inspecto/core/api';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
@@ -4061,5 +4063,94 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
             'Start an Investigation from this',
         );
         await expectNoA11yViolations(discover);
+    });
+});
+
+describe('LinkAnalysisComponent - smart data fetch (PERF-P10a)', () => {
+    async function drawn(opts: Parameters<typeof create>[0] = {}) {
+        const made = create(opts);
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        return { ...made, c: made.fixture.componentInstance };
+    }
+    /** Fire pushFilter on fake timers and let the debounce elapse. */
+    async function pushAndWait(c: LinkAnalysisComponent): Promise<void> {
+        vi.useFakeTimers();
+        try {
+            const p = c.pushFilter();
+            await vi.advanceTimersByTimeAsync(PUSH_FILTER_DEBOUNCE_MS);
+            await p;
+        } finally {
+            vi.useRealTimers();
+        }
+    }
+
+    it('an identical re-run is served from the client with no source call, a different filter makes one, and "as of" is shown', async () => {
+        const { c, queried } = await drawn();
+        expect(queried).toHaveLength(1);
+        expect(c.cachedAsOf()).toBeNull();
+        await c.run(); // same form, same query
+        expect(queried).toHaveLength(1);
+        expect(c.cachedAsOf()).not.toBeNull();
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'D' });
+        await pushAndWait(c);
+        expect(queried).toHaveLength(2);
+        await c.refreshFromServer(); // the Refresh bypass always asks
+        expect(queried).toHaveLength(3);
+        expect(c.cachedAsOf()).toBeNull();
+    });
+
+    it('a burst of pushFilter calls makes ONE request after the pause, carrying the last filter', async () => {
+        const { c, queried } = await drawn();
+        vi.useFakeTimers();
+        try {
+            const calls: Promise<void>[] = [];
+            for (const v of ['A', 'B', 'C']) {
+                c.filterWhere().items = [{ kind: 'condition', field: 'source', operator: '=', value: v }];
+                calls.push(c.pushFilter());
+                await vi.advanceTimersByTimeAsync(PUSH_FILTER_DEBOUNCE_MS - 50);
+            }
+            expect(queried).toHaveLength(1); // nothing sent during the burst
+            await vi.advanceTimersByTimeAsync(PUSH_FILTER_DEBOUNCE_MS);
+            await Promise.all(calls);
+        } finally {
+            vi.useRealTimers();
+        }
+        expect(queried).toHaveLength(2);
+        expect(JSON.stringify((queried[1] as { filter?: unknown }).filter)).toContain('"C"');
+    });
+
+    it('a change of Space or of signed-in user empties the cache: the same query asks the server again', async () => {
+        const { c, queried } = await drawn();
+        await c.run();
+        expect(queried).toHaveLength(1);
+        TestBed.inject(SpacesService).currentSpaceId.set('other-space');
+        await c.run();
+        expect(queried).toHaveLength(2);
+        await c.run();
+        expect(queried).toHaveLength(2);
+        TestBed.inject(SessionService).actor.set('someone-else');
+        await c.run();
+        expect(queried).toHaveLength(3);
+    });
+
+    it('local actions make ZERO server calls (hide, kind filter, size, spacing, layout, selection, legend, local filter)', async () => {
+        const { c, queried, fixture } = await drawn();
+        const n = queried.length;
+        const ids = c.graph()!.nodes.map((x) => x.id);
+        c.hiddenNodeIds.set([ids[0]]);
+        c.hiddenLinkKinds.set(['pays']);
+        c.toggleKind('account', false);
+        c.nodeSize.set(c.nodeSizeOptions[0].value);
+        c.setLayoutSpacing(c.spacingOptions[0].value);
+        c.setLayout(c.layouts[0].id);
+        c.onSelectionChange([ids[1]]);
+        c.legendOpen.set(!c.legendOpen());
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'D' });
+        c.onFilterChanged();
+        c.applyFilterLocally();
+        c.clearFilter();
+        fixture.detectChanges();
+        expect(queried).toHaveLength(n);
     });
 });

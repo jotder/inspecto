@@ -805,6 +805,12 @@
                 </div>
             }
         }
+        @if (cachedAsOf(); as asOf) {
+            <p class="text-secondary m-0 text-xs" role="status" data-testid="cached-as-of">
+                As of {{ asOf | date: 'mediumTime' }} (kept from the last identical run)
+                <button type="button" class="underline" (click)="refreshFromServer()">Refresh</button>
+            </p>
+        }
         @if (expandSourceNote(); as note) {
             <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-source">
                 Last neighbour expand: {{ note }}

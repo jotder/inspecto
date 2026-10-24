@@ -277,6 +277,8 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
 // eslint-disable-next-line no-restricted-imports -- only `actor`, so the Space-switch notice never names another user's item; LA_FEATURES carries module flags, not identity
 import { SessionService } from '@inspecto/core/api';
+import { DatePipe } from '@angular/common';
+import { GraphQueryCache, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
@@ -372,6 +374,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        DatePipe,
         TermHelpComponent,
         FormMenuDirective,
         LinkAnalysisDiscoverComponent,
@@ -466,6 +469,7 @@ export class LinkAnalysisComponent implements OnInit {
     /** LA-22: the shared Geo ↔ Link brush. */
     private brush = inject(GeoLinkBrushService);
     private spaces = inject(SpacesService);
+    private readonly session = inject(SessionService);
     private lens = inject(LensService);
     private exchange = inject(ExchangeService);
     /**
@@ -2066,6 +2070,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.startNotice.set(null);
         this.clearResults();
         this.graph.set(null);
+        this.cachedAsOf.set(null);
         this.lastRun.set(null);
         this.truncated.set(false);
         this.loadError.set('');
@@ -2075,7 +2080,22 @@ export class LinkAnalysisComponent implements OnInit {
         this.growExclude.reset();
     }
 
-    private async execute(sourceId: GraphSourceId, q: GraphSourceQuery): Promise<void> {
+    /** PERF-P10a-1/3: identical (Space, viewer, source, query) answers are served from the client; see graph-query-cache.ts. */
+    private readonly queryCache = new GraphQueryCache<G6GraphData>(
+        () => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}`,
+    );
+    /** "As of" line for a graph served from the cache; null when the server just answered. */
+    readonly cachedAsOf = signal<number | null>(null);
+    private pushTimer: ReturnType<typeof setTimeout> | null = null;
+    private pushWaiters: (() => void)[] = [];
+
+    /** The Refresh bypass: re-run the last query against the server, ignoring the cache. */
+    async refreshFromServer(): Promise<void> {
+        const run = this.lastRun();
+        if (run) await this.execute(run.sourceId, run.query, true);
+    }
+
+    private async execute(sourceId: GraphSourceId, q: GraphSourceQuery, force = false): Promise<void> {
         const source = this.graphSources.byId(sourceId);
         if (!source) return;
         const firstDraw = !this.graph();
@@ -2086,7 +2106,9 @@ export class LinkAnalysisComponent implements OnInit {
         this.clearResults();
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         try {
-            const g = await source.query(q);
+            const hit = await this.queryCache.get(sourceId, q, () => source.query(q), force);
+            const g = hit.value;
+            this.cachedAsOf.set(hit.fromCache ? hit.fetchedAt : null);
             this.growExclude.reset(); // a new graph: an Undo of the old one's Grow must not bring it back
             this.graph.set(g);
             this.resolvePendingPivot(g);
@@ -2160,7 +2182,20 @@ export class LinkAnalysisComponent implements OnInit {
      * layout and selection survive and every node the narrower question excluded is MARKED, never dropped.
      * `truncated` on the result is the loop's signal to refine again.
      */
-    async pushFilter(): Promise<void> {
+    pushFilter(): Promise<void> {
+        // PERF-P10a-4: a burst of edits yields one request after the pause; every caller resolves when it is done.
+        return new Promise<void>((resolve) => {
+            this.pushWaiters.push(resolve);
+            if (this.pushTimer) clearTimeout(this.pushTimer);
+            this.pushTimer = setTimeout(() => {
+                this.pushTimer = null;
+                const waiters = this.pushWaiters.splice(0);
+                void this.sendPushFilter().finally(() => waiters.forEach((w) => w()));
+            }, PUSH_FILTER_DEBOUNCE_MS);
+        });
+    }
+
+    private async sendPushFilter(): Promise<void> {
         const run = this.lastRun();
         const source = run && this.graphSources.byId(run.sourceId);
         const prev = this.graph();
@@ -2169,7 +2204,9 @@ export class LinkAnalysisComponent implements OnInit {
         const q: GraphSourceQuery = { ...run.query, filter: hasConditions(w) ? cloneGroup(w) : undefined };
         this.pushing.set(true);
         try {
-            const next = await source.query(q);
+            const hit = await this.queryCache.get(run.sourceId, q, () => source.query(q));
+            const next = hit.value;
+            this.cachedAsOf.set(hit.fromCache ? hit.fetchedAt : null);
             const truncated = !!(next as ProjectedGraph).truncated;
             this.graph.set(markStranded(prev, next));
             this.truncated.set(truncated);
@@ -4087,6 +4124,7 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** Re-read the Space's Entity Lists (the Start box and the case's list titles read them). */
     private refreshEntityLists(): void {
+        this.queryCache.clear(); // a list write may change what the server answers
         this.inv
             .listEntityLists()
             .pipe(takeUntilDestroyed(this.destroyRef))
