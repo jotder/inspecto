@@ -129,8 +129,20 @@ public final class WorkingSetRoutes implements RouteModule {
         int at = intParam(ex, "at", -1);
         if (ApiContext.query(ex, "at") != null && at < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at must be >= 0");
 
+        // PERF-P4-3: the caller's gate (open / R3 / PDP) has already passed, so a matching If-None-Match may answer 304 here -
+        // before the log is read, hashed, evaluated or masked. The tag is derived from the store's change token, not the log.
+        String token = WorkingSetEtag.logToken(inv);
+        String etag = WorkingSetEtag.of(inv, token, of, limit, offset, at);
+        ex.getResponseHeaders().set("ETag", etag);
+        if (WorkingSetEtag.isFresh(ex, etag)) {
+            String relationName = of;
+            emit(ex, id, b -> b.attr("investigationId", id).attr("relation", relationName).attr("cached", true).attr("notModified", true));
+            ex.sendResponseHeaders(304, -1);   // -1 => no body, as 304 requires
+            return ApiContext.HANDLED;
+        }
+
         boolean[] cached = {false};
-        Relation rel = relation(inv, at, cached);
+        Relation rel = relation(inv, at, cached, token);
         List<Map<String, Object>> all = rel.tables().get(of);
         List<Map<String, Object>> rows = all.subList(Math.min(offset, all.size()), (int) Math.min((long) offset + limit, all.size()));
         boolean truncated = (long) offset + rows.size() < all.size();
@@ -201,6 +213,23 @@ public final class WorkingSetRoutes implements RouteModule {
      * the step, so it shares the cache without ever answering for the head, and vice versa.
      */
     static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut) throws IOException {
+        return relation(inv, at, cachedOut, WorkingSetEtag.logToken(inv));
+    }
+
+    /**
+     * PERF-P4-3: the cache is keyed by the store's {@code logToken} (a stat), so a hit reads no log and hashes nothing. Only a
+     * miss reads the committed lines - and still hashes them, because the answer's {@code key} (the log's SHA-256) is part of
+     * the body clients parse.
+     */
+    static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut, String token) throws IOException {
+        String tokenKey = WorkingSetEtag.relationKey(inv, token, at);
+        synchronized (CACHE) {
+            Relation hit = CACHE.get(tokenKey);
+            if (hit != null) {
+                cachedOut[0] = true;
+                return hit;
+            }
+        }
         // The store hands back COMMITTED lines only (a line being appended right now is not one), each followed by one '\n':
         // exactly the bytes the log file holds for them, so the key is the same on every backend.
         java.io.ByteArrayOutputStream joined = new java.io.ByteArrayOutputStream();
@@ -213,18 +242,11 @@ public final class WorkingSetRoutes implements RouteModule {
         byte[] bytes = joined.toByteArray();
         int end = bytes.length;
         String key = inv.cacheKey() + "\u0000" + sha256(bytes, end) + (at < 0 ? "" : "@" + at);
-        synchronized (CACHE) {
-            Relation hit = CACHE.get(key);
-            if (hit != null) {
-                cachedOut[0] = true;
-                return hit;
-            }
-        }
-        if (inv.draft() == null) return build(key, bytes, end, at);
+        if (inv.draft() == null) return build(tokenKey, key, bytes, end, at);
         final byte[] draftBytes = bytes;
         final int draftEnd = end;
         // D7-6: a Draft's cold relation build is a heavy job - admitted under the heavy-job cap (429 when it is full), never queued
-        return DraftAdmission.heavy("Working Set relation of draft " + inv.draft().draftId(), () -> build(key, draftBytes, draftEnd, at));
+        return DraftAdmission.heavy("Working Set relation of draft " + inv.draft().draftId(), () -> build(tokenKey, key, draftBytes, draftEnd, at));
     }
 
     /** D7-6 (hibernate / expire): forget every cached relation of the log named {@code cacheKey}. */
@@ -236,7 +258,7 @@ public final class WorkingSetRoutes implements RouteModule {
     }
 
     /** The cold path of {@link #relation}: evaluate the committed bytes and cache the relation under {@code key}. */
-    private static Relation build(String key, byte[] bytes, int end, int at) throws IOException {
+    private static Relation build(String tokenKey, String key, byte[] bytes, int end, int at) throws IOException {
         List<Map<String, Object>> log = new ArrayList<>();
         for (String line : new String(bytes, 0, end, StandardCharsets.UTF_8).split("\n")) {
             if (line.isBlank()) continue;
@@ -255,7 +277,7 @@ public final class WorkingSetRoutes implements RouteModule {
         }
         Relation rel = new Relation(key.substring(key.indexOf('\u0000') + 1), headStep, s.hash(), tables(s));
         synchronized (CACHE) {
-            CACHE.put(key, rel);
+            CACHE.put(tokenKey, rel);
         }
         return rel;
     }
