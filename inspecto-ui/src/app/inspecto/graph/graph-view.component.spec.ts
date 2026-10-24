@@ -22,6 +22,7 @@ import {
     graphSummaryLabel,
     edgeLabelsHiddenByDensity,
     layoutConfig,
+    graphSignature,
     stableKey,
 } from './graph-view.component';
 
@@ -321,6 +322,160 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
     });
 });
 
+describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1)', () => {
+    type Internals = {
+        ready: boolean;
+        graph: unknown;
+        data: G6GraphData | null;
+        selection: string[] | null;
+        interaction: GraphViewComponent['interaction'];
+        selectionChange: { emit(ids: string[]): void };
+        styleKey(): string;
+        snapshotKeys(): void;
+        ngOnChanges(changes: Record<string, unknown>): void;
+        onBrushSelect(ids: string[]): void;
+        flushBrush(): void;
+    };
+    const stub = () => ({
+        setData: vi.fn(),
+        draw: vi.fn(() => Promise.resolve()),
+        render: vi.fn(() => Promise.resolve()),
+        setElementState: vi.fn((_s: Record<string, string[]>) => Promise.resolve()),
+        destroy: vi.fn(),
+    });
+    function host() {
+        TestBed.configureTestingModule({
+            imports: [GraphViewComponent],
+            providers: [{ provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } }],
+        });
+        const fixture = TestBed.createComponent(GraphViewComponent);
+        const comp = fixture.componentInstance as unknown as Internals;
+        vi.spyOn(comp as unknown as { create(): void }, 'create').mockImplementation(() => undefined);
+        const graph = stub();
+        comp.ready = true;
+        comp.graph = graph;
+        comp.interaction = { boxSelect: true };
+        comp.data = {
+            nodes: ['a', 'b', 'c', 'd'].map((id) => ({ id, data: { label: id, kind: 'DATASET' } })),
+            edges: [],
+        } as unknown as G6GraphData;
+        comp.snapshotKeys();
+        return { comp, graph };
+    }
+    const select = (comp: Internals, ids: string[]) => {
+        comp.selection = ids;
+        comp.ngOnChanges({ selection: {} });
+    };
+
+    it('a selection change never calls setData or draw, and sets state only for the changed ids', () => {
+        const { comp, graph } = host();
+        select(comp, ['a', 'b']);
+        expect(graph.setData).not.toHaveBeenCalled();
+        expect(graph.draw).not.toHaveBeenCalled();
+        expect(graph.setElementState).toHaveBeenCalledTimes(1);
+        expect(graph.setElementState.mock.calls[0][0]).toEqual({ a: [SELECTED_STATE], b: [SELECTED_STATE] });
+
+        select(comp, ['b', 'c']); // a leaves and c joins; b is already in the state
+        const diff = graph.setElementState.mock.calls[1][0];
+        expect(Object.keys(diff).sort()).toEqual(['a', 'c']);
+        expect(diff['a']).toEqual([]);
+        expect(diff['c']).toEqual([SELECTED_STATE]);
+        expect(graph.setData).not.toHaveBeenCalled();
+        expect(graph.draw).not.toHaveBeenCalled();
+    });
+
+    it('styleKey does not move with the selection', () => {
+        const { comp } = host();
+        const before = comp.styleKey();
+        comp.selection = ['a', 'b', 'c'];
+        expect(comp.styleKey()).toBe(before);
+    });
+
+    it('coalesces brush updates to one emission per frame and emits the final ids on release', () => {
+        const frames: FrameRequestCallback[] = [];
+        vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb));
+        vi.stubGlobal('cancelAnimationFrame', vi.fn());
+        try {
+            const { comp } = host();
+            const emitted: string[][] = [];
+            comp.selectionChange.emit = (ids) => emitted.push(ids);
+            comp.onBrushSelect(['a']);
+            comp.onBrushSelect(['a', 'b']);
+            comp.onBrushSelect(['a', 'b', 'c']);
+            expect(emitted).toEqual([]); // nothing until the frame
+            expect(frames).toHaveLength(1); // one frame requested for three updates
+            frames[0](0);
+            expect(emitted).toEqual([['a', 'b', 'c']]);
+            comp.onBrushSelect(['a', 'd']);
+            comp.flushBrush(); // the release, before the next frame
+            expect(emitted).toEqual([
+                ['a', 'b', 'c'],
+                ['a', 'd'],
+            ]);
+            comp.flushBrush(); // nothing pending: no duplicate
+            expect(emitted).toHaveLength(2);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+});
+
+describe('graphSignature (PERF-P2)', () => {
+    const base = (): G6GraphData =>
+        ({
+            nodes: [
+                { id: 'a', data: { label: 'A', kind: 'entity', attrs: { risk: '5' } } },
+                { id: 'b', data: { label: 'B', kind: 'entity' } },
+            ],
+            edges: [{ id: 'e1', source: 'a', target: 'b', data: { kind: 'calls' } }],
+        }) as unknown as G6GraphData;
+    const node = (g: G6GraphData, i: number) => g.nodes[i].data as unknown as Record<string, unknown>;
+
+    it('is stable for identical content in a fresh object', () => {
+        expect(graphSignature(base())).toBe(graphSignature(base()));
+        expect(graphSignature(null)).toBe(graphSignature(undefined));
+    });
+
+    it('moves when a drawn attribute, a label, or a flag changes', () => {
+        const sig = graphSignature(base());
+        const attr = base();
+        (node(attr, 0)['attrs'] as Record<string, string>)['risk'] = '6';
+        expect(graphSignature(attr)).not.toBe(sig);
+        const label = base();
+        node(label, 1)['label'] = 'B2';
+        expect(graphSignature(label)).not.toBe(sig);
+        for (const flag of ['missing', 'unexpanded', 'highConnectivity', 'held']) {
+            const g = base();
+            node(g, 1)[flag] = true;
+            expect(graphSignature(g), flag).not.toBe(sig);
+        }
+        const edgeKind = base();
+        (edgeKind.edges[0].data as { kind: string }).kind = 'sms';
+        expect(graphSignature(edgeKind)).not.toBe(sig);
+    });
+
+    it('moves when a node or an edge is added or removed', () => {
+        const sig = graphSignature(base());
+        const moreNodes = base();
+        moreNodes.nodes.push({ id: 'c', data: { label: 'C', kind: 'entity' } } as G6GraphData['nodes'][number]);
+        expect(graphSignature(moreNodes)).not.toBe(sig);
+        const lessNodes = base();
+        lessNodes.nodes.pop();
+        expect(graphSignature(lessNodes)).not.toBe(sig);
+        const moreEdges = base();
+        moreEdges.edges.push({
+            id: 'e2',
+            source: 'b',
+            target: 'a',
+            data: { kind: 'calls' },
+        } as G6GraphData['edges'][number]);
+        expect(graphSignature(moreEdges)).not.toBe(sig);
+        const lessEdges = base();
+        lessEdges.edges.pop();
+        expect(graphSignature(lessEdges)).not.toBe(sig);
+    });
+});
+
 describe('stableKey', () => {
     it('is equal for structurally equal objects built fresh — the memoisation contract', () => {
         expect(stableKey({ nodeLabels: true, nodeColors: {} })).toBe(stableKey({ nodeLabels: true, nodeColors: {} }));
@@ -376,7 +531,9 @@ describe('dense-graph link labels (telco demo ring, 2026-09-27)', () => {
     it("names a ringed node's contact count in its hover text, and only when served", () => {
         const comp = create(null).componentInstance as unknown as { tooltipHtml(items: unknown[]): string };
         const node = (data: object) => [{ id: 'h', data: { label: 'H', kind: 'entity', ...data } }];
-        expect(comp.tooltipHtml(node({ highConnectivity: true, contacts: 650 }))).toContain('High connectivity — 650 contacts');
+        expect(comp.tooltipHtml(node({ highConnectivity: true, contacts: 650 }))).toContain(
+            'High connectivity — 650 contacts',
+        );
         expect(comp.tooltipHtml(node({ highConnectivity: true, contacts: 1 }))).toContain('— 1 contact');
         const bare = comp.tooltipHtml(node({ highConnectivity: true }));
         expect(bare).toContain('High connectivity');
@@ -410,7 +567,6 @@ describe('graph text alternative and canvas tabindex (LA-A11Y-AUDIT-1)', () => {
     });
 });
 
-
 describe('opt-in pointer model (Link Analysis, 2026-10-15)', () => {
     const types = (b: unknown[]) => b.map((x) => (typeof x === 'string' ? x : (x as { type: string }).type));
 
@@ -425,7 +581,10 @@ describe('opt-in pointer model (Link Analysis, 2026-10-15)', () => {
 
     it('boxSelect draws a plain-drag brush on the empty canvas only, over nodes only', () => {
         const forwarded: string[][] = [];
-        const b = buildBehaviors({ panByDrag: false, boxSelect: true }, null, (ids) => forwarded.push(ids)) as Record<string, unknown>[];
+        const b = buildBehaviors({ panByDrag: false, boxSelect: true }, null, (ids) => forwarded.push(ids)) as Record<
+            string,
+            unknown
+        >[];
         const brush = b.find((x) => x['type'] === 'brush-select') as Record<string, unknown>;
         expect(brush['trigger']).toEqual(['drag']); // a plain drag, no shift
         expect(brush['enableElements']).toEqual(['node']);

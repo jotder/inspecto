@@ -17,6 +17,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { GammaConfigService } from '@gamma/services/config';
 import {
     CanvasEvent,
+    CommonEvent,
     EdgeData,
     EdgeEvent,
     ElementDatum,
@@ -445,6 +446,67 @@ export function stableKey(value: unknown): string {
     );
 }
 
+/** FNV-1a over a string, folded into a running 32-bit state. */
+function fnv(h: number, s: string): number {
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return h >>> 0;
+}
+
+/**
+ * A cheap content signature of the drawn graph (PERF-P2): counts plus a two-lane FNV hash over every id and every field
+ * the canvas reads (node label, kind, colour, icon, the missing/held/unexpanded/highConnectivity flags, the `attrs`
+ * that conditional formatting reads; edge endpoints, kind, weight, simulated, attrs). Replaces a `JSON.stringify` of
+ * the whole graph, which at 2,000 nodes was 1-3 MB of string per change. Equal content gives an equal signature;
+ * any change of a drawn field moves it. Node order is part of the signature on purpose: it is part of the data.
+ */
+export function graphSignature(data: G6GraphData | null | undefined): string {
+    if (!data) return 'null';
+    let a = 2166136261;
+    let b = 5381;
+    const add = (v: unknown): void => {
+        const t = v === undefined || v === null ? '' : String(v);
+        a = fnv(a, t + '\u0001');
+        b = fnv(b, '\u0002' + t);
+    };
+    const attrs = (o: Record<string, string | null> | undefined): void => {
+        if (!o) return add('-');
+        for (const k of Object.keys(o).sort()) {
+            add(k);
+            add(o[k]);
+        }
+    };
+    for (const n of data.nodes) {
+        const d = n.data as G6Node['data'];
+        add(n.id);
+        add(d.label);
+        add(d.kind);
+        add(d.color);
+        add(d.iconSrc);
+        add(d.missing);
+        add(d.highConnectivity);
+        add(d.contacts);
+        add(d.unexpanded);
+        add(d.held);
+        add(d.provenance?.join('\u0003'));
+        add(d.superMembers?.length);
+        attrs(d.attrs);
+        add('|');
+    }
+    for (const e of data.edges) {
+        const d = e.data as Record<string, unknown> & { attrs?: Record<string, string | null> };
+        add(e.id);
+        add(e.source);
+        add(e.target);
+        add(d.kind);
+        add(d.weight);
+        add(d.simulated);
+        add(d.derived);
+        attrs(d.attrs);
+        add('|');
+    }
+    return `${data.nodes.length}:${data.edges.length}:${a.toString(36)}:${b.toString(36)}`;
+}
+
 /**
  * Read-only AntV G6 host for the catalog metadata graph: layered (dagre) layout,
  * pan/zoom, per-kind shapes/outline colours, node-click emits the node id.
@@ -630,20 +692,26 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             }
         }
         if (changes['data']) {
-            const dataKey = stableKey(this.data ?? null);
+            const dataKey = graphSignature(this.data);
             if (dataKey !== this.prevDataKey) {
                 this.applyData(dataKey);
                 return;
             }
         }
-        if (changes['emphasis'] || changes['display'] || changes['selection']) {
+        if (changes['emphasis'] || changes['display']) {
             const styleKey = this.styleKey();
             if (styleKey !== this.prevStyleKey) this.redraw(styleKey);
+        }
+        // A selection is NEVER a restyle (PERF-P1): G6's `selected` state style paints it, and only the diff is applied.
+        if (changes['selection']) {
+            this.selSet = new Set(this.selection ?? []);
+            this.syncSelectionState();
         }
     }
 
     ngOnDestroy(): void {
         this.resizeObserver?.disconnect();
+        this.dropPendingBrush();
         if (this.fitTimer !== null) clearTimeout(this.fitTimer);
         const host = this.hostEl?.nativeElement;
         host?.removeEventListener('pointerleave', this.hideStaleTooltipBound);
@@ -777,6 +845,36 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         }, 150);
     }
 
+    /** The latest brushed ids not yet emitted, and the animation frame that will emit them (PERF-P1c). */
+    private pendingBrush: string[] | null = null;
+    private brushFrame: number | null = null;
+
+    /** A brush update: remember the latest ids and emit them at most once per animation frame. */
+    private onBrushSelect(ids: string[]): void {
+        this.brushedAt = Date.now();
+        this.pendingBrush = ids;
+        if (this.brushFrame !== null) return;
+        this.brushFrame = requestAnimationFrame(() => {
+            this.brushFrame = null;
+            this.flushBrush();
+        });
+    }
+
+    /** Emit the pending brushed ids now (the frame fired, or the pointer was released). */
+    private flushBrush(): void {
+        if (this.brushFrame !== null) cancelAnimationFrame(this.brushFrame);
+        this.brushFrame = null;
+        const ids = this.pendingBrush;
+        this.pendingBrush = null;
+        if (ids) this.selectionChange.emit(ids);
+    }
+
+    private dropPendingBrush(): void {
+        if (this.brushFrame !== null) cancelAnimationFrame(this.brushFrame);
+        this.brushFrame = null;
+        this.pendingBrush = null;
+    }
+
     private cancelPendingClick(): void {
         if (this.clickTimer !== null) clearTimeout(this.clickTimer);
         this.clickTimer = null;
@@ -784,6 +882,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     private destroyGraph(): void {
         this.cancelPendingClick();
+        this.dropPendingBrush();
         this.graph?.destroy();
         this.graph = null;
         // `destroy()` is expected to remove the G6 tooltip plugin's card, but observed live it sometimes
@@ -802,14 +901,14 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /** Signature of the inputs that affect PAINT ONLY. */
     private styleKey(): string {
-        return stableKey([this.emphasis ?? null, this.display ?? null, this.selection ?? null]);
+        return stableKey([this.emphasis ?? null, this.display ?? null]);
     }
 
     /** Record what the live graph now reflects, so the next `ngOnChanges` can classify against it. */
-    private snapshotKeys(): void {
+    private snapshotKeys(dataKey = graphSignature(this.data)): void {
         this.prevLayoutKey = this.layoutKey();
         this.prevPluginKey = this.pluginKey();
-        this.prevDataKey = stableKey(this.data ?? null);
+        this.prevDataKey = dataKey;
         this.prevStyleKey = this.styleKey();
         this.renderedNodeIds = new Set((this.data?.nodes ?? []).map((n) => String(n.id)));
     }
@@ -825,7 +924,6 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.emNodes = em ? new Set(em.nodeIds) : null;
         this.emEdges = em?.edgeIds ? new Set(em.edgeIds) : null;
         this.emGroups = em?.groups ?? null;
-        this.selSet = new Set(this.selection ?? []);
         this.groupSwatch = new Map<string, string>();
         for (const g of this.emGroups?.values() ?? []) {
             if (!this.groupSwatch.has(g))
@@ -878,11 +976,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
      */
     private syncSelectionState(): void {
         const graph = this.graph;
-        if (!graph || !this.interaction?.boxSelect) return;
+        if (!graph) return;
         const want = this.selSet;
-        const touched = new Set([...this.selectedStateIds, ...want]);
+        const prev = this.selectedStateIds;
+        const touched = [...prev].filter((id) => !want.has(id)).concat([...want].filter((id) => !prev.has(id)));
         this.selectedStateIds = new Set(want);
-        if (!touched.size) return;
+        if (!touched.length) return;
         const states: Record<string, string[]> = {};
         for (const id of touched) states[id] = want.has(id) ? [SELECTED_STATE] : [];
         void graph.setElementState(states, false).catch(() => undefined); // an id the graph no longer holds is not an error
@@ -953,6 +1052,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             return;
         }
         this.refreshStyleState();
+        this.selSet = new Set(this.selection ?? []);
         const kindOf = (d: NodeData): NodeKind => (d.data as { kind: NodeKind }).kind;
         const iconOf = (d: NodeData): string | undefined => {
             const iconSrc = (d.data as { iconSrc?: string }).iconSrc;
@@ -986,8 +1086,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     radius: 8,
                     fill: () => this.styleNodeFill,
                     stroke: (d) => this.nodeColorOf(d),
-                    // A box-selected node (the page's `selection`) wears a thicker outline and a halo.
-                    lineWidth: (d) => (this.selSet.has(d.id as string) ? 4 : 2),
+                    lineWidth: 2,
                     // A stranded node (Link Analysis: excluded by a pushed-down predicate, kept so the analyst
                     // sees what the narrower question removed) renders dimmed with a dashed outline.
                     lineDash: (d) => {
@@ -996,12 +1095,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                         return nd.missing ? [4, 3] : nd.unexpanded ? [2, 3] : undefined;
                     },
                     // A high-connectivity entity (Link Analysis hub suppression) wears a wide halo in its own colour.
-                    halo: (d) =>
-                        !!(d.data as { highConnectivity?: boolean }).highConnectivity ||
-                        this.selSet.has(d.id as string),
+                    halo: (d) => !!(d.data as { highConnectivity?: boolean }).highConnectivity,
                     haloStroke: (d) => this.nodeColorOf(d),
-                    haloLineWidth: (d) => (this.selSet.has(d.id as string) ? 16 : 10),
-                    haloStrokeOpacity: (d) => (this.selSet.has(d.id as string) ? 0.6 : 0.35),
+                    haloLineWidth: 10,
+                    haloStrokeOpacity: 0.35,
                     // LA-GROW-EXCLUDE-1: a busy entity a Grow held wears a "held" badge over its ring.
                     badges: (d) =>
                         (d.data as { held?: boolean }).held
@@ -1036,6 +1133,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     opacity: (d) =>
                         this.nodeDim(d.id as string) ? 0.25 : (d.data as { missing?: boolean }).missing ? 0.45 : 1,
                     labelOpacity: (d) => (this.nodeDim(d.id as string) ? 0.35 : 1),
+                },
+                // A selected node (the page's `selection`, or the box select's own state) wears a thicker outline and a halo.
+                // Painted by G6's state style, so a selection change touches only the changed elements (PERF-P1).
+                state: {
+                    [SELECTED_STATE]: { lineWidth: 4, halo: true, haloLineWidth: 16, haloStrokeOpacity: 0.6 },
                 },
             },
             edge: {
@@ -1076,10 +1178,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             behaviors: buildBehaviors(
                 this.interaction,
                 this.plugins,
-                (ids) => {
-                    this.brushedAt = Date.now();
-                    this.selectionChange.emit(ids);
-                },
+                (ids) => this.onBrushSelect(ids),
                 // The rubber band reads the theme's foreground, so it shows in both colour schemes without a literal colour.
                 { fill: this.styleFg, fillOpacity: 0.08, stroke: this.styleFg, lineWidth: 1, lineDash: [4, 3] },
             ) as never[],
@@ -1128,6 +1227,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     y: ev.client?.y ?? ev.nativeEvent?.clientY ?? 0,
                 });
         });
+        // The brush's own release handler runs first (behaviours register before this), so this flushes its final ids.
+        graph.on(CommonEvent.POINTER_UP, () => this.flushBrush());
         graph.on(CanvasEvent.CLICK, () => {
             // The click that ends a box select must not clear what the box just selected.
             if (this.interaction?.boxSelect && Date.now() - this.brushedAt > 250 && this.selSet.size > 0) {
