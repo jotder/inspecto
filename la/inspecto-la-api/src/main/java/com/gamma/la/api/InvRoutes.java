@@ -1006,12 +1006,14 @@ public final class InvRoutes implements RouteModule {
         }
 
         // PERF-P4-2: the conditional read. Every gate above (write root, body, R3 view gate, filter, four-eyes, alias) has run
-        // for THIS request; only now may a cached body or a 304 answer it. The read is still audited.
+        // for THIS request; only now may a cached body or a 304 answer it. The read is still audited, with the miss's own
+        // detail (which store answered). Limit: a hit does not re-run mask.out(), so an alias book file deleted within the TTL
+        // is not re-minted by a hit (the next miss re-mints it).
         ProjectionCache.Key cacheKey = ProjectionCache.key(ex, neighborsOf != null ? "neighbors" : "projection", writeRoot,
                 api.dataRoot(), datasetId, relationSql, body, limit, mask);
         ProjectionCache.Hit hit = ProjectionCache.get(cacheKey);
         if (hit != null) {
-            audit(ex, datasetId, neighborsOf, hit.rows(), hit.truncated(), null);
+            audit(ex, datasetId, neighborsOf, hit.rows(), hit.truncated(), (IndexedRead.Outcome<?>) hit.auditSource());
             if (ProjectionCache.notModified(ex, hit.etag())) return ProjectionCache.respond304(ex, hit.etag());
             ProjectionCache.tag(ex, cacheKey);
             return hit.body();
@@ -1037,8 +1039,7 @@ public final class InvRoutes implements RouteModule {
                 audit(ex, datasetId, neighborsOf, rows.size(), indexed.result().truncated(), indexed);
                 if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13
                 ProjectionCache.READS.increment();
-                ProjectionCache.put(cacheKey, out, rows.size(), indexed.result().truncated());
-                ProjectionCache.tag(ex, cacheKey);
+                if (ProjectionCache.put(cacheKey, out, rows.size(), indexed.result().truncated(), auditCopy(indexed))) ProjectionCache.tag(ex, cacheKey);
                 return out;
             }
         }
@@ -1075,8 +1076,7 @@ public final class InvRoutes implements RouteModule {
             if (indexed != null) out.put("source", indexed.source());
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated(), indexed);
             if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13: a graph was drawn
-            ProjectionCache.put(cacheKey, out, rows.size(), r.truncated());
-            ProjectionCache.tag(ex, cacheKey);
+            if (ProjectionCache.put(cacheKey, out, rows.size(), r.truncated(), auditCopy(indexed))) ProjectionCache.tag(ex, cacheKey);
             return out;
         } catch (SQLException e) {
             throw DatasetReadFault.of("projection failed", datasetId, writeRoot, e);
@@ -1436,6 +1436,13 @@ public final class InvRoutes implements RouteModule {
      * so {@code rows}/{@code truncated} describe what the analyst actually saw; a partial result the trail
      * cannot show as partial is worth nothing to an investigator.
      */
+    /** The audit detail of an outcome without its rows (a cache entry keeps it so a hit audits exactly as the miss did). */
+    private static IndexedRead.Outcome<?> auditCopy(IndexedRead.Outcome<?> o) {
+        if (o == null || !o.served()) return o;
+        return new IndexedRead.Outcome<>(Boolean.TRUE, o.version(), o.stale(), o.staleReason(), null, o.staleCodes(),
+                o.fingerprintKnown(), null);
+    }
+
     private static void audit(HttpExchange ex, String datasetId, String neighborsOf, int rows, boolean truncated,
                               IndexedRead.Outcome<?> source) {
         try {

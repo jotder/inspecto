@@ -58,7 +58,21 @@ public final class ProjectionCache {
     private static final ObjectWriter CANONICAL = ApiContext.JSON.writer()
             .with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
 
-    private record Cached(Map<String, Object> body, String etag, int rows, boolean truncated, long expiresAt) { }
+    /**
+     * Per-entry caps. 5,000 rows is ten times the explorer's default projection cap (500), so an ordinary graph read
+     * is cached. 2 MB is about 5,000 rows at the measured ~450 B per row. Above either cap the read is served but not
+     * stored. 32 MB in total holds at most 16 such entries, small next to the heap the DuckDB reads already need.
+     */
+    static final int MAX_ENTRY_ROWS = 5_000;
+    static final long MAX_ENTRY_BYTES = 2L * 1024 * 1024;
+    static final long MAX_TOTAL_BYTES = 32L * 1024 * 1024;
+    private static volatile int maxEntryRows = MAX_ENTRY_ROWS;
+    private static volatile long maxTotalBytes = MAX_TOTAL_BYTES;
+    private static long bytes;                                                                   // guarded by ENTRIES
+    private static final LongAdder SKIPPED = new LongAdder();
+
+    private record Cached(Map<String, Object> body, String etag, int rows, boolean truncated, Object auditSource, long bytes,
+                          long expiresAt) { }
 
     /** The lookup handle of one request: {@code etag} null = not cacheable. */
     record Key(String hash, String etag) {
@@ -68,14 +82,9 @@ public final class ProjectionCache {
     }
 
     /** A cached answer: the body and what the audit needs. */
-    record Hit(Map<String, Object> body, String etag, int rows, boolean truncated) { }
+    record Hit(Map<String, Object> body, String etag, int rows, boolean truncated, Object auditSource) { }
 
-    private static final Map<String, Cached> ENTRIES = new LinkedHashMap<>(16, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Cached> eldest) {
-            return size() > MAX_ENTRIES;
-        }
-    };
+    private static final Map<String, Cached> ENTRIES = new LinkedHashMap<>(16, 0.75f, true);   // bounds enforced in put
     private static volatile LongSupplier clock = System::currentTimeMillis;
     private static volatile long ttlMs = DEFAULT_TTL_MS;
 
@@ -112,7 +121,7 @@ public final class ProjectionCache {
             parts.put("indexEnabled", s.effectiveIndex().enabledInForce());
             parts.put("masking", mask.describe());
             parts.put("maskKey", mask.active() ? sha256(MaskTokens.spaceKey(writeRoot)) : "");
-            if ("neighbors".equals(route)) parts.put("index", indexVersions(writeRoot, datasetId));
+            parts.put("index", indexVersions(writeRoot, datasetId));                            // both routes: the route alone tells them apart
             String hash = sha256(CANONICAL.writeValueAsBytes(parts));
             return new Key(hash, "\"" + hash.substring(0, 40) + "\"");
         } catch (IOException | RuntimeException unkeyable) {
@@ -129,18 +138,87 @@ public final class ProjectionCache {
             if (e == null) return null;
             if (now >= e.expiresAt()) {
                 ENTRIES.remove(key.hash());
+                bytes -= e.bytes();
                 return null;
             }
-            return new Hit(e.body(), e.etag(), e.rows(), e.truncated());
+            return new Hit(e.body(), e.etag(), e.rows(), e.truncated(), e.auditSource());
         }
     }
 
-    /** Store a successful answer (the caller hands over a body it no longer changes). */
-    static void put(Key key, Map<String, Object> body, int rows, boolean truncated) {
-        if (!key.cacheable()) return;
-        synchronized (ENTRIES) {
-            ENTRIES.put(key.hash(), new Cached(body, key.etag(), rows, truncated, clock.getAsLong() + ttlMs));
+    /**
+     * Store a successful answer (the caller hands over a body it no longer changes) with the audit detail a hit replays.
+     * A result over {@link #MAX_ENTRY_ROWS} rows or {@link #MAX_ENTRY_BYTES} serialised bytes is not stored (counted in
+     * {@link #skippedStores()}): such a read is expensive to hold and rarely repeated byte-for-byte. Every put first drops
+     * the expired entries (at most {@link #MAX_ENTRIES}, so the sweep is bounded), then evicts least-recently-used entries
+     * until both the count and the {@link #MAX_TOTAL_BYTES} bound hold.
+     */
+    static boolean put(Key key, Map<String, Object> body, int rows, boolean truncated, Object auditSource) {
+        if (!key.cacheable()) return false;
+        if (rows > maxEntryRows) {
+            SKIPPED.increment();
+            return false;
         }
+        long size;
+        try {
+            size = ApiContext.JSON.writeValueAsBytes(body).length;
+        } catch (IOException | RuntimeException unsized) {
+            SKIPPED.increment();
+            return false;
+        }
+        if (size > MAX_ENTRY_BYTES || size > maxTotalBytes) {
+            SKIPPED.increment();
+            return false;
+        }
+        long now = clock.getAsLong();
+        synchronized (ENTRIES) {
+            var it = ENTRIES.entrySet().iterator();
+            while (it.hasNext()) {
+                Cached e = it.next().getValue();
+                if (now >= e.expiresAt()) {
+                    bytes -= e.bytes();
+                    it.remove();
+                }
+            }
+            Cached old = ENTRIES.remove(key.hash());
+            if (old != null) bytes -= old.bytes();
+            it = ENTRIES.entrySet().iterator();                                                  // access order: eldest first
+            while (it.hasNext() && (ENTRIES.size() >= MAX_ENTRIES || bytes + size > maxTotalBytes)) {
+                bytes -= it.next().getValue().bytes();
+                it.remove();
+            }
+            ENTRIES.put(key.hash(), new Cached(body, key.etag(), rows, truncated, auditSource, size, now + ttlMs));
+            bytes += size;
+            return true;
+        }
+    }
+
+    /** Test seam: entries held now. */
+    public static int size() {
+        synchronized (ENTRIES) {
+            return ENTRIES.size();
+        }
+    }
+
+    /** Test seam: serialised bytes held now. */
+    public static long bytes() {
+        synchronized (ENTRIES) {
+            return bytes;
+        }
+    }
+
+    /** Test seam: results not stored for being over a per-entry cap. */
+    public static long skippedStores() {
+        return SKIPPED.sum();
+    }
+
+    /** Test seam: the per-entry row cap and the total byte bound (0 = the defaults). Clears the cache. */
+    public static void forTestCaps(int entryRows, long totalBytes) {
+        synchronized (ENTRIES) {
+            ENTRIES.clear();
+            bytes = 0;
+        }
+        maxEntryRows = entryRows <= 0 ? MAX_ENTRY_ROWS : entryRows;
+        maxTotalBytes = totalBytes <= 0 ? MAX_TOTAL_BYTES : totalBytes;
     }
 
     /** True when the request's {@code If-None-Match} names {@code etag} (or {@code *}). */
@@ -214,8 +292,9 @@ public final class ProjectionCache {
     public static void forTest(LongSupplier fakeClock, long ttl) {
         synchronized (ENTRIES) {
             ENTRIES.clear();
+            bytes = 0;
         }
-        clock = fakeClock == null ? System::currentTimeMillis : fakeClock;
+        clock =fakeClock == null ? System::currentTimeMillis : fakeClock;
         ttlMs = ttl <= 0 ? DEFAULT_TTL_MS : ttl;
     }
 

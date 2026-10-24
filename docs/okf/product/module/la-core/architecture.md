@@ -358,12 +358,19 @@ on that node's real counted degree (distinct links; over the threshold = 403). T
 **Conditional projection read (PERF-P4-2, 2026-10-24).** The flat `/inv/projection` and `/inv/projection/neighbors` (not `list`,
 not `/multi`) answer with `ETag` + `Cache-Control: private, no-cache`; a repeat with a matching `If-None-Match` gets `304` and no
 Dataset read (`ProjectionCache`: LRU 64, TTL 60 s, process-local). It is consulted only AFTER every gate of the read (write root,
-body 422, R3 view 404, filter, four-eyes, alias resolution), and the read is still audited on a hit. The key (and so the ETag)
+body 422, R3 view 404, filter, four-eyes, alias resolution), and the read is still audited on a hit with the miss's own
+`source` / `indexVersion` / `indexStale` / `sourceReason`. Bounds: a result over 5,000 rows or 2 MB serialised is served but not
+stored (no ETag); all entries together stay under 32 MB, evicting least-recently-used by bytes; every store first sweeps the
+expired entries. The key (and so the ETag)
 hashes: route, Space, viewer (Subject id, capabilities, data scopes, attributes, held roles), canonical body, resolved limit, the
 Dataset registry entry and relation SQL, its FRESH input fingerprint, the LA settings in force (masking mode, Entity Types,
 thresholds, index, caps), the Space masking key, and for neighbours each mapping's published index version. Only a `files:`
-fingerprint is cached - a view, a Postgres store, too many files or a timed-out listing is read every time. Gotcha: an in-place
-rewrite of a file that keeps BOTH size and mtime (ms) is not seen until the TTL ends. The executor's outer `LIMIT n+1` is
+fingerprint is cached - a view, a Postgres store, too many files or a timed-out listing is read every time. Limits, stated:
+(1) the fingerprint sees path, size and mtime (ms) only, so an in-place rewrite that keeps BOTH size and mtime (an
+mtime-preserving copy) is served from the cache until the TTL ends; (2) a hit does not re-run masking, so if the Space's
+alias book file is deleted inside the TTL, the aliases a hit hands out are not re-minted into it until the next miss (an alias
+handed back meanwhile answers 422 until then); (3) the relation SQL is derived from the registry entry for every cached
+(files-backed) Dataset, so it is never the only key input that changes. The executor's outer `LIMIT n+1` is
 already planned by DuckDB as a Top-N over the group-by (no full sort), so the projection needs no inner limit.
 
 
