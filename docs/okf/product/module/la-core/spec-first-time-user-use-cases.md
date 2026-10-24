@@ -4,14 +4,18 @@ title: Inspecto LA - first-time user use cases (blank product to first findings)
 description: Goals, use cases and the guided path a beginner needs in the Inspecto LA UI, from an empty install through data, Entity Types, Entity Lists and the first graph; operator answers of 2026-10-22; reconciled with the console first-run use cases.
 resource: inspecto-ui/projects/la-app/
 tags: [module, la-core, link-analysis, onboarding, use-cases, spec]
-timestamp: 2026-10-22T00:00:00Z
+timestamp: 2026-10-24T00:00:00Z
 ---
 
 # Inspecto LA - first-time user use cases
 
-**Status: use cases agreed with the operator 2026-10-22 (§8); nothing built.** It states what a beginner wants,
-how they get there in the Inspecto LA UI, and what stands in the way today. A companion onboarding plan derives
-the product changes from it.
+**Status: use cases agreed with the operator 2026-10-22 (§8); built by `LA-ONBOARD-1` (phases 0-8, closed
+2026-10-22, plan archived), with the follow-up fixes `LA-ONBOARD-FIXES-1`, `LA-ONBOARD-DEFECTS-1` and
+`LA-ONBOARD-RESIDUALS-1` (open for its demand-gated items).** Each use case below carries an **As built** line
+(checked against `inspecto-ui/projects/la-app` and `projects/link-analysis` on 2026-10-24) with the on-screen
+names; **Today** keeps the 2026-10-22 walkthrough state the work started from. The acceptance drive is
+[`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md) (Basic: first graph 2 min 40 s after first
+launch); the as-built design is [architecture](architecture.md) §3.4, §6.10-§6.13.
 
 **Evidence.** On 2026-10-22 a fresh Basic bundle (`la-app` UI, master `cb4feedd9`) was started on an empty Spaces
 root and driven as a first-time user with a synthetic mobile-money file pair (`transfers.csv` 2,215 rows,
@@ -108,18 +112,18 @@ page groups them under **My work**. Recorded Investigations, approvals and Dossi
              9 Come back ◄── 8 Keep & share ◄── 7 Analyse ◄── 6 Grow & clean
 ```
 
-| Stage | Use cases | Today on Basic |
-|---|---|---|
-| 0 First launch | UC-01 | No guidance; Link Analysis shows a query form over nothing (F-1) |
-| 1 Space | UC-02 | Impossible with zero Spaces (F-2) |
-| 2 Data in | UC-03, UC-04, UC-05, UC-06 | Impossible: no upload on Basic; 9 setup steps over the API, no UI (F-3, F-4) |
-| 3 What is in it | UC-07, UC-08 | Entity Types are read-only; no screen sets which column holds which Entity Type (F-5) |
-| 4 Focus | UC-09, UC-10 | Entity Lists work; no general single-entity start (F-7) |
-| 5 First graph | UC-11 | "Investigate" draws the whole Dataset (F-8) |
-| 6 Grow & clean | UC-11 | Grow, held tray and Exclude work, but only after a whole-Dataset draw |
-| 7 Analyse | UC-12 | Paths, communities and centrality work and found the ring |
-| 8 Keep & share | UC-13 | Saved views and export exist; next-step text points to Investigations (F-10) |
-| 9 Come back | UC-14 | Re-import has no UI on Basic |
+| Stage | Use cases | Basic on 2026-10-22 | As built (2026-10-24) |
+|---|---|---|---|
+| 0 First launch | UC-01 | No guidance; Link Analysis shows a query form over nothing (F-1) | Built: *Getting started* page and *Space guide* |
+| 1 Space | UC-02 | Impossible with zero Spaces (F-2) | Built: switcher *No Space yet*, *Create a Space* |
+| 2 Data in | UC-03, UC-04, UC-05, UC-06 | Impossible: no upload on Basic; 9 setup steps over the API, no UI (F-3, F-4) | Built: *Add data* → *Onboard a file*; UC-06 automation not built |
+| 3 What is in it | UC-07, UC-08 | Entity Types are read-only; no screen sets which column holds which Entity Type (F-5) | Built: *Entities* page, *Columns* tab, *New Entity Type* |
+| 4 Focus | UC-09, UC-10 | Entity Lists work; no general single-entity start (F-7) | Built: *Start from...* box |
+| 5 First graph | UC-11 | "Investigate" draws the whole Dataset (F-8) | Built: a start draws one ring |
+| 6 Grow & clean | UC-11 | Grow, held tray and Exclude work, but only after a whole-Dataset draw | Built |
+| 7 Analyse | UC-12 | Paths, communities and centrality work and found the ring | Built: *Find something interesting* |
+| 8 Keep & share | UC-13 | Saved views and export exist; next-step text points to Investigations (F-10) | Built: *Save as a case*, *My work* |
+| 9 Come back | UC-14 | Re-import has no UI on Basic | Built: *Add a file*, *Run now*, *What changed in your data* |
 
 ---
 
@@ -147,6 +151,11 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   2. The **Space guide** (H1) stays visible (collapsible) until done: *Space · Data · What the columns hold ·
      First graph · (optional) A list*. Each line opens the step; each tick comes from server state.
 - **Done when:** the user is inside a Space with data, or inside the sample Space.
+- **As built: done.** The front page is **Getting started** while there is no Space or no Dataset: cards **Try it
+  with sample data** (button **Try the sample**), **Use my own data** (**Create a Space**, or **Add data** when a
+  Space exists) and **Open my team's data**; the **Space guide** below them ticks *Space · Data · What the columns
+  hold · First graph · A list (optional)* from server state. The sample is the Basic-safe **`la-sample`** template
+  (Space *Sample: invented data*), not `la-showcase`, which cannot be created on Basic.
 
 ### UC-02 Create a Space (one per data domain)
 
@@ -159,6 +168,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   2. **What kind of data?** Mobile Money · Telecom · Generic (pack). This sets the default Entity Types and
      wording. Three example column names per pack help the user recognise their data.
   3. Create → **Add data to this Space** (UC-03).
+- **As built: done.** With zero Spaces the switcher reads **No Space yet** and offers **New Space…** and **New from
+  sample…** (F-2 fixed). The **Create a Space** dialog asks a **Name** and **What kind of data?** (*Mobile Money*,
+  *Telecom*, *Generic*, each with three example columns), then lands on *Onboard a file*. With sign-in only an
+  administrator may create a Space.
 
 ### UC-03 Add a file of events (transfers, calls, messages)
 
@@ -193,6 +206,13 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **Help:** a running summary ("2,215 transfers between 312 accounts, 1 to 30 Sep 2026; one account receives 32% of
   rows - it may be a merchant"); every proposal says why it was proposed.
 - **Done when:** the Dataset is listed, its Entity Types are assessed, and a graph can be drawn.
+- **As built: done, except row filtering.** The button is **Add data**, the screen **Onboard a file** (route
+  `/add-data`; API `POST /onboard/files`; every edition). Step 1 asks *Events between entities* or *Details about entities*, then **Choose a
+  file**; *Read from a database or a remote system* is locked on Basic. Step 2 marks a low-confidence choice **A
+  guess** with **Confirm**; columns can be renamed, retyped or **Leave out**. Step 4 is **Create and run**. The result
+  offers **Explore in Link Analysis**, **Add details about these entities** and **Add another file**. With sign-in
+  the per-Space switch is **Settings → Add data** (off by default). Not built: no-code row filtering
+  (`LA-ONBOARD-RESIDUALS-1` item 6). An Add data import is shared with its Space (`LA-ONBOARD-DEFECTS-1`).
 
 ### UC-04 Add a Reference file (who the entities are)
 
@@ -206,6 +226,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   changed (a Reference is mutable, GLOSSARY). Joins that build new Datasets inside a Pipeline stay Standard+
   (DATA-TIERS-1 DT-6) and are shown locked.
 - **Help:** "312 accounts described; 295 of them appear in your transfers; 17 do not" (H9).
+- **As built: import done.** *Details about entities* on the same screen asks **Which column identifies each
+  entity?**; a later **Add a file** always replaces a Reference. Not verified on 2026-10-24: whether nodes can be
+  filtered and coloured by the details (the node detail reads Reference rows through `POST /inv/reference-rows`, which
+  predates this work), and the "N of them appear in your transfers" count.
 
 ### UC-05 Use a Dataset that a Pipeline already builds
 
@@ -215,6 +239,9 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   origin and update pattern are not shown in the picker.
 - **Target flow:** the picker shows per Dataset: plain description, rows, time span, last update, "kept up to date
   by a Pipeline" or "one-time import", its primary Entity Type and the others it holds.
+- **As built: partly.** An import's Dataset card says *one-time import* with its last import, and the Start box picks
+  a Dataset that can start a graph. The full per-Dataset picker line (time span, last update, origin, Entity Types) was
+  not verified on 2026-10-24.
 
 ### UC-06 Keep data arriving - **Standard+**
 
@@ -227,6 +254,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   2. A person without the right to configure sees **Ask an administrator to keep this up to date** instead.
   3. Anything beyond that (joins, SQL steps, remote Collectors) is **Open in editor** in the console, pre-filled.
      Inspecto LA never edits Pipelines itself (§8 A-6).
+- **As built: hand-off only.** The Dataset card shows **Keep this up to date** locked on Basic, *Ask an administrator
+  to keep this up to date* with sign-in, and an *Open in editor* hand-off. The automation itself is not built: the
+  import Pipeline uses a manual trigger until DT-17, and no module declares the `pipeline.automation` feature yet
+  (`LA-ONBOARD-RESIDUALS-1` item 3, demand-gated).
 
 ### UC-07 Say what the columns hold (Entity Types)
 
@@ -244,6 +275,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
      data".
 - **Help:** value-shape detection (phone number lengths, IMEI check digit, IBAN pattern, e-mail) with the reason
   shown; "2 columns hold accounts: transfers.from_account, transfers.to_account - they are the same accounts".
+- **As built: done.** The **Entities** page lists only the Entity Types the data holds (the rest folded under **Not in
+  your data**); its **Columns** tab shows each identifier-like column with its Entity Type or **Not set**, with the
+  Dataset's **primary** Entity Type picker beside its name; **New Entity Type** asks a name, an example value and how
+  to compare. Route `PUT /datasets/{id}/columns/{column}`. F-5, F-6 and F-12 fixed.
 
 ### UC-08 Say what a link is
 
@@ -254,6 +289,9 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   **default link mapping**, reused by every start without asking again. Several link kinds from one Dataset are
   allowed (payer → payee; payer → device).
 - **Help:** a 5-row preview drawn as arrows while choosing columns.
+- **As built: mapping done.** The commit saves `defaultLinkMapping {from, to, kind?, time?, amount?, details?}` and
+  `primaryEntityType` on the Dataset entry; Entity profiles and every start read it (F-9 fixed). Not found in the
+  code on 2026-10-24: the 5-row arrow preview, and editing the link mapping later from the Dataset card.
 
 ### UC-09 Choose the focus (one entity or a set)
 
@@ -272,6 +310,12 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   "Investigate" on an Entity profile does the same for that entity.
 - **Help:** "MULE-HUB: 10 links in transfers, first seen 3 Sep, last seen 30 Sep"; chips such as "Start from the 5
   busiest accounts".
+- **As built: done.** The **Start from...** box offers **One entity** (Entity Type first, type-ahead with link
+  counts), **A list**, **A paste** (at most 25 values per start) and **The whole Dataset** (warns above the node cap);
+  the busiest and groups come from *Find something interesting* → **Start from these**. On the Investigations level
+  *One entity* seeds an Investigation (**Purpose / legal basis**, **Investigate**). *Investigate* on an Entity's page
+  starts from that entity (F-7, F-8 fixed). Pending: `LA-EDITION-PLACEMENT-1` (D-LAE4, assistant-decided 2026-10-24,
+  awaiting operator confirmation, not built) would make Entity profile pages Standard and up.
 
 ### UC-10 Keep lists of entities (suspects, watch, exclusion)
 
@@ -287,6 +331,11 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   4. Lists can be a starting set (UC-09) and an exclusion while growing (UC-11).
 - **Help:** after UC-12 centrality, "MERCHANT-BIG has 270 links. Add it to an exclusion list?"; first lists
   suggested from the pack ("Call centres", "Merchants").
+- **As built: mostly.** **Add to a list** on a *Find something interesting* row and **Exclude… → Add to a list…** on
+  the graph write to an existing list of the same Entity Type or a new one; one purpose vocabulary across the Entity
+  Lists page, New list and Add to a list (*Never follow these (exclusion)* …); a list is a start in the Start box;
+  pack-suggested lists come from the Domain Profile. Not verified on 2026-10-24: creating a list from a file column,
+  and the "members that appear in the data" count.
 
 ### UC-11 First graph from a start, then grow and clean
 
@@ -298,6 +347,9 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   held with a reason → **Remove held** or **Expand anyway** → **Exclude** (X) into this view only or a list →
   **Undo** (Ctrl+Z).
 - **Help:** existing first-time hints; a "why is this node here?" line on every node (which row and which step).
+- **As built: done, except the "why is this node here?" line** (not found in the code on 2026-10-24). A start draws
+  one ring; **Grow** (**G**) with preview, the **Held** tray (**Remove held**, **Expand anyway**), **Exclude…** (**X**),
+  the **Hidden** panel and **Undo** (**Ctrl+Z**) follow. The acceptance drive grew from a one-entity start.
 
 ### UC-12 Discover without a starting point
 
@@ -310,6 +362,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   (UC-09), *Add to a list* (UC-10).
 - **Help:** a one-line reading of each result in the pack's words ("Group 2: 9 accounts, money moves in and out
   within 3 days"); never a number without a sentence.
+- **As built: done.** **Find something interesting** sits at the top of Toolbox → **Analysis**: **Who is busiest**,
+  **Which groups stick together**, **How does A reach B**, each row with **Show on graph**, **Start from these**, **Add
+  to a list**. F-10 fixed (no Investigation hint on Basic); F-11 fixed (legend and Working set start as pills below a
+  1000 px canvas).
 
 ### UC-13 Keep and share what was found
 
@@ -320,6 +376,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   summary. With the Investigations LA level **Start an Investigation from this** records the steps from here; with
   the Explorer level (Basic, or an enterprise install without the Investigations add-on, A-14) that action is shown locked with one line on
   what an Investigation adds.
+- **As built: done.** **Save as a case** (the bookmark in the top bar, the former *Save view*) asks a **Name**, names
+  the lists the graph uses and says a case is not evidence; the case appears under **My work**. **Start an
+  Investigation from this** is locked on the Explorer level with one line. Not verified on 2026-10-24: a one-page
+  summary in **Export**.
 
 ### UC-14 Come back later
 
@@ -329,6 +389,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **Target flow:** home shows **My work** (cases: views with their lists, most recent first) and **What changed in
   your data** ("transfers: re-imported 1 Oct, +2,104 rows"). On Basic the Dataset card has **Add a file** and **Run
   now** side by side (DT-5, manual-only; the run also builds the Dataset's link index and evaluates its Expectations, DT-16); a re-import of a one-time Dataset replaces it and says so.
+- **As built: done, with one gap.** The home page shows **My work**: **Cases** (most recent first, with their lists)
+  and **What changed in your data** (*transfers: imported …, +N rows*; a re-import reads *N rows loaded*). The
+  Dataset card has **Add a file** (events: replace or add rows; details: replace) and **Run now**. Gap: *What changed*
+  cannot tell a replace from an append or give the net change (`LA-ONBOARD-RESIDUALS-1` item 7).
 
 ### UC-15 Get help when stuck
 
@@ -345,6 +409,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
      configured and shown locked on Basic (§8 A-9).
   6. Beginner progress is counted locally on every installation (§8 A-10): time from launch to first graph, Space
      guide completion, the step where people stop. Nothing is sent anywhere.
+- **As built: done.** **What can I do next?** (the light bulb in the left menu) on every la-app screen; a **?** beside
+  a product term explains it; locked controls via `inspecto-locked-action` with the reason; onboarding counters in
+  `onboarding-counters.tsv` (`GET /onboarding/metrics`, `POST /onboarding/events`), shown in **Settings → Getting
+  started counters**. "First launch" is the first server start, not the first time a person opened the app.
 
 ---
 
@@ -376,6 +444,10 @@ The 2026-10-22 setup needed about 6 Pipeline concepts and 8 API calls to reach t
 Dataset, and which columns are from, to and which Entity Type). The target is zero Pipeline concepts on Basic.
 
 ## 7. Gaps found in the 2026-10-22 walkthrough
+
+All thirteen were addressed by `LA-ONBOARD-1` and `LA-ONBOARD-FIXES-1` (F-6, F-10, F-11, F-12 in phase 0; F-1, F-2 in
+phase 3; F-3, F-4 by the `/onboard/files` route and the Add data screen; F-5 in phase 5; F-7, F-8 in phase 6; F-9 by
+`defaultLinkMapping`). F-13 is listed in the plan's phase 0 (unknown `/api/…` paths) and was not re-checked here.
 
 | # | Finding | Use case |
 |---|---|---|

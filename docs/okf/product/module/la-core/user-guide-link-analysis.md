@@ -531,7 +531,9 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
 
 * **Settings ▸ Link Analysis** (2026-09-30, `settings/link-analysis-settings.component`): the four-eyes thresholds
   (`fourEyesBudgetAbove`, `fourEyesFanOutAbove`), `mergedDistinctCap` with `mergedDistinctCapInForce`, and
-  `seedByDistinctCap` only when the server reports that key. ⚠ (Superseded 2026-10-15: the numeric limits moved to the limits section of the pane and
+  `seedByDistinctCap` only when the server reports that key. Since 2026-10-24 (`LA-GROW-EXCLUDE-RESIDUALS-1`) the pane
+  warns per live auto-apply category list that would refuse every new Investigation (its Entity Type out of force, or more
+  members than a list op seals), read from the `problem` key of `GET /inv/exclusion-lists`. ⚠ (Superseded 2026-10-15: the numeric limits moved to the limits section of the pane and
   `PUT /settings/link-analysis` now keeps any limit key its body leaves out; see §*Grounded limits*.) `PUT /settings/link-analysis` REPLACES the
   document, so the save sends every other stated key back as read (node caps, masking mode, Entity Types, `maxSetBytes`). `maxSetBytes` (`max_set_bytes`, 2026-10-10) is the per-set size limit of a sealed Working Set, default 64 MiB (`maxSetBytesInForce`), 1 KiB..1 GiB; a step over it is refused `413` naming the limit; it HAS a field in the settings pane (shown only when the server reports the key). Its sibling `maxInvestigationBytes` (`max_investigation_bytes`, 2026-10-10; `maxInvestigationBytesInForce`) is the per-Investigation TOTAL of sealed Working Sets (main plus open Drafts), default 4 GiB, 1 MiB..1 TiB; a write that would take the total over it is refused `413` naming the Investigation, its total and the budget, and it HAS a field in the settings pane ("In force: 4 GiB (4294967296 bytes)"), shown only when the server reports the key.
   2026-10-10 (DR-U3, `LA-UI-SETTINGS-MASKING-1`): the pane also edits `maskingMode` (select typed | all | none, blank = inherit, with `maskingModeInForce`), `index.enabled` (a three-way select: inherit / on / off, worded neutrally because the shipped default is changing) with `threads` 1..64, `queue` 1..1000 and `maxDiskBytes` 0..10^15 (0 = no limit), and the `graphRun` default budget `maxNodes` / `maxEdges` / `timeoutMs` (1..10 000 000 each; in-force value and server ceilings read from `GET /inv/graph/algorithms`, shown as "-" if that route fails). Read only: `entityTypesInForce` (no editor), `indexInForce` and `investigationStoreInForce` (`fs` | `db`, the process-wide `-Dinvestigations.backend`, echoed by the existing GET; not a setting). A save keeps `keepVersions` and the graph-run `threads` / `queue` / `maxResultItems` as read, sends no `*InForce` key, and omits a wholly blank `index` / `graphRun` block. The two selects are disabled (not hidden) without `canAuthorWorkbench`.
@@ -2378,7 +2380,9 @@ say what each column holds and which way a link goes, then **Create and run**. T
 **Explore in Link Analysis** (opens **Start from...** with the Dataset picked, `?dataset=<id>`), **Add details about
 these entities** and **Add another file**; the Dataset card offers **Add a file** and **Run now**. *Keep this up to
 date* and *Read from a database or a remote system* are locked on Basic. With sign-in an administrator turns adding data
-on per Space (**Settings → Add data**) and the caller needs `canUploadData`.
+on per Space (**Settings → Add data**; after a refused change or a failed read it offers **Try again**, which reads the
+setting afresh) and the caller needs `canUploadData`. The la-app **Access** screen shows the role id `pipeline-developer`
+as *Data builder*; the id is unchanged in `roles.toon` and the console (2026-10-24, `LA-ONBOARD-RESIDUALS-1`).
 
 **Entities and Columns.** The **Entities** page lists the Entity Types the Space's data holds (primary types first,
 the rest under **Not in your data**); its **Columns** tab sets what each identifier-like column holds and each

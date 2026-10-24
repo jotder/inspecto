@@ -140,7 +140,11 @@ Inspecto LA (`LA-ONBOARD-1` phase 8, UC-15), all deterministic (no assistant) on
   **Settings → Getting started counters** shows it to administrators, read-only.
 * **Settings → Add data** (This Space): *People may add data in this Space*, the Space's `data.self_import`
   (`GET|PUT /settings/data`). Editable with no sign-in or with `canAdminister`, read-only otherwise; with sign-in it is
-  off until an administrator turns it on, and the locked Add data screen points that administrator here.
+  off until an administrator turns it on, and the locked Add data screen points that administrator here. When the
+  setting cannot be read the section shows the server's message and **Try again**.
+* **Settings → Access** (This Space): what each role may do in this Space (who holds a role is set in the identity
+  provider); changeable with `canConfigureAccess`. Inspecto LA shows the `pipeline-developer` role as **Data builder**
+  (the role id is unchanged and shows when you hover the name).
 
 ### Add data — Onboard a file
 
@@ -808,7 +812,11 @@ person), the merged-traversal cap and the `seedBy` cap. It also shows and, with 
 (whether reads are served from a fresh index, plus its build workers, waiting line and disk budget, and the longest age in hours of an index that may still serve a Dataset whose files cannot be checked for changes - older, the read comes from the Dataset and says so; default 24 hours), the default
 **server graph-run budget** (nodes, edges, time, shown with the server's ceilings) the Draft limits (default: 50 open per Space, hibernate after 60 minutes, expire after 30 days; the `la-showcase` template sets 10, 60 and 14) and the **embed links** (the default and the longest lifetime in hours, 1 to 8760, the default not above the longest, and the classifications that may not be shared by link; the feature itself is OFF unless the host runs with `-Dla.embed.enabled=true`; defaults 72 h and 720 h). Embed links are an API feature only: there is no screen to mint or open one yet. It lists the
 Entity Types in force and names the active Investigation store (filesystem or PostgreSQL) read only. Without the
-capability every field is read only.
+capability every field is read only. Its **Category exclusion lists** part holds the administrator's category lists
+(§5.4). When a list applied to every new Investigation can no longer be applied (its Entity Type is no longer
+in force, or it has more members than a list op may seal, `input.list_members`, default 5,000), Settings warns first:
+*New Investigations are refused* - until that list is fixed or switched off, no Investigation can be created in the
+Space.
 
 ---
 

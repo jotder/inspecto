@@ -1,6 +1,7 @@
 # Inspecto LA (Link Analysis) demo runbook (rehearsable, stakeholder presentation)
 
-*Status: written 2026-10-12 from the code, the seed script and the tests on `origin/master`. A scene marked
+*Status: written 2026-10-12 from the code, the seed script and the tests on `origin/master`; §0 (package flags,
+Spaces, Space Templates, Demo Users) re-checked against `package.ps1`, the seed scripts and `spaces/_templates` on 2026-10-24. A scene marked
 **UNVERIFIED (rehearse first)** has no test or smoke probe behind one of its claims. Rehearse the whole script once
 on the exact bundle you will present, then again the evening before.*
 
@@ -19,8 +20,8 @@ store) are in the [showcase variants runbook](../../solution-pack/la-showcase/ad
 
 | # | Step | Command / action | Expect |
 |---|---|---|---|
-| 1 | Build the bundle | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app` | A demo bundle folder with `serve-demo.bat` / `serve-demo.sh` and `modules.list` naming `inspecto-demo-auth.jar` (not `inspecto-oidc.jar`). `-DemoAuth` accepts only Advanced or Preview. |
-| 2 | Attach the Spaces | From a repo checkout: `node tools/seed-la-showcase.mjs --scaffold <bundle>\spaces` | `scaffolded: _templates, la-showcase, la-showcase-off`. **Bundles ship NO Spaces**; this lays down `la-showcase` (the demo) and `la-showcase-off` (LA switched off, used by the smoke runner's `MODULE_DISABLED` probe). To also show the tracked `demo` Space, copy `spaces\demo` beside them. Do it BEFORE the server starts. |
+| 1 | Build the bundle | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app` | A demo bundle folder (`inspecto-demo\`, zipped as `inspecto-demo-<platform>.zip`) with `serve-demo.bat` / `serve-demo.sh` and `modules.list` naming `inspecto-demo-auth.jar` (not `inspecto-oidc.jar`). `-DemoAuth` accepts only Advanced or Preview. With `-DemoAuth -Ui la-app` the build **bakes** a pre-seeded `la-showcase` Space into the bundle (`package-demo-bake.ps1`; needs `node`; run it from an interactive terminal, see §7); `-NoBakeDemo` skips the bake, and the bundle then ships no Space. `-SkipBootCheck` skips the post-build boot smoke (local only). |
+| 2 | Attach the Spaces | From a repo checkout: `node tools/seed-la-showcase.mjs --scaffold <bundle>\spaces` | `scaffolded: _templates, la-showcase, la-showcase-off`. Needed on a `-NoBakeDemo` bundle (no Spaces); a baked bundle already holds `la-showcase` but not `la-showcase-off`. This lays down `la-showcase` (the demo) and `la-showcase-off` (LA switched off, used by the smoke runner's `MODULE_DISABLED` probe). To also show the tracked `demo` Space, copy `spaces\demo` beside them; for the other showcases see §0.3. Do it BEFORE the server starts. |
 | 3 | Start | `serve-demo.bat` (Windows) or `./serve-demo.sh`; port is 8080, override with the `PORT` env var (`set PORT=8096`). Optional extra JVM flags: `INSPECTO_JAVA_OPTS`. | Banner `[serve-demo] DEMO BUILD on http://127.0.0.1:<PORT>`. Bound to 127.0.0.1 only. |
 | 4 | Wait for the first ingest | The Space ingests `TRANSFERS_20260901..03.csv` from its inbox on boot. | The seed in step 5 retries a 422 "cannot read the columns" up to 30 times (2 s apart) until `mule_transfers_dataset` has rows. |
 | 5 | Seed | `node tools/seed-la-showcase.mjs --base http://127.0.0.1:<PORT> --space la-showcase --apply` (a run without `--apply` is a dry run that prints every call) | Ends with `created: ...`, `already there: ...`, `failed: -`. Safe to re-run. See §0.1. |
@@ -32,7 +33,7 @@ store) are in the [showcase variants runbook](../../solution-pack/la-showcase/ad
 -Devents.backend=parquet -Djobs.backend=duckdb` (from `package.ps1`). The two staged files in `data/staged` are NOT
 ingested until you copy them into the inbox (used live only if you choose the drift scene, S2).
 
-**Rebuilding or re-copying a demo Space: start it empty.** The audit anchor file lives OUTSIDE the config tree, in `<space>\config.secretsudit-anchors.jsonl`. If you re-extract a bundle or copy a Space folder but keep audit event rows older than yesterday while the `.secrets` folder is missing, the anchor roll logs `ERROR AuditAnchors ... the audit anchor file is missing but the chain holds rows from <date>` every 5 minutes and writes nothing. That is deliberate: a deleted anchor file is never silently re-signed. Fix: rebuild the Space with BOTH an empty event store and no `.secrets`, or copy both together. Never delete just the anchor file to silence it.
+**Rebuilding or re-copying a demo Space: start it empty.** The audit anchor file lives OUTSIDE the config tree, in `<space>\config.secrets\audit-anchors.jsonl`. If you re-extract a bundle or copy a Space folder but keep audit event rows older than yesterday while the `.secrets` folder is missing, the anchor roll logs `ERROR AuditAnchors ... the audit anchor file is missing but the chain holds rows from <date>` every 5 minutes and writes nothing. That is deliberate: a deleted anchor file is never silently re-signed. Fix: rebuild the Space with BOTH an empty event store and no `.secrets`, or copy both together. Never delete just the anchor file to silence it.
 
 ### 0.1 What the seed creates (read from `tools/seed-la-showcase.mjs`, not guessed)
 
@@ -62,6 +63,23 @@ ingested until you copy them into the inbox (used live only if you choose the dr
 | `fm.manager` | Second approver | `canManageIncidents`, `canWorkIncidents`, `canApproveLinkExpansions`, `canOperateRuns` |
 | `ra.analyst` | Reviewer, read-only | none (`la-viewer`) |
 | `demo.manager` | Not a member | none (`la-viewer`) |
+
+### 0.3 Other Spaces and Space Templates
+
+`spaces/_templates/` ships the LA Space Templates below; the three vertical showcases have their own seed script and
+runbook and were rehearsed together on one Demo Auth bundle on 2026-10-24 (`LA-SHOWCASE-REHEARSAL-1`; open defects
+`LA-SEED-FIRST-RUN-1`, `LA-DEMO-PICKER-NAMES-1` on the board). A Demo User id must mean the same person in every
+served Space (see "if it goes wrong" below).
+
+| Template | Use | Lay down / seed | Demo Users (`config/demo-users.toon`) |
+|---|---|---|---|
+| `la-showcase` | this runbook | `tools/seed-la-showcase.mjs` | `admin`, `fm.analyst`, `fm.manager`, `ra.analyst`, `demo.manager` |
+| `la-showcase-off` | smoke `MODULE_DISABLED` probe | laid down with `la-showcase` | same roster as `la-showcase` |
+| `la-mobile-money` | [mobile-money runbook](../../solution-pack/la-mobile-money/admin-guide-showcase-runbook.md) | `tools/seed-la-mm.mjs --scaffold` / `--apply` | `admin`, `mm.analyst`, `mm.manager`, `mm.reviewer`, `mm.outsider` |
+| `la-audit` | [audit runbook](../../solution-pack/la-audit/admin-guide-showcase-runbook.md) | `tools/seed-la-audit.mjs --scaffold` / `--apply` | `audit.admin`, `audit.lead`, `audit.manager`, `audit.committee`, `audit.outsider` |
+| `la-claims` | [claims runbook](../../solution-pack/la-claims/admin-guide-showcase-runbook.md) | `tools/seed-la-claims.mjs --scaffold` / `--apply` | `admin`, `siu.analyst`, `siu.manager`, `partner.reviewer`, `outsider` |
+| `la-daily-feed` | the reusable daily-feed shape (one telecom XDR CSV per UTC day; Pipeline, Collector, Dataset, freshness and index-lag Alert Rules, `la_index_build` Job); no persona demo | copy a sample day from `data/samples` into `data/inbox/daily_xdr` | none |
+| `la-sample` | first-run sample of *Getting started* (every edition, no personas, no Jobs) | created by the app: `POST /spaces {template: "la-sample", loadSamples: true}` | none |
 
 ## 1. Day-of checklist
 

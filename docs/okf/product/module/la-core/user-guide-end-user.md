@@ -264,7 +264,8 @@ a node you have not expanded yet. **Undo** and **Redo** step through display and
 
 * **Grow** (or press **G**) adds the next ring of linked numbers. It opens on safe defaults — both ways, one step,
   busy numbers held — and tells you what the step would add before anything changes. Press **Grow**, or **Cancel**.
-  After it, one line says what happened, with **Undo** (or **Ctrl+Z**).
+  After it, one line says what happened, with **Undo** (or **Ctrl+Z**). In a shared Investigation, Undo takes back
+  only the step it names: if a colleague recorded a newer step meanwhile, nothing is undone and the log shows theirs.
 * **Busy numbers** — call centres, switchboards, shops — link to thousands of others and hide the real links. Grow
   holds them: they stay on the graph with a ring and a *held* badge, listed in the **Held** tray. **Remove held**
   takes them all out in one step; **Expand anyway** grows through one of them.

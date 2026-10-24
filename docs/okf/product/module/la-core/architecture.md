@@ -1162,6 +1162,11 @@ limits and the commit's write order are in
   `index:{result, edges, nodes}`.
 - **Change a column's Entity Type later:** `PUT /datasets/{id}/columns/{column}` (`canAuthorWorkbench`, edit access
   to the Dataset). The profile cache keys on the binding signature, so the next read re-assesses.
+- **Deleting an Add data Dataset retires its import Pipeline** (`LA-ONBOARD-ORPHAN-PIPELINE-1`, `LA-ONBOARD-RETIRE-GAPS-1`).
+  `DELETE /components/dataset/{id}` claims the retirement (`OnboardImport.claimRetirement`) and retires BEFORE the entry
+  is removed: the Pipeline is unregistered and its config, schema and config history removed (the data directory is
+  kept); the step is idempotent and the Pipeline file goes last, so a failed delete is simply retried. The response then
+  carries `retiredPipeline`. Detail: [`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md).
 - **Not built here:** the screens (phase 4), the Start box reading `primaryEntityType` (phase 6), Reference details
   on nodes (phase 5), and the C1 format detections (another session).
 
@@ -1312,8 +1317,8 @@ Calls marked * were assistant-decided under operator delegation, pending confirm
 
 ## 7. Host registration, Jobs and live detection
 
-* **ServiceLoader files:** la-api → `RouteModule` (21); geo-link → `RouteModule`, `InvestigationMeasureProbe`,
-  `CasePort`, `CollectorCoveragePort`, `DatasetProvider`, `LinkIndexBuilder`; la-store-pg →
+* **ServiceLoader files:** la-api → `RouteModule` (27); geo-link → `RouteModule` (4), `InvestigationMeasureProbe`,
+  `CasePort`, `CollectorCoveragePort`, `DatasetProvider`, `OutboundPort`, `UploadLandingPort`, `LinkIndexBuilder`; la-store-pg →
   `InvestigationStoreProvider`.
 * **Host wiring:** `CollectorService` registers Platform Service `link-index` and wires the alerting Investigation
   probe; `JobService` registers Job types `la.detect` (needs `alerts`) and `la.index.build` (needs `link-index`),
@@ -1338,6 +1343,9 @@ Edition names per `LA-EDITIONS-1` ED-2 (2026-10-17; formerly Personal / Professi
 |---|---|---|---|---|
 | la-core, la-storage, la-api, geo-link, entity-list (the **explorer**) | ✓ | ✓ | ✓ | ✓ |
 | Investigation surface (`investigations` edition feature, declared by `inspecto-ops`, AND the Investigations add-on held) | — (503) | ✓ by default | ✓ by default | ✓ by default |
+| Geo map, routes and co-location (`geoMap` route feature on `GeoRoutes`, declared by `inspecto-ops`; D-LAE5) | — (503) | ✓ | ✓ | ✓ |
+| Link analysis and Geo map Widget types (`laWidgets`, a `/bootstrap` UI flag only; D-LAE2) | hidden | ✓ | ✓ | ✓ |
+| Case history beside a node (`CaseHistoryRoutes`, `investigations`; D-LAE1) | — (503) | ✓ | ✓ | ✓ |
 | Sign-in (`inspecto-oidc`; Preview: demo sign-in) | — | ✓ | ✓ | ✓ |
 | la-store-pg (Postgres Investigations) | — | — | ✓ | ✓ |
 | D-E7 PDP (`providers/inspecto-policy`) | — | — | ✓ | ✓ |
@@ -1353,8 +1361,12 @@ every bundle. The Investigation surface is the set of route modules whose `featu
 answers each of them `503 CAPABILITY_UNAVAILABLE` "… available in Standard and above" at dispatch
 (`ControlApi.requireModuleEnabled` → `EditionFeatures.gatesRoutes`) when no installed module declares
 `EditionFeatures.INVESTIGATIONS`; only `inspecto-ops` (`OpsEditionFeatures`) does. The explorer route modules
-(`InvRoutes`, `GeoRoutes`, `PatternRoutes`, `ValueMeasureRoutes`, `EntityIdentityRoutes`, `EntityProfileRoutes`) own
-`geoLink` only and answer with no sign-in. `/bootstrap` reports `features.investigations` (false on Basic), `laLevel` and
+(`InvRoutes`, `PatternRoutes`, `ValueMeasureRoutes`, `EntityIdentityRoutes`, `EntityProfileRoutes`,
+`ExclusionListRoutes`) own `geoLink` only and answer with no sign-in. `GeoRoutes` names `geoLink` and `geoMap`
+(D-LAE5, 2026-10-20): Basic answers `POST /geo/projection` and `POST /geo/routes` 503 `CAPABILITY_UNAVAILABLE` while
+the other Link Analysis modules stay up; `/bootstrap` reports `features.geoMap`, and the console nav, the LA app Geo
+area and the Menu Builder Geo view key on it. `laWidgets` (D-LAE2) only hides the Link analysis and Geo map Widget
+types in the Widget builder on Basic; their routes stay open. `/bootstrap` reports `features.investigations` (false on Basic), `laLevel` and
 `featureReasons` (below). Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
 
 **Trust vs level (`LA-ONBOARD-1` phase 1, 2026-10-22; OB-5, OB-6, OB-10).** Three axes are kept apart: the EDITION decides who
