@@ -357,7 +357,9 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
 ```
 
 * **Every proposed choice is `{value, evidence, confidence}`**. OF-2: `high` when every sampled value agrees and
-  the sample has at least 50 non-blank values (`OnboardDraft.MIN_SAMPLE`), `low` otherwise. A choice the user
+  the sample has at least 50 non-blank values (`OnboardDraft.MIN_SAMPLE`), `low` otherwise. ⚠ **Operator 2026-10-25 changed OF-2
+  to 200 non-blank values; the constant is still 50 (not yet built)**: raise `MIN_SAMPLE`, and the fixtures that rely on
+  50-199 row samples in `ControlApiOnboardFilesTest` and `ControlApiOnboardLinkAnalysisTest`. A choice the user
   stated (`?delimiter=` on a re-draft) is `high` by definition. The sample is the first 1,000 rows.
 * `format` is the extension point of slice C1 (file-name dates, decimal mark, nested-JSON record path): add a key
   and keep the choice shape. A column's date or time format rides its `type` choice (`format`, the strptime

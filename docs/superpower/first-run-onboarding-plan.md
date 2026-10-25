@@ -1,7 +1,7 @@
 # Console first-run onboarding: from a blank install to a queryable Dataset (`ONBOARDING-FIRST-RUN-1`)
 
-**Status: PLAN 2026-10-22 for operator review — nothing built.** The direction is decided (§2, operator
-2026-10-22); the open decisions OF-1…OF-3 (§7) need answers before their slices start. When a slice ships, distil
+**Status: PLAN 2026-10-22, every decision answered (OF-1…OF-3 on 2026-10-25) — nothing built.** The direction is decided (§2, operator
+2026-10-22); the decisions OF-1…OF-3 (§7) were answered 2026-10-25. When a slice ships, distil
 the as-built facts into the product hubs (`layer/product`, `module/etl`, `module/processor`), close its board rows,
 and archive this file when the last slice ships.
 
@@ -83,7 +83,7 @@ Counted by `LA-ONBOARD-1`'s onboarding counters (its OB-13): always on, local, n
 - **Add data** is the same screen as Inspecto LA's (`LA-ONBOARD-1` phase 4): choose the file → check the columns
   (pre-applied, with evidence; no-code shaping, DT-7) → what the columns hold (optional in the console; the
   primary entity per A-7) → name and create (runs once) → land on the Dataset page (B4). Whether this is one
-  component shared by both apps is OF-1 (recommended: yes).
+  component shared by both apps is OF-1 (answered: yes, one component).
 - **Expert path.** *Open in editor* on the review screen and on the Dataset page opens the import's Pipeline in the
   guided editor (an ordinary Pipeline marked `origin: import`, `LA-ONBOARD-1` OB-3). The Catalog's *Onboard
   Stream / Reference* dialog stays as the advanced start (OF-3).
@@ -173,9 +173,9 @@ plan's proposals.
 
 | # | Decision | Recommendation |
 |---|---|---|
-| OF-1 | One Add data component for the console and Inspecto LA, or one each | **One**, in the code both apps already share (the console imports from `projects/link-analysis` today), built in `LA-ONBOARD-1` phase 4; the console passes "what the columns hold" as optional |
-| OF-2 | The confidence rule for pre-applied choices | High when every sampled value agrees and the sample has at least 50 non-blank values; low otherwise; low is highlighted and confirm-gated. Proposed to `LA-ONBOARD-1` so both UIs use one rule |
-| OF-3 | Does Add data replace the Catalog's *Onboard Stream / Reference* dialog | No: Add data is the primary start; the dialog stays as the advanced start next to *Open in editor*, for authors who want every stage from the outset |
+| OF-1 | One Add data component for the console and Inspecto LA, or one each | **ANSWERED 2026-10-25 (operator, recommendation accepted): one**, in the code both apps already share (the console imports from `projects/link-analysis` today), built in `LA-ONBOARD-1` phase 4; the console passes "what the columns hold" as optional |
+| OF-2 | The confidence rule for pre-applied choices | **ANSWERED 2026-10-25 (operator, CHANGED from the proposed 50): high when every sampled value agrees and the sample has at least 200 non-blank values; low otherwise**; low is highlighted and confirm-gated (more confirmations on small files, fewer wrong guesses applied). One rule for both UIs, proposed to `LA-ONBOARD-1` (its Add data screen must use 200, not 50) |
+| OF-3 | Does Add data replace the Catalog's *Onboard Stream / Reference* dialog | **ANSWERED 2026-10-25 (operator, recommendation accepted): no** - Add data is the primary start; the dialog stays as the advanced start next to *Open in editor*, for authors who want every stage from the outset |
 
 **Settled elsewhere, not reopened here:** one import route (`LA-ONBOARD-1` OB-2); the Dataset is registered by a
 commit that leaves nothing behind when it fails (OB-2); Excel (DT-8); measures (A-10, OB-13); the walkthrough fixes

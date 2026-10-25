@@ -162,7 +162,15 @@ shift gets the identical environment.
   locating) or `backend-explorer` / `frontend-explorer`; builds/tests → `verify-runner`. Never parse
   full Maven/npm logs in the main thread.
 - **Parallel forks:** independent research questions = multiple forks/agents launched in a single
-  message, one per question — not sequential searches.
+  message, one per question — not sequential searches (but see the agent budget below).
+- **Agent budget (operator, 2026-10-25 — session-usage limit).** Every agent re-loads CLAUDE.md plus the
+  tool and skill lists (about 40–50k tokens) before it reads a file, and the first three exploration agents
+  of one session used about 211k tokens: a launch costs more than most lookups. (1) A single-fact lookup is
+  one CodeGraph/grep call in the main thread, never an agent. (2) Do not launch exploration agents at session
+  start or before the operator's first concrete ask. (3) At most 3 agents at once. (4) Locate-only work passes
+  `model: "haiku"`. (5) A verification agent runs once per non-trivial lane; a re-verification is scoped to the
+  findings it raised, not a re-run of everything. (6) When the operator caps usage: targeted tests only, and
+  say in every report that the full gate was NOT run.
 - Reserve the strongest model + extended thinking ("think hard") for architecture and design
   decisions; routine edits and mechanical refactors don't need it.
 - Big specs/docs go into `docs/` files and are referenced by path — never pasted inline into prompts.
