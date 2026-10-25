@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { apiUrl } from './api-base';
+import { ShortReads } from './short-reads';
 import { Finding } from './models';
 
 /** The reusable component-registry kinds (mirrors backend `ComponentStore.WRITABLE_TYPES`). `rule-template`
@@ -206,10 +207,13 @@ export type ParserPreview = ParserTablePreview | ParserTreePreview;
 @Injectable({ providedIn: 'root' })
 export class ComponentsService {
     private http = inject(HttpClient);
+    private reads = inject(ShortReads);
 
     /** Components of one kind (empty when no write root is configured). */
     list(type: ComponentType): Observable<ComponentDef[]> {
-        return this.http.get<ComponentDef[]>(apiUrl(`/components/${type}`));
+        // N5: the Space guide and My work list the same kinds back to back - one read (per user and Space).
+        const url = apiUrl(`/components/${type}`);
+        return this.reads.read(url, () => this.http.get<ComponentDef[]>(url));
     }
 
     /** One component by kind/id. */
@@ -219,7 +223,7 @@ export class ComponentsService {
 
     /** Create a component (write-root gated). `content` must include the `id`. 503/409/422 on failure. */
     create(type: ComponentType, content: Record<string, unknown>): Observable<ComponentDef> {
-        return this.http.post<ComponentDef>(apiUrl(`/components/${type}`), content);
+        return this.http.post<ComponentDef>(apiUrl(`/components/${type}`), content).pipe(tap(() => this.reads.clear()));
     }
 
     /**
@@ -245,15 +249,19 @@ export class ComponentsService {
         content: Record<string, unknown>,
         opts?: { ifMatch?: string; compatibility?: 'none' },
     ): Observable<ComponentDef> {
-        return this.http.put<ComponentDef>(apiUrl(`/components/${type}/${encodeURIComponent(id)}`), content, {
-            ...(opts?.compatibility ? { params: { compatibility: opts.compatibility } } : {}),
-            ...(opts?.ifMatch ? { headers: { 'If-Match': `"sha256:${opts.ifMatch}"` } } : {}),
-        });
+        return this.http
+            .put<ComponentDef>(apiUrl(`/components/${type}/${encodeURIComponent(id)}`), content, {
+                ...(opts?.compatibility ? { params: { compatibility: opts.compatibility } } : {}),
+                ...(opts?.ifMatch ? { headers: { 'If-Match': `"sha256:${opts.ifMatch}"` } } : {}),
+            })
+            .pipe(tap(() => this.reads.clear()));
     }
 
     /** Delete a component (write-root gated). 503/404/409 (in use) on failure. */
     remove(type: ComponentType, id: string): Observable<unknown> {
-        return this.http.delete(apiUrl(`/components/${type}/${encodeURIComponent(id)}`));
+        return this.http
+            .delete(apiUrl(`/components/${type}/${encodeURIComponent(id)}`))
+            .pipe(tap(() => this.reads.clear()));
     }
 
     /** Prior saved copies of a component, newest first (MET-5). Empty when none / writes disabled. */

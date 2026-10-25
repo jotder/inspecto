@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { recordReturnUrl, returnKeyForState, safeReturnUrl, takePendingReturnUrl } from './return-url';
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
+import { ShortReads } from '../api/short-reads';
 import { SpacesService } from '../api/spaces.service';
 import { catchError, firstValueFrom, map, Observable, of, tap } from 'rxjs';
 import { APP_ENVIRONMENT } from '../api/app-environment';
@@ -111,6 +112,8 @@ export class SessionService {
     private capabilitiesSpace: string | null = null;
 
     constructor() {
+        // N5: a read answer is replayed only to the user (access token) it was read for.
+        inject(ShortReads).bindUser(() => this.accessToken() ?? '');
         // D3: capabilities are per-Space grants and the unscoped `/bootstrap` is Space-agnostic (empty for a
         // Space-granted subject), so a Space switch that does not reload the page must re-read them.
         effect(() => {
@@ -547,11 +550,7 @@ export class SessionService {
             .get<Bootstrap>(apiUrl('/bootstrap'))
             .pipe(catchError((e: unknown) => this.bootstrapFailed(e)));
         const boot = await firstValueFrom(
-            space
-                ? this.http
-                      .get<Bootstrap>(apiUrl(`/spaces/${encodeURIComponent(space)}/bootstrap`))
-                      .pipe(catchError(() => unscoped))
-                : unscoped,
+            space ? this.spaces.spaceBootstrap<Bootstrap>(space).pipe(catchError(() => unscoped)) : unscoped,
         );
         // An unread session is not a signed-in one: `?? true` held only for a payload that omits the slice.
         const authenticated = this.bootstrapError() === null && (boot.session?.authenticated ?? true);

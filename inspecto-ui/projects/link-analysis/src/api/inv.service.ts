@@ -5,6 +5,7 @@ import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
 import { SessionService, SpacesService } from '@inspecto/core/api';
 import { ConditionalReadCache } from './conditional-read-cache';
 import { apiUrl, toParams } from '@inspecto/core/api/api-base';
+import { ShortReads } from '@inspecto/core/api/short-reads';
 import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import type { BranchStage } from '@inspecto/core/graph/branching-stage';
 import type { EntityTypeRef } from '@inspecto/core/graph/entity-key';
@@ -1702,6 +1703,7 @@ export const STRICT_QUERY_CODEC: HttpParameterCodec = {
 @Injectable({ providedIn: 'root' })
 export class InvService {
     private http = inject(HttpClient);
+    private shortReads = inject(ShortReads);
 
     /** DR-D2: the masking the last exploration read was served under — what the "Masking: …" badge shows. */
     readonly masking = signal<MaskingNote | null>(null);
@@ -2115,7 +2117,10 @@ export class InvService {
     // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──
 
     listEntityLists(): Observable<EntityListIndex> {
-        return this.http.get<EntityListIndex>(apiUrl('/entity-lists'));
+        // N5: the Space guide reads the same index a moment before My work does - one call (see ShortReads).
+        return this.shortReads.read(apiUrl('/entity-lists'), () =>
+            this.http.get<EntityListIndex>(apiUrl('/entity-lists')),
+        );
     }
 
     /** `at` pins the read to a fact-log position: beyond the head → 422; the list did not exist yet → 404. */
@@ -2124,7 +2129,9 @@ export class InvService {
     }
 
     createEntityList(req: EntityListCreateRequest): Observable<EntityListDetail> {
-        return this.http.post<EntityListDetail>(apiUrl('/entity-lists'), req);
+        return this.http
+            .post<EntityListDetail>(apiUrl('/entity-lists'), req)
+            .pipe(tap(() => this.shortReads.clear()));
     }
 
     /** A retired list → 409. */

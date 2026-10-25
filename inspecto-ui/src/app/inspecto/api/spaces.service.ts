@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
+import { catchError, concatMap, first, forkJoin, from, map, Observable, of, switchMap, tap } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
+import { ShortReads } from './short-reads';
 
 /**
  * A hosted space (project) manifest — GET /spaces returns these (camelCase, server-side).
@@ -147,6 +148,7 @@ export const SPACE_STORAGE_KEY = STORAGE_KEY;
 @Injectable({ providedIn: 'root' })
 export class SpacesService {
     private http = inject(HttpClient);
+    private reads = inject(ShortReads);
 
     /** Every hosted space's manifest (sorted by id, server-side). */
     readonly availableSpaces = signal<Space[]>([]);
@@ -162,12 +164,21 @@ export class SpacesService {
     /** Show the switcher only on a multi-space server that has spaces to switch between. */
     readonly showSwitcher = computed(() => this.multiSpace() && this.availableSpaces().length > 0);
 
+    constructor() {
+        this.reads.bindSpace(() => this.currentSpaceId() ?? '');
+    }
+
     /**
      * Load the capability flag + space list and reconcile the active selection: keep a still-valid
      * saved id, otherwise fall back to `default` (if present) or the first space; clear it entirely on a
      * single-tenant server. Degrades to single-tenant on any error so the rest of the app keeps working.
      */
     refresh(): Observable<Space[]> {
+        // N5: the shell's switcher and the landing both refresh at once - one pair of reads, not two (global URLs).
+        return this.reads.read('spaces:refresh', () => this.loadAndReconcile(), false);
+    }
+
+    private loadAndReconcile(): Observable<Space[]> {
         return forkJoin({
             meta: this.http
                 .get<{ multiSpace: boolean }>(apiUrl('/spaces/_meta'))
@@ -211,7 +222,7 @@ export class SpacesService {
 
     /** Create + boot a space (multi-space servers only). 400 bad id, 409 dup / single-tenant. */
     create(req: CreateSpaceRequest): Observable<Space> {
-        return this.http.post<Space>(apiUrl('/spaces'), req);
+        return this.http.post<Space>(apiUrl('/spaces'), req).pipe(tap(() => this.reads.clear()));
     }
 
     /**
@@ -223,12 +234,14 @@ export class SpacesService {
             baseId,
             this.availableSpaces().map((s) => s.id),
         );
-        return this.http.post<SampleSpace>(apiUrl('/spaces'), {
-            id,
-            display_name: displayName,
-            template,
-            loadSamples: true,
-        } satisfies CreateSpaceRequest);
+        return this.http
+            .post<SampleSpace>(apiUrl('/spaces'), {
+                id,
+                display_name: displayName,
+                template,
+                loadSamples: true,
+            } satisfies CreateSpaceRequest)
+            .pipe(tap(() => this.reads.clear()));
     }
 
     /**
@@ -236,14 +249,18 @@ export class SpacesService {
      * Addressed to the named Space, so it works for a Space just created and not yet active.
      */
     setDomainProfile(spaceId: string, domainProfile: string | null): Observable<unknown> {
-        return this.http.put(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/settings/link-analysis/domain-profile`), {
-            domainProfile,
-        });
+        return this.http
+            .put(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/settings/link-analysis/domain-profile`), {
+                domainProfile,
+            })
+            .pipe(tap(() => this.reads.clear()));
     }
 
     /** Update a space's display name / description (the id/folder is immutable). 400 for `default`, 404 unknown. */
     update(id: string, patch: { display_name?: string; description?: string }): Observable<Space> {
-        return this.http.put<Space>(apiUrl(`/spaces/${encodeURIComponent(id)}`), patch);
+        return this.http
+            .put<Space>(apiUrl(`/spaces/${encodeURIComponent(id)}`), patch)
+            .pipe(tap(() => this.reads.clear()));
     }
 
     /** The Space-Template catalog (blueprint bundles "New space from template" instantiates). */
@@ -253,17 +270,21 @@ export class SpacesService {
 
     /** Deregister + drain a space; `purge` also deletes its files. 404 unknown, 409 single-tenant. */
     remove(id: string, purge: boolean): Observable<DeleteSpaceResult> {
-        return this.http.delete<DeleteSpaceResult>(apiUrl(`/spaces/${encodeURIComponent(id)}`), {
-            params: toParams({ purge: purge ? 'true' : '' }),
-        });
+        return this.http
+            .delete<DeleteSpaceResult>(apiUrl(`/spaces/${encodeURIComponent(id)}`), {
+                params: toParams({ purge: purge ? 'true' : '' }),
+            })
+            .pipe(tap(() => this.reads.clear()));
     }
 
     /** Create + boot a brand-new space seeded from a bundle zip (server-global). 400 bad id/bundle, 409 dup. */
     createFromBundle(id: string, zip: Blob): Observable<Space> {
-        return this.http.post<Space>(apiUrl('/spaces/import'), zip, {
-            params: toParams({ id }),
-            headers: { 'Content-Type': 'application/zip' },
-        });
+        return this.http
+            .post<Space>(apiUrl('/spaces/import'), zip, {
+                params: toParams({ id }),
+                headers: { 'Content-Type': 'application/zip' },
+            })
+            .pipe(tap(() => this.reads.clear()));
     }
 
     // ── per-space data sources + export/import (/spaces/{id}/…) ───────────────────
@@ -297,10 +318,12 @@ export class SpacesService {
 
     /** Import a bundle into an existing space. 409 {error, conflicts} unless `overwrite`. */
     importBundle(spaceId: string, zip: Blob, overwrite: boolean): Observable<BundleImportResult> {
-        return this.http.post<BundleImportResult>(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/import`), zip, {
-            params: toParams({ on_conflict: overwrite ? 'overwrite' : '' }),
-            headers: { 'Content-Type': 'application/zip' },
-        });
+        return this.http
+            .post<BundleImportResult>(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/import`), zip, {
+                params: toParams({ on_conflict: overwrite ? 'overwrite' : '' }),
+                headers: { 'Content-Type': 'application/zip' },
+            })
+            .pipe(tap(() => this.reads.clear()));
     }
 
     // ── internals ─────────────────────────────────────────────────────────────────
@@ -319,15 +342,26 @@ export class SpacesService {
         const saved = this.currentSpaceId();
         if (!multiSpace || (saved && spaces.some((s) => s.id === saved))) return of(null);
         if (spaces.length < 2 || spaces.some((s) => s.id === 'default')) return of(null);
-        const probes = spaces.slice(0, 12).map((s) =>
-            this.http
-                .get<{ session?: { capabilities?: string[] } }>(apiUrl(`/spaces/${encodeURIComponent(s.id)}/bootstrap`))
-                .pipe(
-                    map((b) => (b.session?.capabilities?.length ?? 0) > 0),
-                    catchError(() => of(false)),
+        // N5: one Space at a time, in order, stopping at the first the subject holds anything in - the other Spaces'
+        // bootstraps (about 78 KB each) are not read at all. The current Space's read is shared with the session's.
+        return from(spaces.slice(0, 12)).pipe(
+            concatMap((s) =>
+                this.spaceBootstrap<{ session?: { capabilities?: string[] } }>(s.id).pipe(
+                    map((b) => ((b.session?.capabilities?.length ?? 0) > 0 ? s.id : null)),
+                    catchError(() => of(null)),
                 ),
+            ),
+            first((id) => id !== null, null),
         );
-        return forkJoin(probes).pipe(map((held) => spaces[held.findIndex(Boolean)]?.id ?? null));
+    }
+
+    /**
+     * One Space's own `GET /spaces/{id}/bootstrap`, shared between the D7 probe and the session's capability read.
+     * The URL names its Space, so the answer does not depend on the active one (it does on the user).
+     */
+    spaceBootstrap<T>(id: string): Observable<T> {
+        const url = apiUrl(`/spaces/${encodeURIComponent(id)}/bootstrap`);
+        return this.reads.read(url, () => this.http.get<T>(url), false);
     }
 
     private reconcile(multiSpace: boolean, spaces: Space[], preferred: string | null = null): void {

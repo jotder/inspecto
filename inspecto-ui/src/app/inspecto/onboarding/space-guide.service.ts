@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { apiUrl } from '../api/api-base';
 import { ComponentDef, ComponentsService } from '../api/components.service';
+import { ShortReads } from '../api/short-reads';
 import { SpacesService } from '../api/spaces.service';
 import { datasetDescribesColumns, NO_SPACE, SpaceGuideState } from './space-guide';
 
@@ -17,6 +18,7 @@ export class SpaceGuideService {
     private readonly http = inject(HttpClient);
     private readonly spaces = inject(SpacesService);
     private readonly components = inject(ComponentsService);
+    private readonly reads = inject(ShortReads);
 
     load(): Observable<SpaceGuideState> {
         return this.spaces.refresh().pipe(
@@ -32,10 +34,14 @@ export class SpaceGuideService {
                 return forkJoin({
                     datasets: list('dataset'),
                     views: list('link-analysis-view'),
-                    lists: this.http.get<{ lists?: unknown[] }>(apiUrl('/entity-lists')).pipe(
-                        map((r) => (Array.isArray(r?.lists) ? r.lists.length : 0)),
-                        catchError(() => of(0)),
-                    ),
+                    lists: this.reads
+                        .read(apiUrl('/entity-lists'), () =>
+                            this.http.get<{ lists?: unknown[] }>(apiUrl('/entity-lists')),
+                        )
+                        .pipe(
+                            map((r) => (Array.isArray(r?.lists) ? r.lists.length : 0)),
+                            catchError(() => of(0)),
+                        ),
                 }).pipe(
                     map(
                         ({ datasets, views, lists }): SpaceGuideState => ({
