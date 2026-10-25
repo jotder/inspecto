@@ -136,6 +136,9 @@ final class BootstrapRoutes implements RouteModule {
         // LA-EDITIONS-PLACEMENT-1 D-LAE5: the Geo map, routes and co-location have their OWN edition feature (never geoLink, which every
         // Link Analysis module shares): false on Basic, where POST /geo/projection and /geo/routes answer 503. The SPA nav keys on it.
         f.put("geoMap", on.contains("geoMap"));
+        // D-LAE4: the Entity profile pages, a route feature of their own (EntityPageRoutes): false on Basic, where the two profile GETs
+        // answer 503. The SPA nav and the LA app Entities area key on it.
+        f.put("entityPages", on.contains("entityPages"));
         // D-LAE2: Link Analysis widgets on dashboards - a UI flag ONLY (no route is gated by it: the projection routes the widgets call
         // stay open on Basic). False on Basic and wherever Link Analysis is absent or switched off in this Space.
         f.put("laWidgets", on.contains("geoLink") && com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.LA_WIDGETS));

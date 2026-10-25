@@ -46,8 +46,7 @@ public final class EntityProfileRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/inv/entity-types", (e, m) -> list(api, e));
-        api.get("/inv/entity-types/([^/]+)/profile", (e, m) -> typeProfile(api, e, m.group(1)));
-        api.get("/inv/entities/([^/]+)/([^/]+)/profile", (e, m) -> entityProfile(api, e, m.group(1), m.group(2)));
+        // the two profile GETs are registered by EntityPageRoutes, under the entityPages edition feature (D-LAE4)
         api.post("/inv/entities/([^/]+)/resolve", (e, m) -> resolve(api, e, m.group(1), api.body(e)));
         api.post("/inv/entities/([^/]+)/suggest", (e, m) -> suggest(api, e, m.group(1), api.body(e)));
     }
@@ -126,7 +125,7 @@ public final class EntityProfileRoutes implements RouteModule {
         return Map.of("items", items);
     }
 
-    private static Object typeProfile(ApiContext api, HttpExchange ex, String id) {
+    static Object typeProfile(ApiContext api, HttpExchange ex, String id) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity type profile");
         List<String> sections = sections(ApiContext.query(ex, "sections"));
         EntityProfiles.Frame f = frame(api, ex, writeRoot, id);
@@ -169,7 +168,7 @@ public final class EntityProfileRoutes implements RouteModule {
      * value is refused 422 BEFORE anything is read, pointing at {@code POST /inv/entities/{type}/resolve}, so a raw identifier
      * is never looked up through a URL (operator 2026-10-15: never in a URL or a log). The refusal never repeats the key.
      */
-    private static Object entityProfile(ApiContext api, HttpExchange ex, String type, String urlKey) {
+    static Object entityProfile(ApiContext api, HttpExchange ex, String type, String urlKey) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity profile");
         EntityTypes.EntityType t = type(writeRoot, type);
         String mode = LinkAnalysisSettings.forRoot(writeRoot).effectiveMaskingMode();

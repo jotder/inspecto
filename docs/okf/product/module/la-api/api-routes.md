@@ -20,7 +20,7 @@ tags: [api, routes, generated]
 | POST | `/inv/case-history` | The Incidents and Cases referencing one Entity, for a key that may be a masking alias | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/CaseHistoryRoutes.java` |
 | GET | `/inv/datasets/{datasetId}/files` | List the Files recorded towards a Dataset, with each File's index state | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DatasetFilesRoutes.java` |
 | POST | `/inv/deep-links/resolve` | Validate an Open in Inspecto LA link's parameters | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java` |
-| GET | `/inv/entities/{entityType}/{entityKey}/profile` | Read one Entity's profile by raw value or exploration alias | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
+| GET | `/inv/entities/{entityType}/{entityKey}/profile` | Read one Entity's profile by raw value or exploration alias | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityPageRoutes.java` |
 | POST | `/inv/entities/{entityType}/resolve` | Resolve a raw value or an alias to the key an Entity profile URL takes | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
 | POST | `/inv/entities/{entityType}/suggest` | List the values of an Entity Type that start a graph (the Start box type-ahead) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
 | GET | `/inv/entity-identities` | GET /inv/entity-identities (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java` |
@@ -29,7 +29,7 @@ tags: [api, routes, generated]
 | GET | `/inv/entity-identities/group` | GET /inv/entity-identities/group (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java` |
 | POST | `/inv/entity-identities/import` | POST /inv/entity-identities/import (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java` |
 | GET | `/inv/entity-types` | List the Entity Types in force with their bindings and cached headline | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
-| GET | `/inv/entity-types/{entityTypeId}/profile` | Read the Entity Type profile: aggregates over every column bound to the type | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
+| GET | `/inv/entity-types/{entityTypeId}/profile` | Read the Entity Type profile: aggregates over every column bound to the type | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityPageRoutes.java` |
 | GET | `/inv/exclusion-lists` | The exclusion lists an Investigation can apply | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/ExclusionListRoutes.java` |
 | GET | `/inv/graph/algorithms` | The graph-algorithm catalogue and run limits | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java` |
 | GET | `/inv/graph/runs` | List the caller's graph runs | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java` |

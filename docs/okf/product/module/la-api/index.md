@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-EDITION-PLACEMENT-1` | P3 | feature | build D-LAE4: Entity profile pages Standard and up. | — |
+| `LA-EDITION-PLACEMENT-1` | P3 | feature | D-LAE4 BUILT 2026-10-25 except one link: the canvas node dialog's Entity page link must hide when /bootstrap entityPages is false. | — |

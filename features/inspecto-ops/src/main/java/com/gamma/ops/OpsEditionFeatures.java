@@ -16,13 +16,14 @@ import java.util.Set;
  *
  * <p>Also declares the Geo map, routes and co-location ({@link EditionFeatures#GEO_MAP}, D-LAE5, operator 2026-10-20): Standard
  * and up, by a route feature of its own on {@code GeoRoutes}, never through {@code geoLink}. And the Link Analysis dashboard
- * widgets ({@link EditionFeatures#LA_WIDGETS}, D-LAE2): a UI flag only, the routes behind them stay open.
+ * widgets ({@link EditionFeatures#LA_WIDGETS}, D-LAE2): a UI flag only, the routes behind them stay open. And the Entity
+ * profile pages ({@link EditionFeatures#ENTITY_PAGES}, D-LAE4, operator 2026-10-25): a route feature on {@code EntityPageRoutes}.
  */
 public final class OpsEditionFeatures implements EditionFeatureProvider {
 
     @Override
     public Set<String> features() {
         return Set.of(EditionFeatures.ALERT_DISPATCH, EditionFeatures.INVESTIGATIONS,
-                EditionFeatures.GEO_MAP, EditionFeatures.LA_WIDGETS);
+                EditionFeatures.GEO_MAP, EditionFeatures.LA_WIDGETS, EditionFeatures.ENTITY_PAGES);
     }
 }

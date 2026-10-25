@@ -29,7 +29,7 @@ const RESOLVED: DeepLinkResolution = {
 
 function make(
     params: Record<string, string>,
-    opts: { canReveal?: boolean; resolve?: ReturnType<typeof vi.fn>; investigations?: boolean } = {},
+    opts: { canReveal?: boolean; resolve?: ReturnType<typeof vi.fn>; investigations?: boolean; entityPages?: boolean } = {},
 ) {
     const resolve =
         opts.resolve ??
@@ -57,6 +57,7 @@ function make(
                     exchange: signal(false),
                     geoLink: signal(true),
                     investigations: signal(opts.investigations ?? true),
+                    flags: signal({ entityPages: opts.entityPages ?? true }),
                 },
             },
             { provide: LensService, useValue: { canRevealLinkEntities: () => !!opts.canReveal } },
@@ -109,6 +110,14 @@ describe('OpenInLaComponent (Open in Inspecto LA)', () => {
         expect(el.querySelector('[data-testid="open-error"]')?.textContent).toContain(
             'available in Standard and above',
         );
+    });
+
+    // D-LAE4: the Entity profile pages are Standard and up - without them the resolved Entity is shown, but not linked to a page.
+    it('offers no "Open the Entity" link when the edition withholds the Entity profile pages', () => {
+        const { el } = make({ entity: `msisdn:${ALIAS}`, investigation: 'ext-0123' }, { entityPages: false });
+        expect(q(el, 'entity')!.textContent).toContain(ALIAS);
+        expect(q(el, 'open-investigation')).toBeTruthy();
+        expect(q(el, 'open-entity')).toBeNull();
     });
 
     it('refuses an invalid link with a readable reason and never calls the server', () => {

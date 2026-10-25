@@ -290,7 +290,7 @@ export const defaultNavigation: GammaNavigationItem[] = [
                     },
                     {
                         id: 'studio-entities',
-                        navFeature: 'geoLink',
+                        navFeature: 'entityPages', // its OWN edition feature (D-LAE4): Standard and up; never geoLink, which every LA entry shares
                         title: 'Entities',
                         type: 'basic',
                         icon: 'heroicons_outline:identification',

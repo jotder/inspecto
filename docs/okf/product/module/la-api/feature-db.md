@@ -13,10 +13,11 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-97 row(s).
+98 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
+| entityPages | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `entityPages` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | geoLink | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `geoLink` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | geoMap | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `geoMap` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | investigations | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `investigations` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

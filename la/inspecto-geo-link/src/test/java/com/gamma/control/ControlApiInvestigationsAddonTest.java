@@ -138,6 +138,7 @@ class ControlApiInvestigationsAddonTest {
             assertEquals("Investigations are in Standard and above, with the Investigations add-on.",
                     boot.at("/featureReasons/investigations").asText(), boot.toString());
             assertEquals("The Geo map is in Standard and above.", boot.at("/featureReasons/geoMap").asText(), boot.toString());
+            assertEquals("Entity profile pages are in Standard and above.", boot.at("/featureReasons/entityPages").asText(), boot.toString());
         } finally {
             api.close();
             spaces.close();

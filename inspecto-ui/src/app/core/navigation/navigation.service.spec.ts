@@ -20,6 +20,7 @@ describe('NavigationService — optional-module nav entries', () => {
         actionRequestsEnabled = opsEnabled,
         screeningEnabled = true,
         geoMapEnabled = geoLinkEnabled,
+        entityPagesEnabled = geoMapEnabled,
     ) {
         TestBed.resetTestingModule();
         TestBed.configureTestingModule({
@@ -33,6 +34,7 @@ describe('NavigationService — optional-module nav entries', () => {
                         features: signal({
                             geoLink: geoLinkEnabled,
                             geoMap: geoMapEnabled,
+                            entityPages: entityPagesEnabled,
                             events: eventsEnabled,
                             ops: opsEnabled,
                             cases: casesEnabled,
@@ -75,12 +77,21 @@ describe('NavigationService — optional-module nav entries', () => {
     });
 
     // D-LAE5 (operator 2026-10-20): Basic keeps Link Analysis (geoLink true) but withholds the Geo map (its own geoMap feature, false).
-    it('hides Geo Map Analysis alone, keeping Link Analysis, when the edition withholds the Geo map (Basic)', async () => {
-        const nav = await firstValueFrom(mount(true, true, true, true, true, true, false).get());
+    it('hides Geo Map Analysis alone, keeping Link Analysis, when the edition withholds the Geo map', async () => {
+        const nav = await firstValueFrom(mount(true, true, true, true, true, true, false, true).get());
         const ids = studioChildIds(nav as never);
         expect(ids).not.toContain('studio-geo-map');
         expect(ids).toContain('studio-link-analysis');
         expect(ids).toContain('studio-entities');
+    });
+
+    // D-LAE4 (operator 2026-10-25): Basic also withholds the Entity profile pages (their own entityPages feature, false).
+    it('hides Entities alone, keeping Link Analysis, when the edition withholds the Entity profile pages', async () => {
+        const nav = await firstValueFrom(mount(true, true, true, true, true, true, true, false).get());
+        const ids = studioChildIds(nav as never);
+        expect(ids).not.toContain('studio-entities');
+        expect(ids).toContain('studio-geo-map');
+        expect(ids).toContain('studio-link-analysis');
     });
 
     it('hides them — and ONLY them — when the module is absent (Personal)', async () => {
