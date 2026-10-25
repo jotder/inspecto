@@ -238,6 +238,25 @@ export interface GraphDisplayOptions {
      * Absent = 1. A change re-runs the layout.
      */
     layoutSpacing?: number;
+    /**
+     * Per-layout node caps: a layout above its cap is not run, {@link CAPPED_LAYOUT_FALLBACK} is drawn instead
+     * ({@link cappedLayout}). The one choke point where a layout reaches G6, so every host (the Studio page, a
+     * dashboard widget) is covered. Absent = no cap.
+     */
+    layoutCaps?: Partial<Record<GraphLayoutId, number>>;
+}
+
+/** What is drawn in place of a layout that is over its node cap: cheap (milliseconds at 3,000 nodes) and ring-like. */
+export const CAPPED_LAYOUT_FALLBACK: GraphLayoutId = 'concentric';
+
+/** The layout to run for a pick on a graph of `nodeCount` nodes: the pick, or the fallback when it is over its cap. */
+export function cappedLayout(
+    id: GraphLayoutId | null,
+    nodeCount: number,
+    caps: GraphDisplayOptions['layoutCaps'],
+): GraphLayoutId | null {
+    const cap = id ? caps?.[id] : undefined;
+    return id && cap !== undefined && nodeCount > cap ? CAPPED_LAYOUT_FALLBACK : id;
 }
 
 /** The node size every graph drew before {@link GraphDisplayOptions.nodeSize} existed. */
@@ -686,7 +705,14 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             this.create();
             return;
         }
-        if (changes['layout'] || changes['plugins'] || changes['interaction'] || changes['display']) {
+        // `data` too: a graph that grows past a layout's node cap must leave that layout (see effectiveLayout).
+        if (
+            changes['layout'] ||
+            changes['plugins'] ||
+            changes['interaction'] ||
+            changes['display'] ||
+            changes['data']
+        ) {
             const layoutKey = this.layoutKey();
             const pluginKey = this.pluginKey();
             if (layoutKey !== this.prevLayoutKey || pluginKey !== this.prevPluginKey) {
@@ -896,12 +922,17 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
      * Those are fixed at construction, so a change in any of them rebuilds the graph and re-runs the layout.
      */
     private layoutKey(): string {
-        return stableKey([this.layout ?? null, this.display?.nodeSize ?? null, this.display?.layoutSpacing ?? null]);
+        return stableKey([this.effectiveLayout(), this.display?.nodeSize ?? null, this.display?.layoutSpacing ?? null]);
     }
 
     /** Signature of the inputs that affect PAINT ONLY. */
     private styleKey(): string {
         return stableKey([this.emphasis ?? null, this.display ?? null]);
+    }
+
+    /** The layout that is actually run: {@link layout}, or {@link CAPPED_LAYOUT_FALLBACK} when over its node cap. */
+    private effectiveLayout(): GraphLayoutId | null {
+        return cappedLayout(this.layout, this.data?.nodes.length ?? 0, this.display?.layoutCaps);
     }
 
     /** Record what the live graph now reflects, so the next `ngOnChanges` can classify against it. */
@@ -1176,7 +1207,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 // The density rule's reveal: set on hover/click by revealEdgeLabels(), over the base style.
                 state: { labelled: { label: true } },
             },
-            layout: layoutConfig(this.layout, {
+            layout: layoutConfig(this.effectiveLayout(), {
                 nodeSize: this.display?.nodeSize,
                 spacing: this.display?.layoutSpacing,
             }) as LayoutOptions,

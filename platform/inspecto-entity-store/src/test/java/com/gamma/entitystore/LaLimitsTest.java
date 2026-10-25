@@ -98,7 +98,7 @@ class LaLimitsTest {
         assertEquals("display.radial_max_nodes", LaLimit.DISPLAY_RADIAL_MAX_NODES.path());
         assertEquals(100L, LaLimit.DISPLAY_RADIAL_MAX_NODES.parse(100));
         assertThrows(IllegalArgumentException.class, () -> LaLimit.DISPLAY_RADIAL_MAX_NODES.parse(0));
-        assertThrows(IllegalArgumentException.class, () -> LaLimit.DISPLAY_RADIAL_MAX_NODES.parse(3_001));
+        assertThrows(IllegalArgumentException.class, () -> LaLimit.DISPLAY_RADIAL_MAX_NODES.parse(201));
         assertEquals(80L, LaLimit.INDEX_BUILD_MEMORY_PCT.defaultValue(), "CL-8: an index build's own memory share, 80 % of RAM");
     }
 

@@ -1020,12 +1020,12 @@
                                 (focusItem)="focusHeld($event)"
                             ></inspecto-link-analysis-held-tray>
                         }
-                        @if (radialCapNotice(); as notice) {
+                        @if (layoutCapNotice(); as notice) {
                             <div
-                                class="absolute left-2 top-2 z-30 max-w-[28rem] rounded-lg border px-2 py-1 text-xs shadow"
+                                class="absolute bottom-14 right-2 z-20 max-w-[28rem] rounded-lg border px-2 py-1 text-xs shadow"
                                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                                 role="status"
-                                data-testid="la-radial-cap-notice"
+                                data-testid="la-layout-cap-notice"
                             >
                                 {{ notice }}
                             </div>

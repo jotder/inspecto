@@ -241,6 +241,24 @@ class LaLimitCatalogueParityTest {
                 <= LaLimit.INVESTIGATION_EXPAND_BUDGET_MAX.defaultValue().longValue());
     }
 
+    /**
+     * N1: the layouts that freeze the tab (Radial, Information density) carry a node cap whose DEFAULT and MAXIMUM are the
+     * measured ones (about 1 s at the default, 2-3 s at the max, headless): a maximum above it lets an admin put the
+     * freeze back. The SPA fallback table must agree on the default.
+     */
+    @Test
+    void theLayoutCapsKeepTheirMeasuredDefaultAndMaximum() throws Exception {
+        Map<String, Long> spa = spaFallbacks(Files.readString(SPA_FALLBACKS));
+        Map<LaLimit, long[]> measured = new java.util.EnumMap<>(LaLimit.class); // {default, max}
+        measured.put(LaLimit.DISPLAY_RADIAL_MAX_NODES, new long[] {100, 200});
+        measured.put(LaLimit.DISPLAY_MDS_MAX_NODES, new long[] {300, 400});
+        measured.forEach((l, dm) -> {
+            assertEquals(dm[0], l.defaultValue().longValue(), l.path() + " default");
+            assertEquals(dm[1], l.max().longValue(), l.path() + " max");
+            assertEquals(dm[0], spa.get(l.path()), l.path() + " SPA fallback");
+        });
+    }
+
     /** P3: the sites read LaLimits, so the constant each held is gone; one left behind would be a second, silent source. */
     @Test
     void p3SitesHoldNoConstantOfTheirOwn() {

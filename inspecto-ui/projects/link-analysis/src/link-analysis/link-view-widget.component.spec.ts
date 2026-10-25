@@ -10,7 +10,13 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { G6GraphData, GraphSource } from '@inspecto/core/graph';
-import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
+import {
+    GraphDisplayOptions,
+    GraphLayoutId,
+    GraphViewComponent,
+    cappedLayout,
+} from '@inspecto/core/graph/graph-view.component';
+import { By } from '@angular/platform-browser';
 import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
 import { nodeColor } from '@inspecto/core/graph/catalog-graph';
 import { LinkViewWidgetComponent } from './link-view-widget.component';
@@ -233,6 +239,29 @@ describe('LinkViewWidgetComponent — the Space limits', () => {
         expect(capsSeen).toEqual([LA_LIMIT_FALLBACKS.projection_node_cap]);
         expect(fixture.componentInstance.error()).toBeNull();
         expect(fixture.nativeElement.textContent).not.toContain('hit the node cap');
+    });
+
+    it('a saved Radial view hands the canvas the layout node caps, so a graph over them is drawn as Degree ordered (N1)', async () => {
+        truncateAnswer = false;
+        const http = setUp();
+        const fixture = bound();
+        http.expectOne(LIMITS).flush({});
+        await settle();
+        const c = fixture.componentInstance;
+        c.view.set({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
+        const big = {
+            nodes: Array.from({ length: 101 }, (_, i) => ({ id: 'n' + i, data: { kind: 'sim', label: 'n' + i } })),
+            edges: [],
+        } as unknown as G6GraphData;
+        c.data.set(big);
+        fixture.detectChanges();
+        const stub = fixture.debugElement.query(By.directive(StubGraphViewComponent)).componentInstance as StubGraphViewComponent;
+        const display = stub.display() as GraphDisplayOptions;
+        expect(display.layoutCaps).toEqual({ radial: 100, mds: 300 });
+        // the graph view runs what cappedLayout says (graph-view-layout-cap.spec): the saved Radial is over its cap
+        expect(cappedLayout(stub.layout() as GraphLayoutId, (stub.data() as G6GraphData).nodes.length, display.layoutCaps)).toBe(
+            'concentric',
+        );
     });
 
     it('reads the limits once for a dashboard of many tiles', async () => {

@@ -2557,45 +2557,101 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         expect(c.layoutId()).toBe('force-cluster');
     });
 
-    describe('Radial layout cap (N1: Radial blocked the tab for minutes on 767 nodes)', () => {
-        const cap = (): number => laLimit('display.radial_max_nodes');
+    describe('layout node caps: Radial and Information density froze the tab for minutes on 767 nodes (N1)', () => {
+        const radialCap = (): number => laLimit('display.radial_max_nodes');
+        const mdsCap = (): number => laLimit('display.mds_max_nodes');
+        /** A page whose Investigation canvas is a REAL signal, so the guard reads the displayed graph as it does live. */
         const stage = (n: number) => {
             const { fixture } = create();
             const c = fixture.componentInstance;
-            Object.defineProperty(c, 'canvasData', { value: () => chain(n) });
-            return c;
+            const canvas = signal<G6GraphData | null>(chain(n));
+            Object.defineProperty(c.investigation, 'canvas', { value: canvas });
+            return { c, canvas, fixture };
         };
 
-        it('the default cap is 100 nodes', () => expect(cap()).toBe(100));
+        it('the default caps are 100 (Radial) and 300 (Information density)', () => {
+            expect([radialCap(), mdsCap()]).toEqual([100, 300]);
+        });
 
-        it('above the cap a Radial pick made here is NOT run: Force is used and the analyst is told', () => {
-            const c = stage(cap() + 1);
-            c.setLayout('radial');
-            expect(c.layoutId()).toBe('force');
-            expect(c.radialCapNotice()).toBe(
-                `Radial layout is limited to ${cap()} nodes (this graph has ${cap() + 1}), so it is shown in Force.`,
+        it('above its cap a pick made here is NOT run: Degree ordered is drawn and the analyst is told', () => {
+            const r = stage(radialCap() + 1);
+            r.c.setLayout('radial');
+            expect(r.c.layoutId()).toBe('concentric');
+            expect(r.c.layoutCapNotice()).toBe(
+                `Radial layout is limited to ${radialCap()} nodes (this graph has ${radialCap() + 1}), so it is shown in Degree ordered.`,
             );
         });
 
-        it('at the cap Radial is unchanged and there is no notice (boundary)', () => {
-            const c = stage(cap());
-            c.setLayout('radial');
-            expect(c.layoutId()).toBe('radial');
-            expect(c.radialCapNotice()).toBeNull();
+        it('Information density over its cap is guarded the same way', () => {
+            const r = stage(mdsCap() + 1);
+            r.c.setLayout('mds');
+            expect(r.c.layoutId()).toBe('concentric');
+            expect(r.c.layoutCapNotice()).toContain('Information density layout is limited to 300 nodes');
         });
 
-        it('a saved view whose layout is Radial, opened on a big graph, is guarded too', async () => {
-            const c = stage(767);
-            await c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
-            expect(c.pickedLayout()).toBe('radial');
-            expect(c.layoutId()).toBe('force');
-            expect(c.radialCapNotice()).toContain('limited to');
+        it('at the cap a layout is unchanged and there is no notice (boundary)', () => {
+            const r = stage(radialCap());
+            r.c.setLayout('radial');
+            expect(r.c.layoutId()).toBe('radial');
+            expect(r.c.layoutCapNotice()).toBeNull();
+            r.canvas.set(chain(mdsCap()));
+            r.c.setLayout('mds');
+            expect(r.c.layoutId()).toBe('mds');
+            expect(r.c.layoutCapNotice()).toBeNull();
         });
 
-        it('a restored Radial on a small graph still opens as Radial', async () => {
-            const c = stage(cap());
-            await c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
-            expect(c.layoutId()).toBe('radial');
+        it('grow past the cap -> fallback; shrink back under -> true Radial again', () => {
+            const r = stage(radialCap());
+            r.c.setLayout('radial');
+            expect(r.c.layoutId()).toBe('radial');
+            r.canvas.set(chain(radialCap() + 50));
+            expect(r.c.layoutId()).toBe('concentric');
+            r.canvas.set(chain(radialCap() - 10));
+            expect(r.c.layoutId()).toBe('radial');
+        });
+
+        it('the guard compares the DISPLAYED graph: hiding nodes under the cap brings Radial back', () => {
+            const r = stage(radialCap() + 20);
+            r.c.setLayout('radial');
+            expect(r.c.layoutId()).toBe('concentric');
+            r.c.hiddenNodeIds.set(Array.from({ length: 20 }, (_, i) => `n${i}`));
+            expect(r.c.canvasData()?.nodes.length).toBe(radialCap());
+            expect(r.c.layoutId()).toBe('radial');
+        });
+
+        it('a saved view whose layout is Radial, opened on a big graph, is guarded too; a small one is not', async () => {
+            const big = stage(767);
+            await big.c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
+            expect(big.c.pickedLayout()).toBe('radial');
+            expect(big.c.layoutId()).toBe('concentric');
+        });
+
+        it('a restored Radial on a graph at the cap still opens as Radial', async () => {
+            const small = stage(radialCap());
+            await small.c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
+            expect(small.c.layoutId()).toBe('radial');
+        });
+
+        it('undo restores the analyst PICK, not the layout that was drawn: a graph that shrinks returns to Radial', () => {
+            const r = stage(radialCap() + 50);
+            r.c.setLayout('radial'); // drawn as Degree ordered
+            r.c.setLayout('circular'); // records the snapshot taken while Radial was picked but not drawn
+            r.c.undoPresentation();
+            expect(r.c.pickedLayout()).toBe('radial');
+            r.canvas.set(chain(radialCap() - 10));
+            expect(r.c.layoutId()).toBe('radial');
+        });
+
+        it('the notice is in the page only while the fallback applies', () => {
+            const r = stage(radialCap() + 1);
+            const notice = () => r.fixture.nativeElement.querySelector('[data-testid="la-layout-cap-notice"]');
+            r.c.setLayout('radial');
+            r.fixture.detectChanges();
+            expect(notice()?.getAttribute('role')).toBe('status');
+            expect(notice()?.textContent).toContain('so it is shown in Degree ordered');
+            r.canvas.set(chain(radialCap()));
+            r.fixture.detectChanges();
+            expect(notice()).toBeNull();
         });
     });
 

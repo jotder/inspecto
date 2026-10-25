@@ -202,11 +202,13 @@ import {
     GRAPH_NODE_SIZES,
     GraphDisplayOptions,
     GraphEmphasis,
+    CAPPED_LAYOUT_FALLBACK,
     GraphLayoutId,
     GraphViewComponent,
     GraphViewInteraction,
     GraphViewPlugins,
     baseEdgeKind,
+    cappedLayout,
     edgeLabelsHiddenByDensity,
     stableKey,
 } from '@inspecto/core/graph/graph-view.component';
@@ -273,7 +275,7 @@ import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
-import { laLimit } from './la-limits';
+import { laLayoutCaps, laLimit } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
@@ -1212,6 +1214,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 edgePatterns: { ...auto.edgePatterns, ...chosen.edgePatterns },
                 nodeSize: this.nodeSize(),
                 layoutSpacing: this.layoutSpacing(),
+                layoutCaps: laLayoutCaps(),
             };
         },
         { equal: (a, b) => stableKey(a) === stableKey(b) },
@@ -1255,18 +1258,18 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             (g?.nodes.length ?? 0) > laLimit('display.force_atlas_max_nodes')
         )
             return 'force';
-        // Radial (MDS + stress iterations) blocks the tab for minutes on ~800 nodes: above the cap it is never run,
-        // whether picked here or restored (saved view / undo). See {@link radialCapNotice}.
-        if (picked === 'radial' && (g?.nodes.length ?? 0) > laLimit('display.radial_max_nodes')) return 'force';
-        return picked;
+        // Radial and Information density block the tab for minutes on ~800 nodes: above their cap they are never run,
+        // whether picked here or restored (saved view / undo). See {@link layoutCapNotice}.
+        return cappedLayout(picked, g?.nodes.length ?? 0, laLayoutCaps()) ?? picked;
     });
-    /** On-screen notice while a Radial pick is shown as Force because the graph is over `display.radial_max_nodes`. */
-    readonly radialCapNotice = computed<string | null>(() => {
+    /** On-screen notice while a pick is shown as {@link CAPPED_LAYOUT_FALLBACK} because the graph is over its layout cap. */
+    readonly layoutCapNotice = computed<string | null>(() => {
         const n = this.canvasData()?.nodes.length ?? 0;
-        const cap = laLimit('display.radial_max_nodes');
-        return this.pickedLayout() === 'radial' && n > cap
-            ? `Radial layout is limited to ${cap} nodes (this graph has ${n}), so it is shown in Force.`
-            : null;
+        const picked = this.pickedLayout();
+        const cap = picked ? laLayoutCaps()[picked] : undefined;
+        if (!picked || cap === undefined || n <= cap) return null;
+        const name = (id: GraphLayoutId): string => GRAPH_LAYOUTS.find((l) => l.id === id)?.label ?? id;
+        return `${name(picked)} layout is limited to ${cap} nodes (this graph has ${n}), so it is shown in ${name(CAPPED_LAYOUT_FALLBACK)}.`;
     });
     readonly layouts = GRAPH_LAYOUTS;
     /** Whether the current graph is tree/forest-shaped — gates the tree layouts. */
@@ -2613,7 +2616,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             nodeRules: this.nodeRules(),
             nodeSize: this.nodeSize(),
             layoutSpacing: this.layoutSpacing(),
-            layoutId: this.layoutId(),
+            layoutId: this.pickedLayout() ?? this.layoutId(),
         };
     }
 
@@ -3523,7 +3526,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             sourceId: this.sourceId(),
             query: q,
             display: this.chosenDisplay(), // what the analyst chose travels with the view (the automatic look is derived afresh); reapplied on load
-            layout: this.layoutId(),
+            layout: this.pickedLayout() ?? this.layoutId(),
             profile: this.profileId() === 'generic' ? undefined : this.profileId(),
             view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
             // LA-10: no server list exists — the view is where this screen remembers its Investigation ids.

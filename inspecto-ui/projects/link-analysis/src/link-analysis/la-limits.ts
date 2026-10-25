@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import type { GraphDisplayOptions } from '@inspecto/core/graph/graph-view.component';
 
 /**
  * Link Analysis limits (LA-CONFIG-LIMITS-1, plan `docs/superpower/la-configurable-limits-plan.md` §6.3, §7): the ONE
@@ -44,6 +45,7 @@ export const LA_LIMIT_FALLBACKS = {
     'display.lod_label_cap': 300,
     'display.layered_max_nodes': 30,
     'display.radial_max_nodes': 100,
+    'display.mds_max_nodes': 300,
     'display.force_atlas_max_nodes': 800,
     'display.embed_label_limit': 80,
     'display.embed_edge_limit': 3000,
@@ -105,6 +107,11 @@ const values = signal<Partial<Record<LaLimitKey, number>>>({});
 /** The limit this browser uses now: what the service last published, else the shipped fallback. Read it, never cache it. */
 export function laLimit(key: LaLimitKey): number {
     return values()[key] ?? LA_LIMIT_FALLBACKS[key];
+}
+
+/** The per-layout node caps a canvas host hands the graph view (`display.layoutCaps`): the layouts that freeze the tab. */
+export function laLayoutCaps(): NonNullable<GraphDisplayOptions['layoutCaps']> {
+    return { radial: laLimit('display.radial_max_nodes'), mds: laLimit('display.mds_max_nodes') };
 }
 
 /**

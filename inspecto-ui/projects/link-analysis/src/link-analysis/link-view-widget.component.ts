@@ -4,11 +4,12 @@ import { G6GraphData } from '@inspecto/core/graph';
 import { LA_DASHBOARD_HEADER } from '@inspecto/link-analysis/la-host';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
-import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
+import { GraphDisplayOptions, GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
 import { GraphSourcesService } from './graph-sources';
 import type { ProjectedGraph } from './entity-projection';
 import { LaLimitsService } from './la-limits.service';
+import { laLayoutCaps } from './la-limits';
 import {
     hideLinkKinds,
     legendEdgeKindsFor,
@@ -58,7 +59,7 @@ import {
                     <inspecto-graph-view
                         class="min-h-0 flex-auto"
                         [data]="drawn()"
-                        [display]="view()?.display ?? null"
+                        [display]="canvasDisplay()"
                         [layout]="view()?.layout ?? null"
                         [fill]="true"
                     />
@@ -112,6 +113,18 @@ export class LinkViewWidgetComponent {
     readonly edgeKinds = computed(() => legendEdgeKindsFor(this.data()));
     /** Link kinds the legend's chips hide (client-side, this tile only). */
     readonly hiddenLinkKinds = signal<string[]>([]);
+    /** The saved display plus the layout node caps, so a saved Radial / Information density view never freezes the tile. */
+    readonly canvasDisplay = computed<GraphDisplayOptions>(() => ({
+        nodeLabels: true,
+        edgeLabels: true,
+        nodeColors: {},
+        edgeColors: {},
+        nodeShapes: {},
+        edgePatterns: {},
+        edgeSizes: {},
+        ...this.view()?.display,
+        layoutCaps: laLayoutCaps(),
+    }));
     readonly drawn = computed(() => hideLinkKinds(this.data(), this.hiddenLinkKinds()));
     /** The node cap cut the projection short — said in the Link Analysis page's own words. */
     readonly truncated = computed(() => !!(this.data() as ProjectedGraph | null)?.truncated);

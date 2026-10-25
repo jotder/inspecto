@@ -302,7 +302,7 @@ node labels are untouched; the legend still names every link type.
 >   not refused by betweenness's 500); per-algorithm `browser_algorithms.<id>` = min(2,500, the algorithm's server
 >   inline ceiling) for the algorithms the browser consults (betweenness 500; closeness, cliques, max flow, link
 >   prediction, eigenvector, Katz, HITS 1,000; Louvain, label propagation 2,500); refusals name the algorithm and the
->   cap in force. Display caps (`display.*`: LOD labels 300, layered 30, radial 100, force-atlas 800, embed 80 / 3,000, geo 5,000)
+>   cap in force. Display caps (`display.*`: LOD labels 300, layered 30, radial 100, information density 300, force-atlas 800, embed 80 / 3,000, geo 5,000)
 >   are per-analyst; the server's `/geo` default limit is `display.geo_point_cap` in force.
 > * **Menu:** the Link Analysis Settings pane hosts `link-analysis-limits.component.ts` with three sections rendered
 >   from the GET (Analysis = Space items, Host resources = install items read-only unless `canAdminister`, My browser =
