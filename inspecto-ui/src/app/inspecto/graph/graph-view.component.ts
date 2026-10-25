@@ -181,6 +181,10 @@ export function silenceMinimap(graph: Graph): void {
     for (const fn of ['renderMinimap', 'renderMask', 'updateMask', 'setCamera']) minimap[fn] = () => undefined;
 }
 
+/** A hull or bubble-sets plugin key. */
+const isCommunityShape = (p: unknown): boolean =>
+    /^(hull|bubble-sets)-/.test(String((p as { key?: string }).key ?? ''));
+
 /**
  * Replace the community shapes (hull / bubble-sets plugins) on a LIVE graph without a render or a layout.
  * G6 5.1.1 draws a hull only on AFTER_RENDER and `Hull.destroy()` calls `shape.destroy()` unguarded, so a bare
@@ -192,7 +196,7 @@ export function swapCommunityShapes(
     graph: Pick<Graph, 'getPlugins' | 'setPlugins' | 'getPluginInstance'>,
     shapes: Record<string, unknown>[],
 ): void {
-    const isShape = (p: unknown): boolean => /^(hull|bubble-sets)-/.test(String((p as { key?: string }).key ?? ''));
+    const isShape = isCommunityShape;
     const keep = new Set(shapes.map((p) => p['key']));
     for (const p of (graph.getPlugins() as unknown[]).filter(isShape)) {
         const key = (p as { key: string }).key;
@@ -208,8 +212,9 @@ export function swapCommunityShapes(
         try {
             inst?.drawHull?.();
             inst?.drawBubbleSets?.();
-        } catch {
-            // the graph has not rendered yet: AFTER_RENDER draws it
+        } catch (e) {
+            // Most likely the graph has not rendered yet (AFTER_RENDER draws it then); never swallowed silently.
+            console.warn('[graph-view] community shape not drawn now', e);
         }
     }
 }
@@ -1124,6 +1129,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         }
         const next = this.data.nodes.map((n) => String(n.id));
         const added = next.some((id) => !this.renderedNodeIds.has(id));
+        // The shapes name nodes the new data may no longer hold, and G6's render() makes each plugin look them up (it
+        // throws on a missing id): take them off first, syncHulls puts them back once the new data is drawn.
+        if ((graph.getPlugins() as unknown[]).some(isCommunityShape)) {
+            swapCommunityShapes(graph, []);
+            this.prevHullKey = '';
+        }
         const seeded = { nodes: this.data.nodes.map((n) => this.seedPosition(n)), edges: this.data.edges };
         graph.setData(seeded as unknown as GraphData);
         this.refreshStyleState();
@@ -1133,11 +1144,13 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const painted = added ? graph.render() : graph.draw();
         // The pointer model asked for a graph that stays fully in view: re-fit once the new data is on the canvas.
         // Only HERE (a data change), never in `redraw`, so a hover, a selection or a restyle never yanks the view.
-        void painted.then(() => {
-            this.syncHulls();
-            this.syncSelectionState();
-            if (this.interaction?.fitOnDataChange) void graph.fitView();
-        });
+        void painted
+            .then(() => {
+                this.syncHulls();
+                this.syncSelectionState();
+                if (this.interaction?.fitOnDataChange) void graph.fitView();
+            })
+            .catch((e: unknown) => console.warn('[graph-view] drawing the new data failed', e));
     }
 
     /**

@@ -43,6 +43,7 @@ function realG6() {
             controller.setPlugins(options.plugins as never);
         },
         getPluginInstance: (key: string) => controller.getPluginInstance(key),
+        getOptions: () => ({ plugins: options.plugins }),
     };
     const count = (ev: string) => handlers.get(ev)?.size ?? 0;
     return { live, controller, canvas, render, count, graph };

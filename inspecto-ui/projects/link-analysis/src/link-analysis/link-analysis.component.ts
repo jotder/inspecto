@@ -117,6 +117,7 @@ import { LinkAnalysisGlossaryComponent } from './link-analysis-glossary.componen
 import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules.component';
 import {
     analysisNodeCapValue,
+    browserAlgorithmCapValue,
     collapseBranches,
     louvainCommunities,
     descendants,
@@ -663,7 +664,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const out = new Map<string, string[]>();
         if (!g) return out;
         // Louvain over the whole graph is the costly part: reuse it for a graph content already seen.
-        const sig = graphSignature(g);
+        const sig = `${graphSignature(g)}|${browserAlgorithmCapValue('louvainCommunities')}`; // a changed cap is a different answer
         const hit = this.hullMemo.get(sig);
         if (hit) {
             this.hullMemo.delete(sig); // LRU: re-insert as the newest

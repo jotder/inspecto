@@ -197,6 +197,7 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
     function graphStub(positions: Record<string, [number, number]> = {}) {
         return {
             setData: vi.fn(),
+            getPlugins: () => [],
             draw: vi.fn(() => Promise.resolve()),
             render: vi.fn(() => Promise.resolve()),
             destroy: vi.fn(),
@@ -417,6 +418,7 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
             this.held = new Set(d.nodes.map((n) => String(n.id)));
             for (const id of [...applied.keys()]) if (!this.held.has(id)) applied.delete(id);
         }),
+        getPlugins: () => [],
         draw: vi.fn(() => Promise.resolve()),
         render: vi.fn(() => Promise.resolve()),
         // G6 5.1.1 faithful: every id is looked up first; an unknown one throws and the WHOLE batch is dropped.
