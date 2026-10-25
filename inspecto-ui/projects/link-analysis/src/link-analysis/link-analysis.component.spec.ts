@@ -4351,6 +4351,33 @@ describe('LinkAnalysisComponent - revalidation never keeps stale data or stale E
         expect(c.graph()).not.toBe(g1);
     });
 
+    it('an expired re-fold with identical content but a DIFFERENT masking note refreshes the graph and the note', async () => {
+        const { c } = await drawn();
+        const inv = TestBed.inject(InvService);
+        const src = TestBed.inject(GraphSourcesService).byId('entity-projection')!;
+        const orig = src.query.bind(src);
+        const MASKED = { maskingMode: 'mask', masked: true } as unknown as MaskingNote;
+        const OPEN = { maskingMode: 'none', masked: false } as unknown as MaskingNote;
+        let note = MASKED;
+        src.query = async (q) => {
+            const g = structuredClone(await orig(q));
+            inv.masking.set(note);
+            return g;
+        };
+        await expired(() => c.run()); // first read under MASKED, stored
+        const g1 = c.graph();
+        expect(inv.masking()).toEqual(MASKED);
+        note = OPEN;
+        const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 2 * GRAPH_CACHE_TTL_MS + 2);
+        try {
+            await c.run(); // expired again; same nodes and edges, other note
+        } finally {
+            now.mockRestore();
+        }
+        expect(c.graph()).not.toBe(g1);
+        expect(inv.masking()).toEqual(OPEN);
+    });
+
     it('Refresh clears the stored ETags: the entry is gone, so the re-read sends no If-None-Match', async () => {
         const { c, fixture } = await drawn({ inv: {} });
         const inv = TestBed.inject(InvService);

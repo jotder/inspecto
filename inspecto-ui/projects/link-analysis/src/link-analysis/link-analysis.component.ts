@@ -208,7 +208,6 @@ import {
     GraphViewPlugins,
     baseEdgeKind,
     edgeLabelsHiddenByDensity,
-    graphSignature,
     stableKey,
 } from '@inspecto/core/graph/graph-view.component';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
@@ -2105,8 +2104,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         () => Date.now(),
         // PERF-P10a-2: after expiry, requests that revalidate to 304 fold to the same graph - keep the previous object
         (a, b) =>
-            graphSignature(a.g) === graphSignature(b.g) && // cheap reject first
-            deepEqual(a.g, b.g) && // then EVERY field (nodes' data, mappings, idMappings, omittedLinks, source, ...)
+            deepEqual(a.g, b.g) && // EVERY field (nodes' data, mappings, idMappings, omittedLinks, source, ...)
             deepEqual(a.masking, b.masking),
     );
     /** "As of" line for a graph served from the cache; null when the server just answered. */

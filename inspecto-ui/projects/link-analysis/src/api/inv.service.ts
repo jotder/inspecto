@@ -1734,8 +1734,7 @@ export class InvService {
                 headers: etag ? { 'If-None-Match': etag } : undefined,
             });
         const keep = map((res: { body: T | null; headers: { get(n: string): string | null } }) => {
-            const cl = res.headers.get('Content-Length');
-            this.reads.store(key, res.headers.get('ETag'), res.body, cl ? Number(cl) : undefined);
+            this.reads.store(key, res.headers.get('ETag'), res.body);
             return res.body as T;
         });
         return this.noted(

@@ -1,9 +1,10 @@
 import { stableJson } from './stable-json';
 
 /**
- * TOTAL budget for remembered bodies, in estimated size (response Content-Length when sent, else the JSON length,
- * measured once at store time). 32 M: a handful of large Working Set / projection answers, which sit parsed in the
- * heap next to the 20 cached graphs; the least recently used goes first. A body that alone exceeds it is never kept.
+ * TOTAL budget for remembered bodies, in UNCOMPRESSED JSON characters of the parsed body, measured once at store time.
+ * Never the response Content-Length: the server gzips every JSON body of 1 KB or more and sends the COMPRESSED length
+ * (about 7x smaller). Measured: the parsed heap is about 1.7x the JSON characters, so 32 M characters is about 55 MB of
+ * heap in the worst case, next to the 20 cached graphs. The least recently used entry goes first.
  */
 export const CONDITIONAL_CACHE_BUDGET = 32_000_000;
 
@@ -56,12 +57,12 @@ export class ConditionalReadCache {
 
     /**
      * Remember an answer. No tag, or a body over the budget, stores nothing and forgets any older answer.
-     * `size` is the caller's cheap estimate (Content-Length); without it the body is measured ONCE here.
+     * The body is measured ONCE here (JSON length); a Content-Length is never trusted.
      */
-    store(key: string, etag: string | null, body: unknown, size?: number): void {
+    store(key: string, etag: string | null, body: unknown): void {
         this.drop(key);
         if (!etag || body === null || body === undefined) return;
-        const bytes = size !== undefined && size >= 0 ? size : JSON.stringify(body).length;
+        const bytes = JSON.stringify(body).length;
         if (bytes > this.budget) return;
         this.entries.set(key, { etag, body, size: bytes, storedAt: this.now() });
         this.total += bytes;

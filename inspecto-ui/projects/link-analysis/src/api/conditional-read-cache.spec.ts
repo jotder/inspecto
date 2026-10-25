@@ -47,7 +47,7 @@ describe('ConditionalReadCache (PERF-P10a-2)', () => {
         expect(c.entry(k)).toBeUndefined();
     });
 
-    it('does not retain a body over the budget (measured once from the JSON when no size is given)', () => {
+    it('does not retain a body over the budget (measured from the parsed JSON)', () => {
         const c = new ConditionalReadCache(() => 's|u', Date.now, 100);
         const k = c.keyOf('POST', '/p', {});
         c.store(k, '"a"', { pad: 'x'.repeat(200) });
@@ -56,28 +56,19 @@ describe('ConditionalReadCache (PERF-P10a-2)', () => {
         expect(c.entry(k)).toBeDefined();
     });
 
-    it('a caller-supplied size is used instead of measuring: over budget is not kept, in budget is', () => {
-        const c = new ConditionalReadCache(() => 's|u', Date.now, 100);
-        const k = c.keyOf('POST', '/p', {});
-        c.store(k, '"a"', { tiny: 1 }, 101);
-        expect(c.entry(k)).toBeUndefined();
-        c.store(k, '"a"', { tiny: 1 }, 100);
-        expect(c.entry(k)).toBeDefined();
-        expect(c.bytes).toBe(100);
-    });
-
     it('is bounded by TOTAL size: the least recently used entries go first, and the total stays within budget', () => {
         const c = new ConditionalReadCache(() => 's|u', Date.now, 100);
         const [a, b, d] = ['a', 'b', 'd'].map((n) => c.keyOf('POST', '/p', { n }));
-        c.store(a, '"a"', 1, 40);
-        c.store(b, '"b"', 2, 40);
+        const body = (n: number) => ({ p: 'x'.repeat(n - 8) }); // JSON length = n
+        c.store(a, '"a"', body(40));
+        c.store(b, '"b"', body(40));
         c.touch(a); // b is now the least recently used
-        c.store(d, '"d"', 3, 40); // 120 > 100: evicts b
+        c.store(d, '"d"', body(40)); // 120 > 100: evicts b
         expect(c.entry(b)).toBeUndefined();
         expect(c.entry(a)).toBeDefined();
         expect(c.entry(d)).toBeDefined();
         expect(c.bytes).toBe(80);
-        c.store(a, '"a2"', 4, 90); // replacing a: 90 + 40 > 100 evicts d, a stays
+        c.store(a, '"a2"', body(90)); // replacing a: 90 + 40 > 100 evicts d, a stays
         expect(c.entry(d)).toBeUndefined();
         expect(c.bytes).toBe(90);
     });
@@ -85,10 +76,10 @@ describe('ConditionalReadCache (PERF-P10a-2)', () => {
     it('drop and clear keep the total honest', () => {
         const c = new ConditionalReadCache(() => 's|u', Date.now, 100);
         const k = c.keyOf('POST', '/p', {});
-        c.store(k, '"a"', 1, 30);
+        c.store(k, '"a"', { p: 'x'.repeat(22) });
         c.drop(k);
         expect(c.bytes).toBe(0);
-        c.store(k, '"a"', 1, 30);
+        c.store(k, '"a"', { p: 'x'.repeat(22) });
         c.clear();
         expect(c.bytes).toBe(0);
     });

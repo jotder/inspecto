@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { Observable } from 'rxjs';
 import { SessionService, SpacesService } from '@inspecto/core/api';
 import { InvService, MaskingNote, NeighborsRequest, ProjectionRequest, ProjectionResult } from './inv.service';
-import { CONDITIONAL_CACHE_BUDGET } from './conditional-read-cache';
+import { ConditionalReadCache } from './conditional-read-cache';
 import { environment } from 'environments/environment';
 
 const base = environment.apiBaseUrl + '/v1';
@@ -175,26 +175,34 @@ describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
     });
 
     it('(h) an over-size body is not retained: no conditional is ever sent for it', () => {
-        const huge = {
-            ...body(),
-            pad: 'x'.repeat(CONDITIONAL_CACHE_BUDGET + 1),
-        } as unknown as ProjectionResult;
+        (svc as { reads: ConditionalReadCache }).reads = new ConditionalReadCache(() => 'x', Date.now, 1000);
+        const huge = { ...body(), pad: 'x'.repeat(5000) } as unknown as ProjectionResult;
         read(project, (r) => r.flush(huge, tag('"big"')));
         expect(svc.reads.size).toBe(0);
         const again = read(project, (r) => r.flush(huge, tag('"big"')));
         expect(hasHeader(again.r)).toBe(false);
     });
 
-    it('(h) the response Content-Length is the size estimate: over budget is not retained, within budget is counted as sent', () => {
+    it('(h) a gzip response with a tiny Content-Length but a huge body is sized by the BODY, not the header', () => {
+        (svc as { reads: ConditionalReadCache }).reads = new ConditionalReadCache(() => 'x', Date.now, 1000); // a small budget keeps the case light
+        const huge = { ...body(), pad: 'x'.repeat(5000) } as unknown as ProjectionResult;
         read(project, (r) =>
-            r.flush(body(), { headers: { ETag: '"a"', 'Content-Length': String(CONDITIONAL_CACHE_BUDGET + 1) } }),
+            r.flush(huge, { headers: { ETag: '"a"', 'Content-Encoding': 'gzip', 'Content-Length': '120' } }),
         );
         expect(svc.reads.size).toBe(0);
         const again = read(project, (r) => r.flush(body(), tag('"a"')));
         expect(hasHeader(again.r)).toBe(false);
-        read(project, (r) => r.flush(body(2), { headers: { ETag: '"b"', 'Content-Length': '1234' } }));
-        expect(svc.reads.bytes).toBe(1234);
     });
+
+    it.each(['0', 'garbage', '-5'])(
+        '(h) a Content-Length of %s no longer matters: the entry is sized by its body',
+        (cl) => {
+            const b = body(2);
+            read(project, (r) => r.flush(b, { headers: { ETag: '"b"', 'Content-Length': cl } }));
+            expect(svc.reads.size).toBe(1);
+            expect(svc.reads.bytes).toBe(JSON.stringify(b).length);
+        },
+    );
 
     it('a 304 with no stored entry is retried ONCE without the header', () => {
         let got: ProjectionResult | undefined;
