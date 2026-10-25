@@ -19,6 +19,20 @@ describe('GraphQueryCache (PERF-P10a-1 / -3)', () => {
         expect(fetch).toHaveBeenCalledTimes(2);
     });
 
+    it('PERF-P10a-2: an expired re-fetch that is "same" keeps the previous object; a different one replaces it', async () => {
+        let t = 0;
+        const cache = new GraphQueryCache<{ v: number }>(() => 's|u', () => t, (a, b) => a.v === b.v);
+        const first = await cache.get('src', q(), () => Promise.resolve({ v: 1 }));
+        t = GRAPH_CACHE_TTL_MS + 1;
+        const second = await cache.get('src', q(), () => Promise.resolve({ v: 1 }));
+        expect(second.fromCache).toBe(false);
+        expect(second.value).toBe(first.value);
+        t = 2 * GRAPH_CACHE_TTL_MS + 2;
+        const third = await cache.get('src', q(), () => Promise.resolve({ v: 2 }));
+        expect(third.value).not.toBe(first.value);
+        expect(third.value.v).toBe(2);
+    });
+
     it('two overlapping identical calls share ONE fetch', async () => {
         const cache = new GraphQueryCache<string>(() => 's|u');
         let release!: (v: string) => void;

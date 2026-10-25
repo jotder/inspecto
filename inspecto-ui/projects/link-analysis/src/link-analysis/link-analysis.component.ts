@@ -208,6 +208,7 @@ import {
     GraphViewPlugins,
     baseEdgeKind,
     edgeLabelsHiddenByDensity,
+    graphSignature,
     stableKey,
 } from '@inspecto/core/graph/graph-view.component';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
@@ -352,6 +353,11 @@ export function snapshotTitle(onInvestigation: boolean, invTitle: string | undef
     const n = `${nodes} ${nodes === 1 ? 'node' : 'nodes'}`;
     if (onInvestigation) return invTitle?.trim() ? `Investigation ${invTitle.trim()} — ${n}` : `Investigation — ${n}`;
     return `${source.trim() || 'Graph'} — ${n}`;
+}
+
+/** PERF-P10a-2: a reset to an equal list is no change (a re-run that folds to the same graph must not redraw the canvas). */
+function sameStrings(a: readonly string[], b: readonly string[]): boolean {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
 /**
@@ -881,14 +887,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     // ── search & kind filtering ──
     readonly search = signal('');
-    readonly kindFilter = signal<string[]>([]); // empty = all
+    readonly kindFilter = signal<string[]>([], { equal: sameStrings }); // empty = all
     readonly nodeKinds = computed<string[]>(() => {
         const g = this.investigation.canvas() ?? this.graph();
         return g ? [...new Set(g.nodes.map((n) => n.data.kind))].sort() : [];
     });
     readonly edgeKinds = computed<string[]>(() => legendEdgeKindsFor(this.investigation.canvas() ?? this.graph()));
     /** Collapsed branch roots — their downstream nodes are hidden until expanded. */
-    readonly collapsedRoots = signal<string[]>([]);
+    readonly collapsedRoots = signal<string[]>([], { equal: sameStrings });
 
     // ── timeline filter (BACKLOG V2 §3: a time slider filtering edges by a temporal `attrs` column) ──
     /** The `attrs` column to filter on; '' = timeline off. */
@@ -1007,11 +1013,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         return { ...g, nodes: g.nodes.map((n) => (seen.has(n.id) ? n : { ...n, data: { ...n.data, unexpanded: true } })) };
     });
     /** Ids of the exploration canvas nodes an expand has followed since the last run (no Investigation: nothing is sealed). */
-    readonly expandedNodeIds = signal<string[]>([]);
+    readonly expandedNodeIds = signal<string[]>([], { equal: sameStrings });
     /** The link kinds the legend offers as chips: those of what the canvas draws, hidden ones included. */
     readonly legendLinkKinds = computed(() => legendEdgeKindsFor(this.canvasSource()));
     /** Nodes the node detail dialog's "Hide on canvas" took off the exploration canvas (presentation only, never a query). */
-    readonly hiddenNodeIds = signal<string[]>([]);
+    readonly hiddenNodeIds = signal<string[]>([], { equal: sameStrings });
     /** What the canvas draws: {@link canvasSource} without the hidden link kinds and the hidden nodes (with their links). */
     readonly canvasData = computed<G6GraphData | null>(() => {
         const g = hideLinkKinds(this.canvasSource(), this.hiddenLinkKinds());
@@ -2095,6 +2101,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** PERF-P10a-1/3: identical (Space, viewer, source, query) answers are served from the client; see graph-query-cache.ts. */
     private readonly queryCache = new GraphQueryCache<{ g: G6GraphData; masking: MaskingNote | null }>(
         () => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}|${this.limits.limits().maskingModeInForce ?? ''}`,
+        () => Date.now(),
+        // PERF-P10a-2: after expiry, requests that revalidate to 304 fold to the same graph - keep the previous object
+        (a, b) =>
+            graphSignature(a.g) === graphSignature(b.g) &&
+            !!(a.g as ProjectedGraph).truncated === !!(b.g as ProjectedGraph).truncated &&
+            JSON.stringify(a.masking) === JSON.stringify(b.masking),
     );
     /** "As of" line for a graph served from the cache; null when the server just answered. */
     readonly cachedAsOf = signal<number | null>(null);
@@ -2106,10 +2118,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      * is kept with the cached graph and re-applied on a hit: the badge always describes the graph on screen.
      */
     private async cachedQuery(sourceId: GraphSourceId, source: GraphSource, q: GraphSourceQuery, force = false) {
+        this.inv.reads.setScope(this.limits.limits().maskingModeInForce ?? ''); // a masking-mode change drops the stored ETags
         const hit = await this.queryCache.get(
             sourceId,
             q,
             async () => {
+                if (force) this.inv.reads.clear(); // Refresh is a hard re-read: no If-None-Match, the entry is replaced
                 // per read: a read that sets no note is stored as "no note", never the previous read's
                 const before = this.inv.masking();
                 this.inv.masking.set(null);
@@ -4162,6 +4176,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** Re-read the Space's Entity Lists (the Start box and the case's list titles read them). */
     private refreshEntityLists(): void {
         this.queryCache.clear(); // a list write may change what the server answers
+        this.inv.reads.clear();
         this.inv
             .listEntityLists()
             .pipe(takeUntilDestroyed(this.destroyRef))

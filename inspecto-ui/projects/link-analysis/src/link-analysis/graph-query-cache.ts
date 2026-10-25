@@ -1,4 +1,5 @@
 import { GraphSourceQuery } from '@inspecto/core/graph';
+import { stableJson } from '@inspecto/link-analysis/api/stable-json';
 
 /**
  * PERF-P10a-1: staleness window. Within this time a re-run does not see a new pipeline run (the client has no signal
@@ -10,16 +11,7 @@ export const GRAPH_CACHE_MAX_ENTRIES = 20;
 /** PERF-P10a-4: a burst of predicate edits yields one request after this pause. */
 export const PUSH_FILTER_DEBOUNCE_MS = 250;
 
-/** JSON with object keys sorted, so two queries that mean the same thing share a key. */
-export function stableJson(v: unknown): string {
-    return JSON.stringify(v, (_k, x: unknown) =>
-        x && typeof x === 'object' && !Array.isArray(x)
-            ? Object.fromEntries(
-                  Object.entries(x as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
-              )
-            : x,
-    );
-}
+export { stableJson };
 
 export interface CachedGraph<T> {
     readonly value: T;
@@ -40,6 +32,8 @@ export class GraphQueryCache<T> {
     constructor(
         private readonly identity: () => string,
         private readonly now: () => number = Date.now,
+        /** PERF-P10a-2: when a re-fetch after expiry folds to the same content, keep the PREVIOUS value (same reference). */
+        private readonly same?: (a: T, b: T) => boolean,
     ) {}
 
     get(sourceId: string, q: GraphSourceQuery, fetch: () => Promise<T>, force = false): Promise<CachedGraph<T>> {
@@ -58,7 +52,8 @@ export class GraphQueryCache<T> {
         const pending = this.inflight.get(key);
         if (pending && !force) return pending;
         const p = fetch().then(
-            (value) => {
+            (fetched) => {
+                const value = hit && this.same?.(hit.value, fetched) ? hit.value : fetched;
                 const entry = { value, fetchedAt: this.now() };
                 if (this.inflight.get(key) === p) {
                     this.inflight.delete(key);

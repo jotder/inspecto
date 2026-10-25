@@ -1,6 +1,9 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient, HttpParameterCodec, HttpParams } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpParameterCodec, HttpParams } from '@angular/common/http';
+import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
+// eslint-disable-next-line no-restricted-imports -- only `actor`, to keep a stored answer from crossing viewers (as la-limits.service does)
+import { SessionService, SpacesService } from '@inspecto/core/api';
+import { ConditionalReadCache } from './conditional-read-cache';
 import { apiUrl, toParams } from '@inspecto/core/api/api-base';
 import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import type { BranchStage } from '@inspecto/core/graph/branching-stage';
@@ -1705,13 +1708,59 @@ export class InvService {
     private noted = <T extends { masking?: MaskingNote }>(o: Observable<T>): Observable<T> =>
         o.pipe(tap((r) => r.masking && this.masking.set(r.masking)));
 
+    private spaces = inject(SpacesService);
+    private session = inject(SessionService);
+
+    /**
+     * PERF-P10a-2: the last body + ETag of each projection / neighbours read, for `If-None-Match` revalidation.
+     * The host (link-analysis.component) clears it on Refresh and an Entity List write, and sets its scope to the
+     * masking mode in force; a Space or viewer change empties it by itself.
+     */
+    readonly reads = new ConditionalReadCache(() => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}`);
+
+    /**
+     * POST that revalidates: sends `If-None-Match` (the stored tag, verbatim) only when an entry is held, and on
+     * `304` returns the stored body object itself (it carries the masking note, which `noted` re-applies). Any other
+     * error drops the entry and propagates unchanged; a response without an ETag stores nothing.
+     */
+    private conditionalPost<T extends { masking?: MaskingNote }>(path: string, req: unknown): Observable<T> {
+        const key = this.reads.keyOf('POST', path, req);
+        const held = this.reads.entry(key);
+        const send = (etag: string | null) =>
+            this.http.post<T>(apiUrl(path), req, {
+                observe: 'response',
+                headers: etag ? { 'If-None-Match': etag } : undefined,
+            });
+        const keep = map((res: { body: T | null; headers: { get(n: string): string | null } }) => {
+            this.reads.store(key, res.headers.get('ETag'), res.body);
+            return res.body as T;
+        });
+        return this.noted(
+            send(held?.etag ?? null).pipe(
+                keep,
+                catchError((err: unknown) => {
+                    if (err instanceof HttpErrorResponse && err.status === 304) {
+                        if (held) {
+                            this.reads.touch(key);
+                            return of(held.body as T);
+                        }
+                        this.reads.drop(key); // a 304 nobody asked for: ask once more, unconditionally
+                        return send(null).pipe(keep);
+                    }
+                    this.reads.drop(key);
+                    return throwError(() => err);
+                }),
+            ),
+        );
+    }
+
     project(req: ProjectionRequest): Observable<ProjectionResult> {
-        return this.noted(this.http.post<ProjectionResult>(apiUrl('/inv/projection'), req));
+        return this.conditionalPost<ProjectionResult>('/inv/projection', req);
     }
 
     /** Phase E incremental expand: the one-hop neighborhood of `req.value` within the mapping. */
     neighbors(req: NeighborsRequest): Observable<ProjectionResult> {
-        return this.noted(this.http.post<ProjectionResult>(apiUrl('/inv/projection/neighbors'), req));
+        return this.conditionalPost<ProjectionResult>('/inv/projection/neighbors', req);
     }
 
     /** LA-EXPAND-PICK-NEIGHBOURS-1: a window of the entity's neighbours with the real total; never held by the fan-out threshold. */

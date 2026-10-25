@@ -32,7 +32,8 @@ import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { CANVAS_MIN_PX, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
-import { PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
+import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
+import { GRAPH_CACHE_TTL_MS, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { SpacesService } from '@inspecto/core/api';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
@@ -164,6 +165,7 @@ function create(
                           provide: InvService,
                           useValue: {
                               masking: signal(null),
+                              reads: new ConditionalReadCache(() => ''),
                               listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }),
                               ...opts.inv,
                           },
@@ -4099,6 +4101,41 @@ describe('LinkAnalysisComponent - smart data fetch (PERF-P10a)', () => {
         await c.refreshFromServer(); // the Refresh bypass always asks
         expect(queried).toHaveLength(3);
         expect(c.cachedAsOf()).toBeNull();
+    });
+
+    it('PERF-P10a-2: an EXPIRED entry whose re-read folds to the same graph keeps the previous graph object; canvasData keeps its identity', async () => {
+        const { c, queried } = await drawn();
+        const src = TestBed.inject(GraphSourcesService).byId('entity-projection')!;
+        const orig = src.query.bind(src);
+        let variant: 'same' | 'changed' = 'same';
+        // what a 304 round trip yields: a fresh fold of identical content (a new object every time)
+        src.query = async (q) => {
+            const g = structuredClone(await orig(q));
+            if (variant === 'changed') g.nodes.push({ id: 'z', data: { label: 'Z', kind: 'entity' } } as never);
+            return g;
+        };
+        await c.run(); // inside the trust window: served from the client
+        const g1 = c.graph();
+        const canvas1 = c.canvasData();
+        const n = queried.length;
+        const t0 = Date.now();
+        const now = vi.spyOn(Date, 'now').mockReturnValue(t0 + GRAPH_CACHE_TTL_MS + 1);
+        try {
+            await c.run(); // expired -> source.query runs again
+            expect(queried).toHaveLength(n + 1);
+            expect(c.cachedAsOf()).toBeNull();
+            expect(c.graph()).toBe(g1);
+            expect(c.canvasData()).toBe(canvas1);
+            variant = 'changed';
+            now.mockReturnValue(t0 + 2 * GRAPH_CACHE_TTL_MS + 2);
+            await c.run(); // expired again, but the content really changed -> a NEW graph
+            expect(queried).toHaveLength(n + 2);
+            expect(c.graph()).not.toBe(g1);
+            expect(c.graph()!.nodes.map((x) => x.id)).toContain('z');
+            expect(c.canvasData()).not.toBe(canvas1);
+        } finally {
+            now.mockRestore();
+        }
     });
 
     it('a burst of pushFilter calls makes ONE request after the pause, carrying the last filter', async () => {
