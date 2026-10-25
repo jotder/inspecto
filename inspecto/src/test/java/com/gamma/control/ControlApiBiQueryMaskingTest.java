@@ -130,6 +130,13 @@ class ControlApiBiQueryMaskingTest {
 
     private static final String BY_MSISDN = "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"msisdn\"]";
 
+    /** A saved query a viewer runs that computes over a key: refused by the run-time vet before it runs (BI-MASKING-FREE-SQL-ORACLES-1). */
+    private static void assertRefusedOrAllMasked(HttpResponse<String> r, String id) {
+        assertEquals(422, r.statusCode(), id + " -> " + r.body());
+        assertTrue(r.body().contains(BiResultMasking.REVEAL), id + " -> " + r.body());
+        assertNoRaw(r.body());
+    }
+
     private static void assertNoRaw(String body) {
         for (String raw : List.of(A, B, C)) assertFalse(body.contains(raw), "raw key " + raw + " must not appear: " + body);
     }
@@ -408,7 +415,10 @@ class ControlApiBiQueryMaskingTest {
             reg.write("query", "plain_q", Map.of("type", "sql", "datasetId", "calls_ds",
                     "text", "SELECT msisdn, region, amount FROM calls_ds"));
             reg.write("query", "alias_q", Map.of("type", "sql", "datasetId", "calls_ds",
-                    "text", "SELECT msisdn AS m, upper(msisdn) AS u, region, count(*) AS n FROM calls_ds GROUP BY ALL"));
+                    "text", "SELECT msisdn AS m, region, count(*) AS n FROM calls_ds GROUP BY ALL"));
+            // BI-MASKING-FREE-SQL-ORACLES-1: a function over the key is refused for a viewer (it was masked before)
+            reg.write("query", "upper_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT upper(msisdn) AS u, region FROM calls_ds"));
             reg.write("query", "clean_q", Map.of("type", "sql", "datasetId", "plain_ds",
                     "text", "SELECT msisdn AS m, region FROM plain_ds"));
 
@@ -425,8 +435,9 @@ class ControlApiBiQueryMaskingTest {
             assertNoRaw(aliased.body());
             JsonNode a = V1Body.of(aliased.body());
             assertTrue(column(a.get("rows"), "m").stream().allMatch(s -> s.startsWith("masked:")), "msisdn AS m");
-            assertTrue(column(a.get("rows"), "u").stream().allMatch(s -> s.startsWith("masked:")), "upper(msisdn) AS u");
             assertTrue(a.get("rows").get(0).get("n").isNumber(), "a count stays a number");
+            assertEquals(422, post(c, "viewer", "/queries/upper_q/run", null).statusCode(), "upper(msisdn) AS u");
+            assertEquals(200, post(c, "revealer", "/queries/upper_q/run", null).statusCode());
             assertEquals(Set.of("EU", "US"), Set.copyOf(column(a.get("rows"), "region")));
 
             assertTrue(column(V1Body.of(post(c, "revealer", "/queries/plain_q/run", null).body()).get("rows"), "msisdn").contains(A));
@@ -482,7 +493,8 @@ class ControlApiBiQueryMaskingTest {
             String probe = "{\"parameters\":{\"prefix\":\"4417009001%\"}}";
             assertEquals(422, post(c, "viewer", "/queries/probe_q/run", probe).statusCode(), "the oracle is refused");
             assertEquals(200, post(c, "revealer", "/queries/probe_q/run", probe).statusCode(), "a revealer is unrestricted");
-            assertEquals(200, post(c, "viewer", "/queries/probe_q/run", null).statusCode(), "the author's default is trusted");
+            assertEquals(422, post(c, "viewer", "/queries/probe_q/run", null).statusCode(),
+                    "the author's own key predicate is vetted per caller at run time (BI-MASKING-FREE-SQL-ORACLES-1)");
             assertEquals(200, post(c, "viewer", "/queries/region_q/run", "{\"parameters\":{\"r\":\"US\"}}").statusCode(),
                     "a parameter over an unclassified column is not an oracle");
         }
@@ -500,22 +512,13 @@ class ControlApiBiQueryMaskingTest {
                     "text", "SELECT CAST(msisdn AS BIGINT) AS amount, region FROM calls_ds"));
             reg.write("query", "case_q", Map.of("type", "sql", "datasetId", "calls_ds",
                     "text", "SELECT region, count(CASE WHEN msisdn = '" + A + "' THEN 1 END) AS hits FROM calls_ds GROUP BY region"));
-            HttpResponse<String> r = post(c, "viewer", "/queries/cast_q/run", null);
-            assertEquals(200, r.statusCode(), r.body());
-            assertNoRaw(r.body());
-            assertFalse(r.body().contains("441700900102"), "the +1 derivation must not appear either: " + r.body());
-            JsonNode v = V1Body.of(r.body());
-            assertTrue(column(v.get("rows"), "m").stream().allMatch(s -> s.startsWith("masked:")), v.get("rows").toString());
-            assertTrue(column(v.get("rows"), "m1").stream().allMatch(s -> s.startsWith("masked:")));
-            assertTrue(v.get("rows").get(0).get("safe_amount").isNumber(), "an unrelated numeric stays a number");
-            assertTrue(v.get("rows").get(0).get("n").isNumber(), "a count stays a number");
-
-            // Aliasing the derivation to a name the Dataset declares clean does not hide it.
-            JsonNode h = V1Body.of(post(c, "viewer", "/queries/hide_q/run", null).body());
-            assertTrue(column(h.get("rows"), "amount").stream().allMatch(s -> s.startsWith("masked:")), h.get("rows").toString());
-            // A count over a CASE on the key is a test of its value, not a count: masked.
-            JsonNode k = V1Body.of(post(c, "viewer", "/queries/case_q/run", null).body());
-            assertTrue(column(k.get("rows"), "hits").stream().allMatch(s -> s.startsWith("masked:")), k.get("rows").toString());
+            // BI-MASKING-FREE-SQL-ORACLES-1: a cast, a +1, a cast aliased to a clean name and a count over a CASE on the key are
+            // not bare uses, so a viewer is refused before anything runs (they were masked in the output before).
+            for (String id : List.of("cast_q", "hide_q", "case_q")) {
+                HttpResponse<String> r = post(c, "viewer", "/queries/" + id + "/run", null);
+                assertEquals(422, r.statusCode(), id + " -> " + r.body());
+                assertNoRaw(r.body());
+            }
 
             JsonNode rev = V1Body.of(post(c, "revealer", "/queries/cast_q/run", null).body());
             assertTrue(rev.get("rows").get(0).get("m").isNumber(), "a revealer sees the number");
@@ -536,10 +539,7 @@ class ControlApiBiQueryMaskingTest {
             for (Map.Entry<String, String> e : texts.entrySet())
                 reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()));
             for (String id : texts.keySet()) {
-                HttpResponse<String> r = post(c, "viewer", "/queries/" + id + "/run", null);
-                assertEquals(200, r.statusCode(), id + " -> " + r.body());
-                V1Body.of(r.body()).get("rows").forEach(row -> row.forEach(cell ->
-                        assertTrue(cell.isNull() || cell.asText().startsWith("masked:"), id + " -> " + row)));
+                assertRefusedOrAllMasked(post(c, "viewer", "/queries/" + id + "/run", null), id);
                 assertEquals(200, post(c, "revealer", "/queries/" + id + "/run", null).statusCode(), "a revealer: " + id);
             }
         }
@@ -559,12 +559,7 @@ class ControlApiBiQueryMaskingTest {
             for (Map.Entry<String, String> e : texts.entrySet())
                 reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()));
             for (String id : texts.keySet()) {
-                HttpResponse<String> r = post(c, "viewer", "/queries/" + id + "/run", null);
-                assertEquals(200, r.statusCode(), id + " -> " + r.body());
-                JsonNode rows = V1Body.of(r.body()).get("rows");
-                assertNoRaw(rows.toString());
-                rows.forEach(row -> row.forEach(cell ->
-                        assertTrue(cell.isNull() || cell.asText().startsWith("masked:"), id + " -> " + row)));
+                assertRefusedOrAllMasked(post(c, "viewer", "/queries/" + id + "/run", null), id);
                 assertEquals(200, post(c, "revealer", "/queries/" + id + "/run", null).statusCode(), "a revealer: " + id);
             }
             // A caller sort on the author's alias of the key would return the rows in raw key order next to the alias.
@@ -586,8 +581,8 @@ class ControlApiBiQueryMaskingTest {
             JsonNode bare = V1Body.of(bi(c, "viewer", "calls_ds", "\"query\":\"bare_q\"," + BY_MSISDN).body());
             assertTrue(column(bare.get("rows"), "msisdn").stream().allMatch(s -> s.matches(spaceAlias)), bare.get("rows").toString());
             assertTrue(runAliases.containsAll(column(bare.get("rows"), "msisdn")), "one id, one alias: " + bare.get("rows"));
-            JsonNode prefix = V1Body.of(bi(c, "viewer", "calls_ds", "\"query\":\"prefix_q\"," + BY_MSISDN).body());
-            assertTrue(column(prefix.get("rows"), "msisdn").stream().noneMatch(s -> s.matches(spaceAlias)), prefix.get("rows").toString());
+            // BI-MASKING-FREE-SQL-ORACLES-1: a derived prefix in the bound text is refused for a viewer before it runs
+            assertEquals(422, bi(c, "viewer", "calls_ds", "\"query\":\"prefix_q\"," + BY_MSISDN).statusCode());
             // An author's name collision (blank-padded, case-only, or a Measure id) does not hand a chosen value the alias.
             Map<String, String> collide = Map.of(
                     "pad_q", "SELECT msisdn AS \" k\", '" + A + "' AS \"k\" FROM calls_ds",
@@ -596,8 +591,10 @@ class ControlApiBiQueryMaskingTest {
             for (Map.Entry<String, String> e : collide.entrySet())
                 reg.write("query", e.getKey(), Map.of("type", "sql", "datasetId", "calls_ds", "text", e.getValue()));
             for (String id : List.of("pad_q", "case_q2")) {
-                JsonNode w = V1Body.of(bi(c, "viewer", "calls_ds",
-                        "\"query\":\"" + id + "\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"k\"]").body());
+                HttpResponse<String> wr = bi(c, "viewer", "calls_ds",
+                        "\"query\":\"" + id + "\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"k\"]");
+                if (wr.statusCode() == 422) continue;   // case_q2 computes over the key: refused before it runs
+                JsonNode w = V1Body.of(wr.body());
                 w.get("rows").forEach(row -> row.forEach(cell ->
                         assertFalse(cell.asText().matches(spaceAlias), id + " -> " + row)));
             }
@@ -719,13 +716,11 @@ class ControlApiBiQueryMaskingTest {
             reg.write("query", "oddmax_q", Map.of("type", "sql", "datasetId", "odd_ds",
                     "text", "SELECT max(\"msisdn no\") AS m FROM odd_ds"));
             // The saved queries run raw for nobody who cannot reveal.
-            for (Map.Entry<String, String> e : Map.of("oddk_q", "k", "oddmax_q", "m").entrySet()) {
-                HttpResponse<String> r = post(c, "viewer", "/queries/" + e.getKey() + "/run", null);
-                assertEquals(200, r.statusCode(), e.getKey() + " -> " + r.body());
-                assertNoRaw(r.body());
-                V1Body.of(r.body()).get("rows").forEach(row ->
-                        assertTrue(row.get(e.getValue()).asText().startsWith("masked:"), e.getKey() + " -> " + row));
-            }
+            HttpResponse<String> oddk = post(c, "viewer", "/queries/oddk_q/run", null);
+            assertEquals(200, oddk.statusCode(), oddk.body());
+            assertNoRaw(oddk.body());
+            V1Body.of(oddk.body()).get("rows").forEach(row -> assertTrue(row.get("k").asText().startsWith("masked:"), "oddk_q -> " + row));
+            assertEquals(422, post(c, "viewer", "/queries/oddmax_q/run", null).statusCode(), "max over the key is not a bare use");
             // Other names that are no plain word: an embedded double quote, only whitespace, a non-ASCII letter whose lower case
             // depends on its position (Java's final sigma), each reached by a text that never spells the name literally.
             Map<String, String[]> odd = Map.of(
@@ -810,6 +805,76 @@ class ControlApiBiQueryMaskingTest {
             assertTrue(v.get("masking").get("masked").asBoolean());
             // The hole bound to a masked column is an oracle: refused when the caller supplies the value.
             assertEquals(422, post(c, "author", "/rule-templates/byKey/simulate", "{\"params\":{\"who\":\"" + A + "\"}}").statusCode());
+            // BI-MASKING-FREE-SQL-ORACLES-1: the template's OWN predicate on the key (its default value) is an oracle too
+            assertEquals(422, post(c, "author", "/rule-templates/byKey/simulate", "{}").statusCode(), "the template's own key predicate");
+        }
+    }
+
+    // ── BI-MASKING-FREE-SQL-ORACLES-1 / BI-MASKING-STRUCTURED-RESIDUALS-1 / BI-MASKING-SIBLING-TYPED-CLASS-1 ─────────────
+
+    /** A saved query's own predicate on a key bisects it: vetted per caller at run time; a revealer runs the same text. */
+    @Test
+    void aSavedQueryThatTestsAMaskedKeyIsRefusedForAViewerAndRunsForARevealer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("query", "eq_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT count(*) AS n FROM calls_ds WHERE msisdn = '" + A + "'"));
+            reg.write("query", "like_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT count(*) AS n FROM calls_ds WHERE msisdn LIKE '4417009002%'"));
+            reg.write("query", "case_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT CASE WHEN msisdn = '" + A + "' THEN 'hit' ELSE 'miss' END AS z FROM calls_ds"));
+            // bare uses stay open: a bare key, a bare group, count over it
+            reg.write("query", "bare_q", Map.of("type", "sql", "datasetId", "calls_ds",
+                    "text", "SELECT msisdn, count(msisdn) AS n, count(DISTINCT msisdn) AS d FROM calls_ds GROUP BY msisdn"));
+            for (String q : List.of("eq_q", "like_q", "case_q")) {
+                HttpResponse<String> r = post(c, "author", "/queries/" + q + "/run", null);
+                assertEquals(422, r.statusCode(), q + ": " + r.body());
+                assertEquals(200, post(c, "revealer", "/queries/" + q + "/run", null).statusCode(), q + " for a revealer");
+            }
+            HttpResponse<String> bare = post(c, "viewer", "/queries/bare_q/run", null);
+            assertEquals(200, bare.statusCode(), bare.body());
+            assertNoRaw(bare.body());
+        }
+    }
+
+    /** STRUCTURED-RESIDUALS (2): a capped grouped spec with no Measure is ordered by its key, so a viewer is refused. */
+    @Test
+    void aGroupByOnlySpecOverAMaskedKeyIsRefusedForAViewer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            assertEquals(422, bi(c, "viewer", "calls_ds", "\"groupBy\":[\"msisdn\"]").statusCode());
+            assertEquals(200, bi(c, "revealer", "calls_ds", "\"groupBy\":[\"msisdn\"]").statusCode());
+            assertEquals(200, bi(c, "viewer", "calls_ds", "\"groupBy\":[\"region\"]").statusCode(), "a clean group is not refused");
+        }
+    }
+
+    /** STRUCTURED-RESIDUALS (2): with a Measure and no ORDER BY the default key order is replaced by the Measure's. */
+    @Test
+    void aGroupedSpecWithNoOrderIsNotReturnedInRawKeyOrderForAViewer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of());
+            HttpResponse<String> r = bi(c, "viewer", "calls_ds", BY_MSISDN + ",\"limit\":10");
+            assertEquals(200, r.statusCode(), r.body());
+            assertNoRaw(r.body());
+            String sql = V1Body.of(r.body()).path("sql").asText("");
+            assertFalse(sql.matches("(?is).*ORDER BY\\s+\"msisdn\".*"), "never ordered by the raw key: " + sql);
+        }
+    }
+
+    /** SIBLING-TYPED-CLASS: a sibling's IMEI (a masked type outside SENSITIVE) is inherited under typed masking. */
+    @Test
+    void aSiblingsImeiClassificationIsInheritedUnderTypedMasking(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("dev_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('356938035643809','EU'),('356938035643810','US')) AS t(imei,region)", "2026-07-08T00:00:00Z"));
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("dataset", "dev_sib", Map.of("physicalRef", "dev_view", "columns", List.of(Map.of("name", "imei", "classification", "IMEI"))));
+            reg.write("dataset", "dev_ds", Map.of("view", "dev_view", "columns", List.of(Map.of("name", "region"))));
+            HttpResponse<String> r = bi(c, "viewer", "dev_ds", "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"imei\"]");
+            assertEquals(200, r.statusCode(), r.body());
+            assertFalse(r.body().contains("356938035643809"), "the sibling's IMEI is masked: " + r.body());
+            assertEquals(200, bi(c, "revealer", "dev_ds", "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"imei\"]").statusCode());
         }
     }
 }

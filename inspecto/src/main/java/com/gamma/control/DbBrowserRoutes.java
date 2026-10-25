@@ -391,7 +391,7 @@ final class DbBrowserRoutes implements RouteModule {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         List<Object> columns = new ArrayList<>();
         for (ComponentRegistry.Component c : store.list("dataset"))
-            if (storeName.equals(String.valueOf(c.content().get("physicalRef"))) && c.content().get("columns") instanceof List<?> cols)
+            if (storeName.equals(String.valueOf(c.content().get("physicalRef")).trim()) && c.content().get("columns") instanceof List<?> cols)
                 columns.addAll(cols);
         Map<String, Object> pseudo = new LinkedHashMap<>();
         pseudo.put("physicalRef", storeName);

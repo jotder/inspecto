@@ -112,6 +112,7 @@ final class RuleRoutes implements RouteModule {
             Map<String, String> supplied = callerValues(body);
             masking.vetFields(template.params().stream().filter(p -> supplied.containsKey(p.name())).map(RuleTemplate.Param::field).toList(),
                     "comparing a caller-supplied value with");
+            masking.vetAdHocSql(resolved);   // BI-MASKING-FREE-SQL-ORACLES-1: the template's own text, per caller
         }
 
         QueryExecutor.Result result;

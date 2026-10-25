@@ -75,6 +75,36 @@ class ExchangeSnapshotTest {
                 .columns().forEach(c -> assertEquals("NONE", c.get("classification")));
     }
 
+    /**
+     * LINEAGE-SIBLING-NAME-TRIM-1 / BI-MASKING-SIBLING-TYPED-CLASS-1: a sibling's weaker class never overwrites the owner's own
+     * (strictest wins), a sibling column name with blanks is the same column, and a sibling class outside SENSITIVE (IMEI) is
+     * carried for the consumer to judge.
+     */
+    @Test
+    void theSnapshotKeepsTheStrictestClassAndCarriesSiblingClassesOutsideSensitive(@TempDir Path spacesRoot) throws Exception {
+        Path registry = spacesRoot.resolve("finance").resolve("config").resolve("registry");
+        Path dataRoot = spacesRoot.resolve("finance").resolve("data");
+        Files.createDirectories(dataRoot.resolve("devs"));
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement s = c.createStatement()) {
+            s.execute("COPY (SELECT * FROM (VALUES ('441700900101','356938035643809',1.0)) t(msisdn,imei,amount)) TO "
+                    + "'" + unix(dataRoot.resolve("devs").resolve("part.parquet")) + "' (FORMAT PARQUET)");
+        }
+        ComponentStore reg = new ComponentStore(registry);
+        reg.write("dataset", "devs", Map.of("physicalRef", "devs", "columns", java.util.List.of(
+                Map.of("name", "msisdn", "classification", "MSISDN"), Map.of("name", "amount"))));
+        // NEGATIVE PROBE: before the fix IMEI was dropped; trimming " msisdn " without strictest-wins lets the sibling's PII replace MSISDN
+        reg.write("dataset", "devs_sib", Map.of("physicalRef", "devs", "columns", java.util.List.of(
+                Map.of("name", " msisdn ", "classification", "PII"), Map.of("name", "imei", "classification", "IMEI"))));
+
+        Map<String, Object> byName = new java.util.HashMap<>();
+        ExchangeSnapshotWriter.publish(Exchange.under(spacesRoot).dir(), "finance", registry, dataRoot,
+                        spacesRoot.resolve("finance").resolve("views"), "devs")
+                .columns().forEach(c -> byName.put(String.valueOf(c.get("name")), c.get("classification")));
+        assertEquals("MSISDN", byName.get("msisdn"), "the owner's stricter class stands");
+        assertEquals("IMEI", byName.get("imei"), "a sibling class outside SENSITIVE is carried");
+        assertEquals("NONE", byName.get("amount"));
+    }
+
     @Test
     void publishThenResolveThroughGrant(@TempDir Path spacesRoot) throws Exception {
         SnapshotMeta meta = seedAndPublish(spacesRoot);

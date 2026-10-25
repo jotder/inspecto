@@ -112,6 +112,16 @@ public final class EvidenceMasker {
      */
     public static Map<String, String> lineageClassification(String datasetId, Map<String, ?> ds, ComponentStore store,
                                                             ViewStore views) {
+        return lineageClassification(datasetId, ds, store, views, SENSITIVE::contains);
+    }
+
+    /**
+     * {@link #lineageClassification(String, Map, ComponentStore, ViewStore)} keeping the classes {@code masked} accepts, for a
+     * reader that judges by its own claim (a masked Entity Type such as IMEI, WALLET, SUBSCRIBER; BI-MASKING-SIBLING-TYPED-CLASS-1)
+     * instead of {@link #SENSITIVE}. Sibling column names are trimmed and lower-cased, like every other reader's.
+     */
+    public static Map<String, String> lineageClassification(String datasetId, Map<String, ?> ds, ComponentStore store,
+                                                            ViewStore views, Predicate<String> masked) {
         Set<String> stores = new java.util.HashSet<>(datasetStores(ds));
         String view = str(ds.get("view"));
         if (view != null) {
@@ -131,11 +141,11 @@ public final class EvidenceMasker {
                 for (Object o : cols)
                     if (o instanceof Map<?, ?> col && col.get("name") != null && col.get("classification") != null) {
                         String cl = String.valueOf(col.get("classification")).trim().toUpperCase(Locale.ROOT);
-                        if (SENSITIVE.contains(cl))
-                            out.merge(String.valueOf(col.get("name")).toLowerCase(Locale.ROOT), cl, ColumnClassification::stricter);
+                        if (masked.test(cl))
+                            put(out, String.valueOf(col.get("name")).trim().toLowerCase(Locale.ROOT), cl, masked);
                     }
         }
-        schemaClassification(store.root().getParent(), stores, out);
+        schemaClassification(store.root().getParent(), stores, masked).forEach((col, cl) -> put(out, col, cl, masked));
         return out;
     }
 

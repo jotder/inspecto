@@ -162,15 +162,18 @@ class ControlApiDbBrowserMaskingTest {
             assertNoRaw(sel.body());
             assertTrue(column(V1Body.of(sel.body()).get("rows"), "msisdn").stream().allMatch(s -> s.startsWith("masked:")));
 
-            // Derived and renamed: still masked, a count still a number.
+            // Renamed and grouped bare: still masked, a count still a number.
             JsonNode d = V1Body.of(as("reader", c, "POST", "/spaces/s1/db/query", query("calls",
-                    "SELECT CAST(msisdn AS BIGINT) AS m, msisdn AS renamed, count(*) AS n FROM calls GROUP BY ALL")).body());
-            assertTrue(column(d.get("rows"), "m").stream().allMatch(s -> s.startsWith("masked:")), d.toString());
-            assertTrue(column(d.get("rows"), "renamed").stream().allMatch(s -> s.startsWith("masked:")));
+                    "SELECT msisdn AS renamed, count(*) AS n, count(DISTINCT msisdn) AS d FROM calls GROUP BY msisdn")).body());
+            assertTrue(column(d.get("rows"), "renamed").stream().allMatch(s -> s.startsWith("masked:")), d.toString());
             assertTrue(d.get("rows").get(0).get("n").isNumber());
 
-            // Every way to test or bisect the raw value is refused for a reader and allowed for a revealer.
+            // Every way to test or bisect the raw value is refused for a reader and allowed for a revealer
+            // (BI-MASKING-FREE-SQL-ORACLES-1: a key may be named only bare - a cast, CASE or function over it is refused too).
             for (String probe : List.of(
+                    "SELECT CAST(msisdn AS BIGINT) AS m FROM calls",
+                    "SELECT CASE WHEN msisdn = '" + A + "' THEN 'hit' ELSE 'miss' END AS z FROM calls",
+                    "SELECT count(*) AS n FROM calls GROUP BY substr(msisdn, 1, 6)",
                     "SELECT region FROM calls WHERE msisdn LIKE '4417009%'",
                     "SELECT region FROM calls WHERE msisdn = '" + A + "'",
                     "SELECT count(*) FROM calls WHERE CAST(msisdn AS BIGINT) > 441700900150",
@@ -181,12 +184,22 @@ class ControlApiDbBrowserMaskingTest {
                     "SELECT region FROM (SELECT * FROM calls WHERE msisdn = '" + A + "') x",
                     "WITH w AS (SELECT msisdn, region FROM calls) SELECT region FROM w WHERE msisdn = '" + A + "'")) {
                 HttpResponse<String> refused = as("reader", c, "POST", "/spaces/s1/db/query", query("calls", probe));
-                if (refused.statusCode() == 200) {
-                    // A probe the parse tree lets through must at least have its output masked (the CASE / FILTER counts).
-                    assertNoRaw(refused.body());
-                    assertTrue(column(V1Body.of(refused.body()).get("rows"), "hit").stream().allMatch(s -> s.startsWith("masked:")), probe);
-                } else assertEquals(422, refused.statusCode(), probe + " -> " + refused.body());
+                assertEquals(422, refused.statusCode(), probe + " -> " + refused.body());
                 assertEquals(200, as("revealer", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), "a revealer: " + probe);
+            }
+            // A run-time error is a yes / no answer (422 when the key exists, 200 when not): refused before anything runs.
+            HttpResponse<String> oracle = as("reader", c, "POST", "/spaces/s1/db/query", query("calls",
+                    "SELECT CASE WHEN msisdn = '" + B + "' THEN error('x') ELSE 'ok' END AS z FROM calls"));
+            assertEquals(422, oracle.statusCode(), oracle.body());
+            assertTrue(oracle.body().contains("may only be"), "refused by the masking vet, not by the error: " + oracle.body());
+            // ...also when a star or unnest sits in the same item (a star deep inside an expression is not a bare use)
+            for (String hidden : List.of(
+                    "SELECT CASE WHEN COLUMNS('msisdn') = '" + B + "' THEN error('x') ELSE 1 END AS z FROM calls",
+                    "SELECT CASE WHEN msisdn = '" + B + "' THEN error('x') ELSE 1 END + 0 * unnest([1]) AS z FROM calls",
+                    "SELECT count(*) FILTER (WHERE COLUMNS('msisdn') LIKE '4417%') AS n FROM calls")) {
+                HttpResponse<String> h = as("reader", c, "POST", "/spaces/s1/db/query", query("calls", hidden));
+                assertEquals(422, h.statusCode(), hidden + " -> " + h.body());
+                assertTrue(h.body().contains("may only be"), "refused by the vet before it runs: " + hidden + " -> " + h.body());
             }
             // A query that never names the key is unrestricted.
             assertEquals(200, as("reader", c, "POST", "/spaces/s1/db/query",
@@ -214,6 +227,10 @@ class ControlApiDbBrowserMaskingTest {
                     "SELECT * FROM calls a, calls b",
                     "SELECT unlist({'a': region, 'b': amount}), CAST(msisdn AS BIGINT) AS m FROM calls")) {   // the second key comes back as msisdn_1
                 HttpResponse<String> r = as("reader", c, "POST", "/spaces/s1/db/query", query("calls", probe));
+                // BI-MASKING-FREE-SQL-ORACLES-1: a shape that computes over the key is refused; only a bare star (a self-join,
+                // a set operation, a subquery) may still come back, masked whole
+                boolean bareShape = probe.startsWith("SELECT * FROM") || probe.contains("UNION ALL") || probe.startsWith("SELECT (SELECT");
+                if (!bareShape) assertEquals(422, r.statusCode(), "computes over the key: " + probe + " -> " + r.body());
                 if (r.statusCode() == 200) {
                     V1Body.of(r.body()).get("rows").forEach(row -> row.forEach(cell ->
                             assertTrue(cell.isNull() || cell.asText().startsWith("masked:"), probe + " -> " + row)));
@@ -235,6 +252,9 @@ class ControlApiDbBrowserMaskingTest {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(root)) {
             for (String probe : List.of(
+                    // a join on the key the ON check cannot see (BI-MASKING-FREE-SQL-ORACLES-1 verification): USING holds names
+                    "SELECT count(*) AS n FROM calls a JOIN calls b USING (msisdn) WHERE a.region = 'EU' AND b.region = 'US'",
+                    "SELECT count(*) AS n FROM calls a NATURAL JOIN calls b",
                     "SELECT region FROM calls WHERE COLUMNS('msi.*') = '" + A + "'",
                     "SELECT msisdn AS k, region FROM calls ORDER BY 1",
                     "SELECT msisdn AS k FROM calls ORDER BY ALL",
@@ -300,6 +320,25 @@ class ControlApiDbBrowserMaskingTest {
         }
     }
 
+    /**
+     * BI-MASKING-SIBLING-TYPED-CLASS-1: {@code /db/table} masks a store column that a Dataset with a blank-padded {@code physicalRef}
+     * classifies with a masked type outside SENSITIVE (IMEI). NEGATIVE PROBE: before the fix the padded ref missed the store's
+     * own columns and the SENSITIVE-only lineage dropped IMEI, so the column came back raw.
+     */
+    @Test
+    void aStoreColumnClassifiedImeiByAPaddedPhysicalRefIsMaskedOnDbTable(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            ComponentStore reg = new ComponentStore(root.resolve("s1").resolve("config").resolve("registry"));
+            reg.write("dataset", "plain_pad", Map.of("physicalRef", " plain ",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "IMEI"))));
+            HttpResponse<String> t = as("reader", c, "GET", "/spaces/s1/db/table?name=plain", null);
+            assertEquals(200, t.statusCode(), t.body());
+            assertNoRaw(t.body());
+            assertTrue(column(V1Body.of(t.body()).get("rows"), "msisdn").stream().allMatch(s -> s.startsWith("masked:")), t.body());
+        }
+    }
+
     /** BI-MASKING-ROW-VALUE-LEAKS-1: a rename in FROM, or the row itself as a value, returns the key: refused, or every cell masked. */
     @Test
     void aFromClauseRenameOrTheRowAsAValueIsMaskedWhole(@TempDir Path root) throws Exception {
@@ -355,15 +394,17 @@ class ControlApiDbBrowserMaskingTest {
     void aDerivedValueOfAKeyCannotBeMatchedAgainstAKnownValue(@TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(root)) {
+            // BI-MASKING-FREE-SQL-ORACLES-1: a digit or a rank derived from the key is refused before it runs
+            assertEquals(422, as("reader", c, "POST", "/spaces/s1/db/query", query("calls",
+                    "SELECT msisdn, substr(msisdn, 1, 1) AS d, CAST(msisdn AS BIGINT) % 10 AS r FROM calls")).statusCode());
             JsonNode rows = V1Body.of(as("reader", c, "POST", "/spaces/s1/db/query", query("calls",
-                    "SELECT msisdn, substr(msisdn, 1, 1) AS d, '4' AS k, CAST(msisdn AS BIGINT) % 10 AS r, '1' AS one "
-                            + "FROM calls")).body()).get("rows");
+                    "SELECT msisdn, '4' AS k, '1' AS one FROM calls")).body()).get("rows");
             assertEquals(3, rows.size(), rows.toString());
             String spaceAlias = "masked:[0-9a-f]{16}";
             for (JsonNode row : rows) {
                 assertTrue(row.get("msisdn").asText().matches(spaceAlias), "the bare key keeps its alias: " + row);
-                // a digit, a rank, or a value the caller typed: none may carry a Space alias, or '4' decodes the first digit
-                for (String col : List.of("d", "k", "r", "one")) {
+                // a value the caller typed must not carry a Space alias, or '4' would be compared with a known key
+                for (String col : List.of("k", "one")) {
                     assertTrue(row.get(col).asText().startsWith("masked:"), row.toString());
                     assertFalse(row.get(col).asText().matches(spaceAlias), col + " must not be linkable: " + row);
                 }

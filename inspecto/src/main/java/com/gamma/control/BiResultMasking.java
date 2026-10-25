@@ -159,9 +159,10 @@ final class BiResultMasking {
             if (EvidenceMasker.UNKNOWN_LINEAGE.equals(e.getKey())) unknown = true;
             else if (claim.test(e.getValue())) masked.add(norm(e.getKey()));
         }
-        // The claim-based schema pass, which also sees classes outside SENSITIVE that a masked type claims (IMEI, WALLET).
-        for (Map.Entry<String, String> e : EvidenceMasker.schemaClassification(
-                writeRoot, EvidenceMasker.datasetStores(dataset), claim).entrySet()) {
+        // The claim-based lineage pass (sibling Datasets AND pipeline schema), which also sees classes outside SENSITIVE that a
+        // masked type claims (IMEI, WALLET, SUBSCRIBER; BI-MASKING-SIBLING-TYPED-CLASS-1).
+        Map<String, String> claimed = EvidenceMasker.lineageClassification(datasetId, dataset, store, views, claim);
+        for (Map.Entry<String, String> e : claimed.entrySet()) {
             if (EvidenceMasker.UNKNOWN_LINEAGE.equals(e.getKey())) unknown = true;
             else masked.add(norm(e.getKey()));
         }
@@ -179,7 +180,7 @@ final class BiResultMasking {
             if (notBlank(dataset.get("view")) || notBlank(dataset.get("sql"))) unknown = true;   // a rename cannot be traced
         }
         // A view or virtual Dataset over a store with classified columns: a rename cannot be traced (EvidenceMasker's rule).
-        if (!lineage.isEmpty() && (notBlank(dataset.get("view")) || notBlank(dataset.get("sql")))) unknown = true;
+        if ((!lineage.isEmpty() || !claimed.isEmpty()) && (notBlank(dataset.get("view")) || notBlank(dataset.get("sql")))) unknown = true;
 
         // A calculated column that names a masked column carries it (run twice so a chain of two is followed), and so does one
         // that names the row it is computed over (review R4: concat(__base) is the whole row, raw key included).
@@ -285,7 +286,12 @@ final class BiResultMasking {
         if (checkFilters)
             for (MeasureCompiler.Filter f : spec.filters()) refuseIfMasked(f.field(), "filtering", viaText);
         for (String field : whenFields(spec.when())) refuseIfMasked(field, "filtering", viaText);
-        for (MeasureCompiler.Sort s : spec.orderBy()) refuseIfMasked(s.field(), "ordering", viaText);
+        // a Measure / ratio id is an aggregate the checks below vet, not a Dataset column (stripCosmeticOrder orders by one)
+        Set<String> outputs = new HashSet<>();
+        for (MeasureCompiler.Measure m : spec.measures()) if (m.id() != null) outputs.add(m.id());
+        for (MeasureCompiler.Ratio r : spec.ratios()) if (r.id() != null) outputs.add(r.id());
+        for (MeasureCompiler.Sort s : spec.orderBy())
+            if (!(outputs.contains(s.field()) && !s.hidden())) refuseIfMasked(s.field(), "ordering", viaText);
         for (MeasureCompiler.Measure m : spec.measures())
             if (m.field() != null && revealsValues(m.agg()))
                 refuseIfMasked(m.field(), m.agg() + " over", viaText);
@@ -294,6 +300,10 @@ final class BiResultMasking {
                 if (m.field() != null && revealsValues(m.agg()))
                     refuseIfMasked(m.field(), "a ratio of " + m.agg() + " over", viaText);
         if (spec.window() != null) refuseIfMasked(spec.window().field(), "windowing", viaText);
+        // a capped grouped spec with no ORDER BY is ordered by its group keys (MeasureCompiler, BI-QUERY-TRUNCATION-1): with no
+        // Measure to order by instead (stripCosmeticOrder), a masked group key would come back in raw order
+        if (spec.orderBy().isEmpty() && spec.measures().isEmpty() && spec.limit() < Integer.MAX_VALUE)
+            for (String g : spec.groupBy()) refuseIfMasked(g, "ordering (a grouped result with no Measure is ordered by)", viaText);
     }
 
     /**
@@ -309,7 +319,11 @@ final class BiResultMasking {
         List<MeasureCompiler.Sort> kept = new ArrayList<>();
         for (MeasureCompiler.Sort s : spec.orderBy())
             if (!(s.cosmetic() && isMasked(s.field(), viaText))) kept.add(s);
-        if (kept.size() == spec.orderBy().size()) return spec;
+        // no ORDER BY at all: a capped grouped spec is ordered by its group keys (BI-MASKING-STRUCTURED-RESIDUALS-1 (2))
+        boolean keyFallback = false;
+        if (kept.isEmpty() && spec.limit() < Integer.MAX_VALUE)
+            for (String g : spec.groupBy()) keyFallback |= isMasked(g, viaText);
+        if (kept.size() == spec.orderBy().size() && !keyFallback) return spec;
         // The compiler orders an unordered GROUP BY by its keys (a stable LIMIT), which would be the raw rank again: order by
         // the first Measure (descending, no raw value involved) so the cut stays deterministic and leaks nothing.
         if (kept.isEmpty()) kept.add(new MeasureCompiler.Sort(spec.measures().get(0).id(), true));
@@ -710,11 +724,15 @@ final class BiResultMasking {
     }
 
     /**
-     * Ad-hoc SQL typed by the caller ({@code POST /db/query}): a masked column may appear only in the select list (its
-     * output is aliased); in a WHERE, HAVING, GROUP BY, ORDER BY, JOIN, subquery or CTE it would test or bisect raw values,
-     * so it is refused 422 - and so is an alias of it, a {@code COLUMNS(..)} pattern, and {@code ORDER BY 1} / {@code ORDER
-     * BY ALL} while a key is selected (BI-MASKING-SQL-SHAPE-LEAKS-1). Text that does not parse as one plain SELECT is
-     * refused when it names a masked column.
+     * Free SQL run for a caller who cannot reveal - typed ({@code POST /db/query}), a saved query's text
+     * ({@code POST /queries/{id}/run}), a bound Widget's query, a rule template's simulate. A masked key may be named only
+     * BARE (BI-MASKING-FREE-SQL-ORACLES-1, operator 2026-10-25): a bare selected column (its output is aliased), a bare
+     * {@code GROUP BY} column, or the bare argument of {@code count}. Any predicate, {@code CASE}, function or cast over it
+     * - in the select list too ({@code CASE WHEN msisdn = '..' THEN error('x') END} answers yes / no by failing) - and any
+     * WHERE, HAVING, ORDER BY, JOIN, QUALIFY, subquery or CTE use would test or bisect raw values, so it is refused 422; so is
+     * an alias of it, a {@code COLUMNS(..)} pattern, and {@code ORDER BY 1} / {@code ORDER BY ALL} while a key is selected
+     * (BI-MASKING-SQL-SHAPE-LEAKS-1). Text that does not parse as one plain SELECT is refused when it names a masked column.
+     * The check runs per caller at RUN time, so a saved text that filters on a key still serves revealers.
      */
     void vetAdHocSql(String sql) {
         if (!engaged()) return;
@@ -725,6 +743,9 @@ final class BiResultMasking {
             Set<String> aliases = keyAliases(node);
             boolean keySelected = false;
             for (JsonNode item : list) keySelected |= refsKey(item, aliases) || multiColumn(item);   // a plain * selects the key too
+            // only a bare use: a column, a star, or count(<bare column>) with no FILTER
+            for (JsonNode item : list) leak |= refsKey(item, aliases) && !bareKeyUse(item, aliases);
+            leak |= joinsOnKey(node.path("from_table"));
             // a window ordered by a key returns its rows in key order next to the bare alias: the rank leaks
             for (JsonNode item : list) leak |= windowOrderedByKey(item, aliases);
             for (Map.Entry<String, JsonNode> e : node.properties()) {
@@ -736,13 +757,56 @@ final class BiResultMasking {
                                 // any other star in a term (ORDER BY *, (* LIKE 'msi%')) may sort by the key: refused
                                 leak |= positional(o.path("expression")) ? keySelected : refsKey(o, aliases) || hasOpaqueRef(o, aliases);
                         } else leak |= refsKey(mod, aliases);
-                } else leak |= refsKey(e.getValue(), aliases);
+                } else if ("group_expressions".equals(e.getKey())) {
+                    // a bare grouped column is allowed; a computed group (substr(msisdn, 1, 4)) is not
+                    for (JsonNode g : e.getValue()) leak |= !"COLUMN_REF".equals(g.path("type").asText()) && refsKey(g, aliases);
+                } else if (!"group_sets".equals(e.getKey())) leak |= refsKey(e.getValue(), aliases);   // group_sets: indices only
             }
         } else leak = unknown || mentions(sql, masked) || opaqueRefs(sql);
         if (leak)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the SQL compares, joins, groups or orders by a masked "
-                    + "key (or its lineage is untraceable); that would leak its raw values, so a caller needs " + REVEAL
-                    + " - a masked column may only be selected");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the SQL compares, computes over, joins or orders by a "
+                    + "masked key (or its lineage is untraceable); that would leak its raw values, so a caller needs " + REVEAL
+                    + " - a masked column may only be selected, grouped or counted, bare");
+    }
+
+    /**
+     * A select item that names a key only bare: a column reference, a star, or {@code count} over bare columns with no FILTER.
+     * A star whose {@code REPLACE} list or {@code COLUMNS(..)} expression computes over a key is not bare
+     * ({@code COLUMNS(* REPLACE (CASE WHEN msisdn = '..' THEN 1 END AS msisdn))}), not even inside {@code count}.
+     */
+    private boolean bareKeyUse(JsonNode item, Set<String> aliases) {
+        if (starComputes(item, aliases)) return false;
+        String type = item.path("type").asText();
+        // only a TOP-LEVEL star is bare: multiColumn() searches the whole expression, so a CASE around COLUMNS('msisdn') or
+        // `.. + 0 * unnest([1])` would pass as "bare" and be an error() oracle (independent verification, 2026-10-25)
+        if ("COLUMN_REF".equals(type) || "STAR".equals(type)) return true;
+        String fn = item.path("function_name").asText("").toLowerCase(Locale.ROOT);
+        return "FUNCTION".equals(item.path("class").asText()) && (fn.equals("count") || fn.equals("count_star"))
+                && (item.path("filter").isNull() || item.path("filter").isMissingNode()) && barePlainArguments(item);
+    }
+
+    /**
+     * A join on a key the ON check cannot see: {@code USING (msisdn)} holds plain names, not column references, and a
+     * {@code NATURAL} join matches every same-named column, the key included, whenever a column is masked or untraceable.
+     */
+    private boolean joinsOnKey(JsonNode n) {
+        if (n.isObject()) {
+            if ("NATURAL".equals(n.path("ref_type").asText()) && (!masked.isEmpty() || unknown)) return true;
+            for (JsonNode u : n.path("using_columns")) {
+                String col = u.asText().trim().toLowerCase(Locale.ROOT);
+                if (masked.contains(col) || (unknown && !knownClean.contains(col))) return true;
+            }
+        }
+        for (JsonNode c : n) if (joinsOnKey(c)) return true;
+        return false;
+    }
+
+    private boolean starComputes(JsonNode n, Set<String> aliases) {
+        if (n.isObject() && "STAR".equals(n.path("type").asText())
+                && (refsKey(n.path("replace_list"), aliases) || n.path("expr").isObject() && !"VALUE_CONSTANT".equals(n.path("expr").path("type").asText())
+                        && refsKey(n.path("expr"), aliases))) return true;
+        for (JsonNode c : n) if (starComputes(c, aliases)) return true;
+        return false;
     }
 
     private static int countSelectNodes(JsonNode n) {

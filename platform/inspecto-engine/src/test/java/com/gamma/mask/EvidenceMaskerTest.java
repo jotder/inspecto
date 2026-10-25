@@ -241,4 +241,37 @@ class EvidenceMaskerTest {
         EvidenceMasker m = siblingMasker(config, Map.of("view", "plain_v"));
         assertEquals(12.5, m.mask("f_ds", "amount", 12.5));
     }
+
+    /** LINEAGE-SIBLING-NAME-TRIM-1: a sibling's column name with blanks around it is the same column. */
+    @Test
+    void aSiblingColumnNameWithBlanksIsTrimmedBeforeItIsInherited(@TempDir Path space) throws Exception {
+        // NEGATIVE PROBE: untrimmed, the inherited key is " msisdn " and f_ds's msisdn is stored raw
+        Path config = Files.createDirectories(space.resolve("config"));
+        ComponentStore store = new ComponentStore(config.resolve("registry"));
+        store.write("dataset", "topups_raw", Map.of("physicalRef", "topups",
+                "columns", List.of(Map.of("name", " msisdn ", "classification", "MSISDN"))));
+        store.write("dataset", "f_ds", Map.of("physicalRef", "topups"));
+        assertEquals(Map.of("msisdn", "MSISDN"), EvidenceMasker.lineageClassification("f_ds",
+                Map.of("physicalRef", "topups"), store, new com.gamma.pipeline.ViewStore(config.resolve("views"))));
+        EvidenceMasker m = EvidenceMasker.of(store, config, List.of("f_ds"));
+        assertTrue(String.valueOf(m.mask("f_ds", "msisdn", "9198")).startsWith("masked:"));
+    }
+
+    /**
+     * BI-MASKING-SIBLING-TYPED-CLASS-1: a reader judging by its own claim (a masked Entity Type) inherits a sibling's IMEI,
+     * which the SENSITIVE-only default leaves out.
+     */
+    @Test
+    void aClaimPredicateInheritsASiblingClassOutsideSensitive(@TempDir Path space) throws Exception {
+        Path config = Files.createDirectories(space.resolve("config"));
+        ComponentStore store = new ComponentStore(config.resolve("registry"));
+        store.write("dataset", "dev_sib", Map.of("physicalRef", "dev",
+                "columns", List.of(Map.of("name", "imei", "classification", "IMEI"), Map.of("name", "msisdn", "classification", "MSISDN"))));
+        Map<String, Object> ds = Map.of("physicalRef", "dev");
+        com.gamma.pipeline.ViewStore views = new com.gamma.pipeline.ViewStore(config.resolve("views"));
+        assertEquals(Map.of("msisdn", "MSISDN"), EvidenceMasker.lineageClassification("dev_ds", ds, store, views),
+                "the default keeps SENSITIVE only");
+        assertEquals(Map.of("imei", "IMEI"), EvidenceMasker.lineageClassification("dev_ds", ds, store, views, "IMEI"::equals),
+                "the claim decides");
+    }
 }

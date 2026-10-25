@@ -99,6 +99,8 @@ final class QueryRoutes implements RouteModule {
                     BiResultMasking.mayReveal(ex));
             masking.vetSort(sort(body), text);
             masking.vetParameterValues(text, callerValues(body).keySet());
+            // BI-MASKING-FREE-SQL-ORACLES-1: the author's text is vetted like typed SQL, per caller, at run time
+            masking.vetAdHocSql(resolved);
         }
 
         // 4. Execute with pagination / sort / projection.

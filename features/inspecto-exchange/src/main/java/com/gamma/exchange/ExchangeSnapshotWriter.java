@@ -8,6 +8,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlViews;
+import com.gamma.util.ColumnClassification;
 import com.gamma.util.SqlIdent;
 
 import java.nio.file.Files;
@@ -117,19 +118,20 @@ public final class ExchangeSnapshotWriter {
     private static void classify(List<Map<String, Object>> columns, Map<String, Object> dataset, String item,
                                  Path ownerRegistry, Path ownerViews) {
         ComponentStore store = new ComponentStore(ownerRegistry);
-        Path configRoot = ownerRegistry.toAbsolutePath().getParent();
         Map<String, String> cls = new java.util.HashMap<>();
         if (dataset.get("columns") instanceof List<?> own)
             for (Object o : own)
                 if (o instanceof Map<?, ?> c && c.get("name") != null && c.get("classification") != null)
                     cls.put(String.valueOf(c.get("name")).trim().toLowerCase(java.util.Locale.ROOT),
                             String.valueOf(c.get("classification")).trim().toUpperCase(java.util.Locale.ROOT));
+        // Every class counts (the consumer judges it under its own types), strictest wins, and NONE never beats a class
+        // (LINEAGE-SIBLING-NAME-TRIM-1: the lineage used to overwrite the owner's own class).
+        java.util.function.Predicate<String> anyClass = c -> !"NONE".equals(c);
         Map<String, String> traced = new java.util.HashMap<>(
-                EvidenceMasker.lineageClassification(item, dataset, store, new ViewStore(ownerViews)));
-        traced.putAll(EvidenceMasker.schemaClassification(configRoot, EvidenceMasker.datasetStores(dataset), c -> true));
+                EvidenceMasker.lineageClassification(item, dataset, store, new ViewStore(ownerViews), anyClass));
         boolean unknown = traced.containsKey(EvidenceMasker.UNKNOWN_LINEAGE);
         traced.remove(EvidenceMasker.UNKNOWN_LINEAGE);
-        cls.putAll(traced);
+        traced.forEach((col, cl) -> cls.merge(col, cl, (a, b) -> ColumnClassification.stricter(a, b, anyClass)));
         if (!traced.isEmpty() && (hasText(dataset.get("view")) || hasText(dataset.get("sql")))) unknown = true;
         for (Map<String, Object> c : columns) {
             String name = String.valueOf(c.get("name")).trim().toLowerCase(java.util.Locale.ROOT);

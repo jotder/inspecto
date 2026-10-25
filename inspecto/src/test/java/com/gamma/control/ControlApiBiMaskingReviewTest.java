@@ -170,7 +170,8 @@ class ControlApiBiMaskingReviewTest {
             seed(c, Map.of());
             query(c, "pos_q", "SELECT #1 AS x, region FROM calls_ds", null);
             String tile = "\"query\":\"pos_q\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"x\"]";
-            assertAllMasked(bi(c, "viewer", tile), "x");
+            // BI-MASKING-FREE-SQL-ORACLES-1: #1 is an opaque reference, so the bound text is refused for a viewer before it runs
+            assertEquals(422, bi(c, "viewer", tile).statusCode());
             HttpResponse<String> probe = bi(c, "viewer", tile + ",\"filters\":[{\"field\":\"x\",\"op\":\"=\",\"value\":\"" + A + "\"}]");
             assertEquals(422, probe.statusCode(), "a filter on the positional key is an oracle: " + probe.body());
             HttpResponse<String> revealer = bi(c, "revealer", tile);
@@ -185,7 +186,9 @@ class ControlApiBiMaskingReviewTest {
         System.setProperty("bi.share.secret", SECRET);
         try (Ctx c = open(cfg, root, true)) {
             seed(c, Map.of("calculated", List.of(Map.of("name", "seen", "expr", "cast(msisdn AS date)"))));
-            query(c, "err_q", "SELECT error(msisdn) AS e FROM calls_ds", null);
+            // a bare read of the masked calculated column fails at run time and quotes the key (error(msisdn) is now refused
+            // before it runs: BI-MASKING-FREE-SQL-ORACLES-1)
+            query(c, "err_q", "SELECT seen AS e FROM calls_ds", null);
             query(c, "typo_q", "SELECT no_such_column FROM calls_ds", null);
             String token = share(c, "author", "calls_ds");
 
@@ -221,7 +224,8 @@ class ControlApiBiMaskingReviewTest {
             HttpResponse<String> viewer = post(c, "viewer", "/queries/pat_q/run", probe);
             assertEquals(422, viewer.statusCode(), "the oracle is refused: " + viewer.body());
             assertEquals(200, post(c, "revealer", "/queries/pat_q/run", probe).statusCode(), "a revealer is unrestricted");
-            assertEquals(200, post(c, "viewer", "/queries/pat_q/run", null).statusCode(), "the author's default is trusted");
+            assertEquals(422, post(c, "viewer", "/queries/pat_q/run", null).statusCode(),
+                    "the author's own key predicate is vetted per caller at run time (BI-MASKING-FREE-SQL-ORACLES-1)");
         }
     }
 

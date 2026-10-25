@@ -133,6 +133,7 @@ final class BiRoutes implements RouteModule {
         }
 
         masking.vet(spec, true, boundQuery);
+        if (boundQuery != null) masking.vetAdHocSql(boundQuery);   // BI-MASKING-FREE-SQL-ORACLES-1: the bound text, per caller
         QueryExecutor.Request req = new QueryExecutor.Request(spec.dataset(), relationSql, sql.sql(),
                 spec.limit(), 0, List.of(), List.of(), sql.params());
         try {

@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.policy` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `BI-MASKING-FREE-SQL-ORACLES-1` | P1 | defect | a caller without canRevealLinkEntities can still TEST a masked key's value through free SQL, with every output cell masked — found by the… | operator |
+_No open rows._

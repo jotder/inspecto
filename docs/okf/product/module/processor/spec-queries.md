@@ -159,10 +159,34 @@ fails keeps the driver's text in its Run record (a two-step author channel throu
 themselves are masked); two view-backed Datasets over the same view do not share a classification (`EvidenceMasker` matches
 siblings by `physicalRef`; a pipeline-produced view is classified by its schema). Free-SQL shapes the same review found
 already filed (the row as a value, renames in FROM, a decodable alias, a sort on an aliased key) are
-`BI-MASKING-ROW-VALUE-LEAKS-1`. ⚠ Still open, found by the review's independent verification and filed as
-`BI-MASKING-FREE-SQL-ORACLES-1` (an operator call): free SQL can still TEST a key while every output cell is masked - a saved
-query's own `WHERE msisdn = '..'` (its author's text is not vetted the way `/db/query` text is), and a run-time error as a
-yes / no answer (`CASE WHEN msisdn = '..' THEN error('x') END`: R2 withholds the text, not the failure).
+`BI-MASKING-ROW-VALUE-LEAKS-1`.
+
+**Free SQL names a masked key only bare (`BI-MASKING-FREE-SQL-ORACLES-1`, operator 2026-10-25; fixed 2026-10-25).** The
+review's verification found that free SQL could still TEST a key while every output cell was masked: a saved query's own
+`WHERE msisdn = '..'` (bisected with `LIKE`), and a run-time error as a yes / no answer (`CASE WHEN msisdn = '..' THEN
+error('x') END`: R2 withholds the text, not the failure). Now, for a caller without `canRevealLinkEntities`, every free-SQL
+door - `/db/query`, `/queries/{id}/run` (the author's rendered text), a Widget bound to a saved query (its text) and
+`/rule-templates/{id}/simulate` - runs `BiResultMasking.vetAdHocSql` PER CALLER AT RUN TIME: a masked key (or an alias of
+one, a pattern star, `#n`) may appear only as a bare selected column, a bare `GROUP BY` column (`group_expressions`; a
+computed group is refused) or the bare argument of `count` with no `FILTER`; any predicate, `CASE`, function or cast over
+it - the select list included, and a star whose `REPLACE` list computes over it - answers 422 before anything runs. A saved
+text that filters on a key therefore still serves revealers, and is refused for everyone else; authors can still save it.
+Consequence: a saved query or bound Widget that derives from a key (`upper(msisdn)`, `CAST(msisdn AS BIGINT)`, `#1`) now
+answers 422 to a viewer instead of masked cells; the output masking below stays as a second layer.
+
+**Grouped specs never come back in raw key order (`BI-MASKING-STRUCTURED-RESIDUALS-1`, fixed 2026-10-25).** A capped
+`/bi/query` spec with no ORDER BY is ordered by its group keys (`BI-QUERY-TRUNCATION-1`); for a caller who cannot reveal,
+`stripCosmeticOrder` orders it by the first Measure (descending) when a group key is masked, and `vet` refuses a spec with no
+Measure to order by. A sort on a Measure / ratio id is not judged as a column. (Item (1) of the row, a repeated `groupBy`,
+was already refused by `BI-MASKING-GROUPBY-RENAME-1`.)
+
+**Sibling classes by the reader's claim (`BI-MASKING-SIBLING-TYPED-CLASS-1`, `LINEAGE-SIBLING-NAME-TRIM-1`, fixed
+2026-10-25).** `EvidenceMasker.lineageClassification` takes an optional class predicate: BI masking passes its claim (the
+masked Entity Types), so a sibling Dataset's IMEI / WALLET / SUBSCRIBER is inherited under `typed`, not only the SENSITIVE
+classes; sibling column names are trimmed; `/db/table` matches a store's Datasets by trimmed `physicalRef`. An Exchange
+snapshot carries every sibling class and merges strictest-wins with the owner's own (`NONE` never wins), so a sibling's
+weaker class no longer overwrites it. Tests: `EvidenceMaskerTest`, `ExchangeSnapshotTest`, `ControlApiBiQueryMaskingTest`,
+`ControlApiDbBrowserMaskingTest`, `ControlApiBiMaskingReviewTest`.
 
 **SQL shapes the position model cannot prove fail closed (`BI-MASKING-SQL-SHAPE-LEAKS-1`, fixed 2026-10-23, verified on
 DuckDB 2.0.0.0).** Free SQL (a saved query, `/db/query`) is read through `json_serialize_sql`. An item that can expand to several
@@ -202,8 +226,8 @@ name is not entirely `[A-Za-z0-9_]` (`"msisdn no"`, an embedded quote, only blan
 in text, so when one is masked any text counts as reading a key (fail closed; a traced saved query still keeps its clean
 columns through the parse tree; `BI-MASKING-NONWORD-KEY-NAME-1`). Names that reach the masking through lineage (sibling
 Datasets, pipeline schema, shared snapshots) are trimmed and lower-cased like the Dataset's own. Trade-off: derived columns in free SQL no longer show
-per-value aliases. Deliberately not covered: the text of a SAVED query is its author's (an author can still order by
-the key); structured-BI calculated columns are Dataset config. Tests: `ControlApiDbBrowserMaskingTest` (rename / row /
+per-value aliases. Since `BI-MASKING-FREE-SQL-ORACLES-1` (2026-10-25) a saved query's text is vetted per caller at run
+time like typed SQL (above); structured-BI calculated columns are Dataset config. Tests: `ControlApiDbBrowserMaskingTest` (rename / row /
 dictionary / oracle probes), `ControlApiBiQueryMaskingTest.aSavedQueryThatRenamesTheKeyInFromOrReadsTheRowMasksEveryCell`.
 
 ## Row cap on `/bi/query`: ordered and honestly flagged (`BI-QUERY-TRUNCATION-1`, shipped 2026-10-08)
