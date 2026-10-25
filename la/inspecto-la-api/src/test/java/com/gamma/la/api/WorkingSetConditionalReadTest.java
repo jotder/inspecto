@@ -47,14 +47,23 @@ class WorkingSetConditionalReadTest {
 
     /** The token becomes {@code t2} once the log has been read {@code flipAfterReads} times. */
     private static InvestigationRoutes.Inv racing(Path root, int flipAfterReads) {
+        return racing(root, flipAfterReads, () -> { }, false);
+    }
+
+    /** {@code onRead} runs inside every log read; {@code tokenFailsAfterFlip} makes the stat throw instead of answering t2. */
+    private static InvestigationRoutes.Inv racing(Path root, int flipAfterReads, Runnable onRead, boolean tokenFailsAfterFlip) {
         String cacheKey = "k-" + UUID.randomUUID();   // the relation cache is static: a fresh key per test
         AtomicInteger logReads = new AtomicInteger();
         var store = (InvestigationStore) Proxy.newProxyInstance(InvestigationStore.class.getClassLoader(), new Class<?>[] {InvestigationStore.class},
                 (p, m, a) -> switch (m.getName()) {
                     case "cacheKey" -> cacheKey;
-                    case "logToken" -> logReads.get() >= flipAfterReads ? "t2" : "t1";
+                    case "logToken" -> {
+                        if (logReads.get() >= flipAfterReads && tokenFailsAfterFlip) throw new IOException("stat failed");
+                        yield logReads.get() >= flipAfterReads ? "t2" : "t1";
+                    }
                     case "log" -> {
                         logReads.incrementAndGet();
+                        onRead.run();
                         yield List.of();
                     }
                     default -> throw new UnsupportedOperationException(m.getName());
@@ -185,13 +194,104 @@ class WorkingSetConditionalReadTest {
         assertFalse(stable[0]);
     }
 
+    @Test
+    void theFreshlyInitialisedProductionClockIsMonotonic() throws Exception {
+        // A FRESH copy of WorkingSetRoutes: its static initialiser alone decides clockMs, so no test or reset can mask the initial value.
+        java.net.URL code = WorkingSetRoutes.class.getProtectionDomain().getCodeSource().getLocation();
+        String own = WorkingSetRoutes.class.getName();
+        try (java.net.URLClassLoader fresh = new java.net.URLClassLoader(new java.net.URL[] {code}, WorkingSetRoutes.class.getClassLoader()) {
+            @Override
+            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (!name.equals(own) && !name.startsWith(own + "$")) return super.loadClass(name, resolve);   // only the class under test (and its nested classes) is re-defined
+                synchronized (getClassLoadingLock(name)) {
+                    Class<?> c = findLoadedClass(name);
+                    return c != null ? c : findClass(name);
+                }
+            }
+        }) {
+            Class<?> cls = Class.forName(own, true, fresh);
+            org.junit.jupiter.api.Assertions.assertNotSame(WorkingSetRoutes.class, cls);
+            java.lang.reflect.Field f = cls.getDeclaredField("clockMs");
+            f.setAccessible(true);
+            long now = ((java.util.function.LongSupplier) f.get(null)).getAsLong();
+            assertTrue(Math.abs(now - System.nanoTime() / 1_000_000L) < 1_000, "initial clockMs tracks System.nanoTime");
+            assertTrue(Math.abs(now - System.currentTimeMillis()) > 100_000_000_000L, "initial clockMs is not the wall clock");
+        }
+    }
+
+    @Test
+    void theTrustWindowBoundaryIsExclusive(@TempDir Path root) throws Exception {
+        InvestigationRoutes.Inv inv = racing(root, false);
+        AtomicLong mono = new AtomicLong(5_000);
+        WorkingSetRoutes.clockMs = mono::get;
+        String token = WorkingSetEtag.logToken(inv);
+        boolean[] cached = {false}, stable = {true};
+        WorkingSetRoutes.relation(inv, -1, cached, token, stable);
+        long full = WorkingSetRoutes.FULL_READS.sum();
+        mono.set(5_000 + WorkingSetRoutes.WORKING_SET_TRUST_MS - 1);   // 29.999 s: trusted
+        WorkingSetRoutes.relation(inv, -1, cached, token, stable);
+        assertEquals(full, WorkingSetRoutes.FULL_READS.sum(), "29.999 s is inside the window");
+        mono.set(5_000 + WorkingSetRoutes.WORKING_SET_TRUST_MS);       // exactly 30.000 s: NOT trusted (the window is [0, 30 s))
+        WorkingSetRoutes.relation(inv, -1, cached, token, stable);
+        assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - full, "30.000 s revalidates");
+    }
+
+    @Test
+    void aSlowReadDoesNotLengthenTheTrustWindow(@TempDir Path root) throws Exception {
+        AtomicLong mono = new AtomicLong(5_000);
+        InvestigationRoutes.Inv inv = racing(root, Integer.MAX_VALUE, () -> mono.addAndGet(20_000), false);   // every read takes 20 s
+        WorkingSetRoutes.clockMs = mono::get;
+        String token = WorkingSetEtag.logToken(inv);
+        boolean[] cached = {false}, stable = {true};
+        WorkingSetRoutes.relation(inv, -1, cached, token, stable);          // starts at 5_000, ends at 25_000
+        long full = WorkingSetRoutes.FULL_READS.sum();
+        mono.set(5_000 + WorkingSetRoutes.WORKING_SET_TRUST_MS + 1);        // 30.001 s after the START, only 10.001 s after the end
+        WorkingSetRoutes.relation(inv, -1, cached, token, stable);
+        assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - full, "the stamp is the start of the verification, not its end");
+    }
+
+    @Test
+    void aFailedStatAfterTheReadIsTreatedAsMovedUncachedAndUntagged(@TempDir Path root) throws Exception {
+        InvestigationRoutes.Inv inv = racing(root, 1, () -> { }, true);   // the post-read stat throws
+        String before = WorkingSetEtag.logToken(inv);
+        boolean[] cached = {false}, stable = {true};
+        WorkingSetRoutes.relation(inv, -1, cached, before, stable);
+        assertFalse(stable[0], "an unreadable token is a moved token");
+        long full = WorkingSetRoutes.FULL_READS.sum();
+        WorkingSetRoutes.relation(inv, -1, cached, before, stable);
+        assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - full, "not cached");
+    }
+
+    @Test
+    void aRuntimeFailureWhileSendingAlsoWithdrawsTheTag() {
+        Probe ex = new Probe(PATH, null) {
+            @Override
+            public void sendResponseHeaders(int code, long length) {
+                throw new IllegalStateException("socket gone");
+            }
+        };
+        assertThrows(IllegalStateException.class, () -> WorkingSetRoutes.sendTagged(ex, "\"abc\"", Map.of("x", 1)));
+        assertNull(ex.getResponseHeaders().getFirst("ETag"));
+    }
+
+    @Test
+    void aRacedUntaggedAnswerIsA200EvenForIfNoneMatchStar(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");
+        InvestigationRoutes.Inv inv = racing(root, true);
+        Probe star = new Probe(PATH, "*");
+        Object result = WorkingSetRoutes.serve(star, inv);
+        assertTrue(result instanceof Map, "the body is returned for a 200, not a bodiless 304");
+        assertEquals(-1, star.status, "no 304 was sent");
+        assertNull(star.getResponseHeaders().getFirst("ETag"));
+    }
+
     /** The status the framework would answer with: a handler that returns a body (not HANDLED) is answered 200. */
     private static int answer(Probe ex, Object result) {
         return result == com.gamma.spi.http.ApiContext.HANDLED ? ex.status : 200;
     }
 
     /** A request with no network behind it that records the status it was answered with. */
-    private static final class Probe extends FakeApiContext.StubExchange {
+    private static class Probe extends FakeApiContext.StubExchange {
         int status = -1;
 
         Probe(String path, String ifNoneMatch) {
