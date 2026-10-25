@@ -53,7 +53,7 @@ export class GraphQueryCache<T> {
         if (pending && !force) return pending;
         const p = fetch().then(
             (fetched) => {
-                const value = hit && this.same?.(hit.value, fetched) ? hit.value : fetched;
+                const value = !force && hit && this.same?.(hit.value, fetched) ? hit.value : fetched;
                 const entry = { value, fetchedAt: this.now() };
                 if (this.inflight.get(key) === p) {
                     this.inflight.delete(key);

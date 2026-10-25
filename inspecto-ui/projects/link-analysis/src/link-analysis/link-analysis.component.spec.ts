@@ -4282,3 +4282,100 @@ describe('LinkAnalysisComponent - cache keeps the masking badge honest, and a de
         expect(queried).toHaveLength(1);
     });
 });
+
+describe('LinkAnalysisComponent - revalidation never keeps stale data or stale ETags (PERF-P10a-2 review)', () => {
+    async function drawn(opts: Parameters<typeof create>[0] = {}) {
+        const made = create(opts);
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        return { ...made, c: made.fixture.componentInstance };
+    }
+    /** What a fresh re-fold yields: a new object with the same nodes and edges, plus `extra` top-level fields. */
+    function refold(extra: Record<string, unknown>) {
+        const src = TestBed.inject(GraphSourcesService).byId('entity-projection')!;
+        const orig = src.query.bind(src);
+        src.query = async (q) => ({ ...structuredClone(await orig(q)), ...extra }) as never;
+    }
+    const MAPPING = { dataset: 'links-ds', rows: 5 } as never;
+    /** A stored ETag for the request the component would make, to watch whether it survives. */
+    function seed(inv: InvService): string {
+        const key = inv.reads.keyOf('POST', '/inv/projection', { probe: 1 });
+        inv.reads.store(key, '"seed"', { probe: 1 });
+        return key;
+    }
+    async function expired<T>(body: () => Promise<T>): Promise<T> {
+        const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + GRAPH_CACHE_TTL_MS + 1);
+        try {
+            return await body();
+        } finally {
+            now.mockRestore();
+        }
+    }
+
+    it('Refresh never keeps the old object: a fresh fold that differs only in `mappings` shows its rows', async () => {
+        const { c } = await drawn();
+        const g1 = c.graph();
+        expect(c.mappingSummary()).toEqual([]);
+        refold({ mappings: [MAPPING] });
+        await c.refreshFromServer();
+        expect(c.graph()).not.toBe(g1);
+        expect(c.mappingSummary()).toHaveLength(1);
+    });
+
+    it.each([
+        ['mappings', { mappings: [{ dataset: 'x', rows: 1 }] }],
+        ['idMappings', { idMappings: [{ idColumn: 'A' }] }],
+        ['omittedLinks', { omittedLinks: 3 }],
+        ['source', { source: 'index' }],
+        ['truncated', { truncated: true }],
+    ])('an expired re-read that differs only in %s replaces the old graph', async (_name, extra) => {
+        const { c } = await drawn();
+        const g1 = c.graph();
+        refold(extra);
+        await expired(() => c.run());
+        expect(c.graph()).not.toBe(g1);
+    });
+
+    it('an expired re-read whose node spellings / objectRef differ replaces the old graph', async () => {
+        const { c } = await drawn();
+        const g1 = c.graph();
+        const src = TestBed.inject(GraphSourcesService).byId('entity-projection')!;
+        const orig = src.query.bind(src);
+        src.query = async (q) => {
+            const g = structuredClone(await orig(q));
+            (g.nodes[0].data as Record<string, unknown>)['spellings'] = ['A-1', 'a1'];
+            (g.nodes[0].data as Record<string, unknown>)['objectRef'] = { dataset: 'd', key: 'k' };
+            return g;
+        };
+        await expired(() => c.run());
+        expect(c.graph()).not.toBe(g1);
+    });
+
+    it('Refresh clears the stored ETags: the entry is gone, so the re-read sends no If-None-Match', async () => {
+        const { c, fixture } = await drawn({ inv: {} });
+        const inv = TestBed.inject(InvService);
+        const key = seed(inv);
+        expect(inv.reads.entry(key)).toBeDefined();
+        await c.refreshFromServer();
+        expect(inv.reads.entry(key)).toBeUndefined();
+        fixture.destroy();
+    });
+
+    it('an Entity List write clears the stored ETags', async () => {
+        const { c } = await drawn({ inv: {} });
+        const inv = TestBed.inject(InvService);
+        const key = seed(inv);
+        (c as unknown as { refreshEntityLists(): void }).refreshEntityLists();
+        expect(inv.reads.entry(key)).toBeUndefined();
+    });
+
+    it('a change of the masking mode in force clears the stored ETags on the next read', async () => {
+        const { c } = await drawn({ inv: {} });
+        const inv = TestBed.inject(InvService);
+        const key = seed(inv);
+        const settings = TestBed.inject(LinkAnalysisSettingsService);
+        settings.limits.set({ ...settings.limits(), maskingModeInForce: 'mask' } as never);
+        await c.run();
+        expect(inv.reads.entry(key)).toBeUndefined();
+    });
+});

@@ -9,6 +9,7 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { CatalogService, PipelinesService } from '@inspecto/core/api';
 import { InvService } from '@inspecto/link-analysis/api/inv.service';
+import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
 import {
     LA_AI_ASSIST,
     LA_CASES,
@@ -131,7 +132,11 @@ describe('Link Analysis host-service tokens', () => {
                 { provide: PipelinesService, useValue: { list: () => of([]) } },
                 {
                     provide: InvService,
-                    useValue: { masking: signal(null), listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }) },
+                    useValue: {
+                        masking: signal(null),
+                        reads: new ConditionalReadCache(() => ''),
+                        listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }),
+                    },
                 },
                 { provide: LinkAnalysisService, useValue: { list: () => of([]) } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
@@ -167,7 +172,11 @@ describe('Link Analysis host-service tokens', () => {
                 { provide: PipelinesService, useValue: { list: () => of([]) } },
                 {
                     provide: InvService,
-                    useValue: { masking: signal(null), listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }) },
+                    useValue: {
+                        masking: signal(null),
+                        reads: new ConditionalReadCache(() => ''),
+                        listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }),
+                    },
                 },
                 { provide: LinkAnalysisService, useValue: { list } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
@@ -242,7 +251,11 @@ describe('Link Analysis host-service tokens', () => {
                 { provide: PipelinesService, useValue: {} },
                 {
                     provide: InvService,
-                    useValue: { masking: signal(null), listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }) },
+                    useValue: {
+                        masking: signal(null),
+                        reads: new ConditionalReadCache(() => ''),
+                        listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }),
+                    },
                 },
             ],
         });
@@ -259,7 +272,11 @@ describe('Link Analysis host-service tokens', () => {
                 { provide: PipelinesService, useValue: {} },
                 {
                     provide: InvService,
-                    useValue: { masking: signal(null), listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }) },
+                    useValue: {
+                        masking: signal(null),
+                        reads: new ConditionalReadCache(() => ''),
+                        listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }),
+                    },
                 },
                 {
                     provide: LinkAnalysisService,

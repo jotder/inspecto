@@ -282,6 +282,7 @@ import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch }
 import { SessionService } from '@inspecto/core/api';
 import { DatePipe } from '@angular/common';
 import { GraphQueryCache, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
+import { deepEqual } from '@inspecto/link-analysis/api/stable-json';
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
@@ -2104,9 +2105,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         () => Date.now(),
         // PERF-P10a-2: after expiry, requests that revalidate to 304 fold to the same graph - keep the previous object
         (a, b) =>
-            graphSignature(a.g) === graphSignature(b.g) &&
-            !!(a.g as ProjectedGraph).truncated === !!(b.g as ProjectedGraph).truncated &&
-            JSON.stringify(a.masking) === JSON.stringify(b.masking),
+            graphSignature(a.g) === graphSignature(b.g) && // cheap reject first
+            deepEqual(a.g, b.g) && // then EVERY field (nodes' data, mappings, idMappings, omittedLinks, source, ...)
+            deepEqual(a.masking, b.masking),
     );
     /** "As of" line for a graph served from the cache; null when the server just answered. */
     readonly cachedAsOf = signal<number | null>(null);

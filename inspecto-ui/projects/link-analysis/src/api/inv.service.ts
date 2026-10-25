@@ -1716,7 +1716,9 @@ export class InvService {
      * The host (link-analysis.component) clears it on Refresh and an Entity List write, and sets its scope to the
      * masking mode in force; a Space or viewer change empties it by itself.
      */
-    readonly reads = new ConditionalReadCache(() => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}`);
+    readonly reads = new ConditionalReadCache(
+        () => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}`,
+    );
 
     /**
      * POST that revalidates: sends `If-None-Match` (the stored tag, verbatim) only when an entry is held, and on
@@ -1732,7 +1734,8 @@ export class InvService {
                 headers: etag ? { 'If-None-Match': etag } : undefined,
             });
         const keep = map((res: { body: T | null; headers: { get(n: string): string | null } }) => {
-            this.reads.store(key, res.headers.get('ETag'), res.body);
+            const cl = res.headers.get('Content-Length');
+            this.reads.store(key, res.headers.get('ETag'), res.body, cl ? Number(cl) : undefined);
             return res.body as T;
         });
         return this.noted(

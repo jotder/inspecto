@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { Observable } from 'rxjs';
 import { SessionService, SpacesService } from '@inspecto/core/api';
 import { InvService, MaskingNote, NeighborsRequest, ProjectionRequest, ProjectionResult } from './inv.service';
-import { CONDITIONAL_CACHE_MAX_BODY_CHARS } from './conditional-read-cache';
+import { CONDITIONAL_CACHE_BUDGET } from './conditional-read-cache';
 import { environment } from 'environments/environment';
 
 const base = environment.apiBaseUrl + '/v1';
@@ -177,12 +177,23 @@ describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
     it('(h) an over-size body is not retained: no conditional is ever sent for it', () => {
         const huge = {
             ...body(),
-            pad: 'x'.repeat(CONDITIONAL_CACHE_MAX_BODY_CHARS + 1),
+            pad: 'x'.repeat(CONDITIONAL_CACHE_BUDGET + 1),
         } as unknown as ProjectionResult;
         read(project, (r) => r.flush(huge, tag('"big"')));
         expect(svc.reads.size).toBe(0);
         const again = read(project, (r) => r.flush(huge, tag('"big"')));
         expect(hasHeader(again.r)).toBe(false);
+    });
+
+    it('(h) the response Content-Length is the size estimate: over budget is not retained, within budget is counted as sent', () => {
+        read(project, (r) =>
+            r.flush(body(), { headers: { ETag: '"a"', 'Content-Length': String(CONDITIONAL_CACHE_BUDGET + 1) } }),
+        );
+        expect(svc.reads.size).toBe(0);
+        const again = read(project, (r) => r.flush(body(), tag('"a"')));
+        expect(hasHeader(again.r)).toBe(false);
+        read(project, (r) => r.flush(body(2), { headers: { ETag: '"b"', 'Content-Length': '1234' } }));
+        expect(svc.reads.bytes).toBe(1234);
     });
 
     it('a 304 with no stored entry is retried ONCE without the header', () => {
