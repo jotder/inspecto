@@ -33,6 +33,30 @@
 | Analyst CSV upload (`LA-ANALYST-UPLOAD-1`) | **built** 2026-10-18/19 | D-UP1…D-UP8 confirmation, browser drive, multi-node quota ledger (§D4) |
 | Showcases: three synthetic verticals, one private real-feed Space | **built** 2026-10-15/16 | full browser rehearsal of A, B, C and the 30-minute tour (§D5) |
 
+## Operator answers 2026-10-25 (decision interview)
+
+| Id | Answer |
+|---|---|
+| LDP-D1 | D21 stays the product ceiling (20 analysts, 50 Drafts, 10^9 edges). Separate **telecom acceptance target: 1-3 analysts, ~500 million CDRs/day** (5x10^8, not 10^9). |
+| LDP-D2 | The gate counts nodes FOUND; canvas caps unchanged; larger results as a ranked table. |
+| LDP-D6 | **Hive access is a per-Space configuration with two options: (1) raw export to Parquet, (2) query Hive directly.** Build order: the Space setting with Parquet first (works through the file Collectors today); Hive JDBC + Kerberos a later slice after a feasibility spike. Option 2 reopens the Hive JDBC deferral of D-ING5. Evidence (M20) = the retained raw Parquet. |
+| LDP-D3 | Fact log for analyst lists + Parquet sidecar as the single SQL-facing form; computed lists write the sidecar with `computed` provenance; index derives `list_member`. |
+| LDP-D4 | `barrierListIds` field on the `expand` rung; no new operation. |
+| LDP-D5 | Investigation first; node properties as filters/seeds; detection (WP9) only once Risk Score → Alert → Case is the chosen consumer. |
+| LDP-D7 | Domain Profile extended to a server+UI concept declared per Space in TOON; Space Templates ship Profiles; GLOSSARY terms first. |
+| LDP-D8 | Build-time as-of resolution from the SCD2 Reference version store (M08); analyst assertions in the fact log; valid time on assertions = S11, later. |
+| LDP-D9 | Sensitivity tiers as registered Datasets; sensitive reads audited; stateless reads honour masking mode. |
+| LDP-D10 | AC-01..AC-10 adopted as starting targets, against the 500M CDRs/day telecom target. |
+| LDP-D11 | Retention inherits (never longer than raw); hold flag skips a partition in maintenance; **erasure open, waits for legal input — real customer data stays blocked until it is answered.** |
+| D-LD2…D-LD18 | Confirmed as built. |
+| D-LD6 | Template sharing stays owner-only; reopen when an analyst asks. |
+| D-LAE3 | Closed as answered (Basic defaults to `none`, a stated mode wins, display-only). |
+| D-LAE4 | Confirmed: build Entity profile pages Standard and up. |
+| D-LAE6 | Confirmed: P-C, keep patterns and packs on every edition. |
+| D-UP1…D-UP8 | Confirmed as built. |
+| `LA-WHITEPAPER-DEMO-1` calls | Confirmed: Demo Users for rehearsals, real IdP sign-in only for the real review; keep T12. |
+| T4 renamed correction | Not supported: feed contract (same name) + the `RENAMED_CORRECTION` alert; no platform change. |
+
 ## Separation (option D) — what is NOT yet built or still open
 
 Drawn from: `archived-documents/plans-archive/la-separation-feasibility-plan.md`, `la-separation-d7-design.md`, `la-embed-view-design.md`. Built detail lives in OKF `frontend/features/link-analysis.md`.
@@ -198,7 +222,7 @@ Start-now (no decision): #1-9, M11 server gate, M03.
 
 Done-when: WP2 sorted row groups survive partitioned write, day re-run gives identical counts / no stale file; WP3 AC-01 + AC-02, a dropped record type shows as a visible gap, index dependency rule (D-1 decision 5) green; WP4 AC-03/04/07/08 on skewed corpus + mutation test proving hidden nodes spend no budget; WP5 AC-09; WP6 AC-06 with planted-crowd cell excluded and reported; WP7 4-hop-with-filters run by clicking incl. refusal path; WP8 AC-08, AC-10, acceptance run AC-01..AC-10 green on reference host.
 
-### Open decisions (all OPEN; operator writes on the Answer line)
+### Decisions (all ANSWERED 2026-10-25 except LDP-D11 erasure — answers in "Operator answers 2026-10-25" above; the recommendations below are the record)
 
 | ID | Decision | Recommendation | Blocks |
 |---|---|---|---|
@@ -534,7 +558,7 @@ Status: LD-1 to LD-7 are all built (2026-10-04 to 2026-10-05). The design header
 | D-LD17 | Template list is owner-only and summary-only (counts) | Assistant-decided, pending operator confirmation |
 | D-LD18 | Status read-back = list of the Investigation's bound rules (`GET .../alert-rules`), not a per-rule route; SPA edit offers severity (and a Working Set rule's threshold) only | Assistant-decided, pending operator confirmation |
 
-Operator confirmation of D-LD2..D-LD18 is itself the open item (BACKLOG `LA-LIVE-DETECTION-1`).
+D-LD2..D-LD18 CONFIRMED by the operator 2026-10-25 (as built).
 
 Hard invariants: narrow only (a refusal is EMPTY, never a value); aggregate output only (no entity id in any Alert, event, log line or Signal); masking basis may only tighten between bind and sweep; the sweep never approves anything (it cannot be the second person); one audit event per enable, sweep outcome and refusal (best-effort, no ids).
 
@@ -573,7 +597,7 @@ D-LAE1 (Case history), D-LAE2 (dashboard widgets, UI flag only), D-LAE5 (Geo map
 
 ### D4. Analyst CSV upload (`la-analyst-upload-plan`) - built, three items open
 
-Built 2026-10-18/19 (route, status, delete, retention, pane, review hardening; la-core architecture §6.6). Open: operator confirmation of D-UP1…D-UP8 (assistant-decided under delegation); a live browser drive over HTTP (`LA-I2-GAPS-RESIDUALS-1` item 2); a daily-quota ledger shared across nodes (one JVM lock today).
+Built 2026-10-18/19 (route, status, delete, retention, pane, review hardening; la-core architecture §6.6). D-UP1…D-UP8 CONFIRMED by the operator 2026-10-25. Open: a live browser drive over HTTP (`LA-I2-GAPS-RESIDUALS-1` item 2); a daily-quota ledger shared across nodes (one JVM lock today).
 
 ### D5. Showcases (`la-multi-vertical-showcase-plan`, `la-ims-showcase-plan`) - browser rehearsal owed
 
