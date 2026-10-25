@@ -38,7 +38,7 @@ import { SpacesService } from '@inspecto/core/api';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
-import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
+import { configureLaLimits, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { SessionService } from 'app/inspecto/auth/session.service';
 import { LinkAnalysisIdentitiesComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-identities.component';
 
@@ -2547,16 +2547,6 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         expect(c.layoutId()).toBe('dagre');
     });
 
-    it('a restored Clustering force (force-atlas2) opens as Force above the node cap; a pick made here is kept', () => {
-        const { fixture } = create();
-        const c = fixture.componentInstance;
-        Object.defineProperty(c, 'canvasData', { value: () => chain(laLimit('display.force_atlas_max_nodes') + 1) });
-        c.pickedLayout.set('force-cluster'); // as a saved view / undo restores it
-        expect(c.layoutId()).toBe('force');
-        c.setLayout('force-cluster');
-        expect(c.layoutId()).toBe('force-cluster');
-    });
-
     describe('layout node caps: Radial and Information density froze the tab for minutes on 767 nodes (N1)', () => {
         const radialCap = (): number => laLimit('display.radial_max_nodes');
         const mdsCap = (): number => laLimit('display.mds_max_nodes');
@@ -2569,8 +2559,48 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             return { c, canvas, fixture };
         };
 
-        it('the default caps are 100 (Radial) and 300 (Information density)', () => {
-            expect([radialCap(), mdsCap()]).toEqual([100, 300]);
+        it('the default caps are 100 (Radial), 300 (Information density) and 200 (Clustering force)', () => {
+            expect([radialCap(), mdsCap(), laLimit('display.force_atlas_max_nodes')]).toEqual([100, 300, 200]);
+        });
+
+        it('Clustering force is capped whether picked here or restored; at the cap it runs', async () => {
+            const cap = laLimit('display.force_atlas_max_nodes');
+            const r = stage(cap + 1);
+            r.c.setLayout('force-cluster'); // a pick made here no longer bypasses the cap
+            expect(r.c.layoutId()).toBe('concentric');
+            expect(r.c.layoutCapNotice()).toContain('Clustering force layout is limited to 200 nodes');
+            await r.c.loadView({
+                id: 'v',
+                name: 'V',
+                sourceId: 'entity-projection',
+                query: {},
+                layout: 'force-cluster',
+            });
+            expect(r.c.layoutId()).toBe('concentric');
+            r.canvas.set(chain(cap));
+            expect(r.c.layoutId()).toBe('force-cluster');
+        });
+
+        it('the canvas is handed every layout cap (page displayOptions)', () => {
+            const r = stage(10);
+            expect(r.c.displayOptions().layoutCaps).toEqual({ radial: 100, mds: 300, 'force-cluster': 200 });
+        });
+
+        it('a saved view keeps the analyst PICK even while it is drawn as the fallback', async () => {
+            const { fixture, save } = create();
+            fixture.detectChanges();
+            await runQuery(fixture);
+            const c = fixture.componentInstance;
+            configureLaLimits({ 'display.radial_max_nodes': 2 }); // the fixture graph has 5 nodes
+            try {
+                c.setLayout('radial');
+                expect(c.layoutId()).toBe('concentric');
+                c.saveForm.patchValue({ name: 'Over the cap' });
+                await c.saveView();
+                expect(save.mock.calls[0][0].layout).toBe('radial');
+            } finally {
+                resetLaLimits();
+            }
         });
 
         it('above its cap a pick made here is NOT run: Degree ordered is drawn and the analyst is told', () => {

@@ -80,8 +80,9 @@ public enum LaLimit {
     /** N1: measured headless - Information density (MDS) is ~0.7 s at 300 nodes, ~3.7 s at 500, ~30 s at 767. */
     DISPLAY_MDS_MAX_NODES("display.mds_max_nodes", Layer.SPACE, true, "display", "nodes", 300, 1, 400,
             "Nodes above which the Information density (MDS) layout is not run (the canvas shows Degree ordered instead)."),
-    DISPLAY_FORCE_ATLAS_MAX_NODES("display.force_atlas_max_nodes", Layer.SPACE, true, "display", "nodes", 800, 1, 80_000,
-            "Nodes above which the force-atlas layout is not offered."),
+    /** N1: measured in G6's real path (300 ticks): Clustering force is 17-22 s at 767 nodes; 800 -> 200 and a manual pick is capped too. */
+    DISPLAY_FORCE_ATLAS_MAX_NODES("display.force_atlas_max_nodes", Layer.SPACE, true, "display", "nodes", 200, 1, 400,
+            "Nodes above which the Clustering force (force-atlas2) layout is not run (the canvas shows Degree ordered instead)."),
     DISPLAY_EMBED_LABEL_LIMIT("display.embed_label_limit", Layer.SPACE, true, "display", "count", 80, 1, 8_000,
             "Labels drawn in the embedded Investigation view."),
     DISPLAY_EMBED_EDGE_LIMIT("display.embed_edge_limit", Layer.SPACE, true, "display", "edges", 3_000, 1, 300_000,

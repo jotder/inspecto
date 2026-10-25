@@ -9,7 +9,7 @@ import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from '
 import { GraphSourcesService } from './graph-sources';
 import type { ProjectedGraph } from './entity-projection';
 import { LaLimitsService } from './la-limits.service';
-import { laLayoutCaps } from './la-limits';
+import { laLayoutCaps, layoutCapNoticeText } from './la-limits';
 import {
     hideLinkKinds,
     legendEdgeKindsFor,
@@ -77,6 +77,15 @@ import {
                 <p class="text-secondary m-0 shrink-0 pt-1 text-[10px] leading-snug" [title]="savedViewNotice">
                     <span class="text-warn font-semibold">Not evidence</span> — re-projects live
                 </p>
+                @if (layoutCapNotice(); as notice) {
+                    <p
+                        class="text-secondary m-0 shrink-0 text-[10px] leading-snug"
+                        role="status"
+                        data-testid="la-layout-cap-notice"
+                    >
+                        {{ notice }}
+                    </p>
+                }
             } @else if (loaded()) {
                 <inspecto-empty-state
                     icon="heroicons_outline:share"
@@ -125,6 +134,10 @@ export class LinkViewWidgetComponent {
         ...this.view()?.display,
         layoutCaps: laLayoutCaps(),
     }));
+    /** Said when the saved layout is over its node cap and the tile draws the fallback instead. */
+    readonly layoutCapNotice = computed(() =>
+        layoutCapNoticeText(this.view()?.layout ?? null, this.data()?.nodes.length ?? 0),
+    );
     readonly drawn = computed(() => hideLinkKinds(this.data(), this.hiddenLinkKinds()));
     /** The node cap cut the projection short — said in the Link Analysis page's own words. */
     readonly truncated = computed(() => !!(this.data() as ProjectedGraph | null)?.truncated);

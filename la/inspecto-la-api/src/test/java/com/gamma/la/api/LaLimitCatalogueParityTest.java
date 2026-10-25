@@ -252,6 +252,7 @@ class LaLimitCatalogueParityTest {
         Map<LaLimit, long[]> measured = new java.util.EnumMap<>(LaLimit.class); // {default, max}
         measured.put(LaLimit.DISPLAY_RADIAL_MAX_NODES, new long[] {100, 200});
         measured.put(LaLimit.DISPLAY_MDS_MAX_NODES, new long[] {300, 400});
+        measured.put(LaLimit.DISPLAY_FORCE_ATLAS_MAX_NODES, new long[] {200, 400});
         measured.forEach((l, dm) -> {
             assertEquals(dm[0], l.defaultValue().longValue(), l.path() + " default");
             assertEquals(dm[1], l.max().longValue(), l.path() + " max");

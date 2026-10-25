@@ -1,5 +1,10 @@
 import { signal } from '@angular/core';
-import type { GraphDisplayOptions } from '@inspecto/core/graph/graph-view.component';
+import {
+    CAPPED_LAYOUT_FALLBACK,
+    GRAPH_LAYOUTS,
+    type GraphDisplayOptions,
+    type GraphLayoutId,
+} from '@inspecto/core/graph/graph-view.component';
 
 /**
  * Link Analysis limits (LA-CONFIG-LIMITS-1, plan `docs/superpower/la-configurable-limits-plan.md` §6.3, §7): the ONE
@@ -46,7 +51,7 @@ export const LA_LIMIT_FALLBACKS = {
     'display.layered_max_nodes': 30,
     'display.radial_max_nodes': 100,
     'display.mds_max_nodes': 300,
-    'display.force_atlas_max_nodes': 800,
+    'display.force_atlas_max_nodes': 200,
     'display.embed_label_limit': 80,
     'display.embed_edge_limit': 3000,
     'display.geo_point_cap': 5000,
@@ -111,7 +116,19 @@ export function laLimit(key: LaLimitKey): number {
 
 /** The per-layout node caps a canvas host hands the graph view (`display.layoutCaps`): the layouts that freeze the tab. */
 export function laLayoutCaps(): NonNullable<GraphDisplayOptions['layoutCaps']> {
-    return { radial: laLimit('display.radial_max_nodes'), mds: laLimit('display.mds_max_nodes') };
+    return {
+        radial: laLimit('display.radial_max_nodes'),
+        mds: laLimit('display.mds_max_nodes'),
+        'force-cluster': laLimit('display.force_atlas_max_nodes'),
+    };
+}
+
+/** What the analyst is told while a capped layout is drawn as the fallback; null when the pick runs as picked. */
+export function layoutCapNoticeText(picked: GraphLayoutId | null, nodeCount: number): string | null {
+    const cap = picked ? laLayoutCaps()[picked] : undefined;
+    if (!picked || cap === undefined || nodeCount <= cap) return null;
+    const name = (id: GraphLayoutId): string => GRAPH_LAYOUTS.find((l) => l.id === id)?.label ?? id;
+    return `${name(picked)} layout is limited to ${cap} nodes (this graph has ${nodeCount}), so it is shown in ${name(CAPPED_LAYOUT_FALLBACK)}.`;
 }
 
 /**

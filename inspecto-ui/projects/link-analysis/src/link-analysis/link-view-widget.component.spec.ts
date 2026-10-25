@@ -255,13 +255,17 @@ describe('LinkViewWidgetComponent — the Space limits', () => {
         } as unknown as G6GraphData;
         c.data.set(big);
         fixture.detectChanges();
-        const stub = fixture.debugElement.query(By.directive(StubGraphViewComponent)).componentInstance as StubGraphViewComponent;
+        const stub = fixture.debugElement.query(By.directive(StubGraphViewComponent))
+            .componentInstance as StubGraphViewComponent;
         const display = stub.display() as GraphDisplayOptions;
-        expect(display.layoutCaps).toEqual({ radial: 100, mds: 300 });
-        // the graph view runs what cappedLayout says (graph-view-layout-cap.spec): the saved Radial is over its cap
-        expect(cappedLayout(stub.layout() as GraphLayoutId, (stub.data() as G6GraphData).nodes.length, display.layoutCaps)).toBe(
-            'concentric',
+        expect(display.layoutCaps).toEqual({ radial: 100, mds: 300, 'force-cluster': 200 });
+        expect(fixture.nativeElement.querySelector('[data-testid="la-layout-cap-notice"]')?.textContent).toContain(
+            'Radial layout is limited to 100 nodes (this graph has 101), so it is shown in Degree ordered.',
         );
+        // the graph view runs what cappedLayout says (graph-view-layout-cap.spec): the saved Radial is over its cap
+        expect(
+            cappedLayout(stub.layout() as GraphLayoutId, (stub.data() as G6GraphData).nodes.length, display.layoutCaps),
+        ).toBe('concentric');
     });
 
     it('reads the limits once for a dashboard of many tiles', async () => {

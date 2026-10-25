@@ -202,7 +202,6 @@ import {
     GRAPH_NODE_SIZES,
     GraphDisplayOptions,
     GraphEmphasis,
-    CAPPED_LAYOUT_FALLBACK,
     GraphLayoutId,
     GraphViewComponent,
     GraphViewInteraction,
@@ -275,7 +274,7 @@ import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
-import { laLayoutCaps, laLimit } from './la-limits';
+import { laLayoutCaps, laLimit, layoutCapNoticeText } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
@@ -1244,33 +1243,18 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     // ── layout (the Layout toolbox; persisted with a saved view) ──
     /** The analyst's explicit layout (toolbox pick, undo, saved view); null = none, so {@link defaultLayoutFor} decides. */
     readonly pickedLayout = signal<GraphLayoutId | null>(null);
-    /** Whether {@link pickedLayout} was chosen in the Layout toolbox this session (not restored from a view / undo). */
-    private readonly layoutPickedHere = signal(false);
     readonly layoutId = computed<GraphLayoutId>(() => {
         const picked = this.pickedLayout();
         const g = this.canvasData();
         if (!picked) return defaultLayoutFor(g, this.investigation.canvas() !== null);
-        // A RESTORED force-atlas2 ("Clustering force") froze the tab for ~60 s on a big graph; only a pick made here
-        // keeps it there.
-        if (
-            picked === 'force-cluster' &&
-            !this.layoutPickedHere() &&
-            (g?.nodes.length ?? 0) > laLimit('display.force_atlas_max_nodes')
-        )
-            return 'force';
-        // Radial and Information density block the tab for minutes on ~800 nodes: above their cap they are never run,
-        // whether picked here or restored (saved view / undo). See {@link layoutCapNotice}.
+        // Radial, Information density and Clustering force (force-atlas2) block the tab for 20 s to minutes on ~800 nodes:
+        // above their cap they are never run, whether picked here or restored (saved view / undo). See {@link layoutCapNotice}.
         return cappedLayout(picked, g?.nodes.length ?? 0, laLayoutCaps()) ?? picked;
     });
     /** On-screen notice while a pick is shown as {@link CAPPED_LAYOUT_FALLBACK} because the graph is over its layout cap. */
-    readonly layoutCapNotice = computed<string | null>(() => {
-        const n = this.canvasData()?.nodes.length ?? 0;
-        const picked = this.pickedLayout();
-        const cap = picked ? laLayoutCaps()[picked] : undefined;
-        if (!picked || cap === undefined || n <= cap) return null;
-        const name = (id: GraphLayoutId): string => GRAPH_LAYOUTS.find((l) => l.id === id)?.label ?? id;
-        return `${name(picked)} layout is limited to ${cap} nodes (this graph has ${n}), so it is shown in ${name(CAPPED_LAYOUT_FALLBACK)}.`;
-    });
+    readonly layoutCapNotice = computed<string | null>(() =>
+        layoutCapNoticeText(this.pickedLayout(), this.canvasData()?.nodes.length ?? 0),
+    );
     readonly layouts = GRAPH_LAYOUTS;
     /** Whether the current graph is tree/forest-shaped — gates the tree layouts. */
     readonly isTreeShaped = computed<boolean>(() => {
@@ -2588,7 +2572,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     setLayout(id: GraphLayoutId): void {
         this.recordHistory();
         this.pickedLayout.set(id);
-        this.layoutPickedHere.set(true);
     }
 
     // ── undo/redo (Phase G, presentation state only — not the query/graph itself) ──

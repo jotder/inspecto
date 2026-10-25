@@ -1020,16 +1020,6 @@
                                 (focusItem)="focusHeld($event)"
                             ></inspecto-link-analysis-held-tray>
                         }
-                        @if (layoutCapNotice(); as notice) {
-                            <div
-                                class="absolute bottom-14 right-2 z-20 max-w-[28rem] rounded-lg border px-2 py-1 text-xs shadow"
-                                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
-                                role="status"
-                                data-testid="la-layout-cap-notice"
-                            >
-                                {{ notice }}
-                            </div>
-                        }
                         @if (growExclude.lastChange(); as change) {
                             <div
                                 class="absolute bottom-8 right-2 z-30 flex max-w-[28rem] items-center gap-2 rounded-lg border px-2 py-1 text-xs shadow"
@@ -1168,6 +1158,9 @@
                                     {{ ((canvasData()?.edges?.length ?? 0) + omitted).toLocaleString() }} links (render
                                     limit)</span
                                 >
+                            }
+                            @if (layoutCapNotice(); as notice) {
+                                <span class="text-warn" role="status" data-testid="la-layout-cap-notice">{{ notice }}</span>
                             }
                             @if (investigation.canvas()) {
                                 <span>Investigation Working Set</span>
