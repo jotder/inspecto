@@ -36,18 +36,23 @@ class WorkingSetConditionalReadTest {
 
     @AfterEach
     void reset() {
-        WorkingSetRoutes.clockMs = WorkingSetRoutes::monotonicMs;
+        WorkingSetRoutes.clockMs = WorkingSetRoutes.DEFAULT_CLOCK;
         WorkingSetRoutes.trustMs = WorkingSetRoutes.WORKING_SET_TRUST_MS;
     }
 
     /** A store whose token is {@code t1} until the first log read, then {@code t2} (when {@code moves}): the log is rewritten WHILE it is read. */
     private static InvestigationRoutes.Inv racing(Path root, boolean moves) {
+        return racing(root, moves ? 1 : Integer.MAX_VALUE);
+    }
+
+    /** The token becomes {@code t2} once the log has been read {@code flipAfterReads} times. */
+    private static InvestigationRoutes.Inv racing(Path root, int flipAfterReads) {
         String cacheKey = "k-" + UUID.randomUUID();   // the relation cache is static: a fresh key per test
         AtomicInteger logReads = new AtomicInteger();
         var store = (InvestigationStore) Proxy.newProxyInstance(InvestigationStore.class.getClassLoader(), new Class<?>[] {InvestigationStore.class},
                 (p, m, a) -> switch (m.getName()) {
                     case "cacheKey" -> cacheKey;
-                    case "logToken" -> moves && logReads.get() > 0 ? "t2" : "t1";
+                    case "logToken" -> logReads.get() >= flipAfterReads ? "t2" : "t1";
                     case "log" -> {
                         logReads.incrementAndGet();
                         yield List.of();
@@ -133,7 +138,10 @@ class WorkingSetConditionalReadTest {
         long mono = WorkingSetRoutes.monotonicMs();
         assertTrue(Math.abs(mono - System.nanoTime() / 1_000_000L) < 1_000, "tracks System.nanoTime");
         assertTrue(Math.abs(mono - System.currentTimeMillis()) > 100_000_000_000L, "is not on the epoch of the wall clock");
-        assertTrue(Math.abs(WorkingSetRoutes.clockMs.getAsLong() - mono) < 1_000, "the production seam default is the monotonic source");
+        // the PRODUCTION default, read from a constant no test reassigns - independent of test order and of the seam
+        long def = WorkingSetRoutes.DEFAULT_CLOCK.getAsLong();
+        assertTrue(Math.abs(def - System.nanoTime() / 1_000_000L) < 1_000, "the default clock tracks System.nanoTime");
+        assertTrue(Math.abs(def - System.currentTimeMillis()) > 100_000_000_000L, "the default clock is not the wall clock");
     }
 
     @Test
@@ -153,6 +161,28 @@ class WorkingSetConditionalReadTest {
         mono.addAndGet(2);                                            // 30.001 s: the full SHA-256 revalidation happens
         WorkingSetRoutes.relation(inv, -1, cached, token, stable);
         assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - full, "after 30 s of monotonic time, whatever the wall clock did");
+    }
+
+    @Test
+    void aTokenThatMovesDuringARevalidationDoesNotRefreshTheStampAndIsUncachedUntagged(@TempDir Path root) throws Exception {
+        InvestigationRoutes.Inv inv = racing(root, 2);   // read #1 stable; the log moves during read #2 (the re-validation)
+        AtomicLong mono = new AtomicLong(5_000);
+        WorkingSetRoutes.clockMs = mono::get;
+        String token = WorkingSetEtag.logToken(inv);   // t1
+        boolean[] cached = {false}, stable = {true};
+        WorkingSetRoutes.relation(inv, -1, cached, token, stable);
+        assertTrue(stable[0]);
+        mono.addAndGet(WorkingSetRoutes.WORKING_SET_TRUST_MS + 1);   // the window ran out: the next call re-validates by content
+        long full = WorkingSetRoutes.FULL_READS.sum();
+        stable[0] = true;
+        WorkingSetRoutes.relation(inv, -1, cached, token, stable);
+        assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - full, "re-validation read the log");
+        assertFalse(stable[0], "the token moved between the pre-read and post-read capture: no ETag for this answer");
+        // the entry's stamp was NOT refreshed: the very next request (same instant) must re-read, not hit the cache
+        stable[0] = true;
+        WorkingSetRoutes.relation(inv, -1, cached, token, stable);
+        assertEquals(2, WorkingSetRoutes.FULL_READS.sum() - full, "the next request re-reads");
+        assertFalse(stable[0]);
     }
 
     /** The status the framework would answer with: a handler that returns a body (not HANDLED) is answered 200. */

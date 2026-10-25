@@ -35,17 +35,19 @@ class ControlApiErrorNeverTaggedTest {
         try (CollectorService svc = new CollectorService(List.of(pipe), 3600, 1)) {
             ControlApi api = new ControlApi(svc, 0);
             try {
-                for (int status : new int[] {400, 404, 409, 422, 500, 503}) {
+                for (int status : new int[] {400, 404, 409, 412, 422, 429, 500, 503}) {
                     Probe ex = new Probe();
                     ETags.set(ex, "\"sha256:abc\"");   // a handler tagged its answer, then failed
                     api.respond(ex, status, Map.of("error", "boom"));
                     assertNull(ex.getResponseHeaders().getFirst("ETag"), "status " + status);
                     assertEquals(status, ex.status);
                 }
-                Probe ok = new Probe();
-                ETags.set(ok, "\"sha256:abc\"");
-                api.respond(ok, 200, Map.of("a", 1));
-                assertEquals("\"sha256:abc\"", ok.getResponseHeaders().getFirst("ETag"), "a 200 keeps its tag");
+                for (int status : new int[] {200, 201, 202, 299, 300, 399}) {   // below 400 keeps the tag
+                    Probe ok = new Probe();
+                    ETags.set(ok, "\"sha256:abc\"");
+                    api.respond(ok, status, Map.of("a", 1));
+                    assertEquals("\"sha256:abc\"", ok.getResponseHeaders().getFirst("ETag"), "status " + status + " keeps its tag");
+                }
             } finally {
                 api.close();
             }

@@ -119,11 +119,14 @@ public final class WorkingSetRoutes implements RouteModule {
         return System.nanoTime() / 1_000_000L;
     }
 
+    /** The production clock; never reassigned, so a test can assert the default independently of the seam below. */
+    static final java.util.function.LongSupplier DEFAULT_CLOCK = WorkingSetRoutes::monotonicMs;
+
     /** TEST SEAM (package-private; a test in another module reaches it through a same-package accessor): the trust window (default {@link #WORKING_SET_TRUST_MS}). */
     static volatile long trustMs = WORKING_SET_TRUST_MS;
 
     /** TEST SEAM (package-private): the MONOTONIC clock the trust window is measured on; a replacement must be monotonic too. */
-    static volatile java.util.function.LongSupplier clockMs = WorkingSetRoutes::monotonicMs;
+    static volatile java.util.function.LongSupplier clockMs = DEFAULT_CLOCK;
 
     /** TEST SEAM (package-private): full content reads (a miss, or a re-validation after the trust window) - a hit within the window adds none. */
     static final java.util.concurrent.atomic.LongAdder FULL_READS = new java.util.concurrent.atomic.LongAdder();

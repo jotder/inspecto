@@ -17,7 +17,7 @@ public final class WorkingSetTestSeams {
 
     /** Back to the production monotonic clock and the production window. */
     public static void reset() {
-        WorkingSetRoutes.clockMs = WorkingSetRoutes::monotonicMs;
+        WorkingSetRoutes.clockMs = WorkingSetRoutes.DEFAULT_CLOCK;
         WorkingSetRoutes.trustMs = WorkingSetRoutes.WORKING_SET_TRUST_MS;
     }
 
