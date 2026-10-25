@@ -74,6 +74,9 @@ public enum LaLimit {
             "Labels drawn on the canvas before level-of-detail hides the rest."),
     DISPLAY_LAYERED_MAX_NODES("display.layered_max_nodes", Layer.SPACE, true, "display", "nodes", 30, 1, 3_000,
             "Nodes above which the layered layout is not offered."),
+    /** N1: measured headless - Radial (MDS + stress iterations) is ~0.35 s at 100 nodes, ~2 s at 200, 20 s at 500, minutes at 767. */
+    DISPLAY_RADIAL_MAX_NODES("display.radial_max_nodes", Layer.SPACE, true, "display", "nodes", 100, 1, 3_000,
+            "Nodes above which the radial layout is not run (the canvas shows Force instead)."),
     DISPLAY_FORCE_ATLAS_MAX_NODES("display.force_atlas_max_nodes", Layer.SPACE, true, "display", "nodes", 800, 1, 80_000,
             "Nodes above which the force-atlas layout is not offered."),
     DISPLAY_EMBED_LABEL_LIMIT("display.embed_label_limit", Layer.SPACE, true, "display", "count", 80, 1, 8_000,

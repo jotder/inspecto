@@ -43,6 +43,7 @@ export const LA_LIMIT_FALLBACKS = {
     'browser_algorithms.maximumSpanningForest': 2500,
     'display.lod_label_cap': 300,
     'display.layered_max_nodes': 30,
+    'display.radial_max_nodes': 100,
     'display.force_atlas_max_nodes': 800,
     'display.embed_label_limit': 80,
     'display.embed_edge_limit': 3000,

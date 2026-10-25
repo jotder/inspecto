@@ -1255,7 +1255,18 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             (g?.nodes.length ?? 0) > laLimit('display.force_atlas_max_nodes')
         )
             return 'force';
+        // Radial (MDS + stress iterations) blocks the tab for minutes on ~800 nodes: above the cap it is never run,
+        // whether picked here or restored (saved view / undo). See {@link radialCapNotice}.
+        if (picked === 'radial' && (g?.nodes.length ?? 0) > laLimit('display.radial_max_nodes')) return 'force';
         return picked;
+    });
+    /** On-screen notice while a Radial pick is shown as Force because the graph is over `display.radial_max_nodes`. */
+    readonly radialCapNotice = computed<string | null>(() => {
+        const n = this.canvasData()?.nodes.length ?? 0;
+        const cap = laLimit('display.radial_max_nodes');
+        return this.pickedLayout() === 'radial' && n > cap
+            ? `Radial layout is limited to ${cap} nodes (this graph has ${n}), so it is shown in Force.`
+            : null;
     });
     readonly layouts = GRAPH_LAYOUTS;
     /** Whether the current graph is tree/forest-shaped — gates the tree layouts. */

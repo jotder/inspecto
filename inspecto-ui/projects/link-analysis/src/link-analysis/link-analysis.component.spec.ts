@@ -2557,6 +2557,48 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         expect(c.layoutId()).toBe('force-cluster');
     });
 
+    describe('Radial layout cap (N1: Radial blocked the tab for minutes on 767 nodes)', () => {
+        const cap = (): number => laLimit('display.radial_max_nodes');
+        const stage = (n: number) => {
+            const { fixture } = create();
+            const c = fixture.componentInstance;
+            Object.defineProperty(c, 'canvasData', { value: () => chain(n) });
+            return c;
+        };
+
+        it('the default cap is 100 nodes', () => expect(cap()).toBe(100));
+
+        it('above the cap a Radial pick made here is NOT run: Force is used and the analyst is told', () => {
+            const c = stage(cap() + 1);
+            c.setLayout('radial');
+            expect(c.layoutId()).toBe('force');
+            expect(c.radialCapNotice()).toBe(
+                `Radial layout is limited to ${cap()} nodes (this graph has ${cap() + 1}), so it is shown in Force.`,
+            );
+        });
+
+        it('at the cap Radial is unchanged and there is no notice (boundary)', () => {
+            const c = stage(cap());
+            c.setLayout('radial');
+            expect(c.layoutId()).toBe('radial');
+            expect(c.radialCapNotice()).toBeNull();
+        });
+
+        it('a saved view whose layout is Radial, opened on a big graph, is guarded too', async () => {
+            const c = stage(767);
+            await c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
+            expect(c.pickedLayout()).toBe('radial');
+            expect(c.layoutId()).toBe('force');
+            expect(c.radialCapNotice()).toContain('limited to');
+        });
+
+        it('a restored Radial on a small graph still opens as Radial', async () => {
+            const c = stage(cap());
+            await c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
+            expect(c.layoutId()).toBe('radial');
+        });
+    });
+
     it('a first click on an Investigation canvas selects without switching the toolbox tab or opening the dock', async () => {
         const { fixture } = create();
         fixture.detectChanges();

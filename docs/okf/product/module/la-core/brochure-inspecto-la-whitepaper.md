@@ -1002,7 +1002,7 @@ A selection of the shipped items (defaults and ranges are those of the catalogue
 | | `entity_profile.timeline_days`, `relationship_threshold` | 400, 6 | 1 to 36,600; 2 to $10^6$ | timeline length; outlier count |
 | **Browser** | `projection_node_cap` | 1,000 | 1 to 100,000 | entities admitted to one canvas projection |
 | | `analysis_node_cap`, `suspicion_node_cap` | 2,500, 1,000 | 1 to 100,000 each | above it the browser refuses or hands over to the server |
-| | `display.lod_label_cap`, `layered_max_nodes`, `force_atlas_max_nodes` | 300, 30, 800 | up to 30,000; 3,000; 80,000 | labels drawn; layouts offered |
+| | `display.lod_label_cap`, `layered_max_nodes`, `radial_max_nodes`, `force_atlas_max_nodes` | 300, 30, 100, 800 | up to 30,000; 3,000; 3,000; 80,000 | labels drawn; layouts offered |
 
 ### 6.4 Measured on one production-scale day (single run)
 
