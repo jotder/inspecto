@@ -984,4 +984,93 @@ class ControlApiBiQueryMaskingTest {
             assertTrue(column(revealer, "k").contains(A));
         }
     }
+
+    /**
+     * Review of cb84a3365, defect 2: the derived rule must follow the COLUMN, not its output name. {@code cc =
+     * coalesce('441700900202', msisdn)} is always B's number, so under its own name or any rename it must never carry B's
+     * real alias (the lookup table the rule exists to stop).
+     */
+    @Test
+    void aDerivedCalculatedColumnStaysWithheldUnderARenameAndABareCopyKeepsItsAlias(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of("calculated", List.of(
+                    Map.of("name", "cc", "expr", "coalesce('" + B + "', msisdn)"),
+                    Map.of("name", "k", "expr", "msisdn"))));
+            Set<String> keyAliases = Set.copyOf(column(V1Body.of(bi(c, "viewer", "calls_ds", BY_MSISDN).body()).get("rows"), "msisdn"));
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("query", "ren_q", Map.of("type", "sql", "datasetId", "calls_ds", "text", "SELECT cc AS x, region FROM calls_ds"));
+            reg.write("query", "chain_q", Map.of("type", "sql", "datasetId", "calls_ds", "text", "SELECT cc AS a, a AS b FROM calls_ds"));
+            reg.write("query", "copy_q", Map.of("type", "sql", "datasetId", "calls_ds", "text", "SELECT k AS y FROM calls_ds"));
+
+            // a saved query that renames the derived column
+            HttpResponse<String> ren = post(c, "viewer", "/queries/ren_q/run", null);
+            assertEquals(200, ren.statusCode(), ren.body());
+            assertEquals(Set.of("masked:withheld"), Set.copyOf(column(V1Body.of(ren.body()).get("rows"), "x")), ren.body());
+            // a rename chain (the second item is a lateral alias of the first)
+            HttpResponse<String> chain = post(c, "viewer", "/queries/chain_q/run", null);
+            assertEquals(200, chain.statusCode(), chain.body());
+            JsonNode chainRows = V1Body.of(chain.body()).get("rows");
+            assertEquals(Set.of("masked:withheld"), Set.copyOf(column(chainRows, "a")), chain.body());
+            assertEquals(Set.of("masked:withheld"), Set.copyOf(column(chainRows, "b")), chain.body());
+            // a Widget bound to the renaming query
+            HttpResponse<String> bound = bi(c, "viewer", "calls_ds", "\"query\":\"ren_q\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"x\"]");
+            assertEquals(200, bound.statusCode(), bound.body());
+            assertEquals(Set.of("masked:withheld"), Set.copyOf(column(V1Body.of(bound.body()).get("rows"), "x")), bound.body());
+            // a bare copy of the key keeps the key's alias even under a rename
+            HttpResponse<String> copy = post(c, "viewer", "/queries/copy_q/run", null);
+            assertEquals(200, copy.statusCode(), copy.body());
+            assertEquals(keyAliases, Set.copyOf(column(V1Body.of(copy.body()).get("rows"), "y")), copy.body());
+            // a revealer sees the plain value under the rename
+            assertEquals(Set.of(B), Set.copyOf(column(V1Body.of(post(c, "revealer", "/queries/ren_q/run", null).body()).get("rows"), "x")));
+        }
+    }
+
+    /**
+     * Review of cb84a3365, defect 1: the bind check's helper column must not be a name a calculated column or a store column can
+     * hold. A calculated column named like it is refused at save and at read; a store column named like the old helper is
+     * just a column (no whole-row struct is served under it); one named like the new helper fails the bind.
+     */
+    @Test
+    void theBindCheckHelperCannotCollideWithACalculatedOrAStoreColumn(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            // the save gate refuses any internal-looking name
+            for (String name : List.of("__calc_check", "__base", "__calc", "__anything")) {
+                assertEquals(422, post(c, "author", "/components/dataset", "{\"id\":\"r" + name.length() + "\",\"physicalRef\":\"x\","
+                        + "\"calculated\":[{\"name\":\"" + name + "\",\"expr\":\"upper(msisdn)\"}]}").statusCode(), name);
+            }
+            // at read (a Dataset written straight to the registry): the relation is refused for a viewer and a revealer alike
+            seed(c, Map.of("calculated", List.of(Map.of("name", "__calc_check", "expr", "upper(msisdn)")),
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+            for (String user : List.of("viewer", "revealer")) {
+                HttpResponse<String> byName = bi(c, user, "calls_ds", "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"__calc_check_1\"]");
+                assertEquals(422, byName.statusCode(), user + " " + byName.body());
+                assertNoRaw(byName.body());
+                HttpResponse<String> rows = get(c, user, "/datasets/calls_ds/rows?limit=10");
+                assertEquals(422, rows.statusCode(), user + " " + rows.body());
+                assertNoRaw(rows.body());
+            }
+            // a STORE column literally named __calc_check: an ordinary column, and no row struct (raw key inside) is served beside it
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("odd_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('" + A + "','t1'),('" + B + "','t2')) AS t(msisdn,__calc_check)", "2026-07-08T00:00:00Z"));
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("dataset", "odd_ds", Map.of("view", "odd_view", "columns", List.of(
+                    Map.of("name", "msisdn", "classification", "MSISDN"), Map.of("name", "__calc_check")),
+                    "calculated", List.of(Map.of("name", "m_up", "expr", "upper(msisdn)"))));
+            HttpResponse<String> odd = get(c, "viewer", "/datasets/odd_ds/rows?limit=10");
+            assertEquals(200, odd.statusCode(), odd.body());
+            assertNoRaw(odd.body());
+            assertEquals(Set.of("t1", "t2"), Set.copyOf(column(V1Body.of(odd.body()).get("rows"), "__calc_check")));
+            assertFalse(V1Body.of(odd.body()).get("rows").get(0).has("__calc_check_1"), odd.body());
+            assertTrue(column(V1Body.of(get(c, "revealer", "/datasets/odd_ds/rows?limit=10").body()).get("rows"), "m_up").contains(A));
+            // a store column named like the NEW helper fails the bind instead of being renamed
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("odd2_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('" + A + "','t1')) AS t(msisdn,\"__calc check\")", "2026-07-08T00:00:00Z"));
+            reg.write("dataset", "odd2_ds", Map.of("view", "odd2_view", "columns", List.of(
+                    Map.of("name", "msisdn", "classification", "MSISDN")),
+                    "calculated", List.of(Map.of("name", "m_up", "expr", "upper(msisdn)"))));
+            HttpResponse<String> odd2 = get(c, "viewer", "/datasets/odd2_ds/rows?limit=10");
+            assertEquals(422, odd2.statusCode(), odd2.body());
+            assertNoRaw(odd2.body());
+        }
+    }
 }

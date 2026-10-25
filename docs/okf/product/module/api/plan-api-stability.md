@@ -319,6 +319,12 @@ above the generated commit list.
   unchanged — renaming it is a separate, unmade decision.
 
 **Operator-visible behaviour**
+- **Behaviour change (2026-10-25, `DATASET-CALC-NAME-COLLISION-1`):** a Dataset's `calculated` column may not reuse a
+  base or declared column's name (any case), repeat another calculated name, or start with `__`: save answers 422, and an
+  existing Dataset that collided stops reading (422) until the calculated column is renamed. **Report Jobs and
+  attachments approved before this change on a Dataset WITH calculated columns need re-approval** (re-save the Job): the
+  approval fingerprints the relation SQL, and the calculated-column wrap's text changed, so the old approval no longer
+  matches and the send is held — it fails closed. Datasets without calculated columns are unaffected.
 - **Breaking (2026-09-28, `ASSURE-IMPACT-LEDGER-RESIDUALS-1`):** an object read's `impact` block carries its
   amounts (`suspected`, `confirmed`, `recovered`, `prevented`, `outstanding`) as **decimal strings**
   (`"1200.5"`, plain — never exponent form), no longer JSON numbers, so a client can send a read value back

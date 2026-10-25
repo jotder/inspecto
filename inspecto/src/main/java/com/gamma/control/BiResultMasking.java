@@ -637,7 +637,10 @@ final class BiResultMasking {
             String name = names.size() == 1 ? names.get(0).asText().trim().toLowerCase(Locale.ROOT) : "";
             boolean lateral = false;
             for (int j = 0; j < itemAliases.size(); j++) lateral |= j != i && !name.isEmpty() && name.equals(itemAliases.get(j));
-            if ("COLUMN_REF".equals(item.path("type").asText()) && !rowRef(item, relations) && !lateral) {
+            // a reference to a calculated column DERIVED from a key (cc = coalesce('4417..', msisdn)) is no bare key, whatever name it
+            // is selected under: the alias decision follows the column, not its output name (BI-MASKING-CALC-DERIVED-ALIAS-1 review)
+            String last = names.size() > 0 ? names.get(names.size() - 1).asText().trim().toLowerCase(Locale.ROOT) : "";
+            if ("COLUMN_REF".equals(item.path("type").asText()) && !rowRef(item, relations) && !lateral && !derivedCalc.contains(last)) {
                 if (refsKey(item, Set.of())) bare.add(i);
             } else derivedItem = true;
         }

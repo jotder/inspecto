@@ -308,8 +308,8 @@ public final class DatasetRelation {
      * BI masking never sees, so {@code {name: "region", expr: "upper(msisdn)"}} over a base that has {@code region} used to
      * serve the raw key under {@code region_1}. Names are compared ignoring case (DuckDB does). Two layers, both fail closed:
      * <ul>
-     *   <li>this method, which needs no data: a name that is declared in the Dataset's {@code columns[]}, or used by two
-     *       calculated columns. The Dataset save gate runs it too, so the collision is a 422 at save, not only at read.</li>
+     *   <li>this method, which needs no data: a name starting {@code __} (reserved for the wrap's internal aliases), a name
+     *       declared in the Dataset's {@code columns[]}, or one used by two calculated columns. The Dataset save gate runs it too, so the collision is a 422 at save, not only at read.</li>
      *   <li>{@link #withCalculated}'s bind-time check, for a base column the Dataset does not declare (a store read as-is):
      *       the relation itself refuses to bind when a calculated name is already a column of the base.</li>
      * </ul>
@@ -331,6 +331,10 @@ public final class DatasetRelation {
             String name = o instanceof Map<?, ?> c ? Values.trimToNull(cast(c).get("name")) : null;
             if (name == null) continue;
             String key = name.toLowerCase(java.util.Locale.ROOT);
+            // the wrap's own aliases (__base, __calc) and any future one: a calculated column named like one would shadow it
+            if (key.startsWith("__"))
+                throw new IllegalArgumentException("calculated column '" + name + "' starts with '__', which is reserved for"
+                        + " internal aliases; rename the calculated column");
             if (taken.contains(key))
                 throw new IllegalArgumentException("calculated column '" + name + "' has the name of a declared column of this"
                         + " dataset (names are compared ignoring case); rename the calculated column");
@@ -341,18 +345,21 @@ public final class DatasetRelation {
 
     /**
      * Wrap {@code base} with the dataset's calculated columns (DAT-5), or return it untouched when none. The wrap is
-     * {@code SELECT * EXCLUDE (__calc_check) FROM (SELECT *, struct_insert(__base, "n" := NULL) AS __calc_check, (expr) AS "n", …
-     * FROM (<base>) AS __base) AS __calc}: {@code struct_insert} refuses to add a field the row struct already holds, so
-     * DuckDB fails the BIND ("Binder Error: Duplicate struct entry name") when a calculated name is a column of the base, or
-     * another calculated name, whatever the case - even over an empty store, and before any row is read. The helper column is
-     * never selected, so the optimizer drops it and Parquet projection pushdown is unchanged.
+     * {@code SELECT * EXCLUDE ("__calc check") FROM (SELECT *, struct_insert(struct_insert(__base, "__calc check" := NULL), "n" := NULL)
+     * AS "__calc check", (expr) AS "n", … FROM (<base>) AS __base) AS __calc}: {@code struct_insert} refuses to add a field the row
+     * struct already holds, so DuckDB fails the BIND ("Binder Error: Duplicate struct entry name") when a calculated name is a
+     * column of the base, or another calculated name, whatever the case - even over an empty store, and before any row is read.
+     * The helper's own name holds a blank, so no calculated name (a plain identifier) can equal it, and it is part of the check,
+     * so a store column with that exact name fails the bind instead of being renamed {@code _1} with the whole-row struct,
+     * raw key inside, served beside it. The helper column is never selected, so the optimizer drops it and Parquet projection
+     * pushdown is unchanged.
      */
     private static String withCalculated(String base, Map<String, Object> datasetConfig) {
         Object calc = datasetConfig == null ? null : datasetConfig.get("calculated");
         if (!(calc instanceof java.util.List<?> list) || list.isEmpty()) return base;
         requireFreeCalculatedNames(datasetConfig);
         StringBuilder cols = new StringBuilder();
-        String check = "__base";
+        String check = "struct_insert(__base, \"" + CALC_CHECK + "\" := NULL)";   // the helper is in the check too: a store column with its name fails the bind
         for (Object o : list) {
             if (!(o instanceof Map<?, ?> c))
                 throw new IllegalArgumentException("calculated entries must be {name, expr} objects");
@@ -369,7 +376,8 @@ public final class DatasetRelation {
                 + " FROM (" + base + ") AS __base) AS __calc";
     }
 
-    private static final String CALC_CHECK = "__calc_check";
+    /** The helper column: its name holds a blank, which no calculated name (a plain identifier) can, so nothing can collide with it. */
+    private static final String CALC_CHECK = "__calc check";
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> cast(Map<?, ?> m) {

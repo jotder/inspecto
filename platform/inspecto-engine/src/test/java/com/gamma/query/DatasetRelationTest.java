@@ -192,9 +192,40 @@ class DatasetRelationTest {
                 Path.of("/data"), null);
         // DATASET-CALC-NAME-COLLISION-1: the wrap now also carries a bind-time check that no calculated name is taken, so the
         // projection sits one level in and is read back without its helper column; the projection itself is unchanged.
-        assertTrue(sql.startsWith("SELECT * EXCLUDE (\"__calc_check\") FROM (SELECT *, struct_insert(__base, \"amount_taxed\" := NULL)"
-                + " AS \"__calc_check\", (round(amount * 1.2, 2)) AS \"amount_taxed\" FROM ("), sql);
+        // The helper's name holds a blank, which no calculated name (a plain identifier) can, and the helper is itself part of the
+        // check: a store column with that exact name fails the bind too (review of cb84a3365).
+        assertTrue(sql.startsWith("SELECT * EXCLUDE (\"__calc check\") FROM (SELECT *, "
+                + "struct_insert(struct_insert(__base, \"__calc check\" := NULL), \"amount_taxed\" := NULL)"
+                + " AS \"__calc check\", (round(amount * 1.2, 2)) AS \"amount_taxed\" FROM ("), sql);
         assertTrue(sql.endsWith(") AS __base) AS __calc"), sql);
+    }
+
+    /**
+     * Review of cb84a3365: the bind check's helper column must not be nameable. A store column literally named like the
+     * helper fails the bind (never renamed {@code _1} with the whole-row struct, raw key inside, served beside it); a store column
+     * that merely looks like the old helper name ({@code __calc_check}) is an ordinary column; and no calculated column may use a
+     * name starting {@code __} (reserved for internal aliases: {@code __base}, {@code __calc}).
+     */
+    @Test
+    void theBindCheckHelperCannotBeNamedByACalculatedOrAStoreColumn(@TempDir Path root) throws Exception {
+        writeParquet(root.resolve("odd"), "a.parquet", "SELECT '4417' AS msisdn, 't' AS __calc_check");
+        writeParquet(root.resolve("odd2"), "a.parquet", "SELECT '4417' AS msisdn, 't' AS \"__calc check\"");
+        List<Map<String, Object>> calc = List.of(Map.of("name", "m_up", "expr", "upper(msisdn)"));
+        String ordinary = DatasetRelation.relationSql(Map.of("physicalRef", "odd", "calculated", calc), root, null);
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM (" + ordinary + ")")) {
+            assertEquals(List.of("msisdn", "__calc_check", "m_up"), columnNames(rs), "no helper struct is served");
+        }
+        String clash = DatasetRelation.relationSql(Map.of("physicalRef", "odd2", "calculated", calc), root, null);
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement()) {
+            java.sql.SQLException e = assertThrows(java.sql.SQLException.class, () -> st.executeQuery("SELECT * FROM (" + clash + ") LIMIT 0"));
+            assertTrue(e.getMessage().contains("Binder Error"), e.getMessage());
+        }
+        for (String reserved : List.of("__calc_check", "__base", "__calc", "__x")) {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> DatasetRelation.relationSql(Map.of(
+                    "physicalRef", "odd", "calculated", List.of(Map.of("name", reserved, "expr", "1"))), root, null), reserved);
+            assertTrue(e.getMessage().contains("reserved"), e.getMessage());
+        }
     }
 
     /**
