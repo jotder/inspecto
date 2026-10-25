@@ -345,21 +345,23 @@ public final class DatasetRelation {
 
     /**
      * Wrap {@code base} with the dataset's calculated columns (DAT-5), or return it untouched when none. The wrap is
-     * {@code SELECT * EXCLUDE ("__calc check") FROM (SELECT *, struct_insert(struct_insert(__base, "__calc check" := NULL), "n" := NULL)
-     * AS "__calc check", (expr) AS "n", … FROM (<base>) AS __base) AS __calc}: {@code struct_insert} refuses to add a field the row
-     * struct already holds, so DuckDB fails the BIND ("Binder Error: Duplicate struct entry name") when a calculated name is a
-     * column of the base, or another calculated name, whatever the case - even over an empty store, and before any row is read.
-     * The helper's own name holds a blank, so no calculated name (a plain identifier) can equal it, and it is part of the check,
-     * so a store column with that exact name fails the bind instead of being renamed {@code _1} with the whole-row struct,
-     * raw key inside, served beside it. The helper column is never selected, so the optimizer drops it and Parquet projection
-     * pushdown is unchanged.
+     * {@code SELECT * EXCLUDE ("__calc check") FROM (SELECT *, struct_pack(*COLUMNS(*), "__calc check" := NULL, "__base" := NULL,
+     * "n" := NULL) AS "__calc check", (expr) AS "n", … FROM (<base>) AS __base) AS __calc}: {@code struct_pack} refuses a named
+     * field that repeats one the row struct already holds, so DuckDB fails the BIND ("Binder Error: Duplicate named argument") when
+     * a calculated name is a column of the base, or another calculated name, whatever the case - even over an empty store, and
+     * before any row is read. {@code *COLUMNS(*)} expands the relation's own columns, so no column name can shadow it (a first build
+     * read the row as {@code __base}, and a store column called {@code __base} made that the column: the check never saw the real
+     * columns). The helper's own name holds a blank, so no calculated name (a plain identifier) can equal it, and both it and
+     * {@code __base} are in the check, so a store column with either name fails the bind instead of being renamed {@code _1}
+     * and served. {@code __base} stays the row alias a calculated expression may name ({@code concat(__base)}). The helper column
+     * is never selected, so the optimizer drops it and Parquet projection pushdown is unchanged.
      */
     private static String withCalculated(String base, Map<String, Object> datasetConfig) {
         Object calc = datasetConfig == null ? null : datasetConfig.get("calculated");
         if (!(calc instanceof java.util.List<?> list) || list.isEmpty()) return base;
         requireFreeCalculatedNames(datasetConfig);
         StringBuilder cols = new StringBuilder();
-        String check = "struct_insert(__base, \"" + CALC_CHECK + "\" := NULL)";   // the helper is in the check too: a store column with its name fails the bind
+        StringBuilder check = new StringBuilder("struct_pack(*COLUMNS(*), \"" + CALC_CHECK + "\" := NULL, \"__base\" := NULL");   // the helper and the row alias are in the check too
         for (Object o : list) {
             if (!(o instanceof Map<?, ?> c))
                 throw new IllegalArgumentException("calculated entries must be {name, expr} objects");
@@ -370,9 +372,9 @@ public final class DatasetRelation {
             if (expr == null)
                 throw new IllegalArgumentException("calculated column '" + name + "' needs an 'expr'");
             cols.append(", (").append(ExpressionGuard.check(expr)).append(") AS \"").append(name).append('"');
-            check = "struct_insert(" + check + ", \"" + name + "\" := NULL)";
+            check.append(", \"").append(name).append("\" := NULL");
         }
-        return "SELECT * EXCLUDE (\"" + CALC_CHECK + "\") FROM (SELECT *, " + check + " AS \"" + CALC_CHECK + "\"" + cols
+        return "SELECT * EXCLUDE (\"" + CALC_CHECK + "\") FROM (SELECT *, " + check + ") AS \"" + CALC_CHECK + "\"" + cols
                 + " FROM (" + base + ") AS __base) AS __calc";
     }
 

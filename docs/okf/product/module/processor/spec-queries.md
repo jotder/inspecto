@@ -78,7 +78,7 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   deny-set is still checked ahead of the window-keyword rule, so no subquery smuggles in inside `OVER`.
 * **Enforcement point** — `dataset` config gains `calculated: [{name, expr}]`;
   `DatasetRelation.relationSql` wraps `SELECT * EXCLUDE ("__calc check") FROM (SELECT *,
-  struct_insert(struct_insert(__base, "__calc check" := NULL), "name" := NULL) AS "__calc check", (expr) AS "name"
+  struct_pack(*COLUMNS(*), "__calc check" := NULL, "__base" := NULL, "name" := NULL) AS "__calc check", (expr) AS "name"
   FROM (<base>) AS __base) AS __calc` (the helper column is the name check below; it is never selected, so Parquet
   projection pushdown is unchanged, checked with EXPLAIN). Bad
   name/expr throws → **422 at every route, fail-closed** — enforced at relation-build time so every
@@ -93,13 +93,16 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   `__base`, `__calc`), that is a declared `columns[].name`, or that is used by two calculated columns, ignoring case, is a
   plain 422 naming the column — run by the Dataset save gate (`DatasetEntryRules.validate`, so `POST/PUT
   /components/dataset` refuses it) and again by `relationSql`; (2) the bind-time check in the wrap, for a
-  base column the Dataset does not declare (a store read as-is): `struct_insert` refuses to add a field the row struct
-  already holds, case-insensitively, so DuckDB fails the bind with `Binder Error: Duplicate struct entry name` — before
+  base column the Dataset does not declare (a store read as-is): `struct_pack(*COLUMNS(*), …)` refuses a named field that
+  repeats one of the relation's own columns, case-insensitively, so DuckDB fails the bind with `Binder Error: Duplicate named argument` — before
   any row is read, even over an empty store — and the 422 keeps that text (a Binder Error survives the masking scrub).
   The helper's own name (`__calc check`) holds a blank, which no calculated name (a plain identifier) can, and it is part
   of the check, so a store column with that exact name fails the bind too instead of being renamed `_1` with the
   whole-row struct, raw key inside, served beside it (review of the first build, 2026-10-25); a store column named
-  `__calc_check` is an ordinary column.
+  `__calc_check` is an ordinary column. `*COLUMNS(*)` expands the relation's own columns, so no column name can shadow the check
+  (a first build read the row as `__base`, and a store column named `__base` skipped it: second review, 2026-10-25); `__base`
+  is in the check too, so a store with a column of that name is refused outright, collision or not, while `__base` stays the
+  row a calculated expression may name (`concat(__base)`).
   Chosen over a runtime DESCRIBE because the relation SQL is built in 20 places with no connection. ⚠ An existing
   Dataset that already collided stops reading (422) until the calculated column is renamed; the shipped templates'
   calculated names (`period_start`, `BILL_PERIOD_START`, …) are not base columns. Tests:

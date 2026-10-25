@@ -1073,4 +1073,35 @@ class ControlApiBiQueryMaskingTest {
             assertNoRaw(odd2.body());
         }
     }
+
+    /**
+     * Second review of the collision fix: a STORE column named {@code __base} (the wrap's row alias) must not let a collision
+     * through. With a calculated {@code region} over an UNDECLARED base {@code region}, the check used to read that column in
+     * place of the row, and a viewer got the raw key under {@code region_1}. The store is now refused outright (viewer and
+     * revealer, {@code /bi/query} and the rows route), collision or not; {@code concat(__base)} over an ordinary store is
+     * unchanged (R4 in ControlApiBiMaskingReviewTest).
+     */
+    @Test
+    void aStoreColumnNamedLikeTheRowAliasCannotHideACalculatedNameCollision(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("shadow_view", "flow-x", List.of(),
+                    "SELECT msisdn, region, {'q': msisdn} AS __base FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) AS t(msisdn,region)",
+                    "2026-07-08T00:00:00Z"));
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            for (String calcName : List.of("region", "other")) {   // a collision with the undeclared base region, and none
+                reg.write("dataset", "shadow_ds", Map.of("view", "shadow_view",
+                        "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN")),
+                        "calculated", List.of(Map.of("name", calcName, "expr", "upper(msisdn)"))));
+                for (String user : List.of("viewer", "revealer")) {
+                    String by = "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"" + ("region".equals(calcName) ? "region_1" : "other") + "\"]";
+                    HttpResponse<String> q = bi(c, user, "shadow_ds", by);
+                    assertEquals(422, q.statusCode(), calcName + " " + user + " " + q.body());
+                    assertNoRaw(q.body());
+                    HttpResponse<String> rows = get(c, user, "/datasets/shadow_ds/rows?limit=10");
+                    assertEquals(422, rows.statusCode(), calcName + " " + user + " " + rows.body());
+                    assertNoRaw(rows.body());
+                }
+            }
+        }
+    }
 }

@@ -195,7 +195,7 @@ class DatasetRelationTest {
         // The helper's name holds a blank, which no calculated name (a plain identifier) can, and the helper is itself part of the
         // check: a store column with that exact name fails the bind too (review of cb84a3365).
         assertTrue(sql.startsWith("SELECT * EXCLUDE (\"__calc check\") FROM (SELECT *, "
-                + "struct_insert(struct_insert(__base, \"__calc check\" := NULL), \"amount_taxed\" := NULL)"
+                + "struct_pack(*COLUMNS(*), \"__calc check\" := NULL, \"__base\" := NULL, \"amount_taxed\" := NULL)"
                 + " AS \"__calc check\", (round(amount * 1.2, 2)) AS \"amount_taxed\" FROM ("), sql);
         assertTrue(sql.endsWith(") AS __base) AS __calc"), sql);
     }
@@ -252,6 +252,37 @@ class DatasetRelationTest {
             assertEquals(List.of("region", "msisdn", "region_up", "twice"), columnNames(rs), "the helper column is not served");
             assertTrue(rs.next());
             assertEquals("EUEU", rs.getString("twice"));
+        }
+    }
+
+    /**
+     * Second review of the collision fix: a store column named {@code __base} (the wrap's row alias) made {@code struct_insert(__base,
+     * ..)} read that column instead of the row, so a calculated {@code region} over an undeclared base {@code region} skipped the
+     * check and was served as {@code region_1}. The check is now built from {@code struct_pack(*COLUMNS(*), ..)}, which expands the
+     * relation's own columns whatever a column is called, and names {@code __base} itself: a store with a column of that
+     * name is refused outright (a Binder Error), while an ordinary store keeps {@code __base} as the row in a calculated expression.
+     */
+    @Test
+    void aStoreColumnNamedLikeTheRowAliasCannotSkipTheCollisionCheck(@TempDir Path root) throws Exception {
+        writeParquet(root.resolve("shadow"), "a.parquet", "SELECT '4417' AS msisdn, 'EU' AS region, {'q': 1} AS __base");
+        writeParquet(root.resolve("plain"), "a.parquet", "SELECT '4417' AS msisdn, 'EU' AS region");
+        for (String calcName : List.of("region", "other")) {   // a collision with region, and no collision at all
+            String sql = DatasetRelation.relationSql(Map.of("physicalRef", "shadow",
+                    "calculated", List.of(Map.of("name", calcName, "expr", "upper(msisdn)"))), root, null);
+            try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement()) {
+                java.sql.SQLException e = assertThrows(java.sql.SQLException.class,
+                        () -> st.executeQuery("SELECT * FROM (" + sql + ") LIMIT 0"), calcName);
+                assertTrue(e.getMessage().contains("Binder Error"), e.getMessage());
+            }
+        }
+        // __base still names the row in a calculated expression over an ordinary store
+        String rowCopy = DatasetRelation.relationSql(Map.of("physicalRef", "plain", "calculated", List.of(
+                Map.of("name", "row_txt", "expr", "concat(__base)"))), root, null);
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM (" + rowCopy + ")")) {
+            assertEquals(List.of("msisdn", "region", "row_txt"), columnNames(rs));
+            assertTrue(rs.next());
+            assertTrue(rs.getString("row_txt").contains("4417"), rs.getString("row_txt"));
         }
     }
 
