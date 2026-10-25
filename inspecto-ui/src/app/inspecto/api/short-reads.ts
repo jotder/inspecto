@@ -20,6 +20,9 @@ interface Entry {
  * the active Space id, both read when a read starts; a change of either empties the cache first, so another signed-in
  * user, a sign-out or a Space switch never sees an earlier answer. A failed read is never kept. Writers call
  * {@link clear}.
+ *
+ * Known limit: there is no per-read timeout (none exists in the service layer). A read that hangs is shared with every
+ * later caller until the browser gives up, and the D7 probe, one Space at a time, can wait on up to 12 such reads.
  */
 @Injectable({ providedIn: 'root' })
 export class ShortReads {

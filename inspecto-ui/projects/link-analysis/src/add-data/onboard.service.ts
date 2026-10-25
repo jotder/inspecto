@@ -1,7 +1,8 @@
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, filter, switchMap, take, throwError, timer } from 'rxjs';
+import { Observable, filter, switchMap, take, tap, throwError, timer } from 'rxjs';
 import { apiUrl, toParams } from '@inspecto/core/api';
+import { ShortReads } from '@inspecto/core/api/short-reads';
 import type {
     CommitBody,
     DataSettings,
@@ -29,6 +30,7 @@ export const FOLLOW_INTERVAL_MS = 1500;
 @Injectable({ providedIn: 'root' })
 export class OnboardService {
     private readonly http = inject(HttpClient);
+    private readonly reads = inject(ShortReads);
 
     /** Upload the file and read it back as a draft. `format` re-reads it with stated choices (a re-draft). */
     draft(file: File, kind: ImportKind, format: FormatOverrides = {}): Observable<OnboardDraft> {
@@ -48,6 +50,7 @@ export class OnboardService {
 
     /** The one confirm: writes, registers, lands, runs once. A large file answers 202 and is followed to its end. */
     commit(draftId: string, body: CommitBody, onFollow?: (runId: string) => void): Observable<ImportSummary> {
+        // The commit registers a Dataset: the Dataset list the landing reads must be asked again.
         return this.settle(
             this.http.post<ImportSummary | ImportRun>(
                 apiUrl(`/onboard/files/${encodeURIComponent(draftId)}/commit`),
@@ -57,7 +60,7 @@ export class OnboardService {
                 },
             ),
             onFollow,
-        );
+        ).pipe(tap(() => this.reads.clear()));
     }
 
     /** **Add a file** to an imported Dataset and run it (`replace` is the default; `append` for a Stream only). */

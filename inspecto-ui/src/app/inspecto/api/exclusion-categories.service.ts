@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { apiUrl } from './api-base';
+import { ShortReads } from './short-reads';
 
 /** Who owns an exclusion list: a category list is kept by an administrator, an analyst list by analysts. */
 export type ExclusionOwnerKind = 'admin' | 'analyst';
@@ -46,6 +47,7 @@ export interface ExclusionAttributesChange {
 @Injectable({ providedIn: 'root' })
 export class ExclusionCategoriesService {
     private http = inject(HttpClient);
+    private reads = inject(ShortReads);
 
     /** The live exclusion lists, category lists first. Never members. */
     list(): Observable<{ lists: ExclusionListChip[] }> {
@@ -54,11 +56,15 @@ export class ExclusionCategoriesService {
 
     /** Create a category list (`ownerKind: admin`); members are added on the Entity Lists page. */
     create(req: CategoryListCreate): Observable<unknown> {
-        return this.http.post(apiUrl('/entity-lists'), { ...req, purpose: 'exclusion', ownerKind: 'admin' });
+        return this.http
+            .post(apiUrl('/entity-lists'), { ...req, purpose: 'exclusion', ownerKind: 'admin' })
+            .pipe(tap(() => this.reads.clear()));
     }
 
     /** Change a list's ownership, auto-apply or visibility. */
     setAttributes(id: string, change: ExclusionAttributesChange): Observable<unknown> {
-        return this.http.put(apiUrl(`/entity-lists/${encodeURIComponent(id)}/attributes`), change);
+        return this.http
+            .put(apiUrl(`/entity-lists/${encodeURIComponent(id)}/attributes`), change)
+            .pipe(tap(() => this.reads.clear()));
     }
 }

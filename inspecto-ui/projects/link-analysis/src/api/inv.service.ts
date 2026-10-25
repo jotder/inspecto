@@ -2129,9 +2129,7 @@ export class InvService {
     }
 
     createEntityList(req: EntityListCreateRequest): Observable<EntityListDetail> {
-        return this.http
-            .post<EntityListDetail>(apiUrl('/entity-lists'), req)
-            .pipe(tap(() => this.shortReads.clear()));
+        return this.http.post<EntityListDetail>(apiUrl('/entity-lists'), req).pipe(tap(() => this.shortReads.clear()));
     }
 
     /** A retired list → 409. */
@@ -2139,12 +2137,16 @@ export class InvService {
         id: string,
         req: EntityListMembersRequest,
     ): Observable<EntityListMembersResult | EntityListHeld> {
-        return this.http.post<EntityListMembersResult | EntityListHeld>(entityListPath(id, '/members'), req);
+        return this.http
+            .post<EntityListMembersResult | EntityListHeld>(entityListPath(id, '/members'), req)
+            .pipe(tap(() => this.shortReads.clear()));
     }
 
     /** Already retired → 409. */
     retireEntityList(id: string, reason: string): Observable<EntityListDetail> {
-        return this.http.post<EntityListDetail>(entityListPath(id, '/retire'), { reason });
+        return this.http
+            .post<EntityListDetail>(entityListPath(id, '/retire'), { reason })
+            .pipe(tap(() => this.shortReads.clear()));
     }
 
     /**
@@ -2153,7 +2155,10 @@ export class InvService {
      * already exists, or an approval policy governs Datasets (nothing written) · 503 no write root.
      */
     registerEntityListDataset(id: string): Observable<EntityListDatasetRegistration> {
-        return this.http.post<EntityListDatasetRegistration>(entityListPath(id, '/register-dataset'), {});
+        // It also creates a Dataset, so the Dataset list read goes with the Entity List one.
+        return this.http
+            .post<EntityListDatasetRegistration>(entityListPath(id, '/register-dataset'), {})
+            .pipe(tap(() => this.shortReads.clear()));
     }
 
     // ── LA-GROW-EXCLUDE-1. Absent on an older server (404) — callers degrade, never error. ──
