@@ -529,6 +529,12 @@ reusable**: every Widget or KPI tile bound to the same Dataset picks from the sa
 instead of re-typing the aggregate. Reuse is per-Dataset, not global. The Dataset id is immutable
 after creation; the **History** button restores earlier versions.
 
+A calculated column needs a name of its own: one that repeats a column of the Dataset (or another calculated
+column), in any letter case, is refused when you save and whenever the Dataset is read. Where the Space masks
+entity keys, a calculated column that is a plain copy of a masked key shows the same masked token as the key itself;
+any other calculated column built from one (`substr(msisdn, 1, 4)`) shows `masked:withheld` to a person who cannot
+reveal, so the tokens cannot be matched against values typed in to decode the key.
+
 **Which aggregates a Measure can use** — wherever you write `count` or `agg(column)` (a Widget's
 aggregation picker, a KPI, an Alert Rule on a Dataset, a summarize Step, a Risk factor, an Anomaly
 feature): `count`, `countDistinct`, `sum`, `avg`, `min`, `max`, and the statistics `median`,

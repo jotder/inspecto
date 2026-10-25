@@ -190,8 +190,57 @@ class DatasetRelationTest {
                 "physicalRef", "cdr",
                 "calculated", List.of(Map.of("name", "amount_taxed", "expr", "round(amount * 1.2, 2)"))),
                 Path.of("/data"), null);
-        assertTrue(sql.startsWith("SELECT *, (round(amount * 1.2, 2)) AS \"amount_taxed\" FROM ("), sql);
-        assertTrue(sql.endsWith(") AS __base"), sql);
+        // DATASET-CALC-NAME-COLLISION-1: the wrap now also carries a bind-time check that no calculated name is taken, so the
+        // projection sits one level in and is read back without its helper column; the projection itself is unchanged.
+        assertTrue(sql.startsWith("SELECT * EXCLUDE (\"__calc_check\") FROM (SELECT *, struct_insert(__base, \"amount_taxed\" := NULL)"
+                + " AS \"__calc_check\", (round(amount * 1.2, 2)) AS \"amount_taxed\" FROM ("), sql);
+        assertTrue(sql.endsWith(") AS __base) AS __calc"), sql);
+    }
+
+    /**
+     * DATASET-CALC-NAME-COLLISION-1: DuckDB renames a repeated output name ({@code region_1}), so a calculated column named
+     * like a base column would be served under a name no masking rule knows. The relation refuses to bind instead (a Binder
+     * Error, case-insensitive, even over an empty store), and one that does not collide reads as before.
+     */
+    @Test
+    void aCalculatedColumnNamedLikeABaseColumnDoesNotBind(@TempDir Path root) throws Exception {
+        writeParquet(root.resolve("cdr"), "a.parquet", "SELECT 'EU' AS region, '4417' AS msisdn");
+        for (String taken : List.of("region", "REGION", "Msisdn")) {
+            String sql = DatasetRelation.relationSql(Map.of("physicalRef", "cdr",
+                    "calculated", List.of(Map.of("name", taken, "expr", "upper(msisdn)"))), root, null);
+            try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement()) {
+                java.sql.SQLException e = assertThrows(java.sql.SQLException.class,
+                        () -> st.executeQuery("SELECT * FROM (" + sql + ") LIMIT 0"), taken);
+                assertTrue(e.getMessage().contains("Binder Error"), e.getMessage());
+            }
+        }
+        String fine = DatasetRelation.relationSql(Map.of("physicalRef", "cdr", "calculated", List.of(
+                Map.of("name", "region_up", "expr", "upper(region)"), Map.of("name", "twice", "expr", "region_up || region_up"))), root, null);
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM (" + fine + ")")) {
+            assertEquals(List.of("region", "msisdn", "region_up", "twice"), columnNames(rs), "the helper column is not served");
+            assertTrue(rs.next());
+            assertEquals("EUEU", rs.getString("twice"));
+        }
+    }
+
+    /** The declared {@code columns} are known without reading data, so a collision with one is a plain refusal with a name. */
+    @Test
+    void aCalculatedColumnNamedLikeADeclaredColumnIsRefusedByName() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> DatasetRelation.relationSql(Map.of(
+                "physicalRef", "cdr", "columns", List.of(Map.of("name", "msisdn"), Map.of("name", "Region")),
+                "calculated", List.of(Map.of("name", "region", "expr", "upper(msisdn)"))), Path.of("/data"), null));
+        assertTrue(e.getMessage().contains("region") && e.getMessage().contains("declared"), e.getMessage());
+        assertEquals("calculated column 'A' is declared twice (names are compared ignoring case)", assertThrows(
+                IllegalArgumentException.class, () -> DatasetRelation.relationSql(Map.of("physicalRef", "cdr", "calculated",
+                        List.of(Map.of("name", "a", "expr", "1"), Map.of("name", "A", "expr", "2"))), Path.of("/data"), null)).getMessage());
+    }
+
+    private static List<String> columnNames(ResultSet rs) throws java.sql.SQLException {
+        java.sql.ResultSetMetaData md = rs.getMetaData();
+        List<String> out = new java.util.ArrayList<>();
+        for (int i = 1; i <= md.getColumnCount(); i++) out.add(md.getColumnLabel(i));
+        return out;
     }
 
     @Test

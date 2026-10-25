@@ -877,4 +877,111 @@ class ControlApiBiQueryMaskingTest {
             assertEquals(200, bi(c, "revealer", "dev_ds", "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"imei\"]").statusCode());
         }
     }
+
+    // ── DATASET-CALC-NAME-COLLISION-1: a calculated column may not reuse a base column's name ──
+
+    /**
+     * {@code {name:"region", expr:"upper(msisdn)"}} over a base that already has {@code region}: DuckDB would rename the
+     * calculated copy {@code region_1}, a name no masking rule knows, and serve the raw key under it. The relation is refused
+     * instead, for everyone (a revealer too: the collision is a Dataset defect, not a reveal question), whether or not the
+     * base column is declared in {@code columns}.
+     */
+    @Test
+    void aCalculatedColumnNamedLikeABaseColumnIsRefusedForEveryone(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            List<Map<String, Object>> calc = List.of(Map.of("name", "region", "expr", "upper(msisdn)"));
+            // (a) the base column is NOT declared: only the relation itself can know the name is taken
+            seed(c, Map.of("calculated", calc, "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+            String byRenamed = "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"region_1\"]";
+            for (String user : List.of("viewer", "revealer")) {
+                HttpResponse<String> plain = bi(c, user, "calls_ds", byRenamed);
+                assertEquals(422, plain.statusCode(), user + " groupBy region_1: " + plain.body());
+                assertNoRaw(plain.body());
+                HttpResponse<String> rows = get(c, user, "/datasets/calls_ds/rows?limit=10");
+                assertEquals(422, rows.statusCode(), user + " rows: " + rows.body());
+                assertNoRaw(rows.body());
+            }
+            // (b) the base column is declared (the usual case): refused the same way
+            seed(c, Map.of("calculated", calc));
+            HttpResponse<String> declared = bi(c, "viewer", "calls_ds", byRenamed);
+            assertEquals(422, declared.statusCode(), declared.body());
+            assertNoRaw(declared.body());
+            assertEquals(422, get(c, "viewer", "/datasets/calls_ds/rows?limit=10").statusCode());
+            // a calculated column that does NOT collide is untouched
+            seed(c, Map.of("calculated", List.of(Map.of("name", "region_up", "expr", "upper(region)"))));
+            HttpResponse<String> fine = bi(c, "viewer", "calls_ds", "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"region_up\"]");
+            assertEquals(200, fine.statusCode(), fine.body());
+            assertEquals(Set.of("EU", "US"), Set.copyOf(column(V1Body.of(fine.body()).get("rows"), "region_up")));
+        }
+    }
+
+    /** The save gate refuses the collisions it can see without reading data: a declared column, a repeated name (any case). */
+    @Test
+    void theDatasetSaveGateRefusesACalculatedNameThatIsTakenOrRepeated(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String cols = "\"columns\":[{\"name\":\"msisdn\"},{\"name\":\"Region\"}]";
+            assertEquals(422, post(c, "author", "/components/dataset", "{\"id\":\"dup1\",\"physicalRef\":\"x\"," + cols
+                    + ",\"calculated\":[{\"name\":\"region\",\"expr\":\"upper(msisdn)\"}]}").statusCode(),
+                    "a calculated column named like a declared column (case-insensitive)");
+            assertEquals(422, post(c, "author", "/components/dataset", "{\"id\":\"dup2\",\"physicalRef\":\"x\","
+                    + "\"calculated\":[{\"name\":\"a\",\"expr\":\"1\"},{\"name\":\"A\",\"expr\":\"2\"}]}").statusCode(),
+                    "two calculated columns with one name");
+            HttpResponse<String> ok = post(c, "author", "/components/dataset", "{\"id\":\"ok1\",\"physicalRef\":\"x\"," + cols
+                    + ",\"calculated\":[{\"name\":\"region_up\",\"expr\":\"upper(region)\"}]}");
+            assertEquals(200, ok.statusCode(), ok.body());
+        }
+    }
+
+    // ── BI-MASKING-CALC-DERIVED-ALIAS-1: only a bare key keeps the linkable alias ──
+
+    /**
+     * {@code substr(msisdn,1,4)} / {@code coalesce('4417', msisdn)} aliased like the key would let a Dataset author without
+     * reveal build a lookup table of aliases for values they choose. A derived calculated column gets
+     * {@link BiResultMasking#UNLINKABLE}; a bare copy of a key (and a bare copy of that copy) is the key itself and keeps its alias.
+     */
+    @Test
+    void aCalculatedColumnDerivedFromAKeyIsWithheldAndOnlyABareCopyKeepsTheAlias(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seed(c, Map.of("calculated", List.of(
+                    Map.of("name", "m4", "expr", "substr(msisdn,1,4)"),
+                    Map.of("name", "cc", "expr", "coalesce('4417', msisdn)"),
+                    Map.of("name", "len", "expr", "length(msisdn)"),
+                    Map.of("name", "k", "expr", "msisdn"),
+                    Map.of("name", "k2", "expr", "k"),
+                    Map.of("name", "d2", "expr", "m4"))));
+            String measures = "\"measures\":[{\"agg\":\"count\"}],";
+            Set<String> keyAliases = Set.copyOf(column(V1Body.of(bi(c, "viewer", "calls_ds", BY_MSISDN).body()).get("rows"), "msisdn"));
+            assertEquals(3, keyAliases.size());
+            assertTrue(keyAliases.stream().allMatch(s -> s.startsWith("masked:") && !s.equals("masked:withheld")));
+            for (String derived : List.of("m4", "cc", "len", "d2")) {
+                HttpResponse<String> r = bi(c, "viewer", "calls_ds", measures + "\"groupBy\":[\"" + derived + "\"]");
+                assertEquals(200, r.statusCode(), derived + " " + r.body());
+                assertNoRaw(r.body());
+                assertEquals(Set.of("masked:withheld"), Set.copyOf(column(V1Body.of(r.body()).get("rows"), derived)),
+                        derived + " must link to nothing: " + r.body());
+            }
+            for (String bare : List.of("k", "k2")) {
+                HttpResponse<String> r = bi(c, "viewer", "calls_ds", measures + "\"groupBy\":[\"" + bare + "\"]");
+                assertEquals(200, r.statusCode(), bare + " " + r.body());
+                assertEquals(keyAliases, Set.copyOf(column(V1Body.of(r.body()).get("rows"), bare)), bare + " is the key itself");
+            }
+            // the rows route and a saved query (free SQL over the Dataset) judge the same columns the same way
+            JsonNode rows = V1Body.of(get(c, "viewer", "/datasets/calls_ds/rows?limit=10").body()).get("rows");
+            assertEquals(Set.of("masked:withheld"), Set.copyOf(column(rows, "m4")));
+            assertEquals(Set.of("masked:withheld"), Set.copyOf(column(rows, "cc")));
+            assertEquals(keyAliases, Set.copyOf(column(rows, "k")));
+            assertEquals(keyAliases, Set.copyOf(column(rows, "msisdn")));
+            new ComponentStore(c.root.resolve("registry")).write("query", "star_q",
+                    Map.of("type", "sql", "datasetId", "calls_ds", "text", "SELECT * FROM calls_ds"));
+            HttpResponse<String> saved = post(c, "viewer", "/queries/star_q/run", null);
+            assertEquals(200, saved.statusCode(), saved.body());
+            JsonNode saved2 = V1Body.of(saved.body()).get("rows");
+            assertEquals(Set.of("masked:withheld"), Set.copyOf(column(saved2, "m4")), "a star keeps no alias for a derived column");
+            assertEquals(keyAliases, Set.copyOf(column(saved2, "msisdn")));
+            // a revealer is unaffected
+            JsonNode revealer = V1Body.of(get(c, "revealer", "/datasets/calls_ds/rows?limit=10").body()).get("rows");
+            assertTrue(column(revealer, "m4").contains("4417"), revealer.toString());
+            assertTrue(column(revealer, "k").contains(A));
+        }
+    }
 }

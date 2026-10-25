@@ -15,7 +15,8 @@ import java.util.Set;
  *
  * <p>A column a mapping names must be one of the entry's {@code columns[].name} when the entry lists columns; an
  * entry without a column list is not checked against one (a Dataset over a store whose columns are read at query
- * time). {@code from} and {@code to} must differ.
+ * time). {@code from} and {@code to} must differ. The same entry point also refuses a {@code calculated} column whose name
+ * is a declared column or is repeated ({@code DatasetRelation#requireFreeCalculatedNames}).
  */
 final class DatasetEntryRules {
 
@@ -28,6 +29,8 @@ final class DatasetEntryRules {
 
     /** @throws IllegalArgumentException naming the first broken rule */
     static void validate(Map<String, Object> content) {
+        // DATASET-CALC-NAME-COLLISION-1: a calculated column may not reuse a declared column's name, nor repeat another's
+        com.gamma.query.DatasetRelation.requireFreeCalculatedNames(content);
         Object primary = content.get(PRIMARY_ENTITY_TYPE);
         if (primary != null && (!(primary instanceof String s) || s.isBlank()))
             throw new IllegalArgumentException(PRIMARY_ENTITY_TYPE + " must be an Entity Type id (a non-blank string)");

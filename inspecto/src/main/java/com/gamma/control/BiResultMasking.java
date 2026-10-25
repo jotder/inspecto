@@ -83,6 +83,7 @@ final class BiResultMasking {
     private final boolean unknown;          // lineage untraceable: fail closed
     private final Set<String> knownClean;   // declared columns known NOT to be masked
     private final String basis;
+    private final Set<String> derivedCalc;  // lower-cased calculated columns that are NOT a bare copy of one column: never the linkable alias
     private final Map<String, String> tokens = new HashMap<>();   // per-request: a repeated key hashes once
     private byte[] key;
     private List<String> lastMasked = List.of();   // the result columns the last apply() masked
@@ -90,7 +91,7 @@ final class BiResultMasking {
     private boolean boundAll;                      // ... or every name, when the bound text cannot be traced
 
     private BiResultMasking(Path writeRoot, String mode, boolean reveal, Set<String> masked, boolean unknown,
-                            Set<String> knownClean, String basis) {
+                            Set<String> knownClean, String basis, Set<String> derivedCalc) {
         this.writeRoot = writeRoot;
         this.mode = mode;
         this.reveal = reveal;
@@ -98,6 +99,7 @@ final class BiResultMasking {
         this.unknown = unknown;
         this.knownClean = knownClean;
         this.basis = basis;
+        this.derivedCalc = derivedCalc;
     }
 
     /** The {@code shared/<owner>/<item>} refs a Dataset reads directly. */
@@ -137,7 +139,7 @@ final class BiResultMasking {
     private static BiResultMasking of(Path writeRoot, ComponentStore store, ViewStore views, String datasetId,
                                       Map<String, Object> dataset, boolean reveal, String mode) {
         if ("none".equals(mode))
-            return new BiResultMasking(writeRoot, mode, reveal, Set.of(), false, Set.of(), "masking is off for this Space (maskingMode none)");
+            return new BiResultMasking(writeRoot, mode, reveal, Set.of(), false, Set.of(), "masking is off for this Space (maskingMode none)", Set.of());
         List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
         Predicate<String> claim = "all".equals(mode)
                 ? cls -> cls != null && ColumnClassification.SENSITIVE.contains(cls.trim().toUpperCase(Locale.ROOT))
@@ -195,7 +197,38 @@ final class BiResultMasking {
                 ? "the lineage of '" + datasetId + "' cannot be traced, so every column it does not declare is masked"
                 : masked.isEmpty() ? "no column of '" + datasetId + "' is classified as a masked key (maskingMode " + mode + ")"
                 : "column(s) " + masked + " of '" + datasetId + "' are classified as masked keys (maskingMode " + mode + ")";
-        return new BiResultMasking(writeRoot, mode, reveal, masked, unknown, declared, basis);
+        return new BiResultMasking(writeRoot, mode, reveal, masked, unknown, declared, basis, derivedCalculated(dataset));
+    }
+
+    /**
+     * The lower-cased names of the Dataset's calculated columns that are NOT a bare copy of one column
+     * (BI-MASKING-CALC-DERIVED-ALIAS-1). The Space alias is the same in every query, so a cell derived from a key
+     * ({@code substr(msisdn,1,4)}, {@code coalesce('4417', msisdn)}, {@code length(msisdn)}) given that alias could be matched
+     * against the alias of a value the caller chose and decoded - a lookup table the author builds without reveal. Only a
+     * calculated column whose whole {@code expr} is one plain identifier that is itself a column (or a bare copy of one, followed
+     * to a fixpoint: {@code k = msisdn}, {@code k2 = k}) IS that column, and may keep its alias; every other one is
+     * {@link #UNLINKABLE} when masked, as free SQL's derived cells are. Fail closed: a quoted name, a parenthesised
+     * reference, a cycle or anything else not provably a bare reference counts as derived.
+     */
+    private static Set<String> derivedCalculated(Map<String, Object> dataset) {
+        if (!(dataset.get("calculated") instanceof List<?> calc) || calc.isEmpty()) return Set.of();
+        Map<String, String> exprByName = new LinkedHashMap<>();
+        for (Object o : calc)
+            if (o instanceof Map<?, ?> c && c.get("name") != null)
+                exprByName.put(norm(String.valueOf(c.get("name"))), c.get("expr") == null ? "" : String.valueOf(c.get("expr")).trim());
+        Set<String> bare = new HashSet<>();
+        for (boolean grew = true; grew; ) {
+            grew = false;
+            for (Map.Entry<String, String> e : exprByName.entrySet()) {
+                if (bare.contains(e.getKey()) || !WORD.matcher(e.getValue()).matches()) continue;
+                String ref = e.getValue().toLowerCase(Locale.ROOT);
+                // a name another calculated column defines is a column only once THAT one is a bare copy
+                if (!exprByName.containsKey(ref) || bare.contains(ref)) grew |= bare.add(e.getKey());
+            }
+        }
+        Set<String> derived = new HashSet<>(exprByName.keySet());
+        derived.removeAll(bare);
+        return derived;
     }
 
     /** Some column is masked for the Dataset (whoever asks); the {@code masking} block is only added then. */
@@ -451,7 +484,8 @@ final class BiResultMasking {
                     || (viaText && derived == null);
             if (mask) {
                 hit.add(c.name());
-                keepByName.merge(c.name(), bareNames != null ? bareNames.contains(n) : keep.test(pos), Boolean::logicalAnd);   // a repeated name: alias only if every copy may
+                // a repeated name: alias only if every copy may; a calculated column derived from a key never does
+                keepByName.merge(c.name(), (bareNames != null ? bareNames.contains(n) : keep.test(pos)) && !derivedCalc.contains(n), Boolean::logicalAnd);
             }
             columns.add(mask ? new ResultSetDescriptor.Column(c.name(), "string", c.role(), c.cardinality()) : c);
         }

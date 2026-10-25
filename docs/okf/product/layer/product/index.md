@@ -36,9 +36,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | operator |
-| `DATASET-CALC-NAME-COLLISION-1` | P2 | defect | a calculated column named like a base column ({name:"region", expr:"upper(msisdn)"}) is renamed region_1 by DuckDB and served raw (same r… | — |
-| `BI-MASKING-CALC-DERIVED-ALIAS-1` | P2 | defect | a calculated column derived from a key (substr(msisdn,1,4), coalesce('4417', msisdn)) keeps the linkable Space alias, so a Dataset author… | — |
-| `LINEAGE-NONWORD-MAPPING-NAME-1` | P2 | defect | EvidenceMasker.schemaClassification's pipeline-mapping scan only reads [A-Za-z0-9_] words, so a classified raw field with a non-word name… | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `UI-THEME-NULL-TOKENS-1` | P3 | defect | themes.scss rebuilds each Material M2 theme without its _mat-system key, so Material 22 token functions return null; 3fa647719 restored o… | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |

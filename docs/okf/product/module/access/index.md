@@ -34,7 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DATASET-CALC-NAME-COLLISION-1` | P2 | defect | a calculated column named like a base column ({name:"region", expr:"upper(msisdn)"}) is renamed region_1 by DuckDB and served raw (same r… | — |
-| `BI-MASKING-CALC-DERIVED-ALIAS-1` | P2 | defect | a calculated column derived from a key (substr(msisdn,1,4), coalesce('4417', msisdn)) keeps the linkable Space alias, so a Dataset author… | — |
-| `LINEAGE-NONWORD-MAPPING-NAME-1` | P2 | defect | EvidenceMasker.schemaClassification's pipeline-mapping scan only reads [A-Za-z0-9_] words, so a classified raw field with a non-word name… | — |
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |

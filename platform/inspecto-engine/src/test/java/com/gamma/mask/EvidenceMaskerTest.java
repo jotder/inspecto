@@ -103,6 +103,37 @@ class EvidenceMaskerTest {
         assertEquals(List.of(), m.maskedColumns());
     }
 
+    /**
+     * LINEAGE-NONWORD-MAPPING-NAME-1 (closed as unreachable, 2026-10-25): the mapping scan reads only {@code [A-Za-z0-9_]}
+     * words, but no pipeline can carry a raw field name outside that alphabet: every schema form refuses it at load
+     * ({@code Identifiers.validateSchema}), and a pipeline that does not load is {@code unreadable}, which fails closed to
+     * UNKNOWN lineage. This pins that chain, so a loosened identifier rule cannot silently reopen the gap: a classified raw
+     * field named {@code msisdn no} renamed to {@code m} must still mask {@code m} (and every other column).
+     */
+    @Test
+    void aClassifiedRawFieldWithANonWordNameFailsClosedBecauseItsPipelineDoesNotLoad(@TempDir Path space) throws Exception {
+        Path config = Files.createDirectories(space.resolve("config"));
+        Files.createDirectories(config.resolve("cust"));
+        Files.writeString(config.resolve("cust/cust_pipeline.toon"), "name: cust\nactive: true\n\ndirs:\n"
+                + "  poll: data/inbox/cust\n  database: data/cust/database\n  backup: data/cust/backup\n"
+                + "  temp: data/cust/temp\n  errors: data/cust/errors\n  quarantine: data/cust/quarantine\n"
+                + "  markers: data/cust/markers\n  status_dir: data/cust/status\n  log_dir: data/cust/logs\n\n"
+                + "output:\n  format: PARQUET\n  compression: snappy\n\nprocessing:\n  threads: 1\n"
+                + "  file_pattern: \"glob:**/*.csv\"\n  schema_file: cust_schema.toon\n");
+        Files.writeString(config.resolve("cust/cust_schema.toon"), "partitionKey: DAY\nraw:\n  name: CUST\n  format: CSV\n"
+                + "  fields[2]{name,selector,type,description,unit,classification}:\n"
+                + "    \"msisdn no\",\"0\",VARCHAR,\"\",\"\",\"MSISDN\"\n    PLAN,\"1\",VARCHAR,\"\",\"\",\"\"\n"
+                + "mapping:\n  canonicalName: cust\n  rawName: CUST\n  fields[2]:\n"
+                + "    - name: m\n      from: \"msisdn no\"\n      fn: keep\n    - name: plan\n      from: PLAN\n      fn: keep\n");
+        ComponentStore store = new ComponentStore(config.resolve("registry"));
+        store.write("dataset", "cust", Map.of("physicalRef", "cust"));
+        EvidenceMasker m = EvidenceMasker.of(store, config, List.of("cust"));
+        assertEquals(Map.of(EvidenceMasker.UNKNOWN_LINEAGE, "UNKNOWN"), EvidenceMasker.schemaClassification(
+                config, java.util.Set.of("cust"), EvidenceMasker.SENSITIVE::contains));
+        assertTrue(String.valueOf(m.mask("cust", "m", "9198")).startsWith("masked:"), "the renamed field stays masked");
+        assertTrue(String.valueOf(m.mask("cust", "plan", "gold")).startsWith("masked:"), "even an unrelated column");
+    }
+
     @Test
     void untraceableLineageFailsClosedAndMasksEveryEvidenceColumn(@TempDir Path space) throws Exception {
         // FAIL CLOSED: a summarize step rewrites the columns, so the mapping no longer says which stored column is

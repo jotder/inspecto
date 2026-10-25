@@ -43,7 +43,9 @@ import java.util.regex.Pattern;
  * {@code docs/superpower/calculated-columns-design.md}); each {@code name} must be a plain identifier.
  * The base relation is then wrapped {@code SELECT *, (expr) AS "name", … FROM (<base>)} — so every
  * consumer (BI query, reports, alerts, materialization) sees calculated columns as real columns.
- * Fail-closed: one bad column makes the whole dataset unusable (422), never silently degraded.
+ * Fail-closed: one bad column makes the whole dataset unusable (422), never silently degraded. A calculated
+ * {@code name} must be new: one that repeats a base column (or another calculated column) is refused
+ * ({@link #requireFreeCalculatedNames}, and a bind-time check in the wrap), never renamed {@code name_1} by DuckDB.
  */
 public final class DatasetRelation {
 
@@ -300,11 +302,57 @@ public final class DatasetRelation {
         return Optional.ofNullable(found);
     }
 
-    /** Wrap {@code base} with the dataset's calculated columns (DAT-5), or return it untouched when none. */
+    /**
+     * Refuse a calculated column whose name is already taken, so no calculated copy of a masked key can be renamed by DuckDB
+     * to a name nobody tracks (DATASET-CALC-NAME-COLLISION-1). A repeated output name is renamed {@code region_1}, which the
+     * BI masking never sees, so {@code {name: "region", expr: "upper(msisdn)"}} over a base that has {@code region} used to
+     * serve the raw key under {@code region_1}. Names are compared ignoring case (DuckDB does). Two layers, both fail closed:
+     * <ul>
+     *   <li>this method, which needs no data: a name that is declared in the Dataset's {@code columns[]}, or used by two
+     *       calculated columns. The Dataset save gate runs it too, so the collision is a 422 at save, not only at read.</li>
+     *   <li>{@link #withCalculated}'s bind-time check, for a base column the Dataset does not declare (a store read as-is):
+     *       the relation itself refuses to bind when a calculated name is already a column of the base.</li>
+     * </ul>
+     * Lenient about a malformed entry (a non-object, a blank name): the read path refuses those with their own message.
+     *
+     * @throws IllegalArgumentException naming the colliding calculated column
+     */
+    public static void requireFreeCalculatedNames(Map<String, Object> datasetConfig) {
+        Object calc = datasetConfig == null ? null : datasetConfig.get("calculated");
+        if (!(calc instanceof java.util.List<?> list) || list.isEmpty()) return;
+        java.util.Set<String> taken = new java.util.HashSet<>();
+        if (datasetConfig.get("columns") instanceof java.util.List<?> cols)
+            for (Object o : cols) {
+                String n = o instanceof Map<?, ?> c ? Values.trimToNull(cast(c).get("name")) : null;
+                if (n != null) taken.add(n.toLowerCase(java.util.Locale.ROOT));
+            }
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Object o : list) {
+            String name = o instanceof Map<?, ?> c ? Values.trimToNull(cast(c).get("name")) : null;
+            if (name == null) continue;
+            String key = name.toLowerCase(java.util.Locale.ROOT);
+            if (taken.contains(key))
+                throw new IllegalArgumentException("calculated column '" + name + "' has the name of a declared column of this"
+                        + " dataset (names are compared ignoring case); rename the calculated column");
+            if (!seen.add(key))
+                throw new IllegalArgumentException("calculated column '" + name + "' is declared twice (names are compared ignoring case)");
+        }
+    }
+
+    /**
+     * Wrap {@code base} with the dataset's calculated columns (DAT-5), or return it untouched when none. The wrap is
+     * {@code SELECT * EXCLUDE (__calc_check) FROM (SELECT *, struct_insert(__base, "n" := NULL) AS __calc_check, (expr) AS "n", …
+     * FROM (<base>) AS __base) AS __calc}: {@code struct_insert} refuses to add a field the row struct already holds, so
+     * DuckDB fails the BIND ("Binder Error: Duplicate struct entry name") when a calculated name is a column of the base, or
+     * another calculated name, whatever the case - even over an empty store, and before any row is read. The helper column is
+     * never selected, so the optimizer drops it and Parquet projection pushdown is unchanged.
+     */
     private static String withCalculated(String base, Map<String, Object> datasetConfig) {
         Object calc = datasetConfig == null ? null : datasetConfig.get("calculated");
         if (!(calc instanceof java.util.List<?> list) || list.isEmpty()) return base;
+        requireFreeCalculatedNames(datasetConfig);
         StringBuilder cols = new StringBuilder();
+        String check = "__base";
         for (Object o : list) {
             if (!(o instanceof Map<?, ?> c))
                 throw new IllegalArgumentException("calculated entries must be {name, expr} objects");
@@ -315,9 +363,13 @@ public final class DatasetRelation {
             if (expr == null)
                 throw new IllegalArgumentException("calculated column '" + name + "' needs an 'expr'");
             cols.append(", (").append(ExpressionGuard.check(expr)).append(") AS \"").append(name).append('"');
+            check = "struct_insert(" + check + ", \"" + name + "\" := NULL)";
         }
-        return "SELECT *" + cols + " FROM (" + base + ") AS __base";
+        return "SELECT * EXCLUDE (\"" + CALC_CHECK + "\") FROM (SELECT *, " + check + " AS \"" + CALC_CHECK + "\"" + cols
+                + " FROM (" + base + ") AS __base) AS __calc";
     }
+
+    private static final String CALC_CHECK = "__calc_check";
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> cast(Map<?, ?> m) {

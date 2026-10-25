@@ -77,11 +77,29 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   `NULLS FIRST|LAST` (explicit `ROWS|RANGE` frame clauses are deliberately unsupported); the `DENIED`
   deny-set is still checked ahead of the window-keyword rule, so no subquery smuggles in inside `OVER`.
 * **Enforcement point** — `dataset` config gains `calculated: [{name, expr}]`;
-  `DatasetRelation.relationSql` wraps `SELECT *, (expr) AS "name" FROM (<base>) AS __base`. Bad
+  `DatasetRelation.relationSql` wraps `SELECT * EXCLUDE ("__calc_check") FROM (SELECT *, struct_insert(__base,
+  "name" := NULL) AS "__calc_check", (expr) AS "name" FROM (<base>) AS __base) AS __calc` (the helper column
+  is the name check below; it is never selected, so Parquet projection pushdown is unchanged). Bad
   name/expr throws → **422 at every route, fail-closed** — enforced at relation-build time so every
   consumer inherits it (`/bi/query`, `/queries/{id}/run`, reports, measure alerts, DAT-4
   materialize, shares). Surviving bare identifiers are column refs resolved by DuckDB's binder
   (clean 4xx if unknown).
+* **A calculated name must be new (`DATASET-CALC-NAME-COLLISION-1`, 2026-10-25).** DuckDB renames a repeated output
+  name (`region` → `region_1`), so `{name:"region", expr:"upper(msisdn)"}` over a base that already has `region` served
+  the raw key under `region_1`, a name no masking rule knows. The collision is now **refused for everyone, a revealer
+  too** (a collision is a Dataset defect, not a reveal question), in two layers: (1) `DatasetRelation.
+  requireFreeCalculatedNames` (no data needed): a name that is a declared `columns[].name`, or used by two calculated
+  columns, ignoring case, is a plain 422 naming the column — run by the Dataset save gate (`DatasetEntryRules.validate`,
+  so `POST/PUT /components/dataset` refuses it) and again by `relationSql`; (2) the bind-time check in the wrap, for a
+  base column the Dataset does not declare (a store read as-is): `struct_insert` refuses to add a field the row struct
+  already holds, case-insensitively, so DuckDB fails the bind with `Binder Error: Duplicate struct entry name` — before
+  any row is read, even over an empty store — and the 422 keeps that text (a Binder Error survives the masking scrub).
+  Chosen over a runtime DESCRIBE because the relation SQL is built in 20 places with no connection. ⚠ An existing
+  Dataset that already collided stops reading (422) until the calculated column is renamed; the shipped templates'
+  calculated names (`period_start`, `BILL_PERIOD_START`, …) are not base columns. Tests:
+  `DatasetRelationTest.aCalculatedColumnNamedLikeABaseColumnDoesNotBind` / `…DeclaredColumnIsRefusedByName`,
+  `ControlApiBiQueryMaskingTest.aCalculatedColumnNamedLikeABaseColumnIsRefusedForEveryone` /
+  `theDatasetSaveGateRefusesACalculatedNameThatIsTakenOrRepeated`.
 * **Date/string scalars (2026-09-25).** The whitelist grew by a vetted pure, deterministic set so a
   text-typed source can yield typed fields (`'March 22,2025'` → a DATE, `'Eden Gardens, Kolkata'` →
   a city): `strptime try_strptime strftime date_trunc date_part datepart year month day dayname
@@ -144,6 +162,25 @@ file-writing Job types. `BI-QUERY-MASKING-1` closed 2026-10-23 after its securit
   not only by name (`WHERE COLUMNS('msi.*') LIKE $p` was a bisection).
 - **A calculated column naming `__base`** (the alias `DatasetRelation.withCalculated` gives the row it is computed over:
   `concat(__base)` is the whole row) is masked like one naming a masked column.
+- **A calculated column derived from a key is `masked:withheld`, not the alias (`BI-MASKING-CALC-DERIVED-ALIAS-1`,
+  2026-10-25).** The Space alias is the same in every query, so `substr(msisdn,1,4)`, `coalesce('4417', msisdn)` or
+  `length(msisdn)` aliased like the key let a Dataset author without reveal build a lookup table of aliases for values
+  they choose. Only a calculated column whose WHOLE `expr` is one plain identifier that is itself a column — or a bare copy
+  of one, followed to a fixpoint (`k = msisdn`, `k2 = k`) — IS that column and keeps its alias; every other one is
+  `BiResultMasking.UNLINKABLE` (`BiResultMasking.derivedCalculated`). Fail closed: a quoted name, a parenthesised
+  reference, a cycle, or anything not provably a bare reference counts as derived. It holds on every reader (`/bi/query`,
+  `/datasets/{id}/rows`, a saved query's `SELECT *`, a bound Widget), because it is applied where the alias is chosen,
+  after the free-SQL / structured-spec rules. A revealer is unaffected. Test:
+  `ControlApiBiQueryMaskingTest.aCalculatedColumnDerivedFromAKeyIsWithheldAndOnlyABareCopyKeepsTheAlias`.
+- **`LINEAGE-NONWORD-MAPPING-NAME-1` was refuted (2026-10-25).** `EvidenceMasker.schemaClassification` does read only
+  `[A-Za-z0-9_]` words from a mapping rule, but no pipeline can carry a classified raw field named outside that
+  alphabet: `Identifiers.validateSchema` refuses it at config load for the single schema, the `schemas[]` selector and the
+  plugin-segment forms alike, and a pipeline that fails to load is `unreadable`, which fails closed to `UNKNOWN`
+  lineage (every evidence column masked). Pinned by `EvidenceMaskerTest.aClassifiedRawFieldWithANonWordNameFailsClosedBecauseItsPipelineDoesNotLoad`,
+  so loosening the identifier rule cannot silently reopen it; no code was changed. ⚠ Verified neighbouring limit: the
+  `unreadable` flag is set only when the failed file's NAME contains the store name, so a pipeline that does not load
+  AND whose file is named otherwise (`ingest_pipeline.toon` for store `cust`) is skipped, not flagged — that path is a
+  separate question (a heuristic over a file name), not the word scan.
 - **The public share on an install where nobody signs in.** The sign-in `MaskingDefault` makes an unstated mode `none` there
   ("anyone could reveal anyway", `LA-ONBOARD-1` OB-6), which handed classified keys raw to an anonymous link holder.
   `BiResultMasking.forPublicShare` reads the mode the Space STATES, else the shipped `typed`; a stated `none` keeps raw shares
