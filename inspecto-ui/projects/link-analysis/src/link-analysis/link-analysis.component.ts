@@ -209,6 +209,7 @@ import {
     baseEdgeKind,
     cappedLayout,
     edgeLabelsHiddenByDensity,
+    graphSignature,
     stableKey,
 } from '@inspecto/core/graph/graph-view.component';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
@@ -661,14 +662,26 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const g = this.displayed();
         const out = new Map<string, string[]>();
         if (!g) return out;
+        // Louvain over the whole graph is the costly part: reuse it for a graph content already seen.
+        const sig = graphSignature(g);
+        const hit = this.hullMemo.get(sig);
+        if (hit) return hit;
         try {
-            for (const [node, community] of louvainCommunities(g))
+            for (const [node, community] of this.louvainOf(g))
                 out.set(community, [...(out.get(community) ?? []), node]);
         } catch {
             return out; // the cap is a refusal (spec §4.1) — no hulls rather than a throw in a template
         }
+        if (this.hullMemo.size >= 4) this.hullMemo.delete(this.hullMemo.keys().next().value as string);
+        this.hullMemo.set(sig, out);
         return out;
     });
+    /** The one Louvain call of the hulls (a seam so a spec can count the runs). */
+    private louvainOf(g: G6GraphData): Map<string, string> {
+        return louvainCommunities(g);
+    }
+    /** Community assignment per graph content signature (last few), so returning to a graph already seen costs nothing. */
+    private readonly hullMemo = new Map<string, Map<string, string[]>>();
     readonly viewBehaviors: { id: NonNullable<GraphViewPlugins['behaviors']>[number]; label: string; hint: string }[] =
         [
             { id: 'hover-activate', label: 'Hover activate', hint: 'light up a node and its links' },

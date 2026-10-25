@@ -283,6 +283,59 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
         expect(graph.draw).not.toHaveBeenCalled();
     });
 
+    // N2: a hulls toggle used to change `pluginKey`, so it rebuilt the graph and re-ran layout (~3 s on 767 nodes).
+    describe('community hulls ride the live graph (N2)', () => {
+        const members = new Map([['0', ['a', 'b']]]);
+        /** G6 5.1.1 `Graph.setPlugins`: the updater receives the current plugin options and its result replaces them. */
+        function withPlugins(plugins: GraphViewComponent['plugins']) {
+            const h = harness(graphOf(['a', 'b']), { a: [10, 20], b: [30, 40] });
+            let options: Record<string, unknown>[] = [{ type: 'minimap', key: 'minimap' }];
+            const setPlugins = vi.fn((u: (p: Record<string, unknown>[]) => Record<string, unknown>[]) => {
+                options = u(options);
+            });
+            Object.assign(h.graph, { setPlugins });
+            const c = h.comp as unknown as { plugins: GraphViewComponent['plugins'] };
+            c.plugins = plugins;
+            h.comp.snapshotKeys();
+            return { ...h, c, setPlugins, options: () => options };
+        }
+
+        it('turning hulls ON adds the hull plugins in place: no create, no layout, no data reset', () => {
+            const { comp, graph, create, c, setPlugins, options } = withPlugins({ minimap: true, hulls: null });
+            c.plugins = { minimap: true, hulls: members };
+            comp.ngOnChanges({ plugins: {} });
+            expect(create).not.toHaveBeenCalled();
+            expect(graph.destroy).not.toHaveBeenCalled();
+            expect(graph.render).not.toHaveBeenCalled();
+            expect(graph.setData).not.toHaveBeenCalled();
+            expect(setPlugins).toHaveBeenCalledTimes(1);
+            expect(options().map((p) => p['key'])).toEqual(['minimap', 'hull-0']);
+        });
+
+        it('turning hulls OFF removes only the hull plugins, in place', () => {
+            const { comp, graph, create, c, setPlugins, options } = withPlugins({ minimap: true, hulls: members });
+            setPlugins.mockClear();
+            options().push({ type: 'hull', key: 'hull-0' });
+            c.plugins = { minimap: true, hulls: null };
+            comp.ngOnChanges({ plugins: {} });
+            expect(create).not.toHaveBeenCalled();
+            expect(graph.render).not.toHaveBeenCalled();
+            expect(setPlugins).toHaveBeenCalledTimes(1);
+            expect(options().map((p) => p['key'])).toEqual(['minimap']);
+        });
+
+        it('a rebind of equal hulls touches nothing, and a changed minimap still rebuilds', () => {
+            const { comp, create, c, setPlugins } = withPlugins({ minimap: true, hulls: members });
+            c.plugins = { minimap: true, hulls: new Map([['0', ['a', 'b']]]) };
+            comp.ngOnChanges({ plugins: {} });
+            expect(create).not.toHaveBeenCalled();
+            expect(setPlugins).not.toHaveBeenCalled();
+            c.plugins = { minimap: false, hulls: members };
+            comp.ngOnChanges({ plugins: {} });
+            expect(create).toHaveBeenCalledTimes(1);
+        });
+    });
+
     it('a layout change is the one input that forces a rebuild', () => {
         const { comp, graph, create } = harness(graphOf(['a']));
         comp.layout = 'radial' as GraphViewComponent['layout'];

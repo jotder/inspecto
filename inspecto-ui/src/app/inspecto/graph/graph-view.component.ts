@@ -636,7 +636,28 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /** What is fixed at construction besides the layout: the plugins AND the pointer model. */
     private pluginKey(): string {
-        return stableKey([this.plugins ?? null, this.interaction ?? null]);
+        // Hulls / bubble sets are NOT part of it: they are added and removed on the live graph by syncHulls().
+        const { hulls: _h, bubbleSets: _b, ...fixed } = this.plugins ?? {};
+        return stableKey([this.plugins ? fixed : null, this.interaction ?? null]);
+    }
+
+    private prevHullKey = '';
+
+    private hullKey(): string {
+        return stableKey([this.plugins?.hulls ?? null, this.plugins?.bubbleSets ?? false]);
+    }
+
+    /** Swap the community shapes on the LIVE graph: G6 diffs plugins by key, so nothing is rebuilt and no layout runs. */
+    private syncHulls(): void {
+        const key = this.hullKey();
+        if (key === this.prevHullKey) return;
+        this.prevHullKey = key;
+        const shapes = buildPluginList(
+            { hulls: this.plugins?.hulls, bubbleSets: this.plugins?.bubbleSets },
+            ICON_COLOR_SWATCHES,
+        );
+        const isShape = (p: unknown): boolean => /^(hull|bubble-sets)-/.test(String((p as { key?: string }).key ?? ''));
+        this.graph?.setPlugins((prev) => [...prev.filter((p) => !isShape(p)), ...(shapes as never[])]);
     }
 
     constructor() {
@@ -736,6 +757,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 this.create();
                 return;
             }
+            // Hulls ride the live graph (no rebuild, no layout). With a data change in flight, applyData syncs them once drawn.
+            if (!(changes['data'] && graphSignature(this.data) !== this.prevDataKey)) this.syncHulls();
         }
         if (changes['data']) {
             const dataKey = graphSignature(this.data);
@@ -963,6 +986,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private snapshotKeys(dataKey = graphSignature(this.data)): void {
         this.prevLayoutKey = this.layoutKey();
         this.prevPluginKey = this.pluginKey();
+        this.prevHullKey = this.hullKey();
         this.prevDataKey = dataKey;
         this.prevStyleKey = this.styleKey();
         this.renderedNodeIds = new Set((this.data?.nodes ?? []).map((n) => String(n.id)));
@@ -1078,6 +1102,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         // The pointer model asked for a graph that stays fully in view: re-fit once the new data is on the canvas.
         // Only HERE (a data change), never in `redraw`, so a hover, a selection or a restyle never yanks the view.
         void painted.then(() => {
+            this.syncHulls();
             this.syncSelectionState();
             if (this.interaction?.fitOnDataChange) void graph.fitView();
         });

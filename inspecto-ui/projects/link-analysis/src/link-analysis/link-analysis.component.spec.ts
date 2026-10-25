@@ -1429,6 +1429,34 @@ describe('LinkAnalysisComponent', () => {
         expect(c.legendOpen()).toBe(true); // a view without options resets the overlays
         expect(c.viewOptions().hulls).toBe(true); // …but keeps the plugin set the analyst last chose
     });
+    it('N2: Louvain never runs with hulls off, and runs once per graph content however often hulls are toggled', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const louvain = vi.spyOn(c as unknown as { louvainOf(g: unknown): unknown }, 'louvainOf');
+        louvain.mockClear();
+        c.toggleViewFlag('minimap', false);
+        void c.canvasPlugins();
+        expect(louvain).not.toHaveBeenCalled(); // hulls off: no community work at all
+
+        for (let i = 0; i < 3; i++) {
+            c.toggleViewFlag('hulls', true);
+            expect(c.canvasPlugins().hulls?.size).toBe(2);
+            c.toggleViewFlag('hulls', false);
+            expect(c.canvasPlugins().hulls).toBeNull();
+        }
+        expect(louvain).toHaveBeenCalledTimes(1);
+
+        // Aggregating pendant leaves is a different graph (one more run); coming back to the first one reuses its assignment.
+        c.toggleViewFlag('hulls', true);
+        c.superNodeThreshold.set(2);
+        void c.canvasPlugins();
+        expect(louvain).toHaveBeenCalledTimes(2);
+        c.superNodeThreshold.set(0);
+        expect(c.canvasPlugins().hulls?.size).toBe(2);
+        expect(louvain).toHaveBeenCalledTimes(2);
+    });
     it('evidence: Attach to Case is ONE dialog that seals the displayed graph (stranded excluded) and attaches it', async () => {
         const { fixture } = create();
         fixture.detectChanges();
