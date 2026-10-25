@@ -75,13 +75,15 @@ type State = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 
                                 >
                             }
                             @if (r.entity; as e) {
-                                <a
-                                    mat-stroked-button
-                                    data-testid="open-entity"
-                                    [routerLink]="[...base(), 'entities', e.type, e.key]"
-                                    [queryParams]="r.window ? { from: r.window.from, to: r.window.to } : null"
-                                    >Open the Entity</a
-                                >
+                                @if (entityPages()) {
+                                    <a
+                                        mat-stroked-button
+                                        data-testid="open-entity"
+                                        [routerLink]="[...base(), 'entities', e.type, e.key]"
+                                        [queryParams]="r.window ? { from: r.window.from, to: r.window.to } : null"
+                                        >Open the Entity</a
+                                    >
+                                }
                                 @if (e.masked && !revealed() && lens.canRevealLinkEntities()) {
                                     <button mat-stroked-button type="button" data-testid="reveal" (click)="reveal()">
                                         Reveal the value
@@ -102,6 +104,9 @@ export class OpenInLaComponent implements OnInit {
     readonly lens = inject(LensService);
     /** LA-EDITIONS-1 ED-6: links from other tools are third-party integration, Standard and above (503 on Basic). */
     private readonly investigations = inject(LA_FEATURES).investigations;
+    /** D-LAE4: the Entity profile pages are Standard and up; without them there is no Entity page to open. */
+    private readonly flags = inject(LA_FEATURES).flags;
+    readonly entityPages = computed(() => this.flags?.()['entityPages'] === true);
 
     readonly state = signal<State>({ kind: 'loading' });
     readonly revealed = signal<string | null>(null);

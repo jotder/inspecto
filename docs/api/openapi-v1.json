@@ -14674,7 +14674,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "featureId → one short line saying why that feature is locked and which edition or add-on has it (LA-ONBOARD-1 OB-10). Entries only for withheld features (today the route features investigations and geoMap); a present feature has none."
+            "description" : "featureId → one short line saying why that feature is locked and which edition or add-on has it (LA-ONBOARD-1 OB-10). Entries only for withheld features (today the route features investigations, geoMap and entityPages); a present feature has none."
           },
           "configSpecs" : {
             "type" : "object",

@@ -30,7 +30,8 @@ explorer* below.
 | | Value Measures | ✅ | ✅ | ✅ | ✅ |
 | | Geo map, routes, co-location | — | ✅ | ✅ | ✅ |
 | | Browser graph algorithms | ✅ | ✅ | ✅ | ✅ |
-| | Entity Lists, identity resolution, Entity profile pages | ✅ | ✅ | ✅ | ✅ |
+| | Entity Lists, identity resolution | ✅ | ✅ | ✅ | ✅ |
+| | Entity profile pages | — | ✅ | ✅ | ✅ |
 | | Reference data beside a node | ✅ | ✅ | ✅ | ✅ |
 | | Export (PNG, CSV), snapshots (not evidence-grade) | ✅ | ✅ | ✅ | ✅ |
 | | Link Analysis widgets on dashboards (offer hidden on Basic; routes stay open) | — | ✅ | ✅ | ✅ |
@@ -80,6 +81,15 @@ all down. `/bootstrap` reports `features.geoMap` (false on Basic, with `geoLink`
 'geoMap'`), the Geo area of the standalone LA app and the Menu Builder's Geo view key on it, so Basic offers nothing that
 only 503s. Release note: an existing Basic install loses the Geo map on upgrade; no migration shim (D-LAE12). The module
 switch stays as before: a Space may still turn `geoLink` (all of Link Analysis) off.
+
+**Entity profile pages are Standard and up (D-LAE4, operator 2026-10-25), by a feature of their own.** The two profile
+reads, `GET /inv/entity-types/{id}/profile` and `GET /inv/entities/{type}/{key}/profile`, moved to their own route module
+`EntityPageRoutes`, which names a third edition feature, `EditionFeatures.ENTITY_PAGES` (`entityPages`), declared by
+`inspecto-ops`: Basic answers them `503 CAPABILITY_UNAVAILABLE` "available in Standard and above". The Entity Type list
+(`GET /inv/entity-types`), resolve and suggest stay on `EntityProfileRoutes`, open in every edition, because the Basic
+Start box, Add data and "Open in Link Analysis" read them. `/bootstrap` reports `features.entityPages`; the console nav
+(`navFeature: 'entityPages'`), the Entities area of the standalone LA app and the Open-in-LA page's "Open the Entity" link
+key on it. Release note: an existing Basic install loses the Entity profile pages on upgrade; no migration shim (D-LAE12).
 
 **Link Analysis widgets on dashboards are Standard and up as a UI flag only (D-LAE2, operator 2026-10-20).** `EditionFeatures.LA_WIDGETS`
 (`laWidgets`), declared by `inspecto-ops`, is reported as `/bootstrap` `features.laWidgets` (true only where `geoLink` is on and the
@@ -258,7 +268,7 @@ eventually lands (Basic/Standard/Advanced).
 **What ships.** `inspecto-entity-list`, `inspecto-la-core`, `inspecto-la-storage`, `inspecto-la-api` and
 `inspecto-geo-link` are default-reactor modules (`pom.xml`) staged in every bundle (`tools/bundle-modules.mjs` floor
 `all`, `offerings/basic.toon`), so a Basic install answers the explorer routes — projection, neighbours, paths, patterns,
-Value Measures, geo, Entity identities, Entity types and Entity profile pages, reference rows, snapshots — **with no
+Value Measures, Entity identities, the Entity Type list, resolve and suggest, reference rows, snapshots — **with no
 sign-in** (Basic ships no Authenticator). The graph library the plan called `la-graph` is the core thin jar
 `inspecto-graph`, already in every edition.
 

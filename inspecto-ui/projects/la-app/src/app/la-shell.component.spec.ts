@@ -25,7 +25,7 @@ describe('la-app shell and landing page', () => {
 
     let harness: RouterTestingHarness;
 
-    async function render(features: Record<string, boolean> = { geoMap: true, investigations: true }) {
+    async function render(features: Record<string, boolean> = { geoMap: true, investigations: true, entityPages: true }) {
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(),
@@ -94,15 +94,16 @@ describe('la-app shell and landing page', () => {
 
     // D-LAE5 (operator 2026-10-20): the Geo map is Standard and up, so Basic's `/bootstrap` says geoMap false and the area is not offered.
     // Operator 2026-10-21: the Alerts here are the standing-detection Alerts behind Investigations, so Basic (investigations false) hides them too.
-    it('does not offer Geo or Alerts in the rail or on the landing page in Basic', async () => {
-        const el = await render({ geoMap: false, investigations: false });
-        for (const path of ['/geo-map', '/alerts']) {
+    // D-LAE4 (operator 2026-10-25): the Entity profile pages are Standard and up too, so Basic hides the Entities area.
+    it('does not offer Geo, Entities or Alerts in the rail or on the landing page in Basic', async () => {
+        const el = await render({ geoMap: false, investigations: false, entityPages: false });
+        for (const path of ['/geo-map', '/alerts', '/entities']) {
             expect(el.querySelector(`nav[aria-label="Areas"] a[href="${path}"]`), path).toBeNull();
             expect(el.querySelector(`ul a[href="${path}"]`), path).toBeNull();
         }
         // the other areas stay
         expect(el.querySelector('nav[aria-label="Areas"] a[href="/link-analysis"]')).toBeTruthy();
-        expect(el.querySelector('nav[aria-label="Areas"] a[href="/entities"]')).toBeTruthy();
+        expect(el.querySelector('nav[aria-label="Areas"] a[href="/entity-lists"]')).toBeTruthy();
         expect(el.querySelector('ul a[href="/link-analysis"]')).toBeTruthy();
     });
 

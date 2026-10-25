@@ -120,7 +120,8 @@ class EditionFeaturesTest {
      */
     @Test
     void investigationsNeedTheEditionAndTheRuntimeAddon() {
-        EditionFeatures.overrideForTest(Set.of(EditionFeatures.INVESTIGATIONS, EditionFeatures.GEO_MAP));   // Standard
+        EditionFeatures.overrideForTest(Set.of(EditionFeatures.INVESTIGATIONS, EditionFeatures.GEO_MAP,
+                EditionFeatures.ENTITY_PAGES));   // Standard
         assertTrue(EditionFeatures.holdsInvestigationsAddon(), "held by default");
         assertTrue(EditionFeatures.present(EditionFeatures.INVESTIGATIONS));
         assertEquals(Map.of(), EditionFeatures.lockedReasons(), "nothing withheld");
@@ -140,7 +141,11 @@ class EditionFeaturesTest {
         assertFalse(EditionFeatures.present(EditionFeatures.INVESTIGATIONS), "the add-on never lifts Basic");
         assertTrue(EditionFeatures.refusal(EditionFeatures.INVESTIGATIONS).contains("available in Standard and above, with the "
                 + "Investigations add-on"), EditionFeatures.refusal(EditionFeatures.INVESTIGATIONS));
-        assertEquals(List.of(EditionFeatures.GEO_MAP, EditionFeatures.INVESTIGATIONS), List.copyOf(EditionFeatures.lockedReasons().keySet()));
+        assertEquals(List.of(EditionFeatures.ENTITY_PAGES, EditionFeatures.GEO_MAP, EditionFeatures.INVESTIGATIONS),
+                List.copyOf(EditionFeatures.lockedReasons().keySet()));
+        assertEquals("Entity profile pages are in Standard and above.", EditionFeatures.lockedReason(EditionFeatures.ENTITY_PAGES));
+        assertTrue(EditionFeatures.refusal(EditionFeatures.ENTITY_PAGES).contains("available in Standard and above"),
+                EditionFeatures.refusal(EditionFeatures.ENTITY_PAGES));
         assertEquals("Investigations are in Standard and above, with the Investigations add-on.",
                 EditionFeatures.lockedReason(EditionFeatures.INVESTIGATIONS));
     }

@@ -53,7 +53,7 @@ public final class EditionFeatures {
      * above it is also a ROUTE FEATURE: a route module whose {@code featureIds()} names it is answered
      * {@code 503 CAPABILITY_UNAVAILABLE} with {@link #refusal} at dispatch when it is absent ({@link #gatesRoutes}),
      * while the Link Analysis EXPLORER routes beside it (projection, paths, patterns, Value Measures, Entity
-     * identities, Entity profile pages) answer in Basic as in every edition. Since {@code LA-ONBOARD-1} OB-5 it is also the
+     * identities, the Entity Type list, resolve and suggest) answer in Basic as in every edition. Since {@code LA-ONBOARD-1} OB-5 it is also the
      * one feature an ADD-ON withholds at runtime: present only while the install holds {@link #LA_INVESTIGATIONS_ADDON}.
      */
     public static final String INVESTIGATIONS = "investigations";
@@ -64,6 +64,13 @@ public final class EditionFeatures {
      * Link Analysis route module, so gating it would take all of them down.
      */
     public static final String GEO_MAP = "geoMap";
+    /**
+     * The Entity profile pages ({@code GET /inv/entity-types/{id}/profile}, {@code GET /inv/entities/{type}/{key}/profile}) -
+     * Standard and up (D-LAE4, operator 2026-10-25). A ROUTE FEATURE of its own on {@code EntityPageRoutes} only, declared by
+     * {@code inspecto-ops} beside {@link #GEO_MAP}. The Entity Type list, resolve and suggest stay on {@code EntityProfileRoutes},
+     * open in every edition: the Basic Start box, Add data and "Open in Link Analysis" read them.
+     */
+    public static final String ENTITY_PAGES = "entityPages";
     /**
      * Link Analysis widgets on dashboards (the Explore picker's Link view and Geo map widget types) - Standard and up (D-LAE2,
      * operator 2026-10-20). ⚠ A <b>UI flag only</b>, deliberately not a route feature (it is not in {@link #ROUTE_FEATURES}): the
@@ -132,6 +139,7 @@ public final class EditionFeatures {
                     ? "Needs the Investigations add-on, which this installation does not hold."
                     : "Investigations are in Standard and above, with the Investigations add-on.";
         if (GEO_MAP.equals(feature)) return "The Geo map is in Standard and above.";
+        if (ENTITY_PAGES.equals(feature)) return "Entity profile pages are in Standard and above.";
         return refusal(feature);
     }
 
@@ -155,11 +163,12 @@ public final class EditionFeatures {
             case INVESTIGATIONS -> "Link Analysis Investigations (Investigations, Drafts, Dossier, templates, members, embed links, "
                     + "data trust, Case history, Graph Run, index builds and Alert Rules on Investigations)";
             case GEO_MAP -> "The Geo map, routes and co-location (POST /geo/projection, POST /geo/routes)";
+            case ENTITY_PAGES -> "Entity profile pages (GET /inv/entity-types/{id}/profile, GET /inv/entities/{type}/{key}/profile)";
             default -> "'" + feature + "'";
         };
         if (PII_MASK.equals(feature))
             return what + " is an Advanced feature — this build does not include it";
-        if (GEO_MAP.equals(feature))
+        if (GEO_MAP.equals(feature) || ENTITY_PAGES.equals(feature))
             return what + " are available in Standard and above - this build (Basic) does not include them";
         if (INVESTIGATIONS.equals(feature))
             return declared(INVESTIGATIONS)
@@ -175,7 +184,7 @@ public final class EditionFeatures {
      * (pinned by {@code EditionFeaturesTest}). {@code LA-EDITIONS-PLACEMENT-1}: a set, so a second route feature is one
      * more member instead of one more hard-coded comparison.
      */
-    static final Set<String> ROUTE_FEATURES = Set.of(INVESTIGATIONS, GEO_MAP);
+    static final Set<String> ROUTE_FEATURES = Set.of(INVESTIGATIONS, GEO_MAP, ENTITY_PAGES);
 
     /**
      * Whether {@code featureId} — a {@code RouteModule.featureIds()} id — is an edition feature the HOST enforces on routes:

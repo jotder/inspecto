@@ -29,6 +29,13 @@ class OpsEditionFeaturesTest {
     }
 
     @Test
+    void opsDeclaresTheEntityPagesRouteFeatureToo() {
+        EditionFeatures.overrideForTest(null);
+        assertTrue(EditionFeatures.present(EditionFeatures.ENTITY_PAGES), "Standard and up bring the Entity profile pages through inspecto-ops (D-LAE4)");
+        assertTrue(EditionFeatures.gatesRoutes(EditionFeatures.ENTITY_PAGES));
+    }
+
+    @Test
     void opsDeclaresTheDashboardWidgetFlagButItIsNotARouteFeature() {
         EditionFeatures.overrideForTest(null);
         assertTrue(EditionFeatures.present(EditionFeatures.LA_WIDGETS), "Standard and up bring the LA dashboard widgets (D-LAE2)");

@@ -790,9 +790,10 @@ Code: `EmbedGrants` (token, hashing, resolve, revoke, counters), `InvestigationE
 
 Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-archive/la-entity-profile-plan.md) (decisions D-EP1..D-EP8, contract §4.5, live pass §10).
 
-* **Routes** (`EntityProfileRoutes`, la-api, gated and audited like the exploration reads): `GET /inv/entity-types` (cheap, reads the cache only),
-  `GET /inv/entity-types/{id}/profile?sections=` (bindings, volume, shapes, time, lineage, links, relationships),
-  `POST /inv/entities/{type}/resolve {key}` and `GET /inv/entities/{type}/{key}/profile`. Audit events `LINK_ENTITY_*` (three).
+* **Routes** (la-api, gated and audited like the exploration reads): on `EntityProfileRoutes`, every edition, `GET /inv/entity-types`
+  (cheap, reads the cache only) and `POST /inv/entities/{type}/resolve {key}`; on `EntityPageRoutes`, Standard and up (`entityPages`,
+  D-LAE4), `GET /inv/entity-types/{id}/profile?sections=` (bindings, volume, shapes, time, lineage, links, relationships) and
+  `GET /inv/entities/{type}/{key}/profile`. Audit events `LINK_ENTITY_*` (three).
 * **A raw identifier never travels in a URL.** The SPA resolves a typed value with the POST and navigates by the key it returns; for a masked type
   the GET is alias-only (`masked:<16 hex>`) and answers 422 to a raw key. Type pages are aggregates only (D-EP3): a dominant value is reported as
   `kind:"dominant"`, `value:null`; only the built-in sentinels (`''`, `-99`, `0`, `NULL`, `null`, `unknown`, `n/a`) are shown by value.
@@ -1377,6 +1378,7 @@ Edition names per `LA-EDITIONS-1` ED-2 (2026-10-17; formerly Personal / Professi
 | la-core, la-storage, la-api, geo-link, entity-list (the **explorer**) | ✓ | ✓ | ✓ | ✓ |
 | Investigation surface (`investigations` edition feature, declared by `inspecto-ops`, AND the Investigations add-on held) | — (503) | ✓ by default | ✓ by default | ✓ by default |
 | Geo map, routes and co-location (`geoMap` route feature on `GeoRoutes`, declared by `inspecto-ops`; D-LAE5) | — (503) | ✓ | ✓ | ✓ |
+| Entity profile pages (`entityPages` route feature on `EntityPageRoutes`, declared by `inspecto-ops`; D-LAE4) | — (503) | ✓ | ✓ | ✓ |
 | Link analysis and Geo map Widget types (`laWidgets`, a `/bootstrap` UI flag only; D-LAE2) | hidden | ✓ | ✓ | ✓ |
 | Case history beside a node (`CaseHistoryRoutes`, `investigations`; D-LAE1) | — (503) | ✓ | ✓ | ✓ |
 | Sign-in (`inspecto-oidc`; Preview: demo sign-in) | — | ✓ | ✓ | ✓ |
@@ -1398,7 +1400,12 @@ answers each of them `503 CAPABILITY_UNAVAILABLE` "… available in Standard and
 `ExclusionListRoutes`) own `geoLink` only and answer with no sign-in. `GeoRoutes` names `geoLink` and `geoMap`
 (D-LAE5, 2026-10-20): Basic answers `POST /geo/projection` and `POST /geo/routes` 503 `CAPABILITY_UNAVAILABLE` while
 the other Link Analysis modules stay up; `/bootstrap` reports `features.geoMap`, and the console nav, the LA app Geo
-area and the Menu Builder Geo view key on it. `laWidgets` (D-LAE2) only hides the Link analysis and Geo map Widget
+area and the Menu Builder Geo view key on it. `EntityPageRoutes` names `geoLink` and `entityPages` (D-LAE4, 2026-10-25): it
+holds only the two profile GETs, split out of `EntityProfileRoutes` so the Entity Type list, resolve and suggest (read by the
+Basic Start box, Add data and Open in Link Analysis) stay open; Basic answers the two 503, `/bootstrap` reports
+`features.entityPages`, and the console nav, the LA app Entities area and Open-in-LA's "Open the Entity" link key on it.
+⚠ The canvas node dialog's Entity page link (`entityPageOf` in `link-analysis.component.ts`) does not key on it yet (row
+`LA-EDITION-PLACEMENT-1`). `laWidgets` (D-LAE2) only hides the Link analysis and Geo map Widget
 types in the Widget builder on Basic; their routes stay open. `/bootstrap` reports `features.investigations` (false on Basic), `laLevel` and
 `featureReasons` (below). Pinned by `ControlApiBasicEditionLinkAnalysisTest` (geo-link; Basic and Standard over real HTTP).
 
@@ -1419,7 +1426,7 @@ data origin decides the entry points (phase 2).
   `present()`, so nothing else changed.
 - **`/bootstrap` contract** (space-agnostic, also served before sign-in): `laLevel: "explorer" | "investigations"`
   (`investigations` exactly when `features.investigations` is true) and `featureReasons: {featureId: oneLine}` -
-  `EditionFeatures.lockedReasons()`: one entry per WITHHELD route feature (today `investigations`, `geoMap`), none for a
+  `EditionFeatures.lockedReasons()`: one entry per WITHHELD route feature (today `investigations`, `geoMap`, `entityPages`), none for a
   present one, always an object. The line is `EditionFeatures.lockedReason(f)` ("Needs the Investigations add-on, which this
   installation does not hold." / "Investigations are in Standard and above, with the Investigations add-on." / "The Geo map
   is in Standard and above."); a feature without a short line falls back to `refusal(f)`, so DATA-TIERS-1 phase 2 extends the
@@ -1458,11 +1465,11 @@ data origin decides the entry points (phase 2).
 moved out of `InvRoutes` into its own route module `CaseHistoryRoutes` (an edition gate is per `RouteModule`) naming
 `geoLink` and `investigations`, so Basic answers 503 "available in Standard and above" at dispatch and the node dialog hides
 the section. The scheduled link-index builder (`la.index.build` Job) is not edition-gated — its routes are.
-⚠ Route edition features are the set `EditionFeatures.ROUTE_FEATURES` (`investigations`, `geoMap`; generalised from one
+⚠ Route edition features are the set `EditionFeatures.ROUTE_FEATURES` (`investigations`, `geoMap`, `entityPages`; generalised from one
 id 2026-10-20), and each member needs its own `refusal()` text (`EditionFeaturesTest`). `laWidgets` is deliberately not in
 the set: it is a `/bootstrap` UI flag only. A new route gate goes on a whole `RouteModule`, so a route that must differ from
-its neighbours moves to a module of its own first, as Case history did. Open placement questions (D-LAE3, D-LAE4, D-LAE6):
-`docs/superpower/link-analysis-roadmap.md` §D3.
+its neighbours moves to a module of its own first, as Case history and the Entity profile pages did. Placement decisions
+D-LAE3, D-LAE4, D-LAE6 were answered 2026-10-25: `docs/superpower/link-analysis-roadmap.md` §D3.
 The Postgres store also needs `-Dinvestigations.backend=db` plus a `jdbc:postgresql:` URL; the jar alone keeps the
 filesystem store.
 

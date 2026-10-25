@@ -314,8 +314,8 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   counts), **A list**, **A paste** (at most 25 values per start) and **The whole Dataset** (warns above the node cap);
   the busiest and groups come from *Find something interesting* → **Start from these**. On the Investigations level
   *One entity* seeds an Investigation (**Purpose / legal basis**, **Investigate**). *Investigate* on an Entity's page
-  starts from that entity (F-7, F-8 fixed). Pending: `LA-EDITION-PLACEMENT-1` (D-LAE4, assistant-decided 2026-10-24,
-  awaiting operator confirmation, not built) would make Entity profile pages Standard and up.
+  starts from that entity (F-7, F-8 fixed). Since 2026-10-25 (D-LAE4, operator-confirmed) Entity profile pages are
+  Standard and up: Basic hides the Entities area and answers the two profile reads 503.
 
 ### UC-10 Keep lists of entities (suspects, watch, exclusion)
 

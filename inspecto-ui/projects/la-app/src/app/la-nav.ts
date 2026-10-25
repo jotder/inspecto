@@ -16,6 +16,8 @@ export const LA_APP_NAV = [
     },
     {
         path: 'entities',
+        /** The Entity profile pages are Standard and up (D-LAE4): Basic's `/bootstrap` says entityPages false. */
+        feature: 'entityPages',
         label: 'Entities',
         icon: 'heroicons_outline:identification',
         blurb: 'See what the data says about each Entity Type and each Entity: how many, where, how fresh.',
