@@ -14,7 +14,7 @@ import { Component } from '@inspecto/core/component-model';
 import { deriveComponentGraph } from '@inspecto/core/component-model';
 import { toG6Data } from '@inspecto/core/graph/catalog-graph';
 import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';
-import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
+import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry-kinds';
 import { mergeGraphs } from '@inspecto/link-analysis/graph/graph-analysis';
 import { InvService } from '@inspecto/link-analysis/api/inv.service';
 import { LA_CATALOG, LA_DATASETS, LA_PIPELINE_GRAPH } from '@inspecto/link-analysis/la-host';

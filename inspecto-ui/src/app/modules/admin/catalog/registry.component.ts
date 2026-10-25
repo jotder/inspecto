@@ -29,22 +29,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 import { ComponentsDataProvider } from './components-data-provider';
 import { registerPlatformKinds } from './platform-kinds';
-
-/** The component-registry kinds the reuse-graph loads (the backend `ComponentType`s). Pipelines are loaded
- *  separately (authored flows via {@link PipelinesService}) since they live in their own store, not `/components`.
- *  The saved investigation views joined with R1 (widget→view→dataset edges now derive). */
-export const REGISTRY_KINDS = [
-    'dataset',
-    'query',
-    'widget',
-    'dashboard',
-    'grammar',
-    'transform',
-    'sink',
-    'rule-template',
-    'geo-map-view',
-    'link-analysis-view',
-];
+import { REGISTRY_KINDS } from './registry-kinds';
 
 /** The kinds a pipeline node may bind (mirrors `PIPELINE_KIND.allowedPartKinds`); a node's `use=<kind>/<id>`
  *  ref is turned into a part only for these, so source→connection refs don't clutter the graph. */

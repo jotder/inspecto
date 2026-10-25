@@ -33,7 +33,7 @@ import {
     LaWidgets,
 } from '@inspecto/link-analysis';
 import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
-import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
+import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry-kinds';
 import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';
 import { DashboardHeaderComponent } from './dashboards/dashboard-header.component';
 import { DatasetsService } from './datasets/datasets.service';
