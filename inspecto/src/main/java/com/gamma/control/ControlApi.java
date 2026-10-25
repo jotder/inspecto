@@ -1306,7 +1306,10 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 : "write";
     }
 
-    private void respond(HttpExchange ex, int status, Object body) throws IOException {
+    void respond(HttpExchange ex, int status, Object body) throws IOException {
+        // An error response of ANY status never carries an ETag: a handler that tagged its answer (ETags.respond sets the
+        // header before the framework serialises the body) and then failed late must not tag the 500 that replaces it.
+        if (status >= 400) ex.getResponseHeaders().remove("ETag");
         ApiContext.respondJson(ex, status, body);
     }
 

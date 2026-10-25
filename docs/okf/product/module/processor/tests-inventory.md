@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-359 test class(es): 131 unit, 228 real-HTTP control-plane, 0 IT.
+360 test class(es): 131 unit, 229 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -123,6 +123,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiEnrichmentPreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiEnrichmentPreviewTest.java` | {@code POST /enrichment/preview} over real HTTP — the bounded, non-persisting enrichment preview that |
 | `ControlApiEnrichmentRegisterTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiEnrichmentRegisterTest.java` | Integration tests for {@code POST /enrichment} (v5.1.0) over real HTTP — the Stage-2 half of the |
 | `ControlApiErrorBoundaryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiErrorBoundaryTest.java` | ERR-BOUNDARY-ERROR-1 (2026-09-28), over real HTTP: a route that throws a server-side {@link Error} is |
+| `ControlApiErrorNeverTaggedTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiErrorNeverTaggedTest.java` | An error response of ANY status never carries an ETag. {@code ETags.respond} sets the header and returns the body for the |
 | `ControlApiEventPruneJobGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiEventPruneJobGateTest.java` | ASSURE-AUDIT-CHAIN-1: an {@code event_prune} job decides which audit rows may lawfully vanish (its chained prune |
 | `ControlApiExpectationBaselineTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiExpectationBaselineTest.java` | DUCKLE-C8 — real-HTTP + real-DuckDB tests for the {@code baseline} Expectation kind and its audited |
 | `ControlApiExpectationCensusTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiExpectationCensusTest.java` | COMPONENT-KIND-KEY-CENSUS-1, {@code expectation} third of DUCKLE-C3-DEAD-PROPERTY-1: a top-level key |

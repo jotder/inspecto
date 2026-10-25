@@ -24,6 +24,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 /**
  * The <b>Working Set as a derived relation</b> (LA-20, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §2.7):
@@ -42,7 +43,8 @@ import java.util.Map;
  *   <li><b>What the token proves:</b> no append, replace or in-app rewrite since the entry was built.</li>
  *   <li><b>What it cannot prove:</b> that nobody edited the file out of band keeping its size, its nanosecond mtime, its
  *       fileKey AND its last line. The replay equivalence check exists precisely because someone might.</li>
- *   <li><b>The bound:</b> an entry is trusted for at most {@link #TRUST_MS} ({@link #WORKING_SET_TRUST_MS}, 30 s). After
+ *   <li><b>The bound:</b> an entry is trusted for at most {@link #WORKING_SET_TRUST_MS} (30 s), measured on a MONOTONIC clock
+ *       ({@code System.nanoTime}; a backwards wall-clock step cannot stretch it). After
  *       that the next read does the FULL content check - read every committed line, SHA-256 it, compare with the entry's
  *       {@code key} - and either re-seeds the entry (same content) or rebuilds it (different content). So such an edit is
  *       stale for at most the TTL, never indefinitely, and the answer's {@code key} and ETag always name the content
@@ -54,8 +56,11 @@ import java.util.Map;
  *
  * <p><b>Conditional GET (PERF-P4-3).</b> The ETag is built from the token, the verified content {@code key}, the table,
  * the page, the pin and the masking profile, and a matching {@code If-None-Match} answers a bodiless 304. It is decided
- * AFTER the caller's gate and after the relation was obtained without error: an error response (422, 429, ...) never
- * carries an ETag and a conditional request that would be an error returns that error. The 304 writes the same audit
+ * AFTER the caller's gate and after the relation was obtained without error: an error response of ANY status never
+ * carries an ETag (it is attached only around a successful serialisation, {@link #sendTagged}) and a conditional request
+ * that would be an error returns that error. The token is taken before the log is read and RE-CHECKED after the read and
+ * the fold: if it moved meanwhile (a failed promote / Draft append truncating inside one mtime tick) the freshly read
+ * answer is served uncached with no ETag, so a stale token is never cached against newer content nor a 304 source. The 304 writes the same audit
  * event as the 200 (plus {@code notModified}).
  *
  * <p><b>Who may evaluate it (D-E7, decided 2026-09-23).</b> The gate runs on EVERY request, BEFORE the cache is
@@ -106,16 +111,24 @@ public final class WorkingSetRoutes implements RouteModule {
     /** How long a cached relation is trusted on its change token alone before the next read re-validates by content. */
     public static final long WORKING_SET_TRUST_MS = 30_000;
 
-    /** TEST SEAM: the trust window (default {@link #WORKING_SET_TRUST_MS}). */
-    public static volatile long TRUST_MS = WORKING_SET_TRUST_MS;
+    /**
+     * The trust window's clock: MONOTONIC milliseconds ({@code System.nanoTime}), never the wall clock - a backwards step
+     * of the wall clock (NTP, a manual change, a VM resume) must not stretch the window. Only differences are meaningful.
+     */
+    static long monotonicMs() {
+        return System.nanoTime() / 1_000_000L;
+    }
 
-    /** TEST SEAM: the clock the trust window is measured on. */
-    public static volatile java.util.function.LongSupplier CLOCK_MS = System::currentTimeMillis;
+    /** TEST SEAM (package-private; a test in another module reaches it through a same-package accessor): the trust window (default {@link #WORKING_SET_TRUST_MS}). */
+    static volatile long trustMs = WORKING_SET_TRUST_MS;
 
-    /** TEST SEAM: full content reads (a miss, or a re-validation after the trust window) - a hit within the window adds none. */
-    public static final java.util.concurrent.atomic.LongAdder FULL_READS = new java.util.concurrent.atomic.LongAdder();
+    /** TEST SEAM (package-private): the MONOTONIC clock the trust window is measured on; a replacement must be monotonic too. */
+    static volatile java.util.function.LongSupplier clockMs = WorkingSetRoutes::monotonicMs;
 
-    /** A cached relation and when it was last verified against the log's content. */
+    /** TEST SEAM (package-private): full content reads (a miss, or a re-validation after the trust window) - a hit within the window adds none. */
+    static final java.util.concurrent.atomic.LongAdder FULL_READS = new java.util.concurrent.atomic.LongAdder();
+
+    /** A cached relation and when (monotonic ms) it was last verified against the log's content. */
     private static final class Cached {
         final Relation rel;
         volatile long validatedMs;
@@ -169,12 +182,16 @@ public final class WorkingSetRoutes implements RouteModule {
         // within the trust window); only then - nothing has failed - is the ETag derived and a matching If-None-Match answered 304.
         String token = WorkingSetEtag.logToken(inv);
         boolean[] cached = {false};
-        Relation rel = relation(inv, at, cached, token);
-        String etag = WorkingSetEtag.of(inv, token, rel.key(), of, limit, offset, at);
+        boolean[] stable = {true};
+        Relation rel = relation(inv, at, cached, token, stable);
+        // The token was taken BEFORE the log was read. If the log's token moved while it was read (a failed promote / Draft
+        // append truncating in the same mtime tick), the pre-read token does not describe the content just read: serve that
+        // content as a correct 200, uncached, with NO ETag - never a 304 source.
+        String etag = stable[0] ? WorkingSetEtag.of(inv, token, rel.key(), of, limit, offset, at) : null;
         List<Map<String, Object>> all = rel.tables().get(of);
         List<Map<String, Object>> rows = all.subList(Math.min(offset, all.size()), (int) Math.min((long) offset + limit, all.size()));
         boolean truncated = (long) offset + rows.size() < all.size();
-        boolean notModified = WorkingSetEtag.isFresh(ex, etag);
+        boolean notModified = etag != null && WorkingSetEtag.isFresh(ex, etag);
 
         String relation = of;
         emit(ex, id, b -> {
@@ -234,8 +251,23 @@ public final class WorkingSetRoutes implements RouteModule {
             cols.add("linkId");
             masked.put("columns", cols);
         }
-        ex.getResponseHeaders().set("ETag", etag);   // only a fully built 200 carries a tag
-        return masked;
+        return etag == null ? masked : sendTagged(ex, etag, masked);
+    }
+
+    /**
+     * Send {@code body} as the 200 and tag it - the tag is attached only around a successful serialisation. Serialising is
+     * what can still fail here (the framework used to do it AFTER {@code serve} returned, with the header already set, so a
+     * late 500 carried the tag of a body that was never sent). On any failure the tag is withdrawn before the error escapes:
+     * an error response of any status never carries an ETag.
+     */
+    static Object sendTagged(HttpExchange ex, String etag, Object body) throws IOException {
+        try {
+            ex.getResponseHeaders().set("ETag", etag);
+            return ApiContext.respondJson(ex, 200, body);
+        } catch (IOException | RuntimeException | Error e) {
+            ex.getResponseHeaders().remove("ETag");
+            throw e;
+        }
     }
 
     /** The resolved Investigation as the PDP sees it — {@code resource.*} in an Access Policy's {@code when}. */
@@ -249,7 +281,16 @@ public final class WorkingSetRoutes implements RouteModule {
      * the step, so it shares the cache without ever answering for the head, and vice versa.
      */
     static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut) throws IOException {
-        return relation(inv, at, cachedOut, WorkingSetEtag.logToken(inv));
+        return relation(inv, at, cachedOut, WorkingSetEtag.logToken(inv), null);
+    }
+
+    /** True when the store's change token is still {@code token}; a failure to stat it counts as moved (fail toward not caching). */
+    private static boolean tokenUnchanged(InvestigationRoutes.Inv inv, String token) {
+        try {
+            return token.equals(WorkingSetEtag.logToken(inv));
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
     }
 
     /**
@@ -257,13 +298,15 @@ public final class WorkingSetRoutes implements RouteModule {
      * miss reads the committed lines - and still hashes them, because the answer's {@code key} (the log's SHA-256) is part of
      * the body clients parse.
      */
-    static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut, String token) throws IOException {
+    static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut, String token, boolean[] stableOut) throws IOException {
+        if (stableOut != null) stableOut[0] = true;
         String tokenKey = WorkingSetEtag.relationKey(inv, token, at);
         Cached known;
         synchronized (CACHE) {
             known = CACHE.get(tokenKey);
         }
-        if (known != null && CLOCK_MS.getAsLong() - known.validatedMs < TRUST_MS) {
+        long startedMs = clockMs.getAsLong();   // stamped when the verification BEGAN: a slow read never lengthens the window
+        if (known != null && startedMs - known.validatedMs < trustMs) {
             cachedOut[0] = true;
             return known.rel;
         }
@@ -281,17 +324,27 @@ public final class WorkingSetRoutes implements RouteModule {
         byte[] bytes = joined.toByteArray();
         int end = bytes.length;
         String hash = sha256(bytes, end) + (at < 0 ? "" : "@" + at);
+        // READ-vs-WRITE race: `token` was taken BEFORE the read. If the log's token moved while it was read (a failed promote or
+        // Draft append truncating in the same mtime tick as the write before it), `token` may name older bytes than the ones just
+        // read. That result is correct to serve once, but must never be cached under `token` nor tagged: stableOut[0] = false.
+        // Checked here (after the read) and again in build (after the fold, just before the put).
+        BooleanSupplier unchanged = () -> {
+            boolean same = tokenUnchanged(inv, token);
+            if (!same && stableOut != null) stableOut[0] = false;
+            return same;
+        };
         if (known != null && known.rel.key().equals(hash)) {   // the same content as when it was built: trust it for another window
-            known.validatedMs = CLOCK_MS.getAsLong();
+            if (unchanged.getAsBoolean()) known.validatedMs = startedMs;
             cachedOut[0] = true;
             return known.rel;
         }
         String key = inv.cacheKey() + "\u0000" + hash;
-        if (inv.draft() == null) return build(tokenKey, key, bytes, end, at);
+        if (inv.draft() == null) return build(tokenKey, key, bytes, end, at, startedMs, unchanged);
         final byte[] draftBytes = bytes;
         final int draftEnd = end;
         // D7-6: a Draft's cold relation build is a heavy job - admitted under the heavy-job cap (429 when it is full), never queued
-        return DraftAdmission.heavy("Working Set relation of draft " + inv.draft().draftId(), () -> build(tokenKey, key, draftBytes, draftEnd, at));
+        return DraftAdmission.heavy("Working Set relation of draft " + inv.draft().draftId(),
+                () -> build(tokenKey, key, draftBytes, draftEnd, at, startedMs, unchanged));
     }
 
     /** D7-6 (hibernate / expire): forget every cached relation of the log named {@code cacheKey}. */
@@ -303,7 +356,8 @@ public final class WorkingSetRoutes implements RouteModule {
     }
 
     /** The cold path of {@link #relation}: evaluate the committed bytes and cache the relation under {@code key}. */
-    private static Relation build(String tokenKey, String key, byte[] bytes, int end, int at) throws IOException {
+    private static Relation build(String tokenKey, String key, byte[] bytes, int end, int at, long startedMs, BooleanSupplier unchanged)
+            throws IOException {
         List<Map<String, Object>> log = new ArrayList<>();
         for (String line : new String(bytes, 0, end, StandardCharsets.UTF_8).split("\n")) {
             if (line.isBlank()) continue;
@@ -321,8 +375,9 @@ public final class WorkingSetRoutes implements RouteModule {
             headStep = step;
         }
         Relation rel = new Relation(key.substring(key.indexOf('\u0000') + 1), headStep, s.hash(), tables(s));
+        if (!unchanged.getAsBoolean()) return rel;   // the token moved during the read or the fold: serve it, never cache it
         synchronized (CACHE) {
-            CACHE.put(tokenKey, new Cached(rel, CLOCK_MS.getAsLong()));
+            CACHE.put(tokenKey, new Cached(rel, startedMs));
         }
         return rel;
     }

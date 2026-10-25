@@ -287,8 +287,8 @@ public final class FsInvestigationStore implements InvestigationStore {
         return log(scope).size();
     }
 
-    /** TEST SEAM (PERF-P4-3): committed-log reads served, so a test can prove a conditional GET read none. */
-    public static final java.util.concurrent.atomic.LongAdder LOG_READS = new java.util.concurrent.atomic.LongAdder();
+    /** TEST SEAM (PERF-P4-3; package-private - a test in another package reads it through a same-package accessor): committed-log reads served, so a test can prove a conditional GET read none. */
+    static final java.util.concurrent.atomic.LongAdder LOG_READS = new java.util.concurrent.atomic.LongAdder();
 
     @Override
     public List<String> log(Scope scope) throws IOException {

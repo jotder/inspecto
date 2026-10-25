@@ -7,7 +7,7 @@ import com.gamma.audit.Event;
 import com.gamma.event.EventLog;
 import com.gamma.la.api.DraftAdmission;
 import com.gamma.la.api.WorkingSetRoutes;
-import com.gamma.la.core.FsInvestigationStore;
+import com.gamma.la.api.WorkingSetTestSeams;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
@@ -65,8 +65,7 @@ class ControlApiWorkingSetEtagTest {
     void reset() {
         Authenticators.forTest(null);
         AccessDeciders.forTest(null);
-        WorkingSetRoutes.CLOCK_MS = System::currentTimeMillis;
-        WorkingSetRoutes.TRUST_MS = WorkingSetRoutes.WORKING_SET_TRUST_MS;
+        WorkingSetTestSeams.reset();
         DraftAdmission.setHeavyLimit(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 3)));
     }
 
@@ -138,12 +137,12 @@ class ControlApiWorkingSetEtagTest {
                 HttpResponse<String> first = get(c, path, OWNER, null);
                 assertEquals(200, first.statusCode());
                 String tag = etag(first);
-                long reads = FsInvestigationStore.LOG_READS.sum();
+                long reads = com.gamma.la.core.LogReadsProbe.sum();
                 HttpResponse<String> second = get(c, path, OWNER, tag);
                 assertEquals(304, second.statusCode(), of);
                 assertEquals("", second.body(), "a 304 has no body");
                 assertEquals(tag, second.headers().firstValue("ETag").orElse(null));
-                assertEquals(reads, FsInvestigationStore.LOG_READS.sum(), "no committed-log read answered the 304 (" + of + ")");
+                assertEquals(reads, com.gamma.la.core.LogReadsProbe.sum(), "no committed-log read answered the 304 (" + of + ")");
                 // a different variant is a different tag: the entities tag never validates the links body
                 assertNotEquals(tag, etag(get(c, INV + "/working-set?of=" + (of.equals("links") ? "entities" : "links"), OWNER, null)));
             }
@@ -281,12 +280,12 @@ class ControlApiWorkingSetEtagTest {
             HttpResponse<String> cold = get(c, path, OWNER, null);
             long coldMs = (System.nanoTime() - t0) / 1_000_000;
             String tag = etag(cold);
-            long reads = FsInvestigationStore.LOG_READS.sum();
+            long reads = com.gamma.la.core.LogReadsProbe.sum();
             t0 = System.nanoTime();
             HttpResponse<String> warm = get(c, path, OWNER, tag);
             long warmMs = (System.nanoTime() - t0) / 1_000_000;
             assertEquals(304, warm.statusCode());
-            assertEquals(reads, FsInvestigationStore.LOG_READS.sum());
+            assertEquals(reads, com.gamma.la.core.LogReadsProbe.sum());
             System.out.println("PERF-P4-3 timing: log of ~300 ops, cold 200 = " + coldMs + " ms (" + cold.body().length()
                     + " bytes), warm 304 = " + warmMs + " ms (0 bytes, 0 log reads)");
         }
@@ -305,10 +304,10 @@ class ControlApiWorkingSetEtagTest {
             String expected = sha256OfFile(root.resolve("audit/snapshots/investigations/inv-a/log.jsonl"));
             JsonNode miss = JSON.readTree(get(c, INV + "/working-set?of=entities", OWNER, null).body()).get("data");
             assertEquals(expected, miss.get("key").asText(), "on a miss");
-            long reads = WorkingSetRoutes.FULL_READS.sum();
+            long reads = WorkingSetTestSeams.fullReads();
             JsonNode hit = JSON.readTree(get(c, INV + "/working-set?of=entities", OWNER, null).body()).get("data");
             assertTrue(hit.get("cached").asBoolean());
-            assertEquals(reads, WorkingSetRoutes.FULL_READS.sum(), "a hit within the trust window reads no content");
+            assertEquals(reads, WorkingSetTestSeams.fullReads(), "a hit within the trust window reads no content");
             assertEquals(expected, hit.get("key").asText(), "on a hit within the trust window");
         }
     }
@@ -317,7 +316,7 @@ class ControlApiWorkingSetEtagTest {
     void anOutOfBandSameSizeSameMtimeEditIsStaleForAtMostTheTrustWindowThenFullyRevalidated(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();
         java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong(1_000_000);
-        WorkingSetRoutes.CLOCK_MS = now::get;
+        WorkingSetTestSeams.clock(now::get);
         try (Ctx c = open(cfg, root, "none")) {
             seeded(c);
             ok(c, "POST", INV + "/ops", "{\"op\":\"hide\",\"ids\":[\"b\"]}", OWNER);       // step 3: the line the probe rewrites
@@ -341,24 +340,24 @@ class ControlApiWorkingSetEtagTest {
             // inside the window the token cannot tell: stale, and that is the documented bound
             assertEquals(304, get(c, path, OWNER, tag).statusCode());
 
-            long fullBefore = WorkingSetRoutes.FULL_READS.sum();
+            long fullBefore = WorkingSetTestSeams.fullReads();
             now.addAndGet(WorkingSetRoutes.WORKING_SET_TRUST_MS + 1);
             HttpResponse<String> revalidated = get(c, path, OWNER, tag);
             assertEquals(200, revalidated.statusCode(), "after the window the old tag no longer validates");
-            assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - fullBefore, "one full content read for the window");
+            assertEquals(1, WorkingSetTestSeams.fullReads() - fullBefore, "one full content read for the window");
             assertNotEquals(tag, etag(revalidated), "same token, different content: the tag moved");
             assertTrue(revalidated.body().contains("\"entityId\":\"c\",\"type\":null,\"hop\":1,\"seedId\":\"a\",\"opSeq\":2,\"hidden\":true"), revalidated.body());
             assertEquals(sha256OfFile(log), JSON.readTree(revalidated.body()).get("data").get("key").asText());
 
             // the rest of the new window trusts the re-seeded entry: no more full reads
             for (int i = 0; i < 3; i++) assertEquals(304, get(c, path, OWNER, etag(revalidated)).statusCode());
-            assertEquals(1, WorkingSetRoutes.FULL_READS.sum() - fullBefore, "exactly once per window");
+            assertEquals(1, WorkingSetTestSeams.fullReads() - fullBefore, "exactly once per window");
             // an unchanged log re-validated in the next window keeps its tag (and costs one read per window)
             now.addAndGet(WorkingSetRoutes.WORKING_SET_TRUST_MS + 1);
             assertEquals(304, get(c, path, OWNER, etag(revalidated)).statusCode());
-            assertEquals(2, WorkingSetRoutes.FULL_READS.sum() - fullBefore);
+            assertEquals(2, WorkingSetTestSeams.fullReads() - fullBefore);
             assertEquals(304, get(c, path, OWNER, etag(revalidated)).statusCode());
-            assertEquals(2, WorkingSetRoutes.FULL_READS.sum() - fullBefore);
+            assertEquals(2, WorkingSetTestSeams.fullReads() - fullBefore);
         }
     }
 
