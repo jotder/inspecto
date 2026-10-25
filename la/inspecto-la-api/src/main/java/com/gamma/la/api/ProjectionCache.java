@@ -61,7 +61,9 @@ public final class ProjectionCache {
     /**
      * Per-entry caps. 5,000 rows is ten times the explorer's default projection cap (500), so an ordinary graph read
      * is cached. 2 MB is about 5,000 rows at the measured ~450 B per row. Above either cap the read is served but not
-     * stored. 32 MB in total holds at most 16 such entries, small next to the heap the DuckDB reads already need.
+     * stored. 32 MB in total holds at most 16 such entries. ⚠ The bound counts SERIALISED bytes, not heap: the retained
+     * heap measured about 5.8x the counted bytes unmasked and 4.7x masked, so at the bound the real footprint is roughly
+     * 130-190 MB (verified 2026-10-25). Budget the heap for that, not for 32 MB.
      */
     static final int MAX_ENTRY_ROWS = 5_000;
     static final long MAX_ENTRY_BYTES = 2L * 1024 * 1024;
@@ -97,6 +99,9 @@ public final class ProjectionCache {
      */
     static Key key(HttpExchange ex, String route, Path writeRoot, Path dataRoot, String datasetId, String relationSql,
                    Map<String, Object> body, int limit, ExplorationMasking mask) {
+        // Limit (stated, not fixed): the fingerprint sees path, size and mtime in milliseconds only, so a file rewritten in
+        // place with BOTH size and mtime preserved (an mtime-preserving copy) is not noticed; its cached answer is served
+        // until the TTL ends. Also: an expired entry is never served but stays in memory until the next store sweeps it.
         InputFingerprint fp;
         try {
             fp = IndexRoutes.currentInput(dataRoot, writeRoot, datasetId);                     // fresh: never the 30 s fingerprint cache

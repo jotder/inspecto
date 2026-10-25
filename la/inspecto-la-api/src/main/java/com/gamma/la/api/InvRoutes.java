@@ -1007,8 +1007,10 @@ public final class InvRoutes implements RouteModule {
 
         // PERF-P4-2: the conditional read. Every gate above (write root, body, R3 view gate, filter, four-eyes, alias) has run
         // for THIS request; only now may a cached body or a 304 answer it. The read is still audited, with the miss's own
-        // detail (which store answered). Limit: a hit does not re-run mask.out(), so an alias book file deleted within the TTL
-        // is not re-minted by a hit (the next miss re-mints it).
+        // detail (which store answered). A hit does not re-run mask.out(); that adds no exposure: ExplorationMasking.lookup
+        // answers from the in-memory alias book first and remember() appends to the book file only for a pair this process
+        // did not already hold, so a miss would not re-write a deleted book file either. The one read that still precedes
+        // this lookup is the neighbours degree COUNT above (when four_eyes_fan_out_above is set): that gate judges the live degree.
         ProjectionCache.Key cacheKey = ProjectionCache.key(ex, neighborsOf != null ? "neighbors" : "projection", writeRoot,
                 api.dataRoot(), datasetId, relationSql, body, limit, mask);
         ProjectionCache.Hit hit = ProjectionCache.get(cacheKey);

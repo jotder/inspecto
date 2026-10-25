@@ -357,19 +357,24 @@ on that node's real counted degree (distinct links; over the threshold = 403). T
 
 **Conditional projection read (PERF-P4-2, 2026-10-24).** The flat `/inv/projection` and `/inv/projection/neighbors` (not `list`,
 not `/multi`) answer with `ETag` + `Cache-Control: private, no-cache`; a repeat with a matching `If-None-Match` gets `304` and no
-Dataset read (`ProjectionCache`: LRU 64, TTL 60 s, process-local). It is consulted only AFTER every gate of the read (write root,
+projection read (`ProjectionCache`: LRU 64, TTL 60 s, process-local). One read still runs before the cache is
+consulted: a `/inv/projection/neighbors` request, when `four_eyes_fan_out_above` is set, first runs the one degree
+`COUNT(*)`, because that gate must judge the live degree before a cached answer is allowed. It is consulted only AFTER every gate of the read (write root,
 body 422, R3 view 404, filter, four-eyes, alias resolution), and the read is still audited on a hit with the miss's own
 `source` / `indexVersion` / `indexStale` / `sourceReason`. Bounds: a result over 5,000 rows or 2 MB serialised is served but not
-stored (no ETag); all entries together stay under 32 MB, evicting least-recently-used by bytes; every store first sweeps the
-expired entries. The key (and so the ETag)
+stored (no ETag); all entries together stay under 32 MB of SERIALISED bytes, evicting least-recently-used by bytes. ⚠ That
+figure counts the JSON, not the heap: measured retained heap is about 5.8x the counted bytes unmasked and 4.7x masked, so the
+real footprint at the bound is roughly 130-190 MB. Every store first sweeps the expired entries; an expired entry is never
+served, but it stays in memory until the next store sweeps it (not at the TTL). The key (and so the ETag)
 hashes: route, Space, viewer (Subject id, capabilities, data scopes, attributes, held roles), canonical body, resolved limit, the
 Dataset registry entry and relation SQL, its FRESH input fingerprint, the LA settings in force (masking mode, Entity Types,
 thresholds, index, caps), the Space masking key, and for neighbours each mapping's published index version. Only a `files:`
 fingerprint is cached - a view, a Postgres store, too many files or a timed-out listing is read every time. Limits, stated:
 (1) the fingerprint sees path, size and mtime (ms) only, so an in-place rewrite that keeps BOTH size and mtime (an
-mtime-preserving copy) is served from the cache until the TTL ends; (2) a hit does not re-run masking, so if the Space's
-alias book file is deleted inside the TTL, the aliases a hit hands out are not re-minted into it until the next miss (an alias
-handed back meanwhile answers 422 until then); (3) the relation SQL is derived from the registry entry for every cached
+mtime-preserving copy) is served from the cache until the TTL ends; (2) a hit does not re-run masking. This adds no exposure of its own:
+`ExplorationMasking.lookup` answers from the in-memory alias book first, and `remember` appends to the book file only
+for a pair this process did not already hold, so a MISS does not re-write a deleted book file either. A pair the process
+never held is simply unknown (422 "run the query again") whether the read was a hit or a miss; (3) the relation SQL is derived from the registry entry for every cached
 (files-backed) Dataset, so it is never the only key input that changes. The executor's outer `LIMIT n+1` is
 already planned by DuckDB as a Top-N over the group-by (no full sort), so the projection needs no inner limit.
 
