@@ -82,13 +82,13 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 
 ### The re-ranked open list (by what an analyst feels)
 **Tier 1 — freezes the page**
-- **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang.
-- **N2 Community hulls toggle costs ~3.1 s on and off.** Turning hulls OFF must not recompute Louvain; memoise the community assignment per graph signature (P8, now measured).
+- **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang. ✅ **SHIPPED 2026-10-25** (3 builder / verifier rounds; targeted tests only): the Radial, Information density, Clustering and every other layout are capped at the one place they reach G6 (`layoutConfig`, caps through the `display` limits: Java `LaLimit`, `la-limits.ts`, docs, parity test), Concentric is the fallback, the cap notice no longer covers the legend. `d4fd1aa11`, `65593934a`, `92903f91b`.
+- **N2 Community hulls toggle costs ~3.1 s on and off.** Turning hulls OFF must not recompute Louvain; memoise the community assignment per graph signature (P8, now measured). ✅ **SHIPPED 2026-10-25** (3 rounds; targeted tests only): the hulls toggle no longer rebuilds the graph, Louvain is memoised per graph signature and cap, hull shapes come off before a data change and return after it. `0ceee890f`, `f0ecaeed5`, `aec36325a`.
 - **N3 Cold first-open freezes 2.7–4.1 s.** Cause not isolated: the lazy graph chunk (~1.2 MB of library, now loaded on first open since P7) plus the layout. Prefetch the chunk when the landing page is idle; measure parse vs layout separately before building anything.
 - **N4 Other layouts 2.3–3.6 s (Fruchterman, Force, Layered) and box-select 579 ms.** Main-thread layouts: P6 plus the worker decision.
 
 **Tier 2 — load and startup**
-- **N5 Landing makes ~27 calls with every Space's `/bootstrap` fetched twice (~1 MB decoded).** Dedupe (a request-level cache for GETs, the same mechanism as P10a-2) and fetch only the current Space's bootstrap; `/spaces`, `/spaces/_meta`, the components lists and `/entity-lists` each ×2 too. Cheap, client-only, high yield.
+- **N5 Landing makes ~27 calls with every Space's `/bootstrap` fetched twice (~1 MB decoded).** Dedupe (a request-level cache for GETs, the same mechanism as P10a-2) and fetch only the current Space's bootstrap; `/spaces`, `/spaces/_meta`, the components lists and `/entity-lists` each ×2 too. Cheap, client-only, high yield. ✅ **SHIPPED 2026-10-25** (verified PASS; targeted tests only): the landing page fetches each Space call once through short-lived reads (`short-reads.ts`), and every Entity List / Dataset / component / access write clears them. `10b5776b7`, `0a6420e2b`, `ddfa3d81a`.
 - **N6 Hashed JS/CSS/font chunks are revalidated on every load (19 × `304`).** Serve content-hashed files with `Cache-Control: public, max-age=31536000, immutable`; negligible on localhost, 19 round trips on a real network.
 
 **Tier 3 — server fixed overhead (MEASURE FIRST: profile before building; code-read was wrong 6 of 8 times)**
@@ -98,7 +98,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 - **N11 Boot 3 min 35 s (185 s before the first log line).** Re-measure on a warm restart; then trace what runs before logging.
 
 **Tier 4 — defects and small fixes**
-- **N12 `renderMinimap` TypeError after route changes (×4).** Guard the destroyed-graph case.
+- **N12 `renderMinimap` TypeError after route changes (×4).** Guard the destroyed-graph case. ✅ **SHIPPED 2026-10-25** (builder + verifier follow-up; targeted tests only): the graph tears down without a late minimap render and survives a throwing minimap silencer. `c47966312`, `3b5efb0c2`.
 - **N13 `429` without `Retry-After`,** and no client-side handling: add the header and let the client back off.
 - **N14 The "node cap" banner appears at 465–767 nodes** because the 4,000-ROW cap binds first: say which cap bit.
 
@@ -346,7 +346,7 @@ with different row scope.
 **Answer:**
 
 **PERF-D5 — Heavy graph work off the main thread (NEW 2026-10-25, from §0b).** The live measurement found the freezes are LAYOUTS and HULLS, not betweenness: Radial blocks the tab for more than 3 minutes at 767 nodes / 4,000 links, Fruchterman / Force / Layered take 2.3–3.6 s, the hulls toggle 3.1 s, a cold first-open 2.7–4.1 s, while betweenness is 385 ms at 465 nodes and is already refused above 500. The standing refusals LA-06 / LA-07 (viewport culling, Web Worker for the algorithms) were reasoned at a 500-node canvas cap and one slow algorithm. Choose: (a) keep the refusals and fix by CAPS and MEMOISATION only (N1 cap on Radial, N2 memoised hulls, prefetch the graph chunk), or (b) reopen LA-07 to cover layouts and Louvain in a Web Worker (G6 supports worker layouts for some algorithms).
-*Recommendation:* (a) first — N1 and N2 are small and remove the worst freezes — then re-measure; reopen (b) only if layouts above the caps are still a felt freeze. This also supersedes PERF-D1's framing: betweenness alone does not justify a worker.
+*Recommendation:* (a) first — N1 and N2 are small and remove the worst freezes (both SHIPPED 2026-10-25) — then re-measure; reopen (b) only if layouts above the caps are still a felt freeze. This also supersedes PERF-D1's framing: betweenness alone does not justify a worker.
 **Answer:**
 
 ## 6. Documentation that must be corrected
