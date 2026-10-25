@@ -1,12 +1,11 @@
 # Data layer by edition — what Basic, Standard and Advanced get from ingestion, Pipelines and data quality (`DATA-TIERS-1`)
 
-**Status: PLAN — recommendations for operator review, nothing built.** Written 2026-10-21 (DT-1…DT-10); **merged
+**Status: PLAN — every decision DT-1…DT-19 is answered (DT-1, 2, 4, 6, 8, 11…15 on 2026-10-22; DT-3, 5, 7, 9, 10, 16…19 on 2026-10-25); nothing built.** Written 2026-10-21 (DT-1…DT-10); **merged
 2026-10-22** with the parallel draft `PIPELINE-EDITIONS-1` (never pushed; operator: "merge into a single plan"),
 which added the grounding in §3 and §7, the operator decisions DT-11…DT-14, and the open decisions DT-15…DT-19.
 **Operator answers of 2026-10-22** recorded in the Inspecto LA first-time user use cases (§8, A-1…A-16; confirmed
-for this plan by the operator the same day) settle DT-1, DT-2, DT-4, DT-6, DT-8, DT-13 and DT-15 (§5.1). Each open
-decision needs operator confirmation before its phase starts, because the gates remove capability from the free
-tier. When a phase ships, distil the as-built facts into the product hubs (`edition/basic`, `module/etl`,
+for this plan by the operator the same day) settle DT-1, DT-2, DT-4, DT-6, DT-8, DT-13 and DT-15 (§5.1). The gates remove capability from the free
+tier, so each phase is built from the decided table in §5. When a phase ships, distil the as-built facts into the product hubs (`edition/basic`, `module/etl`,
 `module/acquire`, `module/engine`, `layer/platform`), update `docs/EDITIONS.md`, move open items to
 `docs/BACKLOG.md`, and archive this file when the last phase ships.
 
@@ -87,7 +86,7 @@ Cells marked **(DT-n)** depend on an open decision in §5.
 
 | Capability | Basic (free) | Standard | Advanced |
 |---|---|---|---|
-| Ways in | Files only: upload CSV / TSV, Parquet, JSON / NDJSON, and Excel when the bundle carries the DuckDB `excel` extension (DT-8); a file on this machine. A database or remote system is shown locked (DT-4) | Every Collector: inbox, SFTP, FTP/FTPS, S3, Azure, GCS, HTTP, database with incremental watermark, Kafka | Same, plus object storage at scale and premium connectors |
+| Ways in | Files only: upload CSV / TSV, Parquet, JSON / NDJSON, and Excel when the bundle carries the DuckDB `excel` extension (DT-8); a file on this machine, copied in or, for a large file, pointed at in place with a change guard (DT-3). A database or remote system is shown locked (DT-4) | Every Collector: inbox, SFTP, FTP/FTPS, S3, Azure, GCS, HTTP, database with incremental watermark, Kafka | Same, plus object storage at scale and premium connectors |
 | Industry and protocol parsers | — | — | ASN.1 and the telecom vendor decoders (DT-12) |
 | Arrival | Manual only: *Add a file* and *Run now*; a re-import replaces, and says so; a trigger-less Pipeline never polls (DT-17); an enrichment recomputes its full window when run by hand | Scheduled and continuous; event chains and signal-driven Jobs; incremental recompute; late, duplicate and renamed-correction detection (DT-16) | Same, plus multi-node scale-out |
 | Shaping | No-code: column types, rename, choose columns, filter rows, dedupe; schema expression columns per DT-7 | Full Pipeline: Step Processors, SQL steps, parsing grammars | Same, plus PII masking |
@@ -118,19 +117,21 @@ protocols, masking, scale and organisational control.
 | DT-8 | **Formats and limits for "Add data" on Basic**: CSV / TSV, Parquet, JSON / NDJSON (LA A-2), and **Excel when the bundle carries the DuckDB `excel` extension** (operator 2026-10-22: `parser.excel` is delivered, `ProcessorCatalog.java:114`; without the extension the picker says "save as CSV"). Limits through the configurable-limits catalogue: 500 MB per file, 10 million rows per import, 20 imported Datasets per Space. Corrects the 2026-10-21 "no native Excel reader today". |
 | DT-15 | **Expectations, quarantine and dedupe stay on Basic** (LA A-13: "D-PE5 wins"). **Reverses** the 2026-10-21 table (import checks only on Basic). Standard adds delivery Alerts and data trust. |
 
-### 5.2 Recommendations awaiting the operator
+### 5.2 Decided by the operator (2026-10-25)
 
-| # | Decision | Recommendation |
-|---|---|---|
-| DT-3 | **"Point at a file in place" (no copy) is NOT offered** for now. | Yes; revisit on demand for very large files |
-| DT-5 | **No scheduling of any kind in Basic** — not even a daily re-import. Manual re-import only. | Yes, refined by DT-16 and DT-17 |
-| DT-7 | **No-code shaping is in Basic** (types, rename, choose columns, filter rows); anything that needs a Step Processor or SQL is Standard. ⚠ **Conflict between the drafts:** the 2026-10-22 draft (D-PE5) kept schema `expression:` columns on Basic as part of schema landing; this wording moves them to Standard because they are SQL. | Shaping as worded, plus **dedupe** (DT-15). **Keep schema `expression:` columns on Basic**: they belong to schema landing, A-13 kept D-PE5's core set on Basic, and `orders-starter` uses two. `transform.explode` (exploding nested arrays into rows) is a Step: Standard; flattening by record path and dotted selectors stays a parse capability in Basic |
-| DT-9 | **Existing configurations that use Standard features fail with a clear refusal on Basic**, naming the feature. Breaking changes are free; no shim. | Yes, except a trigger-less Pipeline (DT-17) |
-| DT-10 | **Each application gets its own Basic form, decided per application** (Inspecto LA: the explorer). The others default to Standard and above until a free form is chosen. | Yes, under DT-11 |
-| DT-16 | **What counts as automation.** | Continuous triggers, `EVENT` triggers, Jobs on cron / `on_pipeline` / `on_signal` (closing the hole where a signal-driven Job such as `la.index.build` still fires after a manual commit) and incremental recompute are Standard; on Basic an enrichment recomputes its full window when run by hand. **An import's own follow-on work runs inside the user's gesture** (agreed with `LA-ONBOARD-1`, 2026-10-22): an "Add data" commit, *Add a file* or *Run now* on Basic runs the Dataset's link index build and its Expectation evaluation as part of that same user-started run, because it is manual, not automation; Jobs a user authors on `on_signal` stay Standard. Without this, Inspecto LA on Basic would never index an import. **Maintenance Jobs stay automatic on Basic**, or retention never runs and storage grows without limit. Watermarks and the dedup ledger stay in every edition |
-| DT-17 | **A trigger-less Pipeline on Basic** | **Never polls, is not refused**: refusing the default form would break every legacy config and both Basic packs. Explicit interval, cron, stream and `EVENT` triggers are refused (DT-9) |
-| DT-18 | **Content packs on Basic** | `la-daily-feed` (polling, a commit-signal index build, Alert Rules) moves to Standard — this settles the undecided §3.8 board note of 2026-10-18 that kept it on Basic; `orders-starter` stays on Basic as a manual pack with the load-and-run button (DT-14), its derived column kept if DT-7 keeps expression columns |
-| DT-19 | **Kafka** | Stays Standard: a mainstream integration that keeps Standard a complete automated product |
+Answered in the operator decision interview of 2026-10-25. The recommendation was accepted except where marked **changed**.
+
+| # | Decision |
+|---|---|
+| DT-3 | **Changed.** **Basic CAN "point at a file in place" (no copy).** Guard (operator-chosen): the import stores the file's size and modified time (a fingerprint); every read re-checks it, and a changed, replaced or missing file answers a clear "the file changed - re-import" instead of serving different data silently; a Link Analysis index built over it is marked stale by the same check. Offered for large files (above a size threshold set through the configurable-limits catalogue); small files are copied as in DT-1. Not built. |
+| DT-5 | **No scheduling of any kind in Basic** - not even a daily re-import. Manual re-import only; refined by DT-16 and DT-17. |
+| DT-7 | **No-code shaping is in Basic** (types, rename, choose columns, filter rows) **plus dedupe** (DT-15). **Schema `expression:` columns stay on Basic** (they belong to schema landing; `orders-starter` uses two). Anything that needs a Step Processor or SQL is Standard; `transform.explode` is a Step (Standard); flattening by record path and dotted selectors stays a parse capability in Basic. |
+| DT-9 | **Existing configurations that use Standard features fail with a clear refusal on Basic**, naming the feature. Breaking changes are free; no shim. Exception: a trigger-less Pipeline (DT-17). |
+| DT-10 | **Each application gets its own Basic form, decided per application** (Inspecto LA: the explorer), under the one edition switch (DT-11). The others default to Standard and above until a free form is chosen. |
+| DT-16 | **What counts as automation.** Continuous triggers, `EVENT` triggers, Jobs on cron / `on_pipeline` / `on_signal` (closing the hole where a signal-driven Job such as `la.index.build` still fires after a manual commit) and incremental recompute are Standard; on Basic an enrichment recomputes its full window when run by hand. **An import's own follow-on work runs inside the user's gesture** (agreed with `LA-ONBOARD-1`, 2026-10-22): an "Add data" commit, *Add a file* or *Run now* on Basic runs the Dataset's link index build and Expectation evaluation as part of that same user-started run; Jobs a user authors on `on_signal` stay Standard. **Maintenance Jobs stay automatic on Basic**; watermarks and the dedup ledger stay in every edition. |
+| DT-17 | **A trigger-less Pipeline on Basic never polls and is not refused** (it would break every legacy config and both Basic packs). Explicit interval, cron, stream and `EVENT` triggers are refused (DT-9). |
+| DT-18 | **Content packs on Basic:** `la-daily-feed` (polling, a commit-signal index build, Alert Rules) moves to Standard - this settles the undecided §3.8 board note of 2026-10-18; `orders-starter` stays on Basic as a manual pack with the load-and-run button (DT-14), its derived column kept (DT-7). |
+| DT-19 | **Kafka stays Standard**: a mainstream integration that keeps Standard a complete automated product. |
 
 **Operator answers A-1…A-16** (LA use cases §8) not listed above concern Inspecto LA and onboarding (Spaces per
 data domain, the primary entity per Dataset, the sample Space, beginner measures, analyst uploads per Space,
@@ -194,13 +195,14 @@ lane per push.
 | 3 | Automation gate: save and load refusals, scheduler and acquire driver, Job save, Job scheduler and signal dispatcher, enrichment wiring; Activate copy and the manual-run gesture (DT-14) | 2 | 4 to 5 days |
 | 4 | Reach: both Offering moves (`connectors` out of Basic, `telecom-asn1` to Advanced), feature-naming refusals for remote kinds, the Collect stage's locked remote systems | 2 | 1.5 days |
 | 5 | Egress gate and its console locks | 2 | 1 day |
-| 6 | Step catalog `feature` field, refuse walk, the schema expression check if DT-7 moves expression columns, palette locks, contract regeneration | 2 | 3 to 5 days |
+| 6 | Step catalog `feature` field, refuse walk, no schema expression check (DT-7 keeps expression columns on Basic), palette locks, contract regeneration | 2 | 3 to 5 days |
 | 7 | Upgrade path: a test that boots Basic, imports, then boots Standard on the same Space and edits the import as an ordinary Pipeline | 1, 3 | 1 day |
 | 8 | Content packs (DT-18), release note, `docs/EDITIONS.md` matrix and rows (JOB-02, ING-01, SP-PRS-06, the remote SP-ACQ rows, JOB-01 / JOB-06, the SP-XFM rows), the edition hubs, the platform whitepaper's edition ladder, user guides | 3 to 6 | 1 day |
 | 9 | Per-application Basic forms (DT-10), application by application | — | per application |
+| 10 | Large files in place with the change guard (DT-3): size + modified-time fingerprint stored at import and re-checked on every read, a changed / missing file answers "re-import", the link index marked stale by the same check, a size threshold in the configurable-limits catalogue | 1 | to be sized |
 
 Phases 4 and 5 are independent of phase 3 and can be built beside it. Phase 6 goes last: it is the largest and
-depends on DT-7. Each new route clears the four endpoint gates.
+needs the step catalogue only (DT-7 is decided). Each new route clears the four endpoint gates.
 
 ## 9. What breaks (no shim; release note)
 
@@ -230,7 +232,7 @@ depends on DT-7. Each new route clears the four endpoint gates.
 
 ## 11. Board
 
-P2 `DATA-TIERS-1` in `BACKLOG.md` §3.8 (hold: operator), indexed in §1 *Decisions owed on individual rows*.
+P2 `DATA-TIERS-1` in `BACKLOG.md` §3.8, startable (every decision answered 2026-10-25).
 
 ## References
 
