@@ -8,7 +8,7 @@
 
 | | |
 |---|---|
-| Status | ACTIVE PLAN — **status as of 2026-10-25 in §0a**; P0 (the live browser trace) is still NOT done |
+| Status | ACTIVE PLAN — **status as of 2026-10-25 in §0a; live measurement and the RE-RANKED open list in §0b** (fake-auth Preview build, `f6c168147`) |
 | Trigger | Operator report 2026-10-24: "UI performance is poor" on Link Analysis (LA) |
 | Related | [`link-analysis-roadmap.md`](link-analysis-roadmap.md) (LA-06 and LA-07 are standing refusals — see P5) · [`la-separation-feasibility-plan`](../archived-documents/plans-archive/la-separation-feasibility-plan.md) §7.4 (the partitioned index and graph engine are the long-term fix) · [`../okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md) (stale caps, see §6) |
 | Grounding | Two read-only code investigations, 2026-10-24: server `inspecto-la-api` / `inspecto-la-core` / `inspecto-la-storage`; browser `inspecto-ui/projects/link-analysis` and `inspecto-ui/src/app/inspecto/graph/graph-view.component.ts`. ⛔ Re-ground every cite before implementing |
@@ -17,7 +17,7 @@
 
 ## 0a. Status as of 2026-10-25 (what shipped, what is open)
 
-Every shipped lane went through independent adversarial verification (1–3 rounds) before its push. **No full UI suite or full backend plan was run for these pushes** (operator, session-usage limit); the operator runs the full gates. 🔴 **Not done for ANY item: a real-browser check and the live 304 round trip** — the built-in browser pane refused the local WSO2 certificate and the real-Chrome extension was not connected.
+Every shipped lane went through independent adversarial verification (1–3 rounds) before its push. **No full UI suite or full backend plan was run for these pushes** (operator, session-usage limit); the operator runs the full gates. ✅ **Superseded 2026-10-25 by §0b:** a live measurement ran in the built-in browser against a fake-auth ("demo") Preview build, which removes the WSO2 certificate blocker; the live 304 round trip was observed. Still not done: a Chrome performance-panel trace (only in-page `PerformanceObserver` / `performance.now()` timings), the full UI suite and the full backend plan.
 
 | Item | State | On `master` |
 |---|---|---|
@@ -31,13 +31,78 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | P7 bundle | ✅ SHIPPED — main chunk 1.89 MB → 364 kB, initial 2.52 MB → 999 kB (gamma); budgets NOT tightened | `10701932f` |
 | P9 main-log checkpoint | ⛔ MEASURED NO-GO (13–35 ms at 1,000 ops) | — |
 | P3a Grow preview rescans | ⛔ MEASURED NO-GO (DuckDB already materialises the CTE; only a semantic rewrite would help) | — |
-| P0 measure (browser trace, per-option algorithm timings) | ⬜ NOT DONE — needs a signed-in browser | — |
-| P5 betweenness worker | ⬜ OPEN — operator decision PERF-D1 | — |
-| P6 layout on expand, P8 hulls, P11 polish | ⬜ OPEN, not started | — |
+| P0 measure (browser timings, per-option algorithm timings) | 🟡 DONE in-page, 2026-10-25 (§0b); no Chrome performance-panel trace; largest graph available is only 767 nodes | — |
+| P5 betweenness worker | ⬜ OPEN — operator decision PERF-D1; §0b shows betweenness is NOT the top cost (385 ms at 465 nodes), layouts and hulls are | — |
+| P6 layout on expand, P8 hulls, P11 polish | ⬜ OPEN — P8 hulls is now MEASURED at about 3.1 s per toggle (§0b N2) and moves to the top | — |
 | P10a-5 delta fetch on expand | ⬜ OPEN — needs a server delta response | — |
 | P10 wire format | ⬜ DEFERRED — PERF-D3 | — |
 
 **Known low items left open:** no test pins the production ETag-cache budget (a mutation to 3.2 billion passes); `deepEqual` overflows the stack at about 5,000 levels of nesting (real fold output never gets there); a fresh 200 at the full budget blocks the main thread about 70 ms; `menu-landing.spec` fails four tests when it runs after `session.service.spec` (that spec leaves `inspecto.currentSpace=gone` in localStorage, pre-existing on master); `FsInvestigationStore.promoteBeforeMarkHook` is a pre-existing public mutable static; the Postgres store, an ABA token change inside one mtime tick, and a real serialisation failure through the full HTTP stack were never exercised. The LA user guide still states the old caps (500 / 2,000; the defaults are now 1,000 / 2,500).
+
+---
+
+## 0b. Live measurement, 2026-10-25 — and the re-ranked open list
+
+**What was measured.** A fake-auth ("demo sign-in") Preview build of `f6c168147` was deployed to `C:\sandbox\inspecto-preview\inspecto-la` (`package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo`; launcher `serve-demo.bat`; the OIDC variant is backed up at `inspecto-preview\backup\predeploy-20261025-1245-fakeauth`). Server-side numbers below (boot, idle CPU, threads, memory, polling, jobs) were taken first-hand from the process and its log; browser and API numbers by an agent driving the built-in browser with in-page `fetch`, `PerformanceObserver` long tasks and `performance.now()`. ⚠ **Limits:** the data is small (the Spaces are 17–59 MB; the LARGEST graph is la-showcase `telecom_fraud_network`, **767 nodes / 4,000 edge rows, truncated at the 4,000-ROW cap, not at the 1,000-node cap**; no graph reaches 1,000 nodes); the browser pane was in the background (first-contentful-paint is NOT trustworthy; JS-before-paint bytes not measured); several figures are one run (flagged); no Chrome performance-panel trace; 1 Investigation exists, so list-cost scaling (P2-1) and the Entity List chain (P2-2) could not be measured; the geo views are tiny (max 449 points), so the map hypotheses (H1, H2) are NOT measured.
+
+### Server, measured first-hand (idle, no user)
+| Measure | Result |
+|---|---|
+| Boot to `/health` | **3 min 35 s** (12:46:31 → 12:50:06) after the swap; the first application log line came 3 min after launch, then 30 s to `/health` with no gap of 8 s or more inside the log. The 185 s before the first log line is UNEXPLAINED (JVM start, shell start or first-run scanning of freshly written files); a warm restart is owed. |
+| CPU | about **95% of one core** for the first ~4–5 min after boot (start-up work), then **6.9% of one core** settled |
+| Threads / memory (settled) | **3,622 OS threads, only 74 are Java** → about **3,550 native threads** with 48 DuckDB files under the Spaces and one native library loaded (DuckDB's): consistent with an uncapped worker pool PER database instance (H4; not proven by a native stack dump); working set **1.4 GB** |
+| Collector polling | exactly **one poll per source per minute** per Space (26 inbox scans a minute across 5 Spaces: 11 + 6 + 5 + 3 + 1); cheap — **H1 is REFUTED as a CPU problem** at this scale |
+| Scheduled jobs on a no-change tick | `system.freshness-sweep` 6–15 ms (9,972 ms only at boot), `la_detect` 13–567 ms, `la_index_build` **1,527 ms** → the no-change fast paths exist and are cheap (H5/H6 refuted at demo scale) |
+
+### Browser and API, measured by the agent (la-showcase unless noted)
+| Measure | Result |
+|---|---|
+| Cold load, sign-in page | DCL 231 ms; 25 requests; 19 JS files all revalidated with `304` on EVERY load (no long-lived immutable caching of hashed chunks) |
+| Landing page after sign-in | about **27 API calls**; **every Space's `/bootstrap` is fetched TWICE in parallel** (6 Spaces × 2, about 17.4 KB gzip / 78 KB decoded each, plus one more) ≈ **1 MB decoded**; `/spaces` and `/spaces/_meta` ×2; components lists and `/entity-lists` ×2; the SPA's own calls take 155–227 ms against 8–37 ms alone (they queue behind the burst) — **H3/H4 CONFIRMED** |
+| `/health` p50 | 14.8 ms (n=20) |
+| `/bootstrap` 200 vs 304 | 25.3 vs **21.8 ms** — the 304 costs 86% of the 200 (**P2-5 CONFIRMED**) |
+| Projection (767 nodes, 4,000 rows) | 200: p50 **303 ms** (479 KB decoded / 27.9 KB gzip); **304: p50 270–290 ms**, empty body — the live 304 round trip was observed (weak ETag stable, `Cache-Control: private, no-cache`, `Vary: Accept-Encoding`), but **a 304 saves bytes, not time** |
+| Projection variance | 146 ms … **3.2 s**, the SPA's own call **4.4 s and 20.6 s**, a first-open of la-audit `ap_approval_graph` **7.2 s**, a warm direct fetch 310 ms — **UNEXPLAINED** |
+| Neighbors (1 node) | p50 198 ms, max 502 ms, 87 KB |
+| Working Set | 200 p50 **94 ms**, 304 **95 ms** (no cheaper); `/inv/investigations` with ONE Investigation **95 ms** against 15 ms for `/health`: a fixed per-request overhead of about 80 ms on these routes |
+| 429 | 10–20 expensive requests within seconds, or a sustained 4 requests a second, answer `429` with **no `Retry-After`** (the standard bucket is burst 20 then one request per 3 s per subject; LA has its own bucket) |
+
+### UI, 767 nodes / 4,000 links (longest main-thread task)
+| Action | Result |
+|---|---|
+| Open the view, cold | longtasks **4,074 and 3,705 ms** (two cold opens); repeat opens 160–200 ms; JS heap 184 → 323 MB |
+| Box-select 327 nodes | longest **579 ms**, about 2.0 s in total (8 tasks) |
+| Hover | max 55 ms |
+| Layouts | Circular / Grid none; **Fruchterman 3,643 ms; Force 3,113 ms; Layered 2,308 ms; 🔴 Radial FREEZES the page — the main thread blocked for more than 3 minutes, reproduced twice (a reload was needed)** |
+| Community hulls toggle | **about 3.1 s every time, on AND off** (3,099 / 3,084 / 3,123 / 3,334 ms) — **H6 CONFIRMED** |
+| Betweenness | refused above 500 nodes ("767 nodes, above the 500-node limit"); on a 465-node graph **385 / 369 ms** |
+| Other algorithms on 465 nodes | Degree and PageRank under 50 ms; Louvain 682 ms first run (cached after); **Cycles 770 ms; Cliques 700 ms** — **H7 REFUTED** (no worse than betweenness + redraw); shortest path and Grow NOT measured |
+| Memory | five away-and-back cycles: canvases 0 away / 5 back and DOM nodes 322 / 1,022 EVERY time → the view IS destroyed and rebuilt (**H5 REFUTED for canvases and DOM**); heap drifted 160 → 176 MB without a forced GC (inconclusive) |
+| Health | idle: 0 requests in 35 s (no polling); 🔴 **`TypeError: Cannot read properties of undefined (reading 'getData')` in `renderMinimap`, four times, after route changes** (a real defect); 5 × "Unable to preventDefault inside passive event listener" |
+
+### The re-ranked open list (by what an analyst feels)
+**Tier 1 — freezes the page**
+- **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang.
+- **N2 Community hulls toggle costs ~3.1 s on and off.** Turning hulls OFF must not recompute Louvain; memoise the community assignment per graph signature (P8, now measured).
+- **N3 Cold first-open freezes 2.7–4.1 s.** Cause not isolated: the lazy graph chunk (~1.2 MB of library, now loaded on first open since P7) plus the layout. Prefetch the chunk when the landing page is idle; measure parse vs layout separately before building anything.
+- **N4 Other layouts 2.3–3.6 s (Fruchterman, Force, Layered) and box-select 579 ms.** Main-thread layouts: P6 plus the worker decision.
+
+**Tier 2 — load and startup**
+- **N5 Landing makes ~27 calls with every Space's `/bootstrap` fetched twice (~1 MB decoded).** Dedupe (a request-level cache for GETs, the same mechanism as P10a-2) and fetch only the current Space's bootstrap; `/spaces`, `/spaces/_meta`, the components lists and `/entity-lists` each ×2 too. Cheap, client-only, high yield.
+- **N6 Hashed JS/CSS/font chunks are revalidated on every load (19 × `304`).** Serve content-hashed files with `Cache-Control: public, max-age=31536000, immutable`; negligible on localhost, 19 round trips on a real network.
+
+**Tier 3 — server fixed overhead (MEASURE FIRST: profile before building; code-read was wrong 6 of 8 times)**
+- **N7 A fixed ~80 ms per LA request** (Working Set and the Investigation list at 94–95 ms with one Investigation, against 15 ms for `/health`), and **N8 a 304 that costs as much as a 200** (projection 270–290 vs 303 ms; `/bootstrap` 21.8 vs 25.3 ms): the 304 still pays the key computation and gates. Profile with a sampling run (jcmd `Thread.print` ×N or JFR if the runtime has it) under a request loop to find what the fixed cost is (suspects: settings/limits read per request, audit append, capability/ABAC, fingerprint listing in the cache key).
+- **N9 Projection latency 146 ms → 20.6 s, unexplained.** Repeat with a server-side timer and the scheduled jobs' minutes ruled out (jobs are ≤ 1.5 s so they are not the cause); suspects: lazy first-open of a DuckDB file, native-thread oversubscription (N10), the rate limiter's queueing.
+- **N10 About 3,550 native threads and 1.4 GB at idle.** Cap DuckDB `threads` and `memory_limit` per instance (the first review: `DuckDbUtil.applyDuckDbSettings` leaves them at defaults when unset); prove with a before/after thread count and a projection timing.
+- **N11 Boot 3 min 35 s (185 s before the first log line).** Re-measure on a warm restart; then trace what runs before logging.
+
+**Tier 4 — defects and small fixes**
+- **N12 `renderMinimap` TypeError after route changes (×4).** Guard the destroyed-graph case.
+- **N13 `429` without `Retry-After`,** and no client-side handling: add the header and let the client back off.
+- **N14 The "node cap" banner appears at 465–767 nodes** because the 4,000-ROW cap binds first: say which cap bit.
+
+**Standing results.** Refuted at demo scale: H1 idle polling, H5 page leak (canvas/DOM), H7 worst-algorithm, P5's premise that betweenness is the top cost. Unmeasured (need bigger data or a map drive): H1/H2 geo, P2-1/P2-2 scaling, P2-3/P2-4 geo limit (consistent with the limit applied after the scan: 182 vs 177 ms for limit 100 vs 5,000 on 449 points), heap after a forced GC, shortest path, Grow.
 
 ---
 
@@ -278,6 +343,10 @@ with different row scope.
 
 **PERF-D3 — API change for P10.** A new media type / `v2` path for the edge wire format, or defer P10 entirely?
 *Recommendation:* defer until P0-3 shows bytes are still a problem after P4 (gzip removes most of the cost).
+**Answer:**
+
+**PERF-D5 — Heavy graph work off the main thread (NEW 2026-10-25, from §0b).** The live measurement found the freezes are LAYOUTS and HULLS, not betweenness: Radial blocks the tab for more than 3 minutes at 767 nodes / 4,000 links, Fruchterman / Force / Layered take 2.3–3.6 s, the hulls toggle 3.1 s, a cold first-open 2.7–4.1 s, while betweenness is 385 ms at 465 nodes and is already refused above 500. The standing refusals LA-06 / LA-07 (viewport culling, Web Worker for the algorithms) were reasoned at a 500-node canvas cap and one slow algorithm. Choose: (a) keep the refusals and fix by CAPS and MEMOISATION only (N1 cap on Radial, N2 memoised hulls, prefetch the graph chunk), or (b) reopen LA-07 to cover layouts and Louvain in a Web Worker (G6 supports worker layouts for some algorithms).
+*Recommendation:* (a) first — N1 and N2 are small and remove the worst freezes — then re-measure; reopen (b) only if layouts above the caps are still a felt freeze. This also supersedes PERF-D1's framing: betweenness alone does not justify a worker.
 **Answer:**
 
 ## 6. Documentation that must be corrected

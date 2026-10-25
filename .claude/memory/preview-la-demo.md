@@ -48,5 +48,21 @@ the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux bu
 - **The built-in browser pane cannot reach WSO2** (`https://localhost:9443` self-signed cert; a cert accepted in the user's own
   Chrome does not carry over) and the Claude-in-Chrome extension may not be connected, so sign-in checks are often unreachable:
   ask the operator to sign in themselves, and say plainly that a visual/live check was NOT done.
+- **FAKE-AUTH ("demo sign-in") variant, the way to drive the preview in the built-in browser (2026-10-25):** build with
+  `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` (NoBake: otherwise it bakes its own la-showcase Space; the
+  stage dir is `<worktree>\inspecto-demo\`, the launcher `serve-demo.bat` binds 127.0.0.1 with `-Dauth.mode=demo
+  -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb`). The swap DELETES `inspecto-oidc.jar`,
+  `inspecto-secrets.jar`, `inspecto-geo-country.jar`, `serve.bat/.sh`, the Dockerfile and service files and adds
+  `inspecto-demo-auth.jar` + `serve-demo.*` — so `serve-preview-la.bat` (which calls `serve.bat`) stops working until an OIDC
+  redeploy; back up first (the old folder is the OIDC restore). Sign-in is a Demo User picker (no password); users live in each
+  Space's `config/demo-users.toon` (`admin` exists in all but `la-daily-feed`); the same demo token works on every Space via
+  `/spaces/<id>/...`. Start it in the Terminal panel: `& C:\sandbox\inspecto-preview\inspecto-la\serve-demo.bat`.
+- **Driving it from an agent:** the built-in pane can be tiny (it was 742x336): call `resize_window` preset `desktop` first. Measure
+  with in-page `PerformanceObserver({type:'longtask'})`, `performance.getEntriesByType`, `performance.now()` and in-page `fetch`
+  with the SPA's own headers; never emulate a viewport larger than the pane. Server-side: sample `Get-Process` CPU over 60 s,
+  `jcmd <pid> Thread.print` works on the bundled runtime (74 Java threads against ~3,550 OS threads: the rest is native/DuckDB).
+- **Measured demo-scale baseline (2026-10-25, `f6c168147`):** boot 3 min 35 s to `/health` after a fresh swap (185 s of it before
+  the first application log line — unexplained), idle CPU 95% of a core for ~4 min after boot then 6.9%, 1.4 GB working set,
+  collectors poll once a minute per source. Largest graph in the Spaces is 767 nodes / 4,000 rows. Details: `docs/superpower/la-performance-plan.md` §0b.
 
 Related: [[oidc-wso2-keycloak]], [[bundle-and-process-traps]].
