@@ -83,4 +83,52 @@ describe('minimap teardown (N12)', () => {
         });
         expect(order).toEqual(['silence', 'destroy']);
     });
+
+    it('silenceMinimap cancels the throttled transform handler (its trailing timer never fires)', () => {
+        const m = realMinimap() as unknown as { onTransform: { (): void; cancel(): void } };
+        m.onTransform(); // leading call runs now
+        m.onTransform(); // second call inside the 32 ms window arms the trailing timer
+        expect(vi.getTimerCount()).toBe(1);
+        silenceMinimap(fakeGraph(m));
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('silenceMinimap calls cancel() on the minimap onTransform', () => {
+        const m = realMinimap() as unknown as { onTransform: { cancel(): void } };
+        const cancel = vi.spyOn(m.onTransform, 'cancel');
+        silenceMinimap(fakeGraph(m));
+        expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('PIN: the installed G6 Minimap still exposes every name silenceMinimap stubs or cancels', () => {
+        // A G6 upgrade that renames/moves these would turn silenceMinimap into a silent no-op and the race back on.
+        const proto = Minimap.prototype as unknown as Record<string, unknown>;
+        for (const fn of ['renderMinimap', 'renderMask', 'updateMask', 'setCamera', 'destroy']) {
+            expect(typeof proto[fn], `Minimap.prototype.${fn}`).toBe('function');
+        }
+        const m = realMinimap() as unknown as Record<string, { cancel?: unknown }>;
+        expect(typeof m['onRender'], 'instance onRender (debounced)').toBe('function');
+        expect(typeof m['onTransform'], 'instance onTransform (throttled)').toBe('function');
+        expect(typeof m['onTransform'].cancel, 'onTransform.cancel').toBe('function');
+    });
+
+    it('destroyGraph still destroys the graph when silencing throws, and clears the reference', () => {
+        const destroy = vi.fn();
+        const old = {
+            getOptions: () => {
+                throw new Error('G6 reshaped getOptions');
+            },
+            destroy,
+        };
+        const host = {
+            graph: old as unknown,
+            cancelPendingClick: () => undefined,
+            dropPendingBrush: () => undefined,
+            hostEl: undefined,
+        };
+        const destroyGraph = (GraphViewComponent.prototype as unknown as { destroyGraph(): void }).destroyGraph;
+        expect(() => destroyGraph.call(host)).not.toThrow();
+        expect(destroy).toHaveBeenCalledTimes(1);
+        expect(host.graph).toBeNull();
+    });
 });

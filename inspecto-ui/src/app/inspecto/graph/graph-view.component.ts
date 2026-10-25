@@ -926,9 +926,15 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private destroyGraph(): void {
         this.cancelPendingClick();
         this.dropPendingBrush();
-        if (this.graph) silenceMinimap(this.graph);
-        this.graph?.destroy();
+        const graph = this.graph;
         this.graph = null;
+        try {
+            if (graph) silenceMinimap(graph);
+        } catch {
+            // Best effort: a G6 upgrade that reshapes the minimap (see the pin spec) must never leave the graph undestroyed.
+        } finally {
+            graph?.destroy();
+        }
         // `destroy()` is expected to remove the G6 tooltip plugin's card, but observed live it sometimes
         // leaves the DOM node behind (orphaned, no longer owned by any Graph instance) - sweep our own
         // container so a stale tooltip never survives, regardless of why the plugin's cleanup missed it.
