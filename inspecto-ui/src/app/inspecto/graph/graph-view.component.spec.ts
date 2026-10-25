@@ -200,6 +200,7 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
             draw: vi.fn(() => Promise.resolve()),
             render: vi.fn(() => Promise.resolve()),
             destroy: vi.fn(),
+            getOptions: vi.fn(() => ({})),
             getElementPosition: vi.fn((id: string) => {
                 const p = positions[id];
                 if (!p) throw new Error('not rendered');
@@ -352,6 +353,7 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
             return Promise.resolve();
         }),
         destroy: vi.fn(),
+        getOptions: vi.fn(() => ({})),
         held: new Set<string>(),
     });
     const applied = new Map<string, string[]>();

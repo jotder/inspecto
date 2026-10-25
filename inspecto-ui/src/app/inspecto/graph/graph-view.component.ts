@@ -164,6 +164,23 @@ export function demotePositiveTabindex(root: HTMLElement): void {
     });
 }
 
+/**
+ * Call BEFORE `graph.destroy()`. G6's minimap debounces its render (`delay`, no `cancel`) and `destroy()` only
+ * unbinds events, then blanks `context`; a render still pending then runs `renderMinimap()` against an empty
+ * context and throws `Cannot read properties of undefined (reading 'getData')`. Stubbing the render entry points
+ * (and cancelling the throttled transform) makes any pending callback a no-op.
+ */
+export function silenceMinimap(graph: Graph): void {
+    const hasMinimap = (graph.getOptions().plugins ?? []).some(
+        (p) => typeof p === 'object' && (p as { key?: string }).key === 'minimap',
+    );
+    if (!hasMinimap) return;
+    const minimap = graph.getPluginInstance<never>('minimap') as unknown as Record<string, unknown> | undefined;
+    if (!minimap) return;
+    (minimap['onTransform'] as { cancel?: () => void } | undefined)?.cancel?.();
+    for (const fn of ['renderMinimap', 'renderMask', 'updateMask', 'setCamera']) minimap[fn] = () => undefined;
+}
+
 /** The G6 plugin list for a {@link GraphViewPlugins} — pure, so the mapping is unit-testable without a canvas. */
 export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly string[]): Record<string, unknown>[] {
     if (!p) return [];
@@ -909,6 +926,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private destroyGraph(): void {
         this.cancelPendingClick();
         this.dropPendingBrush();
+        if (this.graph) silenceMinimap(this.graph);
         this.graph?.destroy();
         this.graph = null;
         // `destroy()` is expected to remove the G6 tooltip plugin's card, but observed live it sometimes
