@@ -293,7 +293,7 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
             const setPlugins = vi.fn((u: (p: Record<string, unknown>[]) => Record<string, unknown>[]) => {
                 options = u(options);
             });
-            Object.assign(h.graph, { setPlugins });
+            Object.assign(h.graph, { setPlugins, getPlugins: () => options, getPluginInstance: () => undefined });
             const c = h.comp as unknown as { plugins: GraphViewComponent['plugins'] };
             c.plugins = plugins;
             h.comp.snapshotKeys();
@@ -322,6 +322,27 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
             expect(graph.render).not.toHaveBeenCalled();
             expect(setPlugins).toHaveBeenCalledTimes(1);
             expect(options().map((p) => p['key'])).toEqual(['minimap']);
+        });
+
+        it('switching hulls to bubble sets is in place too (bubbleSets is not a rebuild key)', () => {
+            const { comp, create, c, setPlugins, options } = withPlugins({ minimap: true, hulls: members });
+            c.plugins = { minimap: true, hulls: members, bubbleSets: true };
+            comp.ngOnChanges({ plugins: {} });
+            expect(create).not.toHaveBeenCalled();
+            expect(setPlugins).toHaveBeenCalledTimes(1);
+            expect(options().map((p) => p['key'])).toEqual(['minimap', 'bubble-sets-0']);
+        });
+
+        it('hulls and data changing together: the shapes follow only once the data is drawn', async () => {
+            const { comp, create, c, setPlugins } = withPlugins({ minimap: true, hulls: members });
+            comp.data = graphOf(['a']); // a node left: applyData, not a rebuild
+            c.plugins = { minimap: true, hulls: new Map([['0', ['a']]]) };
+            comp.ngOnChanges({ data: {}, plugins: {} });
+            expect(setPlugins).not.toHaveBeenCalled(); // not before the canvas has the new data
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(setPlugins).toHaveBeenCalledTimes(1);
+            expect(create).not.toHaveBeenCalled();
         });
 
         it('a rebind of equal hulls touches nothing, and a changed minimap still rebuilds', () => {

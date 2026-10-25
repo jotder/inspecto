@@ -665,7 +665,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         // Louvain over the whole graph is the costly part: reuse it for a graph content already seen.
         const sig = graphSignature(g);
         const hit = this.hullMemo.get(sig);
-        if (hit) return hit;
+        if (hit) {
+            this.hullMemo.delete(sig); // LRU: re-insert as the newest
+            this.hullMemo.set(sig, hit);
+            return hit;
+        }
         try {
             for (const [node, community] of this.louvainOf(g))
                 out.set(community, [...(out.get(community) ?? []), node]);

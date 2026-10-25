@@ -181,6 +181,39 @@ export function silenceMinimap(graph: Graph): void {
     for (const fn of ['renderMinimap', 'renderMask', 'updateMask', 'setCamera']) minimap[fn] = () => undefined;
 }
 
+/**
+ * Replace the community shapes (hull / bubble-sets plugins) on a LIVE graph without a render or a layout.
+ * G6 5.1.1 draws a hull only on AFTER_RENDER and `Hull.destroy()` calls `shape.destroy()` unguarded, so a bare
+ * `setPlugins` neither draws a new shape, nor moves a kept one onto its new members, and throws removing one never drawn.
+ * Hence: give an undrawn shape a no-op destroy before removal, then call each plugin's own draw (`drawHull` /
+ * `drawBubbleSets`, the very handler AFTER_RENDER runs; pinned against the real classes in the spec).
+ */
+export function swapCommunityShapes(
+    graph: Pick<Graph, 'getPlugins' | 'setPlugins' | 'getPluginInstance'>,
+    shapes: Record<string, unknown>[],
+): void {
+    const isShape = (p: unknown): boolean => /^(hull|bubble-sets)-/.test(String((p as { key?: string }).key ?? ''));
+    const keep = new Set(shapes.map((p) => p['key']));
+    for (const p of (graph.getPlugins() as unknown[]).filter(isShape)) {
+        const key = (p as { key: string }).key;
+        if (keep.has(key)) continue;
+        const inst = graph.getPluginInstance(key) as { shape?: unknown } | undefined;
+        if (inst && !inst.shape) inst.shape = { destroy: () => undefined };
+    }
+    graph.setPlugins((prev) => [...prev.filter((p) => !isShape(p)), ...(shapes as never[])]);
+    for (const p of shapes) {
+        const inst = graph.getPluginInstance(p['key'] as string) as
+            | { drawHull?: () => void; drawBubbleSets?: () => void }
+            | undefined;
+        try {
+            inst?.drawHull?.();
+            inst?.drawBubbleSets?.();
+        } catch {
+            // the graph has not rendered yet: AFTER_RENDER draws it
+        }
+    }
+}
+
 /** The G6 plugin list for a {@link GraphViewPlugins} — pure, so the mapping is unit-testable without a canvas. */
 export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly string[]): Record<string, unknown>[] {
     if (!p) return [];
@@ -656,8 +689,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             { hulls: this.plugins?.hulls, bubbleSets: this.plugins?.bubbleSets },
             ICON_COLOR_SWATCHES,
         );
-        const isShape = (p: unknown): boolean => /^(hull|bubble-sets)-/.test(String((p as { key?: string }).key ?? ''));
-        this.graph?.setPlugins((prev) => [...prev.filter((p) => !isShape(p)), ...(shapes as never[])]);
+        if (this.graph) swapCommunityShapes(this.graph, shapes);
     }
 
     constructor() {
