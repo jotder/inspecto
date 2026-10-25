@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { map, Observable, tap } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
+import { ShortReads } from './short-reads';
 
 /**
  * Lens access configuration (`/access/*` — design `docs/superpower/lens-access-config-design.md`,
@@ -157,6 +158,7 @@ export interface ExplainResult {
 @Injectable({ providedIn: 'root' })
 export class AccessService {
     private http = inject(HttpClient);
+    private reads = inject(ShortReads);
 
     catalog(): Observable<AccessCatalog> {
         return this.http.get<AccessCatalog>(apiUrl('/access/catalog'));
@@ -220,12 +222,15 @@ export class AccessService {
      *  their seed entry (an empty capability list revokes); seed roles not named keep their
      *  defaults. Returns the resulting effective table. */
     saveRoles(authored: RoleDef[]): Observable<RolesDoc> {
-        return this.http.put<RolesDoc>(apiUrl('/access/roles'), {
-            roles: authored.map((r) => ({
-                name: r.name,
-                capabilities: r.capabilities,
-                ...(r.dataScopes?.length ? { dataScopes: r.dataScopes } : {}),
-            })),
-        });
+        // A Space's cached bootstrap carries the capabilities these roles grant: ask again.
+        return this.http
+            .put<RolesDoc>(apiUrl('/access/roles'), {
+                roles: authored.map((r) => ({
+                    name: r.name,
+                    capabilities: r.capabilities,
+                    ...(r.dataScopes?.length ? { dataScopes: r.dataScopes } : {}),
+                })),
+            })
+            .pipe(tap(() => this.reads.clear()));
     }
 }

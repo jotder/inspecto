@@ -120,6 +120,10 @@ describe('the landing page request count (N5)', () => {
         await landAfterSignIn();
         const probes = SPACES.map((s) => backend.countOf(`/spaces/${s.id}/bootstrap`));
         expect(Math.max(...probes)).toBeLessThanOrEqual(1);
+        // la-audit holds nothing, la-bank wins: the four Spaces after it are never read.
+        for (const id of ['la-fraud', 'la-health', 'la-telco', 'la-trade']) {
+            expect(backend.countOf(`/spaces/${id}/bootstrap`)).toBe(0);
+        }
         expect(TestBed.inject(SpacesService).currentSpaceId()).toBe('la-bank');
         expect(TestBed.inject(SessionService).authenticated()).toBe(true);
     });

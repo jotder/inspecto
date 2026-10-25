@@ -271,10 +271,9 @@ export class ComponentsService {
 
     /** Restore an archived version as the current component (write-root gated). Returns the restored component. */
     restore(type: ComponentType, id: string, version: number): Observable<ComponentDef> {
-        return this.http.post<ComponentDef>(
-            apiUrl(`/components/${type}/${encodeURIComponent(id)}/versions/${version}/restore`),
-            {},
-        );
+        return this.http
+            .post<ComponentDef>(apiUrl(`/components/${type}/${encodeURIComponent(id)}/versions/${version}/restore`), {})
+            .pipe(tap(() => this.reads.clear()));
     }
 
     /** Parse raw `sampleText` with a grammar's dialect (scratch-only). */

@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Observable } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { environment } from '../../../environments/environment';
+import { AccessService } from './access.service';
 import { ComponentsService } from './components.service';
 import { SpacesService } from './spaces.service';
 
@@ -68,6 +69,26 @@ describe('Spaces / Components writes clear the short-lived reads (N5)', () => {
             components.list(type).subscribe();
             http.expectOne(`${base}/components/${type}`).flush([]);
         }
+    });
+
+    it('Components restore clears the list read', () => {
+        components.list('dataset').subscribe();
+        http.expectOne(`${base}/components/dataset`).flush([]);
+        components.restore('dataset', 'd', 3).subscribe();
+        http.expectOne(`${base}/components/dataset/d/versions/3/restore`).flush({});
+        components.list('dataset').subscribe();
+        http.expectOne(`${base}/components/dataset`).flush([]);
+    });
+
+    it('saving the access roles clears the cached Space bootstrap', () => {
+        spaces.spaceBootstrap('a').subscribe();
+        http.expectOne(`${base}/spaces/a/bootstrap`).flush({});
+        spaces.spaceBootstrap('a').subscribe();
+        expect(http.match(`${base}/spaces/a/bootstrap`).length).toBe(0);
+        TestBed.inject(AccessService).saveRoles([]).subscribe();
+        http.expectOne(`${base}/access/roles`).flush({});
+        spaces.spaceBootstrap('a').subscribe();
+        http.expectOne(`${base}/spaces/a/bootstrap`).flush({});
     });
 
     it('the first-Space probe goes one Space at a time and stops at the first the subject holds', () => {
