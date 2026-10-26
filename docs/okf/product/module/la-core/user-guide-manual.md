@@ -342,7 +342,8 @@ Datasets in this Space*).
   *Grid*. On a canvas narrower than 1000 px (a laptop) the legend and Working set start as small pills you can
   expand; once you open or minimise one, this browser remembers your choice.
 * **Lenses and selection** — a link-kind lens, hover / brush / lasso selection, fisheye, community hulls and
-  edge bundling.
+  edge bundling. Every lens and selection toggle (fisheye, link filter lens, snap lines, hover activate, lasso
+  select) starts switched off; turn on the ones you want, and a saved view remembers them.
 * **Display options** — labels, colour, shape, pattern and size per kind. Saved with the view.
 
 ### 5.2 Finding things

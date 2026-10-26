@@ -645,9 +645,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly canvasMaximized = computed(() => !this.queryDockOpen() && !this.toolboxDockOpen());
 
     // ── View toolbox: canvas plugins and behaviors (each a G6 v5 built-in), persisted with a saved view ──
+    // Every "Lenses & selection" toggle (fisheye, link filter lens, snap lines, hover activate, lasso select) starts OFF (operator 2026-10-26).
     readonly viewOptions = signal<NonNullable<LinkAnalysisViewOptions['plugins']>>({
         minimap: true,
-        behaviors: ['hover-activate'],
+        behaviors: [],
     });
     readonly canvasPlugins = computed<GraphViewPlugins>(
         () => {

@@ -1399,16 +1399,32 @@ describe('LinkAnalysisComponent', () => {
         ]);
         expect(c.pushState()).toBe('0 links · from advanced search');
     });
+    it('view toolbox: every Lenses & selection toggle starts off (fisheye, link filter lens, snap lines, hover activate, lasso select)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const o = c.viewOptions();
+        expect(o.fisheye).toBeFalsy();
+        expect(o.edgeFilterLens).toBeFalsy();
+        expect(o.snapline).toBeFalsy();
+        expect(c.viewBehaviors.map((b) => b.id).sort()).toEqual(['hover-activate', 'lasso-select']);
+        for (const b of c.viewBehaviors) expect(c.hasBehavior(b.id), b.id).toBe(false);
+        expect(c.canvasPlugins().behaviors ?? []).toEqual([]);
+    });
+
     it('view toolbox: plugin and behavior toggles build the canvas plugin set, hulls follow communities, and the view persists them', async () => {
         const { fixture, save } = create();
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        expect(c.canvasPlugins()).toEqual({ minimap: true, behaviors: ['hover-activate'], hulls: null });
+        expect(c.canvasPlugins()).toEqual({ minimap: true, behaviors: [], hulls: null });
 
         c.toggleViewFlag('minimap', false);
         c.toggleViewFlag('hulls', true);
         c.toggleBehavior('brush-select', true);
+        c.toggleBehavior('hover-activate', true);
+        expect(c.hasBehavior('hover-activate')).toBe(true);
         c.toggleBehavior('hover-activate', false);
         const p = c.canvasPlugins();
         expect(p.minimap).toBe(false);
