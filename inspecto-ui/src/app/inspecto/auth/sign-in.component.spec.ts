@@ -153,7 +153,7 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
         const { el } = create({ noSpace: true });
         const note = el.querySelector('[data-testid="no-space"]');
         expect(note?.textContent?.replace(/\s+/g, ' ')).toContain(
-            "No Space is attached to this demo yet. Copy a Space folder (it needs config\\demo-users.toon) into the bundle's spaces\\ folder and restart.",
+            "No Space is attached yet. Copy a Space folder (it needs config\\demo-users.toon) into the bundle's spaces\\ folder and restart.",
         );
         expect(el.textContent).not.toContain('Sign in with SSO');
         expect(el.querySelector('[data-demo-user]')).toBeNull();
@@ -178,15 +178,15 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
 
             expect(el.textContent).not.toMatch(/secured/i);
             expect(el.textContent).not.toMatch(/single sign-on|\bSSO\b/i);
-            expect(text(el.querySelector('h1'))).toBe('Inspecto demonstration');
+            expect(text(el.querySelector('h1'))).toBe('Inspecto MFS');
             expect(text(el.querySelector('h1 + p'))).toBe(
-                'A demonstration running on this computer only. Choose a Demo User to see Inspecto as that person would.',
+                'Running on this computer only. Choose a user to see Inspecto as that person would.',
             );
-            expect(text(el.querySelector('h2 + p'))).toBe('Choose a Demo User to continue.');
+            expect(text(el.querySelector('h2 + p'))).toBe('Choose a user to continue.');
             expect(el.textContent).not.toContain('Every Pipeline, every Run');
             expect(el.querySelector('mat-icon')?.getAttribute('data-mat-icon-name')).toBe('user-circle');
             expect(text(el.querySelector('inspecto-alert'))).toContain(
-                'Not secure, local only. Pick who you are for this demo.',
+                'Not secure, local only. Pick who you are.',
             );
             await expectNoA11yViolations(el);
         });
@@ -198,9 +198,9 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
 
             const { el } = create({ demoUsers: DEMO, productName: 'Inspecto LA' });
             expect(brand(el)).toBe('Inspecto LA');
-            expect(text(el.querySelector('h1'))).toBe('Inspecto LA demonstration');
+            expect(text(el.querySelector('h1'))).toBe('Inspecto LA MFS');
             expect(text(el.querySelector('h1 + p'))).toBe(
-                'A demonstration running on this computer only. Choose a Demo User to see Inspecto LA as that person would.',
+                'Running on this computer only. Choose a user to see Inspecto LA as that person would.',
             );
             await expectNoA11yViolations(el);
         });
@@ -225,7 +225,7 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
                 "This workspace is secured. Continue with your organisation's single sign-on.",
             );
             expect(el.querySelector('mat-icon')?.getAttribute('data-mat-icon-name')).toBe('lock-closed');
-            expect(el.textContent).not.toContain('Demo sign-in');
+            expect(el.textContent).not.toContain('Local sign-in');
             await expectNoA11yViolations(el);
         });
     });

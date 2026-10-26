@@ -43,10 +43,10 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                     <!-- R2-17: a demo build is shown to business audiences — neutral copy, no builder jargon. -->
                     @if (demo()) {
                         <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-                            {{ product }} demonstration
+                            {{ product }} MFS
                         </h1>
                         <p class="text-secondary max-w-md text-lg">
-                            A demonstration running on this computer only. Choose a Demo User to see {{ product }} as that
+                            Running on this computer only. Choose a user to see {{ product }} as that
                             person would.
                         </p>
                     } @else {
@@ -82,7 +82,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                     @if (!startupError()) {
                         <p class="text-secondary mt-2">
                             @if (demo()) {
-                                Choose a Demo User to continue.
+                                Choose a user to continue.
                             } @else {
                                 This workspace is secured. Continue with your organisation's single sign-on.
                             }
@@ -113,8 +113,8 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                     @if (startupError()) {
                         <!-- No picker and no SSO button: either would lead to a session the server cannot serve. -->
                     } @else if (demo()) {
-                        <inspecto-alert class="mt-4 block text-left" variant="warning" title="Demo sign-in">
-                            Not secure, local only. Pick who you are for this demo.
+                        <inspecto-alert class="mt-4 block text-left" variant="warning" title="Local sign-in">
+                            Not secure, local only. Pick who you are.
                         </inspecto-alert>
                         @if (noSpace()) {
                             <inspecto-alert
@@ -123,11 +123,11 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                                 title="No Space attached"
                                 data-testid="no-space"
                             >
-                                No Space is attached to this demo yet. Copy a Space folder (it needs
+                                No Space is attached yet. Copy a Space folder (it needs
                                 config\\demo-users.toon) into the bundle's spaces\\ folder and restart.
                             </inspecto-alert>
                         }
-                        <ul class="mt-4 flex flex-col gap-2 text-left" aria-label="Demo Users">
+                        <ul class="mt-4 flex flex-col gap-2 text-left" aria-label="Users">
                             @for (u of demoUsers(); track u.id) {
                                 <li>
                                     <button
