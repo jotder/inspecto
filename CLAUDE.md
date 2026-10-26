@@ -144,6 +144,19 @@ shift gets the identical environment.
   protocol plus the lane's named tests, merge `origin/master` again if it moved, then `git push origin HEAD:master`.
   One full gate per day or release. Detail and rationale: `.claude/memory/lane-integration-workflow.md`.
   `.githooks/pre-push` prints a note (never blocks) when it runs from a dirty tree.
+- **`origin/master` is the only line (operator, 2026-10-26 — binding for every session, peer and subagent).**
+  There are no long-lived, per-person or per-topic branches and no parked worktrees (2026-10-26: 117 local branches,
+  45 of them Link Analysis, and 9 LA worktrees had piled up, every one of them already merged).
+  - **Start** a lane from a fresh `git fetch` then `git worktree add --detach C:\sandbox\<lane> origin/master` — never
+    from the shared checkout's local `master`, which is not a base.
+  - **End** the lane the moment it is pushed: `git worktree remove` it and delete its private Maven repo
+    (`C:\sandbox\.m2-<lane>`); if you made a branch, delete it too. One session per lane; archive it when the lane is pushed.
+  - **Unpushed work is not parked.** An unfinished lane may stay for ONE shift as one worktree, listed in
+    `SESSION_STATUS.local.md` with its owner and date; anything unlisted and unpushed at the next shift is removed.
+  - **Shift audit** (start and end): `git worktree list` shows the shared checkout plus listed lanes only, and
+    `git branch` shows `master` only. The shared checkout fast-forwards (`git merge --ff-only origin/master`) when clean.
+  - **Never delete unpushed commits blindly:** `git cherry origin/master <branch>` first; bundle what differs
+    (`git bundle create … <refs> ^origin/master`) into `C:\sandbox\archive\`.
 
 ## Model & effort routing (token economy)
 

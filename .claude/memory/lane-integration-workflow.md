@@ -22,6 +22,12 @@ own — not batched with five other lanes. Lanes still BUILD in parallel; the se
   worktree) is classified, noted in the row, and not fixed by you unless the cause is a clear small test/data defect.
 - **A small group of lanes may go together** only when they touch the same files or one is meaningless without the
   other (otherwise they conflict later). Never batch unrelated lanes.
+- **Lanes do not outlive their push (operator 2026-10-26).** Start from `origin/master`, never from local `master`; when the
+  lane is pushed, remove its worktree, private Maven repo and branch, and archive its session. The 2026-10-26 cleanup found
+  117 local branches (45 Link Analysis) and 9 LA worktrees, all already on master; the full rule is in root `CLAUDE.md`
+  ("origin/master is the only line"). Before deleting a branch run `git cherry origin/master <branch>` and bundle what
+  differs into `C:\sandbox\archive\`. A lane integrated by cherry-pick or squash leaves its original commits behind under
+  other SHAs, so `git branch --merged` lies: use `git cherry` (patch-id), then a subject / added-files check.
 - **Check for duplicated work before integrating:** peers rebuilt the same thing mid-lane three times (a masking
   class, the Home tile refresh, Screening items). `git log origin/master` since the lane's base; when the peer's
   version is complete, DROP the lane's copy and keep only what it adds.
