@@ -1,12 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { MatDatepickerInputEvent } from '@angular/material/datepicker';
+import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
+import { provideLuxonDateAdapter } from '@angular/material-luxon-adapter';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { DashboardDateRangeComponent } from './dashboard-date-range.component';
 import { DateRangeSelection } from './dashboard-date-range';
 
 function create(selection: DateRangeSelection | null) {
-    TestBed.configureTestingModule({ imports: [DashboardDateRangeComponent], providers: [provideNoopAnimations()] });
+    TestBed.configureTestingModule({ imports: [DashboardDateRangeComponent], providers: [provideNoopAnimations(), provideLuxonDateAdapter()] });
     const f = TestBed.createComponent(DashboardDateRangeComponent);
     f.componentRef.setInput('selection', selection);
     f.componentRef.setInput('anchor', '2026-09-24');
@@ -16,13 +19,9 @@ function create(selection: DateRangeSelection | null) {
     return { f, emitted, el: f.nativeElement as HTMLElement };
 }
 
-function typeDay(el: HTMLElement, label: string, value: string): void {
-    const field = Array.from(el.querySelectorAll('mat-form-field')).find((ff) =>
-        ff.querySelector('mat-label')?.textContent?.includes(label),
-    )!;
-    const input = field.querySelector('input') as HTMLInputElement;
-    input.value = value;
-    input.dispatchEvent(new Event('change'));
+/** A pick from the calendar: the datepicker's `dateChange` carries a Luxon date. */
+function typeDay(f: { componentInstance: DashboardDateRangeComponent }, end: 'from' | 'to', value: string): void {
+    f.componentInstance.onDay(end, { value: DateTime.fromISO(value) } as MatDatepickerInputEvent<DateTime>);
 }
 
 describe('DashboardDateRangeComponent (UIE-5 d)', () => {
@@ -46,14 +45,14 @@ describe('DashboardDateRangeComponent (UIE-5 d)', () => {
         f.componentInstance.onPick('custom');
         f.detectChanges();
         expect(emitted).toEqual([]); // no days yet — nothing to apply
-        typeDay(el, 'From', '2026-09-10');
+        typeDay(f, 'from', '2026-09-10');
         f.detectChanges();
         expect(emitted).toEqual([]);
-        typeDay(el, 'To', '2026-09-01');
+        typeDay(f, 'to', '2026-09-01');
         f.detectChanges();
         expect(emitted).toEqual([]);
         expect(el.querySelector('[role="alert"]')!.textContent).toContain('From must be on or before To.');
-        typeDay(el, 'To', '2026-09-12');
+        typeDay(f, 'to', '2026-09-12');
         f.detectChanges();
         expect(emitted).toEqual([{ from: '2026-09-10', to: '2026-09-12' }]);
         expect(el.querySelector('[role="alert"]')).toBeNull();
@@ -61,9 +60,28 @@ describe('DashboardDateRangeComponent (UIE-5 d)', () => {
     });
 
     it('a stored custom span opens on Custom with its days filled in', () => {
-        const { el } = create({ from: '2026-01-05', to: '2026-02-10' });
-        const inputs = Array.from(el.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
-        expect(inputs.map((i) => i.value)).toEqual(['2026-01-05', '2026-02-10']);
+        const { f, el } = create({ from: '2026-01-05', to: '2026-02-10' });
+        expect(el.querySelectorAll('mat-datepicker-toggle')).toHaveLength(2); // a calendar on each day
+        expect([f.componentInstance.from(), f.componentInstance.to()]).toEqual(['2026-01-05', '2026-02-10']);
         expect(el.querySelector('[data-testid="date-range-span"]')!.textContent).toContain('5 Jan – 10 Feb 2026');
+    });
+
+    it('Single day starts on the anchor day and steps to the previous / next day, never past the anchor', () => {
+        const { f, emitted, el } = create(null);
+        f.componentInstance.onPick('day');
+        f.detectChanges();
+        expect(emitted).toEqual([{ from: '2026-09-24', to: '2026-09-24' }]);
+        (el.querySelector('[data-testid="day-prev"]') as HTMLButtonElement).click();
+        f.detectChanges();
+        expect(emitted.at(-1)).toEqual({ from: '2026-09-23', to: '2026-09-23' });
+        (el.querySelector('[data-testid="day-next"]') as HTMLButtonElement).click();
+        f.detectChanges();
+        expect(emitted.at(-1)).toEqual({ from: '2026-09-24', to: '2026-09-24' });
+        expect((el.querySelector('[data-testid="day-next"]') as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('a one-day selection reopens as Single day', () => {
+        const { f } = create({ from: '2026-09-10', to: '2026-09-10' });
+        expect(f.componentInstance.picked()).toBe('day');
     });
 });

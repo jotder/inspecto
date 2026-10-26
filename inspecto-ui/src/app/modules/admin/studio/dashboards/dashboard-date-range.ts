@@ -131,7 +131,8 @@ function iso(utcMillis: number): string {
     return new Date(utcMillis).toISOString().slice(0, 10);
 }
 
-function addDays(day: string, n: number): string {
+/** The calendar day `n` days from `day` (negative = earlier); the previous / next day buttons step with it. */
+export function addDays(day: string, n: number): string {
     const [y, m, d] = day.split('-').map(Number);
     return iso(Date.UTC(y, m - 1, d + n));
 }
