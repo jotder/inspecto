@@ -25,12 +25,12 @@ import { investigationErrorMessage } from './investigation-state';
     host: { class: 'block' },
     template: `
         <section
-            class="flex flex-col gap-2 rounded-md border p-2 text-xs"
+            class="flex flex-col gap-2 rounded-md border p-2 text-sm"
             style="border-color: var(--gamma-border)"
             aria-label="External references"
         >
             <div class="flex items-center gap-1">
-                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">References</h3>
+                <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">References</h3>
                 <button mat-stroked-button class="ml-auto" [disabled]="busy()" (click)="load()">
                     {{ data() ? 'Reload' : 'Load references' }}
                 </button>

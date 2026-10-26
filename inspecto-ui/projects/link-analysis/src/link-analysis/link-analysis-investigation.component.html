@@ -1,4 +1,4 @@
-<section class="flex flex-col gap-3 text-sm" aria-label="Investigation">
+<section class="flex flex-col gap-3 text-base" aria-label="Investigation">
     @if (store.error()) {
         <inspecto-alert variant="error" title="Investigation">{{ store.error() }}</inspecto-alert>
     }
@@ -25,6 +25,7 @@
     }
 
     <!-- ── open an Investigation the caller may read (own + shared through an open Case) ── -->
+<la-fold title="Open an Investigation">
     <section class="flex flex-col gap-1" aria-label="Investigations">
         <div class="flex flex-wrap items-center gap-2">
             <button mat-stroked-button [disabled]="listBusy()" (click)="listInvestigations()">
@@ -38,9 +39,9 @@
         }
         @if (listed(); as items) {
             @if (!items.length) {
-                <p class="text-secondary m-0 text-xs">No Investigation you may read.</p>
+                <p class="text-secondary m-0 text-sm">No Investigation you may read.</p>
             } @else {
-                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
                     @for (i of items; track i.id) {
                         <li class="flex items-center gap-2">
                             <span class="min-w-0 flex-1 truncate">
@@ -66,11 +67,12 @@
                     }
                 </ul>
                 @if (listedTruncated()) {
-                    <p class="text-secondary m-0 text-xs">More Investigations exist than are listed.</p>
+                    <p class="text-secondary m-0 text-sm">More Investigations exist than are listed.</p>
                 }
             }
         }
     </section>
+</la-fold>
 
     @if (store.queuedSeeds().length) {
         <!-- ── ranked nodes carried over from an analysis result; nothing is created until Start / Seed ── -->
@@ -80,8 +82,8 @@
             aria-label="Queued seed entities"
             data-testid="queued-seeds"
         >
-            <div class="text-xs font-semibold">Queued seed entities ({{ store.queuedSeeds().length }})</div>
-            <ul class="m-0 flex list-none flex-wrap gap-1 p-0 text-xs">
+            <div class="text-sm font-semibold">Queued seed entities ({{ store.queuedSeeds().length }})</div>
+            <ul class="m-0 flex list-none flex-wrap gap-1 p-0 text-sm">
                 @for (q of store.queuedSeeds(); track q.id) {
                     <li
                         class="flex items-center gap-0.5 rounded border px-1.5 py-0.5"
@@ -99,7 +101,7 @@
                     </li>
                 }
             </ul>
-            <p class="text-secondary m-0 text-xs">
+            <p class="text-secondary m-0 text-sm">
                 @if (store.active()) {
                     These are not in the Working Set yet. Seed them to add them as one recorded step.
                 } @else {
@@ -129,8 +131,8 @@
                 data-testid="investigate-pending"
                 (ngSubmit)="investigatePending()"
             >
-                <h3 class="m-0 text-sm font-semibold">Investigate {{ q.seed }}</h3>
-                <p class="text-secondary m-0 text-xs">
+                <h3 class="m-0 text-base font-semibold">Investigate {{ q.seed }}</h3>
+                <p class="text-secondary m-0 text-sm">
                     Creates an Investigation over <strong>{{ q.projection.datasetId }}</strong> ({{
                         q.projection.sourceCol
                     }}
@@ -152,10 +154,10 @@
                     [error]="purpose.hasError('maxlength') ? 'At most 1000 characters.' : ''"
                     data-testid="investigate-purpose"
                 />
-                <p class="text-secondary m-0 text-xs">Recorded with the Investigation and shown in its Dossier.</p>
+                <p class="text-secondary m-0 text-sm">Recorded with the Investigation and shown in its Dossier.</p>
                 @if (pendingTried() && purpose.invalid && !purpose.hasError('maxlength')) {
                     <p
-                        class="text-warn m-0 text-xs"
+                        class="text-warn m-0 text-sm"
                         role="alert"
                         data-testid="investigate-purpose-required"
                     >
@@ -175,7 +177,7 @@
                 </div>
             </form>
         } @else if (projection(); as p) {
-            <p class="text-secondary m-0 text-xs">
+            <p class="text-secondary m-0 text-sm">
                 An Investigation is an ordered, append-only log of steps over <strong>{{ p.datasetId }}</strong> ({{
                     p.sourceCol
                 }}
@@ -196,9 +198,9 @@
                 [maxlength]="1000"
                 [error]="purpose.hasError('maxlength') ? 'At most 1000 characters.' : ''"
             />
-            <p class="text-secondary m-0 text-xs">Recorded with the Investigation and shown in its Dossier.</p>
+            <p class="text-secondary m-0 text-sm">Recorded with the Investigation and shown in its Dossier.</p>
             <inspecto-pen-field label="Time column (optional)" [formControl]="timeColumn" [placeholder]="timeCol()" />
-            <p class="text-secondary m-0 text-xs">
+            <p class="text-secondary m-0 text-sm">
                 The event time windows and the coverage check read{{ timeCol() ? ' — blank uses ' + timeCol() : '' }}.
             </p>
             <inspecto-option-picker
@@ -226,7 +228,7 @@
                 ones.
             </inspecto-alert>
         }
-        <p class="text-secondary m-0 text-xs">
+        <p class="text-secondary m-0 text-sm">
             List Investigations asks the server for the ones you may read; this screen also remembers the ones it
             opened, and saving the view keeps them with it.
         </p>
@@ -236,7 +238,7 @@
             <div class="flex items-start gap-1">
                 <div class="min-w-0">
                     <div class="truncate font-semibold">{{ store.displayTitle() || h.id }}</div>
-                    <div class="text-secondary text-xs">{{ h.dataset }} · {{ h.sourceCol }} → {{ h.targetCol }}</div>
+                    <div class="text-secondary text-sm">{{ h.dataset }} · {{ h.sourceCol }} → {{ h.targetCol }}</div>
                 </div>
                 <button
                     mat-icon-button
@@ -250,7 +252,7 @@
             </div>
             @if (h.parent; as parent) {
                 <div
-                    class="rounded-md border p-2 text-xs"
+                    class="rounded-md border p-2 text-sm"
                     style="border-color: var(--gamma-border)"
                     aria-label="Lineage"
                 >
@@ -262,11 +264,18 @@
                     }
                 </div>
             }
+<la-fold title="Case">
             <inspecto-link-analysis-investigation-case
                 [investigationId]="h.id"
             ></inspecto-link-analysis-investigation-case>
+</la-fold>
+<la-fold title="Members">
             <inspecto-link-analysis-members [investigationId]="h.id"></inspecto-link-analysis-members>
+</la-fold>
+<la-fold title="Share and embed">
             <inspecto-link-analysis-embed [investigationId]="h.id"></inspecto-link-analysis-embed>
+</la-fold>
+<la-fold title="Drafts">
             <inspecto-link-analysis-drafts
                 [investigationId]="h.id"
                 [activeDraftId]="store.activeDraftId()"
@@ -274,6 +283,7 @@
                 (scope)="store.useDraft($event)"
                 (promoted)="store.open(h.id)"
             ></inspecto-link-analysis-drafts>
+</la-fold>
         } @else if (!store.busy()) {
             <button mat-stroked-button (click)="store.forget(store.activeId()!)">Forget this Investigation</button>
         }
@@ -289,19 +299,20 @@
                 >, not to the Investigation — promote it from Drafts.
             </inspecto-alert>
         }
-        <p class="m-0 text-xs tabular-nums" aria-label="Working Set">
+        <p class="m-0 text-sm tabular-nums" aria-label="Working Set">
             <strong>Working Set:</strong> {{ counts().entities }} entities · {{ counts().links }} links ·
             {{ counts().excluded }} excluded · {{ counts().hidden }} hidden · {{ counts().kept }} kept
         </p>
         <!-- ── "Expand next degree": the outermost hop, with the profile's presets ── -->
+<la-fold title="Expand by degree">
         <section
-            class="flex flex-col gap-1 rounded-md border p-2"
-            style="border-color: var(--gamma-border)"
+            class="flex flex-col gap-1 "
+
             aria-label="Degrees"
             data-testid="degrees"
         >
             <div class="flex flex-wrap items-center gap-2">
-                <span class="text-xs font-semibold" data-testid="degree-label">
+                <span class="text-sm font-semibold" data-testid="degree-label">
                     Degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}
                 </span>
                 <ol class="m-0 flex list-none gap-1 p-0" aria-hidden="true">
@@ -326,13 +337,13 @@
                 Expand next degree
             </button>
             @if (windowNote(); as w) {
-                <p class="text-secondary m-0 text-xs" data-testid="degree-window">Window: {{ w }}</p>
+                <p class="text-secondary m-0 text-sm" data-testid="degree-window">Window: {{ w }}</p>
             }
             @if (blockedNote(); as why) {
-                <p class="text-secondary m-0 text-xs" data-testid="degree-blocked">{{ why }}</p>
+                <p class="text-secondary m-0 text-sm" data-testid="degree-blocked">{{ why }}</p>
             }
             @if (degree().heldHubs.length) {
-                <p class="text-secondary m-0 text-xs" data-testid="degree-hubs">
+                <p class="text-secondary m-0 text-sm" data-testid="degree-hubs">
                     @if (includeHubs()) {
                         “Include hubs” is ticked: the next degree also expands through
                         {{ degree().heldHubs.length }} high-connectivity
@@ -346,7 +357,7 @@
             }
             @if (store.degreeOutcomes().length) {
                 <ul
-                    class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs"
+                    class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm"
                     aria-live="polite"
                     aria-label="Degree results"
                 >
@@ -356,14 +367,16 @@
                 </ul>
             }
         </section>
+</la-fold>
         <!-- ── Scope list: supernodes to go through, a set to investigate, entities to leave out ── -->
+<la-fold title="Scope list (include / leave out)">
         <section
-            class="flex flex-col gap-2 rounded-md border p-2"
-            style="border-color: var(--gamma-border)"
+            class="flex flex-col gap-2 "
+
             aria-label="Scope list"
             data-testid="scope-list"
         >
-            <span class="text-xs font-semibold">Scope list (this Investigation)</span>
+            <span class="text-sm font-semibold">Scope list (this Investigation)</span>
             <inspecto-pen-field
                 label="Entity ids to include or leave out (one per line or comma-separated)"
                 [formControl]="scopeIds"
@@ -400,7 +413,7 @@
                 }
             </div>
             @if (scopeError()) {
-                <p class="text-warn m-0 text-xs" data-testid="scope-error">{{ scopeError() }}</p>
+                <p class="text-warn m-0 text-sm" data-testid="scope-error">{{ scopeError() }}</p>
             }
             @if (store.scope().include.length) {
                 <ul class="m-0 flex list-none flex-wrap gap-1 p-0" aria-label="Included entities">
@@ -426,12 +439,13 @@
                 >
                     Only these (an expand admits nothing outside the list)
                 </mat-checkbox>
-                <p class="text-secondary m-0 text-xs">
+                <p class="text-secondary m-0 text-sm">
                     Every expand goes through the listed supernodes{{ store.scope().only ? ' and admits only them' : '' }};
                     each step records what it used. Excluded entities stay out of every expand (Undo reverses).
                 </p>
             }
         </section>
+</la-fold>
         <mat-checkbox [ngModel]="!store.showWorkingSet()" (ngModelChange)="store.showWorkingSet.set(!$event)">
             Show the query graph (to pick seeds)
         </mat-checkbox>
@@ -449,30 +463,31 @@
             </inspecto-alert>
         }
         @if (fallbackNote(); as note) {
-            <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-fallback">{{ note }}</p>
+            <p class="text-secondary m-0 text-sm" role="status" data-testid="expand-fallback">{{ note }}</p>
         }
         @if (store.lastOverride(); as o) {
-            <p class="m-0 text-xs" role="status" data-testid="hub-override-recorded">
+            <p class="m-0 text-sm" role="status" data-testid="hub-override-recorded">
                 Override recorded at step {{ o.step }}: expanded through high-connectivity
                 {{ o.ids.slice(0, 5).join(', ') }}{{ o.ids.length > 5 ? ', …' : '' }} — sealed in the log, with your
                 name.
             </p>
         }
         @if (hubs().length) {
+<la-fold title="High-connectivity entities">
             <section
-                class="flex flex-col gap-1 rounded-md border p-2"
-                style="border-color: var(--gamma-border)"
+                class="flex flex-col gap-1 "
+
                 aria-label="High connectivity"
                 data-testid="hub-list"
             >
-                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
+                <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
                     High connectivity ({{ hubs().length }})
                 </h3>
-                <p class="text-secondary m-0 text-xs">
+                <p class="text-secondary m-0 text-sm">
                     Shown, but not expanded further: each has more contacts than the hub threshold. Expanding through
                     one is an override you confirm, and it is recorded.
                 </p>
-                <ul class="m-0 flex list-none flex-col gap-1 p-0 text-xs">
+                <ul class="m-0 flex list-none flex-col gap-1 p-0 text-sm">
                     @for (e of hubs().slice(0, 50); track e.id) {
                         <li class="flex flex-wrap items-center gap-1">
                             <span class="font-mono">{{ e.id }}</span>
@@ -495,11 +510,12 @@
                     }
                 </ul>
                 @if (hubs().length > 50) {
-                    <p class="text-secondary m-0 text-xs">
+                    <p class="text-secondary m-0 text-sm">
                         The first 50 are listed; select another on the canvas to expand through it.
                     </p>
                 }
             </section>
+</la-fold>
         }
         @if (store.lastStep()?.protected?.length) {
             <inspecto-alert variant="info" title="Kept entities were not excluded">
@@ -508,13 +524,14 @@
         }
 
         <!-- ── act on the selected entity ── -->
+<la-fold title="Selected entity" [forceOpen]="!!store.selected()">
         <section
-            class="flex flex-col gap-2 rounded-md border p-2"
-            style="border-color: var(--gamma-border)"
+            class="flex flex-col gap-2 "
+
             aria-label="Selected entity"
         >
             @if (store.selected(); as n) {
-                <div class="text-xs">
+                <div class="text-sm">
                     Selected: <strong>{{ n.data.label }}</strong>
                     @if (n.data.label.startsWith('masked:')) {
                         <span class="text-secondary">(masked)</span>
@@ -578,19 +595,19 @@
                         @if (neighboursOpen()) {
                             @if (neighbourList(); as list) {
                                 @if (list.loading) {
-                                    <p class="text-secondary m-0 text-xs" role="status">Reading neighbours…</p>
+                                    <p class="text-secondary m-0 text-sm" role="status">Reading neighbours…</p>
                                 } @else if (list.error) {
                                     <inspecto-alert variant="warning">{{ list.error }}</inspecto-alert>
                                 } @else if (!list.rows.length) {
-                                    <p class="text-secondary m-0 text-xs">No neighbours found for this entity.</p>
+                                    <p class="text-secondary m-0 text-sm">No neighbours found for this entity.</p>
                                 } @else {
-                                    <p class="text-secondary m-0 text-xs">
+                                    <p class="text-secondary m-0 text-sm">
                                         {{ list.total }} neighbour{{ list.total === 1 ? '' : 's' }}, strongest first
                                         (the whole Dataset, no time window). Reading this list is never held for approval;
                                         the step you add reads only the neighbours you choose.
                                     </p>
                                     <ul
-                                        class="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-auto p-0 text-xs"
+                                        class="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-auto p-0 text-sm"
                                         data-testid="neighbour-list"
                                     >
                                         @for (nb of list.rows; track nb.id) {
@@ -666,7 +683,7 @@
                 </button>
                 <!-- LA-19: a note changes nothing about traversal, display or counts -->
                 @if (selectedNotes().length) {
-                    <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs" aria-label="Notes on this entity">
+                    <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm" aria-label="Notes on this entity">
                         @for (a of selectedNotes(); track a.step + ':' + a.id) {
                             <li>
                                 {{ a.note }} <span class="text-secondary">(step {{ a.step }})</span>
@@ -691,7 +708,7 @@
                     Annotate
                 </button>
             } @else {
-                <p class="text-secondary m-0 text-xs">
+                <p class="text-secondary m-0 text-sm">
                     Click an entity on the canvas to act on it. Seed from the query graph; expand, keep, hide or exclude
                     entities of the Working Set.
                 </p>
@@ -706,17 +723,21 @@
             </button>
             <inspecto-la-expand-rung [presets]="degreePresets()" [limits]="fourEyesLimits()"></inspecto-la-expand-rung>
         </section>
+</la-fold>
 
+<la-fold title="More steps: window, threshold, snapshot, compare, connect">
         <inspecto-la-window-op></inspecto-la-window-op>
         <inspecto-la-threshold-op></inspecto-la-threshold-op>
         <inspecto-la-snapshot-op></inspecto-la-snapshot-op>
         <inspecto-la-compare-op></inspecto-la-compare-op>
         <inspecto-la-connect-op [presets]="degreePresets()"></inspecto-la-connect-op>
+</la-fold>
 
         <!-- ── the op log ── -->
+<la-fold title="Op log">
         <section aria-label="Op log">
             <div class="mb-1 flex items-center gap-1">
-                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Op log</h3>
+                <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Op log</h3>
                 <button
                     mat-button
                     class="ml-auto"
@@ -734,21 +755,21 @@
                         @for (e of log.entries; track e.step) {
                             <li class="rounded-md border px-2 py-1" style="border-color: var(--gamma-border)">
                                 <div class="flex items-baseline gap-2">
-                                    <span class="font-mono text-xs tabular-nums">{{ e.step }}</span>
-                                    <span class="text-xs font-semibold">{{ opLabel(e) }}</span>
+                                    <span class="font-mono text-sm tabular-nums">{{ e.step }}</span>
+                                    <span class="text-sm font-semibold">{{ opLabel(e) }}</span>
                                     @if (e.undoneBy != null) {
-                                        <span class="text-secondary text-xs">undone by step {{ e.undoneBy }}</span>
+                                        <span class="text-secondary text-sm">undone by step {{ e.undoneBy }}</span>
                                     }
                                     <span class="text-secondary ml-auto text-[11px]">{{ time(e.at) }}</span>
                                 </div>
-                                <div class="text-xs" [class.line-through]="e.undoneBy != null">{{ e.text }}</div>
+                                <div class="text-sm" [class.line-through]="e.undoneBy != null">{{ e.text }}</div>
                                 @if (readSuffix(e); as how) {
                                     <div class="text-secondary text-[11px]" data-testid="step-read-source">
                                         {{ how }}
                                     </div>
                                 }
                                 @if (e.params?.reason) {
-                                    <div class="text-secondary text-xs">Reason: {{ e.params!.reason }}</div>
+                                    <div class="text-secondary text-sm">Reason: {{ e.params!.reason }}</div>
                                 }
                                 @if (e.author) {
                                     <div class="text-secondary text-[11px]">by {{ e.author }}</div>
@@ -757,20 +778,22 @@
                         }
                     </ol>
                     @if (log.truncated) {
-                        <p class="text-secondary m-0 mt-1 text-xs">
+                        <p class="text-secondary m-0 mt-1 text-sm">
                             Showing the first {{ log.entries.length }} of {{ log.total }} steps.
                         </p>
                     }
                 } @else {
-                    <p class="text-secondary m-0 text-xs">No steps yet — seed an entity to begin.</p>
+                    <p class="text-secondary m-0 text-sm">No steps yet — seed an entity to begin.</p>
                 }
             }
         </section>
+</la-fold>
 
         @if (store.workingSet()?.annotations?.length) {
+<la-fold title="Annotations">
             <section aria-label="Annotations">
-                <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Annotations</h3>
-                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">Annotations</h3>
+                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
                     @for (a of store.workingSet()!.annotations; track a.step + ':' + a.id) {
                         <li>
                             <strong>{{ a.id }}</strong> — {{ a.note
@@ -779,12 +802,14 @@
                     }
                 </ul>
             </section>
+</la-fold>
         }
 
         @if (store.workingSet()?.linkAnnotations?.length) {
+<la-fold title="Link annotations">
             <section aria-label="Link annotations">
-                <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Link annotations</h3>
-                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">Link annotations</h3>
+                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
                     @for (
                         a of store.workingSet()!.linkAnnotations;
                         track a.step + ':' + (a.linkId ?? a.source + a.target)
@@ -796,6 +821,7 @@
                     }
                 </ul>
             </section>
+</la-fold>
         }
 
         @if (linkOptions().length) {
@@ -827,9 +853,10 @@
         }
 
         <!-- ── LA-19 coverage: a gap in the data looks exactly like innocence ── -->
+<la-fold title="Coverage">
         <section class="flex flex-col gap-1" aria-label="Coverage">
             <div class="flex items-center gap-2">
-                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Coverage</h3>
+                <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Coverage</h3>
                 <button
                     mat-stroked-button
                     class="ml-auto"
@@ -857,7 +884,7 @@
                         </inspecto-alert>
                     }
                     @if (c.collectors.assessed) {
-                        <table class="m-0 w-full text-xs" aria-label="Per-Collector coverage">
+                        <table class="m-0 w-full text-sm" aria-label="Per-Collector coverage">
                             <thead>
                                 <tr class="text-secondary text-left">
                                     <th scope="col">Collector</th>
@@ -876,7 +903,7 @@
                             </tbody>
                         </table>
                     } @else {
-                        <p class="text-secondary m-0 text-xs">
+                        <p class="text-secondary m-0 text-sm">
                             Per-Collector coverage is not assessed for this Dataset.
                             @if (c.collectors.note) {
                                 <span>{{ c.collectors.note }}</span>
@@ -886,8 +913,10 @@
                 }
             }
         </section>
+</la-fold>
 
         <!-- ── re-order → fork ── -->
+<la-fold title="Re-order steps">
         <section aria-label="Re-order steps">
             @if (order(); as o) {
                 <inspecto-alert variant="info" title="Re-ordering creates a fork">
@@ -900,7 +929,7 @@
                             class="flex items-center gap-1 rounded-md border px-2 py-1"
                             style="border-color: var(--gamma-border)"
                         >
-                            <span class="min-w-0 flex-auto truncate text-xs">{{ stepLabel(step) }}</span>
+                            <span class="min-w-0 flex-auto truncate text-sm">{{ stepLabel(step) }}</span>
                             <button
                                 mat-icon-button
                                 [disabled]="first"
@@ -940,15 +969,17 @@
                     Re-order steps (creates a fork)…
                 </button>
                 @if (store.activeDraftId()) {
-                    <p class="text-secondary m-0 text-xs">
+                    <p class="text-secondary m-0 text-sm">
                         Re-ordering forks the Investigation's main log, not a Draft — go back to the Investigation to
                         re-order.
                     </p>
                 }
             }
         </section>
+</la-fold>
 
         <!-- ── replay + drift ── -->
+<la-fold title="Replay and drift">
         <section class="flex flex-col gap-1" aria-label="Replay">
             <div class="flex items-center gap-2">
                 <mat-checkbox
@@ -968,7 +999,7 @@
                 </button>
             </div>
             @if (store.activeDraftId()) {
-                <p class="text-secondary m-0 text-xs">
+                <p class="text-secondary m-0 text-sm">
                     Replay checks the Draft's log; a Draft has no re-read of current data (drift check).
                 </p>
             }
@@ -984,7 +1015,7 @@
                 }
                 @if (r.reread) {
                     @if (r.drift.length) {
-                        <table class="w-full text-xs" aria-label="Drift per expand step">
+                        <table class="w-full text-sm" aria-label="Drift per expand step">
                             <thead>
                                 <tr class="text-secondary text-left">
                                     <th scope="col">Step</th>
@@ -1006,7 +1037,7 @@
                                 }
                             </tbody>
                         </table>
-                        <p class="text-secondary m-0 text-xs">
+                        <p class="text-secondary m-0 text-sm">
                             {{
                                 r.diverged
                                     ? 'The Dataset has changed since at least one read was sealed.'
@@ -1015,21 +1046,23 @@
                             The Working Set shown stays the sealed one.
                         </p>
                     } @else {
-                        <p class="text-secondary m-0 text-xs">No expand steps to re-read.</p>
+                        <p class="text-secondary m-0 text-sm">No expand steps to re-read.</p>
                     }
                 }
             }
         </section>
+</la-fold>
 
         @if (canPin) {
             <!-- ── pin to a Widget (LA-21) ── -->
+<la-fold title="Pin to a Widget">
             <section
-                class="flex flex-col gap-2 rounded-md border p-2"
-                style="border-color: var(--gamma-border)"
+                class="flex flex-col gap-2 "
+
                 aria-label="Pin to a Widget"
             >
-                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Pin to a Widget</h3>
-                <p class="text-secondary m-0 text-xs">
+                <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Pin to a Widget</h3>
+                <p class="text-secondary m-0 text-sm">
                     Save this Working Set as a dashboard Widget. <strong>Frozen</strong> shows it as it is now and never
                     moves. <strong>Live</strong> follows this Investigation and shows what changed since now — a Live
                     Widget cannot leave this Space. Either way only the Investigation's owner sees its rows; anyone else
@@ -1067,39 +1100,53 @@
                     <inspecto-alert variant="error" title="Widget not saved">{{ pinError() }}</inspecto-alert>
                 }
             </section>
+</la-fold>
         }
 
         @if (store.activeId(); as activeId) {
             <!-- ── LA-20 rows · LA-23 measures + templates · LA-12 dossier ── -->
+<la-fold title="Oversight and approvals">
             <inspecto-link-analysis-oversight
                 [investigationId]="activeId"
                 [log]="store.log()"
                 [workingSet]="store.workingSet()"
                 (decided)="store.open(activeId)"
             ></inspecto-link-analysis-oversight>
+</la-fold>
+<la-fold title="Working Set rows">
             <inspecto-link-analysis-working-set-rows
                 [investigationId]="activeId"
                 [version]="store.log()"
             ></inspecto-link-analysis-working-set-rows>
+</la-fold>
+<la-fold title="Measures and templates">
             <inspecto-link-analysis-template-measures
                 [investigationId]="activeId"
                 [log]="store.log()"
                 (instantiated)="adoptInstantiated($event)"
             ></inspecto-link-analysis-template-measures>
+</la-fold>
+<la-fold title="Dossier">
             <inspecto-link-analysis-dossier [investigationId]="activeId"></inspecto-link-analysis-dossier>
+</la-fold>
+<la-fold title="References">
             <inspecto-link-analysis-references [investigationId]="activeId"></inspecto-link-analysis-references>
+</la-fold>
         }
 
         <!-- ── LA-18 value Measures over the whole Dataset; Watch binds to the open Investigation ── -->
+<la-fold title="Value Measures">
         <inspecto-link-analysis-value-measures
             [investigation]="store.header()"
             [timeCol]="timeCol()"
         ></inspecto-link-analysis-value-measures>
+</la-fold>
 
         @if (store.workingSet()?.excluded?.length) {
+<la-fold title="Excluded entities">
             <section aria-label="Excluded entities">
-                <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Excluded</h3>
-                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">Excluded</h3>
+                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
                     @for (x of store.workingSet()!.excluded; track x.id) {
                         <li>
                             <strong>{{ x.id }}</strong> — {{ x.reason }} (step {{ x.step }})
@@ -1107,15 +1154,22 @@
                     }
                 </ul>
             </section>
+</la-fold>
         }
     }
 
     <!-- ── LA-17 Entity Lists: list/create/add/retire always; exclude/seed by list on the open Investigation ── -->
+<la-fold title="Entity Lists">
     <inspecto-link-analysis-entity-lists></inspecto-link-analysis-entity-lists>
+</la-fold>
 
     <!-- ── LA-17 slice 2 identity resolution: assert / look up / retract (needs canManageIncidents, reads too) ── -->
+<la-fold title="Identities">
     <inspecto-link-analysis-identities></inspecto-link-analysis-identities>
+</la-fold>
 
     <!-- ── Analyst CSV upload (LA-ANALYST-UPLOAD-1 D-UP8): land a file in an upload-enabled Collector, see its ingest state (canUploadData) ── -->
+<la-fold title="Upload data">
     <inspecto-link-analysis-uploads></inspecto-link-analysis-uploads>
+</la-fold>
 </section>

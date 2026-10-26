@@ -43,10 +43,10 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
     template: `
         @if (requests().length || masked().length) {
             <section
-                class="flex flex-col gap-2 rounded-md border p-2 text-xs"
+                class="flex flex-col gap-2 rounded-md border p-2 text-sm"
                 style="border-color: var(--gamma-border)"
             >
-                <h3 class="m-0 text-sm font-semibold">Oversight</h3>
+                <h3 class="m-0 text-base font-semibold">Oversight</h3>
                 @if (error()) {
                     <inspecto-alert variant="error" title="Oversight">{{ error() }}</inspecto-alert>
                 }

@@ -42,9 +42,9 @@ import { formatBytes, isBusyRefusal, uploadErrorMessage, uploadFileProblem, uplo
     host: { class: 'block' },
     template: `
         @if (features.geoLink() && canUpload()) {
-            <section class="flex flex-col gap-2 text-xs" aria-label="Upload a CSV">
+            <section class="flex flex-col gap-2 text-sm" aria-label="Upload a CSV">
                 <div class="flex items-center gap-1">
-                    <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Upload a CSV</h3>
+                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Upload a CSV</h3>
                     <button
                         mat-icon-button
                         class="ml-auto"

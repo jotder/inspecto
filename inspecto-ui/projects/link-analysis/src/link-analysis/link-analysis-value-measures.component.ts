@@ -91,8 +91,8 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
     ],
     host: { class: 'block' },
     template: `
-        <section class="flex flex-col gap-2 text-xs" aria-labelledby="la-value-measures-heading">
-            <h3 id="la-value-measures-heading" class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
+        <section class="flex flex-col gap-2 text-sm" aria-labelledby="la-value-measures-heading">
+            <h3 id="la-value-measures-heading" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
                 Value Measures
             </h3>
             <p class="text-secondary m-0" data-test="vm-intro">
@@ -106,7 +106,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                 (submitted)="run()"
             ></inspecto-schema-form>
             <fieldset class="m-0 flex flex-wrap gap-2 border-0 p-0" data-test="vm-window">
-                <legend class="text-secondary p-0 text-xs font-semibold">
+                <legend class="text-secondary p-0 text-sm font-semibold">
                     Fixed window (or use the rolling one above)
                 </legend>
                 <inspecto-pen-field label="From (inclusive)" [formControl]="fromDate" type="date" data-test="vm-from" />
@@ -191,7 +191,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                                       : ''
                             "
                         />
-                        <p class="text-secondary m-0 text-xs">Letters, digits, dot, dash and underscore only.</p>
+                        <p class="text-secondary m-0 text-sm">Letters, digits, dot, dash and underscore only.</p>
                         <inspecto-option-picker
                             label="Severity"
                             formControlName="severity"

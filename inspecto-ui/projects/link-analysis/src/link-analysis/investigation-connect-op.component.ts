@@ -27,11 +27,11 @@ import { parseSeedList } from './seed-list';
             style="border-color: var(--gamma-border)"
             aria-labelledby="la-connect-op-title"
         >
-            <h3 id="la-connect-op-title" class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
+            <h3 id="la-connect-op-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
                 Connect several numbers
             </h3>
             <form class="flex flex-col gap-2" (ngSubmit)="connect()">
-                <label class="flex flex-col gap-1 text-xs">
+                <label class="flex flex-col gap-1 text-sm">
                     Numbers or ids to connect (paste a list: one per line, or separated by commas)
                     <textarea
                         name="seeds"
@@ -43,7 +43,7 @@ import { parseSeedList } from './seed-list';
                     ></textarea>
                 </label>
                 @if (list().ids.length || list().invalid.length) {
-                    <p class="text-secondary m-0 text-xs" data-testid="seed-summary">
+                    <p class="text-secondary m-0 text-sm" data-testid="seed-summary">
                         {{ list().ids.length }} seed{{ list().ids.length === 1 ? '' : 's' }} to connect (up to
                         {{ maxSeeds() }}, within {{ hops() }} hops).
                         @if (list().duplicates) {
@@ -74,7 +74,7 @@ import { parseSeedList } from './seed-list';
                 <inspecto-alert variant="error" title="Connect refused">{{ error() }}</inspecto-alert>
             }
             @if (result(); as r) {
-                <p class="m-0 text-xs" data-testid="connect-summary">
+                <p class="m-0 text-sm" data-testid="connect-summary">
                     {{ r.joined }} of {{ r.pairs.length }} pairs connected within {{ hops() }} hops;
                     {{ r.pairs.length - r.joined }} not connected.
                 </p>
@@ -87,7 +87,7 @@ import { parseSeedList } from './seed-list';
                     <inspecto-alert variant="info" title="No links found for">{{ r.noLinks.join(', ') }}</inspecto-alert>
                 }
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs" aria-label="Connection of every pair of seeds">
+                    <table class="w-full text-left text-sm" aria-label="Connection of every pair of seeds">
                         <thead>
                             <tr>
                                 <th scope="col">A</th>

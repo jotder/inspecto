@@ -60,9 +60,9 @@ import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/l
     host: { class: 'block' },
     template: `
         @if (features.geoLink()) {
-            <section class="flex flex-col gap-2 text-xs" aria-label="Entity Lists">
+            <section class="flex flex-col gap-2 text-sm" aria-label="Entity Lists">
                 <div class="flex items-center gap-1">
-                    <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Entity Lists</h3>
+                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Entity Lists</h3>
                     <button
                         mat-icon-button
                         class="ml-auto"
@@ -192,7 +192,7 @@ import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/l
                         ></inspecto-empty-state>
                         @if (canWrite() && suggestions().length) {
                             <section class="flex flex-col gap-1" aria-labelledby="la-suggested-lists" data-testid="la-suggested-lists">
-                                <h4 id="la-suggested-lists" class="m-0 text-xs font-semibold">First lists to start with</h4>
+                                <h4 id="la-suggested-lists" class="m-0 text-sm font-semibold">First lists to start with</h4>
                                 <ul class="m-0 flex list-none flex-col gap-1 p-0">
                                     @for (sl of suggestions(); track sl.title) {
                                         <li class="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1" style="border-color: var(--gamma-border)">

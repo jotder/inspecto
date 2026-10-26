@@ -24,7 +24,7 @@ import { LA_CASES } from '@inspecto/link-analysis/la-host';
     imports: [FormsModule, MatButtonModule, InspectoAlertComponent, InspectoOptionPickerComponent],
     template: `
         <div
-            class="flex flex-col gap-2 rounded-md border p-2 text-xs"
+            class="flex flex-col gap-2 rounded-md border p-2 text-sm"
             style="border-color: var(--gamma-border)"
             aria-label="Case link"
         >

@@ -54,7 +54,7 @@ import {
             Advanced expand settings
         </button>
         <div id="la-expand-rung-fields" class="flex flex-col gap-2" [hidden]="!open()" [formGroup]="form">
-            <p class="text-secondary m-0 text-xs">Blank = the server default. Applies to both expand buttons.</p>
+            <p class="text-secondary m-0 text-sm">Blank = the server default. Applies to both expand buttons.</p>
             <inspecto-pen-field
                 label="Row budget"
                 formControlName="budget"
@@ -62,12 +62,12 @@ import {
                 placeholder="2000"
                 [error]="form.controls.budget.invalid ? 'A whole number from 1 to ' + (maxBudget()) + '.' : ''"
             />
-            <p class="text-secondary m-0 text-xs">Rows read; a breach marks the step incomplete. At most {{ maxBudget() }}.</p>
+            <p class="text-secondary m-0 text-sm">Rows read; a breach marks the step incomplete. At most {{ maxBudget() }}.</p>
             <inspecto-option-picker label="Direction" formControlName="direction" [options]="directionOptions" />
             <inspecto-option-picker label="Time window" formControlName="window" [options]="windowOptions" />
             @if (form.controls.window.value === 'override') {
                 <div class="rounded-md border p-2" style="border-color: var(--gamma-border)">
-                    <p class="text-secondary m-0 mb-1 text-xs">
+                    <p class="text-secondary m-0 mb-1 text-sm">
                         This rung only — the Investigation's own window is not changed.
                     </p>
                     <inspecto-la-window-fields [form]="override"></inspecto-la-window-fields>
@@ -79,7 +79,7 @@ import {
                 placeholder="kind_a, kind_b"
                 [error]="form.controls.linkKinds.invalid ? 'At most ' + (maxKinds()) + ' kinds.' : ''"
             />
-            <p class="text-secondary m-0 text-xs">Comma-separated; blank = all kinds. Needs the Investigation's link-kind column.</p>
+            <p class="text-secondary m-0 text-sm">Comma-separated; blank = all kinds. Needs the Investigation's link-kind column.</p>
             <inspecto-pen-field
                 label="Minimum events per link"
                 formControlName="minEvents"
@@ -93,7 +93,7 @@ import {
                 type="number"
                 [error]="form.controls.minDistinctDays.invalid ? 'A whole number of at least 1.' : ''"
             />
-            <p class="text-secondary m-0 text-xs">Needs the Investigation's time column.</p>
+            <p class="text-secondary m-0 text-sm">Needs the Investigation's time column.</p>
             <inspecto-pen-field
                 label="Candidate degree — minimum"
                 formControlName="candidateDegreeMin"
@@ -106,9 +106,9 @@ import {
                 type="number"
                 [error]="form.controls.candidateDegreeMax.invalid ? 'A whole number of at least 1.' : ''"
             />
-            <p class="text-secondary m-0 text-xs">Skips hubs: a neighbour with more links in the window is not admitted.</p>
+            <p class="text-secondary m-0 text-sm">Skips hubs: a neighbour with more links in the window is not admitted.</p>
             @if (form.hasError('degreeOrder') && form.touched) {
-                <p class="text-warn m-0 text-xs" role="alert">The minimum degree must not exceed the maximum.</p>
+                <p class="text-warn m-0 text-sm" role="alert">The minimum degree must not exceed the maximum.</p>
             }
             <inspecto-pen-field
                 label="Maximum fan-out per entity"
@@ -116,25 +116,25 @@ import {
                 type="number"
                 [error]="form.controls.maxFanOut.invalid ? 'A whole number of at least 1.' : ''"
             />
-            <p class="text-secondary m-0 text-xs">Strongest links first; blank = unbounded.</p>
+            <p class="text-secondary m-0 text-sm">Strongest links first; blank = unbounded.</p>
         </div>
         <!-- Supernode suppression override: outside the collapsed section, so the opt-in is never hidden. -->
         <mat-checkbox [formControl]="includeHubs" data-testid="include-hubs">
             Include hubs — expand through high-connectivity entities
         </mat-checkbox>
         @if (includeHubs.value) {
-            <p class="text-secondary m-0 text-xs" data-testid="include-hubs-note">
+            <p class="text-secondary m-0 text-sm" data-testid="include-hubs-note">
                 An expand that reaches a flagged entity asks you to confirm first; the override is sealed in that step and
                 shown in the log and the Dossier.
             </p>
         }
         @if (approval(); as a) {
-            <p class="text-secondary m-0 text-xs" data-testid="expand-effective">
+            <p class="text-secondary m-0 text-sm" data-testid="expand-effective">
                 This expand reads at most {{ a.budget.toLocaleString('en') }} rows, fan-out
                 {{ a.fanOut === null ? 'unbounded' : 'capped at ' + a.fanOut.toLocaleString('en') }}.
             </p>
             @if (a.exceeded.length) {
-                <p class="text-warn m-0 text-xs" role="status" data-testid="expand-needs-approval">
+                <p class="text-warn m-0 text-sm" role="status" data-testid="expand-needs-approval">
                     Will need approval from a second person: {{ a.exceeded.join('; ') }}. Lower it here, or change the
                     limit in Settings &gt; Link Analysis.
                 </p>

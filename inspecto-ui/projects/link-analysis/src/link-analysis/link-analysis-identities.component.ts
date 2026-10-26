@@ -47,9 +47,9 @@ import { isUnavailable } from './link-analysis-template.dialogs';
     host: { class: 'block' },
     template: `
         @if (features.geoLink()) {
-            <section class="flex flex-col gap-2 text-xs" aria-label="Identity resolution">
+            <section class="flex flex-col gap-2 text-sm" aria-label="Identity resolution">
                 <div class="flex items-center gap-1">
-                    <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
+                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
                         Identity resolution
                     </h3>
                     @if (canManage()) {

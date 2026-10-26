@@ -90,11 +90,13 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
 /** How often a held degree re-reads the log for its four-eyes decision. */
 export const APPROVAL_POLL_MS = 15_000;
 
+import { LaFoldComponent } from './la-fold.component';
+
 @Component({
     selector: 'inspecto-link-analysis-investigation',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [PenFieldComponent, 
+    imports: [LaFoldComponent, PenFieldComponent, 
         FormsModule,
         ReactiveFormsModule,
         MatButtonModule,

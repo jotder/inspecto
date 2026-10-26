@@ -32,8 +32,8 @@ import {
     imports: [MatButtonModule, InspectoAlertComponent],
     host: { class: 'block' },
     template: `
-        <section class="flex flex-col gap-2 text-xs" aria-label="Measures and templates">
-            <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Measures</h3>
+        <section class="flex flex-col gap-2 text-sm" aria-label="Measures and templates">
+            <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Measures</h3>
             @if (error()) {
                 <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Measures">{{
                     error()

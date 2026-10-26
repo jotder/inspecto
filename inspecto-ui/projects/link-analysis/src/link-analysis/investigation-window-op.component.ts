@@ -33,7 +33,7 @@ import { windowForm, windowOf } from './investigation-rung-form';
             style="border-color: var(--gamma-border)"
             aria-labelledby="la-window-op-title"
         >
-            <h3 id="la-window-op-title" class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
+            <h3 id="la-window-op-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
                 Time window
             </h3>
             <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="submit()">

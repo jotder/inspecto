@@ -146,7 +146,7 @@ describe('start-from (LA-ONBOARD-1 OB-9)', () => {
             projection: { datasetId: 't', sourceCol: 'a', targetCol: 'b', entityType: 'account' },
             timeCol: 'ts',
             presets: {},
-            maxDegree: 4,
+            maxDegree: 6,
         });
     });
 

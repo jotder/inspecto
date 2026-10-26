@@ -35,13 +35,13 @@ import { windowForm, windowOf } from './investigation-rung-form';
             style="border-color: var(--gamma-border)"
             aria-labelledby="la-compare-op-title"
         >
-            <h3 id="la-compare-op-title" class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
+            <h3 id="la-compare-op-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
                 Compare two windows
             </h3>
             <form class="flex flex-col gap-2" (ngSubmit)="submit()">
                 <fieldset class="m-0 flex flex-col gap-2 border-0 p-0">
-                    <legend class="text-secondary p-0 text-xs font-semibold">Window A</legend>
-                    <label class="flex items-center gap-2 text-xs">
+                    <legend class="text-secondary p-0 text-sm font-semibold">Window A</legend>
+                    <label class="flex items-center gap-2 text-sm">
                         <input type="checkbox" [checked]="inheritA()" (change)="inheritA.set(!inheritA())" />
                         Use the Investigation's window
                     </label>
@@ -50,8 +50,8 @@ import { windowForm, windowOf } from './investigation-rung-form';
                     }
                 </fieldset>
                 <fieldset class="m-0 flex flex-col gap-2 border-0 p-0">
-                    <legend class="text-secondary p-0 text-xs font-semibold">Window B</legend>
-                    <label class="flex items-center gap-2 text-xs">
+                    <legend class="text-secondary p-0 text-sm font-semibold">Window B</legend>
+                    <label class="flex items-center gap-2 text-sm">
                         <input type="checkbox" [checked]="inheritB()" (change)="inheritB.set(!inheritB())" />
                         Use the Investigation's window
                     </label>
@@ -59,12 +59,12 @@ import { windowForm, windowOf } from './investigation-rung-form';
                         <inspecto-la-window-fields [form]="formB"></inspecto-la-window-fields>
                     }
                 </fieldset>
-                <label class="flex items-center gap-2 text-xs">
+                <label class="flex items-center gap-2 text-sm">
                     <input type="checkbox" [checked]="byCount()" (change)="byCount.set(!byCount())" />
                     By event count (also seal each link's and entity's count change)
                 </label>
                 @if (byCount()) {
-                    <label class="flex flex-col gap-1 text-xs">
+                    <label class="flex flex-col gap-1 text-sm">
                         Smallest count change to list (optional)
                         <input
                             type="number"
@@ -80,7 +80,7 @@ import { windowForm, windowOf } from './investigation-rung-form';
                         />
                     </label>
                     @if (minAbsDeltaInvalid()) {
-                        <p id="la-compare-min-abs-delta-err" class="m-0 text-xs" role="alert">
+                        <p id="la-compare-min-abs-delta-err" class="m-0 text-sm" role="alert">
                             Enter a whole number of 1 or more, or leave it empty.
                         </p>
                     }

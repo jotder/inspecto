@@ -84,12 +84,12 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
     imports: [MatButtonModule, InspectoAlertComponent, StatusBadgeComponent],
     template: `
         <section
-            class="flex flex-col gap-2 rounded-md border p-2 text-xs"
+            class="flex flex-col gap-2 rounded-md border p-2 text-sm"
             style="border-color: var(--gamma-border)"
             aria-label="Drafts"
         >
             <div class="flex items-center gap-2">
-                <h3 class="m-0 text-sm font-semibold">Drafts</h3>
+                <h3 class="m-0 text-base font-semibold">Drafts</h3>
                 <input
                     class="min-w-0 flex-1 rounded border px-2 py-1"
                     style="border-color: var(--gamma-border)"

@@ -48,11 +48,11 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
     imports: [MatButtonModule, InspectoAlertComponent, StatusBadgeComponent],
     template: `
         <section
-            class="flex flex-col gap-2 rounded-md border p-2 text-xs"
+            class="flex flex-col gap-2 rounded-md border p-2 text-sm"
             style="border-color: var(--gamma-border)"
             aria-label="Members"
         >
-            <h3 class="m-0 text-sm font-semibold">Members</h3>
+            <h3 class="m-0 text-base font-semibold">Members</h3>
             @if (error()) {
                 <inspecto-alert variant="error" title="Members">{{ error() }}</inspecto-alert>
             }
