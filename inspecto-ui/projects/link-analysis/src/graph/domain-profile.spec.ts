@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+    DEFAULT_MAX_DEGREE,
     GENERIC_PROFILE,
     IndustryPackDto,
     activeDomainProfileId,
@@ -123,5 +124,9 @@ describe('domain profiles', () => {
             expect(p.suggestedTools.length).toBeLessThanOrEqual(3);
             for (const t of p.suggestedTools) expect(known.has(t), `${p.id}: ${t}`).toBe(true);
         }
+    });
+
+    it('lets "Expand next degree" reach 6 when a pack does not state its own maximum', () => {
+        expect(DEFAULT_MAX_DEGREE).toBe(6);
     });
 });

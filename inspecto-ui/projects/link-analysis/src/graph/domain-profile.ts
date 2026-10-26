@@ -80,8 +80,11 @@ export interface InvestigateProfile {
     maxDegree: number;
 }
 
-/** The degree "Expand next degree" stops at when the profile does not say. */
-export const DEFAULT_MAX_DEGREE = 4;
+/**
+ * The degree "Expand next degree" stops at when the profile does not say. Six: past it an analyst keeps growing one
+ * node at a time (Expand one hop, Choose neighbours), and the Working Set's own limits are what stop them.
+ */
+export const DEFAULT_MAX_DEGREE = 6;
 
 /** The neutral labels of the `concept.*` keys — the server's `IndustryPack.CONCEPTS`. */
 export const NEUTRAL_CONCEPT_LABELS: Record<string, string> = {
