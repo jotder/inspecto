@@ -356,6 +356,82 @@
                 </ul>
             }
         </section>
+        <!-- ── Scope list: supernodes to go through, a set to investigate, entities to leave out ── -->
+        <section
+            class="flex flex-col gap-2 rounded-md border p-2"
+            style="border-color: var(--gamma-border)"
+            aria-label="Scope list"
+            data-testid="scope-list"
+        >
+            <span class="text-xs font-semibold">Scope list (this Investigation)</span>
+            <inspecto-pen-field
+                label="Entity ids to include or leave out (one per line or comma-separated)"
+                [formControl]="scopeIds"
+            />
+            <div class="flex flex-wrap gap-1">
+                <button
+                    mat-stroked-button
+                    type="button"
+                    data-testid="scope-include"
+                    [disabled]="!canWrite() || store.busy()"
+                    (click)="scopeAdd()"
+                >
+                    Include (go through)
+                </button>
+                <button
+                    mat-stroked-button
+                    type="button"
+                    data-testid="scope-exclude"
+                    [disabled]="!canWrite() || store.busy()"
+                    (click)="scopeExclude()"
+                >
+                    Leave out
+                </button>
+                @if (selectedInSet().length) {
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        data-testid="scope-include-selected"
+                        [disabled]="!canWrite() || store.busy()"
+                        (click)="scopeAdd(selectedInSet())"
+                    >
+                        Include selected
+                    </button>
+                }
+            </div>
+            @if (scopeError()) {
+                <p class="text-warn m-0 text-xs" data-testid="scope-error">{{ scopeError() }}</p>
+            }
+            @if (store.scope().include.length) {
+                <ul class="m-0 flex list-none flex-wrap gap-1 p-0" aria-label="Included entities">
+                    @for (id of store.scope().include; track id) {
+                        <li>
+                            <button
+                                type="button"
+                                class="cursor-pointer border-0 bg-transparent p-0"
+                                [attr.aria-label]="'Remove ' + id + ' from the include list'"
+                                [disabled]="!canWrite()"
+                                (click)="scopeRemove(id)"
+                            >
+                                <inspecto-chip variant="soft" tone="primary">{{ id }} ✕</inspecto-chip>
+                            </button>
+                        </li>
+                    }
+                </ul>
+                <mat-checkbox
+                    data-testid="scope-only"
+                    [ngModel]="store.scope().only"
+                    [disabled]="!canWrite()"
+                    (ngModelChange)="scopeOnly($event)"
+                >
+                    Only these (an expand admits nothing outside the list)
+                </mat-checkbox>
+                <p class="text-secondary m-0 text-xs">
+                    Every expand goes through the listed supernodes{{ store.scope().only ? ' and admits only them' : '' }};
+                    each step records what it used. Excluded entities stay out of every expand (Undo reverses).
+                </p>
+            }
+        </section>
         <mat-checkbox [ngModel]="!store.showWorkingSet()" (ngModelChange)="store.showWorkingSet.set(!$event)">
             Show the query graph (to pick seeds)
         </mat-checkbox>

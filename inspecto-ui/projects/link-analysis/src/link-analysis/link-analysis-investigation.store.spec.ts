@@ -722,6 +722,37 @@ describe('InvestigationSessionStore - live-run fixes (la-showcase telecom)', () 
         });
     });
 
+    it('the scope list sends its supernodes with every expand, and "Only these" limits what is admitted', async () => {
+        const { store, inv, sets } = setup();
+        await store.start(P, 'p');
+        sets['inv-1'] = ws(['s']);
+        await store.reload();
+        inv.appendInvestigationOp.mockImplementation((() => of(step(1, 'expand'))) as never);
+        store.setScope({ include: ['b', 'a', 'a'], only: false });
+        expect(store.scope()).toEqual({ include: ['a', 'b'], only: false });
+        await store.expandNextDegree({}, 4);
+        expect((inv.appendInvestigationOp.mock.calls.at(-1) as unknown[])[1]).toEqual(
+            expect.objectContaining({ op: 'expand', expandHubs: ['a', 'b'] }),
+        );
+        expect((inv.appendInvestigationOp.mock.calls.at(-1) as unknown[])[1]).not.toHaveProperty('only');
+        store.setScope({ include: ['a', 'b'], only: true });
+        await store.apply({ op: 'expand', ids: ['s'] });
+        expect((inv.appendInvestigationOp.mock.calls.at(-1) as unknown[])[1]).toEqual(
+            expect.objectContaining({ expandHubs: ['a', 'b'], only: ['a', 'b'] }),
+        );
+        store.setScope({ include: [], only: true });
+        expect(store.scope()).toEqual({ include: [], only: false });
+    });
+
+    it('a flagged entity on the scope list is in the next degree’s frontier, not left out', () => {
+        const hub = { ...ws(['h']).entities[0], hop: 0, highConnectivity: true };
+        const set = { ...ws(['s']), entities: [hub] };
+        expect(degreeState(set, 4).heldHubs).toEqual(['h']);
+        const through = degreeState(set, 4, [], false, new Set(), new Set(['h']));
+        expect(through.frontier).toEqual(['h']);
+        expect(through.heldHubs).toEqual([]);
+    });
+
     it('a degree is the outermost hop the step admitted, and the step’s sealed hub counts are kept', async () => {
         const { store, inv, sets } = setup();
         await store.start(P, 'p');

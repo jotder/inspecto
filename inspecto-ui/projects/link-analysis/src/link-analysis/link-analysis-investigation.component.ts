@@ -577,6 +577,44 @@ export class LinkAnalysisInvestigationComponent {
         else this.picked.set(new Set());
     }
 
+    /** The scope list's input: ids pasted one per line or comma-separated. */
+    readonly scopeIds = new FormControl('', { nonNullable: true });
+    readonly scopeError = signal('');
+
+    private scopeParsed(): string[] {
+        return [...new Set(this.scopeIds.value.split(/[\s,;]+/).filter(Boolean))];
+    }
+
+    /** Add ids (the box, or the selection) to the supernodes every expand goes through. */
+    scopeAdd(ids: string[] = this.scopeParsed()): void {
+        if (!this.canWrite() || !ids.length) return;
+        const cur = this.store.scope();
+        this.store.setScope({ ...cur, include: [...cur.include, ...ids] });
+        this.scopeIds.reset('');
+        this.scopeError.set('');
+    }
+
+    scopeRemove(id: string): void {
+        const cur = this.store.scope();
+        this.store.setScope({ ...cur, include: cur.include.filter((i) => i !== id) });
+    }
+
+    scopeOnly(only: boolean): void {
+        this.store.setScope({ ...this.store.scope(), only });
+    }
+
+    /** Leave the listed entities out of every expand: one `exclude` step (works before they are in the Working Set). */
+    async scopeExclude(): Promise<void> {
+        if (!this.canWrite()) return;
+        const ids = this.scopeParsed();
+        if (!ids.length) return;
+        const ok = await this.store.apply({ op: 'exclude', ids, reason: 'Left out of the investigated set' });
+        if (ok) {
+            this.scopeIds.reset('');
+            this.scopeError.set('');
+        } else this.scopeError.set(this.store.error());
+    }
+
     mark(op: 'hide' | 'keep'): void {
         if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
         this.store.apply({ op, ids: this.selectedInSet() });

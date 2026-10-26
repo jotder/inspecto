@@ -87,6 +87,31 @@ function fromDraftReplay(id: string, r: DraftReplayResult): InvestigationReplayR
  * canvas cannot be drawn from them. After every mutation the store re-reads `GET /log` and `POST /replay` —
  * `/replay` is the only route answering the full entities + links + exclusions.
  */
+/** The temporary scope list of one Investigation (see `InvestigationSessionStore.scope`). */
+export interface InvestigationScope {
+    /** Supernodes to expand through; with `only`, the only entities an expand may admit. */
+    include: string[];
+    only: boolean;
+}
+const EMPTY_SCOPE: InvestigationScope = { include: [], only: false };
+const SCOPE_KEY = 'la.investigation-scope';
+
+function readScopes(): Record<string, InvestigationScope> {
+    try {
+        return JSON.parse(localStorage.getItem(SCOPE_KEY) ?? '{}') as Record<string, InvestigationScope>;
+    } catch {
+        return {};
+    }
+}
+
+function writeScopes(all: Record<string, InvestigationScope>): void {
+    try {
+        localStorage.setItem(SCOPE_KEY, JSON.stringify(all));
+    } catch {
+        /* storage blocked: the list lasts for this page only */
+    }
+}
+
 @Injectable()
 export class InvestigationSessionStore {
     private inv = inject(InvService);
@@ -346,6 +371,7 @@ export class InvestigationSessionStore {
             this.degreeOutcomes(),
             includeHubs,
             this.overrideSteps(),
+            new Set(this.scope().include),
         );
         if (state.blocked) {
             this.error.set(state.blocked);
@@ -651,8 +677,37 @@ export class InvestigationSessionStore {
         }
     }
 
+    /**
+     * The analyst's temporary scope list for the open Investigation: `include` = supernodes every expand goes through,
+     * and, with `only`, the only entities an expand may admit (investigating a set); `exclude` is applied as one
+     * `exclude` step (see `excludeSet`). Kept in this browser per Investigation; each expand seals what it used.
+     */
+    private readonly scopes = signal<Record<string, InvestigationScope>>(readScopes());
+    readonly scope = computed<InvestigationScope>(() => this.scopes()[this.activeId() ?? ''] ?? EMPTY_SCOPE);
+
+    setScope(next: InvestigationScope): void {
+        const id = this.activeId();
+        if (!id) return;
+        const clean: InvestigationScope = { include: [...new Set(next.include)].sort(), only: next.only };
+        this.scopes.update((all) => {
+            const { [id]: _drop, ...rest } = all;
+            const out = clean.include.length ? { ...rest, [id]: clean } : rest;
+            writeScopes(out);
+            return out;
+        });
+    }
+
+    /** Lay the scope list under an expand: its supernodes join `expandHubs`; `only` limits the neighbours read. */
+    private scoped(op: InvestigationOpRequest): InvestigationOpRequest {
+        const { include, only } = this.scope();
+        if (op.op !== 'expand' || !include.length) return op;
+        const hubs = new Set([...(op.expandHubs ?? []), ...include]);
+        return { ...op, expandHubs: [...hubs].sort(), ...(only && !op.only ? { only: include } : {}) };
+    }
+
     /** Append one op, then re-read the log and the Working Set. */
-    async apply(op: InvestigationOpRequest): Promise<boolean> {
+    async apply(request: InvestigationOpRequest): Promise<boolean> {
+        const op = this.scoped(request);
         const id = this.activeId();
         if (!id) return false;
         // LA-17: a list-bound op's 404/409 is usually about the Entity List, not the Investigation.

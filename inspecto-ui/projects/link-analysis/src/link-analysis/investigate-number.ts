@@ -554,6 +554,8 @@ export function degreeState(
     outcomes: readonly DegreeOutcome[] = [],
     includeHubs = false,
     overrides: ReadonlySet<number> = new Set(),
+    /** Flagged entities the analyst's scope list always expands through: in the frontier, not "left out". */
+    through: ReadonlySet<string> = new Set(),
 ): DegreeState {
     const shown = (ws?.entities ?? []).filter((e) => !e.hidden);
     // A hub's background contacts admitted by "Expand anyway" are not a degree of the ladder: leaving them out of the
@@ -564,8 +566,8 @@ export function degreeState(
         return { current: -1, frontier: [], heldHubs: [], maxDegree, blocked: 'Seed an entity first.' };
     const current = Math.max(...visible.map((e) => e.hop));
     const outer = visible.filter((e) => e.hop === current);
-    const heldHubs = outer.filter((e) => e.highConnectivity).map((e) => e.id);
-    const frontier = outer.filter((e) => includeHubs || !e.highConnectivity).map((e) => e.id);
+    const heldHubs = outer.filter((e) => e.highConnectivity && !through.has(e.id)).map((e) => e.id);
+    const frontier = outer.filter((e) => includeHubs || !e.highConnectivity || through.has(e.id)).map((e) => e.id);
     let blocked: string | null = null;
     const last = outcomes.at(-1);
     if (isAwaiting(last))
