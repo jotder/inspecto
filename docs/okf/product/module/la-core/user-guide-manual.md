@@ -340,7 +340,8 @@ Datasets in this Space*).
   the data is tree-shaped.
 * **Overlays** — *Legend*, *Working set* (top-N counts), *Node labels*, *Link labels*, *Level of detail*, *Minimap*,
   *Grid*. On a canvas narrower than 1000 px (a laptop) the legend and Working set start as small pills you can
-  expand; once you open or minimise one, this browser remembers your choice.
+  expand; once you open or minimise one, this browser remembers your choice. *Level of detail* (drop labels on a
+  big graph, above `display.lod_label_cap` nodes) and *Community hulls* start switched off.
 * **Lenses and selection** — a link-kind lens, hover / brush / lasso selection, fisheye, community hulls and
   edge bundling. Every lens and selection toggle (fisheye, link filter lens, snap lines, hover activate, lasso
   select) starts switched off; turn on the ones you want, and a saved view remembers them.

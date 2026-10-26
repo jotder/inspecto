@@ -1139,7 +1139,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         return g ? [...new Set(g.nodes.flatMap((n) => Object.keys(n.data.attrs ?? {})))].sort() : [];
     });
     // ── level of detail (mockup review point 5): labels are the first thing to go on a big canvas ──
-    readonly levelOfDetail = signal(true);
+    // Starts OFF (operator 2026-10-26), like Community hulls: switch it on to have labels dropped on a big canvas.
+    readonly levelOfDetail = signal(false);
     /** Above this many displayed nodes, labels are dropped while level of detail is on (`display.lod_label_cap`). */
     readonly lodLabelCap = computed(() => laLimit('display.lod_label_cap'));
     readonly lodLabelsOff = computed(

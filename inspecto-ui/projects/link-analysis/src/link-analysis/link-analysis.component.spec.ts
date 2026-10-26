@@ -1794,7 +1794,18 @@ describe('LinkAnalysisComponent', () => {
         fixture.destroy();
         // Builds and renders a 5,003-link Working Set; the CI runner under coverage took more than the default 5 s (run 36952537914).
     }, 30_000);
-    it('level of detail: drops labels above the cap while on, and the footer states the published caps', async () => {
+    it('Level of detail and Community hulls both start off', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.levelOfDetail()).toBe(false);
+        expect(c.lodLabelsOff()).toBe(false);
+        expect(c.viewOptions().hulls).toBeFalsy();
+        expect(c.canvasPlugins().hulls).toBeNull();
+    });
+
+    it('level of detail: drops labels above the cap once switched on, and the footer states the published caps', async () => {
         const big: G6GraphData = {
             nodes: Array.from({ length: 301 }, (_, i) => ({ id: `n${i}`, data: { label: `N${i}`, kind: 'entity' } })),
             edges: [],
@@ -1805,6 +1816,10 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         c.nodeLabels.set(true); // labels start off now: switch them on to see the level-of-detail rule drop them
         c.edgeLabels.set(true);
+        expect(c.levelOfDetail()).toBe(false); // starts off: a big graph keeps its labels until the user switches the rule on
+        expect(c.lodLabelsOff()).toBe(false);
+        expect(c.displayOptions().nodeLabels).toBe(true);
+        c.levelOfDetail.set(true);
         expect(c.lodLabelsOff()).toBe(true);
         expect(c.displayOptions().nodeLabels).toBe(false);
         expect(c.displayOptions().edgeLabels).toBe(false);
