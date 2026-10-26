@@ -1,10 +1,7 @@
 import { signal } from '@angular/core';
-import {
-    CAPPED_LAYOUT_FALLBACK,
-    GRAPH_LAYOUTS,
-    type GraphDisplayOptions,
-    type GraphLayoutId,
-} from '@inspecto/core/graph/graph-view.component';
+// Runtime values come from graph-layouts (plain data): a runtime import of graph-view.component would pull G6 into the landing page's chunk.
+import { CAPPED_LAYOUT_FALLBACK, GRAPH_LAYOUTS, type GraphLayoutId } from '@inspecto/core/graph/graph-layouts';
+import type { GraphDisplayOptions } from '@inspecto/core/graph/graph-view.component';
 
 /**
  * Link Analysis limits (LA-CONFIG-LIMITS-1, plan `docs/superpower/la-configurable-limits-plan.md` §6.3, §7): the ONE

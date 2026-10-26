@@ -1,21 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { G6GraphData } from './catalog-graph';
 import { CAPPED_LAYOUT_FALLBACK, GraphDisplayOptions, GraphViewComponent, cappedLayout } from './graph-view.component';
 
-// G6 cannot mount in jsdom: keep it out when this mock applies; every export is an inert enum-like stand-in. (The assertions below
-// do not depend on the mock being applied.)
-vi.mock('@antv/g6', () => {
-    class FakeGraph {
-        constructor() {
-            return new Proxy(this, { get: (t, p) => (p in t ? Reflect.get(t, p) : () => Promise.resolve()) });
-        }
-    }
-    const events = new Proxy({}, { get: (_t, k) => String(k) });
-    return { Graph: FakeGraph, CanvasEvent: events, CommonEvent: events, EdgeEvent: events, NodeEvent: events };
+// G6 cannot mount in jsdom (no 2D canvas). A `vi.mock('@antv/g6')` is NOT a reliable way to keep it out: under `ng test`'s shared bundle the
+// mock is not applied once another spec in the same worker has loaded G6, and the real Graph then throws async `clearRect` errors after
+// the tests end (2026-10-26 gate). So `create()` (the only place a Graph is built) is stubbed on the prototype: these specs read the
+// component's layout decision, never a rendered graph, and behave the same in any order.
+beforeEach(() => {
+    vi.spyOn(GraphViewComponent.prototype as unknown as { create(): void }, 'create').mockImplementation(() => undefined);
 });
+afterEach(() => vi.restoreAllMocks());
 
 const graphOf = (n: number): G6GraphData =>
     ({
@@ -63,9 +60,7 @@ describe('the layout node cap, at the one place a layout reaches G6 (N1)', () =>
         expect(CAPPED_LAYOUT_FALLBACK).toBe('concentric');
     });
 
-    // These assert on `effectiveLayout()`, the value `create()` hands to `layoutConfig` (graph-view.component.ts). They do NOT read
-    // what the mocked G6 `Graph` was built with: under `ng test`'s shared bundle a `vi.mock('@antv/g6')` is not applied once another
-    // spec in the same worker has loaded G6, so `built` stayed empty in the full UI suite (2026-10-26 gate) while passing alone.
+    // These assert on `effectiveLayout()`, the value `create()` hands to `layoutConfig` (graph-view.component.ts), not on a built Graph.
     const layoutOf = (fixture: ComponentFixture<GraphViewComponent>) =>
         (fixture.componentInstance as unknown as { effectiveLayout(): string | null }).effectiveLayout();
 

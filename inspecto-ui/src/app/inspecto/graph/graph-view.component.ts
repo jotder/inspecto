@@ -30,9 +30,14 @@ import {
 import { G6GraphData, entityTypeIcon, nodeColor, nodeKindLabel, nodeShape } from './catalog-graph';
 import { toSvg } from './graph-export';
 import type { G6Node } from './graph-types';
+import { CAPPED_LAYOUT_FALLBACK, GRAPH_LAYOUTS, type GraphLayoutId } from './graph-layouts';
 import { NodeRule, nodeRuleColor } from './node-rules';
 import { NodeKind } from 'app/inspecto/api';
 import { ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
+
+// The layout ids, labels and capped-layout fallback are plain data in ./graph-layouts; re-exported so importers of this file are unchanged.
+export { CAPPED_LAYOUT_FALLBACK, GRAPH_LAYOUTS };
+export type { GraphLayoutId };
 
 /**
  * An analysis-result overlay (Link Analysis Studio): listed nodes/edges render full-strength (or
@@ -301,9 +306,6 @@ export interface GraphDisplayOptions {
     layoutCaps?: Partial<Record<GraphLayoutId, number>>;
 }
 
-/** What is drawn in place of a layout that is over its node cap: cheap (milliseconds at 3,000 nodes) and ring-like. */
-export const CAPPED_LAYOUT_FALLBACK: GraphLayoutId = 'concentric';
-
 /** The layout to run for a pick on a graph of `nodeCount` nodes: the pick, or the fallback when it is over its cap. */
 export function cappedLayout(
     id: GraphLayoutId | null,
@@ -388,46 +390,7 @@ export function edgeDash(pattern: EdgePattern | undefined): number[] | undefined
     return pattern === 'dashed' ? [6, 4] : pattern === 'dotted' ? [1, 3] : undefined;
 }
 
-/** A selectable graph layout — the requested names mapped onto G6 v5 built-in layout types. */
-export type GraphLayoutId =
-    | 'dagre'
-    | 'grid'
-    | 'force'
-    | 'force-cluster'
-    | 'radial'
-    | 'concentric'
-    | 'circular'
-    | 'mds'
-    | 'fruchterman'
-    | 'mindmap'
-    | 'org'
-    | 'radial-tree'
-    | 'dendrogram'
-    | 'fishbone';
-
-/** The layouts the Link Analysis "Layout" toolbox offers; `tree` ones need a tree/forest graph. */
-export const GRAPH_LAYOUTS: readonly {
-    id: GraphLayoutId;
-    label: string;
-    tree: boolean;
-}[] = [
-    { id: 'dagre', label: 'Layered', tree: false },
-    { id: 'grid', label: 'Grid', tree: false },
-    { id: 'force', label: 'Force', tree: false },
-    { id: 'force-cluster', label: 'Clustering force', tree: false },
-    { id: 'radial', label: 'Radial', tree: false },
-    { id: 'concentric', label: 'Degree ordered', tree: false },
-    { id: 'circular', label: 'Circular', tree: false },
-    { id: 'mds', label: 'Information density', tree: false },
-    { id: 'fruchterman', label: 'Fruchterman', tree: false },
-    { id: 'mindmap', label: 'Mind map', tree: true },
-    { id: 'org', label: 'Organization chart', tree: true },
-    { id: 'radial-tree', label: 'Radial tree', tree: true },
-    // Hierarchical like the three above, so they carry the same tree/forest gate: G6's tree layouts
-    // read a root and a child order, and handed a cyclic graph they lay out only what they can reach.
-    { id: 'dendrogram', label: 'Dendrogram', tree: true },
-    { id: 'fishbone', label: 'Fishbone', tree: true },
-];
+// GraphLayoutId, GRAPH_LAYOUTS and CAPPED_LAYOUT_FALLBACK live in ./graph-layouts (plain data, no G6) and are re-exported at the top of this file.
 
 /**
  * The G6 layout options for an id; `null`/`dagre` = the default LR layered layout.
