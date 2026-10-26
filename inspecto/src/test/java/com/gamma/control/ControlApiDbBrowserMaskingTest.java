@@ -252,9 +252,6 @@ class ControlApiDbBrowserMaskingTest {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(root)) {
             for (String probe : List.of(
-                    // a join on the key the ON check cannot see (BI-MASKING-FREE-SQL-ORACLES-1 verification): USING holds names
-                    "SELECT count(*) AS n FROM calls a JOIN calls b USING (msisdn) WHERE a.region = 'EU' AND b.region = 'US'",
-                    "SELECT count(*) AS n FROM calls a NATURAL JOIN calls b",
                     "SELECT region FROM calls WHERE COLUMNS('msi.*') = '" + A + "'",
                     "SELECT msisdn AS k, region FROM calls ORDER BY 1",
                     "SELECT msisdn AS k FROM calls ORDER BY ALL",
@@ -274,6 +271,24 @@ class ControlApiDbBrowserMaskingTest {
                     "SELECT * FROM calls UNION ALL SELECT * FROM calls ORDER BY 1",
                     "SELECT amount FROM calls ORDER BY (* LIKE 'msi%') DESC LIMIT 1",
                     "SELECT msisdn AS k, amount FROM calls ORDER BY * DESC LIMIT 1")) {
+                assertEquals(422, as("reader", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), probe);
+                assertEquals(200, as("revealer", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), "a revealer: " + probe);
+            }
+        }
+    }
+
+    /**
+     * A join on the key the ON check cannot see (BI-MASKING-FREE-SQL-ORACLES-1 verification): {@code USING} holds plain names
+     * and a NATURAL join matches every same-named column. Its own server: the loop above spends 20 of the 20
+     * {@code /db/query} calls a caller gets per server, and a 21st answers 429 whenever the run is fast (2026-10-26 gate).
+     */
+    @Test
+    void aJoinOnTheKeyThroughUsingOrNaturalIsRefused(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            for (String probe : List.of(
+                    "SELECT count(*) AS n FROM calls a JOIN calls b USING (msisdn) WHERE a.region = 'EU' AND b.region = 'US'",
+                    "SELECT count(*) AS n FROM calls a NATURAL JOIN calls b")) {
                 assertEquals(422, as("reader", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), probe);
                 assertEquals(200, as("revealer", c, "POST", "/spaces/s1/db/query", query("calls", probe)).statusCode(), "a revealer: " + probe);
             }

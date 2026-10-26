@@ -1,18 +1,15 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { G6GraphData } from './catalog-graph';
 import { CAPPED_LAYOUT_FALLBACK, GraphDisplayOptions, GraphViewComponent, cappedLayout } from './graph-view.component';
 
-/** Every `new Graph(options)` the component makes, in order: the layout is the one that would reach G6. */
-const built = vi.hoisted(() => [] as { layout: { type: string } }[]);
-
-// G6 cannot mount in jsdom: only `new Graph(options)` matters here, every other export is an inert enum-like stand-in.
+// G6 cannot mount in jsdom: keep it out when this mock applies; every export is an inert enum-like stand-in. (The assertions below
+// do not depend on the mock being applied.)
 vi.mock('@antv/g6', () => {
     class FakeGraph {
-        constructor(options: { layout: { type: string } }) {
-            built.push(options);
+        constructor() {
             return new Proxy(this, { get: (t, p) => (p in t ? Reflect.get(t, p) : () => Promise.resolve()) });
         }
     }
@@ -56,8 +53,6 @@ function host(n: number, layout: string, caps: GraphDisplayOptions['layoutCaps']
 }
 
 describe('the layout node cap, at the one place a layout reaches G6 (N1)', () => {
-    beforeEach(() => (built.length = 0));
-
     it('cappedLayout: the pick at or under its cap, the fallback over it, any pick with no cap', () => {
         expect(cappedLayout('radial', 100, { radial: 100 })).toBe('radial');
         expect(cappedLayout('radial', 101, { radial: 100 })).toBe(CAPPED_LAYOUT_FALLBACK);
@@ -68,25 +63,29 @@ describe('the layout node cap, at the one place a layout reaches G6 (N1)', () =>
         expect(CAPPED_LAYOUT_FALLBACK).toBe('concentric');
     });
 
+    // These assert on `effectiveLayout()`, the value `create()` hands to `layoutConfig` (graph-view.component.ts). They do NOT read
+    // what the mocked G6 `Graph` was built with: under `ng test`'s shared bundle a `vi.mock('@antv/g6')` is not applied once another
+    // spec in the same worker has loaded G6, so `built` stayed empty in the full UI suite (2026-10-26 gate) while passing alone.
+    const layoutOf = (fixture: ComponentFixture<GraphViewComponent>) =>
+        (fixture.componentInstance as unknown as { effectiveLayout(): string | null }).effectiveLayout();
+
     it('a Radial graph over the cap is built with Concentric, never Radial', () => {
-        host(101, 'radial', { radial: 100 });
-        expect(built.map((o) => o.layout.type)).toEqual(['concentric']);
+        expect(layoutOf(host(101, 'radial', { radial: 100 }))).toBe('concentric');
     });
 
     it('an Information density graph over its cap is built with Concentric', () => {
-        host(301, 'mds', { mds: 300, radial: 100 });
-        expect(built.map((o) => o.layout.type)).toEqual(['concentric']);
+        expect(layoutOf(host(301, 'mds', { mds: 300, radial: 100 }))).toBe('concentric');
     });
 
     it('at the cap the layout is unchanged', () => {
-        host(100, 'radial', { radial: 100 });
-        expect(built.map((o) => o.layout.type)).toEqual(['radial']);
+        expect(layoutOf(host(100, 'radial', { radial: 100 }))).toBe('radial');
     });
 
     it('a graph that GROWS past the cap is rebuilt with the fallback, not re-laid-out as Radial', () => {
         const fixture = host(100, 'radial', { radial: 100 });
+        expect(layoutOf(fixture)).toBe('radial');
         fixture.componentRef.setInput('data', graphOf(101));
         fixture.detectChanges();
-        expect(built.map((o) => o.layout.type)).toEqual(['radial', 'concentric']);
+        expect(layoutOf(fixture)).toBe('concentric');
     });
 });
