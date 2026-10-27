@@ -4931,6 +4931,22 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
         c.onSelectionChange(['a', 'c']);
         await c.findPathsFromCleanup(3);
         expect(run).toHaveBeenCalledWith({ from: 'a', to: 'c', mapping: 0, maxDepth: 3, direction: 'UNDIRECTED' });
+
+        // Inside an Investigation the seeds are Working Set ids, which the query-graph walk cannot take: it says so.
+        run.mockClear();
+        Object.defineProperty(c.investigation, 'canvas', { value: signal(GRAPH) });
+        await c.findPathsFromCleanup(4);
+        expect(warn).toHaveBeenLastCalledWith(expect.stringContaining('not an Investigation'), 'Find paths');
+        expect(run).not.toHaveBeenCalled();
+    });
+
+    it('LA-REORG-SETTINGS-GAPS-1: Find paths (server) before anything is drawn asks for a graph, not a mapping', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const warn = vi.spyOn(TestBed.inject(ToastrService), 'warning');
+        await c.findPathsFromCleanup(4);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('draw a graph from a Dataset first'), 'Find paths');
     });
 
     it('LA-REORG-VIEW-PACK-OVERRIDE-1: a saved view keeps its pack for display but never overrides the Space pack', async () => {
@@ -4985,7 +5001,13 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
         (el.querySelector('[data-testid="la-file"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         await fixture.whenStable();
-        const row = document.querySelector('[data-testid="la-file-transfer"]');
+        const row = document.querySelector('[data-testid="la-file-transfer"]') as HTMLElement;
         expect(row?.textContent).toContain('Import / export views');
+        // The label opens the transfer menu, as its icon button does.
+        const iconButton = row.querySelector('button') as HTMLButtonElement;
+        const opened = vi.fn();
+        iconButton.addEventListener('click', opened);
+        (row.querySelector('span[aria-hidden="true"]') as HTMLElement).click();
+        expect(opened).toHaveBeenCalledTimes(1);
     });
 });

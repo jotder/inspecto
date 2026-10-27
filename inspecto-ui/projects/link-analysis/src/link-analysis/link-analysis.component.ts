@@ -3425,15 +3425,27 @@ Its prior copies stay in its version history.`,
             });
     }
 
+    /** File ▸ Import / export views: a click on the row's label opens the transfer menu its icon button opens. */
+    onTransferRowClick(ev: MouseEvent): void {
+        ev.stopPropagation(); // keeps File open until the transfer menu takes over
+        if ((ev.target as HTMLElement).closest('button')) return;
+        (ev.currentTarget as HTMLElement).querySelector<HTMLButtonElement>('button')?.click();
+    }
+
     /**
      * Clean up's *Find paths (server)* (§5.6): walk paths between the first two clean-up seeds over the first link
      * mapping, up to the length asked, and show the result in the Analysis tab — or say why it cannot run.
      */
     async findPathsFromCleanup(maxDepth: number): Promise<void> {
         const seeds = [...new Set(this.cleanupSeeds())];
-        const why = !this.traversalTargets().length
-            ? 'this graph has no link mapping the server can walk.'
-            : seeds.length < 2
+        // The server walk reads the query graph's mappings and ids, so it cannot take an Investigation's Working Set ids.
+        const why = this.investigation.canvas() !== null
+            ? 'it walks the query graph, not an Investigation — use Connect seeds in the Investigation instead.'
+            : !this.lastRun()
+              ? 'draw a graph from a Dataset first.'
+              : !this.traversalTargets().length
+                ? 'this graph has no link mapping the server can walk.'
+                : seeds.length < 2
               ? 'it needs two seeds on the canvas.'
               : null;
         this.openAnalysis();
