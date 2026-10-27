@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, HostListener, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, computed, input, output, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import type { G6GraphData } from '@inspecto/core/graph/graph-types';
 import type { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
@@ -79,7 +79,7 @@ const TOOLS: { id: CleanupTool; label: string; icon: string }[] = [
                 @if (blocked(); as why) {
                     <p class="m-0" role="alert" data-testid="cleanup-blocked">{{ why }}</p>
                     @if (t === 'paths' || t === 'shortest') {
-                        <button mat-stroked-button type="button" (click)="findOnServer.emit(); close()">
+                        <button mat-stroked-button type="button" (click)="findOnServer.emit(len()); close()">
                             Find paths (server)
                         </button>
                     }
@@ -125,13 +125,15 @@ export class LinkAnalysisCleanupComponent {
     readonly nodeCap = input<number>(Infinity);
     readonly applied = output<CleanupApply>();
     readonly highlight = output<GraphEmphasis | null>();
-    readonly findOnServer = output<void>();
+    /** *Find paths (server)*, with the longest path asked for (links). */
+    readonly findOnServer = output<number>();
 
     readonly tools = TOOLS;
     readonly tool = signal<CleanupTool | null>(null);
     readonly glowing = signal(false);
     readonly maxLen = new FormControl(4, { nonNullable: true, validators: [Validators.min(1), Validators.max(8)] });
-    private readonly len = signal(4);
+    readonly len = signal(4);
+    private readonly trigger = viewChild.required(MatMenuTrigger);
 
     constructor() {
         this.maxLen.valueChanges.subscribe((v) => this.len.set(Number(v)));
@@ -182,6 +184,11 @@ export class LinkAnalysisCleanupComponent {
     });
 
     readonly effect = computed(() => cleanupEffect(this.hidden()?.length ?? 0, this.graph()?.nodes.length ?? 0));
+
+    /** Open the tool menu ("reduce first", §5.7). */
+    openMenu(): void {
+        this.trigger().openMenu();
+    }
 
     pick(t: CleanupTool): void {
         this.tool.set(t);

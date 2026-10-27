@@ -42,7 +42,7 @@
                 <span>Save this analysis (Snapshot)</span>
             </button>
             <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- stops the click closing File before the transfer menu opens -->
-            <div class="px-2" (click)="$event.stopPropagation()">
+            <div class="flex items-center gap-1 px-2" (click)="$event.stopPropagation()" data-testid="la-file-transfer">
                 <inspecto-la-host-slot
                     [component]="transfer.menu"
                     [inputs]="{
@@ -53,6 +53,7 @@
                     }"
                     [outputs]="transferMenuOutputs"
                 />
+                <span aria-hidden="true">Import / export views</span>
             </div>
             <button
                 mat-menu-item
@@ -172,9 +173,9 @@
                         </div>
                     }
                     @if (anyLayoutOverCap()) {
-                        <button mat-menu-item (click)="openReduce()" data-testid="la-layout-reduce">
+                        <button mat-menu-item [matMenuTriggerFor]="reduceMenu" data-testid="la-layout-reduce">
                             <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
-                            <span>Reduce first — filter the graph to use more layouts</span>
+                            <span>Reduce first — cut the graph to use more layouts</span>
                         </button>
                     }
                 </mat-menu>
@@ -418,7 +419,7 @@
                         @if (hullsDisabledReason(); as why) {
                             <span class="text-secondary text-xs" data-testid="la-hulls-reason"
                                 >Community hulls {{ why }} —
-                                <button type="button" class="text-primary underline" (click)="openReduce()">
+                                <button type="button" class="text-primary underline" [matMenuTriggerFor]="reduceMenu" data-testid="la-hulls-reduce">
                                     reduce first
                                 </button></span
                             >
@@ -927,7 +928,7 @@
                 [nodeCap]="cleanupCap()"
                 (applied)="onCleanupApplied($event)"
                 (highlight)="onCleanupHighlight($event)"
-                (findOnServer)="toolboxTab.set('analysis')"
+                (findOnServer)="findPathsFromCleanup($event)"
             />
             <span class="mx-1 hidden h-6 w-px shrink-0 min-[1300px]:block" style="background: var(--gamma-border)" aria-hidden="true"></span>
 
@@ -1162,7 +1163,7 @@
                         </mat-menu>
                         @if (growExclude.growOpen()) {
                             <inspecto-link-analysis-expand
-                                class="absolute left-2 top-12 z-30"
+                                class="absolute left-2 top-12 z-30 flex max-h-[calc(100%-3.5rem)] flex-col"
                                 [ctx]="growContext()"
                                 [presets]="degreePresets()"
                                 [limits]="fourEyesLimits()"
@@ -1266,9 +1267,6 @@
                                     {{ ((canvasData()?.edges?.length ?? 0) + omitted).toLocaleString() }} links (render
                                     limit)</span
                                 >
-                            }
-                            @if (layoutCapNotice(); as notice) {
-                                <span class="text-warn" role="status" data-testid="la-layout-cap-notice">{{ notice }}</span>
                             }
                             @if (investigation.canvas()) {
                                 <span>Investigation Working Set</span>
@@ -1806,7 +1804,18 @@
         <!-- Data: mounted only while ⚙ is open (the one reader on load and the one consumer of a merge hand-off) -->
         <div laSection="entity-lists">@if (settingsOpen()) {<inspecto-link-analysis-entity-lists />}</div>
         <div laSection="identities">@if (settingsOpen()) {<inspecto-link-analysis-identities />}</div>
-        <div laSection="add-data">@if (settingsOpen()) {<inspecto-link-analysis-uploads />}</div>
+        <div laSection="add-data" class="flex flex-col gap-3">
+            @if (addDataOffered) {
+                <div class="flex items-center gap-2">
+                    <button mat-stroked-button type="button" (click)="openAddData()" data-testid="la-settings-add-data">
+                        <mat-icon svgIcon="heroicons_outline:plus" aria-hidden="true"></mat-icon>
+                        Add data
+                    </button>
+                    <span class="text-secondary text-xs">Register a new Dataset, then draw it here.</span>
+                </div>
+            }
+            @if (settingsOpen()) {<inspecto-link-analysis-uploads />}
+        </div>
         <div laSection="investigation">
             @if (settingsOpen() && investigation.active()) {
                 <inspecto-la-investigation-settings-sections />
@@ -1817,4 +1826,19 @@
             }
         </div>
     </inspecto-la-settings>
+    <!-- "reduce first" (§5.7): Clean up / Filter / Collapse -->
+    <mat-menu #reduceMenu="matMenu" aria-label="Reduce the graph">
+        <button mat-menu-item type="button" (click)="openReduce('cleanup')" data-testid="la-reduce-cleanup">
+            <mat-icon svgIcon="heroicons_outline:sparkles" aria-hidden="true"></mat-icon>
+            <span>Clean up…</span>
+        </button>
+        <button mat-menu-item type="button" (click)="openReduce('filter')" data-testid="la-reduce-filter">
+            <mat-icon svgIcon="heroicons_outline:funnel" aria-hidden="true"></mat-icon>
+            <span>Filter…</span>
+        </button>
+        <button mat-menu-item type="button" (click)="openReduce('collapse')" data-testid="la-reduce-collapse">
+            <mat-icon svgIcon="heroicons_outline:minus-circle" aria-hidden="true"></mat-icon>
+            <span>Collapse the selection</span>
+        </button>
+    </mat-menu>
 </div>

@@ -7,6 +7,33 @@
             }
             @if (store.active()) {
                 @if (store.header(); as h) {
+    <la-fold title="General" [forceOpen]="true">
+                <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm" data-testid="inv-settings-general">
+                    <dt class="text-secondary">Title</dt>
+                    <dd class="m-0">{{ store.displayTitle() || h.id }}</dd>
+                    <dt class="text-secondary">Purpose</dt>
+                    <dd class="m-0">{{ h.purpose || '—' }}</dd>
+                    <dt class="text-secondary">Dataset</dt>
+                    <dd class="m-0">{{ h.dataset }}</dd>
+                    <dt class="text-secondary">Time column</dt>
+                    <dd class="m-0">{{ h.timeCol ? h.timeCol + ' (' + (h.timeColZone || 'UTC') + ')' : 'none (timeless)' }}</dd>
+                    <dt class="text-secondary">Lineage</dt>
+                    <dd class="m-0">{{ h.parent ? 'Branched from ' + h.parent.id + ' after ' + h.parent.parentSteps + ' steps' : 'Original' }}</dd>
+                    <dt class="text-secondary">Industry pack</dt>
+                    <dd class="m-0">{{ h.pack || "The Space's pack" }}</dd>
+                </dl>
+                <div>
+                    <button
+                        mat-stroked-button
+                        color="warn"
+                        type="button"
+                        (click)="deleteInvestigation(h.id, store.displayTitle() || h.id)"
+                        data-testid="inv-settings-delete"
+                    >
+                        Delete…
+                    </button>
+                </div>
+    </la-fold>
     <la-fold title="Case">
                 <inspecto-link-analysis-investigation-case
                     [investigationId]="h.id"

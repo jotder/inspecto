@@ -149,7 +149,7 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         await adopted;
 
         expect(c.layoutId()).toBe('force');
-        expect(c.profileId()).toBe('telecom');
+        expect(c.profileId()).toBe('generic'); // the draft's pack is kept, never the one in force (§5.12)
         expect(queried).toEqual([expect.objectContaining(QUERY)]);
         expect(writes(http)).toEqual([]); // adopting wrote nothing
 
@@ -166,7 +166,7 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         expect(post.request.method).toBe('POST');
         expect(post.request.url).toBe(`${base}/components/link-analysis-view`);
         expect(post.request.headers.has('If-Match')).toBe(false);
-        expect(post.request.body).toMatchObject({ id: 'fraud-ring', name: 'Fraud ring', layout: 'force' });
+        expect(post.request.body).toMatchObject({ id: 'fraud-ring', name: 'Fraud ring', layout: 'force', profile: 'telecom' });
         http.expectNone(`${base}/bundle/import`);
         post.flush({});
         await saved;

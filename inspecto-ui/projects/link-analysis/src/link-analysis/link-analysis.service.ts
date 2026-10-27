@@ -81,6 +81,8 @@ export interface LinkAnalysisViewOptions {
     plugins?: Omit<GraphViewPlugins, 'hulls'> & { hulls?: boolean };
     legend?: boolean;
     workingSet?: boolean;
+    /** The folded nodes (Collapse, §5.5): display state, so it travels with the view. */
+    collapsed?: string[];
 }
 
 /** View store — a thin kind/codec binding over the shared {@link SavedViewStore}. */

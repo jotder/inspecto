@@ -256,8 +256,8 @@ Today the profile is not dead. It relabels terms, finds the measure and time col
 - This closes `LA-SAVED-VIEW-DOMAIN-PROFILE-1`.
 
 **As built (P2b, 2026-10-27):** no picker; `profileId = investigation.boundProfileId() ?? boundProfile() ??
-activeDomainProfileId()`. `boundProfile` is set by a saved view's stored pack and by an *Investigate a number* binding,
-and cleared by Close. *Save as template* takes an optional `pack` (`POST /inv/investigations/{id}/template`, shape-checked
+activeDomainProfileId()`. `boundProfile` is set by an *Investigate a number* binding and cleared by Close; a saved view's
+stored pack never binds it (`LA-REORG-VIEW-PACK-OVERRIDE-1`): it is shown in the Open preview and re-saved unchanged. *Save as template* takes an optional `pack` (`POST /inv/investigations/{id}/template`, shape-checked
 as an id, 422 otherwise); an instantiated Investigation's header carries it as `pack`, which `boundProfileId` reads when
 the pack is installed. The pack in force shows read-only at the top of ⚙ → Graph model. `LA-SAVED-VIEW-DOMAIN-PROFILE-1`
 closed: a view without a pack no longer overrides the Space's.

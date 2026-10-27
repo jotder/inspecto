@@ -18,7 +18,6 @@ import {
 } from '@angular/core';
 import {
     FormBuilder,
-    FormControl,
     FormsModule,
     ReactiveFormsModule,
     Validators,
@@ -151,7 +150,6 @@ import {
     DomainProfileId,
     activeDomainProfileId,
     domainProfile,
-    domainProfiles,
     profileForEntityType,
     workingSetOptionsFor,
 } from '@inspecto/link-analysis/graph/domain-profile';
@@ -288,7 +286,7 @@ import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
-import { laLayoutCaps, laLimit, layoutCapNoticeText, layoutOverCapReason, overCapReason } from './la-limits';
+import { laLayoutCaps, laLimit, layoutOverCapReason, overCapReason } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
@@ -556,6 +554,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild(LinkAnalysisToolboxComponent) private toolbox?: LinkAnalysisToolboxComponent;
     @ViewChild(LinkAnalysisDiscoverComponent) private discover?: LinkAnalysisDiscoverComponent;
     @ViewChild(LinkAnalysisQueryPanelComponent) private queryPanel?: LinkAnalysisQueryPanelComponent;
+    @ViewChild(LinkAnalysisCleanupComponent) private cleanup?: LinkAnalysisCleanupComponent;
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
     @ViewChild('graphRegion') private graphRegion?: ElementRef<HTMLElement>;
@@ -563,8 +562,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild('fileTrigger') private fileTrigger?: MatMenuTrigger;
 
     // ── workspace layout: canvas │ [toolbox dock], Data as a bottom strip; the graph model lives in ⚙ Settings ──
-    /** Full query form vs its collapsed selected-values summary (auto-collapses after a run). */
-    readonly queryOpen = signal(true);
     /** ⚙ Settings (§5.10): open, and the section shown (the dialog remembers the last one). */
     readonly settingsOpen = signal(false);
     readonly settingsSection = signal<LaSettingsSection>('graph-model');
@@ -1324,12 +1321,21 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly layoutId = computed<GraphLayoutId>(() => {
         const picked = this.pickedLayout();
         const g = this.canvasData();
-        // Radial, Information density and Clustering force (force-atlas2) block the tab for 20 s to minutes on ~800 nodes:
-        // above their cap they are disabled in the menus (UIR-D11); a pick restored over it (saved view / undo / the
-        // graph grew) draws the default layout, and {@link layoutCapNotice} says why.
+        // Never an over-cap layout, even in the instant before {@link dropOverCapLayout} drops the pick.
         if (!picked || layoutOverCapReason(picked, g?.nodes.length ?? 0))
             return defaultLayoutFor(g, this.investigation.canvas() !== null);
         return picked;
+    });
+    /**
+     * Radial, Information density and Clustering force (force-atlas2) block the tab for 20 s to minutes on ~800 nodes:
+     * above their cap they are disabled in the menus with the reason (UIR-D11). A pick over the cap (saved view, undo, the
+     * graph grew) is dropped, so the menus show the layout actually drawn — no silent stand-in (§5.7).
+     */
+    private readonly dropOverCapLayout = effect(() => {
+        const picked = this.pickedLayout();
+        // Not while a run is in flight: the graph on screen is the OLD one, and a view opening over it would lose its pick.
+        if (picked && !this.loading() && layoutOverCapReason(picked, this.canvasData()?.nodes.length ?? 0))
+            untracked(() => this.pickedLayout.set(null));
     });
     /** Why a layout button is disabled on this graph (tree shape or node cap); null when it can be picked. */
     layoutDisabledReason(l: { id: GraphLayoutId; tree?: boolean }): string | null {
@@ -1345,15 +1351,20 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly hullsDisabledReason = computed(() =>
         overCapReason(browserAlgorithmCapValue('louvainCommunities'), this.displayed()?.nodes.length ?? 0),
     );
-    /** "Reduce first": open the Filter editor in the data strip, so the analyst can cut the graph under a cap. */
-    openReduce(): void {
-        this.bottomOpen.set(true);
-        this.filterOpen.set(true);
+    /**
+     * "Reduce first" (§5.7): cut the graph under a cap with Clean up, the Filter editor (the dock's Rows tab, whichever
+     * tab was showing) or Collapse of the selection.
+     */
+    openReduce(how: 'cleanup' | 'filter' | 'collapse'): void {
+        if (how === 'cleanup') this.cleanup?.openMenu();
+        else if (how === 'collapse') {
+            if (this.selectedOnCanvas().length) this.toggleCollapse(this.selectedOnCanvas());
+            else this.toastr.info('Select the entities to fold first, then Collapse (C).', 'Collapse');
+        } else {
+            this.openDock('rows');
+            this.filterOpen.set(true);
+        }
     }
-    /** On-screen notice while a pick is shown in the default layout because the graph is over that layout's cap. */
-    readonly layoutCapNotice = computed<string | null>(() =>
-        layoutCapNoticeText(this.pickedLayout(), this.canvasData()?.nodes.length ?? 0),
-    );
     readonly layouts = GRAPH_LAYOUTS;
     /** Whether the current graph is tree/forest-shaped — gates the tree layouts. */
     readonly isTreeShaped = computed<boolean>(() => {
@@ -1451,10 +1462,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         () => this.canvasSource()?.nodes.filter((n) => n.data.unexpanded).length ?? 0,
     );
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
-    // UIR-D9 (§5.12): no picker. The Space's Industry pack applies, unless the open Investigation, a Template or a
-    // saved view bound another; a bound pack is shown read-only in ⚙ Settings → Graph model.
-    /** A pack a saved view or an *Investigate a number* binding brought; null = none. */
+    // UIR-D9 (§5.12): no picker. The Space's Industry pack applies, unless the open Investigation, a Template or an
+    // *Investigate a number* binding bound another; a bound pack is shown read-only in ⚙ Settings → Graph model. A saved
+    // view's stored pack never overrides the Space's: it is kept (and re-saved) read-only.
+    /** A pack an *Investigate a number* binding brought; null = none. */
     readonly boundProfile = signal<DomainProfileId | null>(null);
+    /** The pack stored with the open saved view, kept so re-saving it does not rewrite it; null = none. */
+    private readonly viewPack = signal<DomainProfileId | null>(null);
     readonly profileId = computed<DomainProfileId>(
         () => this.investigation.boundProfileId() ?? this.boundProfile() ?? activeDomainProfileId(),
     );
@@ -1968,7 +1982,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 drawn.map((r, i) => seedNodeOf(r, found[i])).filter((id): id is string => !!id),
             );
             this.growExclude.basicHeld.set(held);
-            this.queryOpen.set(false);
             const t = this.growTerms();
             this.startNotice.set({
                 variant: unknown.length ? 'warning' : 'info',
@@ -2096,7 +2109,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     exploreDataset(datasetId?: string): void {
         this.openSettings('graph-model');
-        this.queryOpen.set(true);
         this.sourceId.set('entity-projection');
         this.cdr.detectChanges(); // the picker must exist before it is opened
         this.queryPanel?.startExplore(datasetId);
@@ -2319,6 +2331,7 @@ Its prior copies stay in its version history.`,
             return;
         this.clearDraft();
         this.boundProfile.set(null); // back to the Space's pack (UIR-D9)
+        this.viewPack.set(null);
         this.openViewId.set(null);
         this.setViewParam(null); // Close drops what a refresh would reopen
         this.investigation.close();
@@ -2334,7 +2347,6 @@ Its prior copies stay in its version history.`,
         this.loadError.set('');
         this.kindFilter.set([]);
         this.hiddenNodeIds.set([]);
-        this.queryOpen.set(true);
         this.growExclude.reset();
     }
 
@@ -2406,14 +2418,12 @@ Its prior copies stay in its version history.`,
             this.mappingSummary.set((g as MultiProjectedGraph).mappings ?? []);
             this.kindFilter.set([]);
             this.lastRun.set(this.runOf(sourceId, q, g as ProjectedGraph));
-            this.queryOpen.set(false); // smart form: collapse to the selected-values summary
             this.queryPanel?.markPristine(); // what was run is no longer an unsaved change
             this.settingsOpen.set(false); // the drawn graph is the answer: show it
             if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
         } catch (err) {
             this.graph.set(null);
             this.lastRun.set(null);
-            this.queryOpen.set(true); // a failing query needs its form back
             // EDITIONS CP-09: a 503 means the backend module is absent in this bundle, not that the query
             // was bad — say so, instead of a generic failure the user will retry (the assist-panel idiom).
             // The nav entry is hidden on the same flag; this is the belt for a bookmarked/deep-linked URL.
@@ -2729,7 +2739,6 @@ Its prior copies stay in its version history.`,
 
     /** Reopen the full query form (status-bar chips and pencil): ⚙ Settings → Graph model. */
     editQuery(): void {
-        this.queryOpen.set(true);
         this.openSettings('graph-model');
     }
 
@@ -2813,6 +2822,7 @@ Its prior copies stay in its version history.`,
 
     /** Pick a graph layout (tree layouts are gated on {@link isTreeShaped} in the template). */
     setLayout(id: GraphLayoutId): void {
+        if (layoutOverCapReason(id, this.canvasData()?.nodes.length ?? 0)) return; // the menu item is disabled with the reason
         this.recordHistory();
         this.pickedLayout.set(id);
     }
@@ -3140,26 +3150,6 @@ Its prior copies stay in its version history.`,
         return true;
     }
 
-    /** The selection bar's "Expand from the N selected nodes". */
-    async expandFromSelected(): Promise<void> {
-        const nodes = this.selectedNodes();
-        if (!nodes.length) return;
-        if (this.investigation.canvas() !== null) {
-            if (this.writesToInvestigation()) await this.expandInInvestigation(nodes);
-            return;
-        }
-        // Exploration: one hop per node, each its own fetch, so the number is bounded and said.
-        const todo = nodes.filter((n) => !this.expandedNodeIds().includes(n.id));
-        if (!todo.length) {
-            this.toastr.info('Every selected node is already expanded.');
-            return;
-        }
-        const batch = todo.slice(0, this.selectionExpandCap);
-        for (const n of batch) await this.expandNode(n.id, n.data.label, n.data.spellings);
-        if (todo.length > batch.length)
-            this.toastr.info(`Expanded the first ${batch.length} of ${todo.length} selected nodes - run it again for the rest.`);
-    }
-
     /** "Hide selected": a LOGGED `hide` step inside an Investigation, a presentation hide (undoable) in exploration. */
     async hideSelected(): Promise<void> {
         const nodes = this.selectedNodes();
@@ -3433,6 +3423,25 @@ Its prior copies stay in its version history.`,
                     this.router.navigate(['/' + (objectRef.type === 'CASE' ? 'cases' : 'incidents'), objectRef.id]);
                 }
             });
+    }
+
+    /**
+     * Clean up's *Find paths (server)* (§5.6): walk paths between the first two clean-up seeds over the first link
+     * mapping, up to the length asked, and show the result in the Analysis tab — or say why it cannot run.
+     */
+    async findPathsFromCleanup(maxDepth: number): Promise<void> {
+        const seeds = [...new Set(this.cleanupSeeds())];
+        const why = !this.traversalTargets().length
+            ? 'this graph has no link mapping the server can walk.'
+            : seeds.length < 2
+              ? 'it needs two seeds on the canvas.'
+              : null;
+        this.openAnalysis();
+        if (why) {
+            this.toastr.warning('Find paths (server) cannot run: ' + why, 'Find paths');
+            return;
+        }
+        await this.findPaths({ from: seeds[0], to: seeds[1], mapping: 0, maxDepth, direction: 'UNDIRECTED' });
     }
 
     /**
@@ -3830,8 +3839,13 @@ Its prior copies stay in its version history.`,
             query: q,
             display: this.chosenDisplay(), // what the analyst chose travels with the view (the automatic look is derived afresh); reapplied on load
             layout: this.pickedLayout() ?? this.layoutId(),
-            profile: this.profileId() === 'generic' ? undefined : this.profileId(),
-            view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
+            profile: this.viewPack() ?? (this.profileId() === 'generic' ? undefined : this.profileId()),
+            view: {
+                plugins: this.viewOptions(),
+                legend: this.legendOpen(),
+                workingSet: this.workingSetOpen(),
+                ...(this.collapsedRoots().length ? { collapsed: this.collapsedRoots() } : {}), // §5.5: display state
+            },
             // LA-10: no server list exists — the view is where this screen remembers its Investigation ids.
             investigations: this.investigation.refs().length ? this.investigation.refs() : undefined,
             ...this.caseOfState(),
@@ -3980,6 +3994,7 @@ Its prior copies stay in its version history.`,
      * opened, a draft was imported), so a refresh must not reopen the old one over it. A no-op when no view is open.
      */
     private forgetOpenView(): void {
+        this.viewPack.set(null); // what is drawn next is not that view, so its stored pack is not re-saved
         if (!this.openViewId()) return;
         this.openViewId.set(null);
         this.setViewParam(null);
@@ -3989,7 +4004,8 @@ Its prior copies stay in its version history.`,
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
         this.pickedLayout.set(view.layout ?? null);
-        this.boundProfile.set(view.profile ?? null);
+        // The view's stored pack is shown read-only (Open preview); it never overrides the Space's (§5.12).
+        this.boundProfile.set(null);
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         if (view.view?.plugins) this.viewOptions.set(canvasModeOptions(view.view.plugins));
@@ -4002,9 +4018,12 @@ Its prior copies stay in its version history.`,
         // restore, because a view cannot be remembered while an Investigation canvas is still on screen.
         if (this.importDraft()?.id === view.id) this.forgetOpenView();
         else this.rememberOpenView(view.id);
-        if (view.start && (await this.drawCaseStart(view))) return;
-        await this.execute(view.sourceId, view.query);
-        if (view.lists) this.caseLists.set({ start: view.lists.start, exclusions: view.lists.exclusions ?? [] });
+        this.viewPack.set(view.profile ?? null);
+        if (!(view.start && (await this.drawCaseStart(view)))) {
+            await this.execute(view.sourceId, view.query);
+            if (view.lists) this.caseLists.set({ start: view.lists.start, exclusions: view.lists.exclusions ?? [] });
+        }
+        this.collapsedRoots.set(view.view?.collapsed ?? []); // after the run, which clears it
     }
 
     /**
@@ -4393,7 +4412,7 @@ Its prior copies stay in its version history.`,
 
     /** The explorer frontier minus the busy nodes a preview of it names; those join the Held tray. */
     private async holdBusy(frontier: string[], req: GrowRequest): Promise<string[]> {
-        let held: { id: string; contacts: number }[] = [];
+        let held: { id: string; contacts: number }[];
         try {
             held = (await this.growExclude.basicAdapter?.preview(frontier, req))?.held ?? [];
         } catch {

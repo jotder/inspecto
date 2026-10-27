@@ -74,7 +74,7 @@ export interface ExpandRun {
     ],
     template: `
         <section
-            class="flex max-h-[75vh] w-[28rem] max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-y-auto rounded-lg border p-3 shadow-lg"
+            class="flex max-h-[75vh] min-h-0 w-[28rem] max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-y-auto rounded-lg border p-3 shadow-lg"
             style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
             role="dialog"
             aria-labelledby="la-expand-title"
