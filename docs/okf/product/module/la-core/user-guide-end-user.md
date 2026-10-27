@@ -184,20 +184,55 @@ need the right to edit Datasets when you sign in; without it they are greyed out
 
 ## 4. The screen
 
-* **Left panel, Query:** which Dataset to draw, and which columns are the two ends of a link.
-* **Middle, Canvas:** the graph. Drag to pan, scroll to zoom, click a node for its details, drag a node to move it.
-  **Fit the graph to the screen** re-frames everything.
-* **Right panel, Toolbox:** three tabs: **Analysis** (the tools), **View** (layout and display) and
-  **Investigation** (your recorded work).
-* **Top bar:** search, filter, layout, **Save this analysis**, **Attach to Case**, saved views, undo and redo,
-  **Show as list**, full screen and **Export**.
-* **Bottom bar:** how many nodes and links are drawn, and the **Data** strip showing the rows behind the graph.
+Act on the canvas, read in the dock, configure in **⚙ Settings**. From top to bottom:
 
-On a narrow window the panels stack; open the Toolbox and scroll down to it. A window about 1300 px wide or more
-shows all three panels side by side.
+* **Top bar (file and view):** **File ▾**, then **Search nodes**, **Filter node types**, **Graph layout**, **Filter
+  edges by time**, the **Analysis** and **Investigation** buttons (they open the right panel at that tab), **Help**,
+  **Glossary**, **Display options** (the brush), **Undo** and **Redo**, **Fit the graph to the screen**, **Show as
+  list**, **Full screen**, **Export**, **Show the rows** (opens the dock) and **Hide the side panels**. **⚙ Settings**
+  sits at the right end of the page header.
+* **Second toolbar (work on the canvas):** the **Canvas mode** (Pan, Lasso, Fisheye, Link filter), the selection
+  (**Select all**, **Invert**, **Add neighbours**, **Clear**), the graph edits (**Expand…**, **Collapse**, **Hide**,
+  **Exclude** and **Merge** inside an Investigation, **Attach to Case**), **Clean up ▾**, and the **Held (n)** and
+  **Hidden (n)** counts. On a narrow window the groups that do not fit go into **More canvas tools** (`⋯`); the
+  toolbar never takes a third row.
+* **Middle, Canvas:** the graph, with the legend, the Working set tiles and the minimap.
+* **Right panel:** two tabs, **Analysis** (*Find something interesting* and the algorithm catalogue, section 7) and
+  **Investigation** (the Act panel, section 8).
+* **Dock (bottom):** tabs **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table),
+  plus, with an Investigation open, **Op log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
+  entities**. Drag its edge to resize it; it remembers its tab and height in this browser.
+* **Status bar:** **Caps**, the graph-model chips (Dataset, Mapping, Link type, Attributes: click one to change it in
+  ⚙ Settings ▸ Graph model), the pencil, **Refresh** (runs the same graph model again), the counts and **Installed
+  modules**.
+
+There is no left panel any more: what it held (the Dataset, the entity columns, mappings, attributes, Run) is
+**⚙ Settings ▸ Graph model**.
+
+### ⚙ Settings
+
+One dialog for what you set rarely. The left side lists the sections, each with one line of help:
+
+| Group | Sections |
+|---|---|
+| **This graph** | **Graph model** (Dataset, the two entity columns, link type, mappings, attribute columns, root, depth and direction; **Run query** and **Refresh** at the foot; the Industry pack in force is shown read-only at the top) · **Entity Types** (the types the graph is drawn as, **New Entity Type**, **Retire**) · **Display rules** (node colour rules by attribute) |
+| **Data** | **Entity Lists** · **Identities** (identity resolution) · **Add / Upload data** (upload a CSV to an upload-enabled Collector) |
+| **This Investigation** (only while one is open) | **Investigation settings**: Case, Members, Share and embed, Drafts, Replay and drift, Pin to a Widget, Oversight and approvals, Measures and templates, Dossier, References |
+
+The dialog remembers the last section in this browser. Running the graph model closes it; closing it over an edit
+you did not run asks first.
+
+### File ▾
+
+**New** (back to *Start from…*), **Open…**, **Save view**, **Save view as…**, **Save this analysis (Snapshot)**,
+**Import / export views**, **Close**, and **Delete** (names what it deletes and asks first). See *Save view* in
+section 6.
+
+On a narrow window the right panel stacks under the canvas. A window about 1300 px wide or more shows them side by
+side.
 
 **Masked ids.** If you see names such as `masked:1d4d76be…`, your Space hides sensitive ids. The same alias always
-stands for the same account, so you can still group, count, search and follow it. The query panel says
+stands for the same account, so you can still group, count, search and follow it. ⚙ Settings ▸ Graph model says
 **Masking: typed (ids shown as aliases)**. Someone with Reveal rights can turn an alias back into the real id.
 
 ---
@@ -223,6 +258,7 @@ picked when you come from *Explore in Link Analysis*), then what to start from:
 **Start** draws what you chose and everything linked to it - **one ring** - with busy numbers held (see *Grow and
 clean the graph* below), so **Grow** continues from there one step at a time. A line above the graph says what was
 drawn and lists any value that is not in the Dataset. A list or a paste draws at most 25 values in one start.
+(**Grow** is now the **Expand…** dialog on the second toolbar.)
 
 With Investigations (Standard and above, with the add-on), **One entity** seeds an Investigation instead: state the
 **Purpose / legal basis** and press **Investigate**; it creates the Investigation, seeds the entity and draws one
@@ -233,17 +269,18 @@ Investigation you start.
 
 ### 4.1 Use an example or a saved view
 Under the box, **Follow the money (example)** opens a ready-made view and draws it at once. **Open a saved
-view** lists your Space's views. A saved view re-reads live data; it is a starting point, not evidence. **Add data**
+view** opens **File ▸ Open…** at the *Saved views* tab. A saved view re-reads live data; it is a starting point, not evidence. **Add data**
 brings a file into the Space.
 
 ### 4.2 Draw a Dataset yourself
-**Explore a Dataset** lets you choose the columns:
+**Explore a Dataset** opens **⚙ Settings ▸ Graph model**, where you choose the columns:
 1. Under **Dataset**, choose one. The list shows the ones that look like links first, each with the reason.
 2. The two **entity columns** are filled in for you. Change them if the link runs the other way. Optionally set a
    **Link type column** (channel, call type) and **Attribute columns** (amount, country, time).
-3. Press **Run query**. The footer says, for example, *20 nodes · 20 links drawn*.
+3. Press **Run query**. Settings closes and the footer says, for example, *20 nodes · 20 links drawn*. To run the
+   same model again later, press **Refresh** in the status bar.
 
-> **Tip:** the Purpose field is required. If the Investigation tab opens scrolled somewhere else, scroll to its top.
+> **Tip:** the Purpose field is required when you start an Investigation.
 
 ---
 
@@ -255,28 +292,64 @@ brings a file into the Space.
 | Only some kinds of node | **Filter node types** |
 | A better layout | **Graph layout** |
 | Links in a time range | **Filter edges by time**; needs a time column among the **Attribute columns** |
-| The rows behind the picture | **Show as list**, or the **Data** strip |
+| The rows behind the picture | **Show as list**, or the dock's **Rows** tab (**Show the rows**) |
 
-**Display options** (the brush) switch node and link labels, colours and shapes. A dotted outline in the legend marks
-a node you have not expanded yet. **Undo** and **Redo** step through display and filter changes.
+**Display options** (the brush) switch node and link labels, colours, shapes, node size and spacing, **Snap lines**
+and **Hover activate**, and the overlays: **Legend**, **Working set**, **Level of detail**, **Minimap**, **Grid**,
+**Community hulls**, **Group lone counterparties**, **Bubble sets** and **Link bundling**. Colour rules by attribute
+are in **⚙ Settings ▸ Display rules**. A dotted outline in the legend marks a node you have not expanded yet.
+**Undo** and **Redo** step through display and filter changes. A layout or overlay that the graph is too big for is
+greyed out and says why (*needs at most 300 nodes — this graph has 921*); reduce the graph first with Clean up,
+Filter or Collapse.
+
+### Canvas modes and selecting
+
+The **Canvas mode** decides what a drag on the empty canvas does. One is active at a time; the key is in the tooltip.
+
+| Mode | A drag on the canvas |
+|---|---|
+| **Pan** (default; **Esc** returns to it) | moves the view. **Shift+drag** draws a lasso that adds to the selection. |
+| **Lasso** (**L**) | draws a lasso (handy on a touchpad) |
+| **Fisheye** (**F**) | moves a magnifying lens over the graph |
+| **Link filter** | moves a lens; only the links inside it show |
+
+In every mode: scroll zooms, dragging a node moves it (and the whole selection with it), **Shift+click** adds or
+removes one node, **Ctrl+A** selects all (super-nodes excluded), and the arrow keys and **+** / **−** move and zoom.
+The second toolbar's selection group also has **Invert** and **Add neighbours**; the *N selected* count is in the
+status bar.
 
 ### Grow and clean the graph
 
-* **Grow** (or press **G**) adds the next ring of linked numbers. It opens on safe defaults — both ways, one step,
-  busy numbers held — and tells you what the step would add before anything changes. Press **Grow**, or **Cancel**.
-  After it, one line says what happened, with **Undo** (or **Ctrl+Z**). In a shared Investigation, Undo takes back
-  only the step it names: if a colleague recorded a newer step meanwhile, nothing is undone and the log shows theirs.
-* **Busy numbers** — call centres, switchboards, shops — link to thousands of others and hide the real links. Grow
-  holds them: they stay on the graph with a ring and a *held* badge, listed in the **Held** tray. **Remove held**
-  takes them all out in one step; **Expand anyway** grows through one of them.
-* **Right-click a node** (or press **X** with nodes selected) → **Exclude…**: *From this Investigation only*, or
-  *Add to a list…* so it stays out of every later step too. Some lists are kept by your administrator (VIPs,
+* **Expand…** (second toolbar, **G**, or right-click a node) opens one dialog:
+  * **From**: the selection, the seeds, or the nodes not expanded yet (the first 25).
+  * **Direction**: both ways, outgoing or incoming. **Degrees**: 1 to the maximum in force.
+  * **Hold supernodes with more than *H* links** (on by default).
+  * **Advanced**: link kinds, time window and the other limits.
+  * A preview line says what it would add before anything changes; **Expand** runs it degree by degree, **Cancel**
+    leaves the graph as it is. Afterwards one line says what happened, with **Undo** (or **Ctrl+Z**). In an
+    Investigation each degree is a recorded `expand` step, and one Undo takes back the whole Expand. In a shared
+    Investigation, Undo takes back only the steps it names: if a colleague recorded a newer step meanwhile, nothing
+    is undone and the log shows theirs.
+  * Double-click a node that is not expanded yet to expand it one degree without the dialog.
+* **Busy numbers** — call centres, switchboards, shops — link to thousands of others and hide the real links. Expand
+  holds them: they stay on the graph with a ring and a *held* badge, and **Held (n)** opens the held tray.
+  **Remove held** takes them all out in one step; **Expand anyway** grows through one of them.
+* **Collapse** (**C**, the second toolbar, or right-click) folds a node's branch (the neighbours that link to
+  nothing else) into a **+n** badge. Double-click an expanded node to fold or unfold it. Inside an Investigation this
+  only changes what you see: nothing is recorded and the Working Set does not change.
+* **Clean up ▾** offers **Keep paths between seeds** (keep the seeds and every node on a path of at most *L* links
+  between two of them), **Highlight shortest paths** (glow, nothing removed; **Esc** clears), **Trim dangling
+  leaves**, **Keep only selected** and **Remove selected**. Each first says what it would do (*hides 16 of 112
+  entities*) with **Apply** / **Cancel**. Without an Investigation it hides with Undo; in one it is recorded with a
+  reason filled in for you.
+* **Exclude** (second toolbar, right-click, or **X** with nodes selected) → *From this Investigation only*, or *Add
+  to a list…* so it stays out of every later step too. Some lists are kept by your administrator (VIPs,
   politicians); you can use them, not change them.
-* **Hidden** (tool rail) shows the lists in force — "41 numbers hidden by 3 lists" — lets you switch one on or off,
-  and shows what was removed.
+* **Hidden (n)** shows the lists in force — "41 numbers hidden by 3 lists" — lets you switch one on or off, and shows
+  what was removed.
 
-In an Investigation each of these is a recorded step; without one (Basic) they change only what you see. The first
-time each panel opens, a short note explains it; **Got it** hides the note in this browser.
+In an Investigation Expand, Hide, Exclude and Clean up are recorded steps; without one they change only what you see.
+The first time each panel opens, a short note explains it; **Got it** hides the note in this browser.
 
 ### Save view
 
@@ -299,11 +372,12 @@ asking.
 
 Without Investigations (Basic, or a signed-in install without the Investigations add-on), the menu also shows
 **Start an Investigation from this** locked, with one line naming what has it. With Investigations, the
-Investigation tab starts one as before. To keep a frozen copy, use **Save this analysis** (section 8).
+Investigation tab starts one as before. To keep a frozen copy, use **File ▸ Save this analysis** (section 8).
+**Import / export views** (in File) moves views between Spaces as a file.
 
 ---
 
-## 7. The analysis tools (Toolbox → Analysis)
+## 7. The analysis tools (right panel → Analysis)
 
 **Find something interesting** sits at the top of the Analysis tab: three plain questions about the graph on screen.
 
@@ -321,8 +395,13 @@ its purpose in plain words: *Watch these*, *Never follow these*, *Known good*, *
 exclusion list you add to becomes one of the saved view's lists, and without an Investigation its entities are hidden at once
 (Undo brings them back).
 
-The full toolbox follows. Open one group at a time; results stay while you switch tabs. Click a row in a ranking to select that node and
-centre the canvas on it.
+Below it is **one algorithm catalogue**, ordered by the question each answers. A **Browser | Server** switch sets
+where it runs: *Browser* works on the graph on screen; *Server* lists the server algorithms (29 on a standard
+install) and runs them over the whole Dataset. Each row shows the algorithm, a badge (*both*, *server*) and its limit
+(*≤ 2500 nodes in the browser*). Over the browser limit, Server is chosen for you and says why. The Server side is
+hidden on the Explorer level and on Basic, with one line saying what has it. Open one row at a time; results stay
+while you switch tabs. Click a row in a ranking to select that node and centre the canvas on it. A long result has
+**Open in the dock**, which shows every row in the dock's **Results** tab.
 
 | Group | Use it to answer |
 |---|---|
@@ -335,11 +414,12 @@ centre the canvas on it.
 | **Suspicion score** | Which nodes look riskiest (0 to 100, with the reasons)? |
 | **Pattern match** | Find a shape: a layering chain, a structuring fan-in, a circular flow |
 | **Value Measures** | Which entities stand out by money flow: pass-through, cash-out concentration, structuring, benefit transfer |
+| **Burst and periodicity** | When does activity spike, and what repeats on a schedule? |
 
 **If a tool says it needs a time column.** Pattern packs that care about order (such as *Layering chain*) need a time
-column. Add one under **Attribute columns** in the Query panel, run the query again, then pick it as the **Time
-column** under **Filter edges by time**. The message appears at the top of the Toolbox; it scrolls into view when it
-is raised.
+column. Add one under **Attribute columns** in ⚙ Settings ▸ Graph model, run the query again, then pick it as the
+**Time column** under **Filter edges by time**. The message appears at the top of the right panel; it scrolls into
+view when it is raised.
 
 **Value Measures** read the whole Dataset in a window of at most 31 days, not the filtered picture. Inside an open
 Investigation the Dataset and columns are filled in from it; you choose the Measure, the value column and the window.
@@ -349,22 +429,43 @@ Investigation the Dataset and columns are filled in from it; you choose the Meas
 ## 8. Working a case: Investigations
 
 Open an Investigation when a lead is worth defending. From a ranking, **Start an Investigation from the top
-results** queues the top five nodes as seeds; from a number, use section 5.3; or use the **Investigation** tab.
+results** queues the top five nodes as seeds; from a number, use section 5.3; or use the **Investigation** tab
+(give a **Purpose / legal basis**, then **Start Investigation**). To reopen one, use **File ▸ Open…** ▸
+*Investigations*.
+
+**The Investigation tab (Act panel)**, top to bottom:
+1. **Header:** id, purpose, Dataset, the data-trust chip (**Data details**), the Working Set counts and the degree
+   reached; the `⋯` menu has **Settings…** (opens ⚙ Settings ▸ Investigation settings), **Close** and **Delete**.
+2. The **seed queue**, when it holds anything.
+3. **Expand…** and **Expand next degree**, with the four-eyes waiting line when there is one.
+4. **Selected entity:** Seed, Keep, Hide, Exclude, Annotate, Expand one hop, its neighbours; **Expand the whole
+   Working Set**.
+5. **Held** (high-connectivity entities).
+6. **Scope list:** entity ids to **Include (go through)** or **Leave out**.
+7. **More steps ▾:** Time window, Threshold, Snapshot marker, Compare, Connect seeds (each opens in place).
+8. **Last steps** (the last five) and **Open the Op log**.
+
+The full record is in the dock: **Op log** (with **Re-order steps**, which creates a fork), **Working Set rows**,
+**Coverage**, **Annotations** (entity and link) and **Excluded entities**. Case, Members, Share and embed, Drafts,
+Replay and drift, Pin to a Widget, Oversight, Measures and templates, Dossier and References are in **⚙ Settings ▸
+Investigation settings**; Entity Lists, Identities and uploads are in ⚙ Settings ▸ Data.
 
 **What you do inside it.** Each of these is recorded as a numbered step with who, when and why:
-* **Seed** entities, then **Expand next degree** (one hop) or **Expand the whole Working Set**.
+* **Seed** entities, then **Expand…**, **Expand next degree** or **Expand the whole Working Set**.
 * **Exclude** an entity (give a reason), **Annotate** it, set a **Time window**, apply a **Threshold**.
-* **Identity resolution:** state that two identifiers are the same person, with a reason. It is reversible.
-* **Fork a Draft** to try a side line without touching the main log, then **Promote** or **Discard** it.
+* **Identity resolution:** select two entities and **Merge** (second toolbar) to open ⚙ Settings ▸ Identities with
+  the pair filled in; state that they are the same, with a reason. It is reversible.
+* **Fork a Draft** (⚙ ▸ Investigation settings ▸ Drafts) to try a side line without touching the main log, then
+  **Promote** or **Discard** it.
 
 **Large expands need a second person.** An expand above the Space's limit does not run. It says **waiting for
 approval** and names the request (for example *p1*). A different person with approval rights opens the same
-Investigation, finds the request in the **Oversight** card at the bottom of the Investigation tab, and presses
+Investigation, finds the request under ⚙ Settings ▸ Investigation settings ▸ **Oversight and approvals**, and presses
 **Approve** or **Deny**. Approving runs the expand as your step, stamped with who approved it. Nobody can approve
 their own request.
 
 **Evidence.**
-1. **Save this analysis** freezes what is on screen as a **snapshot**, with a SHA-256 fingerprint, and can attach it to a
+1. **File ▸ Save this analysis** freezes what is on screen as a **snapshot**, with a SHA-256 fingerprint, and can attach it to a
    Case. A *saved view* re-reads live data; a *snapshot* does not change.
 2. **Build dossier** produces the document: the steps, who took them, and a check that the log is intact. Masked
    ids stay masked, even inside free-text reasons.
