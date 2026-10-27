@@ -53,7 +53,7 @@ that would otherwise hide everything.
    **Which groups stick together** (the chain shows as one group) and **How does A reach B** (from the victim's
    account to the cash-out account, the path the money took). Each answer is one sentence, with **Show on graph**,
    **Start from these** and **Add to a list**.
-8. **Save as a case.** **Save as a case** (the bookmark) asks a name, *Mule ring*. A case keeps the graph's start and
+8. **Save view.** **File ▸ Save view as…** asks a name, *Mule ring*. A saved view keeps the graph's start and
    the lists it uses; it re-reads your data when it opens, so it is not evidence.
 9. **Come back.** The front page now shows **My work**: open *Mule ring* to draw it again over the data as it is
    then. **What changed in your data** says when each file was last brought in; **Add a file** on the Dataset card
@@ -110,9 +110,9 @@ are ticked.
 
 **My work.** Once the Space holds data, the front page shows **My work** under the Space guide:
 
-* **Cases** - every case saved in the Space (section 6, *Save as a case*), the most recent first, with when it was
+* **Saved views** - every view saved in the Space (section 6, *Save view*), the most recent first, with when it was
   saved and the Entity Lists it uses (*Lists: started from Suspects; leaves out Busy merchants*). Click one to open
-  its graph. A case re-reads your data each time it opens: it is not evidence.
+  its graph. A saved view re-reads your data each time it opens: it is not evidence.
 * **What changed in your data** - one line per Dataset you brought in with **Add data**, its last import first:
   *transfers: imported 1 Oct 2026, +2,104 rows*, or after another file *transfers: re-imported 3 Oct 2026, 2,300
   rows loaded* (the line counts what the run loaded; it does not say whether the new file replaced the rows or was
@@ -278,14 +278,24 @@ a node you have not expanded yet. **Undo** and **Redo** step through display and
 In an Investigation each of these is a recorded step; without one (Basic) they change only what you see. The first
 time each panel opens, a short note explains it; **Got it** hides the note in this browser.
 
-### Save as a case
+### Save view
 
-A **case** is a graph you keep: a named view plus the Entity Lists it uses. **Save as a case** (the bookmark in the
-top bar) asks a **Name** and an optional description, names the lists the graph uses - the list it started from and
-the exclusion lists you added entities to from it - and says once that a case re-reads live data and is not
-evidence. The case appears under **My work** on the front page. Opening it draws its start again over the data as
-it is then: the list's members as they are now, the entities you started from and grew, each with one ring; then
-whatever its exclusion lists hold now is hidden again. A case saved from **Explore a Dataset** reruns that query.
+A **saved view** is a graph you keep: a named view plus the Entity Lists it uses. (A *Case* is something else: the
+Incident-management record you attach evidence to.) **File ▸ Save view as…** asks a **Name** and an optional
+description, names the lists the graph uses - the list it started from and the exclusion lists you added entities to
+from it - and says once that a saved view re-reads live data and is not evidence. **File ▸ Save view** saves over the
+view you have open (with none open it asks for a name). The view appears under **My work** on the front page. Opening it
+draws its start again over the data as it is then: the list's members as they are now, the entities you started from
+and grew, each with one ring; then whatever its exclusion lists hold now is hidden again. A view saved from **Explore a
+Dataset** reruns that query.
+
+**File ▸ Open…** is one dialog with two tabs. **Saved views**: search by name or description, filter by Tag, Dataset
+and when it last changed, and pick one to see its description, Dataset, pack, last change and the Not-evidence note;
+**Open**, **Rename**, **Duplicate**, **Delete** (asks first), **Version history**, **Comments**, **Tags** and **Offer
+for sharing** act on it. **Investigations**: the ones you may read plus the **Recent** ones this screen opened; filter
+by owner, Dataset, date and status (Recent, Mine, Shared through a Case), and type an id in the search to open it
+directly. **File ▸ Close** goes back to the start; **File ▸ Delete** deletes the open view or Investigation after
+asking.
 
 Without Investigations (Basic, or a signed-in install without the Investigations add-on), the menu also shows
 **Start an Investigation from this** locked, with one line naming what has it. With Investigations, the
@@ -308,7 +318,7 @@ Investigation tab starts one as before. To keep a frozen copy, use **Save this a
 Every result row offers **Show on graph** (highlights it), **Start from these** (a new graph from those entities and
 one ring, as the Start box draws) and **Add to a list** (an existing list of the same Entity Type, or a new one with
 its purpose in plain words: *Watch these*, *Never follow these*, *Known good*, *Block*; a reason is recorded). An
-exclusion list you add to becomes one of the case's lists, and without an Investigation its entities are hidden at once
+exclusion list you add to becomes one of the saved view's lists, and without an Investigation its entities are hidden at once
 (Undo brings them back).
 
 The full toolbox follows. Open one group at a time; results stay while you switch tabs. Click a row in a ranking to select that node and

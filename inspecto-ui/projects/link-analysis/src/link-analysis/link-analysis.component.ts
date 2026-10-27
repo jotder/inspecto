@@ -52,7 +52,8 @@ import {
     SpacesService,
     apiErrorMessage,
 } from '@inspecto/core/api';
-import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
+import { GraphRunResult, GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
+import { graphRunRows, summarizeGraphRun } from './graph-run-summary';
 import { indexSourceNote } from './index-source';
 import { IndexMappingTarget } from './link-analysis-index-build.component';
 import {
@@ -119,6 +120,11 @@ import { DataTableComponent } from '@inspecto/core/data-table';
 import { G6GraphData, EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery, NodeRule, toGraphml } from '@inspecto/core/graph';
 import { LinkAnalysisGlossaryComponent } from './link-analysis-glossary.component';
 import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules.component';
+import { LaSettingsSection, LinkAnalysisSettingsComponent } from './link-analysis-settings.component';
+import { LinkAnalysisEntityTypesComponent } from './link-analysis-entity-types.component';
+import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
+import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
+import { LinkAnalysisUploadsComponent } from './link-analysis-uploads.component';
 import {
     analysisNodeCapValue,
     browserAlgorithmCapValue,
@@ -248,6 +254,7 @@ import {
 } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
+import { LaOpenDialogData, LaOpenResult, LinkAnalysisOpenDialog } from './link-analysis-open.dialog';
 import {
     CaseStart,
     LinkAnalysisService,
@@ -269,7 +276,7 @@ import {
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
-import { InvestigationSettingsDialog } from './investigation-settings-sections.component';
+import { InvestigationSettingsSections } from './investigation-settings-sections.component';
 import { InvestigationSection } from './link-analysis-investigation.component';
 import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
 import { CleanupApply, LinkAnalysisCleanupComponent } from './link-analysis-cleanup.component';
@@ -413,11 +420,17 @@ function readDock(): { open: boolean; tab: DockTab } {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         DatePipe,
+        InvestigationSettingsSections,
         TermHelpComponent,
         FormMenuDirective,
         LinkAnalysisDiscoverComponent,
         LinkAnalysisGlossaryComponent,
         LinkAnalysisDisplayRulesComponent,
+        LinkAnalysisSettingsComponent,
+        LinkAnalysisEntityTypesComponent,
+        LinkAnalysisEntityListsComponent,
+        LinkAnalysisIdentitiesComponent,
+        LinkAnalysisUploadsComponent,
         LinkAnalysisCapsComponent,
         LinkAnalysisCleanupComponent,
         LinkAnalysisModulesComponent,
@@ -547,14 +560,17 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
     @ViewChild('graphRegion') private graphRegion?: ElementRef<HTMLElement>;
     @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
-    @ViewChild('viewsTrigger') private viewsTrigger?: MatMenuTrigger;
+    @ViewChild('fileTrigger') private fileTrigger?: MatMenuTrigger;
 
-    // ── workspace layout: [query dock] │ canvas │ [toolbox dock], Data as a bottom strip ──
+    // ── workspace layout: canvas │ [toolbox dock], Data as a bottom strip; the graph model lives in ⚙ Settings ──
     /** Full query form vs its collapsed selected-values summary (auto-collapses after a run). */
     readonly queryOpen = signal(true);
-    /** The left dock (Query); collapses to an icon rail. */
-    readonly queryDockOpen = signal(true);
-    /** The right dock (Analysis | View toolbox); collapses to an icon rail. */
+    /** ⚙ Settings (§5.10): open, and the section shown (the dialog remembers the last one). */
+    readonly settingsOpen = signal(false);
+    readonly settingsSection = signal<LaSettingsSection>('graph-model');
+    /** Unsaved changes = a graph-model form edited since the last run. */
+    readonly settingsDirty = (): boolean => !!this.queryPanel?.isDirty();
+    /** The right dock (Analysis | Investigation toolbox); collapses to an icon rail. */
     readonly toolboxDockOpen = signal(initialToolboxOpen());
     private toolboxSeen = false;
     /** Remember an explicit open/close for the session (the initial value is not an explicit choice). */
@@ -570,9 +586,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             /* storage blocked - the choice just is not remembered */
         }
     });
-    readonly toolboxTab = signal<'analysis' | 'view' | 'investigation'>('analysis');
+    readonly toolboxTab = signal<'analysis' | 'investigation'>('analysis');
     @ViewChild('toolboxScroll') private toolboxScroll?: ElementRef<HTMLElement>;
-    /** The three tabs share one scroll container; a new tab must open at its top, not where the last one was scrolled to. */
+    /** The tabs share one scroll container; a new tab must open at its top, not where the last one was scrolled to. */
     private readonly resetToolboxScroll = effect(() => {
         this.toolboxTab();
         queueMicrotask(() => {
@@ -589,13 +605,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly investigationsEnabled = this.laFeatures.investigations;
     /** Why an Investigation action is locked on the Explorer level (`/bootstrap` `featureReasons.investigations`). */
     readonly investigationsLockedReason = computed(() => investigationsLockedReason(this.laFeatures));
-    private readonly allToolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [
+    private readonly allToolboxTabs: readonly { id: 'analysis' | 'investigation'; label: string }[] = [
         { id: 'analysis', label: 'Analysis' },
-        { id: 'view', label: 'View' },
         { id: 'investigation', label: 'Investigation' },
     ];
     /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels) - the same on every level. */
-    get toolboxTabs(): readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] {
+    get toolboxTabs(): readonly { id: 'analysis' | 'investigation'; label: string }[] {
         return this.allToolboxTabs;
     }
     /** The graph canvas's text alternative: the displayed graph as a keyboard-navigable node / link list. */
@@ -668,10 +683,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (zoneWidth <= 0 || zoneWidth >= CANVAS_MIN_PX) return;
         if (window.matchMedia?.('(max-width: 959px)').matches) return; // stacked: the canvas has the full width
         if (this.toolboxDockOpen()) this.toolboxDockOpen.set(false);
-        else if (this.queryDockOpen()) this.queryDockOpen.set(false);
     }
     /** The docks give the canvas their width in one step (and take it back). */
-    readonly canvasMaximized = computed(() => !this.queryDockOpen() && !this.toolboxDockOpen());
+    readonly canvasMaximized = computed(() => !this.toolboxDockOpen());
 
     // ── View toolbox: canvas plugins and behaviors (each a G6 v5 built-in), persisted with a saved view ──
     // Fisheye, Link filter, Snap lines and Hover activate all start OFF (operator 2026-10-26).
@@ -1369,6 +1383,16 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         }
     });
     /** Open the dock on one tab (the Act panel's "Open the Op log"; the Rows toggle). */
+    /** The dock's Results tab: the last long answer sent there with *Open in the dock* (headline + every row). */
+    readonly dockResult = signal<{ algorithm: string; headline: string; rows: Record<string, unknown>[] } | null>(null);
+    showResultInDock(r: GraphRunResult): void {
+        this.dockResult.set({
+            algorithm: r.algorithm,
+            headline: summarizeGraphRun(r, this.serverIds()).headline,
+            rows: graphRunRows(r),
+        });
+        this.openDock('results');
+    }
     openDock(tab: DockTab): void {
         this.dockTab.set(tab);
         this.bottomOpen.set(true);
@@ -1388,10 +1412,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** A dock tab that draws a part of the open Investigation (the switch's default branch). */
     invSection(tab: DockTab): InvestigationSection {
         return tab as InvestigationSection;
-    }
-    /** TEMPORARY (P2a → P2b): the Act header's ⋯ ▸ Settings… opens the moved sections until the ⚙ Settings dialog lands. */
-    openInvestigationSettings(): void {
-        this.dialog.open(InvestigationSettingsDialog, { injector: this.injector, width: '44rem', maxWidth: '95vw' });
     }
     /** The Filter predicate editor inside the data strip; collapsed so the strip stays short. */
     readonly filterOpen = signal(false);
@@ -1431,14 +1451,15 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         () => this.canvasSource()?.nodes.filter((n) => n.data.unexpanded).length ?? 0,
     );
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
-    readonly profileControl = new FormControl<DomainProfileId>('generic', { nonNullable: true });
-    /** `generic` plus every Industry pack the server installed (reactive: the packs arrive after the first render). */
-    readonly profileOptions = computed(() =>
-        domainProfiles().map((p) => ({ value: p.id, label: p.label, hint: p.description })),
+    // UIR-D9 (§5.12): no picker. The Space's Industry pack applies, unless the open Investigation, a Template or a
+    // saved view bound another; a bound pack is shown read-only in ⚙ Settings → Graph model.
+    /** A pack a saved view or an *Investigate a number* binding brought; null = none. */
+    readonly boundProfile = signal<DomainProfileId | null>(null);
+    readonly profileId = computed<DomainProfileId>(
+        () => this.investigation.boundProfileId() ?? this.boundProfile() ?? activeDomainProfileId(),
     );
-    readonly profileId = toSignal(this.profileControl.valueChanges, { initialValue: this.profileControl.value });
     readonly profile = computed(() => domainProfile(this.profileId()));
-    /** A reloaded / adopted Investigation brings back the domain profile it was opened under. */
+    readonly profileLabel = computed(() => this.profile().label);
     /** LA-SEED-CONNECT-1 (b): a clicked Connect pair row emphasises its route's nodes and the links between consecutive ones. */
     private readonly showConnectRoute = effect(() => {
         const route = this.investigation.highlightRoute();
@@ -1451,23 +1472,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             nodeIds: ids,
             edgeIds: g.edges.filter((e) => pair.has([e.source, e.target].sort().join('|'))).map((e) => e.id),
         });
-    });
-    /**
-     * The Space's selected Domain Profile is the default reading: applied once, when the packs arrive, unless a view, a
-     * case or an Investigation has already chosen a profile (the control then no longer reads `generic`).
-     */
-    private spaceProfileApplied = false;
-    private readonly applySpaceProfile = effect(() => {
-        const id = activeDomainProfileId();
-        if (this.spaceProfileApplied || id === 'generic') return;
-        this.spaceProfileApplied = true;
-        untracked(() => {
-            if (this.profileControl.value === 'generic') this.profileControl.setValue(id);
-        });
-    });
-    private readonly restoreBoundProfile = effect(() => {
-        const p = this.investigation.boundProfileId();
-        if (p && p !== this.profileControl.value) this.profileControl.setValue(p);
     });
     readonly workingSet = computed(() => {
         const g = this.graph();
@@ -2019,7 +2023,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (binding && ds && !reason) {
             this.investigateIssue.set('');
             this.investigation.close(); // the pending form shows only while no Investigation is open (it stays remembered)
-            this.profileControl.setValue(binding.profileId);
+            this.boundProfile.set(binding.profileId);
             const windowEnd = await this.latestEventTime(ds, binding.timeCol);
             this.pendingInvestigation.set(windowEnd ? { ...binding, windowEnd } : binding);
             this.openInvestigation();
@@ -2073,16 +2077,107 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      * data's `?dataset=<id>`) that Dataset is picked instead, and its graph is drawn when its link columns are suggested.
      */
     exploreDataset(datasetId?: string): void {
-        this.queryDockOpen.set(true);
+        this.openSettings('graph-model');
         this.queryOpen.set(true);
         this.sourceId.set('entity-projection');
-        this.cdr.detectChanges(); // the panel mounts with the dock - the picker must exist before it is opened
+        this.cdr.detectChanges(); // the picker must exist before it is opened
         this.queryPanel?.startExplore(datasetId);
     }
 
-    /** Starter card "Open a saved view": the same menu as the rail's saved-views button. */
+    /** Starter card "Open a saved view": File ▸ Open… on its Saved views tab. */
     openSavedViews(): void {
-        this.viewsTrigger?.openMenu();
+        this.openOpenDialog();
+    }
+
+    /** File ▸ Open… (§5.11): one dialog over saved views and Investigations; the list is re-read after, since it renames, copies and deletes. */
+    openOpenDialog(tab?: 'views' | 'investigations'): void {
+        const data: LaOpenDialogData = {
+            tab,
+            opsEnabled: !!this.opsEnabled(),
+            shareable: (v) => this.shareable(v),
+            history: (v) => this.openHistory(v),
+            comments: (v) => this.openComments(v),
+            tags: (v) => this.openTags(v),
+            offer: (v) => this.offer(v),
+            store: this.investigation,
+            canDeleteInvestigations: this.lens.canManageIncidents(),
+        };
+        this.dialog
+            .open<LinkAnalysisOpenDialog, LaOpenDialogData, LaOpenResult>(LinkAnalysisOpenDialog, {
+                data,
+                maxWidth: '95vw',
+            })
+            .afterClosed()
+            .subscribe((r) => {
+                this.reloadViews();
+                const open = this.openViewId();
+                if (open && !this.views().some((v) => v.id === open)) this.viewsService.get(open).subscribe((v) => !v && this.forgetOpenView());
+                if (r?.kind === 'view') void this.loadView(r.view);
+                else if (r?.kind === 'investigation') {
+                    this.investigation.adopt(r.id, r.title, this.investigation.activeRef() ?? undefined);
+                    this.openInvestigation();
+                }
+            });
+    }
+
+    /** File ▸ Save view: over the open saved view; with none open it asks for a name (Save view as…). */
+    async saveOpenView(): Promise<void> {
+        const open = this.views().find((v) => v.id === this.openViewId());
+        if (!open) {
+            this.fileTrigger?.openMenu();
+            setTimeout(() => this.saveTrigger?.openMenu());
+            return;
+        }
+        const view = this.viewFromState(open.id, open.name, open.description);
+        if (!view) return;
+        this.saving.set(true);
+        try {
+            await firstValueFrom(this.viewsService.save(view, { update: true }));
+            this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
+            this.toastr.success(`Saved the view “${view.name}”.`);
+        } catch (err) {
+            this.toastr.error(apiErrorMessage(err, 'Saving the view failed.'));
+        } finally {
+            this.saving.set(false);
+        }
+    }
+
+    /** What File ▸ Delete removes: the open Investigation, else the open saved view; '' = nothing to delete. */
+    readonly deleteLabel = computed<string>(() => {
+        if (this.investigation.active()) return this.lens.canManageIncidents() ? `Investigation ${this.investigation.displayTitle()}` : '';
+        const v = this.views().find((x) => x.id === this.openViewId());
+        return v ? `view ${v.name}` : '';
+    });
+
+    /** File ▸ Delete, after a confirm: the Investigation (server-side, audited) or the saved view; then back to the empty state. */
+    async deleteOpenWork(): Promise<void> {
+        const label = this.deleteLabel();
+        if (!label) return;
+        const invId = this.investigation.active() ? this.investigation.activeId() : null;
+        const ok = await this.confirm.confirmDestructive(
+            invId
+                ? `Delete the ${label}?
+
+Its log, its Working Sets and its Drafts are removed from the server. This cannot be undone. A record that it was deleted, by whom and when, is kept in the audit trail.`
+                : `Delete the saved ${label}?
+
+Its prior copies stay in its version history.`,
+            { title: invId ? 'Delete Investigation?' : 'Delete saved view?', confirmText: 'Delete', destructive: true },
+        );
+        if (!ok) return;
+        if (invId) {
+            if (!(await this.investigation.deleteInvestigation(invId))) return;
+        } else {
+            const id = this.openViewId()!;
+            try {
+                await firstValueFrom(this.viewsService.remove(id));
+            } catch (err) {
+                this.toastr.error(apiErrorMessage(err, 'Deleting the view failed.'));
+                return;
+            }
+            this.views.set(this.views().filter((v) => v.id !== id));
+        }
+        await this.closeOpenWork();
     }
 
     /** A ranking row was picked: highlight, select and centre that node on the canvas. */
@@ -2205,6 +2300,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         )
             return;
         this.clearDraft();
+        this.boundProfile.set(null); // back to the Space's pack (UIR-D9)
         this.openViewId.set(null);
         this.setViewParam(null); // Close drops what a refresh would reopen
         this.investigation.close();
@@ -2293,6 +2389,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.kindFilter.set([]);
             this.lastRun.set(this.runOf(sourceId, q, g as ProjectedGraph));
             this.queryOpen.set(false); // smart form: collapse to the selected-values summary
+            this.queryPanel?.markPristine(); // what was run is no longer an unsaved change
+            this.settingsOpen.set(false); // the drawn graph is the answer: show it
             if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
         } catch (err) {
             this.graph.set(null);
@@ -2547,9 +2645,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (!pair) return;
         this.investigation.mergeDraft.set(pair);
         // LA-I2-GAPS-RESIDUALS-1 (5): open what holds the prefilled merge, so the next step is on screen. Identities moved
-        // to the Investigation's settings (§5.10); until P2b that is the temporary settings dialog.
-        this.toolboxTab.set('investigation');
-        this.openInvestigationSettings();
+        // to ⚙ Settings ▸ Data (§5.10).
+        this.openSettings('identities');
         this.toastr.info('Prefilled in the Identities section - add a reason and confirm there.');
     }
 
@@ -2612,10 +2709,16 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     // ── workspace layout ──
 
-    /** Reopen the full query form (status-bar pencil) in the query dock. */
+    /** Reopen the full query form (status-bar chips and pencil): ⚙ Settings → Graph model. */
     editQuery(): void {
-        this.queryDockOpen.set(true);
         this.queryOpen.set(true);
+        this.openSettings('graph-model');
+    }
+
+    /** Open ⚙ Settings, at `section` or at the last one shown. */
+    openSettings(section?: LaSettingsSection): void {
+        if (section) this.settingsSection.set(section);
+        this.settingsOpen.set(true);
     }
 
     /** Open the graph-algorithms toolbox (the right dock's Analysis tab). */
@@ -2630,17 +2733,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.toolboxTab.set('investigation');
     }
 
-    /** Open the View toolbox (layouts, lenses, overlays). */
-    openViewTools(): void {
-        this.toolboxDockOpen.set(true);
-        this.toolboxTab.set('view');
-    }
-
     /** Collapse both docks so the canvas takes the row; a second call restores them. */
     toggleCanvasMaximized(): void {
-        const open = this.canvasMaximized();
-        this.queryDockOpen.set(open);
-        this.toolboxDockOpen.set(open);
+        this.toolboxDockOpen.set(this.canvasMaximized());
     }
 
     // ── display options ──
@@ -3692,7 +3787,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.rememberOpenView(view.id); // what is on screen is now this saved view: a refresh reopens it
             this.saveForm.reset({ name: '', description: '' });
             this.saveTrigger?.closeMenu();
-            this.toastr.success(`Saved the case “${view.name}”.`);
+            this.fileTrigger?.closeMenu();
+            this.toastr.success(`Saved the view “${view.name}”.`);
         } catch (err) {
             this.toastr.error(apiErrorMessage(err, 'Saving the view failed.'));
         } finally {
@@ -3875,7 +3971,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
         this.pickedLayout.set(view.layout ?? null);
-        this.profileControl.setValue(view.profile ?? activeDomainProfileId());
+        this.boundProfile.set(view.profile ?? null);
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         if (view.view?.plugins) this.viewOptions.set(canvasModeOptions(view.view.plugins));
@@ -3941,7 +4037,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const hide = (this.graph()?.nodes ?? [])
             .filter((n) => rawIdsOf(n).some((v) => members.has(v.trim().toUpperCase())))
             .map((n) => n.id);
-        if (hide.length) this.hideLocally(hide, 'on the case’s exclusion lists, hidden');
+        if (hide.length) this.hideLocally(hide, 'on the saved view’s exclusion lists, hidden');
     }
 
     /** Prior saved copies of a view — a Component like any other, so the shared history dialog works

@@ -228,6 +228,17 @@ Rules for the dialog:
 - The dialog remembers the last section per browser.
 - A form with unsaved changes asks before closing.
 
+**As built (P2b, 2026-10-27):** `LinkAnalysisSettingsComponent` (`link-analysis-settings.component.ts`) is an in-page
+overlay, not a MatDialog: the host PROJECTS each section (`<div laSection="…">`) and the dialog only hides the others, so
+the query panel stays the host's `@ViewChild` and a half-edited form survives closing. The left panel and its split are
+gone; a run closes the dialog and marks the form pristine; closing over an un-run edit asks. Refresh (status bar and the
+Graph model foot) is `refreshFromServer()`, the cache-bypassing re-read of the last run. Entity Types
+(`link-analysis-entity-types.component.ts`) lists the types in force, reuses *New Entity Type*, and **Retire** states the
+types in force minus one through the existing `PUT /settings/link-analysis` (no new route; sweep S3 closed). Display
+rules moved out of the Display menu. Entity Lists, Identities and Upload are mounted only while ⚙ is open, because the
+Investigation tab still holds copies until P2a moves them (two live Identities would both consume a merge hand-off).
+This Investigation is a placeholder slot until P2a's `InvestigationSettingsSections` lands.
+
 ### 5.11 Open dialog and File menu (UIR-D12)
 - One dialog with two tabs, **Saved views** and **Investigations**.
   - A search box, filters (owner, tag, Dataset, date, status for Investigations), and a sortable list.
@@ -243,6 +254,13 @@ Today the profile is not dead. It relabels terms, finds the measure and time col
 - Saved views and Investigations show their stored pack read-only in the Open preview and in Settings → General.
 - The Template gains an optional pack field.
 - This closes `LA-SAVED-VIEW-DOMAIN-PROFILE-1`.
+
+**As built (P2b, 2026-10-27):** no picker; `profileId = investigation.boundProfileId() ?? boundProfile() ??
+activeDomainProfileId()`. `boundProfile` is set by a saved view's stored pack and by an *Investigate a number* binding,
+and cleared by Close. *Save as template* takes an optional `pack` (`POST /inv/investigations/{id}/template`, shape-checked
+as an id, 422 otherwise); an instantiated Investigation's header carries it as `pack`, which `boundProfileId` reads when
+the pack is installed. The pack in force shows read-only at the top of ⚙ → Graph model. `LA-SAVED-VIEW-DOMAIN-PROFILE-1`
+closed: a view without a pack no longer overrides the Space's.
 
 ### 5.13 Read-only widget toolset (UIR-D4)
 - `link-view-widget.component.ts` gains a compact toolbar:
@@ -353,6 +371,11 @@ On ship: update `okf/product/module/la-core/user-guide-end-user.md` (§4 The scr
   ids. Both are recorded in one function, `recordCleanup` in `link-analysis.component.ts`, so ⚑UIR-A3 can switch there.
   Grouped Undo of the pair waits on OP-4.
 - **OP-2:** Rename and thumbnails for saved views: is a new route needed (PUT with a new name, or a stored PNG)?
+  **Answered (P3a, 2026-10-27): no new route.** A view's name travels as `title` in its content, so Rename is the
+  existing update of the same id, and Duplicate is a create under `<id>-copy`. No thumbnail: nothing stores one, and a
+  view re-projects live data, so a picture of the last draw would show a graph the view may no longer draw. The
+  preview says so instead (counts are taken when it opens). Saved views carry no owner (the Component store records
+  none), so the Owner filter applies to Investigations only.
 - **OP-3:** Where does the embed viewer live? It is outside `projects/link-analysis`.
 - **OP-4:** Grouped Undo for an N-degree expand: the server's `{undoes: step}` takes one step; the client undoes the group newest-first and stops on a 409 (another person's newer step).
 - **OP-5:** Sweep defects S1 (stale list picker), S2 (list start draws 0 links), S5 (`coverage` 422) and S6 (unprompted `PUT /settings/link-analysis`) touch the same screens. Fix S5 and S6 before P2. S1 and S2 fit P3's Start-from.

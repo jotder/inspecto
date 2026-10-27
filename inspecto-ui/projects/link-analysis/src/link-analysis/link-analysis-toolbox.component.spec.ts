@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
@@ -10,6 +12,7 @@ import { G6GraphData } from '@inspecto/core/graph';
 import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import { GENERIC_PROFILE, installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 
 /** A tiny two-cluster graph: a–b–c plus d–e (mirrors the studio spec fixture). */
@@ -30,6 +33,8 @@ function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = [], inv
         imports: [LinkAnalysisToolboxComponent],
         providers: [
             provideNoopAnimations(),
+            provideHttpClient(),
+            provideHttpClientTesting(),
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             // The toolbox fetches this Space's authored pattern packs; an empty list leaves the shipped
             // built-ins in place, which is what most of these tests assert against.
@@ -1044,5 +1049,99 @@ describe('LinkAnalysisToolboxComponent search around', () => {
         expect(c.patternSteps()).toEqual([{ nodeKind: 'entity' }, { direction: 'in', edgeKind: 'link' }]);
         c.patternSteps.set([{}, { direction: 'out', afterPrevious: true }]);
         expect(c.aroundSpec()).toBeNull();
+    });
+
+    describe('the Analysis catalogue (§5.8, UIR-D10)', () => {
+        const CATALOGUE = {
+            algorithms: [
+                { id: 'shortestPath', label: 'Shortest path', inlineNodeCeiling: 50000 },
+                { id: 'pageRank', label: 'PageRank', inlineNodeCeiling: 20000 },
+                { id: 'propagatedRisk', label: 'Propagated risk', inlineNodeCeiling: 10000 },
+                { id: 'egoNetwork', label: 'Ego network', inlineNodeCeiling: 50000 },
+            ].map((a) => ({
+                ...a,
+                cost: 'SYNC',
+                params: [],
+                needsWeights: false,
+                needsSource: false,
+                needsTarget: false,
+                needsNode: false,
+                resultKind: 'SCORES',
+            })),
+        };
+        const rows = (el: HTMLElement): string[] =>
+            Array.from(el.querySelectorAll('section > button > span.font-medium')).map((s) => s.textContent!.trim());
+
+        it('Browser lists every browser group once by question, badged with where it runs and its cap', async () => {
+            const { fixture, c } = make(GRAPH, [], true);
+            TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
+            fixture.detectChanges();
+            const el: HTMLElement = fixture.nativeElement;
+            expect(c.where()).toBe('browser');
+            const names = rows(el);
+            expect(new Set(names).size).toBe(names.length); // each once
+            expect(names).toContain('Value Measures');
+            expect(names).toContain('Burst and periodicity');
+            expect(names).not.toContain('All algorithms (server)');
+            expect(names).not.toContain('Propagated risk'); // server-only: Server side alone
+            expect(Array.from(el.querySelectorAll('h3[data-question]')).map((h) => h.textContent!.trim())).toEqual([
+                'How are they connected?',
+                'Who matters most?',
+                'What groups and weak points are there?',
+                'What looks unusual?',
+            ]);
+            expect(c.runsOn('centrality')).toBe('both');
+            expect(c.runsOn('explain')).toBe('browser');
+            expect(c.toolCap('centrality')).toBe('≤ 500 nodes in the browser'); // betweenness is the lowest
+            await expectNoA11yViolations(el);
+        });
+
+        it('Server lists the server algorithms by question; a row opens that algorithm in one click (two from Browser)', () => {
+            const { fixture, c } = make(GRAPH, [], true);
+            TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
+            fixture.detectChanges();
+            const el: HTMLElement = fixture.nativeElement;
+            const server = Array.from(el.querySelectorAll('[data-testid=catalogue-where] button'))[1] as HTMLButtonElement;
+            server.click(); // click 1
+            fixture.detectChanges();
+            expect(c.where()).toBe('server');
+            const names = rows(el);
+            expect(names).toEqual(expect.arrayContaining(['Propagated risk', 'Ego network', 'PageRank', 'Find paths (server)']));
+            expect(names).not.toContain('Explain node'); // a browser-only group is not listed under Server
+            const risk = el.querySelector('[data-server-algorithm=propagatedRisk]')!;
+            expect(risk.textContent).toContain('server');
+            expect(el.querySelector('[data-server-algorithm=pageRank]')!.textContent).toContain('both');
+            (risk.querySelector('button') as HTMLButtonElement).click(); // click 2
+            fixture.detectChanges();
+            const panel = risk.querySelector('inspecto-link-analysis-server-algorithms')!;
+            expect(panel.querySelector('[data-testid=algo-form]')).not.toBeNull();
+            expect(panel.querySelector('[data-testid=algo-count]')).toBeNull(); // no second picker
+        });
+
+        it('over the browser cap, Server is preselected with the reason; the investigator can still pick Browser', () => {
+            const { fixture, c } = make(GRAPH, [], true);
+            fixture.componentRef.setInput('workingSetNodes', 3000);
+            fixture.detectChanges();
+            const el: HTMLElement = fixture.nativeElement;
+            expect(c.where()).toBe('server');
+            expect(el.querySelector('[data-testid=catalogue-preselect]')!.textContent).toContain(
+                'The Working Set has 3000 nodes - above the 2500-node browser limit, so Server is preselected.',
+            );
+            c.whereChoice.set('browser');
+            fixture.detectChanges();
+            expect(c.where()).toBe('browser');
+            expect(el.querySelector('[data-testid=catalogue-preselect]')).toBeNull();
+        });
+
+        it('on the Explorer level the toggle is hidden: one locked line, and Browser even over the cap', () => {
+            const { fixture, c } = make(GRAPH, [], false);
+            fixture.componentRef.setInput('workingSetNodes', 3000);
+            fixture.detectChanges();
+            const el: HTMLElement = fixture.nativeElement;
+            expect(el.querySelector('[data-testid=catalogue-where]')).toBeNull();
+            expect(el.querySelectorAll('[data-testid=catalogue-server-locked]')).toHaveLength(1);
+            expect(c.where()).toBe('browser');
+            expect(rows(el)).not.toContain('Edge index');
+        });
     });
 });

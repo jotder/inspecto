@@ -206,3 +206,23 @@ export function propagatedRiskRows(
         factors: (x.factors ?? []).map((f) => factorLine(f, origin(f.origin))),
     }));
 }
+
+/**
+ * The whole answer as table rows, for the dock's Results tab (LA-STUDIO-UI-REORG-1 §5.9): every item, not the top
+ * {@link TOP} the panel summary shows. Field names are the result's own.
+ */
+export function graphRunRows(r: GraphRunResult): Record<string, unknown>[] {
+    const flat = (o: object) => ({ ...o }) as Record<string, unknown>;
+    if (r.scores?.length) return r.scores.map(flat);
+    if (r.hubs?.length || r.authorities?.length)
+        return [
+            ...(r.hubs ?? []).map((x) => ({ role: 'hub', ...x })),
+            ...(r.authorities ?? []).map((x) => ({ role: 'authority', ...x })),
+        ];
+    if (r.communities?.length) return r.communities.map(flat);
+    if (r.groups?.length) return r.groups.map((g, i) => ({ group: i + 1, size: g.length, members: g.join(', ') }));
+    if (r.links?.length) return r.links.map(flat);
+    if (r.ids?.length) return r.ids.map((id) => ({ id }));
+    if (r.nodes?.length) return r.nodes.map(flat);
+    return [];
+}

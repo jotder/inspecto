@@ -204,6 +204,27 @@ class ControlApiInvestigationTemplateTest {
 
     // ── gates ──────────────────────────────────────────────────────────────────────────────────────────
 
+    /** UIR-D9: a template may name an Industry pack; it is listed and an instantiated Investigation's header carries it. */
+    @Test
+    void aTemplateMayNameAPackThatItsInvestigationsCarry(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            post(c, "/inv/investigations", CREATE);
+            ops(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"]}", "{\"op\":\"expand\"}");
+            assertEquals(422, status(c, "POST", "/inv/investigations/case-a/template", "{\"id\":\"t0\",\"pack\":\"../x\"}"),
+                    "a pack is an id, never a path");
+            assertEquals("telecom", post(c, "/inv/investigations/case-a/template", "{\"id\":\"t1\",\"pack\":\"telecom\"}")
+                    .get("pack").asText());
+            assertFalse(post(c, "/inv/investigations/case-a/template", "{\"id\":\"t2\"}").has("pack"),
+                    "a template without a pack is unchanged");
+            JsonNode list = data(send(c.port, "GET", "/inv/investigation-templates", null, null)).get("templates");
+            assertEquals(Set.of("telecom", "null"),
+                    Set.of(list.get(0).get("pack").asText(), list.get(1).get("pack").asText()));
+            JsonNode inst = post(c, "/inv/investigation-templates/t1/instantiate",
+                    "{\"purpose\":\"test\",\"id\":\"from-t1\",\"params\":{\"seed1\":[\"alice\"]}}");
+            assertEquals("telecom", inst.at("/header/pack").asText());
+        }
+    }
+
     @Test
     void savingAndInstantiatingFailClosed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

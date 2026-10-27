@@ -71,7 +71,7 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
             datasets: of([{ type: 'dataset', name: 't', ref: '', content: { origin: 'import', importPipeline: 't' } }]),
             batches: () => throwError(() => new Error('no ledger')),
         });
-        expect(el.querySelector('[data-testid="la-cases-empty"]')?.textContent).toContain('Save as a case');
+        expect(el.querySelector('[data-testid="la-cases-empty"]')?.textContent).toContain('Save view as');
         expect(el.querySelector('[data-testid="la-cases-failed"]')).toBeNull();
         expect(el.querySelector('[data-testid="la-changes-empty"]')?.textContent).toContain('Nothing imported with');
         expect(el.querySelector('[role="alert"]')).toBeNull();
@@ -88,11 +88,11 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
         await expectNoA11yViolations(el);
     });
 
-    it('explains what a case and an Entity List are, one click away', () => {
+    it('explains what an Entity List is (a saved view is no "case": that is the Incident-management object), one click away', () => {
         const { el } = create();
         const terms = Array.from(el.querySelectorAll('[data-testid="term-help"]')).map((b) =>
             b.getAttribute('aria-label'),
         );
-        expect(terms).toEqual(['What is a case?', 'What is an Entity List?']);
+        expect(terms).toEqual(['What is an Entity List?']);
     });
 });

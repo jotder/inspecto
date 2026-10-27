@@ -400,6 +400,8 @@ export interface InvestigationLineage {
 export interface InvestigationHeader {
     id: string;
     title: string | null;
+    /** UIR-D9: the Industry pack the template it was started from named; absent = none. */
+    pack?: string | null;
     /** The stated purpose / legal basis (D-U5); absent on an Investigation created before it was required. */
     purpose?: string | null;
     owner: string | null;
@@ -1274,6 +1276,8 @@ export interface IdentityImportResult {
 export interface InvestigationTemplateSummary {
     id: string;
     title: string | null;
+    /** UIR-D9: the Industry pack an instantiated Investigation reads under; null = the Space's. */
+    pack?: string | null;
     createdAt: string;
     dataset: string | null;
     investigation: string | null;
@@ -1284,6 +1288,8 @@ export interface InvestigationTemplateSummary {
 export interface InvestigationTemplate {
     id: string;
     title: string | null;
+    /** UIR-D9: the Industry pack an instantiated Investigation reads under; absent = the Space's. */
+    pack?: string;
     owner: string | null;
     createdAt: string;
     derivedFrom: { investigation: string; steps: number; workingSetHash: string };
@@ -2057,7 +2063,7 @@ export class InvService {
     /** LA-23: save the effective log as a write-once template. The answer lists what was dropped/generalised. */
     saveInvestigationTemplate(
         id: string,
-        body: { id?: string; title?: string } = {},
+        body: { id?: string; title?: string; pack?: string } = {},
     ): Observable<InvestigationTemplate> {
         return this.http.post<InvestigationTemplate>(invPath(id, 'template'), body);
     }

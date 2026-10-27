@@ -219,6 +219,7 @@ describe('Toolbox Explain tab - egoNetwork and seeds-only degreeCentrality on th
 
     it('the Edge index tool opens and hosts the build control', () => {
         const { fixture, c, el } = makeToolbox();
+        c.whereChoice.set('server'); // the Edge index is a server tool: listed under Server (§5.8)
         c.toggleTool('index-build');
         fixture.detectChanges();
         expect(el.querySelector('inspecto-link-analysis-index-build')).not.toBeNull();

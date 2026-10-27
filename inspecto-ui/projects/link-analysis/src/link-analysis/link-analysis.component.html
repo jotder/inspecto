@@ -1,6 +1,78 @@
 <div #studioRoot class="flex h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)] min-h-0 min-w-0 flex-auto flex-col p-2 max-md:h-auto">
     <!-- ── header = the toolbar only (operator 2026-10-15); the title and the page info live in the footer status bar ── -->
     <header class="flex min-w-0 flex-wrap items-center gap-2" data-testid="la-header">
+        <!-- LA-STUDIO-UI-REORG-1 §5.1 / §5.11: File ▾ - New, Open…, Save view, Save view as…, Snapshot, Import / export, Close, Delete -->
+        <button mat-button [matMenuTriggerFor]="fileMenu" #fileTrigger="matMenuTrigger" data-testid="la-file">
+            File
+            <mat-icon svgIcon="heroicons_outline:chevron-down" class="icon-size-4"></mat-icon>
+        </button>
+        <mat-menu #fileMenu="matMenu">
+            <button mat-menu-item (click)="closeOpenWork()" [disabled]="investigation.busy()" data-testid="la-file-new">
+                <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon>
+                <span>New</span>
+            </button>
+            <button mat-menu-item (click)="openOpenDialog()" data-testid="la-file-open">
+                <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
+                <span>Open…</span>
+            </button>
+            <button mat-menu-item (click)="saveOpenView()" [disabled]="!graph() || saving()" data-testid="la-save-view">
+                <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
+                <span>Save view</span>
+            </button>
+            <button
+                mat-menu-item
+                [matMenuTriggerFor]="saveMenu"
+                laFormMenu
+                #saveTrigger="matMenuTrigger"
+                [disabled]="!graph()"
+                aria-label="Save view as"
+                data-testid="la-save-view-as"
+            >
+                <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
+                <span>Save view as…</span>
+            </button>
+            <button
+                mat-menu-item
+                (click)="openSnapshot()"
+                [disabled]="snapshotUnavailable() !== ''"
+                [matTooltip]="snapshotUnavailable() || 'Save this analysis (optionally attaching it to a Case)'"
+                [attr.aria-label]="snapshotUnavailable() ? 'Save this analysis — ' + snapshotUnavailable() : 'Save this analysis'"
+            >
+                <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
+                <span>Save this analysis (Snapshot)</span>
+            </button>
+            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- stops the click closing File before the transfer menu opens -->
+            <div class="px-2" (click)="$event.stopPropagation()">
+                <inspecto-la-host-slot
+                    [component]="transfer.menu"
+                    [inputs]="{
+                        items: transferItems(),
+                        allowedKinds: ['link-analysis-view'],
+                        importDraft: true,
+                        label: 'Import / export views',
+                    }"
+                    [outputs]="transferMenuOutputs"
+                />
+            </div>
+            <button
+                mat-menu-item
+                (click)="closeOpenWork()"
+                [disabled]="!openWorkLabel() || investigation.busy()"
+                data-testid="la-close"
+            >
+                <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                <span>Close{{ openWorkLabel() ? ' ' + openWorkLabel() : '' }}</span>
+            </button>
+            <button
+                mat-menu-item
+                (click)="deleteOpenWork()"
+                [disabled]="!deleteLabel() || investigation.busy()"
+                data-testid="la-file-delete"
+            >
+                <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
+                <span>Delete{{ deleteLabel() ? ' ' + deleteLabel() : '' }}</span>
+            </button>
+        </mat-menu>
         <div class="flex min-w-0 flex-1 items-center">
         <nav
             class="flex min-w-0 flex-row flex-wrap items-center gap-1 rounded-lg border px-1"
@@ -160,17 +232,6 @@
                     </mat-menu>
                 }
 
-                <!-- evidence: snapshot the answer, attach it to a Case (spec §3.6) -->
-                <span class="inline-flex" [matTooltip]="snapshotUnavailable() || 'Save this analysis (optionally attaching it to a Case)'">
-                    <button
-                        mat-icon-button
-                        (click)="openSnapshot()"
-                        [disabled]="snapshotUnavailable() !== ''"
-                        [attr.aria-label]="snapshotUnavailable() ? 'Save this analysis — ' + snapshotUnavailable() : 'Save this analysis'"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
-                    </button>
-                </span>
                 <span
                     class="my-1 h-px w-6 max-md:mx-1 max-md:my-0 max-md:h-5 max-md:w-px"
                     style="background: var(--gamma-border)"
@@ -220,116 +281,7 @@
                 }"
             />
 
-            <!-- saved views (open) — always available -->
-            <button
-                mat-icon-button
-                [matMenuTriggerFor]="viewsMenu"
-                #viewsTrigger="matMenuTrigger"
-                matTooltip="Saved views"
-                aria-label="Open saved views"
-            >
-                <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
-            </button>
-            <mat-menu #viewsMenu="matMenu">
-                @if (views().length) {
-                    <div class="text-secondary max-w-64 px-4 py-2 text-xs leading-snug">
-                        <span class="text-warn font-semibold">Not evidence</span>
-                        — {{ savedViewNotice }}
-                    </div>
-                    @for (v of views(); track v.id) {
-                        <button
-                            mat-menu-item
-                            [matMenuTriggerFor]="viewActions"
-                            [matMenuTriggerData]="{ view: v }"
-                            [attr.aria-label]="'Actions for view ' + v.name"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
-                            <span>{{ v.name }}</span>
-                        </button>
-                    }
-                } @else {
-                    <button mat-menu-item disabled>Nothing saved yet: draw a graph, then Save as a case.</button>
-                }
-                @if (openWorkLabel(); as open) {
-                    <button
-                        mat-menu-item
-                        (click)="closeOpenWork()"
-                        [disabled]="investigation.busy()"
-                        data-testid="la-close-menu-item"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                        <span>Close {{ open }}</span>
-                    </button>
-                }
-            </mat-menu>
 
-            <!-- per-view actions (shared submenu, parameterized by the row's view) -->
-            <mat-menu #viewActions="matMenu">
-                <ng-template matMenuContent let-view="view">
-                    <button mat-menu-item (click)="loadView(view)" [attr.aria-label]="'Load view ' + view.name">
-                        <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
-                        <span>Load view</span>
-                    </button>
-                    <button
-                        mat-menu-item
-                        (click)="openHistory(view)"
-                        [attr.aria-label]="'Version history for ' + view.name"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
-                        <span>Version history</span>
-                    </button>
-                    @if (opsEnabled()) {
-                        <button
-                            mat-menu-item
-                            (click)="openComments(view)"
-                            [attr.aria-label]="'Comments for ' + view.name"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:chat-bubble-left-right"></mat-icon>
-                            <span>Comments</span>
-                        </button>
-                    }
-                    @if (opsEnabled()) {
-                        <button mat-menu-item (click)="openTags(view)" [attr.aria-label]="'Tags for ' + view.name">
-                            <mat-icon svgIcon="heroicons_outline:tag"></mat-icon>
-                            <span>Tags</span>
-                        </button>
-                    }
-                    @if (shareable(view)) {
-                        <button
-                            mat-menu-item
-                            (click)="offer(view)"
-                            [attr.aria-label]="'Offer view ' + view.name + ' for sharing'"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
-                            <span>Offer for sharing</span>
-                        </button>
-                    }
-                </ng-template>
-            </mat-menu>
-
-            <inspecto-la-host-slot
-                [component]="transfer.menu"
-                [inputs]="{
-                    items: transferItems(),
-                    allowedKinds: ['link-analysis-view'],
-                    importDraft: true,
-                    label: 'Import / export saved views',
-                }"
-                [outputs]="transferMenuOutputs"
-            />
-
-            <!-- save as a case (A-1b: a named view plus the Entity Lists it uses) — needs a rendered graph -->
-            <button
-                mat-icon-button
-                #saveTrigger="matMenuTrigger"
-                [matMenuTriggerFor]="saveMenu" laFormMenu
-                [disabled]="!graph()"
-                matTooltip="Save as a case"
-                aria-label="Save as a case"
-                data-testid="la-save-case"
-            >
-                <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-            </button>
             <mat-menu #saveMenu="matMenu">
                 <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events -- (click) only stops propagation so the mat-menu stays open; the form is not a control -->
                 <form
@@ -337,10 +289,10 @@
                     (ngSubmit)="saveView()"
                     class="flex w-72 max-w-full flex-col p-3"
                     (click)="$event.stopPropagation()"
-                    aria-label="Save as a case"
+                    aria-label="Save view as"
                 >
                     <p class="m-0 mb-2 text-sm font-semibold">
-                        Save as a <inspecto-term term="case"></inspecto-term>
+                        Save view as
                     </p>
                     <mat-form-field>
                         <mat-label>Name</mat-label>
@@ -349,7 +301,7 @@
                             <mat-error>A name is required.</mat-error>
                         }
                         @if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>A case with this name already exists.</mat-error>
+                            <mat-error>A view with this name already exists.</mat-error>
                         }
                     </mat-form-field>
                     <mat-form-field>
@@ -362,7 +314,7 @@
                     </p>
                     <button mat-stroked-button type="submit" [disabled]="saving() || !graph()">
                         <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-                        Save as a case
+                        Save view
                     </button>
                     @if (!investigationsEnabled()) {
                         <inspecto-locked-action
@@ -422,6 +374,86 @@
                             >Hover activate
                             <span class="text-secondary text-xs">(light up a node and its links)</span></mat-checkbox
                         >
+                        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Overlays</span>
+                        <mat-checkbox
+                            [checked]="legendOpen()"
+                            (change)="setOverlayOpen('legend', $event.checked)"
+                        >
+                            Legend
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="workingSetOpen()"
+                            (change)="setOverlayOpen('workingSet', $event.checked)"
+                        >
+                            Working set
+                        </mat-checkbox>
+                        <mat-checkbox [checked]="levelOfDetail()" (change)="levelOfDetail.set($event.checked)">
+                            Level of detail
+                            <span class="text-secondary text-xs"
+                                >(labels off above {{ lodLabelCap() }} nodes)</span
+                            >
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().minimap"
+                            (change)="toggleViewFlag('minimap', $event.checked)"
+                        >
+                            Minimap
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().gridLine"
+                            (change)="toggleViewFlag('gridLine', $event.checked)"
+                        >
+                            Grid
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().hulls && !hullsDisabledReason()"
+                            [disabled]="!!hullsDisabledReason()"
+                            [matTooltip]="hullsDisabledReason() ?? ''"
+                            (change)="toggleViewFlag('hulls', $event.checked)"
+                            data-testid="la-hulls-toggle"
+                        >
+                            Community hulls
+                            <span class="text-secondary text-xs">(Louvain)</span>
+                        </mat-checkbox>
+                        @if (hullsDisabledReason(); as why) {
+                            <span class="text-secondary text-xs" data-testid="la-hulls-reason"
+                                >Community hulls {{ why }} —
+                                <button type="button" class="text-primary underline" (click)="openReduce()">
+                                    reduce first
+                                </button></span
+                            >
+                        }
+                        <div class="mt-1 flex items-center gap-2">
+                            <mat-checkbox
+                                [checked]="superNodeThreshold() > 0"
+                                [disabled]="workingSetCanvas()"
+                                (change)="setSuperNodeGrouping($event.checked)"
+                            >
+                                Group lone counterparties
+                            </mat-checkbox>
+                            @if (workingSetCanvas()) {
+                                <span class="text-secondary text-xs">{{ queryGraphOnlyReason }}</span>
+                            }
+                            @if (superNodeThreshold() > 0) {
+                                <span class="text-secondary text-xs">
+                                    {{ superNodeThreshold() }}+ per hub &middot; click a group to open it
+                                </span>
+                            }
+                        </div>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().bubbleSets"
+                            [disabled]="!viewOptions().hulls"
+                            (change)="toggleViewFlag('bubbleSets', $event.checked)"
+                        >
+                            Bubble sets
+                            <span class="text-secondary text-xs">(draw the communities as sets)</span>
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().edgeBundling"
+                            (change)="toggleViewFlag('edgeBundling', $event.checked)"
+                        >
+                            Link bundling
+                        </mat-checkbox>
                         <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node size</span>
                         <div class="flex items-center gap-1.5" role="group" aria-label="Node size">
                             @for (z of nodeSizeOptions; track z.value) {
@@ -586,13 +618,6 @@
                                 </button>
                             </div>
                         }
-                        <inspecto-link-analysis-display-rules
-                            [rules]="nodeRules()"
-                            [attributes]="nodeAttributeKeys()"
-                            [kinds]="nodeKinds()"
-                            [swatches]="swatches"
-                            (rulesChange)="setNodeRules($event)"
-                        />
                     </div>
                 </mat-menu>
 
@@ -702,8 +727,8 @@
                 (click)="toggleCanvasMaximized()"
                 [matTooltip]="
                     canvasMaximized()
-                        ? 'Show the query and toolbox panels'
-                        : 'Hide the query and toolbox panels (more room for the canvas)'
+                        ? 'Show the toolbox panel'
+                        : 'Hide the toolbox panel (more room for the canvas)'
                 "
                 [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Hide the side panels'"
             >
@@ -713,19 +738,16 @@
                     "
                 ></mat-icon>
             </button>
-            <!-- Close what is open (Investigation, Draft, imported view, drawn analysis): back to the empty state -->
-            @if (openWorkLabel(); as open) {
-                <button
-                    mat-icon-button
-                    (click)="closeOpenWork()"
-                    [disabled]="investigation.busy()"
-                    [matTooltip]="'Close ' + open"
-                    [attr.aria-label]="'Close ' + open"
-                    data-testid="la-close"
-                >
-                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                </button>
-            }
+            <!-- ⚙ Settings (§5.10): the right end of the top bar -->
+            <button
+                mat-icon-button
+                (click)="openSettings()"
+                matTooltip="Settings: graph model, Entity Types, display rules, data"
+                aria-label="Settings"
+                data-testid="la-settings-open"
+            >
+                <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon>
+            </button>
         </div>
     </header>
     @if (graph() || workingSetCanvas()) {
@@ -1044,81 +1066,6 @@
         <div
             class="relative flex min-h-[26.25rem] min-w-0 flex-auto overflow-hidden max-md:min-h-[28rem] rounded-lg border max-md:!h-auto max-md:flex-col"
         >
-            <!-- left dock — Query (+ Filter); collapses to an icon rail -->
-            <aside
-                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-r max-md:!w-full max-md:border-b max-md:border-r-0"
-                [class.w-10]="!queryDockOpen()"
-                [style.width.px]="queryDockOpen() ? querySplit.width() : null"
-                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
-                aria-label="Query"
-            >
-                @if (queryDockOpen()) {
-                    <div
-                        class="flex shrink-0 items-center gap-1 border-b py-1 pl-3 pr-1"
-                        style="border-color: var(--gamma-border)"
-                    >
-                        <h2 class="text-xs font-semibold uppercase tracking-wide text-secondary">Query</h2>
-                        <button
-                            class="ml-auto"
-                            mat-icon-button
-                            (click)="queryDockOpen.set(false)"
-                            matTooltip="Hide the query panel"
-                            aria-label="Hide the query panel"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:chevron-double-left"></mat-icon>
-                        </button>
-                    </div>
-                    <div class="min-h-0 flex-auto overflow-y-auto p-3">
-                        <!-- Domain profile — shapes the working-set statistics and the suggested tools; saved with a view. -->
-                        <inspecto-option-picker
-                            class="mb-3 block"
-                            label="Domain profile"
-                            [formControl]="profileControl"
-                            [options]="profileOptions()"
-                            help="Names the statistics after the data and foregrounds the tools that matter for it."
-                        ></inspecto-option-picker>
-                        <!-- Query — the query-panel child owns the form + buildQuery; the host keeps sourceId and the
-                             run/save/load lifecycle, reached via a ViewChild. -->
-                        <inspecto-link-analysis-query-panel
-                            [sources]="sources"
-                            [datasets]="datasets()"
-                            [pipelines]="pipelines()"
-                            [sourceId]="sourceId()"
-                            [queryOpen]="queryOpen()"
-                            [loading]="loading()"
-                            [querySummary]="querySummary()"
-                            [sourceLabel]="sourceLabel()"
-                            (sourceIdChange)="sourceId.set($event)"
-                            (run)="run()"
-                            (edit)="editQuery()"
-                        ></inspecto-link-analysis-query-panel>
-                    </div>
-                } @else {
-                    <button
-                        mat-icon-button
-                        (click)="queryDockOpen.set(true)"
-                        matTooltip="Show the query panel"
-                        aria-label="Show the query panel"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:chevron-double-right"></mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="editQuery()" matTooltip="Query" aria-label="Open the query form">
-                        <mat-icon svgIcon="heroicons_outline:circle-stack"></mat-icon>
-                    </button>
-                }
-            </aside>
-            <!-- Kept mounted (hidden, not @if'd) while collapsed so #querySplit stays resolvable. -->
-            <div
-                inspectoSplit="link-analysis.query"
-                #querySplit="inspectoSplit"
-                [min]="200"
-                [max]="560"
-                [defaultWidth]="220"
-                class="max-md:hidden"
-                [class.hidden]="!queryDockOpen()"
-                aria-label="Resize the query panel (arrow keys or drag)"
-            ></div>
-
             <!-- ══ canvas zone (graph + states + overlays) — the graph-fullscreen target ══ -->
             <div
                 #canvasZone
@@ -1378,7 +1325,7 @@
                 [class.hidden]="!toolboxDockOpen()"
                 aria-label="Resize the toolbox (arrow keys or drag)"
             ></div>
-            <!-- right dock — Analysis | View toolbox; collapses to an icon rail -->
+            <!-- right dock — Analysis | Investigation toolbox; collapses to an icon rail -->
             <aside
                 class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l max-md:!w-full max-md:border-l-0 max-md:border-t"
                 [class.w-10]="!toolboxDockOpen()"
@@ -1475,15 +1422,17 @@
                             [serverCeilings]="serverAlgorithmCeilings()"
                             [canRunOnServer]="canRunGraphOnServer()"
                             [canBuildIndex]="canBuildLinkIndex()"
+                            [dockAvailable]="true"
+                            (openInDock)="showResultInDock($event)"
                             (emphasisChange)="emphasis.set($event)"
                             (nodePick)="onNodePick($event)"
                             (seedFromResults)="queueSeedsAndOpen($event)"
                             (findPaths)="findPaths($event)"
                             (runPatternOnServer)="runPatternOnServer($event)"
-                        ></inspecto-link-analysis-toolbox>
+                        >
+                        <!-- §5.8: Temporal findings is the catalogue's "Burst and periodicity" entry. -->
                         <inspecto-link-analysis-temporal-findings
-                            class="mt-3"
-                            [class.hidden]="toolboxTab() !== 'analysis'"
+                            laTemporal
                             [mappings]="traversalMappingOptions()"
                             [timeColumn]="timeColumn()"
                             [state]="temporalFindings()"
@@ -1497,6 +1446,7 @@
                             (sealRequested)="sealTemporal()"
                             (highlight)="emphasis.set($event)"
                         ></inspecto-link-analysis-temporal-findings>
+                        </inspecto-link-analysis-toolbox>
 
                         <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse.
                              On the Explorer level the tab stays and its one action is LOCKED with the reason (LA-ONBOARD-1 OB-10). -->
@@ -1513,8 +1463,9 @@
                                     [degreePresets]="degreePresets()"
                                     [maxDegree]="maxDegree()"
                                     (pendingDone)="pendingInvestigation.set(null)"
+                                    (openRequested)="openOpenDialog('investigations')"
                                     (expandRequested)="openExpand()"
-                                    (settingsRequested)="openInvestigationSettings()"
+                                    (settingsRequested)="openSettings('investigation')"
                                     (dockRequested)="openDock($event)"
                                 ></inspecto-link-analysis-investigation>
                             } @else {
@@ -1536,154 +1487,6 @@
                                 </div>
                             }
                         }
-
-                        <!-- View — layouts and canvas overlays. `[class.hidden]`, never `[hidden]`: Tailwind's `.flex`
-                             sets display:flex, which beats the [hidden] attribute, so the View tools rendered under
-                             every tab. Still mounted, like the Analysis toolbox above. -->
-                        <div
-                            [class.hidden]="toolboxTab() !== 'view'"
-                            class="flex flex-col gap-3"
-                            data-toolbox-view
-                            role="tabpanel"
-                            id="la-toolbox-panel-view"
-                            aria-labelledby="la-toolbox-tab-view"
-                        >
-                            <section aria-label="Layout">
-                                <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
-                                    Layout
-                                </h3>
-                                <div class="grid grid-cols-2 gap-1">
-                                    @for (l of layouts; track l.id) {
-                                        @let off = layoutDisabledReason(l);
-                                        <span class="flex" [matTooltip]="off ?? ''">
-                                            <button
-                                                type="button"
-                                                class="w-full rounded-md border px-2 py-1.5 text-left text-xs disabled:opacity-50"
-                                                [class.font-semibold]="layoutId() === l.id"
-                                                [style.borderColor]="layoutId() === l.id ? 'var(--gamma-primary)' : null"
-                                                [disabled]="!!off"
-                                                (click)="setLayout(l.id)"
-                                                [attr.aria-pressed]="layoutId() === l.id"
-                                                [attr.aria-label]="l.label + (off ? ' (' + off + ')' : '')"
-                                            >
-                                                {{ l.label }}
-                                            </button>
-                                        </span>
-                                    }
-                                </div>
-                                @if (anyLayoutOverCap()) {
-                                    <button
-                                        type="button"
-                                        class="text-primary mt-1 text-left text-xs underline"
-                                        (click)="openReduce()"
-                                    >
-                                        Reduce first — filter the graph to use the greyed layouts
-                                    </button>
-                                }
-                            </section>
-                            <section aria-label="Overlays" class="flex flex-col">
-                                <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
-                                    Overlays
-                                </h3>
-                                <mat-checkbox
-                                    [checked]="legendOpen()"
-                                    (change)="setOverlayOpen('legend', $event.checked)"
-                                >
-                                    Legend
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="workingSetOpen()"
-                                    (change)="setOverlayOpen('workingSet', $event.checked)"
-                                >
-                                    Working set
-                                </mat-checkbox>
-                                <mat-checkbox [checked]="nodeLabels()" (change)="nodeLabels.set($event.checked)">
-                                    Node labels
-                                </mat-checkbox>
-                                <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)">
-                                    Link labels
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="allEdgeLabels()"
-                                    [disabled]="!edgeLabels()"
-                                    (change)="allEdgeLabels.set($event.checked)"
-                                >
-                                    All link labels
-                                    @if (edgeLabelsDense()) {
-                                        <span class="text-secondary text-xs"
-                                            >(hidden above {{ denseEdgeLabelCap }} links — hover to show)</span
-                                        >
-                                    }
-                                </mat-checkbox>
-                                <mat-checkbox [checked]="levelOfDetail()" (change)="levelOfDetail.set($event.checked)">
-                                    Level of detail
-                                    <span class="text-secondary text-xs"
-                                        >(labels off above {{ lodLabelCap() }} nodes)</span
-                                    >
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().minimap"
-                                    (change)="toggleViewFlag('minimap', $event.checked)"
-                                >
-                                    Minimap
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().gridLine"
-                                    (change)="toggleViewFlag('gridLine', $event.checked)"
-                                >
-                                    Grid
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().hulls && !hullsDisabledReason()"
-                                    [disabled]="!!hullsDisabledReason()"
-                                    [matTooltip]="hullsDisabledReason() ?? ''"
-                                    (change)="toggleViewFlag('hulls', $event.checked)"
-                                    data-testid="la-hulls-toggle"
-                                >
-                                    Community hulls
-                                    <span class="text-secondary text-xs">(Louvain)</span>
-                                </mat-checkbox>
-                                @if (hullsDisabledReason(); as why) {
-                                    <span class="text-secondary text-xs" data-testid="la-hulls-reason"
-                                        >Community hulls {{ why }} —
-                                        <button type="button" class="text-primary underline" (click)="openReduce()">
-                                            reduce first
-                                        </button></span
-                                    >
-                                }
-                                <div class="mt-1 flex items-center gap-2">
-                                    <mat-checkbox
-                                        [checked]="superNodeThreshold() > 0"
-                                        [disabled]="workingSetCanvas()"
-                                        (change)="setSuperNodeGrouping($event.checked)"
-                                    >
-                                        Group lone counterparties
-                                    </mat-checkbox>
-                                    @if (workingSetCanvas()) {
-                                        <span class="text-secondary text-xs">{{ queryGraphOnlyReason }}</span>
-                                    }
-                                    @if (superNodeThreshold() > 0) {
-                                        <span class="text-secondary text-xs">
-                                            {{ superNodeThreshold() }}+ per hub &middot; click a group to open it
-                                        </span>
-                                    }
-                                </div>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().bubbleSets"
-                                    [disabled]="!viewOptions().hulls"
-                                    (change)="toggleViewFlag('bubbleSets', $event.checked)"
-                                >
-                                    Bubble sets
-                                    <span class="text-secondary text-xs">(draw the communities as sets)</span>
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().edgeBundling"
-                                    (change)="toggleViewFlag('edgeBundling', $event.checked)"
-                                >
-                                    Link bundling
-                                </mat-checkbox>
-                            </section>
-                        </div>
                     </div>
                 } @else {
                     <button
@@ -1709,14 +1512,6 @@
                         aria-label="Open the Investigation"
                     >
                         <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                    </button>
-                    <button
-                        mat-icon-button
-                        (click)="openViewTools()"
-                        matTooltip="View"
-                        aria-label="Open the view tools"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:squares-2x2"></mat-icon>
                     </button>
                 }
             </aside>
@@ -1838,9 +1633,22 @@
                         ></inspecto-data-table>
                         }
                         @case ('results') {
-                            <p class="text-secondary m-0 text-sm" data-testid="dock-results-empty">
-                                Long algorithm results open here with “Open in the dock”.
-                            </p>
+                            @if (dockResult(); as res) {
+                                <p class="m-0 mb-2 text-sm" data-testid="dock-results-headline">
+                                    <strong>{{ res.algorithm }}</strong> — {{ res.headline }}
+                                </p>
+                                <inspecto-data-table
+                                    tier="standard"
+                                    [rows]="res.rows"
+                                    height="11rem"
+                                    [exportName]="'link-analysis-' + res.algorithm"
+                                    noRowsTitle="The answer has no rows"
+                                ></inspecto-data-table>
+                            } @else {
+                                <p class="text-secondary m-0 text-sm" data-testid="dock-results-empty">
+                                    Long algorithm results open here with “Open in the dock”.
+                                </p>
+                            }
                         }
                         @default {
                             <inspecto-link-analysis-investigation
@@ -1888,21 +1696,35 @@
                 <!-- one line: a narrow window clips the chips instead of wrapping the title row onto a second and third -->
                 <div class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
                     @for (item of querySummary(); track item.label) {
-                        <inspecto-chip>
-                            <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
-                            <span class="text-secondary">{{ item.label }}:</span>
-                            {{ item.value }}
-                        </inspecto-chip>
+                        <!-- a chip opens ⚙ Settings → Graph model (§5.10) -->
+                        <button type="button" class="shrink-0" (click)="editQuery()" [attr.aria-label]="'Change ' + item.label + ' in the graph model'">
+                            <inspecto-chip>
+                                <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
+                                <span class="text-secondary">{{ item.label }}:</span>
+                                {{ item.value }}
+                            </inspecto-chip>
+                        </button>
                     }
                 </div>
                 <button
                     mat-icon-button
                     class="shrink-0"
                     (click)="editQuery()"
-                    matTooltip="Change the query"
-                    aria-label="Change the query"
+                    matTooltip="Change the graph model"
+                    aria-label="Change the graph model"
                 >
                     <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                </button>
+                <button
+                    mat-icon-button
+                    class="shrink-0"
+                    [disabled]="loading() || !lastRun()"
+                    (click)="refreshFromServer()"
+                    matTooltip="Refresh: run the same graph model again"
+                    aria-label="Refresh the graph"
+                    data-testid="la-status-refresh"
+                >
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
                 <span class="text-secondary shrink-0 whitespace-nowrap text-xs">
                     {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
@@ -1913,4 +1735,63 @@
         </div>
         </div>
     </div>
+    <!-- ══ ⚙ Settings (LA-STUDIO-UI-REORG-1 §5.10): sections are projected and only hidden, so the query panel stays this
+         component's ViewChild and a half-edited form survives closing ══ -->
+    <inspecto-la-settings
+        [(open)]="settingsOpen"
+        [(section)]="settingsSection"
+        [investigationOpen]="!!investigation.active()"
+        [isDirty]="settingsDirty"
+    >
+        <div laSection="graph-model" class="flex flex-col gap-3">
+            @if (profileLabel(); as pack) {
+                <p class="text-secondary m-0 text-xs" data-testid="la-settings-pack">
+                    Industry pack: <span class="font-medium">{{ pack }}</span>
+                </p>
+            }
+            <inspecto-link-analysis-query-panel
+                [sources]="sources"
+                [datasets]="datasets()"
+                [pipelines]="pipelines()"
+                [sourceId]="sourceId()"
+                [queryOpen]="true"
+                [loading]="loading()"
+                [querySummary]="querySummary()"
+                [sourceLabel]="sourceLabel()"
+                (sourceIdChange)="sourceId.set($event)"
+                (run)="run()"
+                (edit)="editQuery()"
+            ></inspecto-link-analysis-query-panel>
+            <div class="flex justify-end gap-2 border-t pt-3" style="border-color: var(--gamma-border)">
+                <!-- Run is the form's own submit (Run query) above; Refresh re-reads the last run from the server -->
+                <button mat-stroked-button [disabled]="loading() || !lastRun()" (click)="refreshFromServer()" data-testid="la-settings-refresh">
+                    <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                    Refresh
+                </button>
+            </div>
+        </div>
+        <div laSection="entity-types"><inspecto-la-entity-types /></div>
+        <div laSection="display-rules">
+            <inspecto-link-analysis-display-rules
+                [rules]="nodeRules()"
+                [attributes]="nodeAttributeKeys()"
+                [kinds]="nodeKinds()"
+                [swatches]="swatches"
+                (rulesChange)="setNodeRules($event)"
+            />
+        </div>
+        <!-- Data: mounted only while ⚙ is open (the one reader on load and the one consumer of a merge hand-off) -->
+        <div laSection="entity-lists">@if (settingsOpen()) {<inspecto-link-analysis-entity-lists />}</div>
+        <div laSection="identities">@if (settingsOpen()) {<inspecto-link-analysis-identities />}</div>
+        <div laSection="add-data">@if (settingsOpen()) {<inspecto-link-analysis-uploads />}</div>
+        <div laSection="investigation">
+            @if (settingsOpen() && investigation.active()) {
+                <inspecto-la-investigation-settings-sections />
+            } @else {
+                <p class="text-secondary m-0 text-sm" data-testid="la-settings-investigation-slot">
+                    Open an Investigation to see its settings here.
+                </p>
+            }
+        </div>
+    </inspecto-la-settings>
 </div>

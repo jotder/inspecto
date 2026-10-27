@@ -174,22 +174,16 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
             ariaDisabled: l.querySelector('button')?.getAttribute('aria-disabled'),
         }));
 
-    it('keeps the server-algorithm and edge-index tools listed, each opening on a LOCKED action with the reason', async () => {
+    it('the catalogue shows ONE locked Run on the server line, and lists no server-only tool (§5.8)', async () => {
         const { fixture, c, el, run } = make({ features: EXPLORER });
         fixture.detectChanges();
         const ids = c.tools.map((t) => t.id);
-        expect(ids).toEqual(expect.arrayContaining(['server-algorithms', 'index-build', 'path', 'value-measures']));
-
-        c.tab.set('server-algorithms');
-        fixture.detectChanges();
+        expect(ids).toEqual(expect.arrayContaining(['index-build', 'path', 'value-measures', 'temporal']));
+        expect(ids).not.toContain('server-algorithms');
+        expect(el.querySelector('[data-testid="catalogue-where"]')).toBeNull();
         expect(el.querySelector('inspecto-link-analysis-server-algorithms')).toBeNull();
-        expect(locked(el)).toEqual([{ label: 'Run on server', reason: REASON, ariaDisabled: 'true' }]);
-        await expectNoA11yViolations(el);
-
-        c.tab.set('index-build');
-        fixture.detectChanges();
-        expect(el.querySelector('inspecto-link-analysis-index-build')).toBeNull();
-        expect(locked(el)).toEqual([{ label: 'Build index', reason: REASON, ariaDisabled: 'true' }]);
+        expect(el.querySelector('[aria-controls="tool-index-build"]')).toBeNull();
+        expect(locked(el)).toEqual([{ label: 'Run on the server', reason: REASON, ariaDisabled: 'true' }]);
         (el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement).click();
         expect(run).not.toHaveBeenCalled();
         await expectNoA11yViolations(el);
@@ -203,7 +197,10 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="run-on-server"]')).toBeNull();
         expect(el.textContent).toContain('This graph has 5 nodes - above the 3-node limit');
-        expect(locked(el)).toEqual([{ label: 'Run on server', reason: REASON, ariaDisabled: 'true' }]);
+        expect(locked(el)).toEqual([
+            { label: 'Run on the server', reason: REASON, ariaDisabled: 'true' }, // the catalogue's one line
+            { label: 'Run on server', reason: REASON, ariaDisabled: 'true' },
+        ]);
         (el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement).click();
         expect(run).not.toHaveBeenCalled();
         await expectNoA11yViolations(el);
@@ -216,9 +213,11 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
         expect(locked(el)[0].reason).toBe('Investigations need the Investigations add-on (Standard and above).');
     });
 
-    it('Standard keeps both server tools', () => {
+    it('Standard lists the Edge index under Server (the server algorithms come from the catalogue)', () => {
         const { c } = make();
-        expect(c.tools.map((t) => t.id)).toEqual(expect.arrayContaining(['server-algorithms', 'index-build']));
+        expect(c.tools.map((t) => t.id)).toContain('index-build');
+        c.whereChoice.set('server');
+        expect(c.sections().flatMap((s) => s.tools.map((t) => t.id))).toContain('index-build');
     });
 });
 
@@ -254,6 +253,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     it('an algorithm without a browser cap (degree) stays local even on a big graph', () => {
         capAll(3);
         const { fixture, c, button } = make();
+        c.whereChoice.set('browser'); // over the cap Server is preselected (§5.8); degree stays a browser run
         c.tab.set('centrality');
         c.centralityMetric.set('degree');
         fixture.detectChanges();

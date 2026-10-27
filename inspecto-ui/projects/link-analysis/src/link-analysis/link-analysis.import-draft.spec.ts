@@ -124,6 +124,8 @@ describe('LinkAnalysisComponent — Import as draft', () => {
     it('offers "Import as draft…" in its editor menu (D8)', () => {
         const { fixture, http } = create();
         flushReads(http);
+        (fixture.nativeElement.querySelector('[data-testid="la-file"]') as HTMLElement).click(); // File ▸ Import / export views
+        fixture.detectChanges();
         const menu = fixture.debugElement.query(By.directive(TransferMenuComponent))
             .componentInstance as TransferMenuComponent;
         expect(menu.importDraft()).toBe(true);

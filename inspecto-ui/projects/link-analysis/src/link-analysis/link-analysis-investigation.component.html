@@ -1,79 +1,10 @@
 <section class="flex flex-col gap-3 text-base" [attr.aria-label]="sectionLabel()">
     @switch (section()) {
         @case ('settings') {
-            <!-- TEMPORARY host (until P2b's ⚙ Settings dialog): the setup and governance folds, unchanged -->
+            <!-- §5.10 This Investigation: the setup and governance folds, unchanged (hosted by the ⚙ Settings dialog) -->
             @if (store.error()) {
                 <inspecto-alert variant="error" title="Investigation">{{ store.error() }}</inspecto-alert>
             }
-        
-            @if (store.refs().length) {
-                <inspecto-option-picker
-                    label="Investigation"
-                    [options]="pickerOptions()"
-                    [ngModel]="store.activeId()"
-                    (ngModelChange)="switchTo($event)"
-                    placeholder="Open a remembered Investigation"
-                ></inspecto-option-picker>
-            }
-        <!-- ── open an Investigation the caller may read (own + shared through an open Case) ── -->
-    <la-fold title="Open an Investigation">
-        <section class="flex flex-col gap-1" aria-label="Investigations">
-            <div class="flex flex-wrap items-center gap-2">
-                <button mat-stroked-button [disabled]="listBusy()" (click)="listInvestigations()">
-                    List Investigations
-                </button>
-                <inspecto-pen-field class="min-w-full flex-1" label="Open by id" [formControl]="openId" (keydown.enter)="openById()"></inspecto-pen-field>
-                <button mat-button [disabled]="!openId.value.trim() || store.busy()" (click)="openById()">Open</button>
-            </div>
-            @if (listError()) {
-                <inspecto-alert variant="error" title="Investigations">{{ listError() }}</inspecto-alert>
-            }
-            @if (listed(); as items) {
-                @if (!items.length) {
-                    <p class="text-secondary m-0 text-sm">No Investigation you may read.</p>
-                } @else {
-                    <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
-                        @for (i of items; track i.id) {
-                            <li class="flex items-center gap-2">
-                                <span class="min-w-0 flex-1 truncate">
-                                    <strong>{{ i.title || i.id }}</strong>
-                                    @if (i.title) {
-                                        <span class="text-secondary">({{ i.id }})</span>
-                                    }
-                                    — {{ i.dataset }}, {{ i.headStep }} steps{{
-                                        i.access === 'case-member'
-                                            ? ', shared through Case ' + i.caseRef + ' (read-only)'
-                                            : ''
-                                    }}
-                                </span>
-                                <button
-                                    mat-button
-                                    [disabled]="store.busy()"
-                                    [attr.aria-label]="'Open Investigation ' + (i.title || i.id)"
-                                    (click)="openListed(i)"
-                                >
-                                    Open
-                                </button>
-                                @if (canDelete(i.id)) {
-                                    <button
-                                        mat-button
-                                        [disabled]="store.busy()"
-                                        [attr.aria-label]="'Delete Investigation ' + (i.title || i.id)"
-                                        (click)="deleteInvestigation(i.id, i.title || i.id)"
-                                    >
-                                        Delete
-                                    </button>
-                                }
-                            </li>
-                        }
-                    </ul>
-                    @if (listedTruncated()) {
-                        <p class="text-secondary m-0 text-sm">More Investigations exist than are listed.</p>
-                    }
-                }
-            }
-        </section>
-    </la-fold>
             @if (store.active()) {
                 @if (store.header(); as h) {
     <la-fold title="Case">
@@ -246,20 +177,6 @@
     </la-fold>
             }
             }
-        <!-- ── LA-17 Entity Lists: list/create/add/retire always; exclude/seed by list on the open Investigation ── -->
-    <la-fold title="Entity Lists">
-        <inspecto-link-analysis-entity-lists></inspecto-link-analysis-entity-lists>
-    </la-fold>
-    
-        <!-- ── LA-17 slice 2 identity resolution: assert / look up / retract (needs canManageIncidents, reads too) ── -->
-    <la-fold title="Identities">
-        <inspecto-link-analysis-identities></inspecto-link-analysis-identities>
-    </la-fold>
-    
-        <!-- ── Analyst CSV upload (LA-ANALYST-UPLOAD-1 D-UP8): land a file in an upload-enabled Collector, see its ingest state (canUploadData) ── -->
-    <la-fold title="Upload data">
-        <inspecto-link-analysis-uploads></inspecto-link-analysis-uploads>
-    </la-fold>
         }
         @case ('oplog') {
             @if (store.active()) {
@@ -647,14 +564,12 @@
                     </inspecto-alert>
                 }
                 <p class="text-secondary m-0 text-sm">
-                    List Investigations asks the server for the ones you may read; this screen also remembers the ones it
-                    opened, and saving the view keeps them with it.
+                    File ▸ Open… lists the ones you may read (Recent: the ones this screen opened);
+                    saving the view keeps them with it.
                 </p>
-                <!-- §5.8: the start form and Open… (File ▾ Open… arrives in P3a; until then Open lives with the settings sections) -->
+                <!-- LA-STUDIO-UI-REORG-1 §5.11: listing, Open by id and Recent live in File ▸ Open… (its Investigations tab) -->
                 <div>
-                    <button mat-stroked-button type="button" data-testid="act-open" (click)="settingsRequested.emit()">
-                        Open an Investigation…
-                    </button>
+                    <button mat-stroked-button (click)="openRequested.emit()" data-testid="investigation-open">Open…</button>
                 </div>
             } @else {
                 @if (store.header(); as h) {
