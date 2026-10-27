@@ -35,6 +35,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
+import { MatDividerModule } from '@angular/material/divider';
 import { FormMenuDirective } from './form-menu.directive';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -78,6 +79,7 @@ import {
     someValues,
 } from './start-from';
 import { QueuedSeed, pickFollowTheMoney } from './la-starter';
+import { CANVAS_MODES, CanvasMode, canvasInteractionFor, canvasModeForKey, canvasModeOptions } from './canvas-mode';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
 import {
@@ -404,6 +406,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         MatIconModule,
         MatInputModule,
         MatMenuModule,
+        MatDividerModule,
         MatSliderModule,
         MatTooltipModule,
         InspectoAlertComponent,
@@ -645,7 +648,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly canvasMaximized = computed(() => !this.queryDockOpen() && !this.toolboxDockOpen());
 
     // ── View toolbox: canvas plugins and behaviors (each a G6 v5 built-in), persisted with a saved view ──
-    // Every "Lenses & selection" toggle (fisheye, link filter lens, snap lines, hover activate, lasso select) starts OFF (operator 2026-10-26).
+    // Fisheye, Link filter, Snap lines and Hover activate all start OFF (operator 2026-10-26).
     readonly viewOptions = signal<NonNullable<LinkAnalysisViewOptions['plugins']>>({
         minimap: true,
         behaviors: [],
@@ -653,7 +656,15 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly canvasPlugins = computed<GraphViewPlugins>(
         () => {
             const o = this.viewOptions();
-            return { ...o, hulls: o.hulls ? this.communityHulls() : null };
+            const mode = this.canvasMode();
+            return {
+                ...o,
+                behaviors: canvasModeOptions(o).behaviors, // no rectangle brush, no second lasso
+                // The lenses follow the one Canvas mode (UIR-D3), so a Fisheye drag never fights the lasso.
+                fisheye: mode === 'fisheye',
+                edgeFilterLens: mode === 'linkFilter',
+                hulls: o.hulls ? this.communityHulls() : null,
+            };
         },
         // LA-05: both this and `displayOptions` build a fresh object on every evaluation, so without a
         // value comparator the canvas host sees a changed `@Input` whenever any unrelated signal moves.
@@ -688,20 +699,26 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
     /** Community assignment per graph content signature (last few), so returning to a graph already seen costs nothing. */
     private readonly hullMemo = new Map<string, Map<string, string[]>>();
-    readonly viewBehaviors: { id: NonNullable<GraphViewPlugins['behaviors']>[number]; label: string; hint: string }[] =
-        [
-            { id: 'hover-activate', label: 'Hover activate', hint: 'light up a node and its links' },
-            // 'brush-select' is no longer offered: a plain drag on the empty canvas ALWAYS draws the selection box here
-            // (canvasInteraction.boxSelect). A saved view that still names it opens fine; the host folds it into that box.
-            { id: 'lasso-select', label: 'Lasso select', hint: 'shift + free-hand' },
-        ];
+
+    // ── Canvas modes (LA-STUDIO-UI-REORG-1 §5.2/§5.3, UIR-D2/D3): one owns the drag at a time, Esc returns to Pan ──
+
+    readonly canvasModes = CANVAS_MODES;
+    /** Fisheye and Link filter are kept as the saved view's plugin flags; Lasso is a session-only mode. */
+    private readonly lassoMode = signal(false);
+    readonly canvasMode = computed<CanvasMode>(() => {
+        const o = this.viewOptions();
+        return o.fisheye ? 'fisheye' : o.edgeFilterLens ? 'linkFilter' : this.lassoMode() ? 'lasso' : 'pan';
+    });
+
+    setCanvasMode(mode: CanvasMode): void {
+        this.lassoMode.set(mode === 'lasso');
+        this.viewOptions.update((o) => ({ ...o, fisheye: mode === 'fisheye', edgeFilterLens: mode === 'linkFilter' }));
+    }
 
     toggleViewFlag(
         flag:
             | 'minimap'
             | 'gridLine'
-            | 'fisheye'
-            | 'edgeFilterLens'
             | 'edgeBundling'
             | 'hulls'
             | 'bubbleSets'
@@ -2670,6 +2687,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const target = e.target as HTMLElement | null;
         if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
         if (this.onGrowExcludeKey(e, target)) return;
+        if (this.onCanvasModeKey(e, target)) return;
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
             e.preventDefault();
@@ -2746,13 +2764,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      * A drag on the EMPTY canvas draws a selection box instead of panning (the Minimap, the wheel and the arrow keys move
      * the view); a double click toggles expand / fold; the view re-fits after a data change. Opt-in on the shared host.
      */
-    readonly canvasInteraction: GraphViewInteraction = {
-        panByDrag: false,
-        boxSelect: true,
-        doubleClick: true,
-        fitOnDataChange: true,
-        fitOnResize: true,
-    };
+    readonly canvasInteraction = computed<GraphViewInteraction>(() => canvasInteractionFor(this.canvasMode()));
 
     /** What the box (or Select all) picked. Read through {@link selectedOnCanvas}: a hide, a fold or a new run drops what is gone. */
     private readonly selectedNodeIds = signal<string[]>([]);
@@ -2786,6 +2798,32 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** Every drawn node (a super-node is a stand-in, not a node an op can name). The keyboard path to a box select. */
     selectAll(): void {
         const ids = (this.canvasData()?.nodes ?? []).filter((n) => n.data.kind !== SUPER_NODE_KIND).map((n) => n.id);
+        this.selectedNodeIds.set(ids);
+        this.announceSelection(ids.length);
+    }
+
+    /** Every drawn node not selected now, and none of those that are. */
+    invertSelection(): void {
+        const picked = new Set(this.selectedOnCanvas());
+        const ids = (this.canvasData()?.nodes ?? [])
+            .filter((n) => n.data.kind !== SUPER_NODE_KIND && !picked.has(n.id))
+            .map((n) => n.id);
+        this.selectedNodeIds.set(ids);
+        this.announceSelection(ids.length);
+    }
+
+    /** The selection plus every drawn node one link away from it. */
+    addNeighboursToSelection(): void {
+        const picked = new Set(this.selectedOnCanvas());
+        if (!picked.size) return;
+        const g = this.canvasData();
+        const out = new Set(picked);
+        for (const e of g?.edges ?? []) {
+            if (picked.has(e.source)) out.add(e.target);
+            if (picked.has(e.target)) out.add(e.source);
+        }
+        const drawn = new Set((g?.nodes ?? []).filter((n) => n.data.kind !== SUPER_NODE_KIND).map((n) => n.id));
+        const ids = [...out].filter((id) => drawn.has(id));
         this.selectedNodeIds.set(ids);
         this.announceSelection(ids.length);
     }
@@ -3692,7 +3730,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.profileControl.setValue(view.profile ?? activeDomainProfileId());
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
-        if (view.view?.plugins) this.viewOptions.set(view.view.plugins);
+        if (view.view?.plugins) this.viewOptions.set(canvasModeOptions(view.view.plugins));
+        this.lassoMode.set(false);
         this.overlaysStated = { legend: view.view?.legend, workingSet: view.view?.workingSet };
         this.applyOverlayStart();
         this.queryPanel?.patchFormFromView(view);
@@ -4312,6 +4351,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         await this.expandNode(id, node.data.label, node.data.spellings);
     }
 
+    /** Held (n): move focus into the held tray, where each held item can be expanded anyway or removed. */
+    focusHeldTray(): void {
+        this.host.nativeElement
+            .querySelector<HTMLElement>('inspecto-link-analysis-held-tray button, inspecto-link-analysis-held-tray [tabindex]')
+            ?.focus();
+    }
+
     focusHeld(id: string): void {
         const node = this.canvasNodeOf(id);
         if (node) this.focusNode(node.id);
@@ -4381,11 +4427,29 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.openGrow();
     }
 
+    /** L = Lasso, F = Fisheye, Esc = back to Pan (the same guards as G / X). True when the key was ours. */
+    private onCanvasModeKey(e: KeyboardEvent, target: HTMLElement | null): boolean {
+        const mode = canvasModeForKey(e, this.canvasMode());
+        if (!mode || !this.canvasKeyTarget(target)) return false;
+        e.preventDefault();
+        this.setCanvasMode(mode);
+        return true;
+    }
+
     /** G = Grow, X = Exclude… (outside a text field, a grid, a menu or a dialog). True when the key was ours. */
     private onGrowExcludeKey(e: KeyboardEvent, target: HTMLElement | null): boolean {
         if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return false;
         const key = e.key.toLowerCase();
         if (key !== 'g' && key !== 'x') return false;
+        if (!this.canvasKeyTarget(target)) return false;
+        e.preventDefault();
+        if (key === 'g') this.openGrow();
+        else this.openExclude();
+        return true;
+    }
+
+    /** A canvas shortcut applies outside a text field, a grid, a menu or a dialog, with a graph on screen. */
+    private canvasKeyTarget(target: HTMLElement | null): boolean {
         if (target?.isContentEditable || target?.tagName === 'SELECT') return false;
         if (
             target?.closest?.(
@@ -4394,10 +4458,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         )
             return false;
         if (this.dialog.openDialogs.length) return false;
-        if (!this.graph() && !this.workingSetCanvas()) return false;
-        e.preventDefault();
-        if (key === 'g') this.openGrow();
-        else this.openExclude();
-        return true;
+        return !!(this.graph() || this.workingSetCanvas());
     }
 }

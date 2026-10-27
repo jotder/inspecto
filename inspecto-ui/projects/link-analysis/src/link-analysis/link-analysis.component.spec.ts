@@ -1399,17 +1399,17 @@ describe('LinkAnalysisComponent', () => {
         ]);
         expect(c.pushState()).toBe('0 links · from advanced search');
     });
-    it('view toolbox: every Lenses & selection toggle starts off (fisheye, link filter lens, snap lines, hover activate, lasso select)', async () => {
+    it('the canvas opens in Pan with every lens and preference off (fisheye, link filter, snap lines, hover activate)', async () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
         const o = c.viewOptions();
+        expect(c.canvasMode()).toBe('pan');
         expect(o.fisheye).toBeFalsy();
         expect(o.edgeFilterLens).toBeFalsy();
         expect(o.snapline).toBeFalsy();
-        expect(c.viewBehaviors.map((b) => b.id).sort()).toEqual(['hover-activate', 'lasso-select']);
-        for (const b of c.viewBehaviors) expect(c.hasBehavior(b.id), b.id).toBe(false);
+        expect(c.hasBehavior('hover-activate')).toBe(false);
         expect(c.canvasPlugins().behaviors ?? []).toEqual([]);
     });
 
@@ -1418,7 +1418,13 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        expect(c.canvasPlugins()).toEqual({ minimap: true, behaviors: [], hulls: null });
+        expect(c.canvasPlugins()).toEqual({
+            minimap: true,
+            behaviors: [],
+            hulls: null,
+            fisheye: false,
+            edgeFilterLens: false,
+        });
 
         c.toggleViewFlag('minimap', false);
         c.toggleViewFlag('hulls', true);
@@ -1428,7 +1434,7 @@ describe('LinkAnalysisComponent', () => {
         c.toggleBehavior('hover-activate', false);
         const p = c.canvasPlugins();
         expect(p.minimap).toBe(false);
-        expect(p.behaviors).toEqual(['brush-select']);
+        expect(p.behaviors).toEqual([]); // the rectangle brush never reaches the canvas (UIR-D3)
         expect([...p.hulls!.values()].map((m) => m.length).sort()).toEqual([2, 3]); // a–b–c and d–e
 
         c.legendOpen.set(false);
@@ -1444,6 +1450,97 @@ describe('LinkAnalysisComponent', () => {
         await c.loadView({ id: 'x', name: 'x', sourceId: 'entity-projection', query: c.lastRun()!.query });
         expect(c.legendOpen()).toBe(true); // a view without options resets the overlays
         expect(c.viewOptions().hulls).toBe(true); // …but keeps the plugin set the analyst last chose
+    });
+
+    it('Canvas modes are exclusive: one owns the drag, the lenses follow it, Esc returns to Pan (UIR-D3)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.canvasInteraction()).toMatchObject({ panByDrag: true, lasso: 'shift', shiftClickToggle: true });
+        expect(c.canvasInteraction().boxSelect).toBeFalsy(); // no rectangle select
+
+        c.setCanvasMode('fisheye');
+        expect(c.canvasMode()).toBe('fisheye');
+        expect(c.canvasPlugins()).toMatchObject({ fisheye: true, edgeFilterLens: false });
+        expect(c.canvasInteraction()).toMatchObject({ panByDrag: false, lasso: undefined }); // the lens owns the drag
+
+        c.setCanvasMode('linkFilter');
+        expect(c.canvasPlugins()).toMatchObject({ fisheye: false, edgeFilterLens: true });
+
+        c.setCanvasMode('lasso');
+        expect(c.canvasPlugins()).toMatchObject({ fisheye: false, edgeFilterLens: false });
+        expect(c.canvasInteraction()).toMatchObject({ panByDrag: false, lasso: 'drag' });
+
+        c.onHistoryKeydown(new KeyboardEvent('keydown', { key: 'Escape' }));
+        expect(c.canvasMode()).toBe('pan');
+        c.onHistoryKeydown(new KeyboardEvent('keydown', { key: 'f' }));
+        expect(c.canvasMode()).toBe('fisheye');
+        c.onHistoryKeydown(new KeyboardEvent('keydown', { key: 'l' }));
+        expect(c.canvasMode()).toBe('lasso');
+
+        fixture.detectChanges();
+        const pressed = Array.from(
+            (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="la-group-mode"] [aria-pressed="true"]'),
+        );
+        expect(pressed.map((b) => b.getAttribute('data-mode'))).toEqual(['lasso']); // one highlighted
+    });
+
+    it('a saved view naming the rectangle brush or the old lasso toggle opens as Pan', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.setCanvasMode('lasso');
+        await c.loadView({
+            id: 'x',
+            name: 'x',
+            sourceId: 'entity-projection',
+            query: c.lastRun()!.query,
+            view: { plugins: { behaviors: ['brush-select', 'lasso-select', 'hover-activate'] } },
+        });
+        expect(c.canvasMode()).toBe('pan');
+        expect(c.viewOptions().behaviors).toEqual(['hover-activate']);
+    });
+
+    it('the second toolbar: named groups, selection actions, the N selected chip, empty slots, no floating bar', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        fixture.detectChanges();
+        for (const g of ['la-group-mode', 'la-group-selection', 'la-group-edits', 'la-group-held'])
+            expect(el.querySelector(`[data-testid="la-canvas-toolbar"] [data-testid="${g}"]`), g).not.toBeNull();
+        expect(el.querySelector('[data-slot="collapse"]')).not.toBeNull();
+        expect(el.querySelector('[data-slot="clean-up"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="la-selection-bar"]')).toBeNull();
+        expect(el.querySelector('[data-testid="la-selection-count"]')).toBeNull();
+
+        c.selectAll();
+        const all = c.selectedOnCanvas().length;
+        expect(all).toBeGreaterThan(1);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="la-selection-count"]')?.textContent).toContain(`${all} selected`);
+
+        c.onSelectionChange([c.selectedOnCanvas()[0]]);
+        c.invertSelection();
+        expect(c.selectedOnCanvas().length).toBe(all - 1);
+        c.onSelectionChange(['a']);
+        c.addNeighboursToSelection();
+        expect(c.selectedOnCanvas().length).toBeGreaterThan(1); // a's neighbours joined
+        c.clearSelection();
+        expect(c.selectedOnCanvas()).toEqual([]);
+        await expectNoA11yViolations(el);
+    });
+
+    it('Snap lines and Hover activate are Display options; the View tab has no lenses section', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('section[aria-label="Lenses and selection"]')).toBeNull();
+        expect(el.textContent).not.toContain('Lenses & selection');
     });
     it('N2: Louvain never runs with hulls off, and runs once per graph content however often hulls are toggled', async () => {
         const { fixture } = create();
@@ -1625,7 +1722,7 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         const el = fixture.nativeElement as HTMLElement;
         const attach = () =>
-            Array.from(el.querySelectorAll('[data-testid="la-tool-rail"] button')).find((b) =>
+            Array.from(el.querySelectorAll('[data-testid="la-tool-rail"] button, [data-testid="la-canvas-toolbar"] button')).find((b) =>
                 (b.getAttribute('aria-label') ?? '').startsWith('Attach to Case'),
             ) as HTMLButtonElement | undefined;
         expect(c.graph()).toBeNull();
@@ -2027,7 +2124,11 @@ describe('LinkAnalysisComponent', () => {
 
         it('keeps every action reachable by its accessible name', async () => {
             const { rail } = await ready();
-            const names = Array.from(rail.querySelectorAll('button')).map((b) => b.getAttribute('aria-label') ?? '');
+            // The two toolbar rows: the tool rail and, under it, the canvas tools (Attach to Case moved there, §5.2).
+            const rows = rail.closest('[data-testid="la-header"]')!.parentElement!;
+            const names = Array.from(
+                rows.querySelectorAll('[data-testid="la-tool-rail"] button, [data-testid="la-canvas-toolbar"] button'),
+            ).map((b) => b.getAttribute('aria-label') ?? '');
             for (const name of [
                 'Search nodes',
                 'Filter node types',
@@ -3088,11 +3189,12 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
             new KeyboardEvent('keydown', { bubbles: true, ...init }),
         );
 
-    it('hands the host the pointer model: no pan by drag, a drag draws a box, double click, re-fit on data change', async () => {
+    it('hands the host the pointer model: drag pans, Shift+drag lassos, Shift+click toggles, no box, double click, re-fit', async () => {
         const { stub } = await drawn();
         expect(stub.interaction).toEqual({
-            panByDrag: false,
-            boxSelect: true,
+            panByDrag: true,
+            lasso: 'shift',
+            shiftClickToggle: true,
             doubleClick: true,
             fitOnDataChange: true,
             fitOnResize: true,
@@ -3117,19 +3219,25 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         const { fixture, c, el } = await drawn();
         c.onSelectionChange(['a', 'b']);
         fixture.detectChanges();
-        const bar = el.querySelector('[data-testid="la-selection-bar"]') as HTMLElement;
-        const names = Array.from(bar.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'));
-        expect(names).toEqual([
-            'Expand from the 2 selected nodes',
-            'Hide the 2 selected nodes',
-            'Attach the 2 selected nodes to a Case',
+        // The floating bar's actions live in the second toolbar's Graph edits and Selection groups (§5.2).
+        const edits = el.querySelector('[data-testid="la-group-edits"]') as HTMLElement;
+        const names = Array.from(edits.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'));
+        expect(names).toEqual(['Expand', 'Hide the selected nodes', 'Attach to Case']);
+        expect(edits.querySelector('[aria-label^="Exclude"]')).toBeNull();
+        const sel = el.querySelector('[data-testid="la-group-selection"]') as HTMLElement;
+        expect(Array.from(sel.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))).toEqual([
+            'Select all',
+            'Invert the selection',
+            'Add the neighbours to the selection',
             'Clear the selection',
         ]);
-        expect(bar.querySelector('[aria-label^="Exclude"]')).toBeNull();
-        // an OVERLAY on the canvas, not part of the toolbar: a selection must never change the layout, or the canvas
-        // would resize and the view re-fit under the analyst's zoom
-        expect(bar.closest('[data-testid="la-graph-region"]')).toBeTruthy();
-        expect(el.querySelector('header[data-testid="la-header"] [data-testid="la-selection-bar"]')).toBeNull();
+        // the toolbar is always there, so a selection never changes the layout or re-fits the canvas
+        expect(el.querySelector('[data-testid="la-selection-bar"]')).toBeNull();
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        fixture.detectChanges();
+        if (c.investigation.canvas())
+            expect(el.querySelector('[data-testid="la-group-edits"] [aria-label^="Exclude"]')).not.toBeNull();
     });
 
     it('Escape clears the selection and Ctrl+A selects every drawn node (the keyboard path to a box select)', async () => {
@@ -3368,7 +3476,7 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         const draft = c.investigation.mergeDraft();
         btn.click(); // the click guard: nothing is prefilled
         expect(c.investigation.mergeDraft()).toBe(draft);
-        await expectNoA11yViolations(el.querySelector('[data-testid="la-selection-bar"]') as HTMLElement);
+        await expectNoA11yViolations(el.querySelector('[data-testid="la-group-edits"]') as HTMLElement);
         fixture.destroy();
     });
 });
@@ -3407,7 +3515,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
         const { fixture, el } = await drawn({ expand });
         const grow = el.querySelector('[data-testid="la-grow-button"]') as HTMLButtonElement;
-        expect(grow.textContent).toContain('Grow');
+        expect(grow.textContent).toContain('Expand'); // the Grow tool, named Expand on the second toolbar (§5.2)
         expect(grow.getAttribute('aria-keyshortcuts')).toBe('G');
         expect(el.querySelector('[data-testid="la-exclusions-button"]')?.getAttribute('aria-label')).toBe(
             'Hidden by lists: 0 hidden',
