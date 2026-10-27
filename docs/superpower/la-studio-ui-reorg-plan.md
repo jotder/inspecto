@@ -283,13 +283,13 @@ Signals: `LA_FEATURES` (`la-host/la-host.ts:240-282`), `investigationsEnabled`, 
 | Search, Filter node types, Timeline | Top bar (unchanged) |
 | Layout menu + View-tab layout grid | Top bar Layout ▾ (one copy) |
 | Display options + View-tab overlays | Top bar Display ▾ (one copy) |
-| Lenses & selection checkboxes | Second toolbar Canvas mode. Snap lines and Hover activate → Display ▾ |
+| Lenses & selection checkboxes | ✅ P1a — Second toolbar Canvas mode. Snap lines and Hover activate → Display ▾ |
 | Snapshot ("Save this analysis") | File ▾ Save this analysis |
 | Graph algorithms button | Right panel Analysis (button kept as the panel toggle) |
 | Investigation button | Right panel Investigation |
 | Grow popover | Expand dialog |
-| Hidden by lists, Held tray | Second toolbar Hidden (n), Held (n) |
-| Attach to Case | Second toolbar |
+| Hidden by lists, Held tray | ✅ P1a — Second toolbar Hidden (n), Held (n) |
+| Attach to Case | ✅ P1a — Second toolbar |
 | Saved views menu + submenus | File ▾ Open… dialog |
 | Import / export views | File ▾ |
 | Save as a case | File ▾ Save view / Save view as… |
@@ -297,7 +297,7 @@ Signals: `LA_FEATURES` (`la-host/la-host.ts:240-282`), `investigationsEnabled`, 
 | Undo, Redo, Fit, Show as list, Full screen, Export | Top bar (unchanged) |
 | Show the rows | Dock toggle (Rows tab) |
 | Show the side panels, Close the analysis | Top bar right end; Close also in File ▾ |
-| Floating selection bar (Expand, Hide, Exclude, Merge, Attach, Clear) | Second toolbar |
+| Floating selection bar (Expand, Hide, Exclude, Merge, Attach, Clear) | ✅ P1a — Second toolbar (Expand = today's Grow until the P1b dialog) |
 | Right-click node menu | Kept (Expand…, Collapse, Hide, Exclude, Seed, Details) |
 | Domain profile picker | Removed. The Space pack applies; stored pack shown read-only; Template field (UIR-D9) |
 | Query panel (Dataset, entity columns, link type, attributes, mappings, root / depth / direction, Pipeline, Run, Edit, Refresh) | ⚙ Settings → Graph model; status-bar chips open it; status-bar Refresh (UIR-D16) |
