@@ -88,7 +88,10 @@ export function msisdnError(raw: string): string | null {
 
 /** A deep-linked "Investigate a number" waiting for the analyst's purpose (nothing is created before Start). */
 export interface PendingInvestigation {
+    /** The one entity, or - with `seeds` - the name shown for them (an Entity List's title). */
     seed: string;
+    /** Several seeds (a start from an Entity List); absent = `seed` alone. */
+    seeds?: string[];
     /** The profile it was bound from — the screen switches to it. */
     profileId: DomainProfileId;
     projection: EntityProjection;

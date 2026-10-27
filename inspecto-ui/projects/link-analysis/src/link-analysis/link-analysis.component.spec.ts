@@ -4287,6 +4287,36 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect([...c.expandedNodeIds()].sort()).toEqual(['S-1', 'S-2']);
     });
 
+    it('LA-START-LIST-1 (S2): on the Investigations level a list starts an Investigation as one entity does - seeded and grown one degree', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), getEntityList } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'suspects' });
+        // not merely queued as bare seeds (they drew 2 entities and 0 links): the pending Investigation seeds every member
+        expect(c.investigation.queuedSeeds()).toEqual([]);
+        expect(c.pendingInvestigation()).toMatchObject({ seeds: ['S-1', 'S-2'], projection: { entityType: 'account' } });
+        expect(c.toolboxTab()).toBe('investigation');
+    });
+
+    it('LA-START-LIST-1 (S1): choosing "A list" re-reads the Entity Lists, so a list made since the page loaded is offered', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        fixture.detectChanges();
+        const reread = vi.spyOn(fixture.componentInstance as unknown as { refreshEntityLists(): void }, 'refreshEntityLists');
+        const box = fixture.debugElement.query((d) => d.name === 'inspecto-link-analysis-start-box');
+        const kind = (box.componentInstance as { form: { controls: { kind: { setValue(v: string): void } } } }).form.controls.kind;
+        kind.setValue('paste');
+        expect(reread).not.toHaveBeenCalled();
+        kind.setValue('list');
+        expect(reread).toHaveBeenCalledTimes(1);
+    });
+
     /**
      * LA-ONBOARD-DEFECTS-1 (2): the Start box's Entity Type types the drawn mapping. It used to be the Dataset's primary type
      * whatever was picked, so a wallet start over a transfers file was normalised, masked and listed as an account, and *Add

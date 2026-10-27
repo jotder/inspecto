@@ -1861,9 +1861,27 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             if (req.kind === 'found')
                 this.startNotice.update((n) => (n ? { ...n, text: `Started from ${req.what}. ${n.text}` } : n));
         }
+        if (!found.length || !this.investigationsEnabled()) return;
+        if (req.kind === 'list') {
+            // A list starts an Investigation as one entity does (S2): its members are seeded and expanded one degree, hubs held.
+            const title = this.entityLists().find((l) => l.id === req.listId)?.title ?? req.listId;
+            // the projection the explorer draw used: the list's own type, else the Dataset's mapping as it is
+            const binding = {
+                ...genericBinding(title, entityType ?? '', ds, activeDomainProfileId()),
+                ...(entityType ? {} : { projection: ds.mapping }),
+                seeds: found,
+            };
+            this.investigateIssue.set('');
+            this.investigation.close();
+            this.boundProfile.set(binding.profileId);
+            const laDs = (await this.datasetsLoaded).find((d) => d.id === ds.id);
+            const windowEnd = laDs ? await this.latestEventTime(laDs, binding.timeCol) : null;
+            this.pendingInvestigation.set(windowEnd ? { ...binding, windowEnd } : binding);
+            this.openInvestigation();
+            return;
+        }
         // Investigations level: the drawn start is also queued as the first seeds of the Investigation (as "top results" are).
-        if (found.length && this.investigationsEnabled())
-            this.queueSeedsAndOpen(found.map((v) => ({ id: v, label: v, ids: [v] })));
+        this.queueSeedsAndOpen(found.map((v) => ({ id: v, label: v, ids: [v] })));
     }
 
     /**
@@ -4564,7 +4582,7 @@ Its prior copies stay in its version history.`,
     }
 
     /** Re-read the Space's Entity Lists (the Start box and the case's list titles read them). */
-    private refreshEntityLists(): void {
+    refreshEntityLists(): void {
         this.queryCache.clear(); // a list write may change what the server answers
         this.inv.reads.clear();
         this.inv
