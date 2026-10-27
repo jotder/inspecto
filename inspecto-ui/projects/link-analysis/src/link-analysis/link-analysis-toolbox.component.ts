@@ -33,7 +33,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { ComponentsService } from '@inspecto/core/api';
-import { GraphRunResult, GraphScoreView, GraphSuspicionView } from '@inspecto/link-analysis/api/graph-runs.service';
+import {
+    GraphRunResult,
+    GraphRunsService,
+    GraphScoreView,
+    GraphSuspicionView,
+} from '@inspecto/link-analysis/api/graph-runs.service';
+import { CATALOGUE_TOOLS, CatalogueWhere, RunsOn, catalogueSections } from './analysis-catalogue';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import {
     BranchStage,
@@ -171,7 +177,8 @@ type AnalysisTab =
     | 'scoring'
     | 'index-build'
     | 'server-algorithms'
-    | 'value-measures';
+    | 'value-measures'
+    | 'temporal';
 
 /** The tool groups that can hand an over-cap run to the server (D-4 step 7). */
 type ServerTool =
@@ -196,6 +203,20 @@ export interface ServerRunSpec {
     /** Why the run cannot start yet (a missing pick); '' = nothing holds it. */
     hold: string;
 }
+
+/** The over-cap hand-offs ({@link ServerRunSpec}) behind each catalogue group. */
+const HAND_OFF: Partial<Record<string, ServerTool[]>> = {
+    path: ['path'],
+    'all-paths': ['allPaths'],
+    centrality: ['centrality'],
+    communities: ['communities'],
+    cohesion: ['cliques'],
+    similarity: ['prediction'],
+    flow: ['flow', 'forest'],
+    scoring: ['scoring'],
+    cycles: ['cycles'],
+    'cut-points': ['cutNodes', 'cutEdges'],
+};
 
 /** The metrics the Centrality group can rank by — each returns a {@link NodeScore} list. */
 type CentralityMetric =
@@ -254,6 +275,8 @@ export class LinkAnalysisToolboxComponent {
         // Never open the Pattern tool on a blank motif — that matches every link. Start from the first pack.
         // Until the investigator picks one, the default follows the domain profile (telecom ⇒ a telecom pack,
         // this Space's own first) and re-resolves when the Space's authored packs arrive.
+        // The catalogue's Server side lists the server's algorithms; the Explorer level has no server runs.
+        if (this.investigationsEnabled()) this.runs.loadCatalogue();
         const first = defaultPatternPack(PATTERN_PACKS, null);
         if (first) this.applyPatternPack(first.id);
         effect(() => {
@@ -438,9 +461,69 @@ export class LinkAnalysisToolboxComponent {
             hint: 'Find entities by money flow: pass-through ratio, withdrawal concentration, structuring, benefit transfer',
         },
         { id: 'pattern', label: 'Pattern match', icon: 'heroicons_outline:magnifying-glass-circle' },
+        {
+            id: 'temporal',
+            label: 'Burst and periodicity',
+            icon: 'heroicons_outline:clock',
+            hint: 'Find bursts of activity and regular rhythms over the time column',
+        },
         { id: 'index-build', label: 'Edge index', icon: 'heroicons_outline:server-stack' },
-        { id: 'server-algorithms', label: 'All algorithms (server)', icon: 'heroicons_outline:server-stack' },
     ];
+
+    // ── The catalogue (§5.8, UIR-D10): one list grouped by question, with a Browser | Server toggle ──
+
+    private readonly runs = inject(GraphRunsService);
+    /** The server's algorithm list (`GET /inv/graph/algorithms`); empty until it loads, or on the Explorer level. */
+    readonly serverAlgorithms = computed(() => this.runs.catalogue()?.algorithms ?? []);
+    /** The investigator's own pick; null = the default (Server over the browser cap, else Browser). */
+    readonly whereChoice = signal<CatalogueWhere | null>(null);
+    /** The nodes the tools run over: the Working Set when the canvas draws one, else the drawn graph. */
+    private readonly analysedNodes = computed(() => this.workingSetNodes() ?? this.graph()?.nodes.length ?? 0);
+    /** Why Server is preselected: the graph is above the browser's shared cap. '' = under it, or no Server here. */
+    readonly serverPreselectReason = computed(() => {
+        const n = this.analysedNodes();
+        const cap = selectionNodeCapValue();
+        if (!this.investigationsEnabled() || n <= cap) return '';
+        const subject = this.workingSetNodes() !== null ? 'The Working Set' : 'This graph';
+        return `${subject} has ${n} nodes - above the ${cap}-node browser limit, so Server is preselected.`;
+    });
+    /** Where the catalogue runs. Always Browser on the Explorer level, which has no server runs. */
+    readonly where = computed<CatalogueWhere>(() => {
+        if (!this.investigationsEnabled()) return 'browser';
+        return this.whereChoice() ?? (this.serverPreselectReason() ? 'server' : 'browser');
+    });
+    readonly sections = computed(() => {
+        const specs = this.serverSpecs();
+        return catalogueSections(this.allTools, this.serverAlgorithms(), this.where(), (id) =>
+            (HAND_OFF[id] ?? []).some((k) => !!specs[k]),
+        );
+    });
+    /** The open server-algorithm row (its own accordion, beside {@link tab}). */
+    readonly serverTab = signal<string | null>(null);
+    /** P2a's bottom dock is mounted: long results get *Open in the dock*. Off until the dock lands. */
+    readonly dockAvailable = input(false);
+    /** *Open in the dock*: a long server result, for the dock's Results tab. */
+    readonly openInDock = output<GraphRunResult>();
+
+    toggleServerTool(id: string): void {
+        this.serverTab.set(this.serverTab() === id ? null : id);
+    }
+
+    /** A row's run-where badge. */
+    runsOn(id: string): RunsOn {
+        return CATALOGUE_TOOLS[id]?.runsOn ?? 'browser';
+    }
+
+    /** A browser group's cap in words: the smallest browser cap among the algorithms behind it; '' = no cap. */
+    toolCap(id: string): string {
+        const t = CATALOGUE_TOOLS[id];
+        if (!t || t.listed !== 'browser') return '';
+        const caps = t.server
+            .map((a) => browserAlgorithmCapValue(a as BrowserCappedAlgorithm))
+            .filter((c) => Number.isFinite(c) && c > 0);
+        const cap = id === 'scoring' ? suspicionNodeCapValue() : caps.length ? Math.min(...caps) : 0;
+        return cap ? `≤ ${cap} nodes in the browser` : '';
+    }
 
     /** The open tool group (accordion: one open at a time; `null` = all collapsed). */
     readonly tab = signal<AnalysisTab | null>('path');

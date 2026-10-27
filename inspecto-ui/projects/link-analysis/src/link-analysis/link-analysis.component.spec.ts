@@ -991,26 +991,29 @@ describe('LinkAnalysisComponent', () => {
         expect(c.queryOpen()).toBe(true);
     });
 
-    it('the View tools are hidden (not merely [hidden]) under the other toolbox tabs, and stay mounted', () => {
-        // jsdom does not compute Tailwind, so pin the class contract: `.flex` beat the [hidden] attribute in the
-        // browser (computed display: flex), which put Layout / Overlays / Lenses under Analysis and Investigation.
+    it('UIR-D13: there is no View tab and no View rail button; the right panel keeps Analysis and Investigation', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         c.toolboxDockOpen.set(true);
-        c.toolboxTab.set('analysis');
         fixture.detectChanges();
-        const view = (): HTMLElement | null => fixture.nativeElement.querySelector('[data-toolbox-view]');
-        expect(view()).not.toBeNull(); // still mounted
-        expect(view()!.classList.contains('hidden')).toBe(true);
-        expect(view()!.hasAttribute('hidden')).toBe(false); // the attribute Tailwind overrides is not relied on
+        await runQuery(fixture);
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('[data-toolbox-view]')).toBeNull();
+        expect(c.toolboxTabs.map((t) => t.label)).toEqual(['Analysis', 'Investigation']);
+        c.toolboxDockOpen.set(false);
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Open the view tools"]')).toBeNull();
 
-        c.toolboxTab.set('investigation');
+        // Its Overlays moved into the Display options menu, each once beside the labels already there.
+        (el.querySelector('[aria-label^="Display options ("]') as HTMLButtonElement).click();
         fixture.detectChanges();
-        expect(view()!.classList.contains('hidden')).toBe(true);
-
-        c.toolboxTab.set('view');
-        fixture.detectChanges();
-        expect(view()!.classList.contains('hidden')).toBe(false);
+        const menu = document.querySelector('[aria-label="Display options"]') as HTMLElement;
+        const boxes = Array.from(menu.querySelectorAll('mat-checkbox')).map((b) => b.textContent!.trim().split(/\s+\(/)[0].trim());
+        for (const label of ['Legend', 'Working set', 'Node labels', 'Link labels', 'All link labels', 'Level of detail',
+            'Minimap', 'Grid', 'Community hulls', 'Group lone counterparties', 'Bubble sets', 'Link bundling']) {
+            expect(boxes.filter((b) => b === label)).toHaveLength(1);
+        }
+        fixture.destroy();
     });
 
     it('Save this analysis is disabled, with the reason, for a user without Incident management', async () => {
@@ -1059,12 +1062,10 @@ describe('LinkAnalysisComponent', () => {
         expect(c.querySummary()).toEqual([]);
 
         c.toolboxDockOpen.set(false);
-        c.toolboxTab.set('view');
+        c.toolboxTab.set('investigation');
         c.openAnalysis(); // the toolbar algorithms icon opens the right dock on its Analysis tab
         expect(c.toolboxDockOpen()).toBe(true);
         expect(c.toolboxTab()).toBe('analysis');
-        c.openViewTools();
-        expect(c.toolboxTab()).toBe('view');
 
         // Maximize hides both docks in one step and a second call restores them.
         c.toggleCanvasMaximized();
@@ -2033,20 +2034,17 @@ describe('LinkAnalysisComponent', () => {
             const { el, tabs } = open();
             const list = el.querySelector('[role="tablist"]') as HTMLElement;
             expect(list.getAttribute('aria-label')).toBe('Toolbox tab');
-            expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Analysis', 'View', 'Investigation']);
-            expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
-            expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
+            expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Analysis', 'Investigation']);
+            expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
+            expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1]);
             expect(list.parentElement!.querySelector('[role="radio"], [role="radiogroup"]')).toBeNull(); // the old switch
             const panel = el.querySelector('#la-toolbox-panel-analysis') as HTMLElement;
             expect(panel.getAttribute('role')).toBe('tabpanel');
             expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-analysis');
             expect(tabs()[0].getAttribute('aria-controls')).toBe('la-toolbox-panel-analysis');
-            const view = el.querySelector('[data-toolbox-view]') as HTMLElement;
-            expect(view.getAttribute('role')).toBe('tabpanel');
-            expect(view.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-view');
             // the Investigation pane is only mounted while it is the tab: no dangling aria-controls
             expect(el.querySelector('#la-toolbox-panel-investigation')).toBeNull();
-            expect(tabs()[2].hasAttribute('aria-controls')).toBe(false);
+            expect(tabs()[1].hasAttribute('aria-controls')).toBe(false);
         });
 
         it('click and arrow keys select (automatic activation), wrap, and Home / End jump; the tab stop roves', () => {
@@ -2054,20 +2052,18 @@ describe('LinkAnalysisComponent', () => {
             const state = () => [c.toolboxTab(), tabs().findIndex((t) => t.tabIndex === 0)];
             tabs()[1].click();
             fixture.detectChanges();
-            expect(state()).toEqual(['view', 1]);
-            press('ArrowRight');
-            expect(state()).toEqual(['investigation', 2]);
-            expect(document.activeElement).toBe(tabs()[2]);
+            expect(state()).toEqual(['investigation', 1]);
             press('ArrowRight'); // wraps
             expect(state()).toEqual(['analysis', 0]);
+            expect(document.activeElement).toBe(tabs()[0]);
             press('ArrowLeft'); // wraps back
-            expect(state()).toEqual(['investigation', 2]);
+            expect(state()).toEqual(['investigation', 1]);
             press('Home');
             expect(state()).toEqual(['analysis', 0]);
             press('End');
-            expect(state()).toEqual(['investigation', 2]);
+            expect(state()).toEqual(['investigation', 1]);
             press('a'); // any other key is left alone
-            expect(state()).toEqual(['investigation', 2]);
+            expect(state()).toEqual(['investigation', 1]);
         });
 
         it('the Investigation pane mounts as a labelled tabpanel on its tab, and selecting a tab does not move focus into a panel', () => {
@@ -2077,8 +2073,8 @@ describe('LinkAnalysisComponent', () => {
             const panel = el.querySelector('#la-toolbox-panel-investigation') as HTMLElement;
             expect(panel.getAttribute('role')).toBe('tabpanel');
             expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-investigation');
-            expect(tabs()[2].getAttribute('aria-controls')).toBe('la-toolbox-panel-investigation');
-            expect(document.activeElement).toBe(tabs()[2]);
+            expect(tabs()[1].getAttribute('aria-controls')).toBe('la-toolbox-panel-investigation');
+            expect(document.activeElement).toBe(tabs()[1]);
             expect(panel.contains(document.activeElement)).toBe(false);
             expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
         });
@@ -2383,7 +2379,7 @@ describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance;
         const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]')).map((t) => t.textContent?.trim());
-        expect(tabs).toEqual(['Analysis', 'View', 'Investigation']);
+        expect(tabs).toEqual(['Analysis', 'Investigation']);
         c.openInvestigation(); // what the rail's "Open the Investigation" button calls - no longer a no-op on this level
         fixture.detectChanges();
         expect(c.toolboxTab()).toBe('investigation');
@@ -2398,13 +2394,13 @@ describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not
         await expectNoA11yViolations(panel);
     });
 
-    it('Standard (the flag on) keeps the three tabs', () => {
+    it('Standard (the flag on) keeps the two tabs', () => {
         const { fixture } = create();
         fixture.detectChanges();
         const tabs = Array.from(
             (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
         ).map((t) => t.textContent?.trim());
-        expect(tabs).toEqual(['Analysis', 'View', 'Investigation']);
+        expect(tabs).toEqual(['Analysis', 'Investigation']);
     });
 });
 
@@ -2590,7 +2586,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             }));
         };
         const toolboxRail = (el: HTMLElement): HTMLElement | null =>
-            el.querySelector('aside[aria-label="Toolbox"] button[aria-label="Open the view tools"]');
+            el.querySelector('aside[aria-label="Toolbox"] button[aria-label="Open the analysis tools"]');
 
         afterEach(() => {
             vi.unstubAllGlobals();
@@ -2847,17 +2843,13 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             r.fixture.detectChanges();
             expect(notice()).toBeNull();
         });
-        it('over its cap a layout is DISABLED with its reason in both pickers, plus a reduce-first hint (UIR-D11)', () => {
+        it('over its cap a layout is DISABLED with its reason in the Layout menu, plus a reduce-first hint (UIR-D11)', () => {
             const r = stage(radialCap() + 821);
             r.fixture.detectChanges();
             const radial = r.c.layouts.find((l) => l.id === 'radial')!;
             expect(r.c.layoutDisabledReason(radial)).toBe('needs at most 100 nodes — this graph has 921');
             expect(r.c.layoutDisabledReason(r.c.layouts.find((l) => l.id === 'force')!)).toBeNull();
             expect(r.c.anyLayoutOverCap()).toBe(true);
-            const btn = [...r.fixture.nativeElement.querySelectorAll('button')].find(
-                (b: HTMLButtonElement) => b.getAttribute('aria-label') === 'Radial (needs at most 100 nodes — this graph has 921)',
-            ) as HTMLButtonElement | undefined;
-            expect(btn?.disabled).toBe(true);
             r.c.openReduce();
             expect([r.c.bottomOpen(), r.c.filterOpen()]).toEqual([true, true]);
         });

@@ -14,7 +14,68 @@
     </div>
 }
 <div class="flex flex-col gap-2">
-    @for (t of tools; track t.id) {
+    <!-- The catalogue (§5.8, UIR-D10): where it runs, then one list grouped by question. -->
+    @if (investigationsEnabled()) {
+        <mat-button-toggle-group
+            class="self-start"
+            data-testid="catalogue-where"
+            aria-label="Where the analysis runs"
+            [value]="where()"
+            (change)="whereChoice.set($event.value)"
+        >
+            <mat-button-toggle value="browser">Browser</mat-button-toggle>
+            <mat-button-toggle value="server">Server</mat-button-toggle>
+        </mat-button-toggle-group>
+        @if (where() === 'server' && !whereChoice() && serverPreselectReason(); as why) {
+            <p class="text-secondary m-0 text-xs" data-testid="catalogue-preselect" role="status">{{ why }}</p>
+        }
+    } @else {
+        <div data-testid="catalogue-server-locked">
+            <inspecto-locked-action label="Run on the server" [reason]="lockedReason()" />
+        </div>
+    }
+    @for (q of sections(); track q.id) {
+    <h3 class="text-secondary m-0 mt-1 text-xs font-semibold uppercase tracking-wide" [attr.data-question]="q.id">
+        {{ q.label }}
+    </h3>
+    @for (a of q.server; track a.id) {
+        <section class="rounded-lg border" [attr.data-server-algorithm]="a.id">
+            <button
+                type="button"
+                class="flex w-full items-center gap-2 p-3 text-left"
+                (click)="toggleServerTool(a.id)"
+                [attr.aria-expanded]="serverTab() === a.id"
+                [attr.aria-controls]="'srv-' + a.id"
+            >
+                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:server-stack"></mat-icon>
+                <span class="font-medium">{{ a.label }}</span>
+                <inspecto-chip class="whitespace-nowrap" variant="soft">{{ a.runsOn }}</inspecto-chip>
+                <span class="text-secondary hidden text-xs sm:inline">waits for ≤ {{ a.inlineNodeCeiling }} nodes</span>
+                <mat-icon
+                    class="icon-size-4 ml-auto shrink-0"
+                    [svgIcon]="serverTab() === a.id ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'"
+                ></mat-icon>
+            </button>
+            @if (serverTab() === a.id) {
+                <div [id]="'srv-' + a.id" class="flex flex-col gap-2 p-3 pt-0">
+                    <inspecto-link-analysis-server-algorithms
+                        [algorithmId]="a.id"
+                        [investigationId]="investigationId()"
+                        [investigationOpen]="investigationOpen()"
+                        [allowed]="canRunOnServer()"
+                        [nodeOptions]="nodeOptions()"
+                        [serverIds]="serverIds()"
+                        [profileId]="profileId()"
+                        [dockAvailable]="dockAvailable()"
+                        (emphasisChange)="emphasisChange.emit($event)"
+                        (resultChange)="applyCatalogueResult($event)"
+                        (openInDock)="openInDock.emit($event)"
+                    />
+                </div>
+            }
+        </section>
+    }
+    @for (t of q.tools; track t.id) {
         <section class="rounded-lg border">
             <button
                 type="button"
@@ -27,6 +88,10 @@
                 <span class="font-medium">{{ t.label }}</span>
                 @if (t.hint) {
                     <span class="text-secondary hidden text-xs sm:inline" [id]="'tool-hint-' + t.id">{{ t.hint }}</span>
+                }
+                <inspecto-chip class="whitespace-nowrap" variant="soft">{{ runsOn(t.id) }}</inspecto-chip>
+                @if (toolCap(t.id); as cap) {
+                    <span class="text-secondary hidden whitespace-nowrap text-xs sm:inline">{{ cap }}</span>
                 }
                 @if (toolBadge(t.id); as badge) {
                     <inspecto-chip class="whitespace-nowrap">{{ badge }}</inspecto-chip>
@@ -351,21 +416,8 @@
                                 [allowed]="canRunOnServer()"
                             />
                         }
-                        @case ('server-algorithms') {
-                            @if (investigationsEnabled()) {
-                                <inspecto-link-analysis-server-algorithms
-                                    [investigationId]="investigationId()"
-                                    [investigationOpen]="investigationOpen()"
-                                    [allowed]="canRunOnServer()"
-                                    [nodeOptions]="nodeOptions()"
-                                    [serverIds]="serverIds()"
-                                    [profileId]="profileId()"
-                                    (emphasisChange)="emphasisChange.emit($event)"
-                                    (resultChange)="applyCatalogueResult($event)"
-                                />
-                            } @else {
-                                <inspecto-locked-action label="Run on server" [reason]="lockedReason()" />
-                            }
+                        @case ('temporal') {
+                            <ng-content select="[laTemporal]" />
                         }
                         @case ('value-measures') {
                             <inspecto-link-analysis-value-measures
@@ -1248,5 +1300,6 @@
                 </div>
             }
         </section>
+    }
     }
 </div>
