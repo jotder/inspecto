@@ -4523,6 +4523,23 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         expect(c.pickedLayout()).toBe('radial');
     });
 
+    it('a case view naming an unknown graph source does not stay loading', async () => {
+        const made = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            inv: { previewNeighbors: noPreview } as Partial<InvService>,
+        });
+        const c = await ready(made);
+        await c.loadView({
+            id: 'odd',
+            name: 'Odd',
+            sourceId: 'no-such-source' as never,
+            query: { projection: { datasetId: 'gone', sourceCol: 'a', targetCol: 'b' } },
+            start: { datasetId: 'gone', values: ['X'] },
+        });
+        expect(c.loading()).toBe(false);
+    });
+
     it('a case whose Dataset no longer starts a graph reruns its saved query instead', async () => {
         const made = create({
             features: BASIC,

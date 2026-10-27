@@ -2399,7 +2399,10 @@ Its prior copies stay in its version history.`,
 
     private async execute(sourceId: GraphSourceId, q: GraphSourceQuery, force = false): Promise<void> {
         const source = this.graphSources.byId(sourceId);
-        if (!source) return;
+        if (!source) {
+            this.loading.set(false); // a case view may have set it before falling back here
+            return;
+        }
         const firstDraw = !this.graph();
         const focusBefore = this.focusHolder();
         this.loading.set(true);
