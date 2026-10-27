@@ -313,7 +313,7 @@ Signals: `LA_FEATURES` (`la-host/la-host.ts:240-282`), `investigationsEnabled`, 
 | Save as a case | File ▾ Save view / Save view as… |
 | Glossary, Help | Top bar (unchanged) |
 | Undo, Redo, Fit, Show as list, Full screen, Export | Top bar (unchanged) |
-| Show the rows | Dock toggle (Rows tab) |
+| Show the rows | ✅ P2a — Dock: Rows tab (the toolbar toggle opens and closes the dock) |
 | Show the side panels, Close the analysis | Top bar right end; Close also in File ▾ |
 | Floating selection bar (Expand, Hide, Exclude, Merge, Attach, Clear) | ✅ P1a — Second toolbar (Expand = today's Grow until the P1b dialog) |
 | Right-click node menu | Kept (Expand…, Collapse, Hide, Exclude, Seed, Details) |
@@ -324,23 +324,23 @@ Signals: `LA_FEATURES` (`la-host/la-host.ts:240-282`), `investigationsEnabled`, 
 | Entity Types, New Entity Type (Entities area) | ⚙ Settings → Entity Types (+ Retire) |
 | Discover, Temporal findings | Analysis tab |
 | 17 browser groups, *Run on server*, *All algorithms (server)* | One catalogue with a Browser / Server toggle |
-| Value Measures (toolbox + Investigation fold) | Catalogue entry only ⚑UIR-A2 |
-| Inv: Open an Investigation, remembered picker | File ▾ Open… (Investigations tab, Recent filter) |
-| Inv: Case, Members, Share and embed, Drafts | ⚙ Settings → This Investigation |
-| Inv: Expand by degree | Act: Expand… / Expand next degree |
-| Inv: Scope list, High-connectivity entities, Selected entity | Act |
-| Inv: More steps (window, threshold, snapshot, compare, connect) | Act: More steps ▾ |
-| Inv: Op log, Re-order steps | Dock: Op log |
-| Inv: Annotations, Link annotations | Dock: Annotations |
-| Inv: Coverage | Dock: Coverage |
-| Inv: Replay and drift, Dossier | Settings: Evidence |
-| Inv: Pin to a Widget | Settings |
-| Inv: Oversight and approvals | Settings; plus the waiting line in Act |
-| Inv: Working Set rows | Dock |
-| Inv: Measures and templates, References | Settings |
-| Inv: Excluded entities | Dock |
-| Inv: Entity Lists, Identities, Upload data | ⚙ Settings → Data (UIR-D16) |
-| Inv: header (Close, Delete, lineage, read-only / Draft alerts, data strip, counts) | Act header + `⋯` menu |
+| Value Measures (toolbox + Investigation fold) | Catalogue entry only ⚑UIR-A2 (✅ P2a removed the Investigation fold) |
+| Inv: Open an Investigation, remembered picker | File ▾ Open… (P3a); until then in `InvestigationSettingsSections` |
+| Inv: Case, Members, Share and embed, Drafts | ✅ P2a — `InvestigationSettingsSections` (temporary host: Act ⋯ ▸ Settings…); ⚙ Settings → This Investigation in P2b |
+| Inv: Expand by degree | ✅ P2a — Act: Expand… / Expand next degree |
+| Inv: Scope list, High-connectivity entities, Selected entity | ✅ P2a — Act |
+| Inv: More steps (window, threshold, snapshot, compare, connect) | ✅ P2a — Act: More steps ▾ (each step opens in place, one at a time) |
+| Inv: Op log, Re-order steps | ✅ P2a — Dock: Op log; Act keeps the last 5 steps |
+| Inv: Annotations, Link annotations | ✅ P2a — Dock: Annotations (with Annotate a link) |
+| Inv: Coverage | ✅ P2a — Dock: Coverage |
+| Inv: Replay and drift, Dossier | ✅ P2a — `InvestigationSettingsSections` (Evidence group in P2b) |
+| Inv: Pin to a Widget | ✅ P2a — `InvestigationSettingsSections` |
+| Inv: Oversight and approvals | ✅ P2a — `InvestigationSettingsSections`; the waiting line stays in Act |
+| Inv: Working Set rows | ✅ P2a — Dock |
+| Inv: Measures and templates, References | ✅ P2a — `InvestigationSettingsSections` |
+| Inv: Excluded entities | ✅ P2a — Dock |
+| Inv: Entity Lists, Identities, Upload data | ✅ P2a — `InvestigationSettingsSections`; ⚙ Settings → Data in P2b (UIR-D16) |
+| Inv: header (Close, Delete, lineage, read-only / Draft alerts, data strip, counts) | ✅ P2a — Act header + `⋯` menu (Settings…, Close, Delete) |
 | Status bar (Caps, chips, counts, modules) | Unchanged |
 
 ---

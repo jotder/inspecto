@@ -4,7 +4,7 @@ import { TELECOM_PACK_FIXTURE } from '@inspecto/link-analysis/graph/domain-profi
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import type { LaFeatures, LaImportDraft } from '@inspecto/link-analysis/la-host';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
+import { ApplicationRef, Component, EventEmitter, Input, Output, getDebugNode, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
@@ -40,7 +40,6 @@ import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { configureLaLimits, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { SessionService } from 'app/inspecto/auth/session.service';
-import { LinkAnalysisIdentitiesComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-identities.component';
 
 /** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
 const STANDARD_EDITION_FEATURES = {
@@ -97,7 +96,11 @@ class StubGraphView {
 }
 
 // The Toolbox dock remembers an explicit open/close in sessionStorage; no test may inherit another's.
-beforeEach(() => sessionStorage.clear());
+// The dock remembers its state per browser (inspecto.la.dock): no spec inherits another's.
+beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.removeItem('inspecto.la.dock');
+});
 
 function create(
     opts: {
@@ -3368,6 +3371,47 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
     });
 });
 
+describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)', () => {
+    const tabs = (el: HTMLElement) =>
+        Array.from(el.querySelectorAll('[role="tablist"][aria-label="Dock tab"] [role="tab"]')).map((t) =>
+            t.textContent?.trim(),
+        );
+
+    it('shows the Investigation tabs only while one is open, collapses to its tabs and remembers itself', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        expect(tabs(el)).toEqual(['Rows', 'Results']);
+        expect(el.querySelector('#bottom-panel-body')).toBeNull(); // collapsed to its tab strip
+
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.openDock('oplog');
+        fixture.detectChanges();
+        expect(tabs(el)).toEqual([
+            'Rows',
+            'Op log',
+            'Working Set rows',
+            'Coverage',
+            'Annotations',
+            'Excluded entities',
+            'Results',
+        ]);
+        expect(el.querySelector('#bottom-panel-body section[aria-label="Investigation op log"]')).not.toBeNull();
+        expect(JSON.parse(localStorage.getItem('inspecto.la.dock')!)).toEqual({ open: true, tab: 'oplog' });
+
+        // closed again: the remembered Investigation tab falls back to Rows
+        c.investigation.activeId.set(null);
+        c.investigation.log.set(null as never);
+        fixture.detectChanges();
+        expect(tabs(el)).toEqual(['Rows', 'Results']);
+        expect(c.dockTabShown()).toBe('rows');
+        fixture.destroy();
+    });
+});
+
 describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, mergeUnavailable)', () => {
     /** An open Investigation whose Working Set holds the given typed entities; all of them drawn, none selected. */
     const inInvestigation = async (ids: string[]) => {
@@ -3457,9 +3501,11 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         expect(merge()).not.toBeNull();
         c.mergeSelected();
         fixture.detectChanges();
-        expect(c.toolboxTab()).toBe('investigation');
-        // The Identity section rendered in that tab took the hand-off into its form (and cleared it).
-        const identities = fixture.debugElement.query(By.directive(LinkAnalysisIdentitiesComponent));
+        // Identities live in ⚙ Settings ▸ Data (§5.10): the merge opens that section, whose form takes the hand-off.
+        expect(c.settingsOpen()).toBe(true);
+        expect(c.settingsSection()).toBe('identities');
+        TestBed.inject(ApplicationRef).tick();
+        const identities = getDebugNode(document.querySelector('inspecto-link-analysis-identities'))!;
         expect(identities.componentInstance.assertForm.getRawValue()).toMatchObject({
             typeA: 'msisdn',
             valueA: '+447700900123',
@@ -3467,6 +3513,7 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
             valueB: '234150000000001',
         });
         expect(c.investigation.mergeDraft()).toBeNull();
+        TestBed.inject(MatDialog).closeAll();
         fixture.destroy();
     });
 
@@ -3503,13 +3550,15 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         c.mergeSelected();
         made.fixture.detectChanges();
         // the Identity section (Investigation tab) took the hand-off: what reached its form is the typed pair
-        const identities = made.fixture.debugElement.query(By.directive(LinkAnalysisIdentitiesComponent));
+        TestBed.inject(ApplicationRef).tick();
+        const identities = getDebugNode(document.querySelector('inspecto-link-analysis-identities'))!;
         expect(identities.componentInstance.assertForm.getRawValue()).toMatchObject({
             typeA: 'msisdn',
             valueA: '99979100001',
             typeB: 'account',
             valueB: 'SHELL-A',
         });
+        TestBed.inject(MatDialog).closeAll();
         made.fixture.destroy();
     });
 

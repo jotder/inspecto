@@ -17,7 +17,7 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityProjection } from '@inspecto/core/graph';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
+import { InvestigationSection, LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { By } from '@angular/platform-browser';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { PendingInvestigation } from './investigate-number';
@@ -38,12 +38,21 @@ import { penByLabel, penEdit, penError, penText, refresh } from '@inspecto/core/
         [degreePresets]="{ budget: 2000 }"
         [maxDegree]="4"
         (pendingDone)="pending.set(null)"
-    ></inspecto-link-analysis-investigation>`,
+        (settingsRequested)="settingsAsked = true"
+        (dockRequested)="dockAsked = $event"
+    ></inspecto-link-analysis-investigation>
+    <!-- §5.8/§5.9: the parts the Act panel handed to the dock and the settings sections, over the same store -->
+    @for (s of sections; track s) {
+        <inspecto-link-analysis-investigation [section]="s" [attr.data-section]="s"></inspecto-link-analysis-investigation>
+    }`,
 })
 class Host {
     readonly projection = signal<EntityProjection | null>({ datasetId: 'calls', sourceCol: 'A', targetCol: 'B' });
     readonly timeCol = signal('');
     readonly pending = signal<PendingInvestigation | null>(null);
+    readonly sections: InvestigationSection[] = ['settings', 'oplog', 'ws-rows', 'coverage', 'annotations', 'excluded'];
+    settingsAsked = false;
+    dockAsked: InvestigationSection | null = null;
 }
 
 const LOG: InvestigationLog = {
@@ -248,6 +257,9 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
             'needs the Incident management capability',
         );
+        // Mark this position sits behind More steps ▾ (§5.8 block 7)
+        (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).moreStep.set('snapshot');
+        fixture.detectChanges();
         for (const label of ['Seed', 'Expand the whole Working Set', 'Undo', 'Mark this position', 'Fork a Draft']) {
             expect(button(label)?.disabled, label).toBe(true);
         }
@@ -416,7 +428,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(el.textContent).toContain('“burners_frozen” is in the Widget library');
         expect(penError(penByLabel(section, 'Widget name')!)).toBe(''); // the cleared name is not left in error (found in preview)
 
-        const comp = fixture.debugElement.children[0].componentInstance;
+        const comp = fixture.debugElement.query(By.css('[data-section="settings"]')).componentInstance;
         comp.pinForm.setValue({ name: 'burners_live', relation: 'links', mode: 'live' });
         button('Save Widget').click();
         await fixture.whenStable();
@@ -515,9 +527,10 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         const { fixture, store, el, inv, button } = create();
         await openInv(store);
         fixture.detectChanges();
-        const comp = fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent;
-        comp.linkPick.set('lk.YQBiAHZvaWNl');
-        comp.linkNote.setValue('shared SIM box');
+        const notes = fixture.debugElement.query(By.css('[data-section="annotations"]'))
+            .componentInstance as LinkAnalysisInvestigationComponent;
+        notes.linkPick.set('lk.YQBiAHZvaWNl');
+        notes.linkNote.setValue('shared SIM box');
         fixture.detectChanges();
         button('Annotate link').click();
         await fixture.whenStable();
@@ -569,7 +582,10 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
             const { fixture, store, el, inv } = create({ confirm: async () => true });
             await openInv(store);
             fixture.detectChanges();
-            (el.querySelector('[data-testid="delete-investigation"]') as HTMLButtonElement).click();
+            // Delete lives in the Act header's ⋯ menu (§5.8 block 1)
+            (el.querySelector('[data-testid="act-menu"]') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            (document.querySelector('[data-testid="delete-investigation"]') as HTMLButtonElement).click();
             await fixture.whenStable();
             expect(inv.deleteInvestigation).toHaveBeenCalledWith('inv-1');
             expect(store.active()).toBe(false);
@@ -1059,5 +1075,59 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', { timeout: 45_000 }, () => 
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="neighbours-section"]')).not.toBeNull();
+    });
+});
+
+describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (LA-STUDIO-UI-REORG-1 §5.8/§5.9)', { timeout: 45_000 }, () => {
+    const act = (el: HTMLElement) =>
+        el.querySelector('inspecto-link-analysis-investigation:not([data-section])') as HTMLElement;
+    const part = (el: HTMLElement, s: InvestigationSection) =>
+        el.querySelector(`inspecto-link-analysis-investigation[data-section="${s}"]`) as HTMLElement;
+
+    it('draws the eight blocks in order with no fold, and keeps setup, governance and dock parts out of it', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        store.selected.set({ id: 'a', data: { label: 'a' } } as never);
+        fixture.detectChanges();
+        const panel = act(el);
+        expect(panel.querySelector('la-fold')).toBeNull();
+        const order = ['act-header', 'degrees', 'act-selected', 'scope-list', 'act-more-steps', 'act-last-steps'].map(
+            (id) => panel.querySelector(`[data-testid="${id}"]`),
+        );
+        expect(order.every(Boolean)).toBe(true);
+        for (let i = 1; i < order.length; i++) {
+            expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        }
+        for (const gone of ['Op log', 'Coverage', 'Members', 'Pin to a Widget', 'Entity Lists', 'Open an Investigation']) {
+            expect(panel.querySelector(`la-fold[title="${gone}"], section[aria-label="${gone}"]`)).toBeNull();
+        }
+        // UIR-A2: Value Measures live only in the algorithm catalogue
+        expect(el.querySelector('inspecto-link-analysis-value-measures')).toBeNull();
+        expect(part(el, 'settings').querySelector('la-fold[title="Members"]')).not.toBeNull();
+        expect(part(el, 'oplog').querySelector('section[aria-label="Op log"]')).not.toBeNull();
+        await expectNoA11yViolations(panel);
+    });
+
+    it('lists the last steps newest first; Open the Op log and Settings… ask the screen', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        const steps = Array.from(act(el).querySelectorAll('[data-testid="act-last-steps"] li')).map((li) =>
+            li.textContent?.trim().slice(0, 1),
+        );
+        expect(steps).toEqual(['2', '1']);
+        (act(el).querySelector('[data-testid="open-op-log"]') as HTMLButtonElement).click();
+        expect(fixture.componentInstance.dockAsked).toBe('oplog');
+        const cmp = fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent))
+            .componentInstance as LinkAnalysisInvestigationComponent;
+        cmp.settingsRequested.emit();
+        expect(fixture.componentInstance.settingsAsked).toBe(true);
+    });
+
+    it('draws no dock part while no Investigation is open', () => {
+        const { el } = create();
+        for (const s of ['oplog', 'ws-rows', 'coverage', 'annotations', 'excluded'] as InvestigationSection[]) {
+            expect(part(el, s).querySelector('section')!.children.length).toBe(0);
+        }
     });
 });

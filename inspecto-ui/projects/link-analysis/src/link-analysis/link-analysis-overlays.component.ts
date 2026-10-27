@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -333,6 +333,11 @@ export class LinkAnalysisLegendComponent {
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:minus"></mat-icon>
                     </button>
                 </div>
+                @if (countsNote()) {
+                    <p class="text-secondary m-0 mt-0.5 text-[11px] leading-snug" data-testid="working-set-counts">
+                        {{ countsNote() }}
+                    </p>
+                }
                 <dl class="mt-1 grid grid-cols-2 gap-1" aria-label="Working set statistics">
                     @for (s of stats(); track s.label) {
                         <div class="rounded-md border px-2 py-1" [title]="s.hint ?? ''">
@@ -362,6 +367,9 @@ export class LinkAnalysisLegendComponent {
                 aria-label="Show the working set"
             >
                 Working set
+                @if (countsNote()) {
+                    <span class="text-secondary font-normal">· {{ countsOf() }}</span>
+                }
                 @if (truncated()) {
                     <span class="text-warn">· truncated</span>
                 }
@@ -385,6 +393,17 @@ export class LinkAnalysisWorkingSetComponent {
     /** Short label for how the set was sampled, e.g. "top-N by count". */
     readonly mode = input('');
     readonly customizable = input(false);
+    /** Which graph the tiles count (LA-STUDIO-UI-REORG-1 §1): `query`, or `query-under-investigation` while the canvas
+     *  draws an Investigation's Working Set instead; '' = say nothing. */
+    readonly countsGraph = input<'' | 'query' | 'query-under-investigation'>('');
+    readonly countsOf = computed(() => (this.countsGraph() ? 'query graph' : ''));
+    readonly countsNote = computed(() =>
+        this.countsGraph() === 'query-under-investigation'
+            ? 'Counts the query graph. The canvas shows the Investigation’s Working Set (its counts are in the Investigation panel).'
+            : this.countsGraph() === 'query'
+              ? 'Counts the query graph.'
+              : '',
+    );
     readonly open = input(true);
     readonly openChange = output<boolean>();
     readonly customize = output<void>();

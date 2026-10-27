@@ -24,9 +24,14 @@ import { Directive, computed, input, signal } from '@angular/core';
     exportAs: 'inspectoSplit',
     host: {
         role: 'separator',
-        'aria-orientation': 'vertical',
+        '[attr.aria-orientation]': "axis() === 'y' ? 'horizontal' : 'vertical'",
         tabindex: '0',
-        class: 'hover:bg-hover w-1.5 shrink-0 cursor-col-resize',
+        class: 'hover:bg-hover shrink-0',
+        // 6 px across the handle; a host class binding cannot name 'w-1.5' (Angular cuts the class name at the dot)
+        '[style.width.px]': "axis() === 'x' ? 6 : null",
+        '[style.height.px]': "axis() === 'y' ? 6 : null",
+        '[class.cursor-col-resize]': "axis() === 'x'",
+        '[class.cursor-row-resize]': "axis() === 'y'",
         '[attr.aria-valuenow]': 'width()',
         '[attr.aria-valuemin]': 'min()',
         '[attr.aria-valuemax]': 'max()',
@@ -44,6 +49,9 @@ export class InspectoSplitDirective {
     /** Which side of the handle the controlled pane sits on: `left` (default) widens as the handle
      *  moves right; `right` widens as it moves left. */
     readonly pane = input<'left' | 'right'>('left');
+    /** `y` makes a horizontal handle that sizes a pane's HEIGHT (a bottom dock: `pane="right"` = the pane sits below
+     *  and grows as the handle moves up). `width()` is then that height. */
+    readonly axis = input<'x' | 'y'>('x');
 
     /** Set once the user resizes this session; otherwise the persisted / default width applies. */
     private readonly override = signal<number | null>(null);
@@ -65,10 +73,11 @@ export class InspectoSplitDirective {
         // before — the documented "drag, then nudge with arrow keys" follow-up silently doesn't
         // work until the user Tabs here separately. Focus explicitly so drag and keyboard compose.
         (e.currentTarget as HTMLElement)?.focus();
-        const startX = e.clientX;
+        const pos = (ev: PointerEvent): number => (this.axis() === 'y' ? ev.clientY : ev.clientX);
+        const startX = pos(e);
         const startW = this.width();
         const dir = this.pane() === 'left' ? 1 : -1;
-        const move = (ev: PointerEvent): void => this.set(startW + dir * (ev.clientX - startX));
+        const move = (ev: PointerEvent): void => this.set(startW + dir * (pos(ev) - startX));
         const up = (): void => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
@@ -79,8 +88,9 @@ export class InspectoSplitDirective {
 
     onKeydown(e: KeyboardEvent): void {
         const dir = this.pane() === 'left' ? 1 : -1;
-        if (e.key === 'ArrowLeft') this.set(this.width() - 16 * dir);
-        if (e.key === 'ArrowRight') this.set(this.width() + 16 * dir);
+        const [less, more] = this.axis() === 'y' ? ['ArrowUp', 'ArrowDown'] : ['ArrowLeft', 'ArrowRight'];
+        if (e.key === less) this.set(this.width() - 16 * dir);
+        if (e.key === more) this.set(this.width() + 16 * dir);
     }
 
     /**

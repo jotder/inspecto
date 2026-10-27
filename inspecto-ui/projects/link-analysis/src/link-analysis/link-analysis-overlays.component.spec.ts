@@ -35,6 +35,7 @@ import {
                 { label: 'Links', value: '5' },
             ]"
             [truncated]="true"
+            [countsGraph]="counts()"
             [open]="wsOpen()"
             (openChange)="wsOpen.set($event)"
         ></inspecto-link-analysis-working-set>
@@ -43,6 +44,7 @@ import {
 class Host {
     readonly legendOpen = signal(true);
     readonly wsOpen = signal(true);
+    readonly counts = signal<'' | 'query' | 'query-under-investigation'>('query');
     readonly hidden = signal<string[]>([]);
     readonly toggled: string[] = [];
     readonly toggle = toggleHiddenKind;
@@ -72,6 +74,23 @@ describe('Link Analysis overlays', () => {
         pill.click();
         fixture.detectChanges();
         expect(fixture.componentInstance.wsOpen()).toBe(true);
+    });
+});
+
+describe('Link Analysis working set - which graph it counts (LA-STUDIO-UI-REORG-1 §1)', () => {
+    it('names the query graph, and says so again when the canvas draws an Investigation', () => {
+        TestBed.configureTestingModule({ imports: [Host], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(Host);
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        const note = () => el.querySelector('[data-testid="working-set-counts"]')?.textContent?.trim();
+        expect(note()).toBe('Counts the query graph.');
+        fixture.componentInstance.counts.set('query-under-investigation');
+        fixture.detectChanges();
+        expect(note()).toContain('The canvas shows the Investigation’s Working Set');
+        fixture.componentInstance.wsOpen.set(false);
+        fixture.detectChanges();
+        expect(el.textContent).toContain('query graph');
     });
 });
 

@@ -52,7 +52,8 @@ import {
     SpacesService,
     apiErrorMessage,
 } from '@inspecto/core/api';
-import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
+import { GraphRunResult, GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
+import { graphRunRows, summarizeGraphRun } from './graph-run-summary';
 import { indexSourceNote } from './index-source';
 import { IndexMappingTarget } from './link-analysis-index-build.component';
 import {
@@ -275,6 +276,8 @@ import {
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { InvestigationSettingsSections } from './investigation-settings-sections.component';
+import { InvestigationSection } from './link-analysis-investigation.component';
 import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
 import { CleanupApply, LinkAnalysisCleanupComponent } from './link-analysis-cleanup.component';
 import { foldBranches, foldableOf } from '@inspecto/link-analysis/graph/graph-cleanup';
@@ -389,12 +392,35 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     return g.nodes.length >= 8 && max >= g.nodes.length / 2 ? 'force' : 'dagre';
 }
 
+/** The bottom dock's tabs (§5.9); `inv` = an Investigation tab. */
+export type DockTab = 'rows' | InvestigationSection | 'results';
+const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean }[] = [
+    { id: 'rows', label: 'Rows' },
+    { id: 'oplog', label: 'Op log', inv: true },
+    { id: 'ws-rows', label: 'Working Set rows', inv: true },
+    { id: 'coverage', label: 'Coverage', inv: true },
+    { id: 'annotations', label: 'Annotations', inv: true },
+    { id: 'excluded', label: 'Excluded entities', inv: true },
+    { id: 'results', label: 'Results' },
+];
+export const DOCK_STORAGE_KEY = 'inspecto.la.dock';
+function readDock(): { open: boolean; tab: DockTab } {
+    try {
+        const v = JSON.parse(localStorage.getItem(DOCK_STORAGE_KEY) ?? 'null');
+        if (v && DOCK_TABS.some((t) => t.id === v.tab)) return { open: v.open === true, tab: v.tab };
+    } catch {
+        /* unreadable or blocked storage: the defaults */
+    }
+    return { open: false, tab: 'rows' };
+}
+
 @Component({
     selector: 'inspecto-link-analysis',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         DatePipe,
+        InvestigationSettingsSections,
         TermHelpComponent,
         FormMenuDirective,
         LinkAnalysisDiscoverComponent,
@@ -1337,7 +1363,56 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     // ── fullscreen (whole studio or just the canvas zone) + the Data strip below the workspace ──
     readonly fullscreen = signal<'app' | 'graph' | null>(null);
-    readonly bottomOpen = signal(false);
+    /** The bottom dock (§5.9): open = its body shows; closed = the tab strip only. Remembered per browser. */
+    readonly bottomOpen = signal(readDock().open);
+    /** The dock's chosen tab; an Investigation tab falls back to Rows while none is open (see `dockTabShown`). */
+    readonly dockTab = signal<DockTab>(readDock().tab);
+    /** The dock's tabs: Rows always; the Investigation's only while one is open, and never on the Explorer level. */
+    readonly dockTabs = computed<readonly { id: DockTab; label: string }[]>(() =>
+        this.investigationsEnabled() && this.investigation.active() ? DOCK_TABS : DOCK_TABS.filter((t) => !t.inv),
+    );
+    readonly dockTabShown = computed<DockTab>(() =>
+        this.dockTabs().some((t) => t.id === this.dockTab()) ? this.dockTab() : 'rows',
+    );
+    private readonly dockRemember = effect(() => {
+        const state = { open: this.bottomOpen(), tab: this.dockTab() };
+        try {
+            localStorage.setItem(DOCK_STORAGE_KEY, JSON.stringify(state));
+        } catch {
+            /* a private window: the dock simply is not remembered */
+        }
+    });
+    /** Open the dock on one tab (the Act panel's "Open the Op log"; the Rows toggle). */
+    /** The dock's Results tab: the last long answer sent there with *Open in the dock* (headline + every row). */
+    readonly dockResult = signal<{ algorithm: string; headline: string; rows: Record<string, unknown>[] } | null>(null);
+    showResultInDock(r: GraphRunResult): void {
+        this.dockResult.set({
+            algorithm: r.algorithm,
+            headline: summarizeGraphRun(r, this.serverIds()).headline,
+            rows: graphRunRows(r),
+        });
+        this.openDock('results');
+    }
+    openDock(tab: DockTab): void {
+        this.dockTab.set(tab);
+        this.bottomOpen.set(true);
+    }
+    onDockTabKey(ev: KeyboardEvent): void {
+        const tabs = this.dockTabs();
+        const at = tabs.findIndex((t) => t.id === this.dockTabShown());
+        const to =
+            ev.key === 'ArrowRight' ? (at + 1) % tabs.length : ev.key === 'ArrowLeft' ? (at - 1 + tabs.length) % tabs.length : -1;
+        if (to < 0) return;
+        ev.preventDefault();
+        this.dockTab.set(tabs[to].id);
+        (ev.currentTarget as HTMLElement).parentElement
+            ?.querySelector<HTMLElement>(`#la-dock-tab-${tabs[to].id}`)
+            ?.focus();
+    }
+    /** A dock tab that draws a part of the open Investigation (the switch's default branch). */
+    invSection(tab: DockTab): InvestigationSection {
+        return tab as InvestigationSection;
+    }
     /** The Filter predicate editor inside the data strip; collapsed so the strip stays short. */
     readonly filterOpen = signal(false);
     readonly tableMode = signal<'links' | 'nodes'>('links');
@@ -2569,9 +2644,10 @@ Its prior copies stay in its version history.`,
         const { pair } = mergePairOf(ids, ws);
         if (!pair) return;
         this.investigation.mergeDraft.set(pair);
-        // LA-I2-GAPS-RESIDUALS-1 (5): open the tab that holds the prefilled merge, so the next step is on screen.
-        this.toolboxTab.set('investigation');
-        this.toastr.info('Prefilled in the Identity section below - add a reason and confirm there.');
+        // LA-I2-GAPS-RESIDUALS-1 (5): open what holds the prefilled merge, so the next step is on screen. Identities moved
+        // to ⚙ Settings ▸ Data (§5.10).
+        this.openSettings('identities');
+        this.toastr.info('Prefilled in the Identities section - add a reason and confirm there.');
     }
 
     /** One step: seal what is on screen and attach it to a Case (optionally linking the open Investigation too). */
