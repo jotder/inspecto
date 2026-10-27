@@ -92,6 +92,14 @@ export interface GraphViewInteraction {
     panByDrag?: boolean;
     /** `true`: a plain drag on the empty canvas draws a rubber-band box that selects the nodes inside it (emitted as `selectionChange`). */
     boxSelect?: boolean;
+    /**
+     * A free-hand lasso (Link Analysis, LA-STUDIO-UI-REORG-1 UIR-D3). `'shift'`: Shift+drag on the empty canvas adds the
+     * nodes inside to the selection and Alt+Shift+drag removes them, while a plain drag still pans. `'drag'`: the same,
+     * plus a plain drag lassos instead of panning (the touchpad mode). Emitted as the WHOLE new selection.
+     */
+    lasso?: 'shift' | 'drag';
+    /** `true`: a Shift+click on a node toggles it in the selection (emitted as `selectionChange`) instead of a `nodeClick`. */
+    shiftClickToggle?: boolean;
     /** `true`: a double click emits `nodeDblClick`, and the single click is delivered after {@link NODE_DBLCLICK_DELAY_MS} unless a second click cancels it. */
     doubleClick?: boolean;
     /** `true`: the view re-fits after a DATA change (an expand, a fold, a hide), never after a hover, a selection or a restyle. */
@@ -120,11 +128,38 @@ export function buildBehaviors(
     plugins: GraphViewPlugins | null,
     onBrush: (nodeIds: string[]) => void,
     brushStyle: Record<string, unknown> = {},
+    onLasso: (nodeIds: string[], mode: 'add' | 'remove') => void = () => undefined,
 ): unknown[] {
     const box = interaction?.boxSelect === true;
-    const extra = (plugins?.behaviors ?? []).filter((b) => !(box && b === 'brush-select'));
+    const lasso = interaction?.lasso;
+    // The host's own lasso replaces the View toolbox's shift+drag brush and lasso (a saved view may still name them).
+    const extra = (plugins?.behaviors ?? []).filter(
+        (b) => !(box && b === 'brush-select') && !(lasso && (b === 'brush-select' || b === 'lasso-select')),
+    );
+    const lassoOf = (key: string, trigger: string[], mode: 'add' | 'remove') => ({
+        type: 'lasso-select',
+        key,
+        trigger,
+        enableElements: ['node'],
+        state: SELECTED_STATE,
+        // 'diff' flips the state; a removal then drops it from every lassoed node, so only selected ones change.
+        mode: mode === 'add' ? 'union' : 'diff',
+        enable: (e: { targetType?: string }) => e.targetType === 'canvas',
+        style: brushStyle,
+        onSelect: (states: Record<string, string[]>) => {
+            if (mode === 'remove')
+                for (const id of Object.keys(states)) states[id] = states[id].filter((s) => s !== SELECTED_STATE);
+            onLasso(Object.keys(states), mode);
+        },
+    });
+    const pan = interaction?.panByDrag !== false && lasso !== 'drag';
     return [
-        ...(interaction?.panByDrag === false ? [] : ['drag-canvas']),
+        ...(pan
+            ? lasso
+                ? // Shift is the lasso's key: a drag holding it never also pans.
+                  [{ type: 'drag-canvas', enable: (e: { targetType?: string; shiftKey?: boolean }) => e.targetType === 'canvas' && !e.shiftKey }]
+                : ['drag-canvas']
+            : []),
         { type: 'zoom-canvas', minZoom: 0.1, maxZoom: 4 },
         'drag-element',
         ...(box
@@ -143,8 +178,27 @@ export function buildBehaviors(
                   },
               ]
             : []),
+        ...(lasso
+            ? [
+                  lassoOf('lasso-add', ['shift'], 'add'),
+                  lassoOf('lasso-remove', ['shift', 'alt'], 'remove'),
+                  ...(lasso === 'drag' ? [lassoOf('lasso-drag', ['drag'], 'add')] : []),
+              ]
+            : []),
         ...extra,
     ];
+}
+
+/** The selection after a lasso: the lassoed nodes added to, or removed from, the current one. */
+export function lassoSelection(current: ReadonlySet<string>, ids: string[], mode: 'add' | 'remove'): string[] {
+    if (mode === 'add') return [...new Set([...current, ...ids])];
+    const drop = new Set(ids);
+    return [...current].filter((id) => !drop.has(id));
+}
+
+/** The selection after a Shift+click: the node toggled in or out. */
+export function toggleInSelection(current: ReadonlySet<string>, id: string): string[] {
+    return current.has(id) ? [...current].filter((x) => x !== id) : [...current, id];
 }
 
 /** The host's accessible name: the graph's size, so the canvas is not an unnamed blank to a screen reader. */
@@ -228,7 +282,16 @@ export function swapCommunityShapes(
 export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly string[]): Record<string, unknown>[] {
     if (!p) return [];
     const out: Record<string, unknown>[] = [];
-    if (p.minimap) out.push({ type: 'minimap', key: 'minimap', size: [160, 100], position: 'right-bottom' });
+    // G6 places the minimap with left/top pixels computed ONCE from the canvas size, so a canvas narrowed later (the
+    // right panel opening) leaves it drawn over the panel. Anchor it to the canvas's right/bottom edge instead.
+    if (p.minimap)
+        out.push({
+            type: 'minimap',
+            key: 'minimap',
+            size: [160, 100],
+            position: 'right-bottom',
+            containerStyle: { left: 'auto', top: 'auto', right: '0px', bottom: '0px' },
+        });
     if (p.gridLine) out.push({ type: 'grid-line', key: 'grid-line', follow: true });
     if (p.fisheye) out.push({ type: 'fisheye', key: 'fisheye', trigger: 'drag', r: 120, scaleRBy: 'wheel' });
     if (p.edgeFilterLens) out.push({ type: 'edge-filter-lens', key: 'edge-filter-lens', trigger: 'drag', r: 90 });
@@ -1274,6 +1337,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 (ids) => this.onBrushSelect(ids),
                 // The rubber band reads the theme's foreground, so it shows in both colour schemes without a literal colour.
                 { fill: this.styleFg, fillOpacity: 0.08, stroke: this.styleFg, lineWidth: 1, lineDash: [4, 3] },
+                (ids, mode) => this.onBrushSelect(lassoSelection(this.selSet, ids, mode)),
             ) as never[],
             plugins: [
                 ...(this.tooltips
@@ -1291,6 +1355,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const targetId = (e: unknown): string | undefined => (e as { target?: { id?: string } }).target?.id;
         graph.on(NodeEvent.CLICK, (e) => {
             const id = targetId(e);
+            const shift = (e as unknown as { nativeEvent?: MouseEvent }).nativeEvent?.shiftKey === true;
+            if (this.interaction?.shiftClickToggle && shift && id) {
+                this.cancelPendingClick();
+                this.selectionChange.emit(toggleInSelection(this.selSet, id));
+                return;
+            }
             if (this.interaction?.doubleClick) {
                 // A double click is two clicks and a dblclick: hold the single click back so it does not also fire.
                 this.cancelPendingClick();
@@ -1322,7 +1392,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         });
         graph.on(CanvasEvent.CLICK, () => {
             // The click that ends a box select must not clear what the box just selected.
-            if (this.interaction?.boxSelect && Date.now() - this.brushedAt > 250 && this.selSet.size > 0) {
+            if ((this.interaction?.boxSelect || this.interaction?.lasso) && Date.now() - this.brushedAt > 250 && this.selSet.size > 0) {
                 this.selectionChange.emit([]);
             }
         });

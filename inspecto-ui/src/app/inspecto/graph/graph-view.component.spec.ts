@@ -18,6 +18,8 @@ import {
     SELECTED_STATE,
     buildBehaviors,
     buildPluginList,
+    lassoSelection,
+    toggleInSelection,
     demotePositiveTabindex,
     graphSummaryLabel,
     edgeLabelsHiddenByDensity,
@@ -74,6 +76,11 @@ describe('GraphViewComponent', () => {
             'hull',
         ]);
         expect(list[5]).toMatchObject({ key: 'hull-0', members: ['a', 'b', 'c'], fill: 'swatch-a' });
+    });
+
+    it('the minimap is anchored to the right/bottom edge, so a canvas narrowed by the right panel keeps it inside', () => {
+        const [minimap] = buildPluginList({ minimap: true }, []);
+        expect(minimap['containerStyle']).toEqual({ left: 'auto', top: 'auto', right: '0px', bottom: '0px' });
     });
 
     // ── LA-09: View toolbox completions ──
@@ -800,6 +807,23 @@ describe('opt-in pointer model (Link Analysis, 2026-10-15)', () => {
 
     it('without boxSelect the toolbox shift+drag brush is untouched', () => {
         expect(types(buildBehaviors(null, { behaviors: ['brush-select'] }, vi.fn()))).toContain('brush-select');
+    });
+
+    it('lasso is opt-in: without it no lasso behaviour is added and the toolbox lasso stays', () => {
+        expect(types(buildBehaviors(null, { behaviors: ['lasso-select'] }, vi.fn()))).toEqual([
+            'drag-canvas',
+            'zoom-canvas',
+            'drag-element',
+            'lasso-select',
+        ]);
+    });
+
+    it('a lasso adds to or removes from the current selection; Shift+click toggles one node', () => {
+        const cur = new Set(['a', 'b']);
+        expect(lassoSelection(cur, ['b', 'c'], 'add')).toEqual(['a', 'b', 'c']);
+        expect(lassoSelection(cur, ['b', 'c'], 'remove')).toEqual(['a']);
+        expect(toggleInSelection(cur, 'a')).toEqual(['b']);
+        expect(toggleInSelection(cur, 'z')).toEqual(['a', 'b', 'z']);
     });
 
     it('the single-click hold for a double click is short enough to feel instant', () => {

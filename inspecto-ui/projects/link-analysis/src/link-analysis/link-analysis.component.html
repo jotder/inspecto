@@ -80,20 +80,29 @@
                 </button>
                 <mat-menu #layoutMenu="matMenu">
                     @for (l of layouts; track l.id) {
-                        <button
-                            mat-menu-item
-                            (click)="setLayout(l.id)"
-                            [disabled]="l.tree && !isTreeShaped()"
-                            [attr.aria-label]="
-                                l.label + (l.tree && !isTreeShaped() ? ' (needs a tree-shaped graph)' : '')
-                            "
-                        >
-                            <mat-icon
-                                [svgIcon]="
-                                    layoutId() === l.id ? 'heroicons_outline:check' : 'heroicons_outline:squares-2x2'
-                                "
-                            ></mat-icon>
-                            <span>{{ l.label }}</span>
+                        @let off = layoutDisabledReason(l);
+                        <!-- A disabled item takes no pointer events: the wrapper carries its tooltip (UIR-D11). -->
+                        <div [matTooltip]="off ?? ''" matTooltipPosition="right">
+                            <button
+                                mat-menu-item
+                                (click)="setLayout(l.id)"
+                                [disabled]="!!off"
+                                [attr.data-testid]="'la-layout-item-' + l.id"
+                                [attr.aria-label]="l.label + (off ? ' (' + off + ')' : '')"
+                            >
+                                <mat-icon
+                                    [svgIcon]="
+                                        layoutId() === l.id ? 'heroicons_outline:check' : 'heroicons_outline:squares-2x2'
+                                    "
+                                ></mat-icon>
+                                <span>{{ l.label }}</span>
+                            </button>
+                        </div>
+                    }
+                    @if (anyLayoutOverCap()) {
+                        <button mat-menu-item (click)="openReduce()" data-testid="la-layout-reduce">
+                            <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
+                            <span>Reduce first — filter the graph to use more layouts</span>
                         </button>
                     }
                 </mat-menu>
@@ -208,55 +217,6 @@
                         {{ collapsedRoots().length }} collapsed
                     </button>
                 }
-            }
-            <!-- outside @if (graph()): an Investigation canvas alone has something to seal too -->
-            @if (graph() || workingSetCanvas()) {
-                <!-- LA-STUDIO-UI-REORG-1 §5.4: Expand… (G) and Hidden by lists — plain words first, the term in the tooltip -->
-                <button
-                    mat-button
-                    type="button"
-                    (click)="growExclude.growOpen() ? closeExpand() : openExpand()"
-                    [color]="growExclude.growOpen() ? 'primary' : undefined"
-                    [attr.aria-expanded]="growExclude.growOpen()"
-                    [matTooltip]="
-                        growMode() === 'investigation'
-                            ? 'Expand: add linked items, one recorded expand step per degree (G)'
-                            : 'Expand: add linked items to this graph, degree by degree; not recorded (G)'
-                    "
-                    aria-label="Expand"
-                    aria-keyshortcuts="G"
-                    data-testid="la-grow-button"
-                >
-                    <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
-                    Expand…
-                </button>
-                <button
-                    mat-button
-                    type="button"
-                    (click)="openExclusions()"
-                    [color]="growExclude.exclusionsOpen() ? 'primary' : undefined"
-                    [attr.aria-expanded]="growExclude.exclusionsOpen()"
-                    matTooltip="Hidden by lists: exclusion lists in force and what they removed (X excludes the selection)"
-                    [attr.aria-label]="'Hidden by lists: ' + hiddenCount() + ' hidden'"
-                    data-testid="la-exclusions-button"
-                >
-                    <mat-icon svgIcon="heroicons_outline:no-symbol" aria-hidden="true"></mat-icon>
-                    {{ hiddenCount() ? hiddenCount().toLocaleString('en') + ' hidden' : 'Hidden' }}
-                </button>
-                <!-- one step: seal what is on screen (the query graph OR the Investigation Working Set) and attach it; disabled with the reason when not permitted -->
-                <span class="inline-flex" [matTooltip]="attachUnavailable() || 'Seal this analysis and attach it to a Case'">
-                <button
-                    mat-icon-button
-                    (click)="openAttachToCase()"
-                    [disabled]="attachUnavailable() !== ''"
-                    [attr.aria-label]="attachUnavailable() ? 'Attach to Case — ' + attachUnavailable() : 'Attach to Case'"
-                >
-                    <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
-                    @if (snapshots.count(); as n) {
-                        <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none">{{ n }}</span>
-                    }
-                </button>
-                </span>
             }
 
             <span class="flex-auto max-md:hidden"></span>
@@ -458,6 +418,19 @@
                             <span class="text-secondary text-xs"
                                 >(else hover-only above {{ denseEdgeLabelCap }} links)</span
                             ></mat-checkbox
+                        >
+                        <mat-checkbox
+                            [checked]="!!viewOptions().snapline"
+                            (change)="toggleViewFlag('snapline', $event.checked)"
+                            data-testid="la-display-snapline"
+                            >Snap lines <span class="text-secondary text-xs">(align while dragging)</span></mat-checkbox
+                        >
+                        <mat-checkbox
+                            [checked]="hasBehavior('hover-activate')"
+                            (change)="toggleBehavior('hover-activate', $event.checked)"
+                            data-testid="la-display-hover-activate"
+                            >Hover activate
+                            <span class="text-secondary text-xs">(light up a node and its links)</span></mat-checkbox
                         >
                         <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node size</span>
                         <div class="flex items-center gap-1.5" role="group" aria-label="Node size">
@@ -765,6 +738,219 @@
             }
         </div>
     </header>
+    @if (graph() || workingSetCanvas()) {
+        <!-- LA-STUDIO-UI-REORG-1 §5.2: the second toolbar - work on the canvas. Named groups; below 1,300 px the groups after
+             Canvas mode fold into overflow menus, so it never wraps to a third row. -->
+        <nav
+            class="mt-1 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden rounded-lg border px-1"
+            style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+            aria-label="Canvas tools"
+            data-testid="la-canvas-toolbar"
+        >
+            <div class="flex shrink-0 items-center" role="group" aria-label="Canvas mode" data-testid="la-group-mode">
+                @for (m of canvasModes; track m.id) {
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="setCanvasMode(m.id)"
+                        [color]="canvasMode() === m.id ? 'primary' : undefined"
+                        [class.la-mode-active]="canvasMode() === m.id"
+                        [attr.aria-pressed]="canvasMode() === m.id"
+                        [attr.aria-keyshortcuts]="m.key || null"
+                        [matTooltip]="m.label + ': ' + m.hint + (m.key ? ' (' + m.key + ')' : '')"
+                        [attr.aria-label]="m.label"
+                        [attr.data-mode]="m.id"
+                    >
+                        <mat-icon [svgIcon]="m.icon" aria-hidden="true"></mat-icon>
+                    </button>
+                }
+            </div>
+            <span class="mx-1 h-6 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
+
+            <!-- Selection -->
+            <div class="hidden shrink-0 items-center min-[1300px]:flex" role="group" aria-label="Selection" data-testid="la-group-selection">
+                <button mat-icon-button type="button" (click)="selectAll()" matTooltip="Select all (Ctrl+A)" aria-label="Select all" aria-keyshortcuts="Control+A">
+                    <mat-icon svgIcon="heroicons_outline:squares-plus" aria-hidden="true"></mat-icon>
+                </button>
+                <button mat-icon-button type="button" (click)="invertSelection()" matTooltip="Invert the selection" aria-label="Invert the selection">
+                    <mat-icon svgIcon="heroicons_outline:arrows-right-left" aria-hidden="true"></mat-icon>
+                </button>
+                <button
+                    mat-icon-button
+                    type="button"
+                    (click)="addNeighboursToSelection()"
+                    [disabled]="!selectedOnCanvas().length"
+                    [disabledInteractive]="true"
+                    [matTooltip]="selectedOnCanvas().length ? 'Add the neighbours to the selection' : 'Select a node first'"
+                    aria-label="Add the neighbours to the selection"
+                >
+                    <mat-icon svgIcon="heroicons_outline:share" aria-hidden="true"></mat-icon>
+                </button>
+                <button
+                    mat-icon-button
+                    type="button"
+                    (click)="clearSelection()"
+                    [disabled]="!selectedOnCanvas().length"
+                    [disabledInteractive]="true"
+                    matTooltip="Clear the selection (Esc)"
+                    aria-label="Clear the selection"
+                >
+                    <mat-icon svgIcon="heroicons_outline:x-mark" aria-hidden="true"></mat-icon>
+                </button>
+            </div>
+            @if (selectedOnCanvas().length) {
+                <inspecto-chip class="shrink-0" tone="primary" data-testid="la-selection-count">{{ selectedOnCanvas().length }} selected</inspecto-chip>
+            }
+            <span class="mx-1 hidden h-6 w-px shrink-0 min-[1300px]:block" style="background: var(--gamma-border)" aria-hidden="true"></span>
+
+            <!-- Graph edits: act on the selection (the right-click menu acts on one node) -->
+            <div class="hidden shrink-0 items-center min-[1300px]:flex" role="group" aria-label="Graph edits" data-testid="la-group-edits">
+                <button
+                    mat-button
+                    type="button"
+                    (click)="growExclude.growOpen() ? closeExpand() : openExpand()"
+                    [color]="growExclude.growOpen() ? 'primary' : undefined"
+                    [attr.aria-expanded]="growExclude.growOpen()"
+                    [matTooltip]="
+                        growMode() === 'investigation'
+                            ? 'Expand: add the next ring of linked items - one recorded expand step (G)'
+                            : 'Expand: add the next ring of linked items to this graph - not recorded (G)'
+                    "
+                    aria-label="Expand"
+                    aria-keyshortcuts="G"
+                    data-testid="la-grow-button"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
+                    Expand…
+                </button>
+                <!-- slot: Collapse (lane P1c, §5.5) -->
+                <span class="contents" data-slot="collapse"></span>
+                <button
+                    mat-icon-button
+                    type="button"
+                    (click)="hideSelected()"
+                    [disabled]="!selectedOnCanvas().length"
+                    [disabledInteractive]="true"
+                    [matTooltip]="selectedOnCanvas().length ? 'Hide the selected nodes' : 'Select nodes to hide'"
+                    aria-label="Hide the selected nodes"
+                    data-testid="la-selection-hide"
+                >
+                    <mat-icon svgIcon="heroicons_outline:eye-slash" aria-hidden="true"></mat-icon>
+                </button>
+                @if (investigation.canvas()) {
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="excludeSelected()"
+                        [disabled]="!selectedOnCanvas().length"
+                        [disabledInteractive]="true"
+                        [matTooltip]="selectedOnCanvas().length ? 'Exclude the selected nodes from the Working Set (asks for a reason) (X)' : 'Select nodes to exclude'"
+                        aria-label="Exclude the selected nodes"
+                        aria-keyshortcuts="X"
+                        data-testid="la-selection-exclude"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:no-symbol" aria-hidden="true"></mat-icon>
+                    </button>
+                    <!-- disabled-with-reason: disabledInteractive keeps it focusable, so the tooltip (the reason) reaches everyone -->
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="mergeSelected()"
+                        [disabled]="!!mergeUnavailable()"
+                        [disabledInteractive]="true"
+                        [matTooltip]="mergeUnavailable() || 'Merge with... assert that the two selected nodes are one entity'"
+                        aria-label="Merge the two selected nodes into one identity"
+                        data-testid="la-selection-merge"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:arrows-pointing-in" aria-hidden="true"></mat-icon>
+                    </button>
+                }
+                <!-- one step: seal what is on screen (the query graph OR the Investigation Working Set) and attach it -->
+                <button
+                    mat-icon-button
+                    type="button"
+                    (click)="openAttachToCase()"
+                    [disabled]="!!attachUnavailable()"
+                    [disabledInteractive]="true"
+                    [matTooltip]="attachUnavailable() || 'Seal this analysis and attach it to a Case'"
+                    [attr.aria-label]="attachUnavailable() ? 'Attach to Case - ' + attachUnavailable() : 'Attach to Case'"
+                    data-testid="la-selection-attach"
+                >
+                    <mat-icon svgIcon="heroicons_outline:paper-clip" aria-hidden="true"></mat-icon>
+                    @if (snapshots.count(); as n) {
+                        <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none">{{ n }}</span>
+                    }
+                </button>
+                <!-- slot: Clean up ▾ (lane P1c, §5.6) -->
+                <span class="contents" data-slot="clean-up"></span>
+            </div>
+            <span class="mx-1 hidden h-6 w-px shrink-0 min-[1300px]:block" style="background: var(--gamma-border)" aria-hidden="true"></span>
+
+            <!-- Held (n) / Hidden (n) -->
+            <div class="hidden shrink-0 items-center min-[1300px]:flex" role="group" aria-label="Held and hidden" data-testid="la-group-held">
+                <button
+                    mat-button
+                    type="button"
+                    (click)="focusHeldTray()"
+                    [disabled]="!heldItems().length"
+                    [disabledInteractive]="true"
+                    matTooltip="Held: high-connectivity items Expand held back (opens the held tray)"
+                    [attr.aria-label]="'Held: ' + heldItems().length"
+                    data-testid="la-held-button"
+                >
+                    Held ({{ heldItems().length }})
+                </button>
+                <button
+                    mat-button
+                    type="button"
+                    (click)="openExclusions()"
+                    [color]="growExclude.exclusionsOpen() ? 'primary' : undefined"
+                    [attr.aria-expanded]="growExclude.exclusionsOpen()"
+                    matTooltip="Hidden by lists: exclusion lists in force and what they removed (X excludes the selection)"
+                    [attr.aria-label]="'Hidden by lists: ' + hiddenCount() + ' hidden'"
+                    data-testid="la-exclusions-button"
+                >
+                    Hidden ({{ hiddenCount().toLocaleString('en') }})
+                </button>
+            </div>
+
+            <!-- below 1,300 px: one overflow menu holds the three groups above -->
+            <button
+                mat-icon-button
+                type="button"
+                class="shrink-0 min-[1300px]:!hidden"
+                [matMenuTriggerFor]="canvasToolsMore"
+                matTooltip="Selection, graph edits, held and hidden"
+                aria-label="More canvas tools"
+                data-testid="la-canvas-tools-more"
+            >
+                <mat-icon svgIcon="heroicons_outline:ellipsis-horizontal" aria-hidden="true"></mat-icon>
+            </button>
+            <mat-menu #canvasToolsMore="matMenu">
+                <button mat-menu-item type="button" (click)="selectAll()">Select all</button>
+                <button mat-menu-item type="button" (click)="invertSelection()">Invert the selection</button>
+                <button mat-menu-item type="button" (click)="addNeighboursToSelection()" [disabled]="!selectedOnCanvas().length">
+                    Add the neighbours
+                </button>
+                <button mat-menu-item type="button" (click)="clearSelection()" [disabled]="!selectedOnCanvas().length">Clear the selection</button>
+                <mat-divider></mat-divider>
+                <button mat-menu-item type="button" (click)="openExpand()">Expand…</button>
+                <button mat-menu-item type="button" (click)="hideSelected()" [disabled]="!selectedOnCanvas().length">Hide the selected nodes</button>
+                @if (investigation.canvas()) {
+                    <button mat-menu-item type="button" (click)="excludeSelected()" [disabled]="!selectedOnCanvas().length">
+                        Exclude the selected nodes
+                    </button>
+                    <button mat-menu-item type="button" (click)="mergeSelected()" [disabled]="!!mergeUnavailable()">Merge…</button>
+                }
+                <button mat-menu-item type="button" (click)="openAttachToCase()" [disabled]="!!attachUnavailable()">Attach to Case</button>
+                <mat-divider></mat-divider>
+                <button mat-menu-item type="button" (click)="focusHeldTray()" [disabled]="!heldItems().length">
+                    Held ({{ heldItems().length }})
+                </button>
+                <button mat-menu-item type="button" (click)="openExclusions()">Hidden ({{ hiddenCount().toLocaleString('en') }})</button>
+            </mat-menu>
+        </nav>
+    }
 
     <div class="mt-1 flex min-h-0 flex-auto flex-col gap-2">
         @if (loadError()) {
@@ -950,7 +1136,7 @@
                             [attr.inert]="listMode() ? '' : null"
                             [layout]="layoutId()"
                             [plugins]="canvasPlugins()"
-                            [interaction]="canvasInteraction"
+                            [interaction]="canvasInteraction()"
                             [selection]="selectedOnCanvas()"
                             (nodeClick)="onNodeClick($event)"
                             (nodeDblClick)="onNodeDblClick($event)"
@@ -1050,80 +1236,6 @@
                                     type="button"
                                     aria-label="Dismiss"
                                     (click)="growExclude.lastChange.set(null)"
-                                >
-                                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                                </button>
-                            </div>
-                        }
-                        <!-- the box selection: what it does. An OVERLAY, so selecting never changes the layout or resizes the canvas -->
-                        @if (selectedOnCanvas().length) {
-                            <div
-                                class="absolute left-1/2 top-2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-lg border px-1 shadow"
-                                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
-                                role="group"
-                                aria-label="Selection"
-                                data-testid="la-selection-bar"
-                            >
-                                <span class="px-1 text-xs font-medium" data-testid="la-selection-count">
-                                    {{ selectedOnCanvas().length }} selected
-                                </span>
-                                <button
-                                    mat-icon-button
-                                    (click)="expandFromSelected()"
-                                    matTooltip="Expand from the selected nodes"
-                                    [attr.aria-label]="'Expand from the ' + selectedOnCanvas().length + ' selected nodes'"
-                                >
-                                    <mat-icon svgIcon="heroicons_outline:plus-circle"></mat-icon>
-                                </button>
-                                <button
-                                    mat-icon-button
-                                    (click)="hideSelected()"
-                                    matTooltip="Hide the selected nodes"
-                                    [attr.aria-label]="'Hide the ' + selectedOnCanvas().length + ' selected nodes'"
-                                >
-                                    <mat-icon svgIcon="heroicons_outline:eye-slash"></mat-icon>
-                                </button>
-                                @if (investigation.canvas()) {
-                                    <button
-                                        mat-icon-button
-                                        (click)="excludeSelected()"
-                                        matTooltip="Exclude the selected nodes from the Working Set (asks for a reason)"
-                                        [attr.aria-label]="'Exclude the ' + selectedOnCanvas().length + ' selected nodes'"
-                                    >
-                                        <mat-icon svgIcon="heroicons_outline:no-symbol"></mat-icon>
-                                    </button>
-                                }
-                                @if (investigation.canvas()) {
-                                    <button
-                                        mat-icon-button
-                                        (click)="mergeSelected()"
-                                        [disabled]="!!mergeUnavailable()"
-                                        [disabledInteractive]="true"
-                                        [matTooltip]="mergeUnavailable() || 'Merge with... assert that the two selected nodes are one entity'"
-                                        aria-label="Merge the two selected nodes into one identity"
-                                        data-testid="la-selection-merge"
-                                    >
-                                        <mat-icon svgIcon="heroicons_outline:arrows-pointing-in"></mat-icon>
-                                    </button>
-                                    <!-- disabled-with-reason: disabledInteractive renders aria-disabled and keeps the button focusable, so the
-                                         tooltip (also its aria-describedby, the one source of the reason) reaches everyone; mergeSelected() guards the click -->
-                                }
-                                <button
-                                    mat-icon-button
-                                    (click)="openAttachToCase()"
-                                    [disabled]="!!attachUnavailable()"
-                                    [disabledInteractive]="true"
-                                    [matTooltip]="attachUnavailable() || 'Attach the selected nodes to a Case'"
-                                    [attr.aria-label]="'Attach the ' + selectedOnCanvas().length + ' selected nodes to a Case'"
-                                    data-testid="la-selection-attach"
-                                >
-                                    <mat-icon svgIcon="heroicons_outline:paper-clip"></mat-icon>
-                                </button>
-                                <button
-                                    mat-icon-button
-                                    (click)="clearSelection()"
-                                    matTooltip="Clear the selection (Esc)"
-                                    aria-label="Clear the selection"
                                 >
                                     <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
@@ -1413,23 +1525,32 @@
                                 </h3>
                                 <div class="grid grid-cols-2 gap-1">
                                     @for (l of layouts; track l.id) {
-                                        <button
-                                            type="button"
-                                            class="rounded-md border px-2 py-1.5 text-left text-xs"
-                                            [class.font-semibold]="layoutId() === l.id"
-                                            [style.borderColor]="layoutId() === l.id ? 'var(--gamma-primary)' : null"
-                                            [disabled]="l.tree && !isTreeShaped()"
-                                            (click)="setLayout(l.id)"
-                                            [attr.aria-pressed]="layoutId() === l.id"
-                                            [attr.aria-label]="
-                                                l.label +
-                                                (l.tree && !isTreeShaped() ? ' (needs a tree-shaped graph)' : '')
-                                            "
-                                        >
-                                            {{ l.label }}
-                                        </button>
+                                        @let off = layoutDisabledReason(l);
+                                        <span class="flex" [matTooltip]="off ?? ''">
+                                            <button
+                                                type="button"
+                                                class="w-full rounded-md border px-2 py-1.5 text-left text-xs disabled:opacity-50"
+                                                [class.font-semibold]="layoutId() === l.id"
+                                                [style.borderColor]="layoutId() === l.id ? 'var(--gamma-primary)' : null"
+                                                [disabled]="!!off"
+                                                (click)="setLayout(l.id)"
+                                                [attr.aria-pressed]="layoutId() === l.id"
+                                                [attr.aria-label]="l.label + (off ? ' (' + off + ')' : '')"
+                                            >
+                                                {{ l.label }}
+                                            </button>
+                                        </span>
                                     }
                                 </div>
+                                @if (anyLayoutOverCap()) {
+                                    <button
+                                        type="button"
+                                        class="text-primary mt-1 text-left text-xs underline"
+                                        (click)="openReduce()"
+                                    >
+                                        Reduce first — filter the graph to use the greyed layouts
+                                    </button>
+                                }
                             </section>
                             <section aria-label="Overlays" class="flex flex-col">
                                 <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
@@ -1484,12 +1605,23 @@
                                     Grid
                                 </mat-checkbox>
                                 <mat-checkbox
-                                    [checked]="!!viewOptions().hulls"
+                                    [checked]="!!viewOptions().hulls && !hullsDisabledReason()"
+                                    [disabled]="!!hullsDisabledReason()"
+                                    [matTooltip]="hullsDisabledReason() ?? ''"
                                     (change)="toggleViewFlag('hulls', $event.checked)"
+                                    data-testid="la-hulls-toggle"
                                 >
                                     Community hulls
                                     <span class="text-secondary text-xs">(Louvain)</span>
                                 </mat-checkbox>
+                                @if (hullsDisabledReason(); as why) {
+                                    <span class="text-secondary text-xs" data-testid="la-hulls-reason"
+                                        >Community hulls {{ why }} —
+                                        <button type="button" class="text-primary underline" (click)="openReduce()">
+                                            reduce first
+                                        </button></span
+                                    >
+                                }
                                 <div class="mt-1 flex items-center gap-2">
                                     <mat-checkbox
                                         [checked]="superNodeThreshold() > 0"
@@ -1521,41 +1653,6 @@
                                 >
                                     Link bundling
                                 </mat-checkbox>
-                            </section>
-                            <section aria-label="Lenses and selection" class="flex flex-col">
-                                <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
-                                    Lenses &amp; selection
-                                </h3>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().fisheye"
-                                    (change)="toggleViewFlag('fisheye', $event.checked)"
-                                >
-                                    Fisheye lens <span class="text-secondary text-xs">(drag; wheel resizes)</span>
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().edgeFilterLens"
-                                    (change)="toggleViewFlag('edgeFilterLens', $event.checked)"
-                                >
-                                    Link filter lens <span class="text-secondary text-xs">(drag)</span>
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().snapline"
-                                    (change)="toggleViewFlag('snapline', $event.checked)"
-                                >
-                                    Snap lines <span class="text-secondary text-xs">(align while dragging)</span>
-                                </mat-checkbox>
-                                @for (b of viewBehaviors; track b.id) {
-                                    <mat-checkbox
-                                        [checked]="hasBehavior(b.id)"
-                                        (change)="toggleBehavior(b.id, $event.checked)"
-                                    >
-                                        {{ b.label }} <span class="text-secondary text-xs">({{ b.hint }})</span>
-                                    </mat-checkbox>
-                                }
-                                <p class="text-secondary mt-1 text-[11px]">
-                                    Each item is an AntV G6 v5 built-in layout, behavior or plugin — the canvas engine
-                                    the studio already renders with.
-                                </p>
                             </section>
                         </div>
                     </div>
