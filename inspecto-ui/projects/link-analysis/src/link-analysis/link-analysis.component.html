@@ -1,6 +1,78 @@
 <div #studioRoot class="flex h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)] min-h-0 min-w-0 flex-auto flex-col p-2 max-md:h-auto">
     <!-- ── header = the toolbar only (operator 2026-10-15); the title and the page info live in the footer status bar ── -->
     <header class="flex min-w-0 flex-wrap items-center gap-2" data-testid="la-header">
+        <!-- LA-STUDIO-UI-REORG-1 §5.1 / §5.11: File ▾ - New, Open…, Save view, Save view as…, Snapshot, Import / export, Close, Delete -->
+        <button mat-button [matMenuTriggerFor]="fileMenu" #fileTrigger="matMenuTrigger" data-testid="la-file">
+            File
+            <mat-icon svgIcon="heroicons_outline:chevron-down" class="icon-size-4"></mat-icon>
+        </button>
+        <mat-menu #fileMenu="matMenu">
+            <button mat-menu-item (click)="closeOpenWork()" [disabled]="investigation.busy()" data-testid="la-file-new">
+                <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon>
+                <span>New</span>
+            </button>
+            <button mat-menu-item (click)="openOpenDialog()" data-testid="la-file-open">
+                <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
+                <span>Open…</span>
+            </button>
+            <button mat-menu-item (click)="saveOpenView()" [disabled]="!graph() || saving()" data-testid="la-save-view">
+                <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
+                <span>Save view</span>
+            </button>
+            <button
+                mat-menu-item
+                [matMenuTriggerFor]="saveMenu"
+                laFormMenu
+                #saveTrigger="matMenuTrigger"
+                [disabled]="!graph()"
+                aria-label="Save view as"
+                data-testid="la-save-view-as"
+            >
+                <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
+                <span>Save view as…</span>
+            </button>
+            <button
+                mat-menu-item
+                (click)="openSnapshot()"
+                [disabled]="snapshotUnavailable() !== ''"
+                [matTooltip]="snapshotUnavailable() || 'Save this analysis (optionally attaching it to a Case)'"
+                [attr.aria-label]="snapshotUnavailable() ? 'Save this analysis — ' + snapshotUnavailable() : 'Save this analysis'"
+            >
+                <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
+                <span>Save this analysis (Snapshot)</span>
+            </button>
+            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- stops the click closing File before the transfer menu opens -->
+            <div class="px-2" (click)="$event.stopPropagation()">
+                <inspecto-la-host-slot
+                    [component]="transfer.menu"
+                    [inputs]="{
+                        items: transferItems(),
+                        allowedKinds: ['link-analysis-view'],
+                        importDraft: true,
+                        label: 'Import / export views',
+                    }"
+                    [outputs]="transferMenuOutputs"
+                />
+            </div>
+            <button
+                mat-menu-item
+                (click)="closeOpenWork()"
+                [disabled]="!openWorkLabel() || investigation.busy()"
+                data-testid="la-close"
+            >
+                <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                <span>Close{{ openWorkLabel() ? ' ' + openWorkLabel() : '' }}</span>
+            </button>
+            <button
+                mat-menu-item
+                (click)="deleteOpenWork()"
+                [disabled]="!deleteLabel() || investigation.busy()"
+                data-testid="la-file-delete"
+            >
+                <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
+                <span>Delete{{ deleteLabel() ? ' ' + deleteLabel() : '' }}</span>
+            </button>
+        </mat-menu>
         <div class="flex min-w-0 flex-1 items-center">
         <nav
             class="flex min-w-0 flex-row flex-wrap items-center gap-1 rounded-lg border px-1"
@@ -160,17 +232,6 @@
                     </mat-menu>
                 }
 
-                <!-- evidence: snapshot the answer, attach it to a Case (spec §3.6) -->
-                <span class="inline-flex" [matTooltip]="snapshotUnavailable() || 'Save this analysis (optionally attaching it to a Case)'">
-                    <button
-                        mat-icon-button
-                        (click)="openSnapshot()"
-                        [disabled]="snapshotUnavailable() !== ''"
-                        [attr.aria-label]="snapshotUnavailable() ? 'Save this analysis — ' + snapshotUnavailable() : 'Save this analysis'"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
-                    </button>
-                </span>
                 <span
                     class="my-1 h-px w-6 max-md:mx-1 max-md:my-0 max-md:h-5 max-md:w-px"
                     style="background: var(--gamma-border)"
@@ -220,116 +281,7 @@
                 }"
             />
 
-            <!-- saved views (open) — always available -->
-            <button
-                mat-icon-button
-                [matMenuTriggerFor]="viewsMenu"
-                #viewsTrigger="matMenuTrigger"
-                matTooltip="Saved views"
-                aria-label="Open saved views"
-            >
-                <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
-            </button>
-            <mat-menu #viewsMenu="matMenu">
-                @if (views().length) {
-                    <div class="text-secondary max-w-64 px-4 py-2 text-xs leading-snug">
-                        <span class="text-warn font-semibold">Not evidence</span>
-                        — {{ savedViewNotice }}
-                    </div>
-                    @for (v of views(); track v.id) {
-                        <button
-                            mat-menu-item
-                            [matMenuTriggerFor]="viewActions"
-                            [matMenuTriggerData]="{ view: v }"
-                            [attr.aria-label]="'Actions for view ' + v.name"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
-                            <span>{{ v.name }}</span>
-                        </button>
-                    }
-                } @else {
-                    <button mat-menu-item disabled>Nothing saved yet: draw a graph, then Save as a case.</button>
-                }
-                @if (openWorkLabel(); as open) {
-                    <button
-                        mat-menu-item
-                        (click)="closeOpenWork()"
-                        [disabled]="investigation.busy()"
-                        data-testid="la-close-menu-item"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                        <span>Close {{ open }}</span>
-                    </button>
-                }
-            </mat-menu>
 
-            <!-- per-view actions (shared submenu, parameterized by the row's view) -->
-            <mat-menu #viewActions="matMenu">
-                <ng-template matMenuContent let-view="view">
-                    <button mat-menu-item (click)="loadView(view)" [attr.aria-label]="'Load view ' + view.name">
-                        <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
-                        <span>Load view</span>
-                    </button>
-                    <button
-                        mat-menu-item
-                        (click)="openHistory(view)"
-                        [attr.aria-label]="'Version history for ' + view.name"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
-                        <span>Version history</span>
-                    </button>
-                    @if (opsEnabled()) {
-                        <button
-                            mat-menu-item
-                            (click)="openComments(view)"
-                            [attr.aria-label]="'Comments for ' + view.name"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:chat-bubble-left-right"></mat-icon>
-                            <span>Comments</span>
-                        </button>
-                    }
-                    @if (opsEnabled()) {
-                        <button mat-menu-item (click)="openTags(view)" [attr.aria-label]="'Tags for ' + view.name">
-                            <mat-icon svgIcon="heroicons_outline:tag"></mat-icon>
-                            <span>Tags</span>
-                        </button>
-                    }
-                    @if (shareable(view)) {
-                        <button
-                            mat-menu-item
-                            (click)="offer(view)"
-                            [attr.aria-label]="'Offer view ' + view.name + ' for sharing'"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
-                            <span>Offer for sharing</span>
-                        </button>
-                    }
-                </ng-template>
-            </mat-menu>
-
-            <inspecto-la-host-slot
-                [component]="transfer.menu"
-                [inputs]="{
-                    items: transferItems(),
-                    allowedKinds: ['link-analysis-view'],
-                    importDraft: true,
-                    label: 'Import / export saved views',
-                }"
-                [outputs]="transferMenuOutputs"
-            />
-
-            <!-- save as a case (A-1b: a named view plus the Entity Lists it uses) — needs a rendered graph -->
-            <button
-                mat-icon-button
-                #saveTrigger="matMenuTrigger"
-                [matMenuTriggerFor]="saveMenu" laFormMenu
-                [disabled]="!graph()"
-                matTooltip="Save as a case"
-                aria-label="Save as a case"
-                data-testid="la-save-case"
-            >
-                <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-            </button>
             <mat-menu #saveMenu="matMenu">
                 <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events -- (click) only stops propagation so the mat-menu stays open; the form is not a control -->
                 <form
@@ -337,10 +289,10 @@
                     (ngSubmit)="saveView()"
                     class="flex w-72 max-w-full flex-col p-3"
                     (click)="$event.stopPropagation()"
-                    aria-label="Save as a case"
+                    aria-label="Save view as"
                 >
                     <p class="m-0 mb-2 text-sm font-semibold">
-                        Save as a <inspecto-term term="case"></inspecto-term>
+                        Save view as
                     </p>
                     <mat-form-field>
                         <mat-label>Name</mat-label>
@@ -349,7 +301,7 @@
                             <mat-error>A name is required.</mat-error>
                         }
                         @if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>A case with this name already exists.</mat-error>
+                            <mat-error>A view with this name already exists.</mat-error>
                         }
                     </mat-form-field>
                     <mat-form-field>
@@ -362,7 +314,7 @@
                     </p>
                     <button mat-stroked-button type="submit" [disabled]="saving() || !graph()">
                         <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-                        Save as a case
+                        Save view
                     </button>
                     @if (!investigationsEnabled()) {
                         <inspecto-locked-action
@@ -713,19 +665,6 @@
                     "
                 ></mat-icon>
             </button>
-            <!-- Close what is open (Investigation, Draft, imported view, drawn analysis): back to the empty state -->
-            @if (openWorkLabel(); as open) {
-                <button
-                    mat-icon-button
-                    (click)="closeOpenWork()"
-                    [disabled]="investigation.busy()"
-                    [matTooltip]="'Close ' + open"
-                    [attr.aria-label]="'Close ' + open"
-                    data-testid="la-close"
-                >
-                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                </button>
-            }
         </div>
     </header>
     @if (graph() || workingSetCanvas()) {
@@ -1512,6 +1451,7 @@
                                     [degreePresets]="degreePresets()"
                                     [maxDegree]="maxDegree()"
                                     (pendingDone)="pendingInvestigation.set(null)"
+                                    (openRequested)="openOpenDialog('investigations')"
                                     (expandRequested)="openExpand()"
                                 ></inspecto-link-analysis-investigation>
                             } @else {

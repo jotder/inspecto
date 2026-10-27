@@ -287,7 +287,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
     it('start state: explains the binding, starts from the projection, and passes axe', async () => {
         const { fixture, el, inv, button } = create();
         expect(el.textContent).toContain("the query's filter is not applied");
-        expect(el.textContent).toContain('List Investigations asks the server');
+        expect(el.textContent).toContain('File ▸ Open… lists the ones you may read');
         await expectNoA11yViolations(el);
 
         // D-U5: no purpose, no start — the server would answer 422.
@@ -549,65 +549,15 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(el.querySelector('[aria-label="Link annotations"]')?.textContent).toContain('a → b (voice)');
     });
 
-    it('lists the Investigations the caller may read and opens one', async () => {
-        const { fixture, store, el, inv, button } = create();
-        button('List Investigations').click();
-        await fixture.whenStable();
-        fixture.detectChanges();
-        const section = el.querySelector('[aria-label="Investigations"]') as HTMLElement;
-        expect(section.textContent).toContain('Shared');
-        expect(section.textContent).toContain('shared through Case case-1 (read-only)');
-
-        // every row's button names its Investigation: three bare "Open" buttons cannot be told apart by a screen reader
-        expect((section.querySelector('ul button') as HTMLButtonElement).getAttribute('aria-label')).toMatch(
-            /^Open Investigation \S/,
-        );
-        (section.querySelector('ul button') as HTMLButtonElement).click();
-        await fixture.whenStable();
-        expect(store.activeId()).toBe('inv-9');
-        expect(inv.investigationLog).toHaveBeenCalledWith('inv-9');
+    it('Open… asks the screen for File ▸ Open (the listing, Open by id and Recent moved there, §5.11)', () => {
+        const { fixture, el } = create();
+        const asked = vi.fn();
+        (fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent)).componentInstance as LinkAnalysisInvestigationComponent).openRequested.subscribe(asked);
+        (el.querySelector('[data-testid="investigation-open"]') as HTMLButtonElement).click();
+        expect(asked).toHaveBeenCalled();
     });
 
     describe('delete (LA-INVESTIGATION-DELETE-1)', () => {
-        const OWN = { id: 'inv-7', title: 'Rehearsal', dataset: 'calls', owner: 'me', createdAt: '', headStep: 2, access: 'owner' as const, readOnly: false };
-        const list = (items: unknown[]) => () => of({ items, total: items.length, limit: 100, offset: 0, truncated: false });
-
-        it('offers Delete only on a row the caller may delete, asks first, says it cannot be undone, deletes and refreshes the list', async () => {
-            const confirm = vi.fn(async () => true);
-            const { fixture, store, el, inv, button } = create({ confirm });
-            (inv.listInvestigations as ReturnType<typeof vi.fn>).mockImplementation(list([OWN]));
-            store.restore([{ id: 'inv-7', title: 'Rehearsal' }]);
-            button('List Investigations').click();
-            await fixture.whenStable();
-            fixture.detectChanges();
-            const del = el.querySelector('[aria-label="Delete Investigation Rehearsal"]') as HTMLButtonElement;
-            expect(del).toBeTruthy();
-            (inv.listInvestigations as ReturnType<typeof vi.fn>).mockImplementation(list([]));
-            del.click();
-            await fixture.whenStable();
-            fixture.detectChanges();
-            expect((confirm.mock.calls[0] as unknown as [string])[0]).toContain('cannot be undone');
-            expect(inv.deleteInvestigation).toHaveBeenCalledWith('inv-7');
-            expect(store.refs()).toEqual([]);
-            expect(inv.listInvestigations).toHaveBeenCalledTimes(2);
-            expect(el.querySelector('[aria-label="Investigations"]')?.textContent).toContain('No Investigation you may read');
-        });
-
-        it('a read-only (Case member) row has no Delete, and declining the confirmation deletes nothing', async () => {
-            const { fixture, el, inv, button } = create({ confirm: async () => false });
-            button('List Investigations').click();
-            await fixture.whenStable();
-            fixture.detectChanges();
-            expect(el.querySelector('[aria-label^="Delete Investigation"]')).toBeNull();
-            (inv.listInvestigations as ReturnType<typeof vi.fn>).mockImplementation(list([OWN]));
-            button('List Investigations').click();
-            await fixture.whenStable();
-            fixture.detectChanges();
-            (el.querySelector('[aria-label="Delete Investigation Rehearsal"]') as HTMLButtonElement).click();
-            await fixture.whenStable();
-            expect(inv.deleteInvestigation).not.toHaveBeenCalled();
-        });
-
         it('without the Incident management capability there is no Delete on the open Investigation', async () => {
             const { fixture, store, el } = create({ canManage: false });
             await openInv(store);

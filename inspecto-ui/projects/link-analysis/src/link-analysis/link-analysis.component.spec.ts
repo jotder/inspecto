@@ -455,31 +455,30 @@ describe('LinkAnalysisComponent', () => {
         expect(queried).toHaveLength(1);
     });
 
-    it('Close: absent on the empty state; names the drawn analysis, in the toolbar and Saved views, and goes back to empty', async () => {
+    it('File ▸ Close: disabled on the empty state; names the drawn analysis and goes back to empty', async () => {
         const { fixture } = create();
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelector('[data-testid="la-close"]')).toBeNull();
+        const close = (): HTMLButtonElement => {
+            el.querySelector<HTMLButtonElement>('[data-testid="la-file"]')!.click();
+            fixture.detectChanges();
+            return document.querySelector<HTMLButtonElement>('[data-testid="la-close"]')!;
+        };
+        expect(close().disabled).toBe(true);
 
         await runQuery(fixture);
         fixture.detectChanges();
-        const close = el.querySelector<HTMLButtonElement>('[data-testid="la-close"]')!;
-        expect(close.getAttribute('aria-label')).toBe('Close the analysis');
-        el.querySelector<HTMLButtonElement>('button[aria-label="Open saved views"]')!.click();
-        fixture.detectChanges();
-        expect(document.querySelector('[data-testid="la-close-menu-item"]')?.textContent?.trim()).toBe(
-            'Close the analysis',
-        );
+        expect(close().textContent?.trim()).toContain('Close the analysis');
         await expectNoA11yViolations(el.querySelector('[data-testid="la-header"]')!);
 
-        close.click();
+        close().click();
         await fixture.whenStable();
         fixture.detectChanges();
         const c = fixture.componentInstance;
         expect(c.graph()).toBeNull();
         expect(c.lastRun()).toBeNull();
         expect(el.textContent).toContain('Start from...');
-        expect(el.querySelector('[data-testid="la-close"]')).toBeNull();
+        expect(c.openWorkLabel()).toBe('');
     }, 45_000);
 
     it('Close: an open Investigation in a Draft scope closes whole, and the store drops ?investigation=', async () => {
@@ -494,7 +493,9 @@ describe('LinkAnalysisComponent', () => {
         expect(c.openWorkLabel()).toBe('Draft d-7 of Investigation Mule hub');
         c.investigation.busy.set(true); // a step in flight: Close waits for it, or the step's answer would reopen
         fixture.detectChanges();
-        expect(fixture.nativeElement.querySelector('[data-testid="la-close"]').disabled).toBe(true);
+        fixture.nativeElement.querySelector('[data-testid="la-file"]').click();
+        fixture.detectChanges();
+        expect(document.querySelector<HTMLButtonElement>('[data-testid="la-close"]')!.disabled).toBe(true);
         c.investigation.busy.set(false);
 
         await c.closeOpenWork();
@@ -1017,10 +1018,12 @@ describe('LinkAnalysisComponent', () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
+        fixture.detectChanges();
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="la-file"]')!.click();
         const btn = (): HTMLButtonElement =>
-            [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find((b) =>
+            [...document.querySelectorAll('.cdk-overlay-container button')].find((b) =>
                 (b.getAttribute('aria-label') ?? '').startsWith('Save this analysis'),
-            )!;
+            ) as HTMLButtonElement;
         fixture.detectChanges();
         expect(btn().disabled).toBe(false); // honor-system mode grants everything
         const session = TestBed.inject(SessionService);
@@ -1977,17 +1980,19 @@ describe('LinkAnalysisComponent', () => {
         expect(c.serverPaths()).toMatchObject({ edgeYieldCapped: true, depthLimit: 3, deepest: 2 });
     });
 
-    /** LA-A11Y-AUDIT-1: an empty role=menu panel (text only) breaks aria-required-children, so the empty text is a menuitem. */
-    it('the empty saved-views menu holds a (disabled) menu item, not bare text', () => {
+    it('File ▾ holds New, Open…, Save view, Save view as…, Snapshot, Close and Delete; Open… opens the Open dialog', () => {
         const { fixture } = create({ views: [] });
         fixture.detectChanges();
-        (fixture.nativeElement.querySelector('button[aria-label="Open saved views"]') as HTMLElement).click();
+        const c = fixture.componentInstance;
+        (fixture.nativeElement.querySelector('[data-testid="la-file"]') as HTMLElement).click();
         fixture.detectChanges();
         const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
-        expect(panel.getAttribute('role')).toBe('menu');
-        const item = panel.querySelector('[role="menuitem"]') as HTMLElement;
-        expect(item.textContent).toContain('Nothing saved yet: draw a graph, then Save as a case.');
-        expect(item.hasAttribute('disabled')).toBe(true);
+        const items = Array.from(panel.querySelectorAll('[role="menuitem"]')).map((i) => i.textContent?.trim());
+        for (const name of ['New', 'Open…', 'Save view', 'Save view as…', 'Save this analysis (Snapshot)', 'Close', 'Delete'])
+            expect(items, name).toContain(name);
+        const open = vi.spyOn(c, 'openOpenDialog').mockImplementation(() => undefined);
+        (panel.querySelector('[data-testid="la-file-open"]') as HTMLElement).click();
+        expect(open).toHaveBeenCalled();
     });
     describe('toolbox tablist (LA-A11Y-AUDIT-1: the Analysis / View / Investigation switch)', () => {
         const open = () => {
@@ -2137,12 +2142,9 @@ describe('LinkAnalysisComponent', () => {
                 'Search nodes',
                 'Filter node types',
                 'Graph layout',
-                'Save this analysis',
                 'Attach to Case',
                 'Open the graph-algorithms toolbox',
                 'Open the Investigation',
-                'Open saved views',
-                'Save as a case',
                 'Undo the last display/filter change',
                 'Redo the last undone display/filter change',
                 'Fit the graph to the screen',
@@ -2455,13 +2457,12 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         expect(card(el, 'starter-views')?.textContent).toContain('1 saved view');
     });
 
-    it('Open a saved view opens the same menu as the rail button', () => {
+    it('Open a saved view opens File ▸ Open… (§5.11)', () => {
         const { fixture } = create({ views: [OTHER] });
         fixture.detectChanges();
-        const open = vi.spyOn(MatMenuTrigger.prototype, 'openMenu').mockImplementation(() => undefined);
+        const open = vi.spyOn(fixture.componentInstance, 'openOpenDialog').mockImplementation(() => undefined);
         card(fixture.nativeElement, 'starter-views')!.click();
         expect(open).toHaveBeenCalledTimes(1);
-        open.mockRestore();
     });
 
     it('Explore a Dataset shows the Query panel and hands over to its guided picker', () => {
@@ -4436,7 +4437,7 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         expect(c.startNotice()?.text).toMatch(/^Started from A-1-R1, the busiest account\. Drew 1 start/);
     });
 
-    it('Analysis leads with Find something interesting; Save as a case states not-evidence, the lists, the locked Investigation', async () => {
+    it('Analysis leads with Find something interesting; Save view as states not-evidence, the lists, the locked Investigation', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const made = create({
             features: BASIC,
@@ -4456,13 +4457,11 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         expect(discover.querySelector('[data-testid="la-discover-reading"]')?.textContent).toContain(
             'A-1 takes part in 2 links, the most on this graph.',
         );
-        const trigger = made.fixture.debugElement
-            .queryAll(By.directive(MatMenuTrigger))
-            .find((d) => (d.nativeElement as HTMLElement).dataset['testid'] === 'la-save-case')!
-            .injector.get(MatMenuTrigger);
-        trigger.openMenu();
+        (el.querySelector('[data-testid="la-file"]') as HTMLButtonElement).click();
         made.fixture.detectChanges();
-        const menu = document.querySelector('.cdk-overlay-container form[aria-label="Save as a case"]') as HTMLElement;
+        (document.querySelector('[data-testid="la-save-view-as"]') as HTMLButtonElement).click();
+        made.fixture.detectChanges();
+        const menu = document.querySelector('.cdk-overlay-container form[aria-label="Save view as"]') as HTMLElement;
         expect(menu.querySelector('[data-testid="la-case-not-evidence"]')?.textContent).toContain('Not evidence');
         expect(menu.querySelector('[data-testid="la-case-lists"]')?.textContent).toContain('It uses no Entity List yet.');
         expect(menu.querySelector('[data-testid="locked-action"]')?.textContent).toContain(

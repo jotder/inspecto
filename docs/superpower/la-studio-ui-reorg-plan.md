@@ -353,6 +353,11 @@ On ship: update `okf/product/module/la-core/user-guide-end-user.md` (§4 The scr
   ids. Both are recorded in one function, `recordCleanup` in `link-analysis.component.ts`, so ⚑UIR-A3 can switch there.
   Grouped Undo of the pair waits on OP-4.
 - **OP-2:** Rename and thumbnails for saved views: is a new route needed (PUT with a new name, or a stored PNG)?
+  **Answered (P3a, 2026-10-27): no new route.** A view's name travels as `title` in its content, so Rename is the
+  existing update of the same id, and Duplicate is a create under `<id>-copy`. No thumbnail: nothing stores one, and a
+  view re-projects live data, so a picture of the last draw would show a graph the view may no longer draw. The
+  preview says so instead (counts are taken when it opens). Saved views carry no owner (the Component store records
+  none), so the Owner filter applies to Investigations only.
 - **OP-3:** Where does the embed viewer live? It is outside `projects/link-analysis`.
 - **OP-4:** Grouped Undo for an N-degree expand: the server's `{undoes: step}` takes one step; the client undoes the group newest-first and stops on a 409 (another person's newer step).
 - **OP-5:** Sweep defects S1 (stale list picker), S2 (list start draws 0 links), S5 (`coverage` 422) and S6 (unprompted `PUT /settings/link-analysis`) touch the same screens. Fix S5 and S6 before P2. S1 and S2 fit P3's Start-from.
