@@ -68,7 +68,8 @@ final class ParameterResolver {
      * {@code config:flow} rung actually reads it.
      */
     private static final java.util.Set<String> FRAMEWORK_KEYS = java.util.Set.of("on_pipeline_gate",
-            JobConfig.DEADLINE_SECONDS, JobConfig.CREATED_BY, JobConfig.UPDATED_BY, JobConfig.UPDATED_BY_ROLES);
+            JobConfig.DEADLINE_SECONDS, JobConfig.CREATED_BY, JobConfig.UPDATED_BY, JobConfig.UPDATED_BY_ROLES,
+            "retries", "retry_backoff_seconds");
 
     /**
      * Where a resolved value came from, and what it overrode (`DUCKLE-C4-PARAM-PROVENANCE-1`, 2026-09-15).

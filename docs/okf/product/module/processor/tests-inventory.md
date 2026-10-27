@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-360 test class(es): 131 unit, 229 real-HTTP control-plane, 0 IT.
+361 test class(es): 132 unit, 229 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -374,6 +374,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ShippedJobStoreKeyNamesARealStoreTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ShippedJobStoreKeyNamesARealStoreTest.java` | A job's {@code store:} key is a <b>data-store id</b>, never a path. It is read at |
 | `SlaSweepModuleGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SlaSweepModuleGateTest.java` | {@code MODULE-REORG-1 P4f}: the SLA sweep tick of {@code CollectorService} consults the Space's module gate. The |
 | `SpaceBootstrapTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceBootstrapTest.java` | Builds one space's runtime from its own {@code config/} directory (the per-space analogue of ServiceBootstrap). |
+| `SpaceDiscoveryRuleTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDiscoveryRuleTest.java` | Which folders under the Spaces root {@link SpaceManager#discover} admits — real folder trees, no mocks. |
 | `SpaceIdTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceIdTest.java` | The filesystem-safe space-id guard: lower-case alnum + hyphen only, so an id can never escape {@code spaces/}. |
 | `SpaceInboxAuditTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceInboxAuditTest.java` | Two Spaces polling one inbox — scale-out plan §5.3. |
 | `SpaceLayoutContractTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLayoutContractTest.java` | The boot-time storage-layout contract: WARN-only findings, never a boot failure. |

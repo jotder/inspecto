@@ -218,6 +218,14 @@ export class JobsComponent implements OnInit, OnDestroy {
             minWidth: 170,
             valueFormatter: (p) => fmtDateTime(p.value),
         },
+        {
+            field: 'lastMessage',
+            headerName: 'Last error',
+            flex: 1,
+            minWidth: 240,
+            tooltipField: 'lastMessage',
+            valueFormatter: (p) => (p.value as string | null) || '',
+        },
     ];
 
     /** Run now / Run with parameters / Enable-Disable are operational, not authoring, but the backend gates them on
@@ -231,6 +239,12 @@ export class JobsComponent implements OnInit, OnDestroy {
                 icon: 'heroicons_outline:play',
                 hint: 'Run now',
                 visible: () => this.lens.canOperateRuns(),
+                onClick: (j) => this.trigger(j),
+            },
+            {
+                icon: 'heroicons_outline:arrow-path',
+                hint: 'Run again (last run failed)',
+                visible: (j) => j.lastStatus === 'FAILED' && this.lens.canOperateRuns(),
                 onClick: (j) => this.trigger(j),
             },
             {
@@ -302,6 +316,12 @@ export class JobsComponent implements OnInit, OnDestroy {
             icon: 'heroicons_outline:information-circle',
             hint: 'Details',
             onClick: (r) => this.openRunDetail(r),
+        },
+        {
+            icon: 'heroicons_outline:arrow-path',
+            hint: 'Run again',
+            visible: (r) => r.status === 'FAILED' && this.lens.canOperateRuns(),
+            onClick: (r) => this.trigger({ name: r.job } as JobView),
         },
     ];
 

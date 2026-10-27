@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -158,8 +159,14 @@ public final class SpaceManager implements AutoCloseable {
         SpacePartition partition = SpacePartition.load(m.spacesRoot);
         try (Stream<Path> dirs = Files.list(spacesRoot)) {
             dirs.filter(Files::isDirectory)
-                .filter(d -> Files.isDirectory(d.resolve("config")))
                 .sorted()
+                .filter(d -> {
+                    String why = notASpaceReason(d);
+                    // only folders that look like Spaces are worth a line: a plain dir without config/ is just a dir
+                    if (why != null && (Files.isDirectory(d.resolve("config")) || Files.exists(d.resolve("space.toon"))))
+                        log.warn("Ignoring folder '{}' under the Spaces root — not a Space: {}", d.getFileName(), why);
+                    return why == null;
+                })
                 .filter(d -> m.ownedByThisPod(partition, d))
                 .peek(d -> com.gamma.pipeline.exec.EgressAllowlist.migrate(d.resolve("config")))   // WEBHOOK-EGRESS-POLICY-1
                 .forEach(m::bootQuietly);
@@ -167,6 +174,27 @@ public final class SpaceManager implements AutoCloseable {
         log.info("SpaceManager: {} space(s) booted from {}", m.spaces.size(), spacesRoot.toAbsolutePath());
         m.auditInboxOwnership();   // §5.3: two Spaces on one inbox = silent double-ingestion
         return m;
+    }
+
+    /** Name tokens (split on {@code - _ . space}) that mark a folder as a copy, never a live Space. */
+    private static final Set<String> COPY_TOKENS =
+            Set.of("bak", "snapshot", "scratch");   // plus any token starting "backup"; "old"/"copy"/"temp" are legitimate Space words
+
+    /**
+     * Why {@code dir} (a child of the Spaces root) is NOT a Space, or {@code null} when it is one. A Space is a folder
+     * that holds {@code config/} and whose name is not hidden ({@code .}), reserved ({@code _}) or a copy
+     * ({@code backup}, {@code snapshot}…). A copied Space carries {@code space.toon} and {@code config/} just like
+     * the original, so only the name can keep a backup from booting; {@code space.toon} is not required.
+     */
+    static String notASpaceReason(Path dir) {
+        String name = dir.getFileName().toString();
+        if (name.startsWith(".")) return "hidden folder";
+        if (name.startsWith("_")) return "reserved '_' folder";
+        for (String t : name.toLowerCase(java.util.Locale.ROOT).split("[-_. ]+"))
+            if (COPY_TOKENS.contains(t) || t.startsWith("backup"))
+                return "name looks like a backup/scratch copy ('" + t + "') — rename it or move it outside the Spaces root";
+        if (!Files.isDirectory(dir.resolve("config"))) return "no config/ folder";
+        return null;   // space.toon stays optional: pre-manifest Spaces still boot (display name defaults to the id)
     }
 
     /**
@@ -649,7 +677,7 @@ public final class SpaceManager implements AutoCloseable {
         if (spacesRoot == null || !Files.isDirectory(spacesRoot)) return false;
         try (Stream<Path> dirs = Files.list(spacesRoot)) {
             return dirs.filter(Files::isDirectory)
-                    .filter(d -> Files.isDirectory(d.resolve("config")))
+                    .filter(d -> notASpaceReason(d) == null)
                     .allMatch(d -> d.getFileName().toString().equals(id.value()));
         }
     }

@@ -211,6 +211,8 @@ export interface JobView {
     onSignal?: string | null;
     enabled: boolean;
     lastStatus?: string;
+    /** The last run's error text, present only while the last run FAILED (`JobView.lastMessage`). */
+    lastMessage?: string | null;
     lastRunTime?: string;
     nextFire?: string;
     /** Platform-armed system job (e.g. `system.freshness-sweep`, DUCKLE-C1) — derived, never persisted. The
