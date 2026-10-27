@@ -2249,6 +2249,40 @@ The analyst's answer to *what data am I looking at*: a **Data strip** above the 
 - **Stated limits (also in the drawer):** an unchanged duplicate is skipped silently; an inbox File is a count only; completeness is judged on days and File sequence, not an expected-Collector roster (`LA-COLLECTOR-COVERAGE-1`).
 - **Driven live 2026-10-14** (fresh Enterprise Demo Auth `la-app` bundle; beat list on the `LA-DATA-TRUST-1` row). Gotchas it surfaced: (1) a POLLED Collector commits Files and emits `pipeline.commit`, never `dataset.write`, so the freshness and index-lag clocks read it through `PipelineCommitProbe` and the commit half of `IndexLagProbe` (a Job-run Pipeline still uses `dataset.write`); (2) the delivery manifest signals its bucket key as the template spells it (`20260902`), so `DataChanges.parseDay` accepts compact, hourly and ISO days; (3) a literal-suffix `file_template` cannot see a RENAMED correction (see `okf/product/module/etl/plan-ingestion.md`, the shipped template ends in `*`); (4) a DATE event column is covered "through its end", the next UTC midnight, so `formatDay` shows the day before; (5) the Files route serves no server path. The banner clears only after a logged step, `lastLook` counts every one (open remainder on the row).
 
+## Studio layout (`LA-STUDIO-UI-REORG-1` phases 1-3, as built 2026-10-27)
+
+This supersedes the layout parts of *Graph page UX* and *i2-gap work* below (the selection bar, the box select, the
+View tab, the left Query panel and the Domain profile picker are gone). The end-user walk-through is
+[user-guide-end-user.md](user-guide-end-user.md) §4-§8; the design is `docs/superpower/la-studio-ui-reorg-plan.md`.
+
+- **Top bar** (`header[data-testid="la-header"]`): **File ▾** first (`la-file`: New, Open…, Save view, Save view as…,
+  Save this analysis (Snapshot), Import / export views, Close, Delete), then search, filters, layout, time, the
+  Analysis / Investigation toggles, help, glossary, Display, undo/redo, fit, list, full screen, export, **Show the
+  rows** (opens the dock) and the side-panel toggle. **⚙ Settings** (`la-settings-open`) is in the page header.
+- **Second toolbar** (`la-canvas-toolbar`): groups `la-group-mode` (Canvas mode, `canvas-mode.ts`: `pan` | `lasso` |
+  `fisheye` | `linkFilter`; Pan = drag pans, Shift+drag lassos; Lasso is session-only, Fisheye and Link filter are
+  the saved view's plugin flags), `la-group-selection`, `la-group-edits` (Expand…, Collapse, Hide, Exclude and Merge
+  only with an Investigation canvas, Attach to Case), Clean up, `la-group-held` (Held (n), Hidden (n)); groups that do
+  not fit go to `la-canvas-tools-more`. The G6 `brush-select` box is removed; a saved view naming it opens as Pan.
+- **Expand dialog** (replaces the Grow popover and the rung form): From, Direction, Degrees, *Hold supernodes above
+  H links*, Advanced; preview line first; in an Investigation one `expand` step per degree under one undo group.
+- **Collapse** folds the pendant neighbours (links read undirected) into a `+n` badge; display state only, also in
+  an Investigation. **Clean up** (`inspecto-link-analysis-cleanup`) states its effect, then Apply / Cancel; in an
+  Investigation `recordCleanup` records `hide` over the complement plus an `annotate` carrying the reason (OP-1).
+- **⚙ Settings** (`LinkAnalysisSettingsComponent`, an in-page overlay whose sections are projected `laSection`
+  blocks): This graph (Graph model, Entity Types with Retire, Display rules), Data (Entity Lists, Identities, Add /
+  Upload data), This Investigation (`InvestigationSettingsSections`). Status-bar chips and the pencil open Graph
+  model; status-bar **Refresh** is `refreshFromServer()`.
+- **Right panel**: Analysis (Discover + one catalogue with a Browser | Server toggle; server rows carry
+  `data-server-algorithm`; *Open in the dock* fills the Results tab) and Investigation (the Act panel: header with
+  `⋯` Settings… / Close / Delete, seed queue, Expand…, Selected entity, Held, Scope list, More steps ▾, last 5 steps).
+- **Dock** (`la-dock`, `DOCK_TABS`): Rows, Results, and with an Investigation Op log, Working Set rows, Coverage,
+  Annotations, Excluded entities. State in `localStorage` `inspecto.la.dock`, height `inspecto.split.link-analysis.dock`.
+- **Domain profile**: no picker; `profileId = investigation.boundProfileId() ?? boundProfile() ??
+  activeDomainProfileId()`; shown read-only at the top of Graph model.
+- **Known defects** (open rows in `docs/BACKLOG.md` §3.12, found by the 2026-10-27 verification and live drive):
+  `LA-SETTINGS-OVERLAY-NEVER-HIDES-1` and the other `LA-REORG-*` rows.
+
 ## Graph page UX (as built 2026-10-15)
 
 An operator-requested pass on the Link Analysis page (`link-analysis.component.html/.ts`) and the shared G6 host (`src/app/inspecto/graph/graph-view.component.ts`).
@@ -2310,7 +2344,7 @@ The decisions behind these (D-M1 stands; D-UP1…D-UP8 with the `canUploadData` 
 
 ### Upload a CSV (analyst upload pane, as built 2026-10-19)
 
-The Investigation tab has an **Upload a CSV** section under *Identity resolution*, shown only to a user with the upload capability (`canUploadData`: operations, support, power, admin) on a build that includes the link-analysis module.
+**⚙ Settings ▸ Add / Upload data** (since `LA-STUDIO-UI-REORG-1` P2b; before, a section of the Investigation tab) holds **Upload a CSV**, shown only to a user with the upload capability (`canUploadData`: operations, support, power, admin) on a build that includes the link-analysis module.
 
 1. Choose a **Collector**. Only a local Collector whose Pipeline says *Accepts analyst upload* (`collector.accepts_upload: true`) is listed; a single one is preselected. The section shows the file-name patterns it picks up and the size limit. With none enabled it says so and what to ask a Space administrator for.
 2. **Choose a CSV file** and press **Upload**. The browser checks the three things it can see (a `.csv` extension, a plain file name, the size cap) and says why in words; a workbook (`.xlsx`) is refused with "export the sheet as CSV (UTF-8)". The server checks the rest (pattern, content, daily quota, the four-eyes row budget).
@@ -2346,7 +2380,7 @@ Refusals read as a cause plus a next step (DR-D6 conventions): 413 names the lim
 - **Scope built:** ordered *node-colour* rules, an attribute predicate to a chart-token swatch. `inspecto/graph/node-rules.ts` is the pure model (`NodeRule {kind?, attr, op, value, color}`, ops equals / is not / contains / greater / less; numeric ops need both sides numeric; a node WITHOUT the attribute never matches, not even *is not*; `kind` scopes to one Entity Type; the first matching rule wins). Rules read the node's `attrs` (a node mapping's attribute columns) only. It is on the core allow-list in `eslint.config.mjs` because `graph-view` reads it.
 - **Precedence:** analysis-overlay group colour > a matching rule > per-kind Display colour > default. Halos (high connectivity, selection), the dotted unexpanded outline and the dimmed stranded node are separate style channels, so a rule never hides them; the halo takes the rule's colour like any node colour.
 - **Persistence:** `GraphDisplayOptions.nodeRules` (optional; written only when non-empty), so it saves and restores with the saved view and rides the same undo history (`PresentationSnapshot.nodeRules`). Client-side only; no backend or Space-level storage.
-- **UI:** `inspecto-link-analysis-display-rules` (presentational) at the foot of the Display menu: rule list with remove, and an add form (type, attribute, comparison, value, swatch).
+- **UI:** `inspecto-link-analysis-display-rules` (presentational) in **⚙ Settings ▸ Display rules** (moved out of the Display menu by `LA-STUDIO-UI-REORG-1` P2b): rule list with remove, and an add form (type, attribute, comparison, value, swatch).
 - **Retired to `BACKLOG.md` §6 (demand-gated, 2026-10-18):** shape / size / halo outcomes, link (edge) rules, measure predicates, per-Space shared rules, rule reordering (add order is the order), and a legend row for rule colours. Reopen when an analyst asks for one.
 
 ### Glossary popover (typology terms, 2026-10-18)
@@ -2362,11 +2396,11 @@ Refusals read as a cause plus a next step (DR-D6 conventions): 413 names the lim
 - **Hidden for a temporal motif** (`stepsToSearchAround` returns null on `afterPrevious` / `maxGapHours`; only the step list can show it) and for a branching pack (the toggle sits in the non-branching branch of the Pattern section, after `branchStages()`). Observed live on the shipped telecom pack set (2026-10-18): shown for *Call-forwarding relay*, *Circular flow* and *Shared associates*; hidden for *Layering chain* and *Pass-through intermediary* (temporal) and for the stage packs (*Structuring*, *Call-forwarding chain*, *Subscription ring*, *Shared top-up evidence*). Choosing *Custom motif* resets the builder to the blank two-step motif (2026-10-18; before, it kept the previous pack's steps, so a temporal motif kept the toggle hidden with no visible reason); spec in `link-analysis-toolbox.component.spec.ts`. Loaded-graph mode only: it leaves no Investigation trace, like the motif builder.
 - **Retired to `BACKLOG.md` §6 (2026-10-18):** the beyond-the-graph mode (chained `expand`), a neighbour type on `expand` (the rung offers only Direction and Link kinds, so the form states that Expand never follows a neighbour type; adding one needs a decision entry, not a twelfth op), OR / branching, temporal conditions. **Driven live 2026-10-18** (Advanced `-Ui la-app` demo bundle, Demo FM Analyst): the form renders, and a *Shared associates* run answered 200 matches shown as masked aliases (masking holds). The Entity Type icons and *Merge with...* were not driven live.
 
-### Merge with... (selection bar)
+### Merge with... (second toolbar; was the selection bar)
 
 - Selection-bar action, shown only while an Investigation canvas is open (`investigation.canvas()`); it needs `canManageIncidents` (the Incident management capability). `mergePairOf` (`investigation-state.ts`) takes the two selected entities and `InvestigationSessionStore.mergeDraft` carries the pair into `LinkAnalysisIdentitiesComponent`, which **prefills** the existing *Assert same entity* form. Nothing is written until the analyst adds a reason and confirms.
 - After a successful assert in an open Investigation the form **offers** *Add a resolve step* (`{op:'resolve'}`, added to the SPA op union; the server op already existed). Merges stay a view (no id rewrite).
-- **Disabled with a tooltip** when the capability is missing, the selection is not exactly two entities, or either is a masked alias (the server also refuses an alias, see the backend concept §6.7). The action opens the Investigation tab, where the Identity section takes the hand-off into its form and clears it (2026-10-18; spec *opens the Investigation tab holding the prefilled merge*). `mergeUnavailable` is pinned by five direct specs in `link-analysis.component.spec.ts` (available; no open Investigation; capability missing; not exactly two typed entities; masked alias).
+- **Disabled with a tooltip** when the capability is missing, the selection is not exactly two entities, or either is a masked alias (the server also refuses an alias, see the backend concept §6.7). The action opens ⚙ Settings ▸ Identities (since `LA-STUDIO-UI-REORG-1` P2a; before, the Investigation tab), where the Identity section takes the hand-off into its form and clears it (2026-10-18; spec *opens the Investigation tab holding the prefilled merge*). `mergeUnavailable` is pinned by five direct specs in `link-analysis.component.spec.ts` (available; no open Investigation; capability missing; not exactly two typed entities; masked alias).
 
 ### Footer AI-explain
 
@@ -2425,7 +2459,7 @@ two classified link-end columns. Code: `link-analysis/start-from.ts`; detail: [a
 
 On the la-app front page, after the Space guide, **My work** lists:
 
-- **Cases** — every case saved in the Space with **Save as a case** (a saved view plus the Entity Lists it started from
+- **Saved views** — every view saved in the Space with **File ▸ Save view** (a saved view plus the Entity Lists it started from
   and excluded through), most recent first, with the lists it uses; opening one draws its start again over the data as
   it is then and hides what its exclusion lists hold now. A case re-reads live data: it is not evidence.
 - **What changed in your data** — one line per Dataset imported with **Add data**: the last successful import's date,

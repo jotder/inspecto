@@ -87,12 +87,13 @@ const COVERAGE = {
     standalone: true,
     imports: [LinkAnalysisDataStripComponent],
     changeDetection: ChangeDetectionStrategy.Eager,
-    template: `<la-data-strip investigationId="inv1" dataset="calls" (refreshed)="refreshed = refreshed + 1"
+    template: `<la-data-strip investigationId="inv1" dataset="calls" [hasTimeColumn]="hasTimeColumn" (refreshed)="refreshed = refreshed + 1"
         ><p la-data-alerts data-test="banner">corrected day</p></la-data-strip
     >`,
 })
 class Host {
     refreshed = 0;
+    hasTimeColumn = true;
 }
 
 const CHANGES = {
@@ -118,7 +119,7 @@ interface Spies {
 let spies: Spies;
 
 function setup(
-    over: { files?: unknown; coverage?: unknown; asOf?: string | null; corrections?: unknown[] } = {},
+    over: { files?: unknown; coverage?: unknown; asOf?: string | null; corrections?: unknown[]; hasTimeColumn?: boolean } = {},
 ): ComponentFixture<Host> {
     spies = {
         changes: vi.fn(() => of({ ...CHANGES, changes: over.corrections ?? [] })),
@@ -170,6 +171,7 @@ function setup(
         ],
     });
     const f = TestBed.createComponent(Host);
+    f.componentInstance.hasTimeColumn = over.hasTimeColumn ?? true;
     f.detectChanges();
     return f;
 }
@@ -242,6 +244,21 @@ describe('LinkAnalysisDataStripComponent', () => {
         q(f, '[data-test="strip-toggle"]')!.click();
         await settle(f);
         expect(q(f, '[data-test="complete-unassessed"]')).not.toBeNull();
+    });
+
+    it('S5: a coverage refusal names its reason on the closed strip, not only in the drawer', async () => {
+        const f = setup({ coverage: throwError(() => new Error('boom')) });
+        await settle(f);
+        expect(q(f, '[data-test="drawer"]')).toBeNull();
+        expect(q(f, '[data-test="strip-days-reason"]')!.textContent).toContain('Days not assessed: the coverage read failed');
+    });
+
+    it('S5: an Investigation with no time column sends no coverage read and says why', async () => {
+        const f = setup({ hasTimeColumn: false });
+        await settle(f);
+        expect(spies.coverage).not.toHaveBeenCalled();
+        expect(q(f, '[data-test="strip-text"]')!.textContent).toContain('days not assessed');
+        expect(q(f, '[data-test="strip-days-reason"]')!.textContent).toContain('no time column');
     });
 
     it('an Investigation with no window is judged over the span of the Files, and the drawer says so', async () => {

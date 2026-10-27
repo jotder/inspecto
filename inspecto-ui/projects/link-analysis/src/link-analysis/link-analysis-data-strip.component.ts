@@ -21,6 +21,7 @@ import { KIND_TEXT, LinkAnalysisCorrectedDaysComponent } from './link-analysis-c
 import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, formatInstant, outcomeTone } from './data-trust';
 
 const PAGE = 25;
+const NO_TIME_COLUMN = 'this Investigation has no time column, so no day can be judged missing.';
 
 /**
  * LA-DATA-TRUST-1 S2 - what data does this graph stand on? A one-line strip (how fresh, how complete, which index) with an
@@ -54,6 +55,9 @@ const PAGE = 25;
             <div class="flex flex-wrap items-center gap-2">
                 <inspecto-status-badge [value]="strip().tone" [label]="strip().label"></inspecto-status-badge>
                 <span data-test="strip-text">{{ strip().text }}</span>
+                @if (coverageError()) {
+                    <span class="text-secondary text-xs" data-test="strip-days-reason">Days not assessed: {{ coverageError() }}</span>
+                }
                 <button
                     mat-button
                     class="ml-auto"
@@ -290,6 +294,8 @@ export class LinkAnalysisDataStripComponent {
     readonly investigationId = input.required<string>();
     /** The Investigation's Dataset. */
     readonly dataset = input.required<string>();
+    /** False when the Investigation binds no event-time column: the coverage read would be refused (422), so it is not sent. */
+    readonly hasTimeColumn = input(true);
 
     /** The host re-reads the Investigation's own data (log + Working Set) when the analyst refreshes. */
     readonly refreshed = output<void>();
@@ -373,6 +379,7 @@ export class LinkAnalysisDataStripComponent {
         effect(() => {
             const id = this.investigationId();
             const ds = this.dataset();
+            this.hasTimeColumn(); // track
             untracked(() => void this.load(id, ds));
         });
     }
@@ -404,10 +411,12 @@ export class LinkAnalysisDataStripComponent {
             (f) => current() && this.dataAsOf.set(f.dataAsOf),
             () => undefined,
         );
-        const coverage = firstValueFrom(this.inv.investigationCoverage(id)).then(
-            (c) => current() && this.coverage.set(c),
-            (err) => current() && this.coverageError.set(apiErrorMessage(err, 'the coverage read failed.')),
-        );
+        const coverage = this.hasTimeColumn()
+            ? firstValueFrom(this.inv.investigationCoverage(id)).then(
+                  (c) => current() && this.coverage.set(c),
+                  (err) => current() && this.coverageError.set(apiErrorMessage(err, 'the coverage read failed.')),
+              )
+            : this.coverageError.set(NO_TIME_COLUMN);
         const files = firstValueFrom(this.inv.datasetFiles(ds, { limit: PAGE })).then(
             (f) => {
                 if (!current()) return;
@@ -423,7 +432,7 @@ export class LinkAnalysisDataStripComponent {
 
     /** The coverage read refuses an Investigation with no window; retry over the span of the Files so the days are judged. */
     private async coverageOverFilesSpan(id: string, current: () => boolean): Promise<void> {
-        const w = this.coverageError() ? daysWindow(this.files()?.days) : null;
+        const w = this.coverageError() && this.hasTimeColumn() ? daysWindow(this.files()?.days) : null;
         if (!w) return;
         try {
             const c = await firstValueFrom(this.inv.investigationCoverage(id, w));

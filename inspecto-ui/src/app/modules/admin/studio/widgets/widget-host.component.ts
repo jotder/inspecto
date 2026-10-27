@@ -125,6 +125,7 @@ export interface DrillEvent extends DrillPair {
                                 [title]="widget.name"
                                 [viewId]="widget.viewId"
                                 [viewBinding]="widget.workingSet"
+                                [viewAllowExport]="widget.options?.allowExport === true"
                             />
                         } @else if (kpiBound()) {
                             <!-- KPI-definition tile (LIVEFIX2 #2): the KPI reads value, comparison and target itself. -->

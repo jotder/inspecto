@@ -230,6 +230,9 @@ describe('VizRenderComponent', () => {
         const c = fixture.componentInstance;
         expect(c.outletComponent()).toBe(ViewStubComponent);
         expect(c.outletInputs()).toEqual({ viewId: 'dhaka-network' });
+        // the sharer's "Allow export" reaches the view component only when on (§5.13)
+        fixture.componentRef.setInput('viewAllowExport', true);
+        expect(c.outletInputs()).toEqual({ viewId: 'dhaka-network', allowExport: true });
     });
 
     it('renders the KPI arm with no a11y violations', async () => {

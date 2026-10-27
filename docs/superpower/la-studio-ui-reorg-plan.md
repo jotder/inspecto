@@ -1,6 +1,6 @@
 # Link Analysis Studio — UI reorganization plan (`LA-STUDIO-UI-REORG-1`)
 
-Status: **PLAN 2026-10-27 — direction decided by the operator in an interview (UIR-D1 … UIR-D16); assistant calls ⚑UIR-A1 … A3 await confirmation; nothing built.**
+Status: **P1-P3 ON MASTER (e80e9d511, 2026-10-27); P4 in flight.** Direction decided by the operator in an interview (UIR-D1 … UIR-D16); assistant calls ⚑UIR-A1 … A3 await confirmation. Independent verification of P1-P3: **FAIL** (2026-10-27) — every §6 row has a home at ≥ 1,300 px, but the defects are open as `LA-SETTINGS-OVERLAY-NEVER-HIDES-1` (P1), the `LA-REORG-*` rows and the still-open `LA-REVOKE-DISCARD-NO-CONFIRM-1` in `docs/BACKLOG.md` §3.12. User guides and glossary updated for P1-P3.
 Item: `module.la-core` (UI in `inspecto-ui/projects/link-analysis/`). Board row: `LA-STUDIO-UI-REORG-1` in
 `docs/BACKLOG.md` §3.12.
 
@@ -298,34 +298,34 @@ Signals: `LA_FEATURES` (`la-host/la-host.ts:240-282`), `investigationsEnabled`, 
 
 | Today | New home |
 |---|---|
-| Search, Filter node types, Timeline | Top bar (unchanged) |
-| Layout menu + View-tab layout grid | Top bar Layout ▾ (one copy) |
-| Display options + View-tab overlays | Top bar Display ▾ (one copy) |
+| Search, Filter node types, Timeline | ✅ P1-P3 — Top bar (unchanged) |
+| Layout menu + View-tab layout grid | ✅ P3 — Top bar Layout ▾ (one copy) |
+| Display options + View-tab overlays | ✅ P3 — Top bar Display ▾ (one copy) |
 | Lenses & selection checkboxes | ✅ P1a — Second toolbar Canvas mode. Snap lines and Hover activate → Display ▾ |
-| Snapshot ("Save this analysis") | File ▾ Save this analysis |
-| Graph algorithms button | Right panel Analysis (button kept as the panel toggle) |
-| Investigation button | Right panel Investigation |
-| Grow popover | Expand dialog |
+| Snapshot ("Save this analysis") | ✅ P3 — File ▾ Save this analysis |
+| Graph algorithms button | ✅ P3 — Right panel Analysis (button kept as the panel toggle) |
+| Investigation button | ✅ P2 — Right panel Investigation |
+| Grow popover | ✅ P1 — Expand dialog |
 | Hidden by lists, Held tray | ✅ P1a — Second toolbar Hidden (n), Held (n) |
 | Attach to Case | ✅ P1a — Second toolbar |
-| Saved views menu + submenus | File ▾ Open… dialog |
-| Import / export views | File ▾ |
-| Save as a case | File ▾ Save view / Save view as… |
-| Glossary, Help | Top bar (unchanged) |
-| Undo, Redo, Fit, Show as list, Full screen, Export | Top bar (unchanged) |
+| Saved views menu + submenus | ✅ P3 — File ▾ Open… dialog |
+| Import / export views | ✅ P3 — File ▾ |
+| Save as a case | ✅ P3 — File ▾ Save view / Save view as… |
+| Glossary, Help | ✅ P1-P3 — Top bar (unchanged) |
+| Undo, Redo, Fit, Show as list, Full screen, Export | ✅ P1-P3 — Top bar (unchanged) |
 | Show the rows | ✅ P2a — Dock: Rows tab (the toolbar toggle opens and closes the dock) |
-| Show the side panels, Close the analysis | Top bar right end; Close also in File ▾ |
+| Show the side panels, Close the analysis | ✅ P3 — Side panels: top bar right end. Close: File ▾ only (the right-end close icon was removed in P3a) |
 | Floating selection bar (Expand, Hide, Exclude, Merge, Attach, Clear) | ✅ P1a — Second toolbar (Expand = today's Grow until the P1b dialog) |
-| Right-click node menu | Kept (Expand…, Collapse, Hide, Exclude, Seed, Details) |
-| Domain profile picker | Removed. The Space pack applies; stored pack shown read-only; Template field (UIR-D9) |
-| Query panel (Dataset, entity columns, link type, attributes, mappings, root / depth / direction, Pipeline, Run, Edit, Refresh) | ⚙ Settings → Graph model; status-bar chips open it; status-bar Refresh (UIR-D16) |
-| "Change the query" pencil (status bar) | Opens ⚙ Settings → Graph model |
-| Display rules (inside Display options) | ⚙ Settings → Display rules; Display ▾ keeps the quick toggles |
-| Entity Types, New Entity Type (Entities area) | ⚙ Settings → Entity Types (+ Retire) |
-| Discover, Temporal findings | Analysis tab |
-| 17 browser groups, *Run on server*, *All algorithms (server)* | One catalogue with a Browser / Server toggle |
-| Value Measures (toolbox + Investigation fold) | Catalogue entry only ⚑UIR-A2 (✅ P2a removed the Investigation fold) |
-| Inv: Open an Investigation, remembered picker | File ▾ Open… (P3a); until then in `InvestigationSettingsSections` |
+| Right-click node menu | ✅ P1 — Kept (Expand…, Collapse, Hide, Exclude, Seed, Details) |
+| Domain profile picker | ✅ P3 — Removed. The Space pack applies; stored pack shown read-only; Template field (UIR-D9) |
+| Query panel (Dataset, entity columns, link type, attributes, mappings, root / depth / direction, Pipeline, Run, Edit, Refresh) | ✅ P2 — ⚙ Settings → Graph model; status-bar chips open it; status-bar Refresh (UIR-D16) |
+| "Change the query" pencil (status bar) | ✅ P2 — Opens ⚙ Settings → Graph model |
+| Display rules (inside Display options) | ✅ P2 — ⚙ Settings → Display rules; Display ▾ keeps the quick toggles |
+| Entity Types, New Entity Type (Entities area) | ✅ P2 — ⚙ Settings → Entity Types (+ Retire) |
+| Discover, Temporal findings | ✅ P3 — Analysis tab |
+| 17 browser groups, *Run on server*, *All algorithms (server)* | ✅ P3 — One catalogue with a Browser / Server toggle |
+| Value Measures (toolbox + Investigation fold) | ✅ P3 — Catalogue entry only ⚑UIR-A2 (✅ P2a removed the Investigation fold) |
+| Inv: Open an Investigation, remembered picker | ✅ P3a — File ▾ Open… ▸ Investigations (Recent filter) |
 | Inv: Case, Members, Share and embed, Drafts | ✅ P2a — `InvestigationSettingsSections` (temporary host: Act ⋯ ▸ Settings…); ⚙ Settings → This Investigation in P2b |
 | Inv: Expand by degree | ✅ P2a — Act: Expand… / Expand next degree |
 | Inv: Scope list, High-connectivity entities, Selected entity | ✅ P2a — Act |
@@ -341,7 +341,7 @@ Signals: `LA_FEATURES` (`la-host/la-host.ts:240-282`), `investigationsEnabled`, 
 | Inv: Excluded entities | ✅ P2a — Dock |
 | Inv: Entity Lists, Identities, Upload data | ✅ P2a — `InvestigationSettingsSections`; ⚙ Settings → Data in P2b (UIR-D16) |
 | Inv: header (Close, Delete, lineage, read-only / Draft alerts, data strip, counts) | ✅ P2a — Act header + `⋯` menu (Settings…, Close, Delete) |
-| Status bar (Caps, chips, counts, modules) | Unchanged |
+| Status bar (Caps, chips, counts, modules) | ✅ P1-P3 — Unchanged |
 
 ---
 
@@ -350,6 +350,8 @@ Signals: `LA_FEATURES` (`la-host/la-host.ts:240-282`), `investigationsEnabled`, 
 Each phase is one lane (`.claude/memory/lane-integration-workflow.md`). Tests: the touched component specs under
 `npx ng test` (`.claude/memory/ui-test-traps.md`), an axe pass on the changed screens, and a live drive in a
 Space with data (MFS or `la-showcase`). Each phase ends with the §6 rows it covers checked off in this file.
+
+Status 2026-10-27: **P1 ✅ shipped · P2 ✅ shipped (revoke / discard confirms NOT built: `LA-REVOKE-DISCARD-NO-CONFIRM-1` open) · P3 ✅ shipped · P4 in flight.** Open defects: BACKLOG §3.12 `LA-SETTINGS-OVERLAY-NEVER-HIDES-1`, `LA-REORG-*`.
 
 | Phase | Scope | Done when |
 |---|---|---|
@@ -377,6 +379,15 @@ On ship: update `okf/product/module/la-core/user-guide-end-user.md` (§4 The scr
   preview says so instead (counts are taken when it opens). Saved views carry no owner (the Component store records
   none), so the Owner filter applies to Investigations only.
 - **OP-3:** Where does the embed viewer live? It is outside `projects/link-analysis`.
+  **Answered (P4, 2026-10-27):** `projects/la-app/src/app/embed-view.page.ts` (`/embed/inv/:token`, LA-EMBED-SPA-1), the
+  no-login viewer of ONE shared Investigation. It renders the graph, but not through the shared G6 host: it draws its
+  own static SVG (one ring per hop, `layoutEmbedGraph`), with zoom, pan, Reset view, a find box over the Working Set
+  table and Highlight. The §5.13 toolset rides on the G6 host (Canvas modes are its lasso and lens plugins, Layout is
+  its layouts), so giving the embed page the same toolset means replacing its renderer with `GraphViewComponent` and
+  re-proving its no-login contract (one read, keyboard canvas, token scrub). Not done in P4: it is the open residual on
+  `LA-STUDIO-UI-REORG-1` in the BACKLOG. The Widget's toolset (§5.13) is built: `link-view-widget.component.ts`, its pure
+  half `link-view-widget-tools.ts` (filters, the six analyses, their blocks), and the Widget option `allowExport`
+  (Widget editor checkbox, passed through `viz-render` only when on).
 - **OP-4:** Grouped Undo for an N-degree expand: the server's `{undoes: step}` takes one step; the client undoes the group newest-first and stops on a 409 (another person's newer step).
 - **OP-5:** Sweep defects S1 (stale list picker), S2 (list start draws 0 links), S5 (`coverage` 422) and S6 (unprompted `PUT /settings/link-analysis`) touch the same screens. Fix S5 and S6 before P2. S1 and S2 fit P3's Start-from.
 
