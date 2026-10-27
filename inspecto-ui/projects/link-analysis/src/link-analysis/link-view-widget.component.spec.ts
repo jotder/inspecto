@@ -12,9 +12,7 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { G6GraphData, GraphSource } from '@inspecto/core/graph';
 import {
     GraphDisplayOptions,
-    GraphLayoutId,
     GraphViewComponent,
-    cappedLayout,
 } from '@inspecto/core/graph/graph-view.component';
 import { By } from '@angular/platform-browser';
 import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
@@ -241,7 +239,7 @@ describe('LinkViewWidgetComponent — the Space limits', () => {
         expect(fixture.nativeElement.textContent).not.toContain('hit the node cap');
     });
 
-    it('a saved Radial view hands the canvas the layout node caps, so a graph over them is drawn as Degree ordered (N1)', async () => {
+    it('a saved Radial view over its node cap opens in the default layout and says why (N1, UIR-D11)', async () => {
         truncateAnswer = false;
         const http = setUp();
         const fixture = bound();
@@ -260,12 +258,9 @@ describe('LinkViewWidgetComponent — the Space limits', () => {
         const display = stub.display() as GraphDisplayOptions;
         expect(display.layoutCaps).toEqual({ radial: 100, mds: 300, 'force-cluster': 200 });
         expect(fixture.nativeElement.querySelector('[data-testid="la-layout-cap-notice"]')?.textContent).toContain(
-            'Radial layout is limited to 100 nodes (this graph has 101), so it is shown in Degree ordered.',
+            'Radial layout needs at most 100 nodes — this graph has 101, so the default layout is shown.',
         );
-        // the graph view runs what cappedLayout says (graph-view-layout-cap.spec): the saved Radial is over its cap
-        expect(
-            cappedLayout(stub.layout() as GraphLayoutId, (stub.data() as G6GraphData).nodes.length, display.layoutCaps),
-        ).toBe('concentric');
+        expect(stub.layout()).toBeNull(); // the graph view's default layout, never the over-cap Radial
     });
 
     it('reads the limits once for a dashboard of many tiles', async () => {

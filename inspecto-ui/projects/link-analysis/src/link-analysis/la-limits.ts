@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 // Runtime values come from graph-layouts (plain data): a runtime import of graph-view.component would pull G6 into the landing page's chunk.
-import { CAPPED_LAYOUT_FALLBACK, GRAPH_LAYOUTS, type GraphLayoutId } from '@inspecto/core/graph/graph-layouts';
+import { GRAPH_LAYOUTS, type GraphLayoutId } from '@inspecto/core/graph/graph-layouts';
 import type { GraphDisplayOptions } from '@inspecto/core/graph/graph-view.component';
 
 /**
@@ -120,12 +120,24 @@ export function laLayoutCaps(): NonNullable<GraphDisplayOptions['layoutCaps']> {
     };
 }
 
-/** What the analyst is told while a capped layout is drawn as the fallback; null when the pick runs as picked. */
+/** Why a control is off on this graph (UIR-D11): "needs at most 300 nodes — this graph has 921"; null when within its limit. */
+export function overCapReason(cap: number | undefined, nodeCount: number): string | null {
+    return cap !== undefined && nodeCount > cap
+        ? `needs at most ${cap.toLocaleString()} nodes — this graph has ${nodeCount.toLocaleString()}`
+        : null;
+}
+
+/** Why this layout cannot run on a graph of `nodeCount` nodes; null when it can. */
+export function layoutOverCapReason(id: GraphLayoutId, nodeCount: number): string | null {
+    return overCapReason(laLayoutCaps()[id], nodeCount);
+}
+
+/** Said when a picked (saved, restored) layout is over its limit, so the default layout is drawn; null when it runs as picked. */
 export function layoutCapNoticeText(picked: GraphLayoutId | null, nodeCount: number): string | null {
-    const cap = picked ? laLayoutCaps()[picked] : undefined;
-    if (!picked || cap === undefined || nodeCount <= cap) return null;
-    const name = (id: GraphLayoutId): string => GRAPH_LAYOUTS.find((l) => l.id === id)?.label ?? id;
-    return `${name(picked)} layout is limited to ${cap} nodes (this graph has ${nodeCount}), so it is shown in ${name(CAPPED_LAYOUT_FALLBACK)}.`;
+    const reason = picked ? layoutOverCapReason(picked, nodeCount) : null;
+    if (!picked || !reason) return null;
+    const name = GRAPH_LAYOUTS.find((l) => l.id === picked)?.label ?? picked;
+    return `${name} layout ${reason}, so the default layout is shown.`;
 }
 
 /**

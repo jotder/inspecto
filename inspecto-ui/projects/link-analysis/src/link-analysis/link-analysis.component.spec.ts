@@ -2727,8 +2727,8 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             const cap = laLimit('display.force_atlas_max_nodes');
             const r = stage(cap + 1);
             r.c.setLayout('force-cluster'); // a pick made here no longer bypasses the cap
-            expect(r.c.layoutId()).toBe('concentric');
-            expect(r.c.layoutCapNotice()).toContain('Clustering force layout is limited to 200 nodes');
+            expect(r.c.layoutId()).toBe('force');
+            expect(r.c.layoutCapNotice()).toBe('Clustering force layout needs at most 200 nodes — this graph has 201, so the default layout is shown.');
             await r.c.loadView({
                 id: 'v',
                 name: 'V',
@@ -2736,7 +2736,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
                 query: {},
                 layout: 'force-cluster',
             });
-            expect(r.c.layoutId()).toBe('concentric');
+            expect(r.c.layoutId()).toBe('force');
             r.canvas.set(chain(cap));
             expect(r.c.layoutId()).toBe('force-cluster');
         });
@@ -2746,7 +2746,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             expect(r.c.displayOptions().layoutCaps).toEqual({ radial: 100, mds: 300, 'force-cluster': 200 });
         });
 
-        it('a saved view keeps the analyst PICK even while it is drawn as the fallback', async () => {
+        it('a saved view keeps the analyst PICK even while the default layout is drawn', async () => {
             const { fixture, save } = create();
             fixture.detectChanges();
             await runQuery(fixture);
@@ -2754,7 +2754,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             configureLaLimits({ 'display.radial_max_nodes': 2 }); // the fixture graph has 5 nodes
             try {
                 c.setLayout('radial');
-                expect(c.layoutId()).toBe('concentric');
+                expect(c.layoutId()).not.toBe('radial');
                 c.saveForm.patchValue({ name: 'Over the cap' });
                 await c.saveView();
                 expect(save.mock.calls[0][0].layout).toBe('radial');
@@ -2763,20 +2763,20 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             }
         });
 
-        it('above its cap a pick made here is NOT run: Degree ordered is drawn and the analyst is told', () => {
+        it('above its cap a pick made here is NOT run: the default layout is drawn and the analyst is told', () => {
             const r = stage(radialCap() + 1);
             r.c.setLayout('radial');
-            expect(r.c.layoutId()).toBe('concentric');
+            expect(r.c.layoutId()).toBe('force');
             expect(r.c.layoutCapNotice()).toBe(
-                `Radial layout is limited to ${radialCap()} nodes (this graph has ${radialCap() + 1}), so it is shown in Degree ordered.`,
+                `Radial layout needs at most ${radialCap()} nodes — this graph has ${radialCap() + 1}, so the default layout is shown.`,
             );
         });
 
         it('Information density over its cap is guarded the same way', () => {
             const r = stage(mdsCap() + 1);
             r.c.setLayout('mds');
-            expect(r.c.layoutId()).toBe('concentric');
-            expect(r.c.layoutCapNotice()).toContain('Information density layout is limited to 300 nodes');
+            expect(r.c.layoutId()).toBe('force');
+            expect(r.c.layoutCapNotice()).toContain('Information density layout needs at most 300 nodes');
         });
 
         it('at the cap a layout is unchanged and there is no notice (boundary)', () => {
@@ -2795,7 +2795,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             r.c.setLayout('radial');
             expect(r.c.layoutId()).toBe('radial');
             r.canvas.set(chain(radialCap() + 50));
-            expect(r.c.layoutId()).toBe('concentric');
+            expect(r.c.layoutId()).toBe('force');
             r.canvas.set(chain(radialCap() - 10));
             expect(r.c.layoutId()).toBe('radial');
         });
@@ -2803,7 +2803,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         it('the guard compares the DISPLAYED graph: hiding nodes under the cap brings Radial back', () => {
             const r = stage(radialCap() + 20);
             r.c.setLayout('radial');
-            expect(r.c.layoutId()).toBe('concentric');
+            expect(r.c.layoutId()).toBe('force');
             r.c.hiddenNodeIds.set(Array.from({ length: 20 }, (_, i) => `n${i}`));
             expect(r.c.canvasData()?.nodes.length).toBe(radialCap());
             expect(r.c.layoutId()).toBe('radial');
@@ -2813,7 +2813,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             const big = stage(767);
             await big.c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
             expect(big.c.pickedLayout()).toBe('radial');
-            expect(big.c.layoutId()).toBe('concentric');
+            expect(big.c.layoutId()).toBe('force');
         });
 
         it('a restored Radial on a graph at the cap still opens as Radial', async () => {
@@ -2824,7 +2824,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
 
         it('undo restores the analyst PICK, not the layout that was drawn: a graph that shrinks returns to Radial', () => {
             const r = stage(radialCap() + 50);
-            r.c.setLayout('radial'); // drawn as Degree ordered
+            r.c.setLayout('radial'); // drawn in the default layout
             r.c.setLayout('circular'); // records the snapshot taken while Radial was picked but not drawn
             r.c.undoPresentation();
             expect(r.c.pickedLayout()).toBe('radial');
@@ -2838,10 +2838,45 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             r.c.setLayout('radial');
             r.fixture.detectChanges();
             expect(notice()?.getAttribute('role')).toBe('status');
-            expect(notice()?.textContent).toContain('so it is shown in Degree ordered');
+            expect(notice()?.textContent).toContain('so the default layout is shown');
             r.canvas.set(chain(radialCap()));
             r.fixture.detectChanges();
             expect(notice()).toBeNull();
+        });
+        it('over its cap a layout is DISABLED with its reason in both pickers, plus a reduce-first hint (UIR-D11)', () => {
+            const r = stage(radialCap() + 821);
+            r.fixture.detectChanges();
+            const radial = r.c.layouts.find((l) => l.id === 'radial')!;
+            expect(r.c.layoutDisabledReason(radial)).toBe('needs at most 100 nodes — this graph has 921');
+            expect(r.c.layoutDisabledReason(r.c.layouts.find((l) => l.id === 'force')!)).toBeNull();
+            expect(r.c.anyLayoutOverCap()).toBe(true);
+            const btn = [...r.fixture.nativeElement.querySelectorAll('button')].find(
+                (b: HTMLButtonElement) => b.getAttribute('aria-label') === 'Radial (needs at most 100 nodes — this graph has 921)',
+            ) as HTMLButtonElement | undefined;
+            expect(btn?.disabled).toBe(true);
+            r.c.openReduce();
+            expect([r.c.bottomOpen(), r.c.filterOpen()]).toEqual([true, true]);
+        });
+
+        it('at its cap the layout is enabled and there is no reduce-first hint (boundary)', () => {
+            const r = stage(radialCap());
+            expect(r.c.layoutDisabledReason(r.c.layouts.find((l) => l.id === 'radial')!)).toBeNull();
+            expect(r.c.anyLayoutOverCap()).toBe(false);
+        });
+
+        it('Community hulls are disabled with a reason above the Louvain browser cap, enabled at it', async () => {
+            const { fixture } = create();
+            fixture.detectChanges();
+            await runQuery(fixture); // the fixture graph has 5 nodes
+            const c = fixture.componentInstance;
+            configureLaLimits({ 'browser_algorithms.louvainCommunities': 4 });
+            try {
+                expect(c.hullsDisabledReason()).toBe('needs at most 4 nodes — this graph has 5');
+                configureLaLimits({ 'browser_algorithms.louvainCommunities': 5 });
+                expect(c.hullsDisabledReason()).toBeNull();
+            } finally {
+                resetLaLimits();
+            }
         });
     });
 

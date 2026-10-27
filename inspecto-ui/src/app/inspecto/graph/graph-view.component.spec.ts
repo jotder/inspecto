@@ -78,6 +78,11 @@ describe('GraphViewComponent', () => {
         expect(list[5]).toMatchObject({ key: 'hull-0', members: ['a', 'b', 'c'], fill: 'swatch-a' });
     });
 
+    it('the minimap is anchored to the right/bottom edge, so a canvas narrowed by the right panel keeps it inside', () => {
+        const [minimap] = buildPluginList({ minimap: true }, []);
+        expect(minimap['containerStyle']).toEqual({ left: 'auto', top: 'auto', right: '0px', bottom: '0px' });
+    });
+
     // ── LA-09: View toolbox completions ──
     it('buildPluginList maps the snapline flag to its G6 built-in', () => {
         expect(buildPluginList({ snapline: true }, []).map((p) => p['type'])).toEqual(['snapline']);
