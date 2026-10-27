@@ -621,6 +621,7 @@
                             <la-data-strip
                                 [investigationId]="openId"
                                 [dataset]="dataset"
+                                [hasTimeColumn]="!!store.header()?.timeCol"
                                 (refreshed)="store.reload()"
                             ></la-data-strip>
                         }
