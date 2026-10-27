@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { Observable, firstValueFrom } from 'rxjs';
 import { InvService, InvestigationMembers, InvestigationRole } from '@inspecto/link-analysis/api/inv.service';
 import { LensService, apiErrorMessage } from '@inspecto/core/api';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { limitRefusalMessage } from './limit-refusal';
@@ -130,6 +131,7 @@ export class LinkAnalysisMembersComponent {
 
     private readonly inv = inject(InvService);
     private readonly lens = inject(LensService);
+    private readonly confirm = inject(InspectoConfirmService);
     readonly roles = ROLES;
     /** Grant and revoke are gated server-side on `canManageIncidents` as well as on being a lead. */
     readonly canManage = computed(() => this.lens.canManageIncidents());
@@ -183,6 +185,11 @@ export class LinkAnalysisMembersComponent {
     }
 
     async revoke(subject: string): Promise<void> {
+        const ok = await this.confirm.confirmDestructive(
+            `Revoke ${subject} from this Investigation? They lose access at once; a lead can grant it again.`,
+            { title: 'Revoke member', confirmText: 'Revoke' },
+        );
+        if (!ok) return;
         await this.act(
             this.inv.revokeInvestigationMember(this.investigationId(), subject),
             'Could not revoke the member.',

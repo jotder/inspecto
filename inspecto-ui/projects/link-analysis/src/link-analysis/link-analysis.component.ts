@@ -3011,23 +3011,13 @@ Its prior copies stay in its version history.`,
             const ws = this.investigation.workingSet();
             const nodes = (this.canvasData()?.nodes ?? []).filter((n) => a.ids.includes(n.id));
             const ids = [...new Set(nodes.flatMap((n) => idsInWorkingSet(n, ws)))];
-            if (ids.length && !(await this.recordCleanup(ids, a.reason)))
+            if (ids.length && !(await this.growExclude.cleanUp(ids, a.reason)))
                 this.toastr.error(this.investigation.error() || 'The clean-up was refused.');
             return;
         }
         this.recordHistory();
         this.hiddenNodeIds.update((h) => [...new Set([...h, ...a.ids])]);
         this.toastr.info(`Hid ${a.ids.length} entities. Undo restores them.`);
-    }
-
-    /**
-     * ⚑UIR-A3 (not yet confirmed by the operator) — the ONE place an Investigation records a clean-up: a `hide` step over
-     * what the tool takes away, then an `annotate` step carrying the prefilled reason (a `hide` takes no reason). OP-1:
-     * the server's `keep` only protects from exclusion, it never hides the rest, so Keep only selected is a `hide` too.
-     */
-    private async recordCleanup(ids: string[], reason: string): Promise<boolean> {
-        if (!(await this.investigation.apply({ op: 'hide', ids }))) return false;
-        return this.investigation.apply({ op: 'annotate', ids, note: reason });
     }
 
     onCleanupHighlight(e: GraphEmphasis | null): void {

@@ -263,6 +263,24 @@ export class GrowExcludeStore {
         return true;
     }
 
+    /**
+     * ⚑UIR-A3 — the ONE place an Investigation records a clean-up: a `hide` step over what the tool takes away, then an
+     * `annotate` step carrying the reason (a `hide` takes no reason). OP-1: `keep` never hides the rest, so Keep only
+     * selected is a `hide` too. OP-4: the pair is ONE change — its Undo takes back both, newest first, and stops on a
+     * colleague's newer step (409), never undoing under it.
+     */
+    async cleanUp(ids: string[], reason: string): Promise<boolean> {
+        if (!(await this.investigation.apply({ op: 'hide', ids }))) return false;
+        const made = this.madeStep();
+        const annotated = await this.investigation.apply({ op: 'annotate', ids, note: reason });
+        if (annotated) made.push(...this.madeStep());
+        this.lastChange.set({
+            text: `Cleaned up — hid ${ids.length.toLocaleString('en')}${annotated ? ' and noted the reason.' : '; the reason was not noted.'}`,
+            ...this.undoOf(made),
+        });
+        return annotated;
+    }
+
     /** "Expand this one anyway" on a held entity — the recorded override (`expandHubs`). */
     async expandAnyway(id: string, presets: DegreePresets): Promise<boolean> {
         if (!(await this.investigation.expandHub(id, this.investigation.withPresets(presets, {})))) return false;
