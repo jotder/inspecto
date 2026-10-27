@@ -365,6 +365,8 @@ export class LinkAnalysisStartBoxComponent {
     readonly exploreDataset = output<void>();
     readonly openSavedViews = output<void>();
     readonly openAddData = output<void>();
+    /** "A list" was chosen: the host re-reads the Space's Entity Lists, so a list made elsewhere since is offered. */
+    readonly listsWanted = output<void>();
 
     readonly kinds = KINDS;
     readonly form = new FormGroup({
@@ -426,6 +428,9 @@ export class LinkAnalysisStartBoxComponent {
             const current = this.form.controls.dataset.value;
             const next = wanted && ids.includes(wanted) ? wanted : ids.includes(current) ? current : (ids[0] ?? '');
             if (next !== current) this.form.controls.dataset.setValue(next);
+        });
+        this.form.controls.kind.valueChanges.pipe(takeUntilDestroyed()).subscribe((k) => {
+            if (k === 'list') this.listsWanted.emit();
         });
         // A-7b: a new Dataset preselects its primary Entity Type (else its first link-end type).
         this.form.controls.dataset.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => {

@@ -1305,6 +1305,7 @@
                             [savedViewCount]="views().length"
                             [addData]="addDataOffered"
                             (start)="startFrom($event)"
+                            (listsWanted)="refreshEntityLists()"
                             (followMoney)="loadFollowTheMoney()"
                             (exploreDataset)="exploreDataset()"
                             (openSavedViews)="openSavedViews()"
