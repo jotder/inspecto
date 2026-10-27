@@ -1,9 +1,20 @@
 import { Location } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
+import type { G6GraphData } from '@inspecto/core/graph';
+import { GraphDisplayOptions, GraphEmphasis, GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
+import { searchNodes } from '@inspecto/link-analysis/graph/graph-analysis';
+import { CANVAS_MODES, CanvasMode, canvasInteractionFor, canvasModeForKey } from '@inspecto/link-analysis/link-analysis/canvas-mode';
 import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
-import { EmbedGraph, EmbedView, EmbedViewService, layoutEmbedGraph } from './embed-view.service';
+import {
+    WIDGET_ANALYSES,
+    WidgetAnalysisId,
+    runWidgetAnalysis,
+    widgetAnalysisBlocked,
+    widgetGraph,
+} from '@inspecto/link-analysis/link-analysis/link-view-widget-tools';
+import { EmbedView, EmbedViewService, embedGraphData } from './embed-view.service';
 
 const PAGE_SIZE = 25;
 
@@ -17,10 +28,15 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
  * needs the original link), and it is never logged, stored or echoed. A bad, expired or revoked link is deliberately the SAME page
  * (the server answers no differently, so as not to be an oracle); only "could not reach the server" is told apart, because it
  * says nothing about the link. Ids are shown exactly as returned (already masked by the Space and by the link).
+ *
+ * The graph is the shared G6 host with the dashboard Widget's read-only toolset (LA-STUDIO-UI-REORG-1 §5.13): search, Canvas
+ * modes, type filter, Hide and the six browser analyses, all in this visit only. There is no Export: an embed grant carries no
+ * export permission (its mint takes only ttl_hours, label, scope and masking_mode).
  */
 @Component({
     selector: 'la-app-embed-view-page',
     standalone: true,
+    imports: [GraphViewComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     // The page sits outside the shell that paints the scheme background; without its own the text tokens were drawn on white (axe color-contrast 2.56:1 in dark).
     host: { class: 'block min-h-screen', style: 'background: var(--gamma-bg-default); color: var(--gamma-text-default)' },
@@ -59,64 +75,88 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                         </header>
 
                         <section aria-labelledby="embed-graph" class="flex flex-col gap-2">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <h2 id="embed-graph" class="m-0 mr-auto text-lg font-semibold">Graph</h2>
-                                <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="zoomBy(1.4)" aria-label="Zoom in">+</button>
-                                <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="zoomBy(1 / 1.4)" aria-label="Zoom out">-</button>
-                                <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="resetView()">Reset view</button>
-                            </div>
-                            @if (graph(); as g) {
+                            <h2 id="embed-graph" class="m-0 text-lg font-semibold">Graph</h2>
+                            @if (drawn(); as g) {
+                                <div class="flex flex-wrap items-center gap-1 text-sm" role="toolbar" aria-label="Graph tools" data-testid="embed-toolbar">
+                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="graphView()?.zoomBy(1.4)" aria-label="Zoom in">+</button>
+                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="graphView()?.zoomBy(1 / 1.4)" aria-label="Zoom out">-</button>
+                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="graphView()?.fitView()">Fit</button>
+                                    <span class="mx-1 h-4 border-l" aria-hidden="true"></span>
+                                    @for (m of canvasModes; track m.id) {
+                                        <button
+                                            type="button"
+                                            class="rounded border px-2 py-1"
+                                            style="border-color: var(--gamma-border)"
+                                            [class.font-semibold]="canvasMode() === m.id"
+                                            [attr.aria-pressed]="canvasMode() === m.id"
+                                            [title]="m.label + ': ' + m.hint"
+                                            (click)="canvasMode.set(m.id)"
+                                        >
+                                            {{ m.label }}
+                                        </button>
+                                    }
+                                    <span class="mx-1 h-4 border-l" aria-hidden="true"></span>
+                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" [disabled]="!selection().length" (click)="hideSelected()">Hide selection</button>
+                                    @if (hiddenNodes().length) {
+                                        <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="hiddenNodes.set([])">Show hidden ({{ hiddenNodes().length }})</button>
+                                    }
+                                </div>
+                                @if (nodeKinds().length > 1) {
+                                    <fieldset class="m-0 flex flex-wrap items-center gap-3 border-0 p-0 text-sm" data-testid="embed-kinds">
+                                        <legend class="float-left mr-2">Entity types</legend>
+                                        @for (k of nodeKinds(); track k) {
+                                            <label class="flex items-center gap-1">
+                                                <input type="checkbox" [checked]="!hiddenKinds().includes(k)" (change)="toggleKind(k)" />
+                                                <span>{{ k }}</span>
+                                            </label>
+                                        }
+                                    </fieldset>
+                                }
+                                <div class="flex flex-wrap items-center gap-1 text-sm" role="group" aria-label="Analyse" data-testid="embed-analyse">
+                                    <span class="mr-1">Analyse:</span>
+                                    @for (a of analyses; track a.id) {
+                                        <button
+                                            type="button"
+                                            class="rounded border px-2 py-1"
+                                            style="border-color: var(--gamma-border)"
+                                            [disabled]="!!analysisBlocked(a.id)"
+                                            [title]="analysisBlocked(a.id) ?? ''"
+                                            (click)="analyse(a.id)"
+                                        >
+                                            {{ a.label }}
+                                        </button>
+                                    }
+                                </div>
+                                @if (resultSummary(); as summary) {
+                                    <p class="text-secondary m-0 flex items-center gap-1 text-sm" role="status" data-testid="embed-result">
+                                        <span>{{ summary }}</span>
+                                        <button type="button" class="rounded border px-2 py-0.5" style="border-color: var(--gamma-border)" (click)="clearResult()">Clear</button>
+                                    </p>
+                                }
                                 <div
                                     tabindex="0"
                                     role="group"
-                                    aria-label="Graph canvas, read-only. Use the arrow keys to move and the zoom buttons to zoom; the Working Set table below lists every entity."
-                                    class="rounded border"
-                                    style="border-color: var(--gamma-border); touch-action: none"
+                                    aria-label="Graph canvas, read-only. Arrow keys move, + and - zoom, L lasso, F fisheye, Escape back to pan; the Working Set table below lists every entity."
+                                    class="h-[28rem] rounded border"
+                                    style="border-color: var(--gamma-border)"
                                     (keydown)="onKey($event)"
                                 >
-                                    <svg
-                                        [attr.viewBox]="viewBox()"
-                                        class="block h-[28rem] w-full cursor-grab"
-                                        aria-hidden="true"
-                                        (pointerdown)="dragStart($event)"
-                                        (pointermove)="dragMove($event)"
-                                        (pointerup)="dragEnd()"
-                                        (pointerleave)="dragEnd()"
-                                    >
-                                        @for (e of g.edges; track $index) {
-                                            <line
-                                                [attr.x1]="e.x1"
-                                                [attr.y1]="e.y1"
-                                                [attr.x2]="e.x2"
-                                                [attr.y2]="e.y2"
-                                                [attr.stroke]="touches(e) ? 'var(--gamma-primary)' : 'currentColor'"
-                                                [attr.stroke-width]="touches(e) ? nodeR() / 2 : nodeR() / 5"
-                                                [attr.opacity]="touches(e) ? 1 : 0.35"
-                                            />
-                                        }
-                                        @for (n of g.nodes; track n.id) {
-                                            <circle
-                                                [attr.cx]="n.x"
-                                                [attr.cy]="n.y"
-                                                [attr.r]="n.id === selected() ? nodeR() * 1.6 : nodeR()"
-                                                [attr.fill]="n.id === selected() ? 'var(--gamma-primary)' : 'currentColor'"
-                                                (click)="select(n.id)"
-                                            />
-                                            @if (showLabel(g, n.id)) {
-                                                <text
-                                                    [attr.x]="n.x"
-                                                    [attr.y]="n.y - nodeR() * 1.6"
-                                                    text-anchor="middle"
-                                                    [attr.font-size]="labelSize()"
-                                                    fill="currentColor"
-                                                >{{ n.id }}</text>
-                                            }
-                                        }
-                                    </svg>
+                                    <inspecto-graph-view
+                                        #gv
+                                        class="block h-full"
+                                        [data]="g"
+                                        [display]="display()"
+                                        [fill]="true"
+                                        [emphasis]="emphasis()"
+                                        [interaction]="interaction()"
+                                        [plugins]="plugins()"
+                                        [selection]="selection()"
+                                        (selectionChange)="selection.set($event)"
+                                        (nodeClick)="selection.set([$event])"
+                                    />
                                 </div>
                                 <p class="text-secondary m-0 text-xs">
-                                    {{ g.nodes.length }} entities on {{ rings() }} ring(s) - the centre is the seed, each ring one hop
-                                    further.
+                                    {{ g.nodes.length }} entities and {{ g.edges.length }} links drawn.
                                     @if (truncated()) {
                                         Only the first {{ edgeLimit() }} links are drawn; the table lists every entity.
                                     }
@@ -139,6 +179,7 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                                     style="border-color: var(--gamma-border)"
                                     [value]="filter()"
                                     (input)="setFilter($any($event.target).value)"
+                                    (keydown.enter)="search()"
                                 />
                             </label>
                             <table class="w-full text-left text-sm">
@@ -240,31 +281,52 @@ export class EmbedViewPageComponent {
     protected readonly edgeLimit = computed(() => laLimit('display.embed_edge_limit'));
     private readonly labelLimit = computed(() => laLimit('display.embed_label_limit'));
 
-    private readonly laidOut = computed<EmbedGraph | null>(() => {
-        const v = this.view();
-        return v && v.workingSet.entities.length ? layoutEmbedGraph(v.workingSet) : null;
-    });
-    protected readonly graph = computed<EmbedGraph | null>(() => {
-        const g = this.laidOut();
-        return g ? { ...g, edges: g.edges.slice(0, this.edgeLimit()) } : null;
-    });
-    protected readonly truncated = computed(() => (this.laidOut()?.edges.length ?? 0) > this.edgeLimit());
-    protected readonly rings = computed(() => new Set(this.graph()?.nodes.map((n) => n.hop)).size);
-    protected readonly nodeR = computed(() => Math.max(3, (this.graph()?.extent ?? 200) / 70));
-    protected readonly labelSize = computed(() => (this.graph()?.extent ?? 200) / 22);
+    // The read-only toolset (LA-STUDIO-UI-REORG-1 §5.13): this visit only, nothing is saved, recorded or sent.
+    protected readonly graphView = viewChild<GraphViewComponent>('gv');
+    protected readonly canvasModes = CANVAS_MODES;
+    protected readonly analyses = WIDGET_ANALYSES;
+    readonly canvasMode = signal<CanvasMode>('pan');
+    readonly interaction = computed(() => canvasInteractionFor(this.canvasMode()));
+    readonly plugins = computed(() => ({
+        fisheye: this.canvasMode() === 'fisheye',
+        edgeFilterLens: this.canvasMode() === 'linkFilter',
+    }));
+    readonly selection = signal<string[]>([]);
+    readonly hiddenNodes = signal<string[]>([]);
+    readonly hiddenKinds = signal<string[]>([]);
+    readonly emphasis = signal<GraphEmphasis | null>(null);
+    readonly resultSummary = signal<string | null>(null);
 
-    // view state: zoom and pan in drawing units, the selected entity, the table filter and page
-    protected readonly zoom = signal(1);
-    private readonly pan = signal({ x: 0, y: 0 });
-    protected readonly selected = signal<string | null>(null);
+    private readonly full = computed<G6GraphData | null>(() => {
+        const v = this.view();
+        return v && v.workingSet.entities.length ? embedGraphData(v.workingSet) : null;
+    });
+    readonly nodeKinds = computed(() => [...new Set((this.full()?.nodes ?? []).map((n) => n.data.kind))].sort());
+    /** The Working Set after the edge limit and the viewer's type and Hide filters. */
+    readonly drawn = computed<G6GraphData | null>(() => {
+        const g = this.full();
+        if (!g) return null;
+        return widgetGraph(
+            { ...g, edges: g.edges.slice(0, this.edgeLimit()) },
+            { hiddenKinds: this.hiddenKinds(), hiddenNodes: this.hiddenNodes(), timeColumn: '', timeCutoff: null },
+        );
+    });
+    protected readonly truncated = computed(() => (this.full()?.edges.length ?? 0) > this.edgeLimit());
+    protected readonly display = computed<GraphDisplayOptions>(() => ({
+        nodeLabels: (this.drawn()?.nodes.length ?? 0) <= this.labelLimit(),
+        edgeLabels: false,
+        nodeColors: {},
+        edgeColors: {},
+        nodeShapes: {},
+        edgePatterns: {},
+        edgeSizes: {},
+    }));
+
+    // the table filter and page
     protected readonly filter = signal('');
     protected readonly page = signal(0);
-
-    protected readonly viewBox = computed(() => {
-        const side = ((this.graph()?.extent ?? 200) * 2) / this.zoom();
-        const p = this.pan();
-        return `${p.x - side / 2} ${p.y - side / 2} ${side} ${side}`;
-    });
+    /** One selected entity: its links and notes are listed under the table. */
+    protected readonly selected = computed(() => (this.selection().length === 1 ? this.selection()[0] : null));
 
     protected readonly matching = computed(() => {
         const q = this.filter().trim().toLowerCase();
@@ -288,8 +350,6 @@ export class EmbedViewPageComponent {
         return s === 'working_set' ? 'This link shows entities and links only.' : s === 'with_notes' ? 'This link omits references.' : '';
     });
 
-    private dragging: { x: number; y: number } | null = null;
-
     private readonly svc = inject(EmbedViewService);
     private readonly destroyRef = inject(DestroyRef);
     private readonly location = inject(Location);
@@ -300,7 +360,7 @@ export class EmbedViewPageComponent {
             const t = this.token();
             this.state.set('loading');
             this.view.set(null);
-            this.selected.set(null);
+            this.selection.set([]);
             this.svc
                 .view(t)
                 .pipe(takeUntilDestroyed(this.destroyRef))
@@ -327,49 +387,65 @@ export class EmbedViewPageComponent {
         if (path.includes(token) || path.includes(encodeURIComponent(token))) this.location.replaceState(EMBED_SCRUBBED_PATH);
     }
 
-    protected zoomBy(f: number): void {
-        this.zoom.update((z) => Math.min(12, Math.max(0.5, z * f)));
-    }
-
-    protected resetView(): void {
-        this.zoom.set(1);
-        this.pan.set({ x: 0, y: 0 });
-    }
-
+    /** The keyboard equivalents of the pointer: arrows pan, + and - zoom, and the Canvas-mode keys (WCAG 2.1.1 / 2.5.7). */
     protected onKey(ev: KeyboardEvent): void {
-        const step = ((this.graph()?.extent ?? 200) * 2) / this.zoom() / 10;
-        const moves: Record<string, [number, number]> = {
-            ArrowLeft: [-step, 0],
-            ArrowRight: [step, 0],
-            ArrowUp: [0, -step],
-            ArrowDown: [0, step],
-        };
+        const moves: Record<string, [number, number]> = { ArrowLeft: [40, 0], ArrowRight: [-40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] };
         const d = moves[ev.key];
-        if (!d) return;
+        const g = this.graphView();
+        if (d) g?.panBy(d[0], d[1]);
+        else if (ev.key === '+' || ev.key === '=') g?.zoomBy(1.2);
+        else if (ev.key === '-') g?.zoomBy(1 / 1.2);
+        else {
+            const mode = canvasModeForKey(ev, this.canvasMode());
+            if (!mode) return;
+            this.canvasMode.set(mode);
+        }
         ev.preventDefault();
-        this.pan.update((p) => ({ x: p.x + d[0], y: p.y + d[1] }));
     }
 
-    protected dragStart(ev: PointerEvent): void {
-        this.dragging = { x: ev.clientX, y: ev.clientY };
-    }
-
-    protected dragMove(ev: PointerEvent): void {
-        if (!this.dragging) return;
-        const el = ev.currentTarget as SVGSVGElement;
-        const unit = ((this.graph()?.extent ?? 200) * 2) / this.zoom() / Math.max(1, Math.min(el.clientWidth, el.clientHeight));
-        const dx = (ev.clientX - this.dragging.x) * unit;
-        const dy = (ev.clientY - this.dragging.y) * unit;
-        this.dragging = { x: ev.clientX, y: ev.clientY };
-        this.pan.update((p) => ({ x: p.x - dx, y: p.y - dy }));
-    }
-
-    protected dragEnd(): void {
-        this.dragging = null;
+    /** Select every entity whose label or id holds the find text, and bring them into view. */
+    protected search(): void {
+        const g = this.drawn();
+        if (!g) return;
+        const hits = searchNodes(g, this.filter());
+        this.selection.set(hits);
+        this.resultSummary.set(this.filter().trim() ? `${hits.length} match(es) on the graph.` : null);
+        if (hits.length) this.graphView()?.centerOn(hits);
     }
 
     protected select(id: string): void {
-        this.selected.set(this.selected() === id ? null : id);
+        const on = this.selected() !== id;
+        this.selection.set(on ? [id] : []);
+        if (on) this.graphView()?.centerOn([id]);
+    }
+
+    toggleKind(kind: string): void {
+        this.hiddenKinds.update((ks) => (ks.includes(kind) ? ks.filter((k) => k !== kind) : [...ks, kind]));
+    }
+
+    hideSelected(): void {
+        const sel = this.selection();
+        this.hiddenNodes.update((h) => [...new Set([...h, ...sel])]);
+        this.selection.set([]);
+        this.clearResult();
+    }
+
+    analysisBlocked(id: WidgetAnalysisId): string | null {
+        const g = this.drawn();
+        return g ? widgetAnalysisBlocked(id, g, this.selection()) : 'Nothing drawn.';
+    }
+
+    analyse(id: WidgetAnalysisId): void {
+        const g = this.drawn();
+        if (!g || this.analysisBlocked(id)) return;
+        const r = runWidgetAnalysis(id, g, this.selection());
+        this.emphasis.set(r.emphasis);
+        this.resultSummary.set(r.summary);
+    }
+
+    clearResult(): void {
+        this.emphasis.set(null);
+        this.resultSummary.set(null);
     }
 
     protected setFilter(v: string): void {
@@ -383,16 +459,6 @@ export class EmbedViewPageComponent {
 
     protected degree(id: string): number {
         return this.degrees().get(id) ?? 0;
-    }
-
-    protected touches(e: { source: string; target: string }): boolean {
-        const s = this.selected();
-        return s !== null && (e.source === s || e.target === s);
-    }
-
-    protected showLabel(g: EmbedGraph, id: string): boolean {
-        const s = this.selected();
-        return g.nodes.length <= this.labelLimit() || id === s || (s !== null && g.edges.some((e) => this.touches(e) && (e.source === id || e.target === id)));
     }
 
     protected linksOf(id: string) {

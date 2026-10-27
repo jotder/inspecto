@@ -1,6 +1,10 @@
 import { Location } from '@angular/common';
 import { HttpBackend, HttpErrorResponse, HttpRequest, HttpResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
-import { TestBed } from '@angular/core/testing';
+import { Component, input, output } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import type { G6GraphData } from '@inspecto/core/graph';
+import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -22,6 +26,34 @@ const VIEW: EmbedView = {
     link: { expiresAt: '2026-10-13T10:00:00Z' },
 };
 
+/** Stands in for G6, which cannot mount in jsdom: the page's own template and toolset around it are what these specs read. */
+@Component({ selector: 'inspecto-graph-view', standalone: true, template: '' })
+class StubGraphViewComponent {
+    readonly data = input<G6GraphData | null>(null);
+    readonly display = input<unknown>(null);
+    readonly fill = input(false);
+    readonly emphasis = input<unknown>(null);
+    readonly interaction = input<unknown>(null);
+    readonly plugins = input<unknown>(null);
+    readonly selection = input<string[] | null>(null);
+    readonly selectionChange = output<string[]>();
+    readonly nodeClick = output<string>();
+    readonly centerOn = vi.fn();
+    readonly panBy = vi.fn();
+    readonly zoomBy = vi.fn();
+    readonly fitView = vi.fn();
+}
+
+function useStub() {
+    TestBed.overrideComponent(EmbedViewPageComponent, {
+        remove: { imports: [GraphViewComponent] },
+        add: { imports: [StubGraphViewComponent] },
+    });
+}
+
+const graphOf = (f: ComponentFixture<EmbedViewPageComponent>) =>
+    f.debugElement.query(By.directive(StubGraphViewComponent)).componentInstance as StubGraphViewComponent;
+
 async function render(svc: Partial<EmbedViewService>, view: EmbedView = VIEW) {
     const location = { path: vi.fn(() => '/embed/inv/g1.secret'), replaceState: vi.fn() };
     TestBed.configureTestingModule({
@@ -30,6 +62,7 @@ async function render(svc: Partial<EmbedViewService>, view: EmbedView = VIEW) {
             { provide: Location, useValue: location },
         ],
     });
+    useStub();
     const f = TestBed.createComponent(EmbedViewPageComponent);
     f.componentRef.setInput('token', 'g1.secret');
     f.detectChanges();
@@ -40,14 +73,17 @@ async function render(svc: Partial<EmbedViewService>, view: EmbedView = VIEW) {
 
 describe('embed view page', () => {
     it('shows the masked view as returned, read-only, with the graph and the Working Set table', async () => {
-        const { el } = await render({});
+        const { el, f } = await render({});
         expect(el.textContent).toContain('Ring case');
         expect(el.textContent).toContain('msisdn:****12');
         expect(el.textContent).toContain('seen twice');
         expect(el.textContent).toContain('cdr ****99');
-        expect(el.querySelectorAll('svg circle').length).toBe(3);
-        expect(el.querySelectorAll('svg line').length).toBe(1);
+        const g = graphOf(f).data()!;
+        expect(g.nodes.map((n) => n.data.label), 'ids drawn exactly as returned (masked)').toEqual(['msisdn:****12', 'b', 'a']);
+        expect(g.edges.length).toBe(1);
         expect(el.querySelector('a, form, textarea, select'), 'no link out and no write control').toBeNull();
+        expect(el.textContent, 'an embed grant carries no export permission').not.toContain('Export');
+        expect(el.querySelector('[tabindex="0"][role="group"] inspecto-graph-view'), 'the canvas sits in a focusable group').not.toBeNull();
         expect(el.querySelectorAll('tbody tr').length).toBe(3);
         await expectNoA11yViolations(el);
     });
@@ -56,8 +92,8 @@ describe('embed view page', () => {
         configureLaLimits({ 'display.embed_edge_limit': 1 });
         try {
             const links = [...VIEW.workingSet.links, { source: 'a', target: 'msisdn:****12', kind: 'calls', count: 1 }];
-            const { el } = await render({}, { ...VIEW, workingSet: { ...VIEW.workingSet, links } });
-            expect(el.querySelectorAll('svg line').length).toBe(1);
+            const { el, f } = await render({}, { ...VIEW, workingSet: { ...VIEW.workingSet, links } });
+            expect(graphOf(f).data()!.edges.length).toBe(1);
             expect(el.textContent).toContain('Only the first 1 links are drawn');
         } finally {
             resetLaLimits();
@@ -117,6 +153,92 @@ describe('embed view page', () => {
         (el.querySelector('tbody button') as HTMLButtonElement).click();
         f.detectChanges();
         expect(el.querySelector('#embed-sel')!.textContent).toContain('e5');
+        expect(graphOf(f).selection()).toEqual(['e5']);
+        expect(graphOf(f).centerOn).toHaveBeenCalledWith(['e5']);
+    });
+
+    it('gives the read-only toolset - search, lasso, type filter, Hide, Shortest path, keys - and makes no call but the one read', async () => {
+        TestBed.resetTestingModule();
+        const seen: HttpRequest<unknown>[] = [];
+        const interceptor = vi.fn((req: HttpRequest<unknown>, next: (r: HttpRequest<unknown>) => never) => next(req));
+        const typed: EmbedView = {
+            ...VIEW,
+            workingSet: {
+                entities: [
+                    { entityId: 'a', type: 'sim' },
+                    { entityId: 'b', type: 'sim' },
+                    { entityId: 'c', type: 'device' },
+                ],
+                links: [
+                    { source: 'a', target: 'b', kind: 'calls' },
+                    { source: 'b', target: 'c', kind: 'uses' },
+                ],
+                excludedCount: 0,
+            },
+        };
+        TestBed.configureTestingModule({
+            providers: [
+                provideAppEnvironment({ apiBaseUrl: '/api' } as never),
+                provideHttpClient(withInterceptors([interceptor as never])),
+                {
+                    provide: HttpBackend,
+                    useValue: {
+                        handle: (r: HttpRequest<unknown>) => {
+                            seen.push(r);
+                            return of(new HttpResponse({ status: 200, body: { data: typed, metadata: { apiVersion: 'v1' } } }));
+                        },
+                    },
+                },
+                { provide: Location, useValue: { path: () => '/embed/inv/g1.secret', replaceState: vi.fn() } },
+            ],
+        });
+        useStub();
+        const f = TestBed.createComponent(EmbedViewPageComponent);
+        f.componentRef.setInput('token', 'g1.secret');
+        f.detectChanges();
+        await f.whenStable();
+        f.detectChanges();
+        const c = f.componentInstance;
+        const el = f.nativeElement as HTMLElement;
+        const g = graphOf(f);
+
+        const find = el.querySelector('input[type=search]') as HTMLInputElement;
+        find.value = 'c';
+        find.dispatchEvent(new Event('input'));
+        find.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        f.detectChanges();
+        expect(g.selection()).toEqual(['c']);
+
+        const canvas = el.querySelector('[role="group"][tabindex="0"]') as HTMLElement;
+        canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'l' }));
+        f.detectChanges();
+        expect(c.canvasMode()).toBe('lasso');
+        expect((g.interaction() as { lasso?: string }).lasso).toBe('drag');
+        canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+        canvas.dispatchEvent(new KeyboardEvent('keydown', { key: '+' }));
+        expect(g.panBy).toHaveBeenCalled();
+        expect(g.zoomBy).toHaveBeenCalled();
+
+        c.toggleKind('device');
+        f.detectChanges();
+        expect(g.data()!.nodes.map((n) => n.id)).toEqual(['a', 'b']);
+        c.toggleKind('device');
+        f.detectChanges();
+
+        expect(c.analysisBlocked('shortestPath')).toBe('Select exactly two entities first.');
+        g.selectionChange.emit(['a', 'c']); // a lasso round two entities
+        c.analyse('shortestPath');
+        f.detectChanges();
+        expect(g.emphasis()).toEqual({ nodeIds: ['a', 'b', 'c'], edgeIds: ['l0', 'l1'] });
+        expect(el.querySelector('[data-testid="embed-result"]')?.textContent).toContain('Shortest path: 2 link(s).');
+
+        c.hideSelected();
+        f.detectChanges();
+        expect(g.data()!.nodes.map((n) => n.id)).toEqual(['b']);
+
+        expect(seen.map((r) => r.method + ' ' + r.url), 'one read, nothing else').toEqual(['GET /api/v1/public/investigations/g1.secret']);
+        expect(interceptor).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
     });
 });
 
