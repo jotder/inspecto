@@ -18,6 +18,7 @@ function mock(listItems = []) {
     if (u === '/auth/exchange') data = { accessToken: 'tok-' + JSON.parse(init.body).code };
     else if (u.startsWith('/spaces/s/inv/investigations?')) data = { items: created && !listItems.length ? [{ id: INV, headStep: 0 }] : listItems };
     else if (u === '/spaces/s/inv/entity-identities' && method === 'GET') data = { items: [] };
+    else if (u.startsWith('/spaces/s/datasets/') && u.includes('/rows')) data = { rows: [{ src: 'x' }] };   // the link Job has run
     else if (u === '/spaces/s/cases/from-entities') data = { case: { id: 'CASE-7' } };
     return { ok: true, status: 200, json: async () => ({ data }) };
   };
@@ -97,4 +98,15 @@ test('scaffold lays down the Space once, stamps the index-build owner, and is id
   assert.ok(fs.existsSync(path.join(root, 'la-claims', 'data', 'inbox', 'claim')));
   assert.match(fs.readFileSync(path.join(root, 'la-claims', 'config', 'jobs', 'la_index_build_job.toon'), 'utf8'), /updatedBy: admin/);
   assert.deepEqual(scaffold(root), []);
+});
+
+test('a fresh Space (no link rows yet) presses Run on claims_links as siu.manager before the create', async () => {
+  const m = mock(); let n = 0;
+  const f = async (url, init = {}) => (url.includes('/datasets/claims_links_dataset/rows') && n++ < 2
+    ? { ok: true, status: 200, json: async () => ({ data: { rows: [] } }) } : m.fetchFn(url, init));
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: { pending: false, draft: false }, sleep: async () => {} });
+  assert.deepEqual(r.failed, []);
+  const i = m.calls.findIndex((c) => c.u === '/spaces/s/jobs/claims_links/trigger' && c.method === 'POST');
+  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:siu.manager');
+  assert.ok(i < m.calls.findIndex((c) => c.u === '/spaces/s/inv/investigations' && c.method === 'POST'));
 });

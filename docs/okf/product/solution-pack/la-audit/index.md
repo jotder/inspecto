@@ -35,4 +35,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | the three showcases were driven in the browser 2026-10-24 (the assistant alone; the tour is written); what is left is narrow. | — |
-| `LA-DEMO-PICKER-NAMES-1` | P3 | defect | two Demo Users read "Demo Outsider" in the sign-in picker. | — |

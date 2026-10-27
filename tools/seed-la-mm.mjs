@@ -115,6 +115,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   }
   if (listed.status !== 200) throw new Error(`cannot list Investigations as mm.analyst (${listed.status}): is the Space '${space}' created from the la-mobile-money template?`);
   const existing = items(listed.data).find((i) => i.id === INV);
+  if (!existing) await prime(call, log, sleep, readyTries);
   const headStep = existing ? existing.headStep || 0 : 0;
   const state = { case: existing && existing.caseRef ? existing.caseRef : null, caseExisted: !!(existing && existing.caseRef) };
 
@@ -127,7 +128,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     if (p.includes('@case')) { out.failed.push(`${s.id}: no Case id`); continue; }
     if (s.id === 'identity') {
       const have = await call(s.as, 'GET', '/inv/entity-identities');
-      if (have.status === 200 && JSON.stringify(have.data).includes('FARM-1')) { out.skipped.push(s.id); continue; }
+      if (have.status === 200 && JSON.stringify(have.data).includes(s.body.reason)) { out.skipped.push(s.id); continue; }   // ids come back MASKED: match on the reason
     }
     let r = await call(s.as, s.method, p, body);
     // Right after boot the Dataset's first ingest / mm_links run may not have landed yet: the create answers 422 "cannot read the columns".
@@ -148,6 +149,16 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   if (want.pending) try { await stagePending(call, out, log, must); } catch (e) { warn('pending', e); }
   if (want.alert) try { await stageAlert(call, out, log, sleep, alertWaitTries, items, must); } catch (e) { warn('alert', e); }
   return out;
+}
+
+/** The link Dataset is a Job output, so a fresh Space has none until the 10-minute cron and the Investigation create is refused: press Run on
+ *  the link Job (as mm.manager, who holds canOperateRuns) and wait for mm_links_dataset to have rows, as seed-la-audit.mjs does. */
+async function prime(call, log, sleep, tries) {
+  const has = async () => { const r = await call('admin', 'GET', '/datasets/mm_links_dataset/rows?limit=1'); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
+  if (await has()) return;
+  const t = await call('mm.manager', 'POST', '/jobs/mm_links/trigger', {}); log(`  prime mm_links: ${t.status}`);
+  for (let i = 0; i < tries; i++) { if (await has()) return; await sleep(2000); }
+  log('  WARNING mm_links_dataset still has no rows; the Investigation create will be refused');
 }
 
 /** ONE pending four-eyes expand. Idempotent: the approver inbox (as mm.manager) is read first. */
