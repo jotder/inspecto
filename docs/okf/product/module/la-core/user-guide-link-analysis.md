@@ -788,6 +788,16 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   Working Sets live in the snapshot store (D-E2, `audit/snapshots/investigations/<id>/`). Access is
   **owner-only** (a non-owner reads 404), writes need `canManageIncidents` (Replay and Re-read are read-shaped and stay enabled read-only), and a bound Dataset shared away
   from the caller makes the Investigation read as absent.
+* **Delete an Investigation** (`LA-INVESTIGATION-DELETE-1`, 2026-10-27; `DELETE /inv/investigations/{id}`). A **Delete** action on the open
+  Investigation and on each row of the Investigations list, behind a confirmation that says it cannot be undone; the list refreshes.
+  **Who:** a lead (the owner is the implicit lead) holding `canManageIncidents` — the same two gates as every other write, so a read-only Case member
+  or a stranger reads 404 and a caller without the capability 403. **Refused 409** while the Investigation is linked to an OPEN Case (unlink it or
+  close the Case first; a closed or vanished Case does not block) or holds a pending four-eyes approval (decide it first). **What goes:** header,
+  sealed log and Working Sets, Drafts, members, references, alert-rule bindings, pending records, Case link and embed grants (and their public pointers),
+  moved to a tombstone then removed; the id is free again. **Audit:** event `LINK_INVESTIGATION_DELETED` (`link.investigation.deleted`) with actor,
+  time, id, title, owner and the number of steps and Drafts removed, emitted once the removal has happened (a refused or failed delete leaves no false record). ⚠ Filesystem backend
+  only: the Postgres store (`inspecto-la-store-pg`) keeps its log tables append-only by trigger and answers **503** until a delete is designed for it
+  (BACKLOG). Not covered: a Dossier bundle or snapshot already exported stays where it was exported, and an Alert Rule bound to the Investigation stays registered (its sweeps log "no investigation") until removed on its own.
 * **Case-team sharing** (LA-24, decision D-U10, shipped 2026-09-30; `InvestigationCaseRoutes`). An
   Investigation may carry an OPTIONAL `caseRef` — `caseRef` on create, `PUT`/`DELETE /inv/investigations/{id}/case`
   (owner-only, `canManageIncidents`; linking also needs a Case the caller can see, and refuses a closed one 409).

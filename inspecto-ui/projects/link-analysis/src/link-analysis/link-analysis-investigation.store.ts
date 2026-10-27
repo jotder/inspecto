@@ -299,6 +299,14 @@ export class InvestigationSessionStore {
         this.refs.update((all) => all.filter((r) => r.id !== id));
     }
 
+    /** Delete an Investigation on the server (log and Drafts with it, cannot be undone), then stop remembering it. A refusal (409 open Case or pending approval, 404) keeps it and shows why. */
+    async deleteInvestigation(id: string): Promise<boolean> {
+        return this.run('Could not delete the Investigation.', async () => {
+            await firstValueFrom(this.inv.deleteInvestigation(id));
+            this.forget(id);
+        });
+    }
+
     /** Create an Investigation over the projection's Dataset + columns and open it. `timeCol` binds the event time
      *  windows and the coverage read use — without it `GET …/coverage` answers 422. `timeColZone` is the IANA zone a naive
      *  TIMESTAMP column is read in (UTC when absent). `eventsCol` weighs each link by that column's SUM (a pre-aggregated

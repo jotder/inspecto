@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-core`](../../../../../product-map/module/la-core.toon).
 
-23 test class(es): 23 unit, 0 real-HTTP control-plane, 0 IT.
+24 test class(es): 24 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -37,6 +37,7 @@ mvn -o test -pl la/inspecto-la-core -Dtest=DraftCheckpointsTest,DraftLifecycleTe
 | `GraphRunServiceRetuneTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/GraphRunServiceRetuneTest.java` | {@code LA-CONFIG-LIMITS-1} P4: a live service takes new install-wide limits ({@link GraphRunService#retune}) - the ceilings |
 | `GraphRunServiceTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/GraphRunServiceTest.java` | D-4 step 5: the {@link GraphRunService} lifecycle - budget before work, deadline, cancel latency, the four terminal |
 | `InvestigationConnectFoldTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/InvestigationConnectFoldTest.java` | LA-SEED-CONNECT-1: folding a sealed {@code connect} - seeds at hop 0, route nodes one hop past a seed, whatever the row order. |
+| `InvestigationDeleteTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/InvestigationDeleteTest.java` | LA-INVESTIGATION-DELETE-1 at the store: the filesystem one removes everything and sweeps; a backend that does not override the default answers 503. |
 | `InvestigationExpandedFoldTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/InvestigationExpandedFoldTest.java` | LA-UNEXPANDED-MARKER-1: an entity an effective expand had in its frontier is {@code expanded}; it never enters the hash. |
 | `InvestigationHubDegreeFoldTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/InvestigationHubDegreeFoldTest.java` | The hub degree ({@code contacts}) an entity carries is the LATEST sealed degree, and it never enters the hash. |
 | `InvestigationMembersTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/InvestigationMembersTest.java` |  |

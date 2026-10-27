@@ -280,6 +280,60 @@ public final class FsInvestigationStore implements InvestigationStore {
         }
     }
 
+    @Override
+    public boolean deleteInvestigation(String id) throws IOException {
+        contained(id);
+        Path inv = investigationDir(id);
+        Path root = investigationsRoot();
+        sweepTombstones(root);
+        Path tomb = root.resolve(".deleting-" + id + "-" + System.nanoTime());   // not a safe id, so no listing or open sees it
+        synchronized (monitor(root)) {
+            synchronized (monitor(inv)) {
+                if (!Files.isRegularFile(inv.resolve("header.json"))) return false;
+                try (var held = lock(inv)) {
+                    // the lock only waits out a writer in another JVM; it is released before the directory moves (Windows)
+                }
+                Path drafts = DraftStore.draftsDir(inv);
+                if (Files.isDirectory(drafts)) try (var ds = Files.newDirectoryStream(drafts)) {
+                    for (Path d : ds) DraftCheckpoints.forget(d);
+                }
+                Files.move(inv, tomb, java.nio.file.StandardCopyOption.ATOMIC_MOVE);   // the one act: before it nothing changed, after it the Investigation is gone
+            }
+        }
+        // from here the Investigation is deleted; the rest is cleanup that never fails the call (a leftover tombstone is swept by the next delete)
+        try {
+            Path embeds = tomb.resolve("embeds");   // each file is <grantId>.json; its public pointer goes with it
+            if (Files.isDirectory(embeds)) try (var ds = Files.newDirectoryStream(embeds, "*.json")) {
+                for (Path f : ds) {
+                    String name = f.getFileName().toString();
+                    String grantId = name.substring(0, name.length() - ".json".length());
+                    if (EMBED_GRANT_ID.matcher(grantId).matches()) Files.deleteIfExists(embedIndex(grantId));
+                }
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // a dead pointer resolves to no grant (embedGrant reads the file it names)
+        }
+        removeTree(tomb);
+        return true;
+    }
+
+    private static void removeTree(Path dir) {
+        try (var walk = Files.walk(dir)) {
+            for (Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
+        } catch (IOException | RuntimeException locked) {
+            // left for the sweep in deleteInvestigation
+        }
+    }
+
+    private static void sweepTombstones(Path root) {
+        if (!Files.isDirectory(root)) return;
+        try (var ds = Files.newDirectoryStream(root, ".deleting-*")) {
+            for (Path t : ds) removeTree(t);
+        } catch (IOException | RuntimeException ignored) {
+            // best effort
+        }
+    }
+
     // ── the sealed log ──────────────────────────────────────────────────────────────────────────────────
 
     @Override

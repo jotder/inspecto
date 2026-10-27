@@ -97,6 +97,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/investigations/([^/]+)/standing-detection"},
             {"DELETE", "/inv/investigations/([^/]+)/standing-detection/([^/]+)"},
             {"PUT", "/inv/investigations/([^/]+)/alert-rules/([^/]+)"},
+            {"DELETE", "/inv/investigations/([^/]+)"},
             {"GET", "/inv/investigations/([^/]+)/case"},
             {"PUT", "/inv/investigations/([^/]+)/case"},
             {"DELETE", "/inv/investigations/([^/]+)/case"},

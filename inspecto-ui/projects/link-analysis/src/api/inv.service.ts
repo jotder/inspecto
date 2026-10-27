@@ -1798,6 +1798,13 @@ export class InvService {
         return this.http.get<InvestigationList>(apiUrl('/inv/investigations'), { params: toParams({ limit, offset }) });
     }
 
+    /** Delete an Investigation with its log and Drafts — a lead with `canManageIncidents`; 409 while it is linked to an open Case or holds a pending approval. */
+    deleteInvestigation(id: string): Observable<{ id: string; deleted: boolean; steps: number; drafts: number }> {
+        return this.http.delete<{ id: string; deleted: boolean; steps: number; drafts: number }>(
+            apiUrl(`/inv/investigations/${encodeURIComponent(id)}`),
+        );
+    }
+
     createInvestigation(req: InvestigationCreateRequest): Observable<InvestigationHeader> {
         return this.http.post<InvestigationHeader>(apiUrl('/inv/investigations'), req);
     }

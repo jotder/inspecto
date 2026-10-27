@@ -685,7 +685,7 @@ optional pack field; no route was added.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **101**<!--count:la-routes--> routes (**94**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+24 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` in geo-link, **102**<!--count:la-routes--> routes (**95**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |

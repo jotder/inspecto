@@ -154,6 +154,16 @@ public final class InvestigationCaseRoutes implements RouteModule {
         }
     }
 
+    /** The id of the open Case this Investigation is linked to, or null: no link, no Case management, or a Case that is closed or gone. */
+    static String openCaseRef(ApiContext api, InvestigationStore store, String id) throws IOException {
+        String caseRef = caseRef(store, id);
+        if (caseRef == null) return null;
+        CasePort objects = CasePorts.available(api).orElse(null);
+        if (objects == null) return null;
+        Map<String, Object> c = objects.summary(api, caseRef).orElse(null);
+        return c != null && "case".equals(c.get("kind")) && Boolean.FALSE.equals(c.get("closed")) ? caseRef : null;
+    }
+
     static String caseRef(InvestigationStore store, String id) throws IOException {
         String raw = store.caseLink(id).orElse(null);
         if (raw == null) return null;

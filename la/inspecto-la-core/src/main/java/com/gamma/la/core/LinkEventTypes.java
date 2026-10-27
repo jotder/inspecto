@@ -239,6 +239,11 @@ public final class LinkEventTypes {
      *  LD-5). {@code rule}, {@code investigationId}, {@code standingDetectionDropped}. */
     public static final String LINK_INVESTIGATION_ALERT_RULE_EDITED = "LINK_INVESTIGATION_ALERT_RULE_EDITED";
 
+    /** An Investigation was deleted with its log and Drafts ({@code DELETE /inv/investigations/{id}}, LA-INVESTIGATION-DELETE-1).
+     *  {@code investigationId}, {@code title}, {@code owner}, {@code steps} (log entries removed) and {@code drafts} (Drafts removed):
+     *  the record that the evidence existed, because the log it describes is gone. */
+    public static final String LINK_INVESTIGATION_DELETED = "LINK_INVESTIGATION_DELETED";
+
     /** An Investigation was linked to a Case ({@code PUT /inv/investigations/{id}/case}, or {@code caseRef} at create,
      *  LA-24) by its owner. {@code investigationId}, {@code caseId} and {@code verified} (false when Case management
      *  is not installed, so the Case could not be checked and the link grants nothing). */

@@ -66,6 +66,17 @@ public interface InvestigationStore {
      */
     boolean createFork(String id, String headerJson, List<String> lines, List<String> sets) throws IOException;
 
+    /**
+     * Delete an Investigation with everything it owns: header, sealed log and sets, Drafts, members, references, workflow records,
+     * Case link and embed grants (LA-INVESTIGATION-DELETE-1). The caller has already judged who may and whether it is safe (no open
+     * Case, no pending approval); the store only removes. False when there was no such Investigation. A backend that cannot
+     * remove an append-only record answers 503 (the default).
+     */
+    default boolean deleteInvestigation(String id) throws IOException {
+        throw new com.gamma.spi.auth.ApiException(503, com.gamma.spi.auth.ErrorCodes.CAPABILITY_UNAVAILABLE,
+                "this Investigation store backend does not delete an Investigation yet");
+    }
+
     // ── the sealed log (append-only) ────────────────────────────────────────────────────────────────────
 
     /**

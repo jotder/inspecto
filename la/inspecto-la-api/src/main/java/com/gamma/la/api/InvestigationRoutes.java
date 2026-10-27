@@ -146,6 +146,8 @@ public final class InvestigationRoutes implements RouteModule {
         api.post("/inv/investigations", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> create(api, e, api.body(e))));
         api.get("/inv/investigations", (e, m) -> list(api, e));
+        api.delete("/inv/investigations/([^/]+)", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> delete(api, e, m.group(1))));
         api.post("/inv/investigations/([^/]+)/ops", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> appendOp(api, e, m.group(1), api.body(e))));
         // LA-GROW-EXCLUDE-1 GE-3: gated as the append it dry-runs (a lead's act on the main log), though it persists nothing
@@ -170,6 +172,38 @@ public final class InvestigationRoutes implements RouteModule {
         } catch (RuntimeException noBootSpace) {
             // no Space is bound yet; each Space is checked on its first request and reported the same way
         }
+    }
+
+    /**
+     * {@code DELETE /inv/investigations/{id}} (LA-INVESTIGATION-DELETE-1) — gates, in order: {@code canManageIncidents} 403 →
+     * {@link #open} lead-only (503 · 422 · 403 · 404; a read-only Case member never reaches it) → 409 while the Investigation is
+     * linked to an OPEN Case or holds a pending four-eyes approval → the store removes it (503 on a backend that cannot), THEN the audit event (title, owner, what was removed;
+     * written only once it is true) (the Investigation, its Drafts and everything beside the log are gone with it).
+     */
+    private static Object delete(ApiContext api, HttpExchange ex, String id) throws IOException {
+        Inv inv = open(api, ex, id);
+        String openCase = InvestigationCaseRoutes.openCaseRef(api, inv.store(), id);
+        if (openCase != null)
+            throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' is linked to open case '" + openCase
+                    + "' — unlink it or close the Case first");
+        for (String raw : inv.store().listPending(id))
+            if ("pending".equals(parse(raw).get("status")))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' has a sensitive expand pending approval ("
+                        + parse(raw).get("id") + ") — approve or deny it first");
+        int steps = inv.store().log(InvestigationStore.Scope.main(id)).size();
+        int drafts = inv.store().draftHeaders(id).size();
+        Object title = inv.header().get("title");
+        if (!inv.store().deleteInvestigation(id)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_DELETED, "link.investigation.deleted",
+                "link.investigation.deleted — " + id + (title == null ? "" : " '" + title + "'"),
+                b -> b.attr("investigationId", id).attr("title", String.valueOf(title)).attr("owner", String.valueOf(inv.header().get("owner")))
+                        .attr("steps", steps).attr("drafts", drafts));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.put("deleted", true);
+        out.put("steps", steps);
+        out.put("drafts", drafts);
+        return out;
     }
 
     /** One opened Investigation: its store, write root and parsed header. Package-private for {@link WorkingSetRoutes}. */

@@ -675,6 +675,22 @@ export class LinkAnalysisInvestigationComponent {
         }
     }
 
+    /** Whether the caller may delete this Investigation: the capability, and not a read-only listing (a Case member). */
+    canDelete(id: string): boolean {
+        return this.canWrite() && !(this.listed()?.find((i) => i.id === id)?.readOnly ?? false);
+    }
+
+    /** Delete an Investigation after a confirmation that says it cannot be undone; the list is refreshed when it was showing. */
+    async deleteInvestigation(id: string, label: string): Promise<void> {
+        const ok = await this.confirm.confirmDestructive(
+            `Delete the Investigation “${label}”?\n\nIts log, its Working Sets and its Drafts are removed from the server. ` +
+                'This cannot be undone. A record that it was deleted, by whom and when, is kept in the audit trail.',
+            { title: 'Delete Investigation?', confirmText: 'Delete', destructive: true },
+        );
+        if (!ok || !(await this.store.deleteInvestigation(id))) return;
+        if (this.listed() !== null) await this.listInvestigations();
+    }
+
     /** Open a listed Investigation — remembered in the saved view like any other. */
     openListed(item: InvestigationListItem): void {
         this.order.set(null);

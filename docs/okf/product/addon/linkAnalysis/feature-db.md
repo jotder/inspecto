@@ -13,7 +13,7 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.linkAnalysis`](../../../../../product-map/addon/linkAnalysis.toon).
 
-107 row(s).
+108 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -30,6 +30,7 @@ tags: [feature-db, addon]
 | geoLink | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `geoLink` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | geoMap | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `geoMap` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | investigations | feature | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `investigations` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "DELETE /inv/investigations/([^/]+)" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"DELETE /inv/investigations/([^/]+)"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "DELETE /inv/investigations/([^/]+)/case" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"DELETE /inv/investigations/([^/]+)/case"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "DELETE /inv/uploads/([^/]+)/([^/]+)" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"DELETE /inv/uploads/([^/]+)/([^/]+)"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/datasets/([^/]+)/files" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/datasets/([^/]+)/files"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

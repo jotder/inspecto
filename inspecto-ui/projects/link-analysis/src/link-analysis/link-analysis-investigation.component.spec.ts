@@ -126,6 +126,7 @@ function create(
         replayInvestigation: vi.fn(() => of({ workingSet: opts.ws ?? WS })),
         appendInvestigationOp: vi.fn(() => of({})),
         undoInvestigation: vi.fn(() => of({})),
+        deleteInvestigation: vi.fn(() => of({ id: 'inv-9', deleted: true, steps: 3, drafts: 0 })),
         reorderInvestigation: vi.fn(() =>
             of({ id: 'inv-fork', parent: { id: 'inv-1', order: [2, 1], parentSteps: 2 } }),
         ),
@@ -564,6 +565,64 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await fixture.whenStable();
         expect(store.activeId()).toBe('inv-9');
         expect(inv.investigationLog).toHaveBeenCalledWith('inv-9');
+    });
+
+    describe('delete (LA-INVESTIGATION-DELETE-1)', () => {
+        const OWN = { id: 'inv-7', title: 'Rehearsal', dataset: 'calls', owner: 'me', createdAt: '', headStep: 2, access: 'owner' as const, readOnly: false };
+        const list = (items: unknown[]) => () => of({ items, total: items.length, limit: 100, offset: 0, truncated: false });
+
+        it('offers Delete only on a row the caller may delete, asks first, says it cannot be undone, deletes and refreshes the list', async () => {
+            const confirm = vi.fn(async () => true);
+            const { fixture, store, el, inv, button } = create({ confirm });
+            (inv.listInvestigations as ReturnType<typeof vi.fn>).mockImplementation(list([OWN]));
+            store.restore([{ id: 'inv-7', title: 'Rehearsal' }]);
+            button('List Investigations').click();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            const del = el.querySelector('[aria-label="Delete Investigation Rehearsal"]') as HTMLButtonElement;
+            expect(del).toBeTruthy();
+            (inv.listInvestigations as ReturnType<typeof vi.fn>).mockImplementation(list([]));
+            del.click();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            expect((confirm.mock.calls[0] as unknown as [string])[0]).toContain('cannot be undone');
+            expect(inv.deleteInvestigation).toHaveBeenCalledWith('inv-7');
+            expect(store.refs()).toEqual([]);
+            expect(inv.listInvestigations).toHaveBeenCalledTimes(2);
+            expect(el.querySelector('[aria-label="Investigations"]')?.textContent).toContain('No Investigation you may read');
+        });
+
+        it('a read-only (Case member) row has no Delete, and declining the confirmation deletes nothing', async () => {
+            const { fixture, el, inv, button } = create({ confirm: async () => false });
+            button('List Investigations').click();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            expect(el.querySelector('[aria-label^="Delete Investigation"]')).toBeNull();
+            (inv.listInvestigations as ReturnType<typeof vi.fn>).mockImplementation(list([OWN]));
+            button('List Investigations').click();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            (el.querySelector('[aria-label="Delete Investigation Rehearsal"]') as HTMLButtonElement).click();
+            await fixture.whenStable();
+            expect(inv.deleteInvestigation).not.toHaveBeenCalled();
+        });
+
+        it('without the Incident management capability there is no Delete on the open Investigation', async () => {
+            const { fixture, store, el } = create({ canManage: false });
+            await openInv(store);
+            fixture.detectChanges();
+            expect(el.querySelector('[data-testid="delete-investigation"]')).toBeNull();
+        });
+
+        it('Delete on the open Investigation confirms, deletes it and drops it', async () => {
+            const { fixture, store, el, inv } = create({ confirm: async () => true });
+            await openInv(store);
+            fixture.detectChanges();
+            (el.querySelector('[data-testid="delete-investigation"]') as HTMLButtonElement).click();
+            await fixture.whenStable();
+            expect(inv.deleteInvestigation).toHaveBeenCalledWith('inv-1');
+            expect(store.active()).toBe(false);
+        });
     });
 
     it('LA-19: coverage names the zero-row days and says per-Collector coverage is not assessed; a 422 is shown', async () => {

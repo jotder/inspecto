@@ -94,6 +94,7 @@ function setup(extra: unknown[] = []) {
         ),
         appendInvestigationOp: vi.fn(),
         undoInvestigation: vi.fn(),
+        deleteInvestigation: vi.fn(() => of({ id: 'x', deleted: true, steps: 0, drafts: 0 })),
         draftLog: vi.fn((id: string, d: string) => of(structuredClone(logs[id + '/' + d]))),
         draftReplay: vi.fn((id: string, d: string) =>
             of({
@@ -400,6 +401,27 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(inv.undoInvestigation).toHaveBeenLastCalledWith('inv-gone', undefined);
 
         store.forget('inv-gone');
+        expect(store.refs()).toEqual([]);
+        expect(store.active()).toBe(false);
+    });
+
+    it('deleteInvestigation removes it server-side and forgets it; a 409 keeps it remembered and says why', async () => {
+        const { store, inv, logs, sets } = setup();
+        logs['inv-1'] = { header: header('inv-1'), entries: [], total: 0, truncated: false };
+        sets['inv-1'] = ws([]);
+        store.restore([{ id: 'inv-1', title: 'Burners' }]);
+        await store.open('inv-1');
+
+        inv.deleteInvestigation.mockImplementationOnce(() =>
+            throwError(() => new HttpErrorResponse({ status: 409, error: { error: { message: "linked to open case 'CASE-1'" } } })),
+        );
+        expect(await store.deleteInvestigation('inv-1')).toBe(false);
+        expect(store.error()).toContain('CASE-1');
+        expect(store.refs().map((r) => r.id)).toEqual(['inv-1']);
+        expect(store.active()).toBe(true);
+
+        expect(await store.deleteInvestigation('inv-1')).toBe(true);
+        expect(inv.deleteInvestigation).toHaveBeenLastCalledWith('inv-1');
         expect(store.refs()).toEqual([]);
         expect(store.active()).toBe(false);
     });

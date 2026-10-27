@@ -12821,6 +12821,27 @@
         "x-optional-module" : true
       }
     },
+    "/inv/investigations/{investigationId}" : {
+      "delete" : {
+        "tags" : [ "inv" ],
+        "summary" : "DELETE /inv/investigations/{investigationId} (generated skeleton)",
+        "operationId" : "deleteInvInvestigationsByInvestigationId",
+        "description" : "Delete an Investigation with its sealed log, Working Sets, Drafts, members, references, alert-rule bindings, pending records, Case link and embed grants (LA-INVESTIGATION-DELETE-1); it cannot be undone. Gated on canManageIncidents and a lead of the Investigation (a read-only Case member or a stranger reads 404). 409 CONFLICT while the Investigation is linked to an open Case or has a pending four-eyes approval. An audit event LINK_INVESTIGATION_DELETED (actor, time, id, title, steps and Drafts removed) is written first. Answers {id, deleted, steps, drafts}. 503 on a store backend that cannot delete (Postgres).",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string" }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/inv/investigations/{investigationId}/embeds" : {
       "get" : {
         "tags" : [ "inv" ],
