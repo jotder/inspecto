@@ -3313,8 +3313,9 @@ Its prior copies stay in its version history.`,
     }
 
     /** The node detail dialog: rows, branch/expand actions (exploration), and the Risk / Enrichment / Actions sections. */
-    /** The Entity Profile page beside this route (`…/link-analysis` -> `…/entities/<type>/<key>`); null when unknown. */
+    /** The Entity Profile page beside this route (`…/link-analysis` -> `…/entities/<type>/<key>`); null when unknown or when `/bootstrap` `entityPages` is off (Basic: its reads answer 503). */
     private entityPageOf(type: string | undefined, key: string): UrlTree | null {
+        if (!this.laFeatures.flags?.()['entityPages']) return null;
         const segs = (this.route.snapshot?.pathFromRoot ?? []).flatMap((r) => r.url.map((u) => u.path));
         if (!type || !key || segs[segs.length - 1] !== 'link-analysis') return null;
         return this.router.createUrlTree(['/', ...segs.slice(0, -1), 'entities', type, key]);
