@@ -27,7 +27,7 @@ import {
     removedRows,
     roundRestricted,
     neighboursPreviewBody,
-    secondStepWhyNot,
+    frontierCapStop,
     withUndrawnLinks,
 } from './grow-exclude';
 
@@ -92,15 +92,20 @@ describe('grow-exclude — wording', () => {
     });
 });
 
-describe('grow-exclude — two steps and the preview failure', () => {
-    it('offers 2 steps only when the previewed first step stays under the cap, and says why otherwise', () => {
-        expect(secondStepWhyNot(preview({ addsNodes: 10 }), 'ready', 2000, TELECOM)).toBeNull();
-        expect(secondStepWhyNot(preview({ addsNodes: 3400 }), 'ready', 2000, TELECOM)).toBe(
-            '2 steps is offered only when the first step adds at most 2,000 numbers; this one adds about 3,400.',
+describe('grow-exclude — the N-degree walk and the preview failure', () => {
+    it('stops the walk only when the next degree would grow from more than the frontier cap, naming the degree reached', () => {
+        expect(frontierCapStop(2000, 2000, 1, TELECOM)).toBeNull();
+        expect(frontierCapStop(3400, 2000, 2, TELECOM)).toBe(
+            'Stopped after degree 2: the next degree would grow from 3,400 numbers, above the frontier cap of 2,000. Select fewer, or remove busy numbers first.',
         );
-        expect(secondStepWhyNot(null, 'loading', 2000, TELECOM)).toContain('Waiting');
-        expect(secondStepWhyNot(null, 'unavailable', 2000, TELECOM)).toContain('none is available here');
-        expect(secondStepWhyNot(preview({ needsApproval: true }), 'ready', 2000, TELECOM)).toContain('approval');
+    });
+
+    it('the preview line covers degree 1 and says later degrees are estimated after it', () => {
+        const p = preview({ addsNodes: 240, addsLinks: 300, heldCount: 3, excludedByLists: [] });
+        expect(previewSentence(p, TELECOM, 2)).toBe(
+            'Degree 1 adds about 240 numbers and 300 calls; 3 busy numbers will be held; degree 2 is estimated after degree 1 runs.',
+        );
+        expect(previewSentence(p, TELECOM, 4)).toContain('degrees 2–4 are estimated after degree 1 runs.');
     });
 
     it('treats a missing or switched-off preview route as "no preview", and a refusal as a reason', () => {
@@ -116,7 +121,7 @@ describe('grow-exclude — two steps and the preview failure', () => {
 
 describe('grow-exclude — the expand a Grow sends', () => {
     const ctx = { frontier: ['a', 'b'], heldFrontier: ['hub'] };
-    const req = { direction: 'out' as const, steps: 1 as const, linkKinds: null, window: 'inherit' as const, hold: true, threshold: 300 };
+    const req = { direction: 'out' as const, degrees: 1, linkKinds: null, hold: true, threshold: 300 };
 
     it('names the frontier, the direction and the hub threshold over the presets', () => {
         const presetWindow = { from: '2026-01-01T00:00:00Z', to: '2026-02-01T00:00:00Z' };
@@ -130,16 +135,21 @@ describe('grow-exclude — the expand a Grow sends', () => {
         });
     });
 
-    it('grows through the held edge (a recorded includeHubs override) when Hold is off, and reads all time on request', () => {
-        const off = { ...req, hold: false, window: 'full' as const, linkKinds: ['voice'] };
-        expect(growExpandBody(growIds(ctx, off), off, { window: { from: 'x' } })).toEqual({
+    it('grows through the held edge (a recorded includeHubs override) when Hold is off; the Advanced rung wins over the presets', () => {
+        const off = { ...req, hold: false, linkKinds: ['voice'], rung: { window: 'full' as const, minEvents: 2, budget: 50 } };
+        expect(growExpandBody(growIds(ctx, off), off, { window: { from: 'x' }, budget: 2000 })).toEqual({
             op: 'expand',
             ids: ['a', 'b', 'hub'],
             direction: 'out',
             linkKinds: ['voice'],
             window: 'full',
+            minEvents: 2,
+            budget: 50,
             includeHubs: true,
         });
+        // typed link kinds (no legend) come from the rung
+        const typed = { ...req, rung: { linkKinds: ['sms'] } };
+        expect(growExpandBody(['a'], typed, {})).toMatchObject({ linkKinds: ['sms'] });
     });
 });
 

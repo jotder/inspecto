@@ -325,14 +325,8 @@
             <strong>Working Set:</strong> {{ counts().entities }} entities · {{ counts().links }} links ·
             {{ counts().excluded }} excluded · {{ counts().hidden }} hidden · {{ counts().kept }} kept
         </p>
-        <!-- ── "Expand next degree": the outermost hop, with the profile's presets ── -->
-<la-fold title="Expand by degree">
-        <section
-            class="flex flex-col gap-1 "
-
-            aria-label="Degrees"
-            data-testid="degrees"
-        >
+        <!-- ── LA-STUDIO-UI-REORG-1 §5.4: Expand… (the dialog, N degrees) and the quick "Expand next degree" ── -->
+        <section class="flex flex-col gap-1" aria-label="Degrees" data-testid="degrees">
             <div class="flex flex-wrap items-center gap-2">
                 <span class="text-sm font-semibold" data-testid="degree-label">
                     Degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}
@@ -349,15 +343,29 @@
                     }
                 </ol>
             </div>
-            <button
-                mat-stroked-button
-                type="button"
-                data-testid="expand-next-degree"
-                [disabled]="!canWrite() || store.busy() || store.chainRunning() || !!degree().blocked"
-                (click)="expandNextDegree()"
-            >
-                Expand next degree
-            </button>
+            <div class="flex flex-wrap gap-1">
+                <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    data-testid="expand-dialog-open"
+                    aria-keyshortcuts="G"
+                    matTooltip="Expand 1 to {{ maxDegree() }} degrees with hubs held, read settings and a preview (G)"
+                    [disabled]="!canWrite() || store.busy() || store.chainRunning()"
+                    (click)="expandRequested.emit()"
+                >
+                    Expand…
+                </button>
+                <button
+                    mat-stroked-button
+                    type="button"
+                    data-testid="expand-next-degree"
+                    [disabled]="!canWrite() || store.busy() || store.chainRunning() || !!degree().blocked"
+                    (click)="expandNextDegree()"
+                >
+                    Expand next degree
+                </button>
+            </div>
             @if (windowNote(); as w) {
                 <p class="text-secondary m-0 text-sm" data-testid="degree-window">Window: {{ w }}</p>
             }
@@ -366,15 +374,9 @@
             }
             @if (degree().heldHubs.length) {
                 <p class="text-secondary m-0 text-sm" data-testid="degree-hubs">
-                    @if (includeHubs()) {
-                        “Include hubs” is ticked: the next degree also expands through
-                        {{ degree().heldHubs.length }} high-connectivity
-                        {{ degree().heldHubs.length === 1 ? 'entity' : 'entities' }} — you are asked to confirm first.
-                    } @else {
-                        {{ degree().heldHubs.length }} high-connectivity
-                        {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} left out of the next degree.
-                        Tick “Include hubs” below, or use “Expand anyway” on one.
-                    }
+                    {{ degree().heldHubs.length }} high-connectivity
+                    {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} left out of the next degree.
+                    Untick “Hold supernodes” in Expand…, or use “Expand anyway” on one.
                 </p>
             }
             @if (store.degreeOutcomes().length) {
@@ -389,7 +391,6 @@
                 </ul>
             }
         </section>
-</la-fold>
         <!-- ── Scope list: supernodes to go through, a set to investigate, entities to leave out ── -->
 <la-fold title="Scope list (include / leave out)">
         <section
@@ -569,7 +570,7 @@
                 </div>
                 <div class="flex flex-wrap gap-1">
                     <button mat-stroked-button [disabled]="!canWrite() || store.busy()" (click)="seed()">Seed</button>
-                    @if (selectedHubs().length && !includeHubs() && !isOverridden(selectedHubs()[0])) {
+                    @if (selectedHubs().length && !isOverridden(selectedHubs()[0])) {
                         <button
                             mat-stroked-button
                             data-testid="selected-expand-anyway"
@@ -743,7 +744,6 @@
             >
                 Expand the whole Working Set
             </button>
-            <inspecto-la-expand-rung [presets]="degreePresets()" [limits]="fourEyesLimits()"></inspecto-la-expand-rung>
         </section>
 </la-fold>
 

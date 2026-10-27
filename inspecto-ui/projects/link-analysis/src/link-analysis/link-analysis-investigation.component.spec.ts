@@ -18,6 +18,7 @@ import { EntityProjection } from '@inspecto/core/graph';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
+import { By } from '@angular/platform-browser';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { PendingInvestigation } from './investigate-number';
 import { WidgetsService } from 'app/modules/admin/studio/widgets/widgets.service';
@@ -834,7 +835,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
 
         const spy = vi.spyOn(store, 'expandNextDegree').mockResolvedValue(true);
         next().click();
-        expect(spy).toHaveBeenCalledWith({ budget: 2000 }, 4, false, {});
+        expect(spy).toHaveBeenCalledWith({ budget: 2000 }, 4);
 
         store.degreeOutcomes.set([
             { degree: 1, admitted: 3, linksAdded: 4, truncated: true, fanOutCapped: 0, budget: 2000 },
@@ -980,7 +981,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
     });
 
-    it('"Expand next degree" passes through the hub only when "Include hubs" is ticked', async () => {
+    it('"Expand next degree" (the quick action) never passes through a held hub, and says to use Expand… or Expand anyway', async () => {
         const confirm = vi.fn(async () => true);
         const { fixture, store, el, inv } = create({ ws: HUB_WS, confirm });
         await openInv(store);
@@ -994,17 +995,9 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         const first = inv.appendInvestigationOp.mock.calls[0] as unknown as [string, Record<string, unknown>];
         expect(first[1]['ids']).toEqual(['b']);
         expect(first[1]['includeHubs']).toBeUndefined();
-
         store.degreeOutcomes.set([]); // the stub admitted nothing; clear it so the degree is not "blocked"
-        (el.querySelector('[data-testid="include-hubs"] input') as HTMLInputElement).click();
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('“Include hubs” is ticked');
-        next().click();
-        await fixture.whenStable();
-        expect(confirm).toHaveBeenCalledTimes(1);
-        const second = inv.appendInvestigationOp.mock.calls[1] as unknown as [string, Record<string, unknown>];
-        expect(second[1]['ids']).toEqual(['b', 'hub']);
-        expect(second[1]['includeHubs']).toBe(true);
+        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold supernodes” in Expand…');
     });
 
     it('badges a hub with the sealed count its step read answered when the Working Set row has none', async () => {
@@ -1044,15 +1037,15 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(el.textContent).not.toContain('waiting for approval');
     });
 
-    it('"Expand next degree" sends the Advanced minimum events per link over the presets', async () => {
+    it('"Expand…" asks the screen for the Expand dialog (the read settings live there, §5.4)', async () => {
         const { fixture, store, el } = create({ ws: HUB_WS });
         await openInv(store);
         fixture.detectChanges();
-        const spy = vi.spyOn(store, 'expandNextDegree').mockResolvedValue(true);
-        penEdit(fixture, penByLabel(el, 'Minimum events per link')!, '1');
-        (el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement).click();
-        await fixture.whenStable();
-        expect(spy).toHaveBeenCalledWith(expect.anything(), expect.any(Number), false, { minEvents: 1 });
+        const asked = vi.fn();
+        (fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent)).componentInstance as LinkAnalysisInvestigationComponent).expandRequested.subscribe(asked);
+        (el.querySelector('[data-testid="expand-dialog-open"]') as HTMLButtonElement).click();
+        expect(asked).toHaveBeenCalledTimes(1);
+        expect(el.textContent).not.toContain('Advanced expand settings');
     });
 });
 

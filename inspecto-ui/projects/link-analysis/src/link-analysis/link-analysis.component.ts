@@ -97,9 +97,11 @@ import {
 import { degreeState } from './investigate-number';
 import { GrowExcludeStore } from './grow-exclude.store';
 import {
+    ExpandSource,
     GrowContext,
     GrowRequest,
     drawnValues,
+    frontierCapStop,
     filterExpansion,
     growKeepsEdge,
     hiddenByListsLine,
@@ -108,7 +110,7 @@ import {
     removedRows,
     withUndrawnLinks,
 } from './grow-exclude';
-import { LinkAnalysisGrowComponent } from './link-analysis-grow.component';
+import { ExpandRun, LinkAnalysisExpandComponent } from './link-analysis-expand.component';
 import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
 import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.component';
 import { ExcludeDialogData, ExcludeDialogResult, LinkAnalysisExcludeDialog } from './link-analysis-exclude.dialog';
@@ -426,7 +428,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
         LinkAnalysisInvestigationComponent,
-        LinkAnalysisGrowComponent,
+        LinkAnalysisExpandComponent,
         LinkAnalysisHeldTrayComponent,
         LinkAnalysisExclusionsComponent,
         LockedActionComponent,
@@ -3911,59 +3913,89 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         return nodes.find((n) => idsInWorkingSet(n, ws).includes(id));
     }
 
-    /** What the Grow panel grows from: the selection, else the outer ring (Investigation) / the edge not grown yet (explorer). */
+    /** The Space's four-eyes thresholds, for the Expand dialog's "will need approval" note. */
+    readonly fourEyesLimits = computed(() => {
+        const l = this.limits.limits();
+        return { budgetAbove: l.fourEyesBudgetAbove ?? null, fanOutAbove: l.fourEyesFanOutAbove ?? null };
+    });
+
+    /**
+     * What the Expand dialog (§5.4) can start from: the selection, the outer ring, the seeds, the whole Working Set
+     * (Investigation), or the selection, the nodes not expanded yet, the whole graph (explorer). The first usable one is
+     * the default, so a right-click on a node starts from it.
+     */
     readonly growContext = computed<GrowContext>(() => {
         const t = this.growTerms();
-        const kinds = this.legendLinkKinds();
         const picked = this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND);
         const many = (n: number) => `${n.toLocaleString('en')} ${n === 1 ? t.node : t.nodes}`;
-        if (this.growMode() === 'investigation') {
-            const ws = this.investigation.workingSet();
-            const flagged = new Set((ws?.entities ?? []).filter((e) => e.highConnectivity).map((e) => e.id));
-            const overridden = this.investigation.overriddenHubs();
-            const isHeld = (id: string) => flagged.has(id) && !overridden.has(id);
-            let frontier: string[];
-            let heldFrontier: string[];
-            let from: string;
-            let blocked: string | null = this.growWriteWhyNot() || null;
-            if (picked.length) {
-                const ids = this.growIdsOf(picked);
-                frontier = ids.filter((id) => !isHeld(id));
-                heldFrontier = ids.filter(isHeld);
-                from = `the ${many(ids.length)} you selected`;
-                if (!ids.length) blocked ??= 'None of the selected items is in the Working Set.';
-            } else {
-                const s = degreeState(
-                    ws,
-                    this.maxDegree(),
-                    this.investigation.degreeOutcomes(),
-                    false,
-                    this.investigation.overrideSteps(),
-                );
-                frontier = s.frontier;
-                heldFrontier = s.heldHubs;
-                from =
-                    s.current >= 0
-                        ? `the outer ring (degree ${s.current}): ${many(frontier.length + heldFrontier.length)}`
-                        : 'nothing yet';
-                // "every entity at the edge is a hub" is the panel's to say: unticking Hold can still grow
-                if (s.blocked && !(s.frontier.length === 0 && s.heldHubs.length)) blocked ??= s.blocked;
-            }
-            const cap = laLimit('investigation.max_frontier');
-            if (!blocked && frontier.length + heldFrontier.length > cap)
-                blocked = `One Grow names at most ${cap.toLocaleString('en')} ${t.nodes}; select fewer, or remove busy ${t.nodes} first.`;
+        const sources: ExpandSource[] = [];
+        const add = (s: ExpandSource, cap: number) => {
+            if (!s.blocked && !s.frontier.length && !s.heldFrontier.length)
+                s.blocked = `There is nothing to expand from ${s.label.toLowerCase()}.`;
+            if (!s.blocked && s.frontier.length + s.heldFrontier.length > cap)
+                s.blocked = `One Expand names at most ${cap.toLocaleString('en')} ${t.nodes}; select fewer, or remove busy ${t.nodes} first.`;
+            sources.push(s);
+        };
+        const pick = (mode: GrowContext['mode'], blocked: string | null, cap: number, hasWindow: boolean): GrowContext => {
+            const first = sources.find((s) => !s.blocked) ?? sources[0];
             return {
-                mode: 'investigation',
-                frontier,
-                heldFrontier,
-                from,
-                blocked,
-                linkKinds: kinds,
+                mode,
+                frontier: first?.frontier ?? [],
+                heldFrontier: first?.heldFrontier ?? [],
+                from: first?.from ?? 'nothing yet',
+                // only the reasons that hold for every start: each start's own reason travels on its source
+                blocked: blocked ?? (sources.length ? null : 'There is nothing to expand from yet.'),
+                sources,
+                linkKinds: this.legendLinkKinds(),
                 hubThreshold: this.growThreshold(),
                 terms: t,
-                secondStepCap: cap,
-                hasWindow: !!this.investigation.header()?.timeCol,
+                frontierCap: cap,
+                maxDegree: this.maxDegree(),
+                hasWindow,
             };
+        };
+        if (this.growMode() === 'investigation') {
+            const ws = this.investigation.workingSet();
+            const shown = (ws?.entities ?? []).filter((e) => !e.hidden);
+            const flagged = new Set(shown.filter((e) => e.highConnectivity).map((e) => e.id));
+            const overridden = this.investigation.overriddenHubs();
+            const isHeld = (id: string) => flagged.has(id) && !overridden.has(id);
+            const cap = laLimit('investigation.max_frontier');
+            const split = (value: ExpandSource['value'], label: string, ids: string[], from: string): ExpandSource => ({
+                value,
+                label,
+                frontier: ids.filter((id) => !isHeld(id)),
+                heldFrontier: ids.filter(isHeld),
+                from,
+                blocked: null,
+            });
+            if (picked.length) {
+                const ids = this.growIdsOf(picked);
+                const s = split('selection', 'The selection', ids, `the ${many(ids.length)} you selected`);
+                if (!ids.length) s.blocked = 'None of the selected items is in the Working Set.';
+                add(s, cap);
+            }
+            const d = degreeState(ws, this.maxDegree(), this.investigation.degreeOutcomes(), false, this.investigation.overrideSteps());
+            add(
+                {
+                    value: 'outer',
+                    label: 'The outer ring (next degree)',
+                    frontier: d.frontier,
+                    heldFrontier: d.heldHubs,
+                    from:
+                        d.current >= 0
+                            ? `the outer ring (degree ${d.current}): ${many(d.frontier.length + d.heldHubs.length)}`
+                            : 'nothing yet',
+                    // "every entity at the edge is a hub" is the dialog's to say: unticking Hold can still expand
+                    blocked: d.blocked && !(d.frontier.length === 0 && d.heldHubs.length) ? d.blocked : null,
+                },
+                cap,
+            );
+            const seeds = shown.filter((e) => e.hop === 0).map((e) => e.id);
+            add(split('seeds', 'The seeds', seeds, `the ${many(seeds.length)} seeded`), cap);
+            const all = shown.map((e) => e.id);
+            add(split('all', 'The whole Working Set', all, `the whole Working Set: ${many(all.length)}`), cap);
+            return pick('investigation', this.growWriteWhyNot() || null, cap, !!this.investigation.header()?.timeCol);
         }
         // Basic / exploration: one neighbours read per node, bounded like "Expand from the selected nodes".
         const run = this.lastRun();
@@ -3971,33 +4003,42 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const held = this.growExclude.basicHeld();
         const isHeld = (n: G6GraphData['nodes'][number]) => held.has(n.id) || rawIdsOf(n).some((r) => held.has(r));
         const done = new Set(this.expandedNodeIds());
-        const pool = picked.length
-            ? picked
-            : (this.canvasData()?.nodes ?? []).filter((n) => n.data.kind !== SUPER_NODE_KIND && !done.has(n.id));
-        const capped = pool.slice(0, this.selectionExpandCap);
-        const from = picked.length
-            ? `the ${many(picked.length)} you selected`
-            : pool.length > capped.length
-              ? `the first ${capped.length} of ${many(pool.length)} not grown yet`
-              : `the ${many(pool.length)} not grown yet`;
-        return {
-            mode: 'basic',
-            frontier: capped.filter((n) => !isHeld(n)).map((n) => n.id),
-            heldFrontier: capped.filter(isHeld).map((n) => n.id),
-            from,
-            blocked: !run
+        const cap = this.selectionExpandCap;
+        const basic = (value: ExpandSource['value'], label: string, pool: G6GraphData['nodes'], what: string, why: string | null = null) => {
+            const capped = pool.slice(0, cap);
+            sources.push({
+                value,
+                label,
+                frontier: capped.filter((n) => !isHeld(n)).map((n) => n.id),
+                heldFrontier: capped.filter(isHeld).map((n) => n.id),
+                from:
+                    pool.length > capped.length
+                        ? `the first ${capped.length} of ${many(pool.length)} ${what}`
+                        : `the ${many(pool.length)} ${what}`,
+                blocked: why ?? (pool.length ? null : `There is nothing to expand from ${label.toLowerCase()}.`),
+            });
+        };
+        const nodes = (this.canvasData()?.nodes ?? []).filter((n) => n.data.kind !== SUPER_NODE_KIND);
+        if (picked.length) basic('selection', 'The selection', picked, 'you selected');
+        const fresh = nodes.filter((n) => !done.has(n.id));
+        basic(
+            'outer',
+            'The nodes not expanded yet',
+            fresh,
+            'not expanded yet',
+            nodes.length && !fresh.length ? `Every ${t.node} on the graph has been expanded already.` : null,
+        );
+        basic('all', 'The whole graph', nodes, 'on the graph');
+        return pick(
+            'basic',
+            !run
                 ? 'Draw a graph first.'
                 : !canExpand
-                  ? 'Grow needs a graph drawn from one Entity/Link mapping (its neighbours read).'
-                  : !pool.length
-                    ? `Every ${t.node} on the graph has been grown already.`
-                    : null,
-            linkKinds: kinds,
-            hubThreshold: this.growThreshold(),
-            terms: t,
-            secondStepCap: this.selectionExpandCap,
-            hasWindow: false,
-        };
+                  ? 'Expand needs a graph drawn from one Entity/Link mapping (its neighbours read).'
+                  : null,
+            cap,
+            false,
+        );
     });
 
     /**
@@ -4070,27 +4111,63 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         };
     }
 
-    openGrow(): void {
+    /** Open the Expand dialog (§5.4): G, the toolbar's Expand…, right-click → Expand…, the Investigation tab. */
+    openExpand(): void {
         if (!this.graph() && !this.workingSetCanvas()) return;
         this.growExclude.exclusionsOpen.set(false);
         this.growExclude.growOpen.set(true);
     }
 
-    closeGrow(): void {
+    closeExpand(): void {
         this.growExclude.growOpen.set(false);
         this.growExclude.resetPreview();
     }
 
-    /** The Grow panel's choice, carried out: recorded `expand` steps, or the explorer's neighbours reads. */
-    async onGrow(req: GrowRequest): Promise<void> {
-        const ctx = this.growContext();
+    /** The Expand dialog's choice, walked degree by degree: recorded `expand` steps, or the explorer's neighbours reads. */
+    async onExpand({ ctx, req }: ExpandRun): Promise<void> {
         this.growExclude.growOpen.set(false);
         if (ctx.mode === 'investigation') {
+            // going through hubs is a sealed override: ask first, as Expand anyway does
+            if (!req.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
             if (!(await this.growExclude.growInvestigation(ctx, req, this.degreePresets())))
-                this.toastr.error(this.investigation.error() || 'The Grow was refused.');
+                this.toastr.error(this.investigation.error() || 'The Expand was refused.');
             return;
         }
         await this.growBasic(ctx, req);
+    }
+
+    /** "Hold supernodes" unticked in an Investigation: the override is sealed in every degree's step, so confirm it. */
+    private confirmHubOverride(held: string[]): Promise<boolean> {
+        const purpose = this.investigation.header()?.purpose;
+        const what = held.length
+            ? `${held.length} held high-connectivity ${held.length === 1 ? 'entity' : 'entities'} and any the walk reaches`
+            : 'any high-connectivity entity the walk reaches';
+        return this.confirm.confirmDestructive(
+            `Expand through ${what}? A hub can pull in many unrelated numbers.\n\n` +
+                'The override is sealed in each step of the Investigation log, with your name, and is shown in the log ' +
+                'and the Dossier' +
+                (purpose ? ` under the stated purpose: “${purpose}”.` : '.'),
+            { title: 'Expand through high connectivity?', confirmText: 'Expand anyway', destructive: false },
+        );
+    }
+
+    /** The explorer frontier minus the busy nodes a preview of it names; those join the Held tray. */
+    private async holdBusy(frontier: string[], req: GrowRequest): Promise<string[]> {
+        let held: { id: string; contacts: number }[] = [];
+        try {
+            held = (await this.growExclude.basicAdapter?.preview(frontier, req))?.held ?? [];
+        } catch {
+            return frontier; // no preview: nothing more is known to hold
+        }
+        if (!held.length) return frontier;
+        const next = new Map(this.growExclude.basicHeld());
+        for (const h of held) next.set(h.id, h.contacts);
+        this.growExclude.basicHeld.set(next);
+        const nodes = this.graph()?.nodes ?? [];
+        return frontier.filter((id) => {
+            const n = nodes.find((x) => x.id === id);
+            return !next.has(id) && !(n && rawIdsOf(n).some((r) => next.has(r)));
+        });
     }
 
     /** Basic Grow (§3.5): neighbours reads merged into the explorer graph — not recorded; Undo restores the graph. */
@@ -4111,7 +4188,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         let frontier = [...ctx.frontier, ...(req.hold ? [] : ctx.heldFrontier)];
         const startNodes = this.graph()?.nodes.length ?? 0;
         const startLinks = this.graph()?.edges.length ?? 0;
-        for (let step = 0; step < req.steps && frontier.length; step++) {
+        let applied = 0;
+        let stop = '';
+        for (let d = 1; d <= req.degrees && frontier.length; d++) {
+            // degree 1 is held by the dialog's preview; each later degree reads its own, so a busy node it reached is
+            // held too (no preview on this server = nothing more is known to hold)
+            if (d > 1 && req.hold) frontier = await this.holdBusy(frontier, req);
+            if (!frontier.length) break;
+            applied = d;
             const known = new Set((this.graph()?.nodes ?? []).map((n) => n.id));
             for (const id of frontier.slice(0, this.selectionExpandCap)) {
                 const node = this.graph()?.nodes.find((n) => n.id === id);
@@ -4124,12 +4208,21 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             frontier = (this.graph()?.nodes ?? [])
                 .filter((n) => !known.has(n.id) && !(req.hold && (held.has(n.id) || rawIdsOf(n).some((r) => held.has(r)))))
                 .map((n) => n.id);
+            if (d < req.degrees) {
+                const cap = frontierCapStop(frontier.length, this.selectionExpandCap, d, t);
+                if (cap) {
+                    stop = ' ' + cap;
+                    break;
+                }
+                if (!frontier.length) stop = ` Degree ${d} found nothing new to grow from, so the walk stopped there.`;
+            }
         }
         const nodes = (this.graph()?.nodes.length ?? 0) - startNodes;
         const links = (this.graph()?.edges.length ?? 0) - startLinks;
         const text =
-            `Grew ${req.steps === 1 ? 'one step' : '2 steps'}: ${nodes.toLocaleString('en')} ${nodes === 1 ? t.node : t.nodes} ` +
-            `and ${links.toLocaleString('en')} ${links === 1 ? t.link : t.links} added (not recorded).`;
+            `Expanded ${applied === 1 ? 'one degree' : `${applied} degrees`}: ${nodes.toLocaleString('en')} ${nodes === 1 ? t.node : t.nodes} ` +
+            `and ${links.toLocaleString('en')} ${links === 1 ? t.link : t.links} added (not recorded).` +
+            stop;
         const after = this.graph();
         this.growExclude.lastChange.set({
             text,
@@ -4441,10 +4534,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         setTimeout(() => this.nodeMenuTrigger?.openMenu());
     }
 
-    growFromMenu(): void {
+    expandFromMenu(): void {
         this.selectedNodeIds.set(this.nodeMenuTargets());
         this.announceSelection(this.nodeMenuTargets().length);
-        this.openGrow();
+        this.openExpand();
     }
 
     /** L = Lasso, F = Fisheye, Esc = back to Pan (the same guards as G / X). True when the key was ours. */
@@ -4463,7 +4556,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (key !== 'g' && key !== 'x') return false;
         if (!this.canvasKeyTarget(target)) return false;
         e.preventDefault();
-        if (key === 'g') this.openGrow();
+        if (key === 'g') this.openExpand();
         else this.openExclude();
         return true;
     }

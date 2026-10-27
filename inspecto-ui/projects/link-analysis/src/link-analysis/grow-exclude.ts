@@ -20,8 +20,8 @@ import { baseEdgeKind } from '@inspecto/link-analysis/graph/graph-analysis';
  * no HTTP — the components and `GrowExcludeStore` call these.
  */
 
-/** The three directions the Grow panel offers (`reciprocal` stays in the full expand form). */
-export type GrowDirection = 'either' | 'out' | 'in';
+/** The directions the Expand dialog offers; `reciprocal` only in an Investigation (the explorer's neighbours read has none). */
+export type GrowDirection = 'either' | 'out' | 'in' | 'reciprocal';
 
 export const GROW_DIRECTIONS: readonly { value: GrowDirection; label: string; icon: string; hint: string }[] = [
     {
@@ -42,19 +42,41 @@ export const GROW_DIRECTIONS: readonly { value: GrowDirection; label: string; ic
         icon: 'heroicons_outline:arrow-down-left',
         hint: 'Only links that end at the grown items (expand direction: in)',
     },
+    {
+        value: 'reciprocal',
+        label: 'Reciprocal',
+        icon: 'heroicons_outline:arrow-path',
+        hint: 'Only pairs linked in both directions (expand direction: reciprocal)',
+    },
 ];
 
-/** What the analyst chose in the Grow panel. */
+/** What the analyst chose in the Expand dialog (LA-STUDIO-UI-REORG-1 §5.4). */
 export interface GrowRequest {
     direction: GrowDirection;
-    steps: 1 | 2;
+    /** Degrees to walk, 1 … the pack's `maxDegree`: one `expand` per degree, each from what the previous one admitted. */
+    degrees: number;
     /** null = every link kind. */
     linkKinds: string[] | null;
-    /** `inherit` = the Investigation's own window; `full` = all available data. */
-    window: 'inherit' | 'full';
     /** Hold busy items above `threshold` contacts (the hub threshold); false = grow through them (a sealed override). */
     hold: boolean;
     threshold: number;
+    /** The Advanced fold's rung fields (window, min events, degree band, fan-out, budget) — Investigation only. */
+    rung?: ExpandRung;
+}
+
+/** Where an Expand starts. */
+export type ExpandFrom = 'selection' | 'seeds' | 'outer' | 'all';
+
+/** One "From" choice: what it names, computed by the host. */
+export interface ExpandSource {
+    value: ExpandFrom;
+    label: string;
+    frontier: string[];
+    heldFrontier: string[];
+    /** Plain words for the frontier, e.g. "the 3 numbers you selected". */
+    from: string;
+    /** Why this start cannot be used now; null = it can. */
+    blocked: string | null;
 }
 
 /** What the Grow panel grows from — computed by the host, so the panel never guesses. */
@@ -72,8 +94,12 @@ export interface GrowContext {
     /** The Space's hub threshold in force — the default of "Hold … with more than N contacts". */
     hubThreshold: number;
     terms: PackTerms;
-    /** The most items a first step may add for a second step to be offered (the frontier cap). */
-    secondStepCap: number;
+    /** The frontier cap: a degree that would name more items than this is not walked (the walk stops there). */
+    frontierCap: number;
+    /** The pack's `maxDegree`: the Degrees field's upper bound. */
+    maxDegree: number;
+    /** The "From" choices; the top-level frontier / heldFrontier / from / blocked are the default (first usable) one. */
+    sources?: ExpandSource[];
     /** An Investigation with a time column: the window choice is offered. */
     hasWindow: boolean;
 }
@@ -108,19 +134,20 @@ export function roundRestricted(n: number): number {
     return Math.max(5, Math.round(n / 5) * 5);
 }
 
-/** The preview in one plain sentence (§3.1): what the step would add, hold and remove. */
-export function previewSentence(p: GrowPreview, t: PackTerms): string {
+/** The preview in one plain sentence (§5.4): what degree 1 would add, hold and remove; later degrees after it runs. */
+export function previewSentence(p: GrowPreview, t: PackTerms, degrees = 1): string {
     const parts: string[] = [];
     parts.push(
         p.addsNodes || p.addsLinks
-            ? `This step adds about ${plural(p.addsNodes, t.node, t.nodes)} and ${plural(p.addsLinks, t.link, t.links)}`
-            : 'This step adds nothing new',
+            ? `${degrees > 1 ? 'Degree 1' : 'This step'} adds about ${plural(p.addsNodes, t.node, t.nodes)} and ${plural(p.addsLinks, t.link, t.links)}`
+            : `${degrees > 1 ? 'Degree 1' : 'This step'} adds nothing new`,
     );
     const held = p.heldCount ?? p.held?.length ?? 0;
     if (held) parts.push(`${plural(held, `busy ${t.node}`, `busy ${t.nodes}`)} will be held`);
     const removed = (p.excludedByLists ?? []).reduce((s, l) => s + (l.removed || 0), 0);
     if (removed)
         parts.push(`${plural(removed, t.node, t.nodes)} ${removed === 1 ? 'is' : 'are'} removed by your exclusion lists`);
+    if (degrees > 1) parts.push(`degree${degrees > 2 ? `s 2–${degrees} are` : ' 2 is'} estimated after degree 1 runs`);
     let text = parts.join('; ') + '.';
     if (p.truncated) text += ' The read would hit its row limit, so the result would be incomplete.';
     if (p.needsApproval)
@@ -128,23 +155,13 @@ export function previewSentence(p: GrowPreview, t: PackTerms): string {
     return text;
 }
 
-/**
- * Why "2 steps" is greyed (§3.1, GE-2): a second step is offered only when the first one stays under the frontier cap,
- * which only a preview can say. Null = it is offered.
- */
-export function secondStepWhyNot(
-    preview: GrowPreview | null,
-    state: 'loading' | 'ready' | 'unavailable' | 'error' | 'idle',
-    cap: number,
-    t: PackTerms,
-): string | null {
-    if (state === 'loading' || state === 'idle') return 'Waiting for the preview of the first step.';
-    if (state !== 'ready' || !preview)
-        return '2 steps needs a preview of the first step, and none is available here — grow one step at a time.';
-    if (preview.needsApproval) return 'The first step needs a second person’s approval, so a second step cannot follow it.';
-    if (preview.addsNodes > cap)
-        return `2 steps is offered only when the first step adds at most ${plural(cap, t.node, t.nodes)}; this one adds about ${fmt(preview.addsNodes)}.`;
-    return null;
+/** Why a walk stopped before its last degree: the next degree would name more than the frontier cap. Null = go on. */
+export function frontierCapStop(next: number, cap: number, reached: number, t: PackTerms): string | null {
+    if (next <= cap) return null;
+    return (
+        `Stopped after degree ${reached}: the next degree would grow from ${plural(next, t.node, t.nodes)}, ` +
+        `above the frontier cap of ${fmt(cap)}. Select fewer, or remove busy ${t.nodes} first.`
+    );
 }
 
 /** Plain words for a preview failure: a missing route degrades quietly; a refusal says why. */
@@ -166,20 +183,21 @@ export function growIds(ctx: Pick<GrowContext, 'frontier' | 'heldFrontier'>, req
     return req.hold ? ctx.frontier : [...ctx.frontier, ...ctx.heldFrontier];
 }
 
-/** The one recorded `expand` a Grow step sends: the profile's presets under the analyst's choices. */
+/** The one recorded `expand` a degree sends: the profile's presets, then the Advanced rung, then the basic choices. */
 export function growExpandBody(
     frontier: string[],
     req: GrowRequest,
     presets: ExpandRung,
 ): Extract<InvestigationOpRequest, { op: 'expand' }> {
-    const { window: presetWindow, ...rest } = presets;
+    const { includeHubs: _i, expandHubs: _e, ...merged } = { ...presets, ...(req.rung ?? {}) };
+    const kinds = req.linkKinds ?? merged.linkKinds ?? null;
+    delete merged.linkKinds;
     return {
         op: 'expand',
         ids: frontier,
-        ...rest,
+        ...merged,
         direction: req.direction,
-        ...(req.linkKinds ? { linkKinds: req.linkKinds } : {}),
-        ...(req.window === 'full' ? { window: 'full' as const } : presetWindow ? { window: presetWindow } : {}),
+        ...(kinds?.length ? { linkKinds: kinds } : {}),
         ...(req.hold ? { hubThreshold: req.threshold } : { includeHubs: true }),
     };
 }

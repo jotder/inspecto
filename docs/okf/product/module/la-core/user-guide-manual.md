@@ -596,9 +596,9 @@ connectivity*), badged with its own sealed count — *High connectivity — 650 
 in the panel and in the Working Set rows (logs sealed before the count was recorded show *more than 500 contacts*),
 and listed under **High connectivity**. The degree result says whether the counts came from the link index or the
 Dataset. *Expand next degree* leaves hubs out of its frontier and says how many it left out. To go
-through one anyway, use **Expand anyway** on it (that entity only), or tick **Include hubs** on the expand settings
-(every hub the expand reaches, including the next degree). Either asks you to confirm first, showing the
-Investigation's purpose; the override is sealed in that step and the panel shows *Override recorded at step N*.
+through one anyway, use **Expand anyway** on it (that entity only), or untick **Hold supernodes** in **Expand…**
+(every hub the walk reaches, at every degree). Either asks you to confirm first, showing the
+Investigation's purpose; the override is sealed in each step it makes (Expand anyway also shows *Override recorded at step N*).
 The hub threshold is set per Space in **Settings → Link Analysis → Hub threshold** (a whole number ≥ 1; blank = the
 default, 500; the value in force is shown; editing needs the Workbench authoring capability, read-only otherwise).
 

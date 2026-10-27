@@ -184,7 +184,7 @@ describe('investigate-number - next degree', () => {
         expect(state).toMatchObject({ current: 1, frontier: ['a'], heldHubs: ['h'], blocked: null });
         expect(degreeState(ws(entity('s', 0), entity('a', 1), hub), 4, [], true).frontier).toEqual(['a', 'h']);
         // Every outer entity flagged: nothing to name, and the way out is stated.
-        expect(degreeState(ws(entity('s', 0), hub), 4).blocked).toContain('Include hubs');
+        expect(degreeState(ws(entity('s', 0), hub), 4).blocked).toContain('Hold supernodes');
         expect(degreeState(ws(entity('s', 0), hub), 4, [], true).blocked).toBeNull();
     });
 
