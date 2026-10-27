@@ -1,6 +1,6 @@
 # Link Analysis Studio — UI reorganization plan (`LA-STUDIO-UI-REORG-1`)
 
-Status: **P1-P4 ON MASTER (d7292300c, 2026-10-27); re-verification FAIL — three new defects plus `LA-REVOKE-DISCARD-NO-CONFIRM-1` open, P4 Widget not driven live, embed viewer toolset not built.** Direction decided by the operator in an interview (UIR-D1 … UIR-D16); assistant calls ⚑UIR-A1 … A3 await confirmation. Independent verification of P1-P3: **FAIL** (2026-10-27) — every §6 row has a home at ≥ 1,300 px, but the defects are open as `LA-SETTINGS-OVERLAY-NEVER-HIDES-1` (P1), the `LA-REORG-*` rows and the still-open `LA-REVOKE-DISCARD-NO-CONFIRM-1` in `docs/BACKLOG.md` §3.12. User guides and glossary updated for P1-P3.
+Status: **P1-P4 ON MASTER (d7292300c, 2026-10-27); re-verification FAIL — its three new defects (`LA-REORG-OVERFLOW-CLEANUP-ENABLED-1`, `LA-SETTINGS-ESC-REOPENS-CONFIRM-1`, `LA-REORG-CASE-VIEW-LAYOUT-DROPPED-1`) fixed 2026-10-28, `LA-REVOKE-DISCARD-NO-CONFIRM-1` still open, P4 Widget not driven live, embed viewer toolset not built.** Direction decided by the operator in an interview (UIR-D1 … UIR-D16); assistant calls ⚑UIR-A1 … A3 await confirmation. Independent verification of P1-P3: **FAIL** (2026-10-27) — every §6 row has a home at ≥ 1,300 px, but the defects are open as `LA-SETTINGS-OVERLAY-NEVER-HIDES-1` (P1), the `LA-REORG-*` rows and the still-open `LA-REVOKE-DISCARD-NO-CONFIRM-1` in `docs/BACKLOG.md` §3.12. User guides and glossary updated for P1-P3.
 Item: `module.la-core` (UI in `inspecto-ui/projects/link-analysis/`). Board row: `LA-STUDIO-UI-REORG-1` in
 `docs/BACKLOG.md` §3.12.
 
@@ -257,7 +257,7 @@ Today the profile is not dead. It relabels terms, finds the measure and time col
 
 **As built (P2b, 2026-10-27):** no picker; `profileId = investigation.boundProfileId() ?? boundProfile() ??
 activeDomainProfileId()`. `boundProfile` is set by an *Investigate a number* binding and cleared by Close; a saved view's
-stored pack never binds it (`LA-REORG-VIEW-PACK-OVERRIDE-1`): it is shown in the Open preview and re-saved unchanged. *Save as template* takes an optional `pack` (`POST /inv/investigations/{id}/template`, shape-checked
+stored pack never binds it (`LA-REORG-VIEW-PACK-OVERRIDE-1`): it is shown in the Open preview and re-saved unchanged. Operator confirmed 2026-10-28: a saved view never keeps its own Industry pack; the Space's pack always applies. *Save as template* takes an optional `pack` (`POST /inv/investigations/{id}/template`, shape-checked
 as an id, 422 otherwise); an instantiated Investigation's header carries it as `pack`, which `boundProfileId` reads when
 the pack is installed. The pack in force shows read-only at the top of ⚙ → Graph model. `LA-SAVED-VIEW-DOMAIN-PROFILE-1`
 closed: a view without a pack no longer overrides the Space's.
@@ -351,7 +351,7 @@ Each phase is one lane (`.claude/memory/lane-integration-workflow.md`). Tests: t
 `npx ng test` (`.claude/memory/ui-test-traps.md`), an axe pass on the changed screens, and a live drive in a
 Space with data (MFS or `la-showcase`). Each phase ends with the §6 rows it covers checked off in this file.
 
-Status 2026-10-27 (re-verified, range e80e9d511..d7292300c): **P1 ✅ · P2 ⚠ (revoke / discard confirms NOT built: `LA-REVOKE-DISCARD-NO-CONFIRM-1` open) · P3 ✅ · P4 ⚠ (Widget toolset and "Allow export" built and spec-tested, not yet driven live — no dashboard with a Link analysis Widget exists on the demo; embed viewer toolset not built).** The eight first-verification defects are closed. Open defects: BACKLOG §3.12 `LA-REORG-OVERFLOW-CLEANUP-ENABLED-1`, `LA-SETTINGS-ESC-REOPENS-CONFIRM-1`, `LA-REORG-CASE-VIEW-LAYOUT-DROPPED-1`, `LA-REVOKE-DISCARD-NO-CONFIRM-1`.
+Status 2026-10-27 (re-verified, range e80e9d511..d7292300c): **P1 ✅ · P2 ⚠ (revoke / discard confirms NOT built: `LA-REVOKE-DISCARD-NO-CONFIRM-1` open) · P3 ✅ · P4 ⚠ (Widget toolset and "Allow export" built and spec-tested, not yet driven live — no dashboard with a Link analysis Widget exists on the demo; embed viewer toolset not built).** The eight first-verification defects are closed. Open defects: BACKLOG §3.12 `LA-REVOKE-DISCARD-NO-CONFIRM-1` (the three re-verification defects were fixed 2026-10-28).
 
 | Phase | Scope | Done when |
 |---|---|---|

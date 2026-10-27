@@ -14,7 +14,7 @@ import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, delay, of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, delay, of, throwError } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
@@ -1541,6 +1541,29 @@ describe('LinkAnalysisComponent', () => {
         c.clearSelection();
         expect(c.selectedOnCanvas()).toEqual([]);
         await expectNoA11yViolations(el);
+    });
+
+    it('the overflow menu disables Keep only selected and Remove selected with nothing selected (LA-REORG-OVERFLOW-CLEANUP-ENABLED-1)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.clearSelection();
+        fixture.detectChanges();
+        const more = fixture.debugElement.query(By.css('[data-testid="la-canvas-tools-more"]'));
+        const item = (id: string) => document.querySelector(`[data-testid="la-more-cleanup-${id}"]`) as HTMLButtonElement;
+        more.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        expect(item('keep').disabled).toBe(true);
+        expect(item('remove').disabled).toBe(true);
+        expect(item('trim').disabled).toBe(false); // the other tools need no selection
+        more.injector.get(MatMenuTrigger).closeMenu();
+        c.onSelectionChange(['a']);
+        fixture.detectChanges();
+        more.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        expect(item('keep').disabled).toBe(false);
+        expect(item('remove').disabled).toBe(false);
     });
 
     it('below 1,300 px the overflow menu holds Collapse, the N collapsed chip and Clean up (LA-REORG-NARROW-CLEANUP-1)', async () => {
@@ -4471,6 +4494,33 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         expect(c.hiddenNodeIds()).toEqual(['A-1-R2']);
         expect(c.caseLists()).toEqual({ start: undefined, exclusions: ['noisy'] });
         expect(c.caseStart()).toEqual({ datasetId: 'transfers', values: ['A-1'] });
+    });
+
+    it('a case view is in flight while it awaits its Entity List, and keeps its layout (LA-REORG-CASE-VIEW-LAYOUT-DROPPED-1)', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const list = new Subject<{ id: string; title: string; members: string[] }>();
+        const made = create({
+            features: BASIC,
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: noPreview, getEntityList: () => list } as unknown as Partial<InvService>,
+        });
+        const c = await ready(made);
+        const opened = c.loadView({
+            id: 'ring-list',
+            name: 'Ring list',
+            sourceId: 'entity-projection',
+            query: { projection: { datasetId: 'transfers', sourceCol: 'from_account', targetCol: 'to_account' } },
+            start: { datasetId: 'transfers', values: ['A-1'], listId: 'watch' },
+            layout: 'radial',
+        });
+        await new Promise((r) => setTimeout(r));
+        expect(c.loading()).toBe(true); // the old graph is still on screen: the over-cap drop must wait
+        list.next({ id: 'watch', title: 'Watch', members: [] });
+        list.complete();
+        await opened;
+        expect(c.loading()).toBe(false);
+        expect(c.pickedLayout()).toBe('radial');
     });
 
     it('a case whose Dataset no longer starts a graph reruns its saved query instead', async () => {

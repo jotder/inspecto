@@ -1006,7 +1006,13 @@
                 <button mat-menu-item type="button" (click)="openAttachToCase()" [disabled]="!!attachUnavailable()">Attach to Case</button>
                 <mat-divider></mat-divider>
                 @for (t of cleanup.tools; track t.id) {
-                    <button mat-menu-item type="button" (click)="cleanup.pick(t.id)" [attr.data-testid]="'la-more-cleanup-' + t.id">
+                    <button
+                        mat-menu-item
+                        type="button"
+                        (click)="cleanup.pick(t.id)"
+                        [disabled]="(t.id === 'keep' || t.id === 'remove') && !selectedOnCanvas().length"
+                        [attr.data-testid]="'la-more-cleanup-' + t.id"
+                    >
                         Clean up: {{ t.label }}
                     </button>
                 }

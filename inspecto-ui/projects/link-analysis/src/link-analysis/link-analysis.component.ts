@@ -4037,6 +4037,9 @@ Its prior copies stay in its version history.`,
      */
     private async drawCaseStart(view: LinkAnalysisView): Promise<boolean> {
         const start = view.start!;
+        // In flight before the awaits: the over-cap drop must not judge the view's layout against the OLD graph
+        // (LA-REORG-CASE-VIEW-LAYOUT-DROPPED-1; drawStart and execute clear it when they finish).
+        this.loading.set(true);
         await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
         const ds = this.startCatalogue().datasets.find((d) => d.id === start.datasetId);
         if (!ds) return false;

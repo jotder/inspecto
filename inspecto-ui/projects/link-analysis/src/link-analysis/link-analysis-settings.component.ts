@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, effect, inject, input, model, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
@@ -177,6 +178,7 @@ function storedSection(): LaSettingsSection | null {
 })
 export class LinkAnalysisSettingsComponent {
     private readonly confirm = inject(InspectoConfirmService);
+    private readonly dialogs = inject(MatDialog);
     private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
 
     readonly open = model(false);
@@ -207,9 +209,14 @@ export class LinkAnalysisSettingsComponent {
         if (!this.investigationOpen() && this.section() === 'investigation') this.section.set('graph-model');
     });
 
-    /** Esc closes from anywhere while open, not only with focus inside the panel. */
-    @HostListener('document:keydown.escape')
-    onEscape(): void {
+    /**
+     * Esc closes from anywhere while open, not only with focus inside the panel. An Esc another overlay already handled
+     * (a mat-select panel, the unsaved-changes confirm) or fired while a dialog is open is not ours
+     * (LA-SETTINGS-ESC-REOPENS-CONFIRM-1).
+     */
+    @HostListener('document:keydown.escape', ['$event'])
+    onEscape(event?: Event): void {
+        if (event?.defaultPrevented || this.dialogs.openDialogs.length) return;
         if (this.open()) void this.requestClose();
     }
 

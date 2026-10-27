@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -106,6 +107,25 @@ describe('LinkAnalysisSettingsComponent (⚙ Settings, §5.10)', () => {
             await settle();
             expect(host.open()).toBe(false);
         }
+    });
+
+    it('ignores an Esc another overlay handled, or one fired while a dialog is open (LA-SETTINGS-ESC-REOPENS-CONFIRM-1)', async () => {
+        const { host, settings, confirm } = make(false);
+        host.isDirtyNow = true;
+        const handled = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        handled.preventDefault(); // as the confirm dialog or a mat-select panel does when Esc closes it
+        document.dispatchEvent(handled);
+        await Promise.resolve();
+        expect(confirm).not.toHaveBeenCalled();
+        const dialogs = TestBed.inject(MatDialog);
+        vi.spyOn(dialogs, 'openDialogs', 'get').mockReturnValue([{} as MatDialogRef<unknown>]);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await Promise.resolve();
+        expect(confirm).not.toHaveBeenCalled();
+        expect(host.open()).toBe(true);
+        vi.restoreAllMocks();
+        settings.onEscape(new KeyboardEvent('keydown', { key: 'Escape' }));
+        expect(confirm).toHaveBeenCalledTimes(1); // a plain Esc still asks
     });
 
     it('asks before closing over unsaved changes', async () => {
