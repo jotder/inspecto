@@ -208,7 +208,6 @@ import {
     GraphViewInteraction,
     GraphViewPlugins,
     baseEdgeKind,
-    cappedLayout,
     edgeLabelsHiddenByDensity,
     graphSignature,
     stableKey,
@@ -276,7 +275,7 @@ import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
-import { laLayoutCaps, laLimit, layoutCapNoticeText } from './la-limits';
+import { laLayoutCaps, laLimit, layoutCapNoticeText, layoutOverCapReason, overCapReason } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
@@ -1266,12 +1265,33 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly layoutId = computed<GraphLayoutId>(() => {
         const picked = this.pickedLayout();
         const g = this.canvasData();
-        if (!picked) return defaultLayoutFor(g, this.investigation.canvas() !== null);
         // Radial, Information density and Clustering force (force-atlas2) block the tab for 20 s to minutes on ~800 nodes:
-        // above their cap they are never run, whether picked here or restored (saved view / undo). See {@link layoutCapNotice}.
-        return cappedLayout(picked, g?.nodes.length ?? 0, laLayoutCaps()) ?? picked;
+        // above their cap they are disabled in the menus (UIR-D11); a pick restored over it (saved view / undo / the
+        // graph grew) draws the default layout, and {@link layoutCapNotice} says why.
+        if (!picked || layoutOverCapReason(picked, g?.nodes.length ?? 0))
+            return defaultLayoutFor(g, this.investigation.canvas() !== null);
+        return picked;
     });
-    /** On-screen notice while a pick is shown as {@link CAPPED_LAYOUT_FALLBACK} because the graph is over its layout cap. */
+    /** Why a layout button is disabled on this graph (tree shape or node cap); null when it can be picked. */
+    layoutDisabledReason(l: { id: GraphLayoutId; tree?: boolean }): string | null {
+        if (l.tree && !this.isTreeShaped()) return 'needs a tree-shaped graph';
+        return layoutOverCapReason(l.id, this.canvasData()?.nodes.length ?? 0);
+    }
+    /** Some layout is off for its node cap: the menus add a "reduce first" hint. */
+    readonly anyLayoutOverCap = computed(() => {
+        const n = this.canvasData()?.nodes.length ?? 0;
+        return GRAPH_LAYOUTS.some((l) => layoutOverCapReason(l.id, n) !== null);
+    });
+    /** Why Community hulls are off on this graph: Louvain over its browser cap draws none. */
+    readonly hullsDisabledReason = computed(() =>
+        overCapReason(browserAlgorithmCapValue('louvainCommunities'), this.displayed()?.nodes.length ?? 0),
+    );
+    /** "Reduce first": open the Filter editor in the data strip, so the analyst can cut the graph under a cap. */
+    openReduce(): void {
+        this.bottomOpen.set(true);
+        this.filterOpen.set(true);
+    }
+    /** On-screen notice while a pick is shown in the default layout because the graph is over that layout's cap. */
     readonly layoutCapNotice = computed<string | null>(() =>
         layoutCapNoticeText(this.pickedLayout(), this.canvasData()?.nodes.length ?? 0),
     );

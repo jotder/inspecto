@@ -228,7 +228,16 @@ export function swapCommunityShapes(
 export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly string[]): Record<string, unknown>[] {
     if (!p) return [];
     const out: Record<string, unknown>[] = [];
-    if (p.minimap) out.push({ type: 'minimap', key: 'minimap', size: [160, 100], position: 'right-bottom' });
+    // G6 places the minimap with left/top pixels computed ONCE from the canvas size, so a canvas narrowed later (the
+    // right panel opening) leaves it drawn over the panel. Anchor it to the canvas's right/bottom edge instead.
+    if (p.minimap)
+        out.push({
+            type: 'minimap',
+            key: 'minimap',
+            size: [160, 100],
+            position: 'right-bottom',
+            containerStyle: { left: 'auto', top: 'auto', right: '0px', bottom: '0px' },
+        });
     if (p.gridLine) out.push({ type: 'grid-line', key: 'grid-line', follow: true });
     if (p.fisheye) out.push({ type: 'fisheye', key: 'fisheye', trigger: 'drag', r: 120, scaleRBy: 'wheel' });
     if (p.edgeFilterLens) out.push({ type: 'edge-filter-lens', key: 'edge-filter-lens', trigger: 'drag', r: 90 });

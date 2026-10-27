@@ -80,20 +80,29 @@
                 </button>
                 <mat-menu #layoutMenu="matMenu">
                     @for (l of layouts; track l.id) {
-                        <button
-                            mat-menu-item
-                            (click)="setLayout(l.id)"
-                            [disabled]="l.tree && !isTreeShaped()"
-                            [attr.aria-label]="
-                                l.label + (l.tree && !isTreeShaped() ? ' (needs a tree-shaped graph)' : '')
-                            "
-                        >
-                            <mat-icon
-                                [svgIcon]="
-                                    layoutId() === l.id ? 'heroicons_outline:check' : 'heroicons_outline:squares-2x2'
-                                "
-                            ></mat-icon>
-                            <span>{{ l.label }}</span>
+                        @let off = layoutDisabledReason(l);
+                        <!-- A disabled item takes no pointer events: the wrapper carries its tooltip (UIR-D11). -->
+                        <div [matTooltip]="off ?? ''" matTooltipPosition="right">
+                            <button
+                                mat-menu-item
+                                (click)="setLayout(l.id)"
+                                [disabled]="!!off"
+                                [attr.data-testid]="'la-layout-item-' + l.id"
+                                [attr.aria-label]="l.label + (off ? ' (' + off + ')' : '')"
+                            >
+                                <mat-icon
+                                    [svgIcon]="
+                                        layoutId() === l.id ? 'heroicons_outline:check' : 'heroicons_outline:squares-2x2'
+                                    "
+                                ></mat-icon>
+                                <span>{{ l.label }}</span>
+                            </button>
+                        </div>
+                    }
+                    @if (anyLayoutOverCap()) {
+                        <button mat-menu-item (click)="openReduce()" data-testid="la-layout-reduce">
+                            <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
+                            <span>Reduce first — filter the graph to use more layouts</span>
                         </button>
                     }
                 </mat-menu>
@@ -1411,23 +1420,32 @@
                                 </h3>
                                 <div class="grid grid-cols-2 gap-1">
                                     @for (l of layouts; track l.id) {
-                                        <button
-                                            type="button"
-                                            class="rounded-md border px-2 py-1.5 text-left text-xs"
-                                            [class.font-semibold]="layoutId() === l.id"
-                                            [style.borderColor]="layoutId() === l.id ? 'var(--gamma-primary)' : null"
-                                            [disabled]="l.tree && !isTreeShaped()"
-                                            (click)="setLayout(l.id)"
-                                            [attr.aria-pressed]="layoutId() === l.id"
-                                            [attr.aria-label]="
-                                                l.label +
-                                                (l.tree && !isTreeShaped() ? ' (needs a tree-shaped graph)' : '')
-                                            "
-                                        >
-                                            {{ l.label }}
-                                        </button>
+                                        @let off = layoutDisabledReason(l);
+                                        <span class="flex" [matTooltip]="off ?? ''">
+                                            <button
+                                                type="button"
+                                                class="w-full rounded-md border px-2 py-1.5 text-left text-xs disabled:opacity-50"
+                                                [class.font-semibold]="layoutId() === l.id"
+                                                [style.borderColor]="layoutId() === l.id ? 'var(--gamma-primary)' : null"
+                                                [disabled]="!!off"
+                                                (click)="setLayout(l.id)"
+                                                [attr.aria-pressed]="layoutId() === l.id"
+                                                [attr.aria-label]="l.label + (off ? ' (' + off + ')' : '')"
+                                            >
+                                                {{ l.label }}
+                                            </button>
+                                        </span>
                                     }
                                 </div>
+                                @if (anyLayoutOverCap()) {
+                                    <button
+                                        type="button"
+                                        class="text-primary mt-1 text-left text-xs underline"
+                                        (click)="openReduce()"
+                                    >
+                                        Reduce first — filter the graph to use the greyed layouts
+                                    </button>
+                                }
                             </section>
                             <section aria-label="Overlays" class="flex flex-col">
                                 <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
@@ -1482,12 +1500,23 @@
                                     Grid
                                 </mat-checkbox>
                                 <mat-checkbox
-                                    [checked]="!!viewOptions().hulls"
+                                    [checked]="!!viewOptions().hulls && !hullsDisabledReason()"
+                                    [disabled]="!!hullsDisabledReason()"
+                                    [matTooltip]="hullsDisabledReason() ?? ''"
                                     (change)="toggleViewFlag('hulls', $event.checked)"
+                                    data-testid="la-hulls-toggle"
                                 >
                                     Community hulls
                                     <span class="text-secondary text-xs">(Louvain)</span>
                                 </mat-checkbox>
+                                @if (hullsDisabledReason(); as why) {
+                                    <span class="text-secondary text-xs" data-testid="la-hulls-reason"
+                                        >Community hulls {{ why }} —
+                                        <button type="button" class="text-primary underline" (click)="openReduce()">
+                                            reduce first
+                                        </button></span
+                                    >
+                                }
                                 <div class="mt-1 flex items-center gap-2">
                                     <mat-checkbox
                                         [checked]="superNodeThreshold() > 0"

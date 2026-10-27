@@ -9,7 +9,7 @@ import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from '
 import { GraphSourcesService } from './graph-sources';
 import type { ProjectedGraph } from './entity-projection';
 import { LaLimitsService } from './la-limits.service';
-import { laLayoutCaps, layoutCapNoticeText } from './la-limits';
+import { laLayoutCaps, layoutCapNoticeText, layoutOverCapReason } from './la-limits';
 import {
     hideLinkKinds,
     legendEdgeKindsFor,
@@ -60,7 +60,7 @@ import {
                         class="min-h-0 flex-auto"
                         [data]="drawn()"
                         [display]="canvasDisplay()"
-                        [layout]="view()?.layout ?? null"
+                        [layout]="drawnLayout()"
                         [fill]="true"
                     />
                     <inspecto-link-analysis-legend
@@ -134,7 +134,12 @@ export class LinkViewWidgetComponent {
         ...this.view()?.display,
         layoutCaps: laLayoutCaps(),
     }));
-    /** Said when the saved layout is over its node cap and the tile draws the fallback instead. */
+    /** The saved layout, or null (the graph view's default) when it is over its node cap (UIR-D11). */
+    readonly drawnLayout = computed(() => {
+        const saved = this.view()?.layout ?? null;
+        return saved && layoutOverCapReason(saved, this.data()?.nodes.length ?? 0) ? null : saved;
+    });
+    /** Said when the saved layout is over its node cap and the tile draws the default layout instead. */
     readonly layoutCapNotice = computed(() =>
         layoutCapNoticeText(this.view()?.layout ?? null, this.data()?.nodes.length ?? 0),
     );
