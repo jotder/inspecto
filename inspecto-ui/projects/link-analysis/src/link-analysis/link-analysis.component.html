@@ -1315,6 +1315,7 @@
                             [truncated]="truncated()"
                             [splitIdentityCount]="splitIdentities().length"
                             [splitIdentityHint]="splitIdentityHint()"
+                            [countsGraph]="workingSetCanvas() ? 'query-under-investigation' : 'query'"
                             [mode]="strandedCount() ? strandedCount() + ' stranded' : 'top-N by count'"
                             [open]="workingSetOpen()"
                             (openChange)="setOverlayOpen('workingSet', $event)"
@@ -1513,6 +1514,8 @@
                                     [maxDegree]="maxDegree()"
                                     (pendingDone)="pendingInvestigation.set(null)"
                                     (expandRequested)="openExpand()"
+                                    (settingsRequested)="openInvestigationSettings()"
+                                    (dockRequested)="openDock($event)"
                                 ></inspecto-link-analysis-investigation>
                             } @else {
                                 <div
@@ -1721,63 +1724,133 @@
 
         </div>
 
-        <!-- ══ Data strip: the displayed graph as rows (links or nodes); hidden entirely until the table icon in the toolbox is pressed ══ -->
-        @if (bottomOpen()) {
-        <div class="shrink-0 rounded-lg border">
-                <div id="bottom-panel-body" class="px-3 py-3">
-                    <div class="mb-2 flex flex-wrap items-center gap-2">
-                        <mat-button-toggle-group
-                            [value]="tableMode()"
-                            (change)="tableMode.set($event.value)"
-                            aria-label="Table contents"
-                        >
-                            <mat-button-toggle value="links">Links</mat-button-toggle>
-                            <mat-button-toggle value="nodes">Nodes</mat-button-toggle>
-                        </mat-button-toggle-group>
-                        <span class="text-secondary text-xs">{{ tableRows().length }} rows</span>
+        <!-- ══ Dock (LA-STUDIO-UI-REORG-1 §5.9): Rows, the open Investigation's tabs, Results. Resizable; collapses to its
+             tab strip; open state and tab remembered per browser (inspecto.la.dock) ══ -->
+        @if (graph() || workingSetCanvas() || investigation.active()) {
+        <div class="flex shrink-0 flex-col rounded-lg border" role="region" aria-label="Dock" data-testid="la-dock">
+            <!-- kept mounted while collapsed so #dockSplit stays resolvable for the body's height -->
+            <div
+                    [class.hidden]="!bottomOpen()"
+                    inspectoSplit="link-analysis.dock"
+                    #dockSplit="inspectoSplit"
+                    axis="y"
+                    pane="right"
+                    [min]="120"
+                    [max]="640"
+                    [defaultWidth]="280"
+                    aria-label="Resize the dock (arrow keys or drag)"
+                ></div>
+            <div class="flex items-center gap-1 px-2 py-0.5">
+                <div class="flex flex-wrap" role="tablist" aria-label="Dock tab">
+                    @for (t of dockTabs(); track t.id) {
                         <button
-                            mat-stroked-button
-                            class="ml-auto !min-h-0 !px-2 !py-0.5 text-xs"
-                            (click)="filterOpen.set(!filterOpen())"
-                            [attr.aria-expanded]="filterOpen()"
-                            [disabled]="!graph()"
+                            type="button"
+                            role="tab"
+                            class="border px-3 py-1 text-xs"
+                            style="border-color: var(--gamma-border)"
+                            [id]="'la-dock-tab-' + t.id"
+                            [class.font-semibold]="dockTabShown() === t.id"
+                            [style.boxShadow]="bottomOpen() && dockTabShown() === t.id ? 'inset 0 -2px 0 var(--gamma-primary)' : null"
+                            [attr.aria-selected]="dockTabShown() === t.id"
+                            [attr.aria-controls]="bottomOpen() && dockTabShown() === t.id ? 'bottom-panel-body' : null"
+                            [attr.tabindex]="dockTabShown() === t.id ? 0 : -1"
+                            (click)="openDock(t.id)"
+                            (keydown)="onDockTabKey($event)"
                         >
-                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:funnel"></mat-icon>
-                            Filter
+                            {{ t.label }}
                         </button>
-                        <button mat-icon-button (click)="bottomOpen.set(false)" matTooltip="Hide the rows" aria-label="Hide the rows">
-                            <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                        </button>
-                    </div>
-                    <!-- Filter predicate — the two-stage loop over the loaded graph, sat on the table it narrows. -->
-                    @if (graph() && filterOpen()) {
-                        <inspecto-link-analysis-filter
-                            class="mb-3 block"
-                            [where]="filterWhere()"
-                            [columns]="filterColumns()"
-                            [localMatch]="localMatch()"
-                            [pushState]="pushState()"
-                            [truncated]="truncated()"
-                            [busy]="pushing()"
-                            (changed)="onFilterChanged()"
-                            (applyLocal)="applyFilterLocally()"
-                            (pushToServer)="pushFilter()"
-                            (clear)="clearFilter()"
-                            (advanced)="openAdvancedSearch()"
-                        ></inspecto-link-analysis-filter>
                     }
-                    <inspecto-data-table
-                        stateKey="link-analysis-rows"
-                        tier="standard"
-                        [rows]="tableRows()"
-                        height="11rem"
-                        [pageSize]="10"
-                        exportName="link-analysis"
-                        sourceName="link-analysis"
-                        noRowsTitle="Nothing matches the current graph"
-                        (rowClick)="onTableRow($event)"
-                    ></inspecto-data-table>
                 </div>
+                <button
+                    mat-icon-button
+                    class="ml-auto"
+                    data-testid="dock-toggle"
+                    (click)="bottomOpen.set(!bottomOpen())"
+                    [attr.aria-expanded]="bottomOpen()"
+                    [matTooltip]="bottomOpen() ? 'Collapse the dock to its tabs' : 'Expand the dock'"
+                    [attr.aria-label]="bottomOpen() ? 'Collapse the dock' : 'Expand the dock'"
+                >
+                    <mat-icon [svgIcon]="bottomOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-up'"></mat-icon>
+                </button>
+            </div>
+            @if (bottomOpen()) {
+                <div
+                    id="bottom-panel-body"
+                    role="tabpanel"
+                    class="overflow-auto border-t px-3 py-3"
+                    style="border-color: var(--gamma-border)"
+                    [attr.aria-labelledby]="'la-dock-tab-' + dockTabShown()"
+                    [style.height.px]="dockSplit.width()"
+                >
+                    @switch (dockTabShown()) {
+                        @case ('rows') {
+                        <div class="mb-2 flex flex-wrap items-center gap-2">
+                            <mat-button-toggle-group
+                                [value]="tableMode()"
+                                (change)="tableMode.set($event.value)"
+                                aria-label="Table contents"
+                            >
+                                <mat-button-toggle value="links">Links</mat-button-toggle>
+                                <mat-button-toggle value="nodes">Nodes</mat-button-toggle>
+                            </mat-button-toggle-group>
+                            <span class="text-secondary text-xs">{{ tableRows().length }} rows</span>
+                            <button
+                                mat-stroked-button
+                                class="ml-auto !min-h-0 !px-2 !py-0.5 text-xs"
+                                (click)="filterOpen.set(!filterOpen())"
+                                [attr.aria-expanded]="filterOpen()"
+                                [disabled]="!graph()"
+                            >
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:funnel"></mat-icon>
+                                Filter
+                            </button>
+                            <button mat-icon-button (click)="bottomOpen.set(false)" matTooltip="Hide the rows" aria-label="Hide the rows">
+                                <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                            </button>
+                        </div>
+                        <!-- Filter predicate — the two-stage loop over the loaded graph, sat on the table it narrows. -->
+                        @if (graph() && filterOpen()) {
+                            <inspecto-link-analysis-filter
+                                class="mb-3 block"
+                                [where]="filterWhere()"
+                                [columns]="filterColumns()"
+                                [localMatch]="localMatch()"
+                                [pushState]="pushState()"
+                                [truncated]="truncated()"
+                                [busy]="pushing()"
+                                (changed)="onFilterChanged()"
+                                (applyLocal)="applyFilterLocally()"
+                                (pushToServer)="pushFilter()"
+                                (clear)="clearFilter()"
+                                (advanced)="openAdvancedSearch()"
+                            ></inspecto-link-analysis-filter>
+                        }
+                        <inspecto-data-table
+                            stateKey="link-analysis-rows"
+                            tier="standard"
+                            [rows]="tableRows()"
+                            height="11rem"
+                            [pageSize]="10"
+                            exportName="link-analysis"
+                            sourceName="link-analysis"
+                            noRowsTitle="Nothing matches the current graph"
+                            (rowClick)="onTableRow($event)"
+                        ></inspecto-data-table>
+                        }
+                        @case ('results') {
+                            <p class="text-secondary m-0 text-sm" data-testid="dock-results-empty">
+                                Long algorithm results open here with “Open in the dock”.
+                            </p>
+                        }
+                        @default {
+                            <inspecto-link-analysis-investigation
+                                [section]="invSection(dockTabShown())"
+                                (dockRequested)="openDock($event)"
+                            ></inspecto-link-analysis-investigation>
+                        }
+                    }
+                </div>
+            }
         </div>
         }
         <!-- ══ Status bar (footer): the active query as chips — edit-to-change + the counts ══ -->

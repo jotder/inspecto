@@ -4,7 +4,7 @@ import { TELECOM_PACK_FIXTURE } from '@inspecto/link-analysis/graph/domain-profi
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import type { LaFeatures, LaImportDraft } from '@inspecto/link-analysis/la-host';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
+import { ApplicationRef, Component, EventEmitter, Input, Output, getDebugNode, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
@@ -40,7 +40,6 @@ import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { configureLaLimits, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { SessionService } from 'app/inspecto/auth/session.service';
-import { LinkAnalysisIdentitiesComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-identities.component';
 
 /** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
 const STANDARD_EDITION_FEATURES = {
@@ -3454,7 +3453,9 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         fixture.detectChanges();
         expect(c.toolboxTab()).toBe('investigation');
         // The Identity section rendered in that tab took the hand-off into its form (and cleared it).
-        const identities = fixture.debugElement.query(By.directive(LinkAnalysisIdentitiesComponent));
+        // Identities moved to the Investigation settings (§5.10): the merge opens them in that dialog (an overlay)
+        TestBed.inject(ApplicationRef).tick();
+        const identities = getDebugNode(document.querySelector('inspecto-link-analysis-identities'))!;
         expect(identities.componentInstance.assertForm.getRawValue()).toMatchObject({
             typeA: 'msisdn',
             valueA: '+447700900123',
@@ -3462,6 +3463,7 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
             valueB: '234150000000001',
         });
         expect(c.investigation.mergeDraft()).toBeNull();
+        TestBed.inject(MatDialog).closeAll();
         fixture.destroy();
     });
 
@@ -3498,13 +3500,15 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         c.mergeSelected();
         made.fixture.detectChanges();
         // the Identity section (Investigation tab) took the hand-off: what reached its form is the typed pair
-        const identities = made.fixture.debugElement.query(By.directive(LinkAnalysisIdentitiesComponent));
+        TestBed.inject(ApplicationRef).tick();
+        const identities = getDebugNode(document.querySelector('inspecto-link-analysis-identities'))!;
         expect(identities.componentInstance.assertForm.getRawValue()).toMatchObject({
             typeA: 'msisdn',
             valueA: '99979100001',
             typeB: 'account',
             valueB: 'SHELL-A',
         });
+        TestBed.inject(MatDialog).closeAll();
         made.fixture.destroy();
     });
 

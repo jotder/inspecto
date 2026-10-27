@@ -22,6 +22,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EntityProjection } from '@inspecto/core/graph';
@@ -76,7 +77,6 @@ import { LinkAnalysisEmbedComponent } from './link-analysis-embed.component';
 import { LinkAnalysisInvestigationCaseComponent } from './link-analysis-investigation-case.component';
 import { LinkAnalysisOversightComponent } from './link-analysis-oversight.component';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
-import { LinkAnalysisValueMeasuresComponent } from './link-analysis-value-measures.component';
 import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set-rows.component';
 
 /**
@@ -88,6 +88,26 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
  */
 /** How often a held degree re-reads the log for its four-eyes decision. */
 export const APPROVAL_POLL_MS = 15_000;
+
+/** The parts of an Investigation: the Act panel, the dock tabs (§5.9) and the settings sections (§5.10). */
+export type InvestigationSection = 'act' | 'settings' | 'oplog' | 'ws-rows' | 'coverage' | 'annotations' | 'excluded';
+export const INVESTIGATION_SECTION_LABELS: Record<InvestigationSection, string> = {
+    act: 'Investigation',
+    settings: 'Investigation settings',
+    oplog: 'Investigation op log',
+    'ws-rows': 'Investigation Working Set rows',
+    coverage: 'Investigation coverage',
+    annotations: 'Investigation annotations',
+    excluded: 'Investigation exclusions',
+};
+type MoreStepId = 'window' | 'threshold' | 'snapshot' | 'compare' | 'connect';
+const MORE_STEPS: readonly { id: MoreStepId; label: string }[] = [
+    { id: 'window', label: 'Time window' },
+    { id: 'threshold', label: 'Threshold' },
+    { id: 'snapshot', label: 'Snapshot marker' },
+    { id: 'compare', label: 'Compare' },
+    { id: 'connect', label: 'Connect seeds' },
+];
 
 import { LaFoldComponent } from './la-fold.component';
 
@@ -101,6 +121,7 @@ import { LaFoldComponent } from './la-fold.component';
         MatButtonModule,
         MatCheckboxModule,
         MatIconModule,
+        MatMenuModule,
         MatRadioModule,
         MatTooltipModule,
         InspectoAlertComponent,
@@ -123,11 +144,10 @@ import { LaFoldComponent } from './la-fold.component';
         LinkAnalysisEmbedComponent,
         LinkAnalysisOversightComponent,
         LinkAnalysisTemplateMeasuresComponent,
-        LinkAnalysisValueMeasuresComponent,
         LinkAnalysisWorkingSetRowsComponent,
     ],
     // Back on the tab: a decision made elsewhere (an approval in Oversight) shows without reopening.
-    host: { class: 'block', '(window:focus)': 'store.reload()' },
+    host: { class: 'block', '(window:focus)': 'onWindowFocus()' },
     templateUrl: './link-analysis-investigation.component.html',
 })
 export class LinkAnalysisInvestigationComponent {
@@ -162,6 +182,24 @@ export class LinkAnalysisInvestigationComponent {
     readonly pendingDone = output<void>();
     /** "Expand…": the screen opens its Expand dialog (§5.4), which holds the read settings. */
     readonly expandRequested = output<void>();
+    /** Which part of the Investigation this instance draws (§5.8 / §5.9); every instance shares the one store. */
+    readonly section = input<InvestigationSection>('act');
+    /** "Settings…" in the header's ⋯ menu: the screen opens the Investigation's settings. */
+    readonly settingsRequested = output<void>();
+    /** "Open the Op log": the screen opens that dock tab. */
+    readonly dockRequested = output<InvestigationSection>();
+    readonly sectionLabel = computed(() => INVESTIGATION_SECTION_LABELS[this.section()]);
+    /** More steps ▾ (§5.8 block 7): the one step open in place, or null. */
+    readonly moreSteps = MORE_STEPS;
+    readonly moreStep = signal<MoreStepId | null>(null);
+    readonly moreStepLabel = computed(() => MORE_STEPS.find((m) => m.id === this.moreStep())?.label ?? '');
+    /** The Act panel's last five steps, newest first. */
+    readonly lastSteps = computed(() => (this.store.log()?.entries ?? []).slice(-5).reverse());
+
+    /** Back on the tab: one instance (the Act panel) re-reads, so a decision made elsewhere shows without reopening. */
+    onWindowFocus(): void {
+        if (this.section() === 'act') void this.store.reload();
+    }
 
     constructor() {
         // Prefill the time column from the canvas / Dataset default; an analyst's own edit is never overwritten.
@@ -179,7 +217,7 @@ export class LinkAnalysisInvestigationComponent {
         // A held degree: poll the log modestly until the four-eyes request is decided (the effect re-runs, and the
         // interval is cleared, as soon as the reconciled outcome is no longer waiting).
         effect((onCleanup) => {
-            if (!this.store.awaitingApproval()) return;
+            if (this.section() !== 'act' || !this.store.awaitingApproval()) return;
             const timer = setInterval(() => void this.store.reload(), APPROVAL_POLL_MS);
             onCleanup(() => clearInterval(timer));
         });
