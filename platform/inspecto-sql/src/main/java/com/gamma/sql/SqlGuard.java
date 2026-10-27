@@ -27,8 +27,11 @@ import java.util.regex.Pattern;
  *       — every DuckDB table function except the path-free generators in {@link #SAFE_TABLE_FUNCTIONS},
  *       bare or double-quoted (see {@link #BLOCKED_FUNCTION}); the {@code install}/
  *       {@code load}/{@code pragma}/{@code set} configuration verbs.</li>
+ *   <li><b>Quoted text is data</b> — the keyword and statement checks run on real SQL tokens only: the
+ *       content of string literals, double-quoted identifiers and {@code $$} strings is masked first, so
+ *       {@code WHERE record_kind = 'CALL'} passes while {@code 'x'; DROP TABLE t; --} is still refused.</li>
  *   <li><b>Comment-smuggling</b> — line ({@code --}) and block ({@code /* *}{@code /}) comments are
- *       stripped (outside string literals) <em>before</em> the token scan, with block comments removed
+ *       stripped (outside quoted text, nested block comments included) <em>before</em> the token scan, with block comments removed
  *       to empty so {@code read/*x*}{@code /_csv(…)} cannot hide a blocked token; an unterminated block
  *       comment is itself rejected.</li>
  *   <li><b>Anything DuckDB's own parse tree shows</b> — text the lexical checks pass is then parsed by
@@ -165,7 +168,12 @@ public final class SqlGuard {
         String noTrailing = cleaned.endsWith(";")
                 ? cleaned.substring(0, cleaned.length() - 1).trim()
                 : cleaned;
-        if (noTrailing.contains(";")) {
+        // Statement and keyword checks read the MASKED text: quoted data is not SQL.
+        String maskedCleaned = s.masked().trim();
+        String maskedNoTrailing = maskedCleaned.endsWith(";")
+                ? maskedCleaned.substring(0, maskedCleaned.length() - 1).trim()
+                : maskedCleaned;
+        if (maskedNoTrailing.contains(";")) {
             out.add(Finding.error("sql",
                     "only a single statement is allowed; remove the extra ';'-separated statement(s)"));
         }
@@ -185,10 +193,10 @@ public final class SqlGuard {
             }
         }
 
-        var km = BLOCKED_KEYWORDS.matcher(noTrailing);
+        var km = BLOCKED_KEYWORDS.matcher(maskedNoTrailing);
         if (km.find()) {
             out.add(Finding.error("sql", "the keyword '" + km.group(1).toUpperCase()
-                    + "' is not allowed — only a read-only SELECT over the catalog views is permitted"));
+                    + "' is not allowed as SQL (found outside quoted text) — only a read-only SELECT over the catalog views is permitted"));
         }
 
         var rm = RELATION_REF.matcher(noTrailing);
@@ -478,51 +486,83 @@ public final class SqlGuard {
         parser = null;
     }
 
-    // ── comment stripping (string-literal aware) ───────────────────────────────────────
-
-    private record Stripped(String text, boolean unterminatedComment) {}
+    // ── tokenising scan (comments, string literals, quoted identifiers) ─────────────────
 
     /**
-     * Remove line and block comments, honouring single-quoted string literals (so a literal containing
-     * {@code --} or {@code /*} is not mistaken for a comment). Block comments are removed to empty so a
-     * comment cannot be used to split a blocked token; line comments become a newline.
+     * {@code text}: the SQL with comments removed, quoted text intact (what the function and relation
+     * checks read). {@code masked}: the same with the CONTENT of every string literal, quoted identifier
+     * and dollar-quoted string emptied (delimiters kept), so a word that is only data — {@code
+     * record_kind = 'CALL'}, {@code "set"}, {@code ';'} — is invisible to the keyword and statement
+     * checks, which therefore see real SQL tokens only.
+     */
+    private record Stripped(String text, String masked, boolean unterminatedComment) {}
+
+    /**
+     * One pass over {@code sql}, honouring {@code '…'} (with {@code ''} escapes), {@code "…"} (with {@code ""}),
+     * {@code $$…$$} / {@code $tag$…$tag$}, {@code --} line comments and nestable {@code /* *}{@code /} block
+     * comments (DuckDB, like PostgreSQL, nests them). Block comments are removed to empty so a comment
+     * cannot split a blocked token; line comments become a newline. Strict where unsure: an unterminated
+     * quote masks to the end of the text (DuckDB then refuses it too), and a backslash is NOT an escape,
+     * so an {@code E'…\'…'} string is scanned as MORE code, never less.
      */
     private static Stripped strip(String sql) {
-        StringBuilder b = new StringBuilder(sql.length());
+        StringBuilder b = new StringBuilder(sql.length()), m = new StringBuilder(sql.length());
         int i = 0, n = sql.length();
-        boolean inStr = false;
         while (i < n) {
             char c = sql.charAt(i);
-            if (inStr) {
-                b.append(c);
-                if (c == '\'') {
-                    if (i + 1 < n && sql.charAt(i + 1) == '\'') { // escaped '' inside a literal
-                        b.append('\'');
-                        i += 2;
-                        continue;
+            if (c == '\'' || c == '"') {
+                int j = i + 1;
+                while (j < n) {
+                    if (sql.charAt(j) == c) {
+                        if (j + 1 < n && sql.charAt(j + 1) == c) { j += 2; continue; } // doubled-quote escape
+                        break;
                     }
-                    inStr = false;
+                    j++;
                 }
-                i++;
-                continue;
-            }
-            if (c == '\'') {
-                inStr = true;
-                b.append(c);
-                i++;
+                int end = Math.min(j + 1, n);
+                b.append(sql, i, end);
+                m.append(c);
+                if (j < n) m.append(c);
+                i = end;
+            } else if (c == '$' && dollarTagEnd(sql, i) > 0) {
+                int open = dollarTagEnd(sql, i);
+                String tag = sql.substring(i, open);
+                int close = sql.indexOf(tag, open);
+                int end = close < 0 ? n : close + tag.length();
+                b.append(sql, i, end);
+                m.append(tag);
+                if (close >= 0) m.append(tag);
+                i = end;
             } else if (c == '-' && i + 1 < n && sql.charAt(i + 1) == '-') {
                 i += 2;
                 while (i < n && sql.charAt(i) != '\n') i++;
                 b.append('\n');
+                m.append('\n');
             } else if (c == '/' && i + 1 < n && sql.charAt(i + 1) == '*') {
-                int end = sql.indexOf("*/", i + 2);
-                if (end < 0) return new Stripped(b.toString(), true);
-                i = end + 2; // drop the comment entirely (no separator) to defeat token-splitting
+                int depth = 1;
+                i += 2;
+                while (i < n && depth > 0) {
+                    if (sql.startsWith("/*", i)) { depth++; i += 2; }
+                    else if (sql.startsWith("*/", i)) { depth--; i += 2; }
+                    else i++;
+                }
+                if (depth > 0) return new Stripped(b.toString(), m.toString(), true);
+                // dropped entirely (no separator) to defeat token-splitting
             } else {
                 b.append(c);
+                m.append(c);
                 i++;
             }
         }
-        return new Stripped(b.toString(), false);
+        return new Stripped(b.toString(), m.toString(), false);
+    }
+
+    /** Index just past a {@code $tag$} opener at {@code i} ({@code tag} empty or an identifier), or -1. */
+    private static int dollarTagEnd(String sql, int i) {
+        int j = i + 1, n = sql.length();
+        if (j < n && (Character.isLetter(sql.charAt(j)) || sql.charAt(j) == '_')) {
+            while (j < n && (Character.isLetterOrDigit(sql.charAt(j)) || sql.charAt(j) == '_')) j++;
+        }
+        return j < n && sql.charAt(j) == '$' ? j + 1 : -1;
     }
 }

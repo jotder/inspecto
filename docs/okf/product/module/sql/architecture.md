@@ -26,6 +26,13 @@ candidate SQL ──► SqlGuard (lexical + DuckDB parse tree) ──finding─�
 - The sandbox is the backstop: once sealed, a guard bypass still cannot reach the filesystem or change
   configuration. `sealAllowing` keeps named directories readable for callers that need their own inputs.
 - `SqlViews` makes the oracle and production Enrichment read a Dataset the same way.
+- **Quoted text is data (`SQLGUARD-QUOTED-TEXT-1`, 2026-10-27).** The keyword and `;` checks run on a masked copy of
+  the SQL in which the content of `'…'` strings (`''` escapes), `"…"` identifiers and `$$…$$`/`$tag$…$tag$` strings is
+  emptied and comments (nested `/* */` included) are removed, so `WHERE record_kind = 'CALL'` passes (it refused three
+  `sql.template` Jobs) while `'x'; DROP TABLE t; --` and a real `CALL`/`SET`/`COPY` statement are refused as before.
+  Unsure cases scan MORE, never less: a backslash is not an escape, an unterminated quote masks to the end and the parser
+  layer then refuses it. The function-call, relation (replacement-scan) and parse-tree checks still read the raw text,
+  so a file function or path literal is refused wherever it sits. Tests: `SqlGuardQuotedTextTest`.
 
 ## Where it is used
 
