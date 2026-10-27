@@ -62,6 +62,8 @@ class LaClaimsTemplateTest {
             assertEquals("dst", p.get("targetCol"));
             assertEquals("kind", p.get("linkKindCol"));
         }
+        Map<String, Object> money = ToonHelper.load(CFG.resolve("registry/link-analysis-views/claims_provider_money.toon").toString());
+        assertEquals("force", money.get("layout"), "dagre drew this wide, shallow graph as a vertical sliver");
     }
 
     @Test

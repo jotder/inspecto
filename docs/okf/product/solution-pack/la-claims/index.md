@@ -35,4 +35,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | the three showcases were driven in the browser 2026-10-24 (the assistant alone; the tour is written); what is left is narrow. | — |
-| `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1` | P3 | defect | the saved view claims_provider_money draws as an unreadable vertical sliver. | — |

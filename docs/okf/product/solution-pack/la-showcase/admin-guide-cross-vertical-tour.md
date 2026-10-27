@@ -98,7 +98,7 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 | Panel | Where | Rehearsal result |
 |---|---|---|
-| Graph page, saved views | start card or *Open saved views* > the view > *Load view* | A `mm_money_trail` 465 nodes, 4 000 links, "Truncated" banner; B `gl_intercompany` 8 / 72; C `claims_network` 388 / 2 574 (force, hulls), `claims_provider_money` 320 / 806 but **drawn as an unreadable vertical sliver** (dagre; defect row `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1`) |
+| Graph page, saved views | start card or *Open saved views* > the view > *Load view* | A `mm_money_trail` 465 nodes, 4 000 links, "Truncated" banner; B `gl_intercompany` 8 / 72; C `claims_network` 388 / 2 574 (force, hulls), `claims_provider_money` 320 / 806 (drawn as a vertical sliver under dagre on 2026-10-24; force since 2026-10-28, `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1`) |
 | Domain profile | the Query panel picker | the start page offered "Mobile Money" on A; after *Follow the money* it read "finance" (defect row `LA-SAVED-VIEW-DOMAIN-PROFILE-1`) |
 | Draft, Members | Investigation tab | B: all of 1.4; A: Members shown, Drafts "No Drafts" |
 | Settings | left rail > Settings (admin) | Link Analysis group (masking mode, link index, propagated-risk weights, embed lists, Domain profile, category lists) and *Analysis limits* (about 20 groups: Canvas, Investigation, Traversal, Dossier, Identity, Upload…). Editing worked: masking `all`, save ("Link Analysis settings saved"), "In force: all", then back to `typed` |
