@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationDraft } from '@inspecto/link-analysis/api/inv.service';
 import { LensService, SessionService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
 
 @Component({
@@ -40,6 +41,8 @@ const DRAFT: InvestigationDraft = {
     stale: false,
     pinWarning: false,
 };
+const confirm = { answer: true, confirmDestructive: vi.fn(async (..._a: unknown[]) => confirm.answer) };
+
 const REPORT = {
     draftId: 'd-1',
     baseStep: 3,
@@ -76,6 +79,7 @@ async function create(
         draftLog: vi.fn(() => throwError(() => http(404, 'no log'))),
         ...overrides,
     };
+    confirm.confirmDestructive.mockClear();
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [
@@ -83,6 +87,7 @@ async function create(
             { provide: InvService, useValue: inv },
             { provide: SessionService, useValue: { actor: signal(actor) } },
             { provide: LensService, useValue: { canManageIncidents: signal(true) } },
+            { provide: InspectoConfirmService, useValue: confirm },
         ],
     });
     const f = TestBed.createComponent(Host);
@@ -313,6 +318,16 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         const { f, el, inv } = await create();
         await click(f, button(el, 'Discard'));
         expect(inv.discardDraft).toHaveBeenCalledWith('inv-1', 'd-1');
+    });
+
+    it('LA-REVOKE-DISCARD-NO-CONFIRM-1: discards only after a confirm naming the Draft', async () => {
+        confirm.answer = false;
+        const { f, el, inv } = await create(undefined, [{ ...DRAFT, label: 'hub check' }]);
+        await click(f, button(el, 'Discard'));
+        expect(confirm.confirmDestructive).toHaveBeenCalledTimes(1);
+        expect(String(confirm.confirmDestructive.mock.calls[0][0])).toContain('hub check');
+        expect(inv.discardDraft).not.toHaveBeenCalled();
+        confirm.answer = true;
     });
 
     it('LA-UI-DRAFT-ACTS-GATE-1: a reviewer cannot rebase, promote or discard another actor’s Draft', async () => {

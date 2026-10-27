@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationMembers } from '@inspecto/link-analysis/api/inv.service';
 import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { LinkAnalysisMembersComponent } from './link-analysis-members.component';
 
 @Component({
@@ -31,7 +32,10 @@ const AS_ANALYST: InvestigationMembers = { ...AS_LEAD, you: 'analyst' };
 
 const http = (status: number, message: string) => new HttpErrorResponse({ status, error: { error: { message } } });
 
+const confirm = { answer: true, confirmDestructive: vi.fn(async (..._a: unknown[]) => confirm.answer) };
+
 async function create(overrides: Partial<Record<keyof InvService, unknown>> = {}, canManage = true) {
+    confirm.confirmDestructive.mockClear();
     const inv = {
         investigationMembers: vi.fn(() => of(AS_LEAD)),
         grantInvestigationMember: vi.fn(() => of(AS_LEAD)),
@@ -44,6 +48,7 @@ async function create(overrides: Partial<Record<keyof InvService, unknown>> = {}
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
             { provide: LensService, useValue: { canManageIncidents: signal(canManage) } },
+            { provide: InspectoConfirmService, useValue: confirm },
         ],
     });
     const f = TestBed.createComponent(Host);
@@ -104,6 +109,17 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         (el.querySelector('[aria-label="Revoke ana-1"]') as HTMLButtonElement).click();
         await f.whenStable();
         expect(inv.revokeInvestigationMember).toHaveBeenCalledWith('inv-1', 'ana-1');
+    });
+
+    it('LA-REVOKE-DISCARD-NO-CONFIRM-1: revokes only after a confirm naming the member', async () => {
+        confirm.answer = false;
+        const { f, el, inv } = await create();
+        (el.querySelector('[aria-label="Revoke ana-1"]') as HTMLButtonElement).click();
+        await f.whenStable();
+        expect(confirm.confirmDestructive).toHaveBeenCalledTimes(1);
+        expect(String(confirm.confirmDestructive.mock.calls[0][0])).toContain('ana-1');
+        expect(inv.revokeInvestigationMember).not.toHaveBeenCalled();
+        confirm.answer = true;
     });
 
     it('explains a refused revoke of the last lead (422) in place', async () => {

@@ -193,6 +193,29 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         expect(store.lastChange()?.text).toContain('not the newest step');
     });
 
+    it('clean-up records hide + annotate, and ONE Undo takes the pair back newest first', async () => {
+        const { store, session, applied } = create();
+        expect(await store.cleanUp(['a', 'b'], 'Trimmed to 2')).toBe(true);
+        expect(applied).toEqual([{ op: 'hide', ids: ['a', 'b'] }, { op: 'annotate', ids: ['a', 'b'], note: 'Trimmed to 2' }]);
+        expect(store.lastChange()?.text).toContain('hid 2');
+        expect(await store.undoLast()).toBe(true);
+        expect(session.undo.mock.calls).toEqual([[2], [1]]);
+        expect(store.lastChange()?.text).toBe('Undone (2 steps).');
+    });
+
+    it('clean-up Undo stops on a 409 and names the colleague’s newer step', async () => {
+        const { store, session } = create();
+        await store.cleanUp(['a'], 'why');
+        const undo = store.lastChange()!.undo!;
+        session.undo.mockImplementationOnce(async (undoes?: number) => {
+            session.error.set(`Refused — step ${undoes} is not the newest step any more: step 3 (keep by lead-1) is`);
+            return false;
+        });
+        await undo();
+        expect(session.undo.mock.calls).toEqual([[2]]); // the hide (step 1) is not undone under the colleague's step
+        expect(store.lastChange()?.text).toContain('step 3 (keep by lead-1)');
+    });
+
     it('Undo is offered only while the change is still the newest: a later step takes it away', async () => {
         const { store, session } = create();
         await store.growInvestigation(CTX, REQ, {});

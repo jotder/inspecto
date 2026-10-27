@@ -20,6 +20,7 @@ import {
     InvestigationRole,
 } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage } from '@inspecto/core/api';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { limitRefusalMessage } from './limit-refusal';
@@ -252,6 +253,7 @@ export class LinkAnalysisDraftsComponent {
 
     private readonly inv = inject(InvService);
     private readonly lens = inject(LensService);
+    private readonly confirm = inject(InspectoConfirmService);
     readonly canWrite = computed(() => this.lens.canManageIncidents());
     private readonly session = inject(SessionService);
     /** The caller's role on this Investigation (null until read, or when it cannot be). */
@@ -447,6 +449,12 @@ export class LinkAnalysisDraftsComponent {
     }
 
     async discard(d: InvestigationDraft): Promise<void> {
+        const name = d.label ? `“${d.label}” (${d.draftId})` : d.draftId;
+        const ok = await this.confirm.confirmDestructive(
+            `Discard the Draft ${name}? Its steps are dropped and are not promoted. This cannot be undone.`,
+            { title: 'Discard Draft', confirmText: 'Discard' },
+        );
+        if (!ok) return;
         const done = await this.run(
             () => firstValueFrom(this.inv.discardDraft(this.investigationId(), d.draftId)),
             'Could not discard the Draft.',
