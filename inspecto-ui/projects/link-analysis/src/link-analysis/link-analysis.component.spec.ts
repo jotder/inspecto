@@ -5074,3 +5074,24 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
         expect(opened).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('LinkAnalysisComponent - the node dialog Entity page link follows /bootstrap entityPages (LA-EDITION-PLACEMENT-1)', () => {
+    type EntityPageOf = { entityPageOf: (type: string | undefined, key: string) => unknown; route: unknown };
+    const onLinkAnalysisRoute = (c: unknown) =>
+        Object.defineProperty(c, 'route', { value: { snapshot: { pathFromRoot: [{ url: [{ path: 's1' }, { path: 'link-analysis' }] }] } } });
+
+    it('is null when entityPages is off or absent (Basic), a link to the Entity page when it is on', () => {
+        for (const [flags, expected] of [
+            [undefined, null],
+            [signal({ entityPages: false }), null],
+            [signal({ entityPages: true }), '/s1/entities/msisdn/123'],
+        ] as const) {
+            TestBed.resetTestingModule();
+            const { fixture } = create({ features: { ...STANDARD_EDITION_FEATURES, ...(flags ? { flags } : {}) } });
+            const c = fixture.componentInstance as unknown as EntityPageOf;
+            onLinkAnalysisRoute(c);
+            const tree = c.entityPageOf('msisdn', '123');
+            expect(tree === null ? null : String(tree)).toBe(expected);
+        }
+    });
+});
