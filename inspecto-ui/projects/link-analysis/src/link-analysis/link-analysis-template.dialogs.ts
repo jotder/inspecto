@@ -28,6 +28,7 @@ import { AttributeOptionLoader, InspectoSchemaFormComponent } from '@inspecto/co
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
+import { domainProfiles } from '@inspecto/link-analysis/graph/domain-profile';
 import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
 import { investigationErrorMessage } from './investigation-state';
 import { limitRefusalMessage } from './limit-refusal';
@@ -63,6 +64,7 @@ export interface SaveTemplateData {
         MatFormFieldModule,
         MatInputModule,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
     ],
     template: `
         <h2 mat-dialog-title>Save as Investigation Template</h2>
@@ -129,6 +131,14 @@ export interface SaveTemplateData {
                             <mat-error>At most 200 characters.</mat-error>
                         }
                     </mat-form-field>
+                    <!-- UIR-D9: an optional pack, for a Space that mixes verticals; blank = the Space's own -->
+                    <inspecto-option-picker
+                        label="Industry pack (optional)"
+                        formControlName="pack"
+                        [options]="packOptions"
+                        help="Investigations started from this template read under this pack. Blank: the Space's pack."
+                        data-testid="save-template-pack"
+                    ></inspecto-option-picker>
                     <mat-form-field subscriptSizing="dynamic">
                         <mat-label>Template id (optional — generated when blank)</mat-label>
                         <input matInput formControlName="id" />
@@ -166,7 +176,14 @@ export class SaveTemplateDialog {
     readonly form = new FormGroup({
         title: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
         id: new FormControl('', { nonNullable: true, validators: [Validators.pattern(SAFE_ID_PATTERN)] }),
+        pack: new FormControl('', { nonNullable: true }),
     });
+    readonly packOptions: PickerOption[] = [
+        { value: '', label: "The Space's pack" },
+        ...domainProfiles()
+            .filter((p) => p.id !== 'generic')
+            .map((p) => ({ value: p.id, label: p.label, hint: p.description })),
+    ];
     readonly busy = signal(false);
     readonly error = signal('');
     readonly unavailable = signal(false);
@@ -179,7 +196,7 @@ export class SaveTemplateDialog {
             this.form.markAllAsTouched();
             return;
         }
-        const { title, id } = this.form.getRawValue();
+        const { title, id, pack } = this.form.getRawValue();
         this.busy.set(true);
         this.error.set('');
         try {
@@ -188,6 +205,7 @@ export class SaveTemplateDialog {
                     this.inv.saveInvestigationTemplate(this.data.investigationId, {
                         ...(title.trim() ? { title: title.trim() } : {}),
                         ...(id.trim() ? { id: id.trim() } : {}),
+                        ...(pack ? { pack } : {}),
                     }),
                 ),
             );

@@ -51,5 +51,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-SUSPICION-FACTORS-DEMO-1` | P3 | defect | the Suspicion score's per-node "Factors" cannot be shown on any showcase Space (whitepaper claim T2). | — |
 | `LA-REVOKE-DISCARD-NO-CONFIRM-1` | P3 | defect | revoking an Investigation member and discarding a Draft take no confirmation, unlike revoking an embed link. | — |
 | `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1` | P3 | defect | the saved view claims_provider_money draws as an unreadable vertical sliver. | — |
-| `LA-SAVED-VIEW-DOMAIN-PROFILE-1` | P3 | defect | loading a saved view changes the Domain profile. | — |
 | `LA-STUDIO-UI-REORG-1` | P2 | feature | reorganize the Link Analysis Studio UI so it is easier and cleaner without removing any function (plan 2026-10-27, direction decided by t… | — |

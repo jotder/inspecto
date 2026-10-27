@@ -119,6 +119,11 @@ import { DataTableComponent } from '@inspecto/core/data-table';
 import { G6GraphData, EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery, NodeRule, toGraphml } from '@inspecto/core/graph';
 import { LinkAnalysisGlossaryComponent } from './link-analysis-glossary.component';
 import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules.component';
+import { LaSettingsSection, LinkAnalysisSettingsComponent } from './link-analysis-settings.component';
+import { LinkAnalysisEntityTypesComponent } from './link-analysis-entity-types.component';
+import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
+import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
+import { LinkAnalysisUploadsComponent } from './link-analysis-uploads.component';
 import {
     analysisNodeCapValue,
     browserAlgorithmCapValue,
@@ -394,6 +399,11 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         LinkAnalysisDiscoverComponent,
         LinkAnalysisGlossaryComponent,
         LinkAnalysisDisplayRulesComponent,
+        LinkAnalysisSettingsComponent,
+        LinkAnalysisEntityTypesComponent,
+        LinkAnalysisEntityListsComponent,
+        LinkAnalysisIdentitiesComponent,
+        LinkAnalysisUploadsComponent,
         LinkAnalysisCapsComponent,
         LinkAnalysisCleanupComponent,
         LinkAnalysisModulesComponent,
@@ -525,11 +535,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
     @ViewChild('viewsTrigger') private viewsTrigger?: MatMenuTrigger;
 
-    // ── workspace layout: [query dock] │ canvas │ [toolbox dock], Data as a bottom strip ──
+    // ── workspace layout: canvas │ [toolbox dock], Data as a bottom strip; the graph model lives in ⚙ Settings ──
     /** Full query form vs its collapsed selected-values summary (auto-collapses after a run). */
     readonly queryOpen = signal(true);
-    /** The left dock (Query); collapses to an icon rail. */
-    readonly queryDockOpen = signal(true);
+    /** ⚙ Settings (§5.10): open, and the section shown (the dialog remembers the last one). */
+    readonly settingsOpen = signal(false);
+    readonly settingsSection = signal<LaSettingsSection>('graph-model');
+    /** Unsaved changes = a graph-model form edited since the last run. */
+    readonly settingsDirty = (): boolean => !!this.queryPanel?.isDirty();
     /** The right dock (Analysis | View toolbox); collapses to an icon rail. */
     readonly toolboxDockOpen = signal(initialToolboxOpen());
     private toolboxSeen = false;
@@ -644,10 +657,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (zoneWidth <= 0 || zoneWidth >= CANVAS_MIN_PX) return;
         if (window.matchMedia?.('(max-width: 959px)').matches) return; // stacked: the canvas has the full width
         if (this.toolboxDockOpen()) this.toolboxDockOpen.set(false);
-        else if (this.queryDockOpen()) this.queryDockOpen.set(false);
     }
     /** The docks give the canvas their width in one step (and take it back). */
-    readonly canvasMaximized = computed(() => !this.queryDockOpen() && !this.toolboxDockOpen());
+    readonly canvasMaximized = computed(() => !this.toolboxDockOpen());
 
     // ── View toolbox: canvas plugins and behaviors (each a G6 v5 built-in), persisted with a saved view ──
     // Fisheye, Link filter, Snap lines and Hover activate all start OFF (operator 2026-10-26).
@@ -1364,14 +1376,15 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         () => this.canvasSource()?.nodes.filter((n) => n.data.unexpanded).length ?? 0,
     );
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
-    readonly profileControl = new FormControl<DomainProfileId>('generic', { nonNullable: true });
-    /** `generic` plus every Industry pack the server installed (reactive: the packs arrive after the first render). */
-    readonly profileOptions = computed(() =>
-        domainProfiles().map((p) => ({ value: p.id, label: p.label, hint: p.description })),
+    // UIR-D9 (§5.12): no picker. The Space's Industry pack applies, unless the open Investigation, a Template or a
+    // saved view bound another; a bound pack is shown read-only in ⚙ Settings → Graph model.
+    /** A pack a saved view or an *Investigate a number* binding brought; null = none. */
+    readonly boundProfile = signal<DomainProfileId | null>(null);
+    readonly profileId = computed<DomainProfileId>(
+        () => this.investigation.boundProfileId() ?? this.boundProfile() ?? activeDomainProfileId(),
     );
-    readonly profileId = toSignal(this.profileControl.valueChanges, { initialValue: this.profileControl.value });
     readonly profile = computed(() => domainProfile(this.profileId()));
-    /** A reloaded / adopted Investigation brings back the domain profile it was opened under. */
+    readonly profileLabel = computed(() => this.profile().label);
     /** LA-SEED-CONNECT-1 (b): a clicked Connect pair row emphasises its route's nodes and the links between consecutive ones. */
     private readonly showConnectRoute = effect(() => {
         const route = this.investigation.highlightRoute();
@@ -1384,23 +1397,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             nodeIds: ids,
             edgeIds: g.edges.filter((e) => pair.has([e.source, e.target].sort().join('|'))).map((e) => e.id),
         });
-    });
-    /**
-     * The Space's selected Domain Profile is the default reading: applied once, when the packs arrive, unless a view, a
-     * case or an Investigation has already chosen a profile (the control then no longer reads `generic`).
-     */
-    private spaceProfileApplied = false;
-    private readonly applySpaceProfile = effect(() => {
-        const id = activeDomainProfileId();
-        if (this.spaceProfileApplied || id === 'generic') return;
-        this.spaceProfileApplied = true;
-        untracked(() => {
-            if (this.profileControl.value === 'generic') this.profileControl.setValue(id);
-        });
-    });
-    private readonly restoreBoundProfile = effect(() => {
-        const p = this.investigation.boundProfileId();
-        if (p && p !== this.profileControl.value) this.profileControl.setValue(p);
     });
     readonly workingSet = computed(() => {
         const g = this.graph();
@@ -1952,7 +1948,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (binding && ds && !reason) {
             this.investigateIssue.set('');
             this.investigation.close(); // the pending form shows only while no Investigation is open (it stays remembered)
-            this.profileControl.setValue(binding.profileId);
+            this.boundProfile.set(binding.profileId);
             const windowEnd = await this.latestEventTime(ds, binding.timeCol);
             this.pendingInvestigation.set(windowEnd ? { ...binding, windowEnd } : binding);
             this.openInvestigation();
@@ -2006,10 +2002,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      * data's `?dataset=<id>`) that Dataset is picked instead, and its graph is drawn when its link columns are suggested.
      */
     exploreDataset(datasetId?: string): void {
-        this.queryDockOpen.set(true);
+        this.openSettings('graph-model');
         this.queryOpen.set(true);
         this.sourceId.set('entity-projection');
-        this.cdr.detectChanges(); // the panel mounts with the dock - the picker must exist before it is opened
+        this.cdr.detectChanges(); // the picker must exist before it is opened
         this.queryPanel?.startExplore(datasetId);
     }
 
@@ -2138,6 +2134,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         )
             return;
         this.clearDraft();
+        this.boundProfile.set(null); // back to the Space's pack (UIR-D9)
         this.openViewId.set(null);
         this.setViewParam(null); // Close drops what a refresh would reopen
         this.investigation.close();
@@ -2226,6 +2223,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.kindFilter.set([]);
             this.lastRun.set(this.runOf(sourceId, q, g as ProjectedGraph));
             this.queryOpen.set(false); // smart form: collapse to the selected-values summary
+            this.queryPanel?.markPristine(); // what was run is no longer an unsaved change
+            this.settingsOpen.set(false); // the drawn graph is the answer: show it
             if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
         } catch (err) {
             this.graph.set(null);
@@ -2543,10 +2542,16 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     // ── workspace layout ──
 
-    /** Reopen the full query form (status-bar pencil) in the query dock. */
+    /** Reopen the full query form (status-bar chips and pencil): ⚙ Settings → Graph model. */
     editQuery(): void {
-        this.queryDockOpen.set(true);
         this.queryOpen.set(true);
+        this.openSettings('graph-model');
+    }
+
+    /** Open ⚙ Settings, at `section` or at the last one shown. */
+    openSettings(section?: LaSettingsSection): void {
+        if (section) this.settingsSection.set(section);
+        this.settingsOpen.set(true);
     }
 
     /** Open the graph-algorithms toolbox (the right dock's Analysis tab). */
@@ -2569,9 +2574,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     /** Collapse both docks so the canvas takes the row; a second call restores them. */
     toggleCanvasMaximized(): void {
-        const open = this.canvasMaximized();
-        this.queryDockOpen.set(open);
-        this.toolboxDockOpen.set(open);
+        this.toolboxDockOpen.set(this.canvasMaximized());
     }
 
     // ── display options ──
@@ -3806,7 +3809,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
         this.pickedLayout.set(view.layout ?? null);
-        this.profileControl.setValue(view.profile ?? activeDomainProfileId());
+        this.boundProfile.set(view.profile ?? null);
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         if (view.view?.plugins) this.viewOptions.set(canvasModeOptions(view.view.plugins));
