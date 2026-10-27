@@ -377,6 +377,15 @@ On ship: update `okf/product/module/la-core/user-guide-end-user.md` (§4 The scr
   preview says so instead (counts are taken when it opens). Saved views carry no owner (the Component store records
   none), so the Owner filter applies to Investigations only.
 - **OP-3:** Where does the embed viewer live? It is outside `projects/link-analysis`.
+  **Answered (P4, 2026-10-27):** `projects/la-app/src/app/embed-view.page.ts` (`/embed/inv/:token`, LA-EMBED-SPA-1), the
+  no-login viewer of ONE shared Investigation. It renders the graph, but not through the shared G6 host: it draws its
+  own static SVG (one ring per hop, `layoutEmbedGraph`), with zoom, pan, Reset view, a find box over the Working Set
+  table and Highlight. The §5.13 toolset rides on the G6 host (Canvas modes are its lasso and lens plugins, Layout is
+  its layouts), so giving the embed page the same toolset means replacing its renderer with `GraphViewComponent` and
+  re-proving its no-login contract (one read, keyboard canvas, token scrub). Not done in P4: it is the open residual on
+  `LA-STUDIO-UI-REORG-1` in the BACKLOG. The Widget's toolset (§5.13) is built: `link-view-widget.component.ts`, its pure
+  half `link-view-widget-tools.ts` (filters, the six analyses, their blocks), and the Widget option `allowExport`
+  (Widget editor checkbox, passed through `viz-render` only when on).
 - **OP-4:** Grouped Undo for an N-degree expand: the server's `{undoes: step}` takes one step; the client undoes the group newest-first and stops on a 409 (another person's newer step).
 - **OP-5:** Sweep defects S1 (stale list picker), S2 (list start draws 0 links), S5 (`coverage` 422) and S6 (unprompted `PUT /settings/link-analysis`) touch the same screens. Fix S5 and S6 before P2. S1 and S2 fit P3's Start-from.
 

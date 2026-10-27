@@ -1,6 +1,6 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Component, input } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
@@ -150,7 +150,124 @@ class StubGraphViewComponent {
     readonly display = input<unknown>(null);
     readonly layout = input<unknown>(null);
     readonly fill = input(false);
+    readonly emphasis = input<unknown>(null);
+    readonly interaction = input<unknown>(null);
+    readonly plugins = input<unknown>(null);
+    readonly selection = input<string[] | null>(null);
+    readonly selectionChange = output<string[]>();
+    readonly nodeClick = output<string>();
 }
+
+// LA-STUDIO-UI-REORG-1 §5.13: the read-only toolset of a dashboard tile. Session only - nothing is saved or sent.
+describe('LinkViewWidgetComponent — the read-only toolset', () => {
+    const LIMITS = apiUrl('/settings/link-analysis/limits');
+    const graph = {
+        nodes: [
+            { id: 'a', data: { kind: 'sim', label: 'SIM A' } },
+            { id: 'b', data: { kind: 'sim', label: 'SIM B' } },
+            { id: 'c', data: { kind: 'device', label: 'Phone C' } },
+        ],
+        edges: [
+            { id: 'ab', source: 'a', target: 'b', data: { kind: 'calls', attrs: { at: '2026-01-05' } } },
+            { id: 'bc', source: 'b', target: 'c', data: { kind: 'uses', attrs: { at: '2026-03-05' } } },
+        ],
+    } as unknown as G6GraphData;
+    afterEach(() => resetLaLimits());
+
+    async function setUp(allowExport = false) {
+        resetLaLimits();
+        TestBed.configureTestingModule({
+            imports: [LinkViewWidgetComponent],
+            providers: [
+                ...provideLaHostServices(),
+                provideNoopAnimations(),
+                provideHttpClient(withXhr()),
+                provideHttpClientTesting(),
+                {
+                    provide: ComponentsService,
+                    useValue: { get: () => of(viewDef({ name: 'V', sourceId: 'entity-projection', query: {} })) },
+                },
+                { provide: CatalogService, useValue: {} },
+                { provide: PipelinesService, useValue: {} },
+                { provide: ComponentsDataProvider, useValue: {} },
+                { provide: DatasetsService, useValue: {} },
+            ],
+        });
+        TestBed.overrideComponent(LinkViewWidgetComponent, {
+            remove: { imports: [GraphViewComponent] },
+            add: { imports: [StubGraphViewComponent] },
+        });
+        TestBed.inject(GraphSourcesService).byId = () =>
+            ({ id: 'entity-projection', query: async () => graph }) as unknown as GraphSource;
+        const http = TestBed.inject(HttpTestingController);
+        const fixture = TestBed.createComponent(LinkViewWidgetComponent);
+        fixture.componentRef.setInput('viewId', 'v1');
+        fixture.componentRef.setInput('allowExport', allowExport);
+        fixture.detectChanges();
+        http.expectOne(LIMITS).flush({});
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        fixture.detectChanges();
+        const stub = () =>
+            fixture.debugElement.query(By.directive(StubGraphViewComponent)).componentInstance as StubGraphViewComponent;
+        return { fixture, c: fixture.componentInstance, stub, http };
+    }
+
+    it('searches, selects with a details pop-over, filters and runs Shortest path, with no further request', async () => {
+        const { fixture, c, stub, http } = await setUp();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('[data-testid="la-widget-toolbar"]')).not.toBeNull();
+
+        c.searchText.set('phone');
+        c.search();
+        fixture.detectChanges();
+        expect(stub().selection()).toEqual(['c']);
+        expect(el.querySelector('[data-testid="la-widget-details"]')?.textContent).toContain('Phone C');
+
+        c.toggleKind('device');
+        fixture.detectChanges();
+        expect((stub().data() as G6GraphData).nodes.map((n) => n.id)).toEqual(['a', 'b']);
+        expect(el.querySelector('[data-testid="la-widget-details"]')).toBeNull(); // the selected entity is filtered out
+        c.toggleKind('device');
+
+        c.timeColumn.set('at');
+        c.setCutoff('2026-02-01');
+        fixture.detectChanges();
+        expect((stub().data() as G6GraphData).edges.map((e) => e.id)).toEqual(['ab']);
+        c.setCutoff('');
+
+        expect(c.analysisBlocked('shortestPath')).toBe('Select exactly two entities first.');
+        stub().selectionChange.emit(['a', 'c']);
+        c.analyse('shortestPath');
+        fixture.detectChanges();
+        expect(stub().emphasis()).toEqual({ nodeIds: ['a', 'b', 'c'], edgeIds: ['ab', 'bc'] });
+        expect(el.querySelector('[data-testid="la-widget-result"]')?.textContent).toContain('Shortest path: 2 link(s).');
+        http.verify(); // nothing beyond the limits read: no write, no server run
+        await expectNoA11yViolations(el);
+    });
+
+    it('hides the selection for this visit only, and switches Canvas modes', async () => {
+        const { fixture, c, stub } = await setUp();
+        stub().nodeClick.emit('a');
+        c.hideSelected();
+        fixture.detectChanges();
+        expect((stub().data() as G6GraphData).nodes.map((n) => n.id)).toEqual(['b', 'c']);
+        expect(fixture.nativeElement.textContent).toContain('Show hidden (1)');
+        c.canvasMode.set('fisheye');
+        fixture.detectChanges();
+        expect(stub().plugins()).toEqual({ fisheye: true, edgeFilterLens: false });
+        expect((stub().interaction() as { panByDrag: boolean }).panByDrag).toBe(false);
+    });
+
+    it('offers export only when the sharer allowed it', async () => {
+        const off = await setUp(false);
+        expect(off.fixture.nativeElement.querySelector('[data-testid="la-widget-export"]')).toBeNull();
+    });
+
+    it('shows the export menu when the sharer allowed it', async () => {
+        const on = await setUp(true);
+        expect(on.fixture.nativeElement.querySelector('[data-testid="la-widget-export"]')).not.toBeNull();
+    });
+});
 
 // LA-CONFIG-LIMITS-RESIDUALS-1 (5): a dashboard tile projected with the SPA fallbacks, never the Space's limits.
 describe('LinkViewWidgetComponent — the Space limits', () => {

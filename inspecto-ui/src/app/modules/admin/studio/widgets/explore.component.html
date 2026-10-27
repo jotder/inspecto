@@ -113,6 +113,14 @@
                 @if (!savedViews().length) {
                     <div class="text-secondary text-sm">No saved views yet — create one in its studio first.</div>
                 }
+                @if (vizType() === 'link-analysis') {
+                    <mat-checkbox
+                        [checked]="options().allowExport === true"
+                        (change)="options.set({ ...options(), allowExport: $event.checked || undefined })"
+                    >
+                        Allow export (viewers may download the graph as an image)
+                    </mat-checkbox>
+                }
             }
 
             @if (dataset() && !viewBound()) {
