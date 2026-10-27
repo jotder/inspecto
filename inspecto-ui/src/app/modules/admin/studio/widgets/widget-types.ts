@@ -40,6 +40,8 @@ export interface WidgetOptions extends VizRenderOptions {
     /** Caption override; defaults to the widget's name. */
     title?: string;
     subtitle?: string;
+    /** Link analysis Widget only: the sharer lets viewers export the drawn graph as an image (LA-STUDIO-UI-REORG-1 §5.13). */
+    allowExport?: boolean;
 }
 
 export interface Widget extends WidgetConfig {

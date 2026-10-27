@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, Input, OnInit, computed, inject, si
 import { FormsModule } from '@angular/forms';
 import { concatMap, map, of, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -60,6 +61,7 @@ import './widget.kind'; // ensure the widget kind + viz plugins are registered
         InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
+        MatCheckboxModule,
         MatFormFieldModule,
         MatIconModule,
         RouterLink,
