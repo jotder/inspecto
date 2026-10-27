@@ -71,6 +71,20 @@ function create(list: () => unknown, pending: unknown[] = []) {
             ],
         }),
     );
+    const scores = vi.fn((_model: string, picks: Record<string, string> = {}) =>
+        of({
+            model: 'sim_box',
+            entityType: 'msisdn',
+            highThreshold: 70,
+            segments: [{ column: 'band', values: ['1', '2'] }],
+            limit: 2,
+            truncated: true,
+            rows: [
+                { entityKey: '966501234567', score: 80, high: true, scoredAt: 't', segments: { band: picks['band'] ?? '2' } },
+                { entityKey: '966507654321', score: 10, high: false, scoredAt: 't', segments: { band: null } },
+            ],
+        }),
+    );
     const open = vi.fn(() => ({ afterClosed: () => of(false) }));
     // No Anomaly Score for the entity: the anomaly panel beside the Risk Score renders nothing.
     const anomalyLatest = vi.fn(() => throwError(() => ({ status: 404 })));
@@ -80,7 +94,7 @@ function create(list: () => unknown, pending: unknown[] = []) {
             provideNoopAnimations(),
             provideRouter([]),
             { provide: ComponentsService, useValue: { list: vi.fn(list) } },
-            { provide: RiskScoresService, useValue: { latest, preview } },
+            { provide: RiskScoresService, useValue: { latest, preview, list: scores } },
             { provide: AnomalyScoresService, useValue: { latest: anomalyLatest } },
             { provide: MatDialog, useValue: { open } },
             { provide: ToastrService, useValue: {} },
@@ -93,10 +107,43 @@ function create(list: () => unknown, pending: unknown[] = []) {
     TestBed.overrideComponent(RiskScoresComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });
     const fixture = TestBed.createComponent(RiskScoresComponent);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, latest, preview, open, anomalyLatest };
+    return { fixture, el: fixture.nativeElement as HTMLElement, latest, preview, open, anomalyLatest, scores };
 }
 
 describe('RiskScoresComponent', () => {
+    it('lists the latest scores of a model, filters them by a segment and opens a row in the lookup', () => {
+        const { fixture, el, scores, latest } = create(() => of([MODEL]));
+        (el.querySelector('nav li button') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(scores).toHaveBeenLastCalledWith('sim_box', {});
+        const rows = () => Array.from(el.querySelectorAll('table[data-scores] tbody tr')).map((r) => r.textContent);
+        expect(rows()).toHaveLength(2);
+        expect(rows()[0]).toContain('966501234567');
+        expect(rows()[0]).toContain('High');
+        expect(rows()[1]).toContain('—');
+        expect(el.textContent).toContain("cut at the Space's list limit of 2");
+
+        const select = el.querySelector('select[data-segment="band"]') as HTMLSelectElement;
+        expect(Array.from(select.options).map((o) => o.textContent?.trim())).toEqual(['All', '1', '2']);
+        select.value = '1';
+        select.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        expect(scores).toHaveBeenLastCalledWith('sim_box', { band: '1' });
+        expect(rows()[0]).toContain('1');
+
+        (el.querySelector('table[data-scores] tbody button') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(latest).toHaveBeenCalledWith('sim_box', '966501234567');
+    });
+
+    it('says why the scores could not be listed', () => {
+        const { fixture, el, scores } = create(() => of([MODEL]));
+        scores.mockReturnValue(throwError(() => ({ status: 500 })) as never);
+        (el.querySelector('nav li button') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(el.querySelector('[role="alert"]')?.textContent).toContain('Could not load the scores');
+    });
+
     it('lists models, shows one in detail and looks up a masked entity score', async () => {
         const { fixture, el, latest, open, anomalyLatest } = create(() => of([MODEL, BROKEN]));
         const items = Array.from(el.querySelectorAll('nav li button')) as HTMLButtonElement[];

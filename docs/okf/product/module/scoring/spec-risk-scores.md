@@ -41,6 +41,7 @@ is injective (`a-b` and `a_b` cannot share an output).
 | `highThreshold` | a score at or above this is `high` (in (0, 100]) |
 | `dataScope` | optional; a data-scoped caller must hold it to read a score |
 | `watchList` | optional `{list, ttlHours}`: feed every high entity to a `watch` Entity List for 1..24 h ([Entity Lists](../entity-list/spec.md)) |
+| `segments` | optional, 1..4 **evidence columns** of the model's factors that act as filters on the Risk Scores list (see [Segments](#segments--filtering-the-scores-list)); each must be evidence of some factor, no duplicates |
 | `factors[]` | `id`, `label?`, `dataset`, `key`, `measure`, `filters?`, `weight`, `cap?`, `evidence?` |
 
 A factor's **indicator** is a Measure (`count` or `agg(field)`, with the Measure grammar's `filters`) over
@@ -165,6 +166,31 @@ Real-HTTP coverage with an armed Subject is in `ControlApiRiskScoreTest`.
 ⚠ "Dataset data scopes" do not exist as a separate mechanism. `Subject.dataScopes` filters case-typed
 objects (SEC-7d), and nothing scopes Dataset rows. The route applies that rule to the model's optional
 `dataScope`.
+
+## Segments — filtering the scores list
+
+*(MFS review D4, 2026-10-27; `LIST-LIMIT-1`.)* A model may declare `segments: [col, ...]`, a short list of evidence
+columns that are **filters only**: they never change how a score is computed. The scores stay one population-wide
+number per entity. A segment's value for an entity is the column's value in the **first evidence row** of the first
+factor that lists the column as evidence (so a column that is constant per entity, such as a band or a direction mix,
+is exact). Nothing new is stored; the value is read from the `factors` JSON of the latest-run Dataset.
+
+**`GET /risk-score-lists/{model}`** (`canWorkIncidents`) answers `{model, entityType, highThreshold, segments[{column,
+values[]}], limit, truncated, rows[{entityKey, keyMasked, score, high, scoredAt, segments{}}]}`: the latest run's scores,
+highest first. `segments[].values` are the distinct values found in the latest run (at most 200 each). A query
+parameter named like a declared segment (`?band=1&mix=both`) keeps only the matching entities, several are ANDed, an
+undeclared name filters nothing. The rows are cut at `limit`, which defaults to and may not exceed the **Space's list
+limit** ([`GET|PUT /settings/list-limit`](../../layer/platform/plan-data-plane.md), default 1,000); `truncated` says
+the list was cut. Gates and masking are those of the single-score read (unknown model, data scope or row policy is a
+404; the key is masked unless the caller may reveal it). The path is deliberately not under `/risk-scores/`, where an
+entity key named `lists` would collide. A model with no run yet answers empty rows. A row is read only while the
+stored factor at that position still carries the same indicator id, so a model edited after a run drops out of a
+filter instead of matching the wrong column.
+
+**UI.** The Risk Scores page shows, for the selected model, a **Scores** table under the Factors, with one select per
+declared segment (All plus the values found) above it. Picking a value reloads the list; clicking a key opens it in
+the lookup below. A note says when the list was cut at the Space's list limit. The model form carries `segments`
+through an edit untouched (it does not author them yet: set them in the raw editor).
 
 ## The preview route — `POST /risk-scores/preview` (slice S3, 2026-10-06)
 

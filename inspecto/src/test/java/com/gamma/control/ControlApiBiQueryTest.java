@@ -96,24 +96,24 @@ class ControlApiBiQueryTest {
         return out;
     }
 
-    /** BI-QUERY-TRUNCATION-1: a result past the default cap is the SAME first 500 groups every time (ordered by the
-     *  grouping key) and says it was cut; a result under the cap says it was not. The 700-group case is the probe
-     *  that would otherwise succeed: before the fix truncated was always false and the 500 were arbitrary. */
+    /** BI-QUERY-TRUNCATION-1: a result past the default cap is the SAME first 1,000 groups every time (ordered by the
+     *  grouping key) and says it was cut; a result under the cap says it was not. The 1,200-group case is the probe
+     *  that would otherwise succeed: before the fix truncated was always false and the rows were arbitrary. */
     @Test
     void aResultPastTheLimitIsDeterministicAndFlaggedTruncated(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            seedGroups(c, "big_ds", 700);
+            seedGroups(c, "big_ds", 1200);
             seedGroups(c, "small_ds", 300);
             String bigBody = "{\"dataset\":\"big_ds\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"id\"]}";
             JsonNode first = V1Body.of(biQuery(c.port, bigBody).body());
             JsonNode second = V1Body.of(biQuery(c.port, bigBody).body());
-            assertEquals(500, first.get("rows").size(), "trimmed back to the cap");
-            assertTrue(first.get("statistics").get("truncated").asBoolean(), "700 groups > 500 cap");
-            assertEquals(500, first.get("statistics").get("rowCount").asInt());
+            assertEquals(1000, first.get("rows").size(), "trimmed back to the cap");
+            assertTrue(first.get("statistics").get("truncated").asBoolean(), "1,200 groups > 1,000 cap");
+            assertEquals(1000, first.get("statistics").get("rowCount").asInt());
             assertEquals(ids(first.get("rows")), ids(second.get("rows")), "same query, same rows");
-            assertEquals(java.util.stream.IntStream.range(0, 500).boxed().toList(), ids(first.get("rows")),
-                    "the first 500 by the grouping key");
-            assertTrue(first.get("sql").asText().strip().endsWith("LIMIT 500"),
+            assertEquals(java.util.stream.IntStream.range(0, 1000).boxed().toList(), ids(first.get("rows")),
+                    "the first 1,000 by the grouping key");
+            assertTrue(first.get("sql").asText().strip().endsWith("LIMIT 1000"),
                     "the echoed sql is the statement for the caller's cap, not the cap+1 probe: " + first.get("sql").asText());
 
             JsonNode small = V1Body.of(biQuery(c.port,
@@ -124,6 +124,21 @@ class ControlApiBiQueryTest {
             String exact = bigBody.replace("big_ds", "small_ds").replace("}", ",\"limit\":300}");
             assertFalse(V1Body.of(biQuery(c.port, exact).body()).get("statistics").get("truncated").asBoolean(),
                     "exactly at the cap is not truncated");
+        }
+    }
+
+    /** LIST-LIMIT-1: the Space's list-limit.toon replaces the shipped default; a request's own limit still wins. */
+    @Test
+    void theSpacesListLimitReplacesTheDefault(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedGroups(c, "big_ds", 300);
+            String body = "{\"dataset\":\"big_ds\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"id\"]}";
+            new ListLimitSettings(120).write(root.resolve(ListLimitSettings.FILE));
+            JsonNode r = V1Body.of(biQuery(c.port, body).body());
+            assertEquals(120, r.get("rows").size());
+            assertTrue(r.get("statistics").get("truncated").asBoolean());
+            JsonNode own = V1Body.of(biQuery(c.port, body.replace("}]", "}],\"limit\":50")).body());
+            assertEquals(50, own.get("rows").size(), "an explicit limit wins over the Space's");
         }
     }
 

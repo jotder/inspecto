@@ -23,7 +23,7 @@ import { channelGrains } from './plugin-helpers';
  */
 /**
  * A heatmap needs EVERY cell, so it asks for the server's ceiling (`BiRoutes.MAX_LIMIT`) instead of taking the
- * 500-row default — 24 controls × 30 days is 720 cells. Without it the server returned an arbitrary 500 of an
+ * old 500-row default — 24 controls × 30 days is 720 cells. Without it the server returned an arbitrary 500 of an
  * unordered GROUP BY and a different 500 on each reload: scattered holes that read as missed runs (R2-01).
  */
 export const HEATMAP_MAX_CELLS = 10_000;

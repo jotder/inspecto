@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { apiUrl } from './api-base';
@@ -44,6 +44,29 @@ export interface RiskScorePreview {
     factors: RiskFactor[];
 }
 
+/** One row of `GET /risk-score-lists/{model}`: an entity's latest score and its segment values (the key may be masked). */
+export interface RiskScoreListRow {
+    entityKey: string;
+    keyMasked?: boolean;
+    score: number;
+    high: boolean;
+    scoredAt: string;
+    segments: Record<string, string | null>;
+}
+
+/** `GET /risk-score-lists/{model}` — the latest run's scores, highest first, filtered by the model's segments. */
+export interface RiskScoreList {
+    model: string;
+    entityType: string;
+    highThreshold: number;
+    /** The model's declared segments (evidence columns) with the values found in the latest run. */
+    segments: { column: string; values: string[] }[];
+    limit: number;
+    /** The list was cut at `limit` (the Space's list limit). */
+    truncated: boolean;
+    rows: RiskScoreListRow[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class RiskScoresService {
     private http = inject(HttpClient);
@@ -52,6 +75,13 @@ export class RiskScoresService {
         return this.http.get<RiskScore>(
             apiUrl(`/risk-scores/${encodeURIComponent(model)}/${encodeURIComponent(entityKey)}`),
         );
+    }
+
+    /** The latest scores of a model; `segments` maps a declared segment column to the value to keep (blank = all). */
+    list(model: string, segments: Record<string, string> = {}): Observable<RiskScoreList> {
+        let params = new HttpParams();
+        for (const [column, value] of Object.entries(segments)) if (value) params = params.set(column, value);
+        return this.http.get<RiskScoreList>(apiUrl(`/risk-score-lists/${encodeURIComponent(model)}`), { params });
     }
 
     /** Preview a SAVED model for one entity (needs only the read capability). */

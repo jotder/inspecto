@@ -39,7 +39,15 @@ import java.util.regex.Pattern;
  *       ({@link RowScope}), or no score for that entity → <b>404</b>, all indistinguishable (existence-hiding,
  *       the SEC-7d rule {@code ObjectRoutes} applies).</li>
  * </ol>
- * The entity key travels as a bound parameter — it is compared, never resolved as a path or spliced into SQL.
+ * <h3>{@code GET /risk-score-lists/{model}}</h3>
+ * The latest run's scores of one model, highest first, optionally filtered by the model's declared
+ * {@code segments} (evidence columns, see {@link RiskScoreModel}): {@code ?<column>=<value>} per segment, ANDed. The
+ * answer carries the segments with the values found in the latest run (the page's selects) and at most
+ * {@code limit} rows (default and ceiling: the Space's list limit, {@code ListLimitSettings}); {@code truncated}
+ * says the list was cut. Same gates as the GET above; a key is masked as there. The path is not under
+ * {@code /risk-scores/} so an entity key can never be mistaken for it.
+ *
+ * <p>The entity key travels as a bound parameter — it is compared, never resolved as a path or spliced into SQL.
  * The response echoes it as the Space {@code masked:} token (with {@code keyMasked: true}) unless the caller holds
  * {@code canRevealLinkEntities} (D-P8 mask on read, as {@code POST /risk-scores/preview}).
  */
@@ -57,6 +65,8 @@ public final class RiskScoreRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/risk-scores/([^/]+)/([^/]+)", ApiContext.withCapability("canWorkIncidents",
                 (e, m) -> latest(api, e, m.group(1), m.group(2))));
+        api.get("/risk-score-lists/([^/]+)", ApiContext.withCapability("canWorkIncidents",
+                (e, m) -> list(api, e, m.group(1))));
         api.post("/risk-scores/preview", ApiContext.withCapability("canWorkIncidents",
                 (e, m) -> preview(api, e, api.body(e))));
     }
@@ -168,6 +178,97 @@ public final class RiskScoreRoutes implements RouteModule {
     private static boolean outOfScope(HttpExchange ex, RiskScoreModel model) {
         return ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && s.scoped()
                 && (model.dataScope() == null || !s.dataScopes().contains(model.dataScope()));
+    }
+
+    /** A segment's value as stored: the first evidence row of its factor, only while that stored factor is still the one. */
+    private static String segmentExpr(RiskScoreModel model, String column) {
+        int i = model.segmentFactorIndex(column);
+        return "CASE WHEN json_extract_string(\"factors\", '$[" + i + "].indicator') = '" + model.factors().get(i).id()
+                + "' THEN json_extract_string(\"factors\", '$[" + i + "].evidence[0]." + column + "') END";
+    }
+
+    private Object list(ApiContext api, HttpExchange ex, String modelId) throws Exception {
+        if (!SAFE_ID.matcher(modelId).matches()) throw notFound(modelId, "");
+        Path writeRoot = api.writeRoot();
+        Path dataRoot = api.dataRoot();
+        if (writeRoot == null || dataRoot == null) throw notFound(modelId, "");
+        Optional<Map<String, Object>> content = new ComponentStore(writeRoot.resolve("registry"))
+                .get(TYPE, modelId).map(ComponentRegistry.Component::content);
+        if (content.isEmpty()) throw notFound(modelId, "");
+        RiskScoreModel model;
+        try {
+            model = RiskScoreModel.fromMap(modelId, content.get());
+        } catch (IllegalArgumentException e) {
+            throw notFound(modelId, "");
+        }
+        if (outOfScope(ex, model)) throw notFound(modelId, "");
+        int cap = com.gamma.control.ListLimitSettings.effectiveRows(writeRoot);
+        int limit = Math.max(1, Math.min(cap, ApiContext.parseIntOr(ApiContext.query(ex, "limit"), cap)));
+        boolean ran = Files.isDirectory(dataRoot.resolve(model.scoresDataset()));
+        String relation = ran ? DatasetRelation.relationSql(Map.of("physicalRef", model.scoresDataset()), dataRoot, null) : null;
+
+        List<Map<String, Object>> segments = new java.util.ArrayList<>();
+        List<String> select = new java.util.ArrayList<>();
+        StringBuilder where = new StringBuilder("WHERE \"model\" = ?");
+        List<Object> binds = new java.util.ArrayList<>(List.of(modelId));
+        for (String col : model.segments()) {
+            String expr = segmentExpr(model, col);
+            select.add(expr + " AS \"seg_" + select.size() + "\"");
+            List<String> values = List.of();
+            if (ran) {
+                QueryExecutor.Result v = QueryExecutor.run(new QueryExecutor.Request("scores", relation,
+                        "SELECT DISTINCT " + expr + " AS \"v\" FROM \"scores\" WHERE \"model\" = ? AND (" + expr
+                                + ") IS NOT NULL ORDER BY \"v\"", 200, 0, List.of(), List.of(), List.of(modelId)));
+                values = v.rows().stream().map(r -> String.valueOf(r.get("v"))).toList();
+            }
+            Map<String, Object> seg = new LinkedHashMap<>();
+            seg.put("column", col);
+            seg.put("values", values);
+            segments.add(seg);
+            String picked = ApiContext.query(ex, col);
+            if (picked != null && !picked.isEmpty()) {
+                where.append(" AND (").append(expr).append(") = ?");
+                binds.add(picked);
+            }
+        }
+
+        List<Map<String, Object>> rows = new java.util.ArrayList<>();
+        boolean truncated = false;
+        if (ran) {
+            String cols = "\"entity_key\", \"score\", \"high\", \"scored_at\"" + (select.isEmpty() ? "" : ", " + String.join(", ", select));
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request("scores", relation,
+                    "SELECT " + cols + " FROM \"scores\" " + where + " ORDER BY \"score\" DESC, \"entity_key\"",
+                    limit, 0, List.of(), List.of(), binds));
+            truncated = r.truncated();
+            for (Map<String, Object> row : r.rows()) {
+                String key = String.valueOf(row.get("entity_key"));
+                Map<String, Object> resource = new LinkedHashMap<>();
+                resource.put("id", modelId + "/" + key);
+                resource.put("model", modelId);
+                resource.put("entityType", model.entityType());
+                resource.put("entityKey", key);
+                if (model.dataScope() != null) resource.put("dataScope", model.dataScope());
+                if (!RowScope.visible(ex, TYPE, resource)) continue;
+                Map<String, Object> out = new LinkedHashMap<>();
+                putEntityKey(ex, writeRoot, out, key);
+                out.put("score", row.get("score"));
+                out.put("high", row.get("high"));
+                out.put("scoredAt", String.valueOf(row.get("scored_at")));
+                Map<String, Object> seg = new LinkedHashMap<>();
+                for (int i = 0; i < model.segments().size(); i++) seg.put(model.segments().get(i), row.get("seg_" + i));
+                out.put("segments", seg);
+                rows.add(out);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("model", modelId);
+        out.put("entityType", model.entityType());
+        out.put("highThreshold", model.highThreshold());
+        out.put("segments", segments);
+        out.put("limit", limit);
+        out.put("truncated", truncated);
+        out.put("rows", rows);
+        return out;
     }
 
     private static ApiException notFound(String model, String key) {

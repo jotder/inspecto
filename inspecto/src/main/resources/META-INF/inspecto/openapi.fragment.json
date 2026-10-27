@@ -314,6 +314,7 @@
     "/settings/link-analysis/limits",
     "/settings/link-analysis/domain-profile",
     "/settings/pipeline-history",
+    "/settings/list-limit",
     "/settings/timezone",
     "/inv/schema/overlap-profile",
     "/inv/snapshots",
@@ -6722,6 +6723,30 @@
         "summary" : "Set the Space's Pipeline config-history retention",
         "operationId" : "putSettingsPipelineHistory",
         "description" : "Body {keep}: an integer 1..1000, or null for the shipped default; anything else is 422, never clamped. Stored as pipeline-history.toon in the Space's config root; a lower value prunes on each Pipeline's next save. Gated on canAuthorWorkbench; 503 when writes are disabled.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/settings/list-limit" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "Read the Space's list limit",
+        "operationId" : "getSettingsListLimit",
+        "description" : "Returns {rows, effectiveRows, defaultRows, maxRows}: the most rows a Dashboard Widget reads from a Dataset when it asks for no number itself (POST /bi/query and the public share read). rows null = the shipped default (1,000).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "Set the Space's list limit",
+        "operationId" : "putSettingsListLimit",
+        "description" : "Body {rows}: an integer 1..10000, or null for the shipped default; anything else is 422, never clamped. Stored as list-limit.toon in the Space's config root. A request's own limit still wins. Gated on canAuthorWorkbench; 503 when writes are disabled.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

@@ -212,7 +212,7 @@ const numeric = (s: string): number | string => (s.trim() !== '' && isFinite(Num
 
 /**
  * The component body to save. `stored` is the content being edited: keys this form does not author
- * (`name`, `owner`, `shares`) ride through untouched; the keys it does author are replaced or dropped.
+ * (`name`, `owner`, `shares`, `segments`) ride through untouched; the keys it does author are replaced or dropped.
  */
 export function toRiskScoreContent(
     id: string,
@@ -221,7 +221,7 @@ export function toRiskScoreContent(
     stored: Record<string, unknown> = {},
 ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
-    for (const k of ['name', 'owner', 'shares']) if (k in stored) out[k] = stored[k];
+    for (const k of ['name', 'owner', 'shares', 'segments']) if (k in stored) out[k] = stored[k];
     out['id'] = id;
     out['entityType'] = str(top['entityType']).trim();
     out['highThreshold'] = top['highThreshold'];

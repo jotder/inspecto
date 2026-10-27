@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
  * highThreshold: 70                 (a score at or above this is "high")
  * (the scores Datasets are ALWAYS risk_scores_&lt;id&gt; and risk_scores_&lt;id&gt;_latest — not authorable)
  * maxEntities: 500000          (optional; entity cap for one run, 1..2000000; default -Drisk.score.maxEntities, else 200000)
+ * segments: [activity_band]        (optional; evidence columns that act as filters on the Risk Scores list, 1..4)
  * retainDays: 90                 (optional; prune history runs older than this — OR retainRuns: keep the newest N; OFF by default)
  * dataScope: fraud                  (optional; a data-scoped caller must hold it to read a score)
  * factors[n]:
@@ -41,7 +42,8 @@ import java.util.regex.Pattern;
  */
 public record RiskScoreModel(String id, String entityType, double highThreshold, String scoresDataset,
                              String dataScope, String description, List<Factor> factors, WatchList watchList,
-                             Integer retainDays, Integer retainRuns, Integer maxEntities) {
+                             Integer retainDays, Integer retainRuns, Integer maxEntities,
+                             List<String> segments) {
 
     /** The highest per-model {@code maxEntities} a model may author (operator, 2026-10-06): 10x the system default. */
     public static final int MAX_ENTITIES_CEILING = com.gamma.analytics.score.EntityCap.CEILING;
@@ -59,10 +61,11 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     public static final String LATEST_SUFFIX = com.gamma.alert.RiskScoreOutputs.LATEST_SUFFIX;
     static final int MAX_FACTORS = 32;
     static final int MAX_EVIDENCE = 8;
+    static final int MAX_SEGMENTS = 4;
     /** The component envelope the store/route adds (name = id, owner, shares) — accepted, never scored. */
     public static final Set<String> ENVELOPE_KEYS = Set.of("name", "owner", "shares");
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType",
-            "highThreshold", "dataScope", "description", "factors", "watchList", "retainDays", "retainRuns", "maxEntities");
+            "highThreshold", "dataScope", "description", "factors", "watchList", "retainDays", "retainRuns", "maxEntities", "segments");
     private static final Set<String> FACTOR_KEYS = Set.of("id", "label", "dataset", "key", "measure",
             "filters", "when", "weight", "cap", "evidence");
 
@@ -131,7 +134,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     /** This model with every factor narrowed to one entity ({@link Factor#forEntity}) — the S3 preview's input. */
     public RiskScoreModel forEntity(String entityKey) {
         return new RiskScoreModel(id, entityType, highThreshold, scoresDataset, dataScope, description,
-                factors.stream().map(f -> f.forEntity(entityKey)).toList(), watchList, retainDays, retainRuns, maxEntities);
+                factors.stream().map(f -> f.forEntity(entityKey)).toList(), watchList, retainDays, retainRuns, maxEntities, segments);
     }
 
     /** The longest a fed watch entry may live: D-P5 lets only an expiring (at most 24 h) entry skip four-eyes. */
@@ -146,6 +149,16 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
 
     public RiskScoreModel {
         factors = List.copyOf(factors);
+        segments = segments == null ? List.of() : List.copyOf(segments);
+    }
+
+    /**
+     * The index of the first factor that carries {@code column} as evidence — where a segment's value is read from the
+     * stored {@code factors} (its first evidence row) — or -1 when no factor does.
+     */
+    public int segmentFactorIndex(String column) {
+        for (int i = 0; i < factors.size(); i++) if (factors.get(i).evidence().contains(column)) return i;
+        return -1;
     }
 
     /** The latest-run scores Dataset ({@code risk_scores_<id>_latest}). */
@@ -226,7 +239,25 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
         }
         return new RiskScoreModel(id, entityType, high, scores, scope, Values.trimToNull(m.get("description")), factors,
                 watchList(m.get("watchList")), retain(m.get("retainDays"), "retainDays"),
-                retain(m.get("retainRuns"), "retainRuns"), maxEntities(m.get("maxEntities")));
+                retain(m.get("retainRuns"), "retainRuns"), maxEntities(m.get("maxEntities")), segments(m.get("segments"), factors));
+    }
+
+    /** Optional list filters: evidence columns of this model's factors, 1..{@value #MAX_SEGMENTS}, each once. */
+    private static List<String> segments(Object raw, List<Factor> factors) {
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> l) || l.isEmpty())
+            throw new IllegalArgumentException("risk-score.segments must be a list of evidence column names");
+        if (l.size() > MAX_SEGMENTS)
+            throw new IllegalArgumentException("risk-score.segments: at most " + MAX_SEGMENTS + " columns, got " + l.size());
+        List<String> out = new ArrayList<>();
+        for (Object o : l) {
+            String c = ident(o, "risk-score.segments");
+            if (out.contains(c)) throw new IllegalArgumentException("risk-score.segments: duplicate column '" + c + "'");
+            if (factors.stream().noneMatch(f -> f.evidence().contains(c)))
+                throw new IllegalArgumentException("risk-score.segments: '" + c + "' is not an evidence column of any factor");
+            out.add(c);
+        }
+        return List.copyOf(out);
     }
 
     /** Optional per-model entity cap: a whole number 1..{@link #MAX_ENTITIES_CEILING}; absent = the system default. */

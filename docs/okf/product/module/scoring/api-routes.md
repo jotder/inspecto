@@ -11,10 +11,11 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-2 route(s) registered; 2 in the OpenAPI contract, 0 not.
+3 route(s) registered; 3 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
+| GET | `/risk-score-lists/{model}` | The latest scores of one Risk Score model, highest first, filtered by its segments | risk-scores | `canWorkIncidents` | `features/inspecto-scoring/src/main/java/com/gamma/risk/RiskScoreRoutes.java` |
 | GET | `/risk-scores/{model}/{entityKey}` | The latest Risk Score of one entity under a saved risk-score model, with its factors | risk-scores | `canWorkIncidents` | `features/inspecto-scoring/src/main/java/com/gamma/risk/RiskScoreRoutes.java` |
 | POST | `/risk-scores/preview` | Preview one entity's Risk Score under a saved or unsaved model, writing nothing | risk-scores | `canWorkIncidents` | `features/inspecto-scoring/src/main/java/com/gamma/risk/RiskScoreRoutes.java` |
 

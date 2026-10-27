@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-353 route(s) registered; 353 in the OpenAPI contract, 0 not.
+355 route(s) registered; 355 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -330,6 +330,8 @@ tags: [api, routes, generated]
 | PUT | `/settings/link-analysis/domain-profile` | Select the Space's Domain Profile (canAuthorWorkbench) | settings | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DomainProfileRoutes.java` |
 | GET | `/settings/link-analysis/limits` | GET /settings/link-analysis/limits (generated skeleton) | settings | — | `inspecto/src/main/java/com/gamma/control/LinkAnalysisLimitsRoutes.java` |
 | PUT | `/settings/link-analysis/limits` | PUT /settings/link-analysis/limits (generated skeleton) | settings | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/LinkAnalysisLimitsRoutes.java` |
+| GET | `/settings/list-limit` | Read the Space's list limit | settings | — | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java` |
+| PUT | `/settings/list-limit` | Set the Space's list limit | settings | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java` |
 | GET | `/settings/mail-attachments` | GET /settings/mail-attachments (generated skeleton) | settings | — | `inspecto/src/main/java/com/gamma/control/MailAttachmentRoutes.java` |
 | PUT | `/settings/mail-attachments` | PUT /settings/mail-attachments (generated skeleton) | settings | `canAdminister` | `inspecto/src/main/java/com/gamma/control/MailAttachmentRoutes.java` |
 | GET | `/settings/modules` | GET /settings/modules (generated skeleton) | settings | — | `inspecto/src/main/java/com/gamma/control/ModuleSettingsRoutes.java` |

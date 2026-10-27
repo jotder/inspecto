@@ -44,6 +44,42 @@
         }
       }
     },
+    "/risk-score-lists/{model}" : {
+      "get" : {
+        "tags" : [ "risk-scores" ],
+        "summary" : "The latest scores of one Risk Score model, highest first, filtered by its segments",
+        "operationId" : "listRiskScores",
+        "description" : "Gated on canWorkIncidents; an unknown model or one outside the caller's data scopes is 404 (existence-hiding), as for a single score. Each query parameter named like one of the model's declared segments (evidence columns, `segments` in the model) keeps only the entities whose latest score carries that value in the factor's first evidence row; several are ANDed. `limit` (default and ceiling: the Space's list limit, GET /settings/list-limit) caps the rows; `truncated` says the list was cut. A model with no run yet answers empty rows. Entity keys are masked as for a single score.",
+        "parameters" : [ {
+          "name" : "model",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9][A-Za-z0-9_]*$"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "minimum" : 1
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {model, entityType, highThreshold, segments[{column, values[]}], limit, truncated, rows[{entityKey, keyMasked, score, high, scoredAt, segments{}}]}"
+          },
+          "403" : {
+            "description" : "The caller lacks canWorkIncidents."
+          },
+          "404" : {
+            "description" : "No such model visible to the caller."
+          }
+        }
+      }
+    },
     "/risk-scores/{model}/{entityKey}" : {
       "get" : {
         "tags" : [ "risk-scores" ],

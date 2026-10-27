@@ -244,6 +244,40 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** LIST-LIMIT-1: the list limit is a per-Space setting over a shipped default of 1,000. */
+    @Test
+    void listLimitRoundTripsPerSpaceAndRefusesBadValues(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"beta\"}").statusCode());
+
+            JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/list-limit", null));
+            assertTrue(def.get("rows").isNull(), "no document ⇒ the shipped default: " + def);
+            assertEquals(1000, def.get("effectiveRows").asInt());
+            assertEquals(1000, def.get("defaultRows").asInt());
+            assertEquals(ListLimitSettings.MAX_ROWS, def.get("maxRows").asInt());
+
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/list-limit", "{\"rows\":2500}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals(2500, json(put).get("effectiveRows").asInt());
+            assertTrue(Files.exists(root.resolve("acme").resolve("config").resolve(ListLimitSettings.FILE)));
+            assertTrue(json(send(c.port, "GET", "/spaces/beta/settings/list-limit", null)).get("rows").isNull(),
+                    "per-Space: beta still has the default");
+
+            for (String bad : List.of("0", "10001", "\"lots\"")) {
+                HttpResponse<String> r = send(c.port, "PUT", "/spaces/acme/settings/list-limit", "{\"rows\":" + bad + "}");
+                assertEquals(422, r.statusCode(), bad + " → " + r.body());
+                assertTrue(r.body().contains("rows"), r.body());
+            }
+            assertEquals(2500, json(send(c.port, "GET", "/spaces/acme/settings/list-limit", null)).get("rows").asInt(),
+                    "a refused write left the last good value standing");
+
+            HttpResponse<String> cleared = send(c.port, "PUT", "/spaces/acme/settings/list-limit", "{\"rows\":null}");
+            assertEquals(200, cleared.statusCode(), cleared.body());
+            assertEquals(1000, json(cleared).get("effectiveRows").asInt());
+        }
+    }
+
     /** A hand-edited out-of-range value reads as the default — `keep: 0` must never prune every version. */
     @Test
     void anOutOfRangeStoredRetentionReadsAsTheDefault(@TempDir Path dir) throws Exception {
@@ -746,6 +780,15 @@ class ControlApiSettingsTest {
             assertEquals(200, sendAs(c.port, "GET", "/spaces/acme/settings/pipeline-history", null, "Bearer plain").statusCode());
             HttpResponse<String> keepAllowed = sendAs(c.port, "PUT", "/spaces/acme/settings/pipeline-history", keep, "Bearer valid");
             assertEquals(200, keepAllowed.statusCode(), keepAllowed.body());
+
+            // LIST-LIMIT-1: the list limit is gated the same way.
+            String rows = "{\"rows\":2000}";
+            assertEquals(401, send(c.port, "PUT", "/spaces/acme/settings/list-limit", rows).statusCode());
+            HttpResponse<String> rowsDenied = sendAs(c.port, "PUT", "/spaces/acme/settings/list-limit", rows, "Bearer plain");
+            assertEquals(403, rowsDenied.statusCode(), rowsDenied.body());
+            assertTrue(rowsDenied.body().contains("canAuthorWorkbench"), rowsDenied.body());
+            assertEquals(200, sendAs(c.port, "GET", "/spaces/acme/settings/list-limit", null, "Bearer plain").statusCode());
+            assertEquals(200, sendAs(c.port, "PUT", "/spaces/acme/settings/list-limit", rows, "Bearer valid").statusCode());
         } finally {
             Authenticators.forTest(null);
         }

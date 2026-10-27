@@ -38,6 +38,12 @@ describe('risk-score-form', () => {
         expect(out).toEqual(STORED);
     });
 
+    it('carries the declared segments through an edit untouched', () => {
+        const stored = { ...STORED, segments: ['cell'] };
+        const out = toRiskScoreContent('sim_box', riskScoreInitial(stored), factorDrafts(stored), stored);
+        expect(out['segments']).toEqual(['cell']);
+    });
+
     it('drops the authored keys the author cleared (no watch list, no retention, no cap)', () => {
         const top = { ...riskScoreInitial(STORED), watchList: '', retention: '' };
         const f = factorDrafts(STORED).map((x) => ({ ...x, cap: '', filters: [], evidence: [] }));

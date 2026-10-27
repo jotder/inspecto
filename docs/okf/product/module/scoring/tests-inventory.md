@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.scoring`](../../../../../product-map/module/scoring.toon).
 
-30 test class(es): 27 unit, 3 real-HTTP control-plane, 0 IT.
+31 test class(es): 27 unit, 4 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -30,6 +30,7 @@ mvn -o test -pl features/inspecto-scoring -Dtest=RiskScoreAlertTest,BypassAllowL
 | `BypassClusterTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/BypassClusterTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B3: the two cluster stages in isolation (gate G-SB(c): a stage's SQL can be |
 | `BypassScaleMeasureTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/BypassScaleMeasureTest.java` | Measurement, not a gate ({@code TELCO-BYPASS-SIMBOX-1} slice B2). Runs only with {@code TELCO_BYPASS_PERF=1} and prints: |
 | `BypassScoreTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/BypassScoreTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B2: the shipped {@code tb_sim} Risk Score model, factor by factor. Pure arithmetic |
+| `ControlApiRiskScoreListTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScoreListTest.java` | {@code GET /risk-score-lists/{model}} over real HTTP with an ARMED Subject (MFS review D4): the latest run's scores, |
 | `ControlApiRiskScorePreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScorePreviewTest.java` | ASSURE-RISK-SCORE-RESIDUALS-1 S3 over real HTTP with an ARMED Subject: {@code POST /risk-scores/preview} scores ONE |
 | `ControlApiRiskScoreTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScoreTest.java` | ASSURE-RISK-SCORE-1 over real HTTP with an ARMED Subject: {@code GET /risk-scores/{model}/{entityKey}} returns |
 | `PaymentFraudDashboardTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-scoring/src/test/java/com/gamma/control/PaymentFraudDashboardTest.java` | ASSURE-PACK-PAYMENT-FRAUD-1 (WS-44 dashboards + KPIs): the shipped {@code payment-fraud} Space Template is created |

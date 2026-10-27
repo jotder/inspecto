@@ -221,6 +221,16 @@ three parameter namespaces are deliberately distinct and each resolver ignores t
 
 ### 3.5 `POST /bi/query` — the spec-compiled path, and where the structured boundary really is
 
+**The list limit (`LIST-LIMIT-1`, MFS review D9, 2026-10-27).** A spec that states no `limit` is read at the **Space's
+list limit**: `GET|PUT /spaces/{id}/settings/list-limit` (`{rows, effectiveRows, defaultRows, maxRows}`, `canAuthorWorkbench`
+to write), stored as `list-limit.toon` (`rows: N`) in the Space's config root (`ListLimitSettings`, mirroring the
+pipeline-history setting). `rows` null means the shipped default, **1,000** (it was a hard-coded 500 in
+`BiRoutes.DEFAULT_LIMIT` and in `ShareRoutes`' public read); a value outside 1..10,000 is refused with 422 on the PUT and
+reads as the default from a hand-edited file. 10,000 is `MeasureCompiler`'s own ceiling, so a larger request is still
+clamped there. A spec's own `limit` still wins. The same limit caps the Risk Scores list
+([`spec-risk-scores.md`](../../module/scoring/spec-risk-scores.md)). `POST /queries/{id}/run` (the Query Library) keeps its
+own 500 default: it is the Explorer's page, not a Dashboard read.
+
 `BiRoutes` (`inspecto/src/main/java/com/gamma/control/BiRoutes.java`): **`POST /bi/query`**,
 `GET|POST /bi/templates` (+ apply, capability-gated). ⛔ `GET /bi/datasets` was **retired 2026-09-14**
 (`RETIRE-HALVES-1`) — no client ever listed Datasets through it. `/bi/query` takes a **spec** — measures, dimensions,

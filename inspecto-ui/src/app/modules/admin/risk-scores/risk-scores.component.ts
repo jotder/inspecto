@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
-import { RiskScore, RiskScoresService } from 'app/inspecto/api/risk-scores.service';
+import { RiskScore, RiskScoreList, RiskScoresService } from 'app/inspecto/api/risk-scores.service';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -70,6 +70,12 @@ export class RiskScoresComponent implements OnInit {
     readonly previewed = signal<{ score: RiskScore; found: boolean } | null>(null);
     readonly previewError = signal<string | null>(null);
 
+    /** The latest scores of the selected model, filtered by the picked segments (D4 of the MFS review). */
+    readonly scoreList = signal<RiskScoreList | null>(null);
+    readonly listLoading = signal(false);
+    readonly listError = signal<string | null>(null);
+    readonly segmentPicks = signal<Record<string, string>>({});
+
     ngOnInit(): void {
         this.load();
     }
@@ -96,6 +102,41 @@ export class RiskScoresComponent implements OnInit {
         this.entityKey.set(null);
         this.previewed.set(null);
         this.previewError.set(null);
+        this.segmentPicks.set({});
+        this.scoreList.set(null);
+        this.loadList();
+    }
+
+    /** (Re)load the scores list of the selected model under the picked segments. */
+    loadList(): void {
+        const id = this.selectedId();
+        if (!id) return;
+        this.listLoading.set(true);
+        this.listError.set(null);
+        this.riskScores.list(id, this.segmentPicks()).subscribe({
+            next: (l) => {
+                if (this.selectedId() !== id) return;
+                this.scoreList.set(l);
+                this.listLoading.set(false);
+            },
+            error: (err) => {
+                if (this.selectedId() !== id) return;
+                this.scoreList.set(null);
+                this.listError.set(apiErrorMessage(err, 'Could not load the scores.'));
+                this.listLoading.set(false);
+            },
+        });
+    }
+
+    pickSegment(column: string, value: string): void {
+        this.segmentPicks.update((p) => ({ ...p, [column]: value }));
+        this.loadList();
+    }
+
+    /** Open one listed entity in the lookup below. */
+    openRow(key: string): void {
+        this.entityDraft.setValue(key);
+        this.lookUp();
     }
 
     lookUp(): void {

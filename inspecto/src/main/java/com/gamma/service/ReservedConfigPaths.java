@@ -23,7 +23,7 @@ import java.util.Set;
  *       assist agent's autonomy {@code policy.json}, {@code approvals.jsonl} and run logs), and the Data
  *       Exchange {@code offers.toon} / {@code grants.toon};</li>
  *   <li>Space settings documents — {@code branding.toon}, {@code geo.toon}, {@code link-analysis.toon},
- *       {@code pipeline-history.toon}, {@code timezone.toon}, {@code icon-map.toon}, {@code scheduler.toon}, {@code nav-menus.toon},
+ *       {@code pipeline-history.toon}, {@code list-limit.toon}, {@code timezone.toon}, {@code icon-map.toon}, {@code scheduler.toon}, {@code nav-menus.toon},
  *       {@code notification-preferences.toon}, {@code partition.toon}, {@code space.toon}, {@code data.toon}, and the install-wide Link Analysis
  *       limits {@code la-limits.toon} (it lives beside the server-wide {@code scheduler.toon});</li>
  *   <li>operational state — {@code rename.journal} (what {@code /pipelines/rename/resume} acts on),
@@ -44,7 +44,7 @@ public final class ReservedConfigPaths {
     /** Reserved files, matched at the config root. */
     static final Set<String> FILES = Set.of(
             "roles.toon", "demo-users.toon", "access-policies.toon", "approval.toon", "egress.toon", "modules.toon", "approvers.toon", "publication-destinations.toon", "mail-attachments.toon", "attach-approvals.json", "offers.toon", "grants.toon",
-            "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "timezone.toon", "icon-map.toon",
+            "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "list-limit.toon", "timezone.toon", "icon-map.toon",
             "scheduler.toon", "nav-menus.toon", "notification-preferences.toon", "partition.toon", "space.toon",
             "data.toon",   // LA-ONBOARD-1 OB-7 data.self_import: an import must not turn Add data on (canAdminister decides)
             "la-limits.toon",   // LA-CONFIG-LIMITS-1 install-wide Link Analysis limits, beside scheduler.toon (may be the sole Space's write root)

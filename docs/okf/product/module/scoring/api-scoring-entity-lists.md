@@ -13,6 +13,7 @@ Routes for Risk Scores and Entity Lists. Design and internals: [Risk Scores and 
 | Route | Gate | Handler |
 |---|---|---|
 | `GET /risk-scores/{model}/{entityKey}` | `canWorkIncidents`; existence-hiding 404 | `features/inspecto-scoring/src/main/java/com/gamma/risk/RiskScoreRoutes.java` |
+| `GET /risk-score-lists/{model}` | `canWorkIncidents`; existence-hiding 404; capped at the Space's list limit | same |
 | `POST /risk-scores/preview` | `canWorkIncidents` (+ `canAuthorWorkbench` for unsaved content) | same |
 | `GET /entity-lists`, `GET /entity-lists/{id}` | Space access | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 | `POST /entity-lists` | `canManageIncidents` | same |

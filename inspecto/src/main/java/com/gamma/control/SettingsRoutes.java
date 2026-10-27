@@ -37,6 +37,9 @@ import com.gamma.access.WriteGates;
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
  *   PUT /settings/pipeline-history   replace it (same gates as branding)
+ *   GET /settings/list-limit   the space's {rows, effectiveRows, defaultRows, maxRows} — rows a Dashboard Widget reads
+ *                              from a Dataset by default (rows null = the shipped default, 1,000)
+ *   PUT /settings/list-limit   replace it (same gates as branding)
  *   GET /settings/timezone   the space's {timezone, effectiveTimezone} — the default zone a KPI without its own
  *                            timezone is evaluated in (timezone null = UTC)
  *   PUT /settings/timezone   replace it (same gates as branding; a non-IANA name is 422)
@@ -88,6 +91,9 @@ final class SettingsRoutes implements RouteModule {
         api.get("/settings/pipeline-history", (e, m) -> ETags.respond(e, readPipelineHistory(api)));
         api.put("/settings/pipeline-history", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> writePipelineHistory(api, api.body(e))));
+        api.get("/settings/list-limit", (e, m) -> ETags.respond(e, ListLimitSettings.forRoot(api.writeRoot()).shape()));
+        api.put("/settings/list-limit", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> writeListLimit(api, api.body(e))));
         api.get("/config/icon-map", (e, m) -> ETags.respond(e, readIconMap(api)));
         api.put("/config/icon-map", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> writeIconMap(api, api.body(e))));
@@ -583,6 +589,25 @@ final class SettingsRoutes implements RouteModule {
         PipelineHistorySettings s = new PipelineHistorySettings(keep);
         s.write(root.resolve(PipelineHistorySettings.FILE));
         return pipelineHistoryShape(s);
+    }
+
+    /** {@code rows}: {@code null}/absent = the shipped default; else an int in {@code 1..MAX_ROWS} or 422 — never clamped. */
+    private Object writeListLimit(ApiContext api, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "list-limit settings write");
+        Object raw = body.get("rows");
+        Integer rows = null;
+        if (raw != null) {
+            try {
+                rows = Integer.parseInt(String.valueOf(raw).trim());
+            } catch (NumberFormatException e) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "rows must be an integer, got '" + raw + "'");
+            }
+            if (rows < 1 || rows > ListLimitSettings.MAX_ROWS)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "rows must be 1.." + ListLimitSettings.MAX_ROWS + ", got " + rows);
+        }
+        ListLimitSettings s = new ListLimitSettings(rows);
+        s.write(root.resolve(ListLimitSettings.FILE));
+        return s.shape();
     }
 
     private static Map<String, Object> pipelineHistoryShape(PipelineHistorySettings s) {

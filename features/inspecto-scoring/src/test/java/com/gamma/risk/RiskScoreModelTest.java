@@ -36,6 +36,22 @@ class RiskScoreModelTest {
         return assertThrows(IllegalArgumentException.class, () -> RiskScoreModel.fromMap("subs", m)).getMessage();
     }
 
+    /** MFS review D4: segments are optional list filters and must be evidence columns of a factor. */
+    @Test
+    void segmentsAreEvidenceColumnsOfSomeFactor() {
+        assertTrue(RiskScoreModel.fromMap("subs", model(factor())).segments().isEmpty(), "absent = none");
+        Map<String, Object> m = model(factor());
+        m.put("segments", List.of("topup_id"));
+        RiskScoreModel parsed = RiskScoreModel.fromMap("subs", m);
+        assertEquals(List.of("topup_id"), parsed.segments());
+        assertEquals(0, parsed.segmentFactorIndex("topup_id"));
+        for (Object bad : List.of(List.of("amount"), List.of("topup_id", "topup_id"), List.of(), "topup_id",
+                List.of("a", "b", "c", "d", "e"), List.of("bad col"))) {
+            m.put("segments", bad);
+            assertTrue(refused(m).contains("segments"), "segments " + bad);
+        }
+    }
+
     /** ASSURE-ENTITY-LISTS-1: the watch-list feed is optional, and only an expiring (1..24 h) feed is accepted (D-P5). */
     @Test
     void aWatchListFeedIsAListIdAndAWholeTtlOfAtMost24Hours() {

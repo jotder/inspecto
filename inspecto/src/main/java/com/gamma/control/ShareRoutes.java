@@ -131,7 +131,7 @@ final class ShareRoutes implements RouteModule {
                     DashboardDateRange.today(java.time.ZoneId.systemDefault())));
             fenced.put("filters", filters);
             // The chart's cosmetic category order over a masked key is dropped, as /bi/query drops it (review R6).
-            spec = masking.stripCosmeticOrder(MeasureCompiler.parse(fenced, 500, 10_000), null);
+            spec = masking.stripCosmeticOrder(MeasureCompiler.parse(fenced, ListLimitSettings.effectiveRows(api.writeRoot()), ListLimitSettings.MAX_ROWS), null);
             sql = MeasureCompiler.compile(spec.withLimit(spec.limit() + 1));   // one past the cap, so truncated is exact
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());

@@ -46,8 +46,8 @@ import com.gamma.access.WriteGates;
  */
 final class BiRoutes implements RouteModule {
 
-    private static final int DEFAULT_LIMIT = 500;
-    private static final int MAX_LIMIT = 10_000;
+    /** The default row limit is the Space's {@link ListLimitSettings}; this is the hard cap a request cannot exceed. */
+    private static final int MAX_LIMIT = ListLimitSettings.MAX_ROWS;
 
     @Override
     public void register(ApiContext api) {
@@ -70,7 +70,7 @@ final class BiRoutes implements RouteModule {
         MeasureCompiler.Compiled sql;   // the probe statement that is EXECUTED (cap + 1), its values bound
         String echoSql;   // the statement for the ORIGINAL spec (LIMIT = cap) that the response echoes, values rendered
         try {
-            spec = MeasureCompiler.parse(body, DEFAULT_LIMIT, MAX_LIMIT);
+            spec = MeasureCompiler.parse(body, ListLimitSettings.effectiveRows(writeRoot), MAX_LIMIT);
             // One row PAST the cap: the compiled statement carries its own LIMIT, so asking for exactly the cap
             // could never come back truncated (statistics.truncated was always false). QueryExecutor trims it.
             probe = spec.withLimit(spec.limit() + 1);

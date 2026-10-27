@@ -221,6 +221,8 @@ public final class CapabilityManifest {
             // RiskScoreRoutes (ASSURE-RISK-SCORE-1) — an entity's Risk Score and its factors are read while
             // working the Incident it raised; data scopes and the row PDP apply beneath the gate.
             new Entry("GET", "/risk-scores/([^/]+)/([^/]+)", Roles.CAN_WORK_INCIDENTS),
+            // The latest run's scores of one model, filtered by its declared segments (D4 of the MFS review).
+            new Entry("GET", "/risk-score-lists/([^/]+)", Roles.CAN_WORK_INCIDENTS),
             // S3 preview: scores one entity and writes nothing. Previewing UNSAVED content additionally needs
             // canAuthorWorkbench, checked in the handler (D-RP4, operator 2026-10-06).
             new Entry("POST", "/risk-scores/preview", Roles.CAN_WORK_INCIDENTS),
@@ -435,6 +437,7 @@ public final class CapabilityManifest {
             new Entry("PUT", "/settings/branding", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/geo", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/link-analysis", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("PUT", "/settings/list-limit", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/pipeline-history", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/timezone", Roles.CAN_AUTHOR_WORKBENCH),
             // LA-ONBOARD-1 OB-7: whether people may Add data in a Space is the administrator's decision.

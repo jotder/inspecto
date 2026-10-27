@@ -129,6 +129,76 @@
                     add a per-entity Alert Rule over the latest Dataset.
                 </p>
 
+                <h3 class="mt-6 text-sm font-semibold">Scores</h3>
+                @if (scoreList(); as l) {
+                    @if (l.segments.length > 0) {
+                        <div class="mt-2 flex flex-wrap items-end gap-4">
+                            @for (s of l.segments; track s.column) {
+                                <label class="flex flex-col text-sm">
+                                    {{ s.column }}
+                                    <select
+                                        class="rounded border px-2 py-1"
+                                        [attr.data-segment]="s.column"
+                                        (change)="pickSegment(s.column, $any($event.target).value)"
+                                    >
+                                        <option value="" [selected]="!segmentPicks()[s.column]">All</option>
+                                        @for (v of s.values; track v) {
+                                            <option [value]="v" [selected]="segmentPicks()[s.column] === v">{{ v }}</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                        </div>
+                    }
+                    @if (l.rows.length === 0) {
+                        <p class="text-secondary mt-2 text-sm">No scores match; the latest run may not have happened yet.</p>
+                    } @else {
+                        <div class="mt-2 overflow-x-auto" [class.opacity-60]="listLoading()">
+                            <table class="w-full text-left text-sm [&_td]:py-1 [&_td]:pr-4 [&_th]:pr-4" data-scores>
+                                <thead>
+                                    <tr class="border-b">
+                                        <th scope="col">Entity</th>
+                                        <th scope="col">Score</th>
+                                        @for (s of l.segments; track s.column) {
+                                            <th scope="col">{{ s.column }}</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (r of l.rows; track r.entityKey) {
+                                        <tr class="border-b">
+                                            <td>
+                                                <button type="button" class="text-primary underline" (click)="openRow(r.entityKey)">
+                                                    {{ r.entityKey }}
+                                                </button>
+                                            </td>
+                                            <td class="tabular-nums">
+                                                {{ r.score }}
+                                                @if (r.high) {
+                                                    <inspecto-status-badge value="error" label="High"></inspecto-status-badge>
+                                                }
+                                            </td>
+                                            @for (s of l.segments; track s.column) {
+                                                <td>{{ r.segments[s.column] ?? '—' }}</td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-secondary mt-1 text-xs">
+                            {{ count(l.rows.length, 'score') }} shown
+                            @if (l.truncated) {
+                                — cut at the Space's list limit of {{ l.limit }}; narrow it with a filter.
+                            }
+                        </p>
+                    }
+                } @else if (listError(); as e) {
+                    <p class="text-warn mt-2 text-sm" role="alert">{{ e }}</p>
+                } @else {
+                    <inspecto-skeleton [lines]="3"></inspecto-skeleton>
+                }
+
                 <h3 class="mt-6 text-sm font-semibold">Latest score of an entity</h3>
                 <form class="mt-2 flex items-end gap-2" (submit)="$event.preventDefault(); lookUp()">
                     <label class="flex flex-col text-sm">
