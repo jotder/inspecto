@@ -3425,15 +3425,27 @@ Its prior copies stay in its version history.`,
             });
     }
 
+    /** File ▸ Import / export views: a click on the row's label opens the transfer menu its icon button opens. */
+    onTransferRowClick(ev: MouseEvent): void {
+        ev.stopPropagation(); // keeps File open until the transfer menu takes over
+        if ((ev.target as HTMLElement).closest('button')) return;
+        (ev.currentTarget as HTMLElement).querySelector<HTMLButtonElement>('button')?.click();
+    }
+
     /**
      * Clean up's *Find paths (server)* (§5.6): walk paths between the first two clean-up seeds over the first link
      * mapping, up to the length asked, and show the result in the Analysis tab — or say why it cannot run.
      */
     async findPathsFromCleanup(maxDepth: number): Promise<void> {
         const seeds = [...new Set(this.cleanupSeeds())];
-        const why = !this.traversalTargets().length
-            ? 'this graph has no link mapping the server can walk.'
-            : seeds.length < 2
+        // The server walk reads the query graph's mappings and ids, so it cannot take an Investigation's Working Set ids.
+        const why = this.investigation.canvas() !== null
+            ? 'it walks the query graph, not an Investigation — use Connect seeds in the Investigation instead.'
+            : !this.lastRun()
+              ? 'draw a graph from a Dataset first.'
+              : !this.traversalTargets().length
+                ? 'this graph has no link mapping the server can walk.'
+                : seeds.length < 2
               ? 'it needs two seeds on the canvas.'
               : null;
         this.openAnalysis();
@@ -4003,7 +4015,6 @@ Its prior copies stay in its version history.`,
     async loadView(view: LinkAnalysisView): Promise<void> {
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
-        this.pickedLayout.set(view.layout ?? null);
         // The view's stored pack is shown read-only (Open preview); it never overrides the Space's (§5.12).
         this.boundProfile.set(null);
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
@@ -4024,6 +4035,9 @@ Its prior copies stay in its version history.`,
             if (view.lists) this.caseLists.set({ start: view.lists.start, exclusions: view.lists.exclusions ?? [] });
         }
         this.collapsedRoots.set(view.view?.collapsed ?? []); // after the run, which clears it
+        // After the run too: set before it, the over-cap drop would judge the pick against the OLD graph still on screen
+        // (a case start awaits its Entity List before anything shows as loading).
+        this.pickedLayout.set(view.layout ?? null);
     }
 
     /**

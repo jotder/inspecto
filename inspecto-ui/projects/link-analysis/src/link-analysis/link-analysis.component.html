@@ -42,7 +42,7 @@
                 <span>Save this analysis (Snapshot)</span>
             </button>
             <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- stops the click closing File before the transfer menu opens -->
-            <div class="flex items-center gap-1 px-2" (click)="$event.stopPropagation()" data-testid="la-file-transfer">
+            <div class="flex items-center gap-1 px-2" (click)="onTransferRowClick($event)" data-testid="la-file-transfer">
                 <inspecto-la-host-slot
                     [component]="transfer.menu"
                     [inputs]="{
@@ -53,7 +53,8 @@
                     }"
                     [outputs]="transferMenuOutputs"
                 />
-                <span aria-hidden="true">Import / export views</span>
+                <!-- the icon button carries the name for assistive tech; the label is its larger mouse target -->
+                <span class="cursor-pointer" aria-hidden="true">Import / export views</span>
             </div>
             <button
                 mat-menu-item
