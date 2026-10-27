@@ -44,7 +44,15 @@ const TOOLS: { id: CleanupTool; label: string; icon: string }[] = [
     host: { class: 'relative inline-block' },
     imports: [MatButtonModule, MatIconModule, MatMenuModule, ReactiveFormsModule, PenFieldComponent],
     template: `
-        <button mat-button type="button" [matMenuTriggerFor]="menu" aria-label="Clean up the canvas" data-testid="cleanup-toggle">
+        <!-- below 1,300 px the Studio's second toolbar folds into one overflow menu, which offers these tools -->
+        <button
+            mat-button
+            type="button"
+            class="hidden min-[1300px]:inline-flex"
+            [matMenuTriggerFor]="menu"
+            aria-label="Clean up the canvas"
+            data-testid="cleanup-toggle"
+        >
             <mat-icon svgIcon="heroicons_outline:sparkles" aria-hidden="true"></mat-icon>
             Clean up
         </button>
