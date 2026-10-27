@@ -468,6 +468,37 @@ ctx.zone())`). One zone for both deliberately: a job that fires at 00:30 ops-loc
   their dates never coincide. ⛔ Every zone in both is **named**; a test asserting `systemDefault()` passes
   everywhere and proves nothing.
 
+## Failure handling: retry, alarm, misfire, re-run (`JOB-RELIABILITY-1`, decision D8, 2026-10-27)
+
+**Survey, before the change.** Existing: non-overlap + cross-pod claims; a `catch_up: true` cron job runs once on
+startup when a fire was missed while the server was down (`JobService.catchUpMissedFires`; needs at least one earlier
+run as baseline; off by default); `POST /jobs/{name}/trigger` and `POST /jobs/runs/{runId}/replay` (both
+`canOperateRuns`); a `job.run.failed` CRITICAL Signal only for a *thrown* failure; a built-in notification rule
+`builtin-job-failed` (event `JOB_FAILED`). Missing: any retry (the `retries` parameter of `sample.hello` was declared
+and read by nothing); **nothing ever emitted `JOB_FAILED`, so the built-in rule was dead and a failed scheduled Job
+told nobody**; the Jobs list showed only the status label, not the reason.
+
+**As built.**
+- **Retry** (`RetryPolicy`). Authored `retries:` (0–5) and `retry_backoff_seconds:` (first wait, doubles per retry, cap
+  600 s, default 30 s); both are framework keys, never reported undeclared. Default 2 retries for `sql.template`,
+  `report`, `risk.score`, `anomaly.score`, none for other types; `retries: 0` switches it off. Only a **transient**
+  failure is retried: an `IOException` / `SQLException` (or either as a cause) thrown by the run body. ⛔ A SQL-guard
+  refusal, config error, missing parameter, returned `FAILED` result or deadline expiry is permanent and is never
+  retried. The retries run inside the one Run (claims and deadline stay held, so no overlap); each attempt is
+  logged to the Run Log.
+- **Alarm** (`JobService.raiseFailureAlarm`). When a Run ends `FAILED` — after its retries — and was not fired by hand,
+  it emits a `JOB_FAILED` event (correlation id = run id; attrs `job`, `type`, `runId`, `trigger`, `error`), which the
+  built-in `builtin-job-failed` rule turns into a notification, and opens one Incident per Job (`dedupe: job-failed:<job>`,
+  severity ERROR) when the operational-objects seam is wired. A manual Run is not alarmed: its author is watching.
+  Best-effort — an alarm failure never changes the Run's recorded result.
+- **List** — `JobView.lastMessage` carries the last run's error text only while that run is `FAILED`; the Jobs list
+  shows it in a **Last error** column. **Run again** (arrow icon) appears on a failed Job row and on a failed row of the
+  run history, reuses `POST /jobs/{name}/trigger`, and is gated on `canOperateRuns`.
+- **Misfire** — unchanged: `catch_up: true` is the explicit, per-Job opt-in; without it a missed fire is skipped.
+
+**Deferred.** Retry of a *returned* `FAILED` result (a Job type cannot yet say "transient"); catch-up of more than one
+missed fire; a catch-up baseline for a Job that has never run.
+
 ## Three single-seam properties, confirmed by audit (2026-09-15)
 
 Distilled from the duckle review before that candidate list was archived. Each was checked against the

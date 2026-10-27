@@ -148,6 +148,25 @@ describe('JobsComponent', () => {
             expect(shown(c)).toEqual(['Run now', 'Run with parameters…', 'Disable']);
         });
 
+        it('Run again appears only when the last run FAILED, and only with canOperateRuns', () => {
+            const failed = { ...job, lastStatus: 'FAILED', lastMessage: 'sql guard refused' } as JobView;
+            const hintsOf = (c: JobsComponent, j: JobView) =>
+                c.scheduleActions
+                    .filter((a) => !a.visible || a.visible(j))
+                    .map((a) => (typeof a.hint === 'function' ? a.hint(j) : a.hint));
+            const c = create('ok').componentInstance;
+            oidc(['canOperateRuns']);
+            expect(hintsOf(c, failed)).toContain('Run again (last run failed)');
+            expect(hintsOf(c, { ...job, lastStatus: 'SUCCESS' } as JobView)).not.toContain('Run again (last run failed)');
+            oidc([]);
+            expect(hintsOf(c, failed)).toEqual([]);
+        });
+
+        it('the list carries a Last error column fed by the last failed run', () => {
+            const c = create('ok').componentInstance;
+            expect(c.columnDefs.some((d) => d.field === 'lastMessage' && d.headerName === 'Last error')).toBe(true);
+        });
+
         it('open mode (no auth) still shows them', () => {
             const c = create('ok').componentInstance;
             expect(shown(c)).toEqual(['Run now', 'Run with parameters…', 'Disable', 'Reschedule', 'Edit', 'Delete']);

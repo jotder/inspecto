@@ -16,6 +16,18 @@ list row `JobRunRow`'s `startTime` / `endTime`). The run-detail dialog (`job-run
 fills `derivedFrom` (the one field only the by-id read carries) when it returns; a failed read keeps the row and shows nothing
 (`JOB-RUN-DETAIL-DERIVEDFROM-1`, shipped 2026-10-11).
 
+## When a Job fails (2026-10-27)
+
+- **Retries.** A scheduled SQL, report or scoring Job retries twice (30 s, then 60 s) when the cause may pass — a
+  network, file or database hiccup. A refusal that cannot succeed (the SQL guard, a config error) is never retried.
+  Set `retries:` (0–5) and `retry_backoff_seconds:` on the Job to change it; `retries: 0` turns it off.
+- **You are told.** After the last attempt fails you get a notification ("Job failed") and one Incident per Job naming
+  the run and the error. A Job you run by hand is not alarmed — you are watching it.
+- **See why.** The Jobs list has a **Last error** column with the reason; the full detail stays in Logs and events.
+- **Fix, then run again.** After correcting the cause, press **Run again** (arrow icon) on the failed Job, or on the
+  failed row in the run history. It needs the run-operations permission.
+- **Server was down at a fire time.** The fire is skipped unless the Job has `catch_up: true`, which runs it once on startup.
+
 ## System jobs are badged and read-only (DUCKLE-C1, 2026-09-25)
 
 `GET /jobs` carries `system: true` on a platform-armed job (today only `system.freshness-sweep`, derived

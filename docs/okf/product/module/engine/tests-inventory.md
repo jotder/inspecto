@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-369 test class(es): 369 unit, 0 real-HTTP control-plane, 0 IT.
+371 test class(es): 371 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -187,6 +187,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `JobRunLedgerAuditSignalTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunLedgerAuditSignalTest.java` | {@code JOBRUN-STORE-SWALLOWED-WRITES-1}: a failed append to {@code jobs_runs.csv} loses the durable record |
 | `JobRunLedgerStreamedReadTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunLedgerStreamedReadTest.java` | {@code AUDIT-LOG-UNBOUNDED-READ-1}: the three read-backs of {@code jobs_runs.csv} stream the file instead of |
 | `JobServiceOrphanAuditTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceOrphanAuditTest.java` | The default-on orphan {@code output_store:} audit ({@link JobService#auditOrphanOutputStores()}) — |
+| `JobServiceRetryAlarmTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceRetryAlarmTest.java` | D8: transient failures retry, permanent ones do not, and a final failure raises the alarm. |
 | `JobServiceSharedPipelineAuditTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceSharedPipelineAuditTest.java` | The default-on shared-pipeline audit ({@link JobService#auditSharedPipelines()}) — |
 | `JobServiceTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceTest.java` | Tests for the {@link JobService} registry/scheduler: manual / cron / event triggers, |
 | `JobTaskGateTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobTaskGateTest.java` | {@code MODULE-REORG-1 P4f}: the task half of the Space's module gate. A {@code maintenance} Job whose {@code task:} |
@@ -223,6 +224,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `RecipeExecutionParityTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RecipeExecutionParityTest.java` | The Phase-3 parity gate (S4), execution half — deferred 2026-08-06 ("lands with S3's executor |
 | `ReferenceCompactorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReferenceCompactorTest.java` | Reference Phase-2 P3 verify: {@link ReferenceCompactor} collapses an append-only versioned Reference |
 | `ReportJobDeliveryTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReportJobDeliveryTest.java` | BI-4 scheduled export delivery: the dataset scope renders a CSV artifact into out_dir. |
+| `RetryPolicyTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RetryPolicyTest.java` | D8: the retry policy's defaults, backoff and the transient/permanent split. |
 | `RunArtifactStoreTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunArtifactStoreTest.java` | P1d Run Artifacts (§10): recording through {@code ctx.artifacts()} persists to JSONL and reads back |
 | `RunContextCausationTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunContextCausationTest.java` | The causation THREAD, end to end at the producing side. |
 | `RunLogStoreTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunLogStoreTest.java` | {@code AUDIT-LOG-UNBOUNDED-READ-1}: {@link RunLogStore#read} streams the run's JSONL instead of loading it |

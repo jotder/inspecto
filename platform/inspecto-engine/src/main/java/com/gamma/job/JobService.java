@@ -343,7 +343,8 @@ public final class JobService implements AutoCloseable {
      *  known but not installed (P4e); null when hosted or when no known module declares it. */
     public record JobView(String name, String type, String cron, String onPipeline, String onSignal,
                           boolean enabled, String lastStatus, String lastRunTime, String nextFire,
-                          boolean system, boolean hosted, String reason, String missingModule) {}
+                          boolean system, boolean hosted, String reason, String missingModule,
+                          String lastMessage) {}
 
     public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir) {
@@ -1339,7 +1340,7 @@ public final class JobService implements AutoCloseable {
         return RunIds.next(name);
     }
 
-    private void submit(String name, String trigger) {
+    void submit(String name, String trigger) {
         if (jobs.containsKey(name)) submitRun(newRunId(name), name, trigger);
     }
 
@@ -1674,7 +1675,7 @@ public final class JobService implements AutoCloseable {
         JobDeadline.Watch watch = JobDeadline.arm(deadline);
         try {
             try {
-                res = job.run(ctx);
+                res = runWithRetry(job, ctx, RetryPolicy.resolve(job.type(), params), name);
             } catch (com.gamma.inspector.CommitFence.RunCancelledException e) {
                 // HA-CANCEL-RESIDUALS-1: the host is closing and cancelled this Run at a checkpoint - a planned
                 // stop, recorded CANCELLED with an INFO job.run.completed, never FAILED/CRITICAL. A genuine lease
@@ -1718,6 +1719,7 @@ public final class JobService implements AutoCloseable {
         JobRun run = new JobRun(runId, name, job.type(), trigger, start,
                 LocalDateTime.now().format(TS), res.status(), res.durationMs(), res.message());
         record(run);
+        if ("FAILED".equals(res.status())) raiseFailureAlarm(name, job.type(), runId, trigger, res.message());
         // X2: the Consignments this run READ, beside its row. Only the DB projection carries it (the
         // CSV ledger is the nine-column record of the run); nothing to write when the job said nothing.
         runStore().ifPresent(rs -> rs.recordSources(runId, ctx.consignmentsRead()));
@@ -1727,6 +1729,59 @@ public final class JobService implements AutoCloseable {
                 Map.of("job", name), res.durationMs() / 1000.0);
         log.info("[JOB] {} ({}) {} in {}ms — {}",
                 name, trigger, res.status(), res.durationMs(), res.message());
+    }
+
+    /** Test seam: how a retry waits out its backoff. */
+    interface Pause { void sleep(java.time.Duration d) throws InterruptedException; }
+
+    static volatile Pause pause = d -> Thread.sleep(d.toMillis());
+
+    /** Runs the job body, retrying a transient failure per {@link RetryPolicy}. A permanent failure (a guard or
+     *  config refusal, a returned FAILED result) and the final attempt's failure propagate unchanged. The
+     *  Run's claims and deadline stay held across the waits, so a retry never overlaps another run. */
+    private JobResult runWithRetry(Job job, JobContext ctx, RetryPolicy policy, String name) throws Exception {
+        for (int retry = 1; ; retry++) {
+            try {
+                return job.run(ctx);
+            } catch (Exception e) {
+                if (retry > policy.retries() || !RetryPolicy.transientFailure(e)) throw e;
+                java.time.Duration wait = policy.waitBefore(retry);
+                log.warn("Job '{}' attempt {} failed transiently ({}); retrying in {}s",
+                        name, retry, e.getMessage(), wait.toSeconds());
+                ctx.log().warn("attempt " + retry + " of " + (policy.retries() + 1) + " failed, retrying in "
+                        + wait.toSeconds() + "s: " + e.getMessage());
+                pause.sleep(wait);
+            }
+        }
+    }
+
+    /** The alarm for a Run that finally failed (D8): a {@code JOB_FAILED} event, which the built-in
+     *  {@code builtin-job-failed} notification rule delivers, and one deduped Incident per Job. A manual Run is
+     *  not alarmed — the person who fired it is watching. Best-effort: it never fails the Run's own record. */
+    private void raiseFailureAlarm(String name, String type, String runId, String trigger, String message) {
+        if (trigger != null && trigger.startsWith("manual")) return;
+        String text = "Job '" + name + "' failed (run " + runId + "): " + message;
+        try {
+            EventLog.current().emit(com.gamma.audit.Event.builder(com.gamma.audit.EventType.JOB_FAILED)
+                    .source(JobService.class.getName())
+                    .level(com.gamma.audit.EventLevel.ERROR)
+                    .correlationId(runId)
+                    .message(text)
+                    .attr("job", name).attr("type", type).attr("runId", runId)
+                    .attr("trigger", trigger).attr("error", String.valueOf(message)));
+        } catch (RuntimeException e) {
+            log.warn("job-failed event for '{}' not emitted: {}", name, e.getMessage());
+        }
+        com.gamma.objects.ObjectAccess svc = objects;
+        if (svc == null) return;
+        try {
+            String dedupe = "job-failed:" + name;
+            if (svc.hasActive(com.gamma.workflow.ObjectType.INCIDENT, dedupe)) return;
+            svc.open(com.gamma.workflow.ObjectType.INCIDENT, "Job failed: " + name, text, "ERROR", dedupe,
+                    Map.of("job", name, "runId", runId, "error", String.valueOf(message)));
+        } catch (RuntimeException e) {
+            log.warn("job-failed Incident for '{}' not opened: {}", name, e.getMessage());
+        }
     }
 
     /**
@@ -2007,7 +2062,8 @@ public final class JobService implements AutoCloseable {
                     last == null ? "" : last.endTime(),
                     nextFire, systemJobs.contains(c.name()), hosted,
                     hosted ? null : unhostedReason(c.type(), missing),
-                    hosted ? null : missing));
+                    hosted ? null : missing,
+                    last == null || !"FAILED".equals(last.status()) ? null : last.message()));
         }
         return out;
     }
