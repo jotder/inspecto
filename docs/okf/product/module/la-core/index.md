@@ -49,7 +49,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-INVESTIGATE-CARD-FOUR-EYES-HOLD-1` | P2 | defect | the *Investigate* start card ends at "waiting for approval" in every showcase Space. | — |
 | `LA-BOUND-RULE-AUTHOR-READONLY-1` | P3 | defect | the Value Measures *Watch* line and the bound Alert Rule panel say "your role cannot author Alert Rules" for personas that hold canAuthor… | — |
 | `LA-SUSPICION-FACTORS-DEMO-1` | P3 | defect | the Suspicion score's per-node "Factors" cannot be shown on any showcase Space (whitepaper claim T2). | — |
-| `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1` | P3 | defect | the saved view claims_provider_money draws as an unreadable vertical sliver. | — |
 | `LA-STUDIO-UI-REORG-1` | P2 | feature | reorganize the Link Analysis Studio UI so it is easier and cleaner without removing any function (plan 2026-10-27, direction decided by t… | — |
 | `LA-REORG-OVERFLOW-CLEANUP-ENABLED-1` | P3 | defect | below 1,300 px the "More canvas tools" menu offers *Clean up: Keep only selected* and *Remove selected* with nothing selected, and a clic… | — |
 | `LA-SETTINGS-ESC-REOPENS-CONFIRM-1` | P3 | defect | with unsaved Graph model edits, Esc cannot dismiss the "unsaved changes" confirm: it opens again. | — |
