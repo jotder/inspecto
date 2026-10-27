@@ -42,6 +42,8 @@ describe('InspectoSplitDirective', () => {
         expect(handle.getAttribute('role')).toBe('separator');
         expect(handle.getAttribute('aria-orientation')).toBe('vertical');
         expect(handle.getAttribute('tabindex')).toBe('0');
+        expect(handle.style.width).toBe('6px'); // a 6 px handle across the split
+        expect(handle.classList.contains('cursor-col-resize')).toBe(true);
         expect(handle.getAttribute('aria-valuenow')).toBe('200');
         expect(handle.getAttribute('aria-valuemin')).toBe('100');
         expect(handle.getAttribute('aria-valuemax')).toBe('300');
@@ -107,5 +109,39 @@ describe('InspectoSplitDirective', () => {
         localStorage.setItem('inspecto.split.test.pane', '250');
         const { aside } = create();
         expect(aside.style.width).toBe('250px');
+    });
+});
+
+@Component({
+    standalone: true,
+    imports: [InspectoSplitDirective],
+    changeDetection: ChangeDetectionStrategy.Eager,
+    template: `<div
+        inspectoSplit="test.dock"
+        axis="y"
+        pane="right"
+        [min]="100"
+        [max]="300"
+        [defaultWidth]="200"
+        aria-label="Resize the dock"
+    ></div>`,
+})
+class DockHostComponent {}
+
+describe('InspectoSplitDirective - axis y (a bottom dock)', () => {
+    beforeEach(() => localStorage.removeItem('inspecto.split.test.dock'));
+
+    it('is a horizontal 6 px handle; ArrowUp makes the dock below it taller and the height persists', () => {
+        TestBed.configureTestingModule({ imports: [DockHostComponent] });
+        const fixture = TestBed.createComponent(DockHostComponent);
+        fixture.detectChanges();
+        const handle = (fixture.nativeElement as HTMLElement).querySelector('[inspectoSplit]') as HTMLElement;
+        expect(handle.getAttribute('aria-orientation')).toBe('horizontal');
+        expect(handle.style.height).toBe('6px');
+        expect(handle.classList.contains('cursor-row-resize')).toBe(true);
+        handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
+        fixture.detectChanges();
+        expect(handle.getAttribute('aria-valuenow')).toBe('216');
+        expect(localStorage.getItem('inspecto.split.test.dock')).toBe('216');
     });
 });

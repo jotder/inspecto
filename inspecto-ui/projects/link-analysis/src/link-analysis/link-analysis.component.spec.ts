@@ -96,7 +96,11 @@ class StubGraphView {
 }
 
 // The Toolbox dock remembers an explicit open/close in sessionStorage; no test may inherit another's.
-beforeEach(() => sessionStorage.clear());
+// The dock remembers its state per browser (inspecto.la.dock): no spec inherits another's.
+beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.removeItem('inspecto.la.dock');
+});
 
 function create(
     opts: {
@@ -3359,6 +3363,47 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         await c.onNodeDblClick('c'); // expanded, and its only neighbour b links on to a: no pendant to fold
         expect(c.collapsedRoots()).not.toContain('c');
         expect(c.drawAnnouncement()).toContain('no branch to fold');
+    });
+});
+
+describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)', () => {
+    const tabs = (el: HTMLElement) =>
+        Array.from(el.querySelectorAll('[role="tablist"][aria-label="Dock tab"] [role="tab"]')).map((t) =>
+            t.textContent?.trim(),
+        );
+
+    it('shows the Investigation tabs only while one is open, collapses to its tabs and remembers itself', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        expect(tabs(el)).toEqual(['Rows', 'Results']);
+        expect(el.querySelector('#bottom-panel-body')).toBeNull(); // collapsed to its tab strip
+
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.openDock('oplog');
+        fixture.detectChanges();
+        expect(tabs(el)).toEqual([
+            'Rows',
+            'Op log',
+            'Working Set rows',
+            'Coverage',
+            'Annotations',
+            'Excluded entities',
+            'Results',
+        ]);
+        expect(el.querySelector('#bottom-panel-body section[aria-label="Investigation op log"]')).not.toBeNull();
+        expect(JSON.parse(localStorage.getItem('inspecto.la.dock')!)).toEqual({ open: true, tab: 'oplog' });
+
+        // closed again: the remembered Investigation tab falls back to Rows
+        c.investigation.activeId.set(null);
+        c.investigation.log.set(null as never);
+        fixture.detectChanges();
+        expect(tabs(el)).toEqual(['Rows', 'Results']);
+        expect(c.dockTabShown()).toBe('rows');
+        fixture.destroy();
     });
 });
 

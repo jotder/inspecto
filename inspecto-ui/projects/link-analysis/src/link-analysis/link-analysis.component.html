@@ -684,7 +684,7 @@
                 <!-- the data table below the canvas is hidden entirely until this is pressed -->
                 <button
                     mat-icon-button
-                    (click)="bottomOpen.set(!bottomOpen())"
+                    (click)="bottomOpen() ? bottomOpen.set(false) : openDock('rows')"
                     [color]="bottomOpen() ? 'primary' : undefined"
                     [attr.aria-pressed]="bottomOpen()"
                     [attr.aria-controls]="bottomOpen() ? 'bottom-panel-body' : null"

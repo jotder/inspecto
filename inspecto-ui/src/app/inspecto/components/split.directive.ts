@@ -27,9 +27,10 @@ import { Directive, computed, input, signal } from '@angular/core';
         '[attr.aria-orientation]': "axis() === 'y' ? 'horizontal' : 'vertical'",
         tabindex: '0',
         class: 'hover:bg-hover shrink-0',
-        '[class.w-1.5]': "axis() === 'x'",
+        // 6 px across the handle; a host class binding cannot name 'w-1.5' (Angular cuts the class name at the dot)
+        '[style.width.px]': "axis() === 'x' ? 6 : null",
+        '[style.height.px]': "axis() === 'y' ? 6 : null",
         '[class.cursor-col-resize]': "axis() === 'x'",
-        '[class.h-1.5]': "axis() === 'y'",
         '[class.cursor-row-resize]': "axis() === 'y'",
         '[attr.aria-valuenow]': 'width()',
         '[attr.aria-valuemin]': 'min()',
