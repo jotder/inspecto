@@ -3884,7 +3884,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 frontier: first?.frontier ?? [],
                 heldFrontier: first?.heldFrontier ?? [],
                 from: first?.from ?? 'nothing yet',
-                blocked: blocked ?? first?.blocked ?? null,
+                // only the reasons that hold for every start: each start's own reason travels on its source
+                blocked: blocked ?? (sources.length ? null : 'There is nothing to expand from yet.'),
                 sources,
                 linkKinds: this.legendLinkKinds(),
                 hubThreshold: this.growThreshold(),
@@ -4067,11 +4068,47 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     async onExpand({ ctx, req }: ExpandRun): Promise<void> {
         this.growExclude.growOpen.set(false);
         if (ctx.mode === 'investigation') {
+            // going through hubs is a sealed override: ask first, as Expand anyway does
+            if (!req.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
             if (!(await this.growExclude.growInvestigation(ctx, req, this.degreePresets())))
                 this.toastr.error(this.investigation.error() || 'The Expand was refused.');
             return;
         }
         await this.growBasic(ctx, req);
+    }
+
+    /** "Hold supernodes" unticked in an Investigation: the override is sealed in every degree's step, so confirm it. */
+    private confirmHubOverride(held: string[]): Promise<boolean> {
+        const purpose = this.investigation.header()?.purpose;
+        const what = held.length
+            ? `${held.length} held high-connectivity ${held.length === 1 ? 'entity' : 'entities'} and any the walk reaches`
+            : 'any high-connectivity entity the walk reaches';
+        return this.confirm.confirmDestructive(
+            `Expand through ${what}? A hub can pull in many unrelated numbers.\n\n` +
+                'The override is sealed in each step of the Investigation log, with your name, and is shown in the log ' +
+                'and the Dossier' +
+                (purpose ? ` under the stated purpose: “${purpose}”.` : '.'),
+            { title: 'Expand through high connectivity?', confirmText: 'Expand anyway', destructive: false },
+        );
+    }
+
+    /** The explorer frontier minus the busy nodes a preview of it names; those join the Held tray. */
+    private async holdBusy(frontier: string[], req: GrowRequest): Promise<string[]> {
+        let held: { id: string; contacts: number }[] = [];
+        try {
+            held = (await this.growExclude.basicAdapter?.preview(frontier, req))?.held ?? [];
+        } catch {
+            return frontier; // no preview: nothing more is known to hold
+        }
+        if (!held.length) return frontier;
+        const next = new Map(this.growExclude.basicHeld());
+        for (const h of held) next.set(h.id, h.contacts);
+        this.growExclude.basicHeld.set(next);
+        const nodes = this.graph()?.nodes ?? [];
+        return frontier.filter((id) => {
+            const n = nodes.find((x) => x.id === id);
+            return !next.has(id) && !(n && rawIdsOf(n).some((r) => next.has(r)));
+        });
     }
 
     /** Basic Grow (§3.5): neighbours reads merged into the explorer graph — not recorded; Undo restores the graph. */
@@ -4095,6 +4132,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         let applied = 0;
         let stop = '';
         for (let d = 1; d <= req.degrees && frontier.length; d++) {
+            // degree 1 is held by the dialog's preview; each later degree reads its own, so a busy node it reached is
+            // held too (no preview on this server = nothing more is known to hold)
+            if (d > 1 && req.hold) frontier = await this.holdBusy(frontier, req);
+            if (!frontier.length) break;
             applied = d;
             const known = new Set((this.graph()?.nodes ?? []).map((n) => n.id));
             for (const id of frontier.slice(0, this.selectionExpandCap)) {

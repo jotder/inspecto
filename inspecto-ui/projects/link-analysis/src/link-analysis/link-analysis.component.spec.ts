@@ -3526,6 +3526,31 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(c.graph()!.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
     });
 
+    it('Basic Expand holds a busy node found at degree 2: it joins the Held tray and is not grown at degree 3', async () => {
+        const next: Record<string, string> = { c: 'x1', x1: 'x2', x2: 'x3' };
+        const expand = vi.fn(async (id: string) => ({
+            nodes: [{ id, data: { label: id, kind: 'entity' } }, { id: next[id], data: { label: next[id], kind: 'entity' } }],
+            edges: [{ id: id + '->' + next[id], source: id, target: next[id], data: { kind: 'link' } }],
+        }));
+        const { c } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
+        // the later degrees' previews name x2 as busy
+        c.growExclude.basicAdapter = {
+            preview: vi.fn(async (frontier: string[]) => ({
+                addsNodes: 1,
+                addsLinks: 1,
+                held: frontier.includes('x2') ? [{ id: 'x2', contacts: 900 }] : [],
+                heldCount: frontier.includes('x2') ? 1 : 0,
+                excludedByLists: [],
+                truncated: false,
+                readPath: 'index',
+            })),
+        } as never;
+        c.onSelectionChange(['c']);
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1']);
+        expect(c.growExclude.basicHeld().get('x2')).toBe(900);
+    });
+
     it('Basic Expand stops at the frontier cap with a message naming the degree reached', async () => {
         const expand = vi.fn(async (id: string) => {
             const kids = Array.from({ length: 30 }, (_, i) => `${id}-${i}`);
@@ -3686,6 +3711,11 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         });
         await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
         expect(ops).toEqual([{ op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500 }]);
+        // Hold off goes through hubs: a sealed override, so it asks first; No sends nothing
+        const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 } });
+        expect(ask).toHaveBeenCalledWith(expect.stringContaining('1 held high-connectivity entity'), expect.anything());
+        expect(ops).toHaveLength(1);
         await c.removeHeld();
         expect(ops[1]).toEqual({ op: 'exclude', ids: ['ws-hub'], reason: 'busy node above 500 contacts' });
         expect(c.growExclude.lastChange()?.text).toBe('Removed 1 busy node.');

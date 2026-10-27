@@ -86,7 +86,7 @@ export interface ExpandRun {
                 <h2 id="la-expand-title" class="m-0 text-sm font-semibold">Expand</h2>
                 <span class="text-secondary text-xs">({{ ctx().mode === 'investigation' ? 'recorded' : 'not recorded' }})</span>
                 <button mat-icon-button class="ml-auto" type="button" aria-label="Close Expand" (click)="closed.emit()">
-                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    <mat-icon svgIcon="heroicons_outline:x-mark" aria-hidden="true"></mat-icon>
                 </button>
             </div>
 
@@ -230,6 +230,7 @@ export interface ExpandRun {
                                 type="number"
                                 [error]="rung.controls.minDistinctDays.invalid ? 'A whole number of at least 1.' : ''"
                             />
+                            <p class="text-secondary m-0 text-xs">Needs the Investigation's time column.</p>
                             <inspecto-pen-field
                                 label="Candidate degree, minimum"
                                 formControlName="candidateDegreeMin"
@@ -242,6 +243,7 @@ export interface ExpandRun {
                                 type="number"
                                 [error]="rung.controls.candidateDegreeMax.invalid ? 'A whole number of at least 1.' : ''"
                             />
+                            <p class="text-secondary m-0 text-xs">Skips hubs: a neighbour with more links in the window is not admitted.</p>
                             @if (rung.hasError('degreeOrder')) {
                                 <p class="text-warn m-0 text-xs" role="alert">The minimum degree must not exceed the maximum.</p>
                             }
@@ -251,6 +253,7 @@ export interface ExpandRun {
                                 type="number"
                                 [error]="rung.controls.maxFanOut.invalid ? 'A whole number of at least 1.' : ''"
                             />
+                            <p class="text-secondary m-0 text-xs">Strongest links first; blank = unbounded.</p>
                             <inspecto-pen-field
                                 label="Row budget"
                                 formControlName="budget"
@@ -299,6 +302,10 @@ export interface ExpandRun {
             </div>
 
             @if (approval(); as a) {
+                <p class="text-secondary m-0 text-xs" data-testid="la-expand-effective">
+                    Each degree reads at most {{ a.budget.toLocaleString('en') }} rows, fan-out
+                    {{ a.fanOut === null ? 'unbounded' : 'capped at ' + a.fanOut.toLocaleString('en') }}.
+                </p>
                 @if (a.exceeded.length) {
                     <p class="text-warn m-0 text-xs" role="status" data-testid="la-expand-needs-approval">
                         Each degree will need approval from a second person: {{ a.exceeded.join('; ') }}. The walk stops at

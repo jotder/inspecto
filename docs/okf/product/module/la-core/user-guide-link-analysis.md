@@ -848,8 +848,8 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   `[Name=]*-MM-DD` `[Name=]*-MM-DOW#N` and `[Name=]*-MM-DOW#L` - the LAST weekday (`Xmas=*-12-25`, `*-11-THU#4`, `*-05-MON#L`), client-validated against the same bounds
   (a11y spec in `investigation-window-op.component.spec.ts`). ⏳ Not built: Easter-style
   computed holidays, lunar calendars. ✅ The rest
-  (`threshold`, `snapshot`, comparison mode — read route, then the sealed `compare` op on 2026-10-05 —, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
-  settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
+  (`threshold`, `snapshot`, comparison mode — read route, then the sealed `compare` op on 2026-10-05 —, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the *Expand* dialog's collapsed *Advanced*
+  fold (`link-analysis-expand.component`, LA-STUDIO-UI-REORG-1 §5.4; it replaced the expand rung form) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
   refuses) · `direction` · rung `window` (`inherit` · `full` · *A window for this rung…*, an override object) · `linkKinds`
   (comma-separated, trimmed and deduplicated, at most 100; blank = all kinds; the server 422s it without an Investigation
   link-kind column) · `minEvents` ·
