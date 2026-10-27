@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, model, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, effect, inject, input, model, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -103,10 +103,13 @@ function storedSection(): LaSettingsSection | null {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [MatButtonModule, MatIconModule, MatTooltipModule],
     template: `
+        <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- a backdrop click is the pointer twin of Esc, which a document listener handles -->
         <div
-            class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 p-4"
-            [hidden]="!open()"
+            class="fixed inset-0 z-[1000] items-center justify-center bg-black/40 p-4"
+            [class.flex]="open()"
+            [class.hidden]="!open()"
             data-testid="la-settings"
+            (click)="$event.target === $event.currentTarget && requestClose()"
         >
             <div
                 #panel
@@ -115,7 +118,6 @@ function storedSection(): LaSettingsSection | null {
                 aria-modal="true"
                 aria-labelledby="la-settings-title"
                 tabindex="-1"
-                (keydown.escape)="requestClose()"
             >
                 <div class="flex shrink-0 items-center gap-2 border-b px-4 py-2" style="border-color: var(--gamma-border)">
                     <h2 id="la-settings-title" class="m-0 text-lg font-semibold">Settings</h2>
@@ -204,6 +206,12 @@ export class LinkAnalysisSettingsComponent {
     private readonly dropInvestigation = effect(() => {
         if (!this.investigationOpen() && this.section() === 'investigation') this.section.set('graph-model');
     });
+
+    /** Esc closes from anywhere while open, not only with focus inside the panel. */
+    @HostListener('document:keydown.escape')
+    onEscape(): void {
+        if (this.open()) void this.requestClose();
+    }
 
     show(id: LaSettingsSection): void {
         this.section.set(id);

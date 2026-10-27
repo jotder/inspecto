@@ -252,6 +252,7 @@ export class LinkAnalysisInvestigationComponent {
             timeCol: p.timeCol,
             eventsCol: p.eventsCol,
             seed: p.seed,
+            seeds: p.seeds,
             presets: p.presets,
             maxDegree: p.maxDegree,
             degrees: 1,

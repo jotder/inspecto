@@ -12,6 +12,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
+import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, delay, of, throwError } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -1521,7 +1522,7 @@ describe('LinkAnalysisComponent', () => {
         // P1c filled the Collapse and Clean up slots (§5.5, §5.6)
         const edits = el.querySelector('[data-testid="la-canvas-toolbar"] [data-testid="la-group-edits"]')!;
         expect(edits.querySelector('[data-testid="la-selection-collapse"]')).not.toBeNull();
-        expect(edits.querySelector('inspecto-link-analysis-cleanup')).not.toBeNull();
+        expect(el.querySelector('[data-testid="la-canvas-toolbar"] inspecto-link-analysis-cleanup')).not.toBeNull();
         expect(el.querySelector('[data-testid="la-selection-bar"]')).toBeNull();
         expect(el.querySelector('[data-testid="la-selection-count"]')).toBeNull();
 
@@ -1540,6 +1541,38 @@ describe('LinkAnalysisComponent', () => {
         c.clearSelection();
         expect(c.selectedOnCanvas()).toEqual([]);
         await expectNoA11yViolations(el);
+    });
+
+    it('below 1,300 px the overflow menu holds Collapse, the N collapsed chip and Clean up (LA-REORG-NARROW-CLEANUP-1)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        c.onSelectionChange([c.selectedOnCanvas()[0] ?? 'a']);
+        c.collapsedRoots.set(['a']);
+        fixture.detectChanges();
+        // Clean up's panel is anchored on its own host, so the host must not sit inside a group hidden below 1,300 px
+        const cleanup = el.querySelector('[data-testid="la-canvas-toolbar"] inspecto-link-analysis-cleanup')!;
+        expect(cleanup.closest('.hidden')).toBeNull();
+
+        const more = fixture.debugElement.query(By.css('[data-testid="la-canvas-tools-more"]'));
+        more.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        const item = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement | null;
+        expect(item('la-more-collapse')).not.toBeNull();
+        expect(item('la-more-collapsed')?.textContent).toContain('1 collapsed');
+        for (const t of ['paths', 'shortest', 'trim', 'keep', 'remove']) expect(item(`la-more-cleanup-${t}`), t).not.toBeNull();
+
+        item('la-more-cleanup-trim')!.click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="cleanup-panel"]')).not.toBeNull();
+
+        more.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        item('la-more-collapsed')!.click();
+        fixture.detectChanges();
+        expect(c.collapsedRoots()).toEqual([]);
     });
 
     it('Snap lines and Hover activate are Display options; the View tab has no lenses section', async () => {
@@ -3234,8 +3267,7 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
             'Collapse or unfold the selected nodes',
             'Hide the selected nodes',
             'Attach to Case',
-            'Clean up the canvas',
-        ]);
+        ]); // Clean up sits beside the group, so its panel stays reachable below 1,300 px
         expect(edits.querySelector('[aria-label^="Exclude"]')).toBeNull();
         const sel = el.querySelector('[data-testid="la-group-selection"]') as HTMLElement;
         expect(Array.from(sel.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))).toEqual([
@@ -4200,6 +4232,36 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'suspects' });
         expect(getEntityList).toHaveBeenCalledWith('suspects');
         expect([...c.expandedNodeIds()].sort()).toEqual(['S-1', 'S-2']);
+    });
+
+    it('LA-START-LIST-1 (S2): on the Investigations level a list starts an Investigation as one entity does - seeded and grown one degree', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), getEntityList } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'suspects' });
+        // not merely queued as bare seeds (they drew 2 entities and 0 links): the pending Investigation seeds every member
+        expect(c.investigation.queuedSeeds()).toEqual([]);
+        expect(c.pendingInvestigation()).toMatchObject({ seeds: ['S-1', 'S-2'], projection: { entityType: 'account' } });
+        expect(c.toolboxTab()).toBe('investigation');
+    });
+
+    it('LA-START-LIST-1 (S1): choosing "A list" re-reads the Entity Lists, so a list made since the page loaded is offered', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        fixture.detectChanges();
+        const reread = vi.spyOn(fixture.componentInstance as unknown as { refreshEntityLists(): void }, 'refreshEntityLists');
+        const box = fixture.debugElement.query((d) => d.name === 'inspecto-link-analysis-start-box');
+        const kind = (box.componentInstance as { form: { controls: { kind: { setValue(v: string): void } } } }).form.controls.kind;
+        kind.setValue('paste');
+        expect(reread).not.toHaveBeenCalled();
+        kind.setValue('list');
+        expect(reread).toHaveBeenCalledTimes(1);
     });
 
     /**

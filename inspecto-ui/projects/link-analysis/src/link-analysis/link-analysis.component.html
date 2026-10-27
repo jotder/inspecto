@@ -916,18 +916,20 @@
                         <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none">{{ n }}</span>
                     }
                 </button>
-                <!-- slot: Clean up ▾ (lane P1c, §5.6) -->
-                <inspecto-link-analysis-cleanup
-                    [graph]="canvasData()"
-                    [seeds]="cleanupSeeds()"
-                    [selection]="selectedOnCanvas()"
-                    [spare]="cleanupSpare()"
-                    [nodeCap]="cleanupCap()"
-                    (applied)="onCleanupApplied($event)"
-                    (highlight)="onCleanupHighlight($event)"
-                    (findOnServer)="findPathsFromCleanup($event)"
-                />
             </div>
+            <!-- Clean up ▾ (lane P1c, §5.6) sits outside the group: its panel is anchored on this host, so the host stays
+                 visible below 1,300 px, where its own toggle hides and the overflow menu offers the tools -->
+            <inspecto-link-analysis-cleanup
+                #cleanup
+                [graph]="canvasData()"
+                [seeds]="cleanupSeeds()"
+                [selection]="selectedOnCanvas()"
+                [spare]="cleanupSpare()"
+                [nodeCap]="cleanupCap()"
+                (applied)="onCleanupApplied($event)"
+                (highlight)="onCleanupHighlight($event)"
+                (findOnServer)="findPathsFromCleanup($event)"
+            />
             <span class="mx-1 hidden h-6 w-px shrink-0 min-[1300px]:block" style="background: var(--gamma-border)" aria-hidden="true"></span>
 
             <!-- Held (n) / Hidden (n) -->
@@ -979,6 +981,20 @@
                 <button mat-menu-item type="button" (click)="clearSelection()" [disabled]="!selectedOnCanvas().length">Clear the selection</button>
                 <mat-divider></mat-divider>
                 <button mat-menu-item type="button" (click)="openExpand()">Expand…</button>
+                <button
+                    mat-menu-item
+                    type="button"
+                    (click)="toggleCollapse(selectedOnCanvas())"
+                    [disabled]="!selectedOnCanvas().length"
+                    data-testid="la-more-collapse"
+                >
+                    Collapse / unfold the selected
+                </button>
+                @if (collapsedRoots().length) {
+                    <button mat-menu-item type="button" (click)="expandAll()" data-testid="la-more-collapsed">
+                        Expand {{ collapsedRoots().length }} collapsed
+                    </button>
+                }
                 <button mat-menu-item type="button" (click)="hideSelected()" [disabled]="!selectedOnCanvas().length">Hide the selected nodes</button>
                 @if (investigation.canvas()) {
                     <button mat-menu-item type="button" (click)="excludeSelected()" [disabled]="!selectedOnCanvas().length">
@@ -987,6 +1003,12 @@
                     <button mat-menu-item type="button" (click)="mergeSelected()" [disabled]="!!mergeUnavailable()">Merge…</button>
                 }
                 <button mat-menu-item type="button" (click)="openAttachToCase()" [disabled]="!!attachUnavailable()">Attach to Case</button>
+                <mat-divider></mat-divider>
+                @for (t of cleanup.tools; track t.id) {
+                    <button mat-menu-item type="button" (click)="cleanup.pick(t.id)" [attr.data-testid]="'la-more-cleanup-' + t.id">
+                        Clean up: {{ t.label }}
+                    </button>
+                }
                 <mat-divider></mat-divider>
                 <button mat-menu-item type="button" (click)="focusHeldTray()" [disabled]="!heldItems().length">
                     Held ({{ heldItems().length }})
@@ -1303,6 +1325,7 @@
                             [savedViewCount]="views().length"
                             [addData]="addDataOffered"
                             (start)="startFrom($event)"
+                            (listsWanted)="refreshEntityLists()"
                             (followMoney)="loadFollowTheMoney()"
                             (exploreDataset)="exploreDataset()"
                             (openSavedViews)="openSavedViews()"

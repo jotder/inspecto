@@ -580,6 +580,8 @@ export class InvestigationSessionStore {
         timeCol?: string;
         eventsCol?: string;
         seed: string;
+        /** Several seeds (an Entity List start); absent = `seed` alone. */
+        seeds?: string[];
         presets: DegreePresets;
         maxDegree: number;
         degrees: number;
@@ -618,7 +620,7 @@ export class InvestigationSessionStore {
         const id = this.activeId();
         this.windowEnd.set(req.windowEnd ?? null);
         const entityType = req.projection.entityType;
-        if (!(await this.apply({ op: 'seed', ids: [req.seed], ...(entityType ? { entityType } : {}) }))) return false;
+        if (!(await this.apply({ op: 'seed', ids: req.seeds ?? [req.seed], ...(entityType ? { entityType } : {}) }))) return false;
         this.showWorkingSet.set(true);
         // A held (pending-approval) degree blocks the next one, so the loop stops there - no error, no retry.
         for (let i = 0; i < req.degrees; i++) {
