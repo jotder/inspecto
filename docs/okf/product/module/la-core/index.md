@@ -54,9 +54,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-STUDIO-UI-REORG-1` | P2 | feature | reorganize the Link Analysis Studio UI so it is easier and cleaner without removing any function (plan 2026-10-27, direction decided by t… | — |
 | `LA-SETTINGS-OVERLAY-NEVER-HIDES-1` | P1 | defect | ⚙ Settings covers the Studio from page load and cannot be closed in the console shell. | — |
 | `LA-REORG-NARROW-CLEANUP-1` | P2 | defect | below about 1,300 px Clean up, Collapse and the "N collapsed" chip have no reachable home. | — |
-| `LA-REORG-COLLAPSE-NOT-SAVED-1` | P3 | defect | Collapse is not saved with the view | — |
-| `LA-REORG-REDUCE-FIRST-1` | P3 | defect | "Reduce first" and "Find paths (server)" can do nothing visible. | — |
-| `LA-REORG-VIEW-PACK-OVERRIDE-1` | P3 | defect | a saved view still overrides the Space's Industry pack | operator |
-| `LA-REORG-LAYOUT-FALLBACK-1` | P3 | defect | the silent layout fallback and its notice are still there | — |
-| `LA-REORG-EXPAND-UNDER-DOCK-1` | P3 | defect | the first time the Expand dialog opens, its Cancel / Expand buttons sit under the dock tab strip | — |
-| `LA-REORG-SETTINGS-GAPS-1` | P3 | defect | small §5.10/§5.11 gaps. | — |
