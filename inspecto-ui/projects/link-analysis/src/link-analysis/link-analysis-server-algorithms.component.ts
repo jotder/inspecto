@@ -51,16 +51,18 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
         @if (!algorithms().length) {
             <p class="text-secondary text-sm" data-testid="algo-none">The server's algorithm list is not available.</p>
         } @else {
-            <p class="text-secondary text-sm" data-testid="algo-count">
-                {{ algorithms().length }} algorithms on the server.
-            </p>
-            <inspecto-option-picker
-                class="w-72"
-                label="Algorithm"
-                [options]="algorithmOptions()"
-                [ngModel]="picked()"
-                (ngModelChange)="pick($any($event))"
-            />
+            @if (!algorithmId()) {
+                <p class="text-secondary text-sm" data-testid="algo-count">
+                    {{ algorithms().length }} algorithms on the server.
+                </p>
+                <inspecto-option-picker
+                    class="w-72"
+                    label="Algorithm"
+                    [options]="algorithmOptions()"
+                    [ngModel]="picked()"
+                    (ngModelChange)="pick($any($event))"
+                />
+            }
             @if (current(); as a) {
                 <div class="flex flex-wrap items-center gap-2" data-testid="algo-form">
                     @if (a.needsSource) {
@@ -259,6 +261,11 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                                 Highlight on canvas
                             </button>
                         }
+                        @if (dockAvailable() && lastResult() && (riskRows().length || s.lines.length) > LONG_RESULT) {
+                            <button mat-stroked-button class="mt-1" data-testid="algo-open-dock" (click)="openInDock.emit(lastResult()!)">
+                                Open in the dock
+                            </button>
+                        }
                     </div>
                 }
             }
@@ -280,6 +287,15 @@ export class LinkAnalysisServerAlgorithmsComponent {
     readonly emphasisChange = output<GraphEmphasis | null>();
     /** Every completed answer, so the host can feed a ranking or a partition into its own ranking / community views. */
     readonly resultChange = output<GraphRunResult>();
+    /** The catalogue row this panel runs (§5.8): set, the panel runs that one algorithm and hides its own picker. */
+    readonly algorithmId = input<string | null>(null);
+    /** P2a's bottom dock is mounted: a long answer gets *Open in the dock*. */
+    readonly dockAvailable = input(false);
+    /** *Open in the dock*: the last answer, for the dock's Results tab. */
+    readonly openInDock = output<GraphRunResult>();
+    /** More rows than this is a long table: it gets *Open in the dock*. */
+    readonly LONG_RESULT = 10;
+    readonly lastResult = signal<GraphRunResult | null>(null);
 
     readonly algorithms = computed<GraphAlgorithm[]>(() => this.runs.catalogue()?.algorithms ?? []);
     readonly algorithmOptions = computed<PickerOption[]>(() =>
@@ -291,7 +307,7 @@ export class LinkAnalysisServerAlgorithmsComponent {
     readonly picked = signal('');
     readonly current = computed(() => {
         const all = this.algorithms();
-        return all.find((a) => a.id === this.picked()) ?? all[0] ?? null;
+        return all.find((a) => a.id === (this.algorithmId() || this.picked())) ?? all[0] ?? null;
     });
     readonly editableParams = computed(() => (this.current()?.params ?? []).filter(isEditableParam));
     readonly structuredParams = computed(() => (this.current()?.params ?? []).filter((p) => STRUCTURED.has(p.type)));
@@ -454,12 +470,14 @@ export class LinkAnalysisServerAlgorithmsComponent {
         this.summary.set(summarizeGraphRun(r, this.serverIds()));
         this.riskRows.set(propagatedRiskRows(r, this.serverIds(), (id) => this.labelOfCanvas(id)));
         this.expanded.set(null);
+        this.lastResult.set(r);
         this.resultChange.emit(r);
     }
 
     /** A new run replaces the answer: a refused one (429, 422...) must not leave the previous result under its banner. */
     clearResult(): void {
         this.summary.set(null);
+        this.lastResult.set(null);
         this.riskRows.set([]);
         this.expanded.set(null);
     }

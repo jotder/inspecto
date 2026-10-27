@@ -530,7 +530,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly queryOpen = signal(true);
     /** The left dock (Query); collapses to an icon rail. */
     readonly queryDockOpen = signal(true);
-    /** The right dock (Analysis | View toolbox); collapses to an icon rail. */
+    /** The right dock (Analysis | Investigation toolbox); collapses to an icon rail. */
     readonly toolboxDockOpen = signal(initialToolboxOpen());
     private toolboxSeen = false;
     /** Remember an explicit open/close for the session (the initial value is not an explicit choice). */
@@ -546,9 +546,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             /* storage blocked - the choice just is not remembered */
         }
     });
-    readonly toolboxTab = signal<'analysis' | 'view' | 'investigation'>('analysis');
+    readonly toolboxTab = signal<'analysis' | 'investigation'>('analysis');
     @ViewChild('toolboxScroll') private toolboxScroll?: ElementRef<HTMLElement>;
-    /** The three tabs share one scroll container; a new tab must open at its top, not where the last one was scrolled to. */
+    /** The tabs share one scroll container; a new tab must open at its top, not where the last one was scrolled to. */
     private readonly resetToolboxScroll = effect(() => {
         this.toolboxTab();
         queueMicrotask(() => {
@@ -565,13 +565,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly investigationsEnabled = this.laFeatures.investigations;
     /** Why an Investigation action is locked on the Explorer level (`/bootstrap` `featureReasons.investigations`). */
     readonly investigationsLockedReason = computed(() => investigationsLockedReason(this.laFeatures));
-    private readonly allToolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [
+    private readonly allToolboxTabs: readonly { id: 'analysis' | 'investigation'; label: string }[] = [
         { id: 'analysis', label: 'Analysis' },
-        { id: 'view', label: 'View' },
         { id: 'investigation', label: 'Investigation' },
     ];
     /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels) - the same on every level. */
-    get toolboxTabs(): readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] {
+    get toolboxTabs(): readonly { id: 'analysis' | 'investigation'; label: string }[] {
         return this.allToolboxTabs;
     }
     /** The graph canvas's text alternative: the displayed graph as a keyboard-navigable node / link list. */
@@ -2559,12 +2558,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     openInvestigation(): void {
         this.toolboxDockOpen.set(true);
         this.toolboxTab.set('investigation');
-    }
-
-    /** Open the View toolbox (layouts, lenses, overlays). */
-    openViewTools(): void {
-        this.toolboxDockOpen.set(true);
-        this.toolboxTab.set('view');
     }
 
     /** Collapse both docks so the canvas takes the row; a second call restores them. */

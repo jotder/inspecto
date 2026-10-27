@@ -422,6 +422,86 @@
                             >Hover activate
                             <span class="text-secondary text-xs">(light up a node and its links)</span></mat-checkbox
                         >
+                        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Overlays</span>
+                        <mat-checkbox
+                            [checked]="legendOpen()"
+                            (change)="setOverlayOpen('legend', $event.checked)"
+                        >
+                            Legend
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="workingSetOpen()"
+                            (change)="setOverlayOpen('workingSet', $event.checked)"
+                        >
+                            Working set
+                        </mat-checkbox>
+                        <mat-checkbox [checked]="levelOfDetail()" (change)="levelOfDetail.set($event.checked)">
+                            Level of detail
+                            <span class="text-secondary text-xs"
+                                >(labels off above {{ lodLabelCap() }} nodes)</span
+                            >
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().minimap"
+                            (change)="toggleViewFlag('minimap', $event.checked)"
+                        >
+                            Minimap
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().gridLine"
+                            (change)="toggleViewFlag('gridLine', $event.checked)"
+                        >
+                            Grid
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().hulls && !hullsDisabledReason()"
+                            [disabled]="!!hullsDisabledReason()"
+                            [matTooltip]="hullsDisabledReason() ?? ''"
+                            (change)="toggleViewFlag('hulls', $event.checked)"
+                            data-testid="la-hulls-toggle"
+                        >
+                            Community hulls
+                            <span class="text-secondary text-xs">(Louvain)</span>
+                        </mat-checkbox>
+                        @if (hullsDisabledReason(); as why) {
+                            <span class="text-secondary text-xs" data-testid="la-hulls-reason"
+                                >Community hulls {{ why }} —
+                                <button type="button" class="text-primary underline" (click)="openReduce()">
+                                    reduce first
+                                </button></span
+                            >
+                        }
+                        <div class="mt-1 flex items-center gap-2">
+                            <mat-checkbox
+                                [checked]="superNodeThreshold() > 0"
+                                [disabled]="workingSetCanvas()"
+                                (change)="setSuperNodeGrouping($event.checked)"
+                            >
+                                Group lone counterparties
+                            </mat-checkbox>
+                            @if (workingSetCanvas()) {
+                                <span class="text-secondary text-xs">{{ queryGraphOnlyReason }}</span>
+                            }
+                            @if (superNodeThreshold() > 0) {
+                                <span class="text-secondary text-xs">
+                                    {{ superNodeThreshold() }}+ per hub &middot; click a group to open it
+                                </span>
+                            }
+                        </div>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().bubbleSets"
+                            [disabled]="!viewOptions().hulls"
+                            (change)="toggleViewFlag('bubbleSets', $event.checked)"
+                        >
+                            Bubble sets
+                            <span class="text-secondary text-xs">(draw the communities as sets)</span>
+                        </mat-checkbox>
+                        <mat-checkbox
+                            [checked]="!!viewOptions().edgeBundling"
+                            (change)="toggleViewFlag('edgeBundling', $event.checked)"
+                        >
+                            Link bundling
+                        </mat-checkbox>
                         <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node size</span>
                         <div class="flex items-center gap-1.5" role="group" aria-label="Node size">
                             @for (z of nodeSizeOptions; track z.value) {
@@ -1377,7 +1457,7 @@
                 [class.hidden]="!toolboxDockOpen()"
                 aria-label="Resize the toolbox (arrow keys or drag)"
             ></div>
-            <!-- right dock — Analysis | View toolbox; collapses to an icon rail -->
+            <!-- right dock — Analysis | Investigation toolbox; collapses to an icon rail -->
             <aside
                 class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l max-md:!w-full max-md:border-l-0 max-md:border-t"
                 [class.w-10]="!toolboxDockOpen()"
@@ -1479,10 +1559,10 @@
                             (seedFromResults)="queueSeedsAndOpen($event)"
                             (findPaths)="findPaths($event)"
                             (runPatternOnServer)="runPatternOnServer($event)"
-                        ></inspecto-link-analysis-toolbox>
+                        >
+                        <!-- §5.8: Temporal findings is the catalogue's "Burst and periodicity" entry. -->
                         <inspecto-link-analysis-temporal-findings
-                            class="mt-3"
-                            [class.hidden]="toolboxTab() !== 'analysis'"
+                            laTemporal
                             [mappings]="traversalMappingOptions()"
                             [timeColumn]="timeColumn()"
                             [state]="temporalFindings()"
@@ -1496,6 +1576,7 @@
                             (sealRequested)="sealTemporal()"
                             (highlight)="emphasis.set($event)"
                         ></inspecto-link-analysis-temporal-findings>
+                        </inspecto-link-analysis-toolbox>
 
                         <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse.
                              On the Explorer level the tab stays and its one action is LOCKED with the reason (LA-ONBOARD-1 OB-10). -->
@@ -1533,154 +1614,6 @@
                                 </div>
                             }
                         }
-
-                        <!-- View — layouts and canvas overlays. `[class.hidden]`, never `[hidden]`: Tailwind's `.flex`
-                             sets display:flex, which beats the [hidden] attribute, so the View tools rendered under
-                             every tab. Still mounted, like the Analysis toolbox above. -->
-                        <div
-                            [class.hidden]="toolboxTab() !== 'view'"
-                            class="flex flex-col gap-3"
-                            data-toolbox-view
-                            role="tabpanel"
-                            id="la-toolbox-panel-view"
-                            aria-labelledby="la-toolbox-tab-view"
-                        >
-                            <section aria-label="Layout">
-                                <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
-                                    Layout
-                                </h3>
-                                <div class="grid grid-cols-2 gap-1">
-                                    @for (l of layouts; track l.id) {
-                                        @let off = layoutDisabledReason(l);
-                                        <span class="flex" [matTooltip]="off ?? ''">
-                                            <button
-                                                type="button"
-                                                class="w-full rounded-md border px-2 py-1.5 text-left text-xs disabled:opacity-50"
-                                                [class.font-semibold]="layoutId() === l.id"
-                                                [style.borderColor]="layoutId() === l.id ? 'var(--gamma-primary)' : null"
-                                                [disabled]="!!off"
-                                                (click)="setLayout(l.id)"
-                                                [attr.aria-pressed]="layoutId() === l.id"
-                                                [attr.aria-label]="l.label + (off ? ' (' + off + ')' : '')"
-                                            >
-                                                {{ l.label }}
-                                            </button>
-                                        </span>
-                                    }
-                                </div>
-                                @if (anyLayoutOverCap()) {
-                                    <button
-                                        type="button"
-                                        class="text-primary mt-1 text-left text-xs underline"
-                                        (click)="openReduce()"
-                                    >
-                                        Reduce first — filter the graph to use the greyed layouts
-                                    </button>
-                                }
-                            </section>
-                            <section aria-label="Overlays" class="flex flex-col">
-                                <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
-                                    Overlays
-                                </h3>
-                                <mat-checkbox
-                                    [checked]="legendOpen()"
-                                    (change)="setOverlayOpen('legend', $event.checked)"
-                                >
-                                    Legend
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="workingSetOpen()"
-                                    (change)="setOverlayOpen('workingSet', $event.checked)"
-                                >
-                                    Working set
-                                </mat-checkbox>
-                                <mat-checkbox [checked]="nodeLabels()" (change)="nodeLabels.set($event.checked)">
-                                    Node labels
-                                </mat-checkbox>
-                                <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)">
-                                    Link labels
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="allEdgeLabels()"
-                                    [disabled]="!edgeLabels()"
-                                    (change)="allEdgeLabels.set($event.checked)"
-                                >
-                                    All link labels
-                                    @if (edgeLabelsDense()) {
-                                        <span class="text-secondary text-xs"
-                                            >(hidden above {{ denseEdgeLabelCap }} links — hover to show)</span
-                                        >
-                                    }
-                                </mat-checkbox>
-                                <mat-checkbox [checked]="levelOfDetail()" (change)="levelOfDetail.set($event.checked)">
-                                    Level of detail
-                                    <span class="text-secondary text-xs"
-                                        >(labels off above {{ lodLabelCap() }} nodes)</span
-                                    >
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().minimap"
-                                    (change)="toggleViewFlag('minimap', $event.checked)"
-                                >
-                                    Minimap
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().gridLine"
-                                    (change)="toggleViewFlag('gridLine', $event.checked)"
-                                >
-                                    Grid
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().hulls && !hullsDisabledReason()"
-                                    [disabled]="!!hullsDisabledReason()"
-                                    [matTooltip]="hullsDisabledReason() ?? ''"
-                                    (change)="toggleViewFlag('hulls', $event.checked)"
-                                    data-testid="la-hulls-toggle"
-                                >
-                                    Community hulls
-                                    <span class="text-secondary text-xs">(Louvain)</span>
-                                </mat-checkbox>
-                                @if (hullsDisabledReason(); as why) {
-                                    <span class="text-secondary text-xs" data-testid="la-hulls-reason"
-                                        >Community hulls {{ why }} —
-                                        <button type="button" class="text-primary underline" (click)="openReduce()">
-                                            reduce first
-                                        </button></span
-                                    >
-                                }
-                                <div class="mt-1 flex items-center gap-2">
-                                    <mat-checkbox
-                                        [checked]="superNodeThreshold() > 0"
-                                        [disabled]="workingSetCanvas()"
-                                        (change)="setSuperNodeGrouping($event.checked)"
-                                    >
-                                        Group lone counterparties
-                                    </mat-checkbox>
-                                    @if (workingSetCanvas()) {
-                                        <span class="text-secondary text-xs">{{ queryGraphOnlyReason }}</span>
-                                    }
-                                    @if (superNodeThreshold() > 0) {
-                                        <span class="text-secondary text-xs">
-                                            {{ superNodeThreshold() }}+ per hub &middot; click a group to open it
-                                        </span>
-                                    }
-                                </div>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().bubbleSets"
-                                    [disabled]="!viewOptions().hulls"
-                                    (change)="toggleViewFlag('bubbleSets', $event.checked)"
-                                >
-                                    Bubble sets
-                                    <span class="text-secondary text-xs">(draw the communities as sets)</span>
-                                </mat-checkbox>
-                                <mat-checkbox
-                                    [checked]="!!viewOptions().edgeBundling"
-                                    (change)="toggleViewFlag('edgeBundling', $event.checked)"
-                                >
-                                    Link bundling
-                                </mat-checkbox>
-                            </section>
-                        </div>
                     </div>
                 } @else {
                     <button
@@ -1706,14 +1639,6 @@
                         aria-label="Open the Investigation"
                     >
                         <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                    </button>
-                    <button
-                        mat-icon-button
-                        (click)="openViewTools()"
-                        matTooltip="View"
-                        aria-label="Open the view tools"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:squares-2x2"></mat-icon>
                     </button>
                 }
             </aside>
