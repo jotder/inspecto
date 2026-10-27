@@ -52,8 +52,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-REVOKE-DISCARD-NO-CONFIRM-1` | P3 | defect | revoking an Investigation member and discarding a Draft take no confirmation, unlike revoking an embed link. | — |
 | `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1` | P3 | defect | the saved view claims_provider_money draws as an unreadable vertical sliver. | — |
 | `LA-STUDIO-UI-REORG-1` | P2 | feature | reorganize the Link Analysis Studio UI so it is easier and cleaner without removing any function (plan 2026-10-27, direction decided by t… | — |
-| `LA-SETTINGS-OVERLAY-NEVER-HIDES-1` | P1 | defect | ⚙ Settings covers the Studio from page load and cannot be closed in the console shell. | — |
-| `LA-REORG-NARROW-CLEANUP-1` | P2 | defect | below about 1,300 px Clean up, Collapse and the "N collapsed" chip have no reachable home. | — |
 | `LA-REORG-COLLAPSE-NOT-SAVED-1` | P3 | defect | Collapse is not saved with the view | — |
 | `LA-REORG-REDUCE-FIRST-1` | P3 | defect | "Reduce first" and "Find paths (server)" can do nothing visible. | — |
 | `LA-REORG-VIEW-PACK-OVERRIDE-1` | P3 | defect | a saved view still overrides the Space's Industry pack | operator |

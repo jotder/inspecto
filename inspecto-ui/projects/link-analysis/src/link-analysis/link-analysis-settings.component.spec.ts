@@ -67,6 +67,47 @@ describe('LinkAnalysisSettingsComponent (⚙ Settings, §5.10)', () => {
         expect(el.querySelector('[data-testid="la-settings-nav-investigation"]')).not.toBeNull();
     });
 
+    it('is really hidden while closed, and closes on the backdrop and on Esc (LA-SETTINGS-OVERLAY-NEVER-HIDES-1)', async () => {
+        {
+            const { fixture, el, host } = make();
+            const overlay = el.querySelector('[data-testid="la-settings"]') as HTMLElement;
+            const settle = async () => {
+                fixture.detectChanges();
+                await fixture.whenStable();
+                fixture.detectChanges();
+            };
+            host.open.set(false);
+            await settle();
+            // the console shell's Tailwind utilities are !important: `.flex` beats both a bare [hidden] attribute and an
+            // inline display (jsdom cascades neither), so closed must drop `flex` and carry `hidden`
+            expect(overlay.classList.contains('flex')).toBe(false);
+            expect(overlay.classList.contains('hidden')).toBe(true);
+
+            host.open.set(true);
+            await settle();
+            expect(overlay.classList.contains('flex')).toBe(true);
+            expect(overlay.classList.contains('hidden')).toBe(false);
+            (el.querySelector('[data-testid="la-settings-close"]') as HTMLElement).click(); // a click inside is not the backdrop
+            await settle();
+            expect(host.open()).toBe(false);
+
+            host.open.set(true);
+            await settle();
+            (el.querySelector('[data-testid="gm"]') as HTMLElement).click();
+            await settle();
+            expect(host.open()).toBe(true); // a click inside the panel does not close
+            overlay.click();
+            await settle();
+            expect(host.open()).toBe(false);
+
+            host.open.set(true);
+            await settle();
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            await settle();
+            expect(host.open()).toBe(false);
+        }
+    });
+
     it('asks before closing over unsaved changes', async () => {
         const declined = make(false);
         declined.host.isDirtyNow = true;
