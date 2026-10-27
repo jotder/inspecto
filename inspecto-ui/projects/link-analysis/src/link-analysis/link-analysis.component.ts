@@ -1333,7 +1333,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     private readonly dropOverCapLayout = effect(() => {
         const picked = this.pickedLayout();
-        if (picked && layoutOverCapReason(picked, this.canvasData()?.nodes.length ?? 0))
+        // Not while a run is in flight: the graph on screen is the OLD one, and a view opening over it would lose its pick.
+        if (picked && !this.loading() && layoutOverCapReason(picked, this.canvasData()?.nodes.length ?? 0))
             untracked(() => this.pickedLayout.set(null));
     });
     /** Why a layout button is disabled on this graph (tree shape or node cap); null when it can be picked. */

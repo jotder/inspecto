@@ -2784,6 +2784,19 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             expect(small.c.layoutId()).toBe('radial');
         });
 
+        it('a view opening over a bigger graph keeps its layout while its own run is in flight', () => {
+            const r = stage(radialCap() + 50); // the old graph, still on screen
+            r.c.loading.set(true); // the view's run has started
+            r.c.pickedLayout.set('radial'); // as loadView sets it
+            TestBed.tick();
+            expect(r.c.pickedLayout()).toBe('radial');
+            r.canvas.set(chain(40)); // the view's own, smaller graph arrives
+            r.c.loading.set(false);
+            TestBed.tick();
+            expect(r.c.pickedLayout()).toBe('radial');
+            expect(r.c.layoutId()).toBe('radial');
+        });
+
         it('there is no fallback notice in the page', () => {
             const r = stage(radialCap() + 1);
             r.fixture.detectChanges();
