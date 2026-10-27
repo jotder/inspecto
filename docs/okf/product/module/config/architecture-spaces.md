@@ -49,6 +49,15 @@ mechanism is [Multi-Space Hosting](../processor/architecture-multi-space.md); th
 - **discover** — `-Dspaces.root=<dir>`: `SpaceManager.discover(root)` boots every `spaces/<id>/` that has a
   `config/` subtree, each over `SpaceRoot.under(base)`. Zero Spaces boots with a warning; Space-scoped routes
   then answer 503 "No Space is attached".
+  **What is NOT a Space (`SpaceManager.notASpaceReason`, 2026-10-27).** A folder under the Spaces root is skipped
+  when its name starts with `.` or `_`, or has a `-`/`_`/`.`/space-separated token `bak`, `snapshot`, `scratch` or
+  starting `backup` (`mfs-backup-20261026`, `backup_mfs`, `mfs.bak`), or it has no `config/`. A copy of a Space
+  holds `config/` and `space.toon` exactly like the original, so only the name keeps it from booting — before this
+  an MFS rehearsal opened a backup copy as a live Space, wrote into it and drained the real Space's inbox.
+  Each skipped folder that looks like a Space (has `config/` or `space.toon`) is logged once at boot:
+  `Ignoring folder '<name>' under the Spaces root — not a Space: <reason>`. `space.toon` stays optional (pre-manifest
+  Spaces boot). Keep backups outside the Spaces root, or name them with one of those tokens. ⚠ `POST /spaces`
+  with such an id is not refused yet, so it would vanish at the next restart.
 
 **Space root.** `SpaceRoot` is the one object deciding where a Space's state lives. For a directory Space
 (`DirSpaceRoot`): `config/` (scanned `*.toon`), `data/` (partition stores; events under `data/events/`),
