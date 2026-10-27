@@ -39,6 +39,7 @@ function create(opts: { tab?: 'views' | 'investigations'; confirm?: boolean } = 
                 truncated: false,
             }),
         ),
+        investigationLog: vi.fn((id: string) => of({ header: { id, pack: id === 'inv-1' ? 'mobile-money' : null }, entries: [], total: 0, truncated: false })),
     };
     const store = { refs: signal([{ id: 'inv-old', title: 'Remembered' }]), deleteInvestigation: vi.fn(async () => true), error: signal('') };
     const close = vi.fn();
@@ -164,6 +165,27 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         await settle();
         (el.querySelector('[data-testid="la-open-by-id"]') as HTMLButtonElement).click();
         expect(close).toHaveBeenCalledWith({ kind: 'investigation', id: 'inv-404', title: undefined });
+        await expectNoA11yViolations(el);
+    });
+
+    it('LA-REORG-SETTINGS-GAPS-1: the list sorts by name or by last changed, and the Investigation preview shows its pack', async () => {
+        const { c, el, settle } = create({ tab: 'investigations' });
+        await settle();
+        expect(c.investigationRows().map((r) => r.id)).toEqual(['inv-1', 'inv-2', 'inv-old']); // newest first, unknown last
+        c.sortBy.setValue('name');
+        await settle();
+        expect(c.investigationRows().map((r) => r.id)).toEqual(['inv-2', 'inv-1', 'inv-old']); // inv-2, Mule ring, Remembered
+
+        (el.querySelector('[data-testid="la-open-inv-inv-1"]') as HTMLButtonElement).click();
+        await settle();
+        expect(el.querySelector('[data-testid="la-open-inv-pack"]')?.textContent?.trim()).toBe('mobile-money');
+        (el.querySelector('[data-testid="la-open-inv-inv-2"]') as HTMLButtonElement).click();
+        await settle();
+        expect(el.querySelector('[data-testid="la-open-inv-pack"]')?.textContent?.trim()).toBe("none (the Space's pack)");
+
+        c.setTab('views');
+        await settle();
+        expect(c.viewRows().map((r) => r.view.id)).toEqual(['calls-hub', 'transfers']);
         await expectNoA11yViolations(el);
     });
 

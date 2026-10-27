@@ -69,6 +69,9 @@ export interface OpenInvestigationRow {
 
 const DAY = 86_400_000;
 
+/** The Open list's order: most recently changed first (the default), or by name (A-Z). */
+type OpenSort = 'name' | 'changed';
+
 /** The Dataset a view reads: its Start's, else its projection's. */
 export function viewDataset(view: LinkAnalysisView): string {
     const q = view.query as { projection?: { datasetId?: string } };
@@ -163,6 +166,13 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                     </mat-select>
                 </mat-form-field>
                 <mat-form-field class="w-36" subscriptSizing="dynamic">
+                    <mat-label>Sort by</mat-label>
+                    <mat-select [formControl]="sortBy" data-testid="la-open-sort">
+                        <mat-option value="name">Name</mat-option>
+                        <mat-option value="changed">Last changed</mat-option>
+                    </mat-select>
+                </mat-form-field>
+                <mat-form-field class="w-36" subscriptSizing="dynamic">
                     <mat-label>Changed</mat-label>
                     <mat-select [formControl]="days">
                         <mat-option [value]="0">Any time</mat-option>
@@ -209,7 +219,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                 [class.bg-hover]="selectedInvestigationId() === r.id"
                                 [attr.aria-pressed]="selectedInvestigationId() === r.id"
                                 [attr.data-testid]="'la-open-inv-' + r.id"
-                                (click)="selectedInvestigationId.set(r.id)"
+                                (click)="selectInvestigation(r.id)"
                                 (dblclick)="openInvestigation(r)"
                             >
                                 <span class="font-medium">{{ r.title || r.id }}</span>
@@ -296,6 +306,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                 <dt class="text-secondary">Owner</dt><dd class="m-0">{{ r.owner || '—' }}</dd>
                                 <dt class="text-secondary">Created</dt><dd class="m-0">{{ when(r.changed) }}</dd>
                                 <dt class="text-secondary">Linked Case</dt><dd class="m-0">{{ r.caseRef || '—' }}{{ r.readOnly ? ' (read-only)' : '' }}</dd>
+                                <dt class="text-secondary">Pack</dt><dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
                             </dl>
                             <div class="flex flex-wrap gap-1">
                                 <button mat-flat-button color="primary" (click)="openInvestigation(r)" data-testid="la-open-open">Open</button>
@@ -338,6 +349,10 @@ export class LinkAnalysisOpenDialog {
     readonly status = new FormControl('', { nonNullable: true });
     readonly dataset = new FormControl('', { nonNullable: true });
     readonly days = new FormControl(0, { nonNullable: true });
+    readonly sortBy = new FormControl<OpenSort>('changed', { nonNullable: true });
+    private readonly sortValue = toSignal(this.sortBy.valueChanges, { initialValue: 'changed' as OpenSort });
+    /** The selected Investigation's stored pack, read from its header (the listing does not carry it). */
+    readonly investigationPack = signal('—');
     readonly renameForm = new FormGroup({ name: new FormControl('', { nonNullable: true, validators: [Validators.required] }) });
     readonly renameTo = this.renameForm.controls.name;
     private readonly searchText = toSignal(this.search.valueChanges, { initialValue: '' });
@@ -376,7 +391,11 @@ export class LinkAnalysisOpenDialog {
                     (!tagged || tagged.has(r.view.id)) &&
                     withinDays(r.modified, days),
             )
-            .sort((a, b) => a.view.name.localeCompare(b.view.name));
+            .sort((a, b) =>
+                this.sortValue() === 'changed'
+                    ? (b.modified ?? '').localeCompare(a.modified ?? '')
+                    : a.view.name.localeCompare(b.view.name),
+            );
     });
 
     /** Listed Investigations plus the Recent ones (remembered by this screen) the listing did not return. */
@@ -407,7 +426,8 @@ export class LinkAnalysisOpenDialog {
         const status = this.statusValue();
         const ds = this.datasetValue();
         const days = this.daysValue();
-        return this.allInvestigations().filter(
+        return this.allInvestigations()
+            .filter(
             (r) =>
                 (!q || `${r.title ?? ''} ${r.id}`.toLowerCase().includes(q)) &&
                 (!owner || r.owner === owner) &&
@@ -416,7 +436,12 @@ export class LinkAnalysisOpenDialog {
                 (status !== 'owner' || (!r.readOnly && r.owner !== null)) &&
                 (status !== 'case' || !!r.caseRef) &&
                 withinDays(r.changed, days),
-        );
+            )
+            .sort((a, b) =>
+                this.sortValue() === 'changed'
+                    ? (b.changed ?? '').localeCompare(a.changed ?? '')
+                    : (a.title || a.id).localeCompare(b.title || b.id),
+            );
     });
 
     /** The search text as an id to open directly, when it names no listed Investigation (Open by id, kept as a search). */
@@ -455,6 +480,19 @@ export class LinkAnalysisOpenDialog {
         this.tab.set(tab);
         this.dataset.setValue('');
         if (tab === 'investigations' && this.listed() === null) void this.loadInvestigations();
+    }
+
+    selectInvestigation(id: string): void {
+        this.selectedInvestigationId.set(id);
+        this.investigationPack.set('…');
+        this.inv.investigationLog(id, 1).subscribe({
+            next: (log) => {
+                if (this.selectedInvestigationId() === id) this.investigationPack.set(log.header.pack || "none (the Space's pack)");
+            },
+            error: () => {
+                if (this.selectedInvestigationId() === id) this.investigationPack.set('—');
+            },
+        });
     }
 
     selectView(id: string): void {

@@ -12,7 +12,6 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
-import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, delay, of, throwError } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -39,6 +38,7 @@ import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.com
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { configureLaLimits, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
+import { LinkAnalysisCleanupComponent } from './link-analysis-cleanup.component';
 import { SessionService } from 'app/inspecto/auth/session.service';
 
 /** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
@@ -179,7 +179,7 @@ function create(
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             {
                 provide: ToastrService,
-                useValue: { success: () => undefined, error: () => undefined, info: () => undefined },
+                useValue: { success: () => undefined, error: () => undefined, info: () => undefined, warning: () => undefined },
             },
             {
                 provide: ActivatedRoute,
@@ -975,14 +975,12 @@ describe('LinkAnalysisComponent', () => {
         vi.restoreAllMocks();
     });
 
-    it('smart form: auto-collapses to the selected-values summary after a run, and edit reopens it', async () => {
+    it('after a run the status bar summarises the query, and edit opens Settings → Graph model', async () => {
         const { fixture } = create();
         fixture.detectChanges();
-        expect(fixture.componentInstance.queryOpen()).toBe(true); // full form until something runs
         await runQuery(fixture);
         const c = fixture.componentInstance;
 
-        expect(c.queryOpen()).toBe(false); // collapsed — the summary + status bar take over
         expect(c.sourceLabel()).toBe('Entity/Link (from a Dataset)');
         expect(c.querySummary().map((i) => `${i.label}: ${i.value}`)).toEqual([
             'Dataset: Links',
@@ -992,7 +990,6 @@ describe('LinkAnalysisComponent', () => {
         c.editQuery(); // the status-bar pencil opens ⚙ Settings → Graph model with the form expanded
         expect(c.settingsOpen()).toBe(true);
         expect(c.settingsSection()).toBe('graph-model');
-        expect(c.queryOpen()).toBe(true);
     });
 
     it('UIR-D13: there is no View tab and no View rail button; the right panel keeps Analysis and Investigation', async () => {
@@ -1064,7 +1061,6 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        expect(c.queryOpen()).toBe(true); // a failing query needs its form back
         expect(c.querySummary()).toEqual([]);
 
         c.toolboxDockOpen.set(false);
@@ -2722,22 +2718,16 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             expect([radialCap(), mdsCap(), laLimit('display.force_atlas_max_nodes')]).toEqual([100, 300, 200]);
         });
 
-        it('Clustering force is capped whether picked here or restored; at the cap it runs', async () => {
+        it('Clustering force over its cap is refused when picked and dropped when restored (§5.7)', async () => {
             const cap = laLimit('display.force_atlas_max_nodes');
             const r = stage(cap + 1);
-            r.c.setLayout('force-cluster'); // a pick made here no longer bypasses the cap
+            r.c.setLayout('force-cluster');
+            expect(r.c.pickedLayout()).toBeNull();
             expect(r.c.layoutId()).toBe('force');
-            expect(r.c.layoutCapNotice()).toBe('Clustering force layout needs at most 200 nodes — this graph has 201, so the default layout is shown.');
-            await r.c.loadView({
-                id: 'v',
-                name: 'V',
-                sourceId: 'entity-projection',
-                query: {},
-                layout: 'force-cluster',
-            });
+            await r.c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'force-cluster' });
+            TestBed.tick();
+            expect(r.c.pickedLayout()).toBeNull();
             expect(r.c.layoutId()).toBe('force');
-            r.canvas.set(chain(cap));
-            expect(r.c.layoutId()).toBe('force-cluster');
         });
 
         it('the canvas is handed every layout cap (page displayOptions)', () => {
@@ -2745,7 +2735,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             expect(r.c.displayOptions().layoutCaps).toEqual({ radial: 100, mds: 300, 'force-cluster': 200 });
         });
 
-        it('a saved view keeps the analyst PICK even while the default layout is drawn', async () => {
+        it('a saved view stores the layout in force, never an over-cap pick', async () => {
             const { fixture, save } = create();
             fixture.detectChanges();
             await runQuery(fixture);
@@ -2753,66 +2743,39 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             configureLaLimits({ 'display.radial_max_nodes': 2 }); // the fixture graph has 5 nodes
             try {
                 c.setLayout('radial');
-                expect(c.layoutId()).not.toBe('radial');
                 c.saveForm.patchValue({ name: 'Over the cap' });
                 await c.saveView();
-                expect(save.mock.calls[0][0].layout).toBe('radial');
+                expect(save.mock.calls[0][0].layout).toBe('dagre');
             } finally {
                 resetLaLimits();
             }
         });
 
-        it('above its cap a pick made here is NOT run: the default layout is drawn and the analyst is told', () => {
+        it('Radial and Information density over their caps are refused; at the cap they run (boundary)', () => {
             const r = stage(radialCap() + 1);
             r.c.setLayout('radial');
             expect(r.c.layoutId()).toBe('force');
-            expect(r.c.layoutCapNotice()).toBe(
-                `Radial layout needs at most ${radialCap()} nodes — this graph has ${radialCap() + 1}, so the default layout is shown.`,
-            );
-        });
-
-        it('Information density over its cap is guarded the same way', () => {
-            const r = stage(mdsCap() + 1);
+            r.canvas.set(chain(mdsCap() + 1));
             r.c.setLayout('mds');
             expect(r.c.layoutId()).toBe('force');
-            expect(r.c.layoutCapNotice()).toContain('Information density layout needs at most 300 nodes');
-        });
-
-        it('at the cap a layout is unchanged and there is no notice (boundary)', () => {
-            const r = stage(radialCap());
+            r.canvas.set(chain(radialCap()));
             r.c.setLayout('radial');
             expect(r.c.layoutId()).toBe('radial');
-            expect(r.c.layoutCapNotice()).toBeNull();
             r.canvas.set(chain(mdsCap()));
             r.c.setLayout('mds');
             expect(r.c.layoutId()).toBe('mds');
-            expect(r.c.layoutCapNotice()).toBeNull();
         });
 
-        it('grow past the cap -> fallback; shrink back under -> true Radial again', () => {
+        it('a graph that grows past the cap drops the pick: shrinking back keeps the layout drawn', () => {
             const r = stage(radialCap());
             r.c.setLayout('radial');
             expect(r.c.layoutId()).toBe('radial');
             r.canvas.set(chain(radialCap() + 50));
-            expect(r.c.layoutId()).toBe('force');
+            expect(r.c.layoutId()).toBe('force'); // never drawn over the cap
+            TestBed.tick();
+            expect(r.c.pickedLayout()).toBeNull();
             r.canvas.set(chain(radialCap() - 10));
-            expect(r.c.layoutId()).toBe('radial');
-        });
-
-        it('the guard compares the DISPLAYED graph: hiding nodes under the cap brings Radial back', () => {
-            const r = stage(radialCap() + 20);
-            r.c.setLayout('radial');
             expect(r.c.layoutId()).toBe('force');
-            r.c.hiddenNodeIds.set(Array.from({ length: 20 }, (_, i) => `n${i}`));
-            expect(r.c.canvasData()?.nodes.length).toBe(radialCap());
-            expect(r.c.layoutId()).toBe('radial');
-        });
-
-        it('a saved view whose layout is Radial, opened on a big graph, is guarded too; a small one is not', async () => {
-            const big = stage(767);
-            await big.c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
-            expect(big.c.pickedLayout()).toBe('radial');
-            expect(big.c.layoutId()).toBe('force');
         });
 
         it('a restored Radial on a graph at the cap still opens as Radial', async () => {
@@ -2821,26 +2784,10 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             expect(small.c.layoutId()).toBe('radial');
         });
 
-        it('undo restores the analyst PICK, not the layout that was drawn: a graph that shrinks returns to Radial', () => {
-            const r = stage(radialCap() + 50);
-            r.c.setLayout('radial'); // drawn in the default layout
-            r.c.setLayout('circular'); // records the snapshot taken while Radial was picked but not drawn
-            r.c.undoPresentation();
-            expect(r.c.pickedLayout()).toBe('radial');
-            r.canvas.set(chain(radialCap() - 10));
-            expect(r.c.layoutId()).toBe('radial');
-        });
-
-        it('the notice is in the page only while the fallback applies', () => {
+        it('there is no fallback notice in the page', () => {
             const r = stage(radialCap() + 1);
-            const notice = () => r.fixture.nativeElement.querySelector('[data-testid="la-layout-cap-notice"]');
-            r.c.setLayout('radial');
             r.fixture.detectChanges();
-            expect(notice()?.getAttribute('role')).toBe('status');
-            expect(notice()?.textContent).toContain('so the default layout is shown');
-            r.canvas.set(chain(radialCap()));
-            r.fixture.detectChanges();
-            expect(notice()).toBeNull();
+            expect(r.fixture.nativeElement.querySelector('[data-testid="la-layout-cap-notice"]')).toBeNull();
         });
         it('over its cap a layout is DISABLED with its reason in the Layout menu, plus a reduce-first hint (UIR-D11)', () => {
             const r = stage(radialCap() + 821);
@@ -2849,8 +2796,8 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             expect(r.c.layoutDisabledReason(radial)).toBe('needs at most 100 nodes — this graph has 921');
             expect(r.c.layoutDisabledReason(r.c.layouts.find((l) => l.id === 'force')!)).toBeNull();
             expect(r.c.anyLayoutOverCap()).toBe(true);
-            r.c.openReduce();
-            expect([r.c.bottomOpen(), r.c.filterOpen()]).toEqual([true, true]);
+            r.c.openReduce('filter');
+            expect([r.c.bottomOpen(), r.c.filterOpen(), r.c.dockTabShown()]).toEqual([true, true, 'rows']);
         });
 
         it('at its cap the layout is enabled and there is no reduce-first hint (boundary)', () => {
@@ -3324,20 +3271,6 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         expect(c.selectedOnCanvas()).toEqual([]);
         c.undoPresentation();
         expect(c.hiddenNodeIds()).toEqual([]);
-    });
-
-    it('Expand from the selected nodes fetches one hop for each node not yet expanded, once', async () => {
-        const expand = vi.fn(async () => ({
-            nodes: [{ id: 'x', data: { label: 'X', kind: 'entity' } }],
-            edges: [{ id: 'a->x', source: 'a', target: 'x', data: { kind: 'link' } }],
-        }));
-        const { c } = await drawn({ expand });
-        c.onSelectionChange(['a', 'b']);
-        await c.expandFromSelected();
-        expect(expand).toHaveBeenCalledTimes(2);
-        expect(c.expandedNodeIds()).toEqual(['a', 'b']);
-        await c.expandFromSelected(); // already expanded: nothing more is fetched
-        expect(expand).toHaveBeenCalledTimes(2);
     });
 
     it('double click toggles: expand the neighbours, then fold the branch it brought in, then unfold it', async () => {
@@ -4859,5 +4792,125 @@ describe('LinkAnalysisComponent - revalidation never keeps stale data or stale E
         settings.limits.set({ ...settings.limits(), maskingModeInForce: 'mask' } as never);
         await c.run();
         expect(inv.reads.entry(key)).toBeUndefined();
+    });
+});
+
+describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verification)', () => {
+    const drawn = async (opts: Parameters<typeof create>[0] = {}) => {
+        const made = create(opts);
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        made.fixture.detectChanges();
+        return { ...made, c: made.fixture.componentInstance, el: made.fixture.nativeElement as HTMLElement };
+    };
+
+    it('LA-REORG-COLLAPSE-NOT-SAVED-1: Collapse is saved with the view and reapplied on open', async () => {
+        const { c, save } = await drawn();
+        c.collapseBranch('a');
+        c.saveForm.patchValue({ name: 'Folded' });
+        await c.saveView();
+        const saved = save.mock.calls[0][0] as LinkAnalysisView;
+        expect(saved.view?.collapsed).toEqual(['a']);
+
+        c.expandAll();
+        await c.loadView(saved);
+        expect(c.collapsedRoots()).toEqual(['a']);
+        await c.loadView({ id: 'plain', name: 'Plain', sourceId: 'entity-projection', query: {} });
+        expect(c.collapsedRoots()).toEqual([]);
+    });
+
+    it('LA-REORG-REDUCE-FIRST-1: "reduce first" opens Filter on the Rows tab, Clean up, or Collapse of the selection', async () => {
+        const { c, fixture } = await drawn();
+        c.openDock('results');
+        c.bottomOpen.set(false);
+        c.openReduce('filter');
+        expect(c.bottomOpen()).toBe(true);
+        expect(c.dockTabShown()).toBe('rows');
+        expect(c.filterOpen()).toBe(true);
+
+        const cleanup = fixture.debugElement.query(By.directive(LinkAnalysisCleanupComponent)).componentInstance as LinkAnalysisCleanupComponent;
+        const menu = vi.spyOn(cleanup, 'openMenu').mockImplementation(() => undefined);
+        c.openReduce('cleanup');
+        expect(menu).toHaveBeenCalled();
+
+        const info = vi.spyOn(TestBed.inject(ToastrService), 'info');
+        c.openReduce('collapse');
+        expect(info).toHaveBeenCalled(); // nothing selected: says what to do
+        c.onSelectionChange(['b']);
+        c.openReduce('collapse');
+        expect(c.collapsedRoots()).toEqual(['b']); // b's leaf c folds into it
+    });
+
+    it('LA-REORG-REDUCE-FIRST-1: Find paths (server) opens Analysis and runs between two seeds, or says why it cannot', async () => {
+        const { c } = await drawn();
+        c.toolboxDockOpen.set(false);
+        c.toolboxTab.set('investigation');
+        const warn = vi.spyOn(TestBed.inject(ToastrService), 'warning');
+        const run = vi.spyOn(c, 'findPaths').mockResolvedValue();
+        await c.findPathsFromCleanup(4);
+        expect(c.toolboxDockOpen()).toBe(true);
+        expect(c.toolboxTab()).toBe('analysis');
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('two seeds'), 'Find paths');
+        expect(run).not.toHaveBeenCalled();
+
+        c.onSelectionChange(['a', 'c']);
+        await c.findPathsFromCleanup(3);
+        expect(run).toHaveBeenCalledWith({ from: 'a', to: 'c', mapping: 0, maxDepth: 3, direction: 'UNDIRECTED' });
+    });
+
+    it('LA-REORG-VIEW-PACK-OVERRIDE-1: a saved view keeps its pack for display but never overrides the Space pack', async () => {
+        const { c, save } = await drawn();
+        await c.loadView({ id: 'mm', name: 'MM', sourceId: 'entity-projection', query: c.lastRun()!.query, profile: 'mobile-money' });
+        expect(c.boundProfile()).toBeNull();
+        expect(c.profileId()).toBe('generic');
+        c.saveForm.setValue({ name: 'MM', description: '' });
+        await c.saveView();
+        expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ profile: 'mobile-money' }), expect.anything()); // kept on re-save
+    });
+
+    it('LA-REORG-LAYOUT-FALLBACK-1: an over-cap layout is refused or dropped, never drawn as a silent stand-in with a notice', async () => {
+        const { c, fixture, el } = await drawn();
+        configureLaLimits({ 'display.radial_max_nodes': 2 }); // the fixture graph has 5 nodes
+        try {
+            c.setLayout('radial');
+            expect(c.pickedLayout()).toBeNull(); // refused: the menu item is disabled with its reason
+            await c.loadView({ id: 'r', name: 'R', sourceId: 'entity-projection', query: {}, layout: 'radial' });
+            fixture.detectChanges();
+            expect(c.pickedLayout()).toBeNull(); // a restored pick over the cap is dropped
+            expect(c.layoutId()).toBe('dagre');
+            expect(el.querySelector('[data-testid="la-layout-cap-notice"]')).toBeNull();
+            expect('layoutCapNotice' in c).toBe(false);
+        } finally {
+            resetLaLimits();
+        }
+    });
+
+    it('LA-REORG-EXPAND-UNDER-DOCK-1: the Expand dialog is bounded to the graph region, so its buttons never sit under the dock', async () => {
+        const { c, fixture, el } = await drawn();
+        c.growExclude.growOpen.set(true);
+        fixture.detectChanges();
+        const host = el.querySelector('inspecto-link-analysis-expand') as HTMLElement;
+        expect(host.closest('[data-testid="la-graph-region"]')).not.toBeNull();
+        expect(host.classList).toContain('max-h-[calc(100%-3.5rem)]');
+        expect(host.classList).toContain('flex-col');
+        expect(host.querySelector('section[role="dialog"]')!.classList).toContain('min-h-0');
+    });
+
+    it('LA-REORG-SETTINGS-GAPS-1: Add / Upload data offers Add data; File labels Import / export views', async () => {
+        const { c, fixture, el } = await drawn();
+        Object.defineProperty(c, 'addDataOffered', { value: true });
+        c.openSettings('add-data');
+        fixture.detectChanges();
+        const add = el.querySelector('[data-testid="la-settings-add-data"]') as HTMLButtonElement;
+        expect(add?.textContent).toContain('Add data');
+        const nav = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        add.click();
+        expect(nav).toHaveBeenCalledWith('/add-data');
+
+        (el.querySelector('[data-testid="la-file"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const row = document.querySelector('[data-testid="la-file-transfer"]');
+        expect(row?.textContent).toContain('Import / export views');
     });
 });

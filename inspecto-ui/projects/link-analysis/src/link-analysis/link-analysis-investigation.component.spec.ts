@@ -1108,6 +1108,24 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
         await expectNoA11yViolations(panel);
     });
 
+    it('LA-REORG-SETTINGS-GAPS-1: This Investigation opens with a General section (title, purpose, time, lineage, pack, Delete)', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        const settings = part(el, 'settings');
+        const folds = Array.from(settings.querySelectorAll('la-fold')).map((f) => f.getAttribute('title'));
+        expect(folds[0]).toBe('General');
+        const general = settings.querySelector('[data-testid="inv-settings-general"]')!;
+        const text = general.textContent!.replace(/\s+/g, ' ');
+        expect(text).toContain('Burners');
+        expect(text).toContain('calls');
+        expect(text).toContain('none (timeless)');
+        expect(text).toContain('Original');
+        expect(text).toContain("The Space's pack");
+        expect(settings.querySelector('[data-testid="inv-settings-delete"]')).not.toBeNull();
+        await expectNoA11yViolations(settings);
+    });
+
     it('lists the last steps newest first; Open the Op log and Settings… ask the screen', async () => {
         const { fixture, store, el } = create();
         await openInv(store);

@@ -411,6 +411,8 @@ export interface InvestigationHeader {
     linkKindCol: string | null;
     /** LA-13: the bound event-time column; absent on a timeless Investigation. */
     timeCol?: string | null;
+    /** The zone a naive TIMESTAMP `timeCol` is read in; null = UTC. */
+    timeColZone?: string | null;
     /** The bound events column; absent when links are weighed by row count. */
     eventsCol?: string | null;
     createdAt: string;
