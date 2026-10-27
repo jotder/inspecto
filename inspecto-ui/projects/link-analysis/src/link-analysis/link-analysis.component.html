@@ -207,16 +207,6 @@
                         <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                     </button>
                 }
-                @if (collapsedRoots().length) {
-                    <button
-                        mat-button
-                        (click)="expandAll()"
-                        [attr.aria-label]="'Expand ' + collapsedRoots().length + ' collapsed branches'"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:plus-circle"></mat-icon>
-                        {{ collapsedRoots().length }} collapsed
-                    </button>
-                }
             }
 
             <span class="flex-auto max-md:hidden"></span>
@@ -824,7 +814,29 @@
                     Expand…
                 </button>
                 <!-- slot: Collapse (lane P1c, §5.5) -->
-                <span class="contents" data-slot="collapse"></span>
+                <button
+                    mat-icon-button
+                    type="button"
+                    (click)="toggleCollapse(selectedOnCanvas())"
+                    [disabled]="!selectedOnCanvas().length"
+                    [disabledInteractive]="true"
+                    [matTooltip]="selectedOnCanvas().length ? 'Collapse / unfold the selected nodes\' branches (C)' : 'Select nodes to collapse'"
+                    aria-label="Collapse or unfold the selected nodes"
+                    aria-keyshortcuts="C"
+                    data-testid="la-selection-collapse"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrows-pointing-in" aria-hidden="true"></mat-icon>
+                </button>
+                @if (collapsedRoots().length) {
+                    <button
+                        mat-button
+                        (click)="expandAll()"
+                        [attr.aria-label]="'Expand ' + collapsedRoots().length + ' collapsed branches'"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:plus-circle"></mat-icon>
+                        {{ collapsedRoots().length }} collapsed
+                    </button>
+                }
                 <button
                     mat-icon-button
                     type="button"
@@ -882,7 +894,16 @@
                     }
                 </button>
                 <!-- slot: Clean up ▾ (lane P1c, §5.6) -->
-                <span class="contents" data-slot="clean-up"></span>
+                <inspecto-link-analysis-cleanup
+                    [graph]="canvasData()"
+                    [seeds]="cleanupSeeds()"
+                    [selection]="selectedOnCanvas()"
+                    [spare]="cleanupSpare()"
+                    [nodeCap]="cleanupCap()"
+                    (applied)="onCleanupApplied($event)"
+                    (highlight)="onCleanupHighlight($event)"
+                    (findOnServer)="toolboxTab.set('analysis')"
+                />
             </div>
             <span class="mx-1 hidden h-6 w-px shrink-0 min-[1300px]:block" style="background: var(--gamma-border)" aria-hidden="true"></span>
 
@@ -1158,6 +1179,11 @@
                                 <mat-icon svgIcon="heroicons_outline:no-symbol" aria-hidden="true"></mat-icon>
                                 <span>Exclude{{ nodeMenuTargets().length > 1 ? ' ' + nodeMenuTargets().length : '' }}…</span>
                                 <span class="text-secondary ml-3 text-xs" aria-hidden="true">X</span>
+                            </button>
+                            <button mat-menu-item type="button" (click)="toggleCollapse(nodeMenuTargets())" data-testid="la-node-menu-collapse">
+                                <mat-icon svgIcon="heroicons_outline:arrows-pointing-in" aria-hidden="true"></mat-icon>
+                                <span>Collapse / unfold</span>
+                                <span class="text-secondary ml-3 text-xs" aria-hidden="true">C</span>
                             </button>
                             <button mat-menu-item type="button" (click)="expandFromMenu()" data-testid="la-node-menu-grow">
                                 <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>

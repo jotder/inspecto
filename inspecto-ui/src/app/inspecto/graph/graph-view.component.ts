@@ -1256,18 +1256,31 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     haloLineWidth: 10,
                     haloStrokeOpacity: 0.35,
                     // LA-GROW-EXCLUDE-1: a busy entity a Grow held wears a "held" badge over its ring.
-                    badges: (d) =>
-                        (d.data as { held?: boolean }).held
+                    // §5.5: a collapsed node wears "+n" for the pendant neighbours it folds.
+                    badges: (d) => [
+                        ...((d.data as { held?: boolean }).held
                             ? [
                                   {
                                       text: 'held',
-                                      placement: 'right-top',
+                                      placement: 'right-top' as const,
                                       fontSize: 9,
                                       fill: this.styleNodeFill,
                                       backgroundFill: this.nodeColorOf(d),
                                   },
                               ]
-                            : [],
+                            : []),
+                        ...((d.data as { folded?: number }).folded
+                            ? [
+                                  {
+                                      text: `+${(d.data as { folded?: number }).folded}`,
+                                      placement: 'right-bottom' as const,
+                                      fontSize: 9,
+                                      fill: this.styleNodeFill,
+                                      backgroundFill: this.nodeColorOf(d),
+                                  },
+                              ]
+                            : []),
+                    ],
                     iconSrc: (d) => iconOf(d),
                     iconWidth: Math.max(
                         10,
