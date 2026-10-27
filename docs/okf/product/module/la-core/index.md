@@ -52,3 +52,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-REVOKE-DISCARD-NO-CONFIRM-1` | P3 | defect | revoking an Investigation member and discarding a Draft take no confirmation, unlike revoking an embed link. | — |
 | `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1` | P3 | defect | the saved view claims_provider_money draws as an unreadable vertical sliver. | — |
 | `LA-STUDIO-UI-REORG-1` | P2 | feature | reorganize the Link Analysis Studio UI so it is easier and cleaner without removing any function (plan 2026-10-27, direction decided by t… | — |
+| `LA-REORG-OVERFLOW-CLEANUP-ENABLED-1` | P3 | defect | below 1,300 px the "More canvas tools" menu offers *Clean up: Keep only selected* and *Remove selected* with nothing selected, and a clic… | — |
+| `LA-SETTINGS-ESC-REOPENS-CONFIRM-1` | P3 | defect | with unsaved Graph model edits, Esc cannot dismiss the "unsaved changes" confirm: it opens again. | — |
+| `LA-REORG-CASE-VIEW-LAYOUT-DROPPED-1` | P3 | defect | a saved view with a start (a case view) loses its layout when opened over a bigger graph. | — |
