@@ -2830,6 +2830,19 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             expect(r.c.layoutId()).toBe('radial');
         });
 
+        it('loadView applies the layout after its run, so the old bigger graph never judges it', async () => {
+            const r = stage(radialCap() + 50); // the old graph, still on screen
+            // Change detection runs during the run (e.g. while a case start awaits its Entity List), before loading is set.
+            vi.spyOn(r.c as unknown as { execute: () => Promise<void> }, 'execute').mockImplementation(async () => {
+                TestBed.tick();
+                r.canvas.set(chain(40));
+            });
+            await r.c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'radial' });
+            TestBed.tick();
+            expect(r.c.pickedLayout()).toBe('radial');
+            expect(r.c.layoutId()).toBe('radial');
+        });
+
         it('there is no fallback notice in the page', () => {
             const r = stage(radialCap() + 1);
             r.fixture.detectChanges();

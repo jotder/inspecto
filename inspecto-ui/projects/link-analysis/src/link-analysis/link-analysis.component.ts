@@ -4015,7 +4015,6 @@ Its prior copies stay in its version history.`,
     async loadView(view: LinkAnalysisView): Promise<void> {
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
-        this.pickedLayout.set(view.layout ?? null);
         // The view's stored pack is shown read-only (Open preview); it never overrides the Space's (§5.12).
         this.boundProfile.set(null);
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
@@ -4036,6 +4035,9 @@ Its prior copies stay in its version history.`,
             if (view.lists) this.caseLists.set({ start: view.lists.start, exclusions: view.lists.exclusions ?? [] });
         }
         this.collapsedRoots.set(view.view?.collapsed ?? []); // after the run, which clears it
+        // After the run too: set before it, the over-cap drop would judge the pick against the OLD graph still on screen
+        // (a case start awaits its Entity List before anything shows as loading).
+        this.pickedLayout.set(view.layout ?? null);
     }
 
     /**
