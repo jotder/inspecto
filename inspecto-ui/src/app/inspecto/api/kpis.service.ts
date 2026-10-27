@@ -24,7 +24,13 @@ export interface KpiDefinition {
     format?: Record<string, unknown>;
 }
 
-/** `GET /kpis/{id}/value` — one evaluation, as of a date. */
+/** A range of calendar days (`YYYY-MM-DD`, both ends inclusive) a KPI is read over. */
+export interface KpiRange {
+    from: string;
+    to: string;
+}
+
+/** `GET /kpis/{id}/value` — one evaluation, as of a date or over a range. */
 export interface KpiValue {
     kpi: string;
     title?: string | null;
@@ -54,9 +60,13 @@ export interface KpiValue {
 export class KpisService {
     private http = inject(HttpClient);
 
-    value(id: string, asOf?: string): Observable<KpiValue> {
+    /**
+     * One evaluation. With a `range` (a Dashboard's picked dates, both ends inclusive) the Measure runs over those
+     * days and the comparison is the equal-length period before them; `asOf` is then ignored by the server.
+     */
+    value(id: string, asOf?: string, range?: KpiRange | null): Observable<KpiValue> {
         return this.http.get<KpiValue>(apiUrl(`/kpis/${encodeURIComponent(id)}/value`), {
-            params: toParams({ asOf }),
+            params: toParams(range ? { from: range.from, to: range.to } : { asOf }),
         });
     }
 }

@@ -68,6 +68,22 @@ public final class KpiEvaluator {
     }
 
     /**
+     * The same KPI over an explicit range of days ({@code from} and {@code to}, both inclusive) instead of the grain's
+     * period to date: the Measure over the range, against the comparison the KPI declares applied to that range
+     * ({@link KpiDefinition#comparisonOf}). A Dashboard's date picker reads a KPI tile through this.
+     */
+    public static Result evaluateRange(KpiDefinition kpi, String relationSql, LocalDate from, LocalDate to) throws SQLException, IOException {
+        if (to.isBefore(from)) throw new IllegalArgumentException("range to " + to + " is before from " + from);
+        KpiDefinition.Window cur = new KpiDefinition.Window(from, to.plusDays(1));
+        Double value = run(kpi, relationSql, cur);
+        KpiDefinition.Window cmpWindow = kpi.comparisonOf(cur);
+        Double cmp = cmpWindow == null ? null : run(kpi, relationSql, cmpWindow);
+        Double delta = value == null || cmp == null ? null : value - cmp;
+        KpiDefinition.Rag rag = kpi.rag(value);
+        return new Result(cur, value, cmpWindow, cmp, delta, KpiDefinition.deltaPct(cmp, value), rag, KpiDefinition.tone(rag));
+    }
+
+    /**
      * The newest day present in the KPI's {@code timeField}, in its zone (for {@code asOf: latest}); {@code null} when
      * the Dataset holds no dated row. The caller caps it at today.
      */

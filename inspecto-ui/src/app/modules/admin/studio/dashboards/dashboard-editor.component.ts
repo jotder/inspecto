@@ -65,6 +65,7 @@ import { DashboardTileComponent } from './dashboard-tile.component';
 import { DashboardFilterBarComponent } from './dashboard-filter-bar.component';
 import { DashboardDateRangeComponent } from './dashboard-date-range.component';
 import { DateRangeSelection } from './dashboard-date-range';
+import { KpiRange } from 'app/inspecto/api/kpis.service';
 import { DashboardDrillDrawerComponent } from './dashboard-drill-drawer.component';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -320,6 +321,11 @@ export class DashboardEditorComponent implements OnInit {
     /** The Dashboard's `asOf` day, which a KPI-bound tile evaluates its definition at (blank ⇒ today). */
     tileAsOf(): string {
         return this.view.kpiAsOf();
+    }
+
+    /** The viewer's picked dates, which a KPI-bound tile reads over (null ⇒ the tile keeps its `asOf` day). */
+    tileRange(): KpiRange | null {
+        return this.view.kpiRange();
     }
 
     /** The author picked a default range — it is also what the preview shows from now on. */

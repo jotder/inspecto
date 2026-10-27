@@ -5,7 +5,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { formatNumber, NumberFormat } from '../number-format';
 import { targetStatus } from '../target-status';
 import { kpiDelta, toneBadge } from '../kpi-delta';
-import { KpisService, KpiValue } from 'app/inspecto/api/kpis.service';
+import { KpiRange, KpisService, KpiValue } from 'app/inspecto/api/kpis.service';
 
 export type KpiMode = 'mini' | 'standard' | 'max';
 
@@ -96,6 +96,8 @@ export class KpiComponent {
     readonly kpiId = input<string | undefined>(undefined);
     /** The day a bound definition is evaluated at (`YYYY-MM-DD`, a Dashboard's `asOf`); blank ⇒ the server's today. */
     readonly asOf = input<string | undefined>(undefined);
+    /** The Dashboard's picked dates: when set, a bound definition is evaluated over them (and `asOf` is ignored). */
+    readonly range = input<KpiRange | null | undefined>(undefined);
     /** The definition's evaluation, once loaded. */
     readonly definition = signal<KpiValue | null>(null);
     /** Resolved only when a `kpiId` is bound, so an unbound tile needs no HttpClient (every host spec). */
@@ -124,12 +126,13 @@ export class KpiComponent {
         effect((onCleanup) => {
             const id = this.kpiId();
             const asOf = this.asOf() || undefined;
+            const range = this.range() ?? undefined;
             this.definition.set(null);
             this.failed.set(false);
             if (!id) return;
             const read = this.injector
                 .get(KpisService)
-                .value(id, asOf)
+                .value(id, asOf, range)
                 .subscribe({ next: (v) => this.definition.set(v), error: () => this.failed.set(true) });
             onCleanup(() => read.unsubscribe());
         });

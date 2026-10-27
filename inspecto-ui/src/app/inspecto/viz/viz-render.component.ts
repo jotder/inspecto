@@ -39,6 +39,7 @@ import {
     waterfallTones,
 } from './waterfall-chart';
 import { comboAltText, comboChartData, comboSeriesFormat, comboUsesSecondaryAxis } from './combo-chart';
+import { KpiRange } from 'app/inspecto/api/kpis.service';
 import { ChannelId, VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
 /** componentKey → Angular component, for plugins that render via the escape hatch (`render.kind:'component'`).
@@ -161,6 +162,8 @@ export class VizRenderComponent {
     readonly kpiSize = input<KpiMode | undefined>(undefined);
     /** KPI only: the day a `kpiId`-bound KPI is evaluated at (the host Dashboard's `asOf`); blank ⇒ today. */
     readonly kpiAsOf = input<string | undefined>(undefined);
+    /** KPI only: the host Dashboard's picked dates; a `kpiId`-bound KPI is evaluated over them instead of at `asOf`. */
+    readonly kpiRange = input<KpiRange | null | undefined>(undefined);
     /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no filterable
      *  categories, so it never emits. */
     readonly categoryClick = output<string>();
@@ -626,6 +629,7 @@ export class VizRenderComponent {
                   better: this.renderOptions()?.kpi?.better ?? 'higher',
                   kpiId: this.renderOptions()?.kpi?.kpiId,
                   asOf: this.kpiAsOf(),
+                  range: this.kpiRange(),
                   size: this.kpiSize(),
               }
             : this.viewBinding() === undefined

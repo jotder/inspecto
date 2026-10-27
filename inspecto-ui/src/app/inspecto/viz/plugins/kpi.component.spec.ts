@@ -180,6 +180,31 @@ describe('KpiComponent (UIE-1)', () => {
             http.verify();
         });
 
+        it("reads over the Dashboard's picked dates (from and to) instead of an asOf day, and back to asOf when cleared", () => {
+            TestBed.configureTestingModule({
+                imports: [KpiComponent],
+                providers: [provideNoopAnimations(), provideHttpClient(withXhr()), provideHttpClientTesting()],
+            });
+            const fixture = TestBed.createComponent(KpiComponent);
+            const http = TestBed.inject(HttpTestingController);
+            const url = environment.apiBaseUrl + '/v1/kpis/refunds/value';
+            fixture.componentRef.setInput('kpiId', 'refunds');
+            fixture.componentRef.setInput('asOf', '2026-08-13');
+            fixture.componentRef.setInput('range', { from: '2026-08-01', to: '2026-08-10' });
+            fixture.detectChanges();
+            const ranged = http.expectOne((r) => r.url === url).request.params;
+            expect(ranged.get('from')).toBe('2026-08-01');
+            expect(ranged.get('to')).toBe('2026-08-10');
+            expect(ranged.has('asOf')).toBe(false);
+
+            fixture.componentRef.setInput('range', null);
+            fixture.detectChanges();
+            const plain = http.expectOne((r) => r.url === url).request.params;
+            expect(plain.get('asOf')).toBe('2026-08-13');
+            expect(plain.has('from')).toBe(false);
+            http.verify();
+        });
+
         it('a newer asOf cancels the older read, so a slow stale answer never overwrites the newer value', () => {
             TestBed.configureTestingModule({
                 imports: [KpiComponent],

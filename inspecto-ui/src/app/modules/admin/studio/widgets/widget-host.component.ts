@@ -30,6 +30,7 @@ import { formatNumber } from 'app/inspecto/viz/number-format';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 import { Widget, isKpiBound } from './widget-types';
 import { WidgetsService } from './widgets.service';
+import { KpiRange } from 'app/inspecto/api/kpis.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 
@@ -134,6 +135,7 @@ export interface DrillEvent extends DrillPair {
                                 [renderOptions]="widget.options"
                                 [kpiSize]="kpiSize()"
                                 [kpiAsOf]="asOf()"
+                                [kpiRange]="range()"
                             />
                         } @else if (resolvedDataset(); as dataset) {
                             @if (showRevoked()) {
@@ -170,6 +172,7 @@ export interface DrillEvent extends DrillPair {
                                     [renderOptions]="widget.options"
                                     [kpiSize]="kpiSize()"
                                     [kpiAsOf]="asOf()"
+                                [kpiRange]="range()"
                                     (categoryClick)="onCategoryClick($event)"
                                     (channelClick)="onChannelClick($event)"
                                     (cellClick)="onCellClick($event)"
@@ -227,6 +230,8 @@ export class WidgetHostComponent {
     readonly stale = input<StaleMark | null>(null);
     /** The host Dashboard's `asOf` day (`YYYY-MM-DD`; blank ⇒ today) — handed to a KPI-bound Widget's evaluation. */
     readonly asOf = input('');
+    /** The host Dashboard's picked dates — handed to a KPI-bound Widget, which then reads over them. */
+    readonly range = input<KpiRange | null>(null);
     /** A category click, resolved to the field it should filter on (drill-down). */
     readonly drill = output<DrillEvent>();
 

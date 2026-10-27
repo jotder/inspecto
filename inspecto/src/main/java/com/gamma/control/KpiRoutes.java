@@ -34,6 +34,10 @@ import com.gamma.access.WriteGates;
  * <ul>
  *   <li>{@code GET /kpis/{id}/value?asOf=YYYY-MM-DD} — the Measure over the current period to date and over the
  *       comparison period, the delta and Δ%, and the RAG band with its status tone ({@link KpiEvaluator}).</li>
+ *   <li>{@code GET /kpis/{id}/value?from=YYYY-MM-DD&to=YYYY-MM-DD} — the same, over that range of days (both ends
+ *       inclusive) against the comparison the KPI declares applied to it: a Dashboard's picked dates. Both or neither;
+ *       {@code from} after {@code to}, a future day or a span over {@value #MAX_RANGE_DAYS} days → 400. When given,
+ *       {@code asOf} is ignored and the answer's {@code asOf} is {@code to}.</li>
  * </ul>
  *
  * <p>A read, so ungated like {@code POST /bi/query}. Fail closed: write root unset → 503; an unsafe id → 400; an
@@ -71,7 +75,22 @@ final class KpiRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "kpi '" + id + "' is invalid: " + bad.getMessage());
         }
         String asOfParam = ApiContext.query(ex, "asOf");
-        LocalDate asOf = asOf(asOfParam, kpi.zone());
+        String fromParam = ApiContext.query(ex, "from"), toParam = ApiContext.query(ex, "to");
+        boolean ranged = (fromParam != null && !fromParam.isBlank()) || (toParam != null && !toParam.isBlank());
+        LocalDate rangeFrom = null;
+        if (ranged) {
+            if (fromParam == null || fromParam.isBlank() || toParam == null || toParam.isBlank())
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'from' and 'to' go together: send both or neither");
+            rangeFrom = day("from", fromParam, kpi.zone());
+            asOfParam = toParam;
+        }
+        LocalDate asOf = ranged ? day("to", toParam, kpi.zone()) : asOf(asOfParam, kpi.zone());
+        if (ranged) {
+            if (rangeFrom.isAfter(asOf))
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'from' " + rangeFrom + " is after 'to' " + asOf);
+            if (java.time.temporal.ChronoUnit.DAYS.between(rangeFrom, asOf) + 1 > MAX_RANGE_DAYS)
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "a range is at most " + MAX_RANGE_DAYS + " days");
+        }
         Map<String, Object> dataset = readableDataset(ex, store, kpi.dataset());
         if (dataset == null)
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "kpi '" + id + "': no dataset '" + kpi.dataset() + "'");
@@ -83,11 +102,11 @@ final class KpiRoutes implements RouteModule {
         KpiEvaluator.Result r;
         try {
             String relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
-            if (kpi.asOfLatest() && (asOfParam == null || asOfParam.isBlank())) {   // opt-in: follow the data, never past today
+            if (!ranged && kpi.asOfLatest() && (asOfParam == null || asOfParam.isBlank())) {   // opt-in: follow the data, never past today
                 LocalDate latest = KpiEvaluator.latestDay(kpi, relationSql);
                 if (latest != null && latest.isBefore(asOf)) asOf = latest;
             }
-            r = KpiEvaluator.evaluate(kpi, relationSql, asOf);
+            r = ranged ? KpiEvaluator.evaluateRange(kpi, relationSql, rangeFrom, asOf) : KpiEvaluator.evaluate(kpi, relationSql, asOf);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
@@ -139,6 +158,25 @@ final class KpiRoutes implements RouteModule {
      * on anything unparseable, on an instant the calendar cannot place (an extreme year), and on a date after today:
      * a period that has not started yet has no value to report.
      */
+    /** A day of a range: {@code YYYY-MM-DD} only, not after today in the KPI's zone, named in the error. */
+    private static LocalDate day(String name, String raw, java.time.ZoneId zone) {
+        LocalDate d;
+        try {
+            d = LocalDate.parse(raw);
+        } catch (java.time.DateTimeException bad) {
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'" + name + "' must be YYYY-MM-DD, got '" + raw + "'");
+        }
+        LocalDate today = LocalDate.now(zone);
+        if (d.getYear() < 1) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'" + name + "' " + d + " is before year 1");
+        if (d.isAfter(today))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'" + name + "' " + d + " is in the future (today in "
+                    + zone.getId() + " is " + today + ")");
+        return d;
+    }
+
+    /** The longest range one read may cover (ten years of days). */
+    static final int MAX_RANGE_DAYS = 3660;
+
     static LocalDate asOf(String raw, java.time.ZoneId zone) {
         LocalDate today = LocalDate.now(zone);
         if (raw == null || raw.isBlank()) return today;

@@ -262,7 +262,7 @@
                             </app-dashboard-tile>
                         } @else if (isKpiBound(widget)) {
                             <!-- KPI-definition tile: the KPI reads its own value; no Dataset, no cross-filter. -->
-                            <app-dashboard-tile [widget]="widget" [stale]="staleOf(tile)" [asOf]="tileAsOf()">
+                            <app-dashboard-tile [widget]="widget" [stale]="staleOf(tile)" [asOf]="tileAsOf()" [range]="tileRange()">
                                 <ng-container tileActions [ngTemplateOutlet]="tileControls" />
                             </app-dashboard-tile>
                         } @else if (datasetOf(tile); as dataset) {
@@ -272,6 +272,7 @@
                                 [stale]="staleOf(tile)"
                                 [filter]="tileFilter(dataset)"
                                 [asOf]="tileAsOf()"
+                                [range]="tileRange()"
                                 (drill)="onDrill($event)"
                             >
                                 <ng-container tileActions [ngTemplateOutlet]="tileControls" />

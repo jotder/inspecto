@@ -49,6 +49,32 @@ class KpiEvaluatorTest {
     }
 
     @Test
+    void anExplicitRangeIsComparedWithTheEqualLengthPeriodBefore() throws Exception {
+        KpiDefinition kpi = KpiDefinition.fromMap("k", Map.of("dataset", "orders", "measure", "sum(amount)",
+                "timeField", "order_date", "grain", "month"));
+        // Aug 1-13 (13 days): 20 + 30 + 5. The 13 days before are Jul 19-31: only the 20th (50).
+        KpiEvaluator.Result r = KpiEvaluator.evaluateRange(kpi, RELATION, LocalDate.parse("2026-08-01"), AS_OF);
+        assertEquals(55.0, r.value());
+        assertEquals(LocalDate.parse("2026-08-14"), r.window().to());
+        assertEquals(LocalDate.parse("2026-07-19"), r.comparisonWindow().from());
+        assertEquals(50.0, r.comparisonValue());
+        assertEquals(5.0, r.delta());
+        // a single day compares with the day before it
+        KpiEvaluator.Result day = KpiEvaluator.evaluateRange(kpi, RELATION, LocalDate.parse("2026-08-10"), LocalDate.parse("2026-08-10"));
+        assertEquals(30.0, day.value());
+        assertEquals(LocalDate.parse("2026-08-09"), day.comparisonWindow().from());
+        assertNull(day.comparisonValue(), "nothing was booked on Aug 9");
+        // last-year: the same dates one year earlier; none: no comparison at all
+        KpiDefinition ly = KpiDefinition.fromMap("k", Map.of("dataset", "orders", "measure", "sum(amount)",
+                "timeField", "order_date", "grain", "month", "comparison", "last-year"));
+        assertEquals(7.0, KpiEvaluator.evaluateRange(ly, RELATION, LocalDate.parse("2026-08-01"), AS_OF).comparisonValue());
+        KpiDefinition none = KpiDefinition.fromMap("k", Map.of("dataset", "orders", "measure", "sum(amount)",
+                "timeField", "order_date", "grain", "month", "comparison", "none"));
+        assertNull(KpiEvaluator.evaluateRange(none, RELATION, LocalDate.parse("2026-08-01"), AS_OF).comparisonWindow());
+        assertThrows(IllegalArgumentException.class, () -> KpiEvaluator.evaluateRange(kpi, RELATION, AS_OF, LocalDate.parse("2026-08-01")));
+    }
+
+    @Test
     void aTimestampColumnIsCutOnTheSameDayBoundaries() throws Exception {
         KpiEvaluator.Result r = eval(Map.of("timeField", "order_ts"));
         assertEquals(55.0, r.value(), "23:59:59 on asOf is in; 00:00 the next day is out");

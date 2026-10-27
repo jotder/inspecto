@@ -29,6 +29,7 @@ class StubTileComponent {
     readonly dataset = input<Dataset | undefined>(undefined);
     readonly filter = input<ConditionGroup | null>(null);
     readonly asOf = input('');
+    readonly range = input<unknown>(null);
     readonly drill = output<DrillEvent>();
 }
 @Component({

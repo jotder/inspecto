@@ -10966,7 +10966,23 @@
           "name" : "asOf",
           "in" : "query",
           "required" : false,
-          "description" : "The day the period runs to (inclusive): YYYY-MM-DD, or an ISO instant read as its date in the KPI's zone. Absent: today in that zone. A future day, one before year 1, or an unplaceable instant is a 400.",
+          "description" : "The day the period runs to (inclusive): YYYY-MM-DD, or an ISO instant read as its date in the KPI's zone. Absent: today in that zone. A future day, one before year 1, or an unplaceable instant is a 400. Ignored when from and to are sent.",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "description" : "First day (inclusive, YYYY-MM-DD) of a range to read the KPI over instead of the grain's period to date. Send with to. The comparison is the equal-length period before the range (or the same dates a year earlier, or none, as the KPI declares).",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "description" : "Last day (inclusive, YYYY-MM-DD) of the range; the answer's asOf is this day. Send with from. 400 when only one of from and to is sent, when from is after to, for a future day, a malformed day, or a span over 3660 days.",
           "schema" : {
             "type" : "string"
           }

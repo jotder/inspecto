@@ -9,6 +9,7 @@ import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { Dashboard, DashboardTile } from './dashboard-types';
 import { DateRangeSelection, isIsoDay, rangeCondition, resolveRange, todayIso } from './dashboard-date-range';
+import { KpiRange } from 'app/inspecto/api/kpis.service';
 
 /**
  * The viewer-facing state of ONE rendered Dashboard — shared by the Dashboard editor and every read-only
@@ -46,6 +47,19 @@ export class DashboardViewStore {
     readonly kpiAsOf = computed(() => {
         const d = this.asOf();
         return isIsoDay(d) && d <= todayIso() ? d : '';
+    });
+
+    /**
+     * The days a KPI-bound tile reads over: the viewer's picked range (a preset, a custom span or a single day) once
+     * the Dashboard has a date control, cut at today so a range that runs past it never 400s the tile. Null when no
+     * range is picked: the tile then keeps its `asOf` day. A range that starts after today is null too.
+     */
+    readonly kpiRange = computed<KpiRange | null>(() => {
+        if (!this.dateField()) return null;
+        const span = resolveRange(this.range(), this.anchor());
+        const today = todayIso();
+        if (!span || span.from > today) return null;
+        return { from: span.from, to: span.to > today ? today : span.to };
     });
 
     /** Value suggestions per exposed field — the quick-filter pickers' choices, read off one PAGE of each

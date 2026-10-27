@@ -307,7 +307,7 @@ describe('WidgetHostComponent', () => {
         expect(fixture.componentInstance.kpiBound()).toBe(true);
         expect(fixture.componentInstance.tileState()).toBe('ready');
         expect(datasetFetched).toBe(false);
-        expect(value).toHaveBeenCalledWith('leakage_found', '2026-10-09');
+        expect(value).toHaveBeenCalledWith('leakage_found', '2026-10-09', undefined);
     });
 
     it("evaluates a kpiId-bound KPI at the host Dashboard's asOf day", async () => {
@@ -327,7 +327,7 @@ describe('WidgetHostComponent', () => {
         fixture.detectChanges();
         await fixture.whenStable();
         fixture.detectChanges();
-        expect(value).toHaveBeenCalledWith('refunds', '2026-08-13');
+        expect(value).toHaveBeenCalledWith('refunds', '2026-08-13', undefined);
     });
 
     it('the KPI size cycle lives in the tile action set and drives the KPI (which drops its own button)', async () => {

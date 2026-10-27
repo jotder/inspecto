@@ -124,6 +124,33 @@ class ControlApiKpiTest {
     // ── save gate ────────────────────────────────────────────────────────────────
 
     @Test
+    void aDateRangeIsEvaluatedAgainstTheEqualLengthPeriodBeforeAndBadRangesAre400(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOrders(c, "orders", Map.of());
+            data(send(c, "POST", "/components/kpi", KPI, ALICE), 200);
+            JsonNode v = data(send(c, "GET", "/kpis/revenue/value?from=2026-08-01&to=2026-08-13", null, BOB), 200);
+            assertEquals(50.0, v.get("value").asDouble(), 1e-9, "the range, not the month to date of today");
+            assertEquals("2026-08-13", v.get("asOf").asText(), "the answer's asOf is the range end");
+            assertEquals("2026-08-01", v.at("/period/from").asText());
+            assertEquals("2026-08-14", v.at("/period/to").asText());
+            assertEquals("2026-07-19", v.at("/comparisonPeriod/from").asText(), "13 days before the range");
+            assertEquals("2026-08-01", v.at("/comparisonPeriod/to").asText());
+            // a single day is a range of one
+            JsonNode one = data(send(c, "GET", "/kpis/revenue/value?from=2026-08-10&to=2026-08-10", null, BOB), 200);
+            assertEquals("2026-08-11", one.at("/period/to").asText());
+            assertEquals("2026-08-09", one.at("/comparisonPeriod/from").asText());
+            // refusals: only one end, reversed, malformed, future, too long
+            assertEquals(400, send(c, "GET", "/kpis/revenue/value?from=2026-08-01", null, BOB).statusCode());
+            assertEquals(400, send(c, "GET", "/kpis/revenue/value?to=2026-08-01", null, BOB).statusCode());
+            assertTrue(error(send(c, "GET", "/kpis/revenue/value?from=2026-08-13&to=2026-08-01", null, BOB), 400).contains("is after"));
+            assertEquals(400, send(c, "GET", "/kpis/revenue/value?from=01-08-2026&to=2026-08-13", null, BOB).statusCode());
+            String tomorrow = java.time.LocalDate.now(java.time.ZoneId.of("UTC")).plusDays(2).toString();
+            assertTrue(error(send(c, "GET", "/kpis/revenue/value?from=2026-08-01&to=" + tomorrow, null, BOB), 400).contains("in the future"));
+            assertTrue(error(send(c, "GET", "/kpis/revenue/value?from=2000-01-01&to=2026-08-13", null, BOB), 400).contains("at most"));
+        }
+    }
+
+    @Test
     void aValidKpiSavesThroughTheComponentsDoorAndEvaluates(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seedOrders(c, "orders", Map.of());

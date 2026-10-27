@@ -258,6 +258,22 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
     }
 
     /**
+     * The comparison window of an explicit range (a Dashboard's picked dates), or {@code null} for {@code none}: for
+     * {@code previous} the period of the same length that ends the day before the range starts; for {@code last-year}
+     * the same dates one year earlier. {@code cur}'s {@code to} is exclusive, like every {@link Window}.
+     */
+    public Window comparisonOf(Window cur) {
+        return switch (comparison) {
+            case NONE -> null;
+            case PREVIOUS -> {
+                long days = ChronoUnit.DAYS.between(cur.from(), cur.to());
+                yield new Window(cur.from().minusDays(days), cur.from());
+            }
+            case LAST_YEAR -> new Window(cur.from().minusYears(1), cur.to().minusYears(1));
+        };
+    }
+
+    /**
      * The RAG status of {@code value}: from the bands when there are any, else from the target alone (met → GREEN,
      * missed → RED), else {@code null}. {@code null} value → {@code null}.
      */

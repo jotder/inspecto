@@ -164,3 +164,24 @@ describe('DashboardViewStore — the day a KPI tile evaluates at (ASSURE-KPI-DEF
         expect(s.kpiAsOf()).toBe(todayIso());
     });
 });
+
+describe('DashboardViewStore — the dates a KPI tile reads over (D3)', () => {
+    it('follows the picked range or day, is cut at today, and is null with no date control or no pick', () => {
+        const s = store();
+        expect(s.kpiRange()).toBeNull(); // no date field: no control, so no range
+        s.dateField.set('event_date');
+        expect(s.kpiRange()).toBeNull(); // nothing picked
+        s.asOf.set('2026-08-13');
+        s.range.set('last-7-days');
+        expect(s.kpiRange()).toEqual({ from: '2026-08-07', to: '2026-08-13' });
+        s.range.set({ from: '2026-08-10', to: '2026-08-10' }); // a single day
+        expect(s.kpiRange()).toEqual({ from: '2026-08-10', to: '2026-08-10' });
+        s.range.set({ from: '2026-08-01', to: '9999-12-31' }); // past today: cut, never a 400
+        expect(s.kpiRange()).toEqual({ from: '2026-08-01', to: todayIso() });
+        s.range.set({ from: '9999-01-01', to: '9999-12-31' }); // starts after today: nothing to read
+        expect(s.kpiRange()).toBeNull();
+        s.range.set(null);
+        expect(s.kpiRange()).toBeNull();
+    });
+});
+

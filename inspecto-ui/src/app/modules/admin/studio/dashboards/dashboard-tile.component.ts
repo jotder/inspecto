@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { ConditionGroup } from 'app/inspecto/query';
 import { Widget } from '../widgets/widget-types';
 import { Dataset } from '../datasets/dataset-types';
+import { KpiRange } from 'app/inspecto/api/kpis.service';
 import { StaleMark } from 'app/inspecto/signal/stale-tiles';
 import { DrillEvent, WidgetHostComponent } from '../widgets/widget-host.component';
 
@@ -27,6 +28,7 @@ import { DrillEvent, WidgetHostComponent } from '../widgets/widget-host.componen
         [filter]="filter()"
         [stale]="stale()"
         [asOf]="asOf()"
+        [range]="range()"
         (drill)="drill.emit($event)"
         ><ng-container tileActions><ng-content select="[tileActions]" /></ng-container
     ></app-widget-host>`,
@@ -40,5 +42,7 @@ export class DashboardTileComponent {
     readonly stale = input<StaleMark | null>(null);
     /** The Dashboard's `asOf` day (`YYYY-MM-DD`; blank ⇒ today) — what a KPI-bound tile evaluates at. */
     readonly asOf = input('');
+    /** The Dashboard's picked dates; a KPI-bound tile reads over them. */
+    readonly range = input<KpiRange | null>(null);
     readonly drill = output<DrillEvent>();
 }
