@@ -161,6 +161,26 @@ describe('LensService', () => {
         expect(service.canUploadData()).toBe(true);
     });
 
+    // LA-BOUND-RULE-AUTHOR-READONLY-1: the la-mobile-money mm-analyst role holds canAuthorAlertRules but neither
+    // canAuthorWorkbench nor canOperateRuns, so it qualifies only for Business — the grant must survive that.
+    it('canAuthorAlertRules survives the business lens for an analyst-only OIDC subject', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        session.capabilities.set([
+            'canManageIncidents',
+            'canWorkIncidents',
+            'canRunLinkGraphAnalysis',
+            'canBuildLinkIndex',
+            'canAuthorAlertRules',
+        ]);
+        expect(service.allowedLenses().map((l) => l.id)).toEqual(['business']);
+        expect(service.canAuthorAlertRules()).toBe(true);
+
+        session.capabilities.set(['canManageIncidents']);
+        expect(service.canAuthorAlertRules()).toBe(false);
+    });
+
     // Off-OIDC there is no identity to justify the exemption — granted() is true for everyone — so the
     // lens stays the only signal and the Business "View as" preview keeps hiding authoring affordances.
     it('identity capabilities are still lens-suppressed in honor-system mode', () => {
