@@ -67,8 +67,8 @@ ingested until you copy them into the inbox (used live only if you choose the dr
 ### 0.3 Other Spaces and Space Templates
 
 `spaces/_templates/` ships the LA Space Templates below; the three vertical showcases have their own seed script and
-runbook and were rehearsed together on one Demo Auth bundle on 2026-10-24 (`LA-SHOWCASE-REHEARSAL-1`; open defects
-`LA-SEED-FIRST-RUN-1`, `LA-DEMO-PICKER-NAMES-1` on the board). A Demo User id must mean the same person in every
+runbook and were rehearsed together on one Demo Auth bundle on 2026-10-24 (`LA-SHOWCASE-REHEARSAL-1`; its two
+seed and picker defects were fixed 2026-10-28). A Demo User id must mean the same person in every
 served Space (see "if it goes wrong" below).
 
 | Template | Use | Lay down / seed | Demo Users (`config/demo-users.toon`) |

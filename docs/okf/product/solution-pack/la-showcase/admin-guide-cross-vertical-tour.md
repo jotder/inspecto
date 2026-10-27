@@ -11,7 +11,7 @@ The tour shows three verticals back to back on **one server**: A [`la-mobile-mon
 | 1 | One bundle: `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` (unzip or use `inspecto-demo\`, inside the checkout) | `serve-demo.bat`; `-NoBakeDemo` because the bake needs an interactive console |
 | 2 | Lay the four Spaces down offline: `node tools/seed-la-showcase.mjs --scaffold <bundle>\spaces`, then `seed-la-mm.mjs`, `seed-la-audit.mjs`, `seed-la-claims.mjs` the same way | `la-showcase`, `la-showcase-off`, `la-mobile-money`, `la-audit`, `la-claims`; the Demo User roster merges (no id is defined two ways) |
 | 3 | Start with `PORT=<free>` and `INSPECTO_JAVA_OPTS=-Dla.embed.enabled=true`; wait for the ingest | `/health` 200 |
-| 4 | **Press Run on the link Jobs before seeding**: `mm_links` as `mm.manager`, `claims_links` as `siu.manager` (the audit seed presses Run itself). Then `la_index_build` in each Space as the **manager** persona (`admin` has no `canOperateRuns`: 403) | Run `SUCCESS`; without this the mm and claims seeds fail (defect row `LA-SEED-FIRST-RUN-1`) |
+| 4 | **The seeds press Run on their link Job themselves** on a fresh Space (`mm_links` as `mm.manager`, `claims_links` as `siu.manager`, `ap_links` as `audit.manager`) and wait for its rows. Then `la_index_build` in each Space as the **manager** persona (`admin` has no `canOperateRuns`: 403) | Run `SUCCESS`; a re-run of a seed skips what exists (the identity is matched on its reason) |
 | 5 | Seed each Space `--base http://127.0.0.1:<PORT> --apply`, then run the smokes | rehearsal: `la-demo-smoke` 16/16 (20/20 with `--staged --inbox --embed`), `la-mm-smoke` 10/10, `la-audit-smoke` 30/30, `la-claims-smoke --embed` 32/32 |
 
 Two things the audience must not see go wrong:
@@ -98,7 +98,7 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 | Panel | Where | Rehearsal result |
 |---|---|---|
-| Graph page, saved views | start card or *Open saved views* > the view > *Load view* | A `mm_money_trail` 465 nodes, 4 000 links, "Truncated" banner; B `gl_intercompany` 8 / 72; C `claims_network` 388 / 2 574 (force, hulls), `claims_provider_money` 320 / 806 but **drawn as an unreadable vertical sliver** (dagre; defect row `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1`) |
+| Graph page, saved views | start card or *Open saved views* > the view > *Load view* | A `mm_money_trail` 465 nodes, 4 000 links, "Truncated" banner; B `gl_intercompany` 8 / 72; C `claims_network` 388 / 2 574 (force, hulls), `claims_provider_money` 320 / 806 (drawn as a vertical sliver under dagre on 2026-10-24; force since 2026-10-28, `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1`) |
 | Domain profile | the Query panel picker | the start page offered "Mobile Money" on A; after *Follow the money* it read "finance" (defect row `LA-SAVED-VIEW-DOMAIN-PROFILE-1`) |
 | Draft, Members | Investigation tab | B: all of 1.4; A: Members shown, Drafts "No Drafts" |
 | Settings | left rail > Settings (admin) | Link Analysis group (masking mode, link index, propagated-risk weights, embed lists, Domain profile, category lists) and *Analysis limits* (about 20 groups: Canvas, Investigation, Traversal, Dossier, Identity, Upload…). Editing worked: masking `all`, save ("Link Analysis settings saved"), "In force: all", then back to `typed` |
@@ -108,7 +108,7 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 ## 3. Everything the three verticals share
 
-* One server holds all of them; the Demo User picker lists every persona of every Space (two entries read "Demo Outsider": defect row `LA-DEMO-PICKER-NAMES-1`).
+* One server holds all of them; the Demo User picker lists every persona of every Space (the outsiders are told apart: `audit.outsider` is "Demo Outsider", the claims `outsider` is "Demo Claims Outsider").
 * Typed masking everywhere: raw ids only through the audited Reveal. Free text is not masked: the claims references and the Investigation title carry ids typed by the seed.
 * Link Jobs first, index second: `mm_links` / `ap_links` / `claims_links`, then `la_index_build` (a cron or the produced-Dataset signal).
 

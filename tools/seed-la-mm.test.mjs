@@ -18,6 +18,7 @@ function mock(listItems = []) {
     if (u === '/auth/exchange') data = { accessToken: 'tok-' + JSON.parse(init.body).code };
     else if (u.startsWith('/spaces/s/inv/investigations?')) data = { items: created && !listItems.length ? [{ id: INV, headStep: 0 }] : listItems };
     else if (u === '/spaces/s/inv/entity-identities' && method === 'GET') data = { items: [] };
+    else if (u.startsWith('/spaces/s/datasets/') && u.includes('/rows')) data = { rows: [{ src: 'x' }] };   // the link Job has run
     else if (u === '/spaces/s/cases/from-entities') data = { case: { id: 'CASE-7' } };
     return { ok: true, status: 200, json: async () => ({ data }) };
   };
@@ -77,4 +78,26 @@ test('scaffold lays the Space and the template gallery, and stamps the index own
   assert.match(job, /updatedBy: admin/);
   assert.deepEqual(scaffold(root), []);
   assert.equal(stampIndexBuildOwner('job:\n  type: sql.template\n'), 'job:\n  type: sql.template\n');
+});
+
+test('a fresh Space (no link rows yet) presses Run on mm_links as mm.manager before the create', async () => {
+  const m = mock(); let n = 0;
+  const f = async (url, init = {}) => (url.includes('/datasets/mm_links_dataset/rows') && n++ < 2
+    ? { ok: true, status: 200, json: async () => ({ data: { rows: [] } }) } : m.fetchFn(url, init));
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async () => {} });
+  assert.deepEqual(r.failed, []);
+  const i = m.calls.findIndex((c) => c.u === '/spaces/s/jobs/mm_links/trigger' && c.method === 'POST');
+  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:mm.manager');
+  assert.ok(i < m.calls.findIndex((c) => c.u === '/spaces/s/inv/investigations' && c.method === 'POST'));
+});
+
+test('a re-run matches the handset identity on its reason (ids come back masked) and does not assert it twice', async () => {
+  const m = mock([{ id: INV, headStep: 8, caseRef: 'CASE-7' }]);
+  const reason = buildPlan().find((s) => s.id === 'identity').body.reason;
+  const f = async (url, init = {}) => (url.endsWith('/inv/entity-identities') && (init.method || 'GET') === 'GET'
+    ? { ok: true, status: 200, json: async () => ({ data: { groups: [{ id: 'tok-1', members: ['tok-a', 'tok-b'], assertions: [{ seq: 7, a: 'tok-a', b: 'tok-b', reason }] }] } }) }
+    : m.fetchFn(url, init));
+  const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF });
+  assert.ok(r.skipped.includes('identity'));
+  assert.ok(!m.calls.some((c) => c.u.endsWith('/inv/entity-identities') && c.method === 'POST'));
 });

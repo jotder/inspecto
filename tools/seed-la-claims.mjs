@@ -69,6 +69,16 @@ export function buildPlan() {
   ];
 }
 
+/** The link Dataset is a Job output, so a fresh Space has none until the 10-minute cron and the Investigation create is refused: press Run on
+ *  the link Job (as siu.manager, who holds canOperateRuns) and wait for claims_links_dataset to have rows, as seed-la-audit.mjs does. */
+async function prime(call, log, sleep, tries) {
+  const has = async () => { const r = await call('siu.analyst', 'GET', '/datasets/claims_links_dataset/rows?limit=1'); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
+  if (await has()) return;
+  const t = await call('siu.manager', 'POST', '/jobs/claims_links/trigger', {}); log(`  prime claims_links: ${t.status}`);
+  for (let i = 0; i < tries; i++) { if (await has()) return; await sleep(2000); }
+  log('  WARNING claims_links_dataset still has no rows; the Investigation create will be refused');
+}
+
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 export const DRAFT_STEP = { op: 'annotate', ids: ['CLI-04'], note: 'widen the ring: who else does LAW-02 refer to this clinic?' };
 
@@ -108,6 +118,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const listed = await poll(() => call('siu.analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
   if (listed.status !== 200) throw new Error(`cannot list Investigations as siu.analyst (${listed.status}): is the Space '${space}' created from the la-claims template?`);
   let existing = items(listed.data).find((i) => i.id === INV);
+  if (!existing) await prime(call, log, sleep, readyTries);
   let headStep = existing ? existing.headStep || 0 : 0;
   const state = { case: existing && existing.caseRef ? existing.caseRef : null, caseExisted: !!(existing && existing.caseRef) };
   for (const s of plan) {
