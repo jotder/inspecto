@@ -30,7 +30,6 @@ import {
     InstantiateTemplateResult,
     InvService,
     InvestigationCoverage,
-    InvestigationListItem,
     InvestigationLogEntry,
     WorkingSetRelationName,
 } from '@inspecto/link-analysis/api/inv.service';
@@ -162,6 +161,8 @@ export class LinkAnalysisInvestigationComponent {
     readonly pendingDone = output<void>();
     /** "Expand…": the screen opens its Expand dialog (§5.4), which holds the read settings. */
     readonly expandRequested = output<void>();
+    /** "Open…": the screen opens File ▸ Open… on its Investigations tab (§5.11). */
+    readonly openRequested = output<void>();
 
     constructor() {
         // Prefill the time column from the canvas / Dataset default; an analyst's own edit is never overwritten.
@@ -331,13 +332,6 @@ export class LinkAnalysisInvestigationComponent {
     });
     /** The `linkId` of the link picked for a note. */
     readonly linkPick = signal<string | null>(null);
-    /** `GET /inv/investigations`: what the caller may read (own + shared through an open Case); null until asked. */
-    readonly listed = signal<InvestigationListItem[] | null>(null);
-    readonly listedTruncated = signal(false);
-    readonly listBusy = signal(false);
-    readonly listError = signal('');
-    /** Open an Investigation by its id (there is no get-one route, so a bad id surfaces as the open's own error). */
-    readonly openId = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
     readonly reread = signal(false);
     /** LA-19: the last coverage read and the Investigation it is FOR — rendered only while that one is open. */
     readonly coverage = signal<InvestigationCoverage | null>(null);
@@ -366,13 +360,6 @@ export class LinkAnalysisInvestigationComponent {
     /** Non-null while the analyst is re-ordering: the proposed order of effective step numbers. */
     readonly order = signal<number[] | null>(null);
 
-    readonly pickerOptions = computed<PickerOption[]>(() =>
-        this.store.refs().map((r) => ({
-            value: r.id,
-            label: r.title ? `${r.title} (${r.id})` : r.id,
-            hint: r.parentId ? `Fork of ${r.parentId}` : undefined,
-        })),
-    );
 
     /** D-U9: the Working Set's links that carry a wire id — what a link note may name. */
     readonly linkOptions = computed<PickerOption[]>(() =>
@@ -620,28 +607,12 @@ export class LinkAnalysisInvestigationComponent {
         if (ok) this.linkNote.reset('');
     }
 
-    /** Ask the server which Investigations the caller may read. */
-    async listInvestigations(): Promise<void> {
-        if (this.listBusy()) return;
-        this.listBusy.set(true);
-        this.listError.set('');
-        try {
-            const res = await firstValueFrom(this.inv.listInvestigations());
-            this.listed.set(res.items);
-            this.listedTruncated.set(res.truncated);
-        } catch (err) {
-            this.listError.set(apiErrorMessage(err, 'Could not list the Investigations.'));
-        } finally {
-            this.listBusy.set(false);
-        }
+    /** Whether the caller may delete this Investigation (the capability; a read-only Case member's delete is refused by the server). */
+    canDelete(_id: string): boolean {
+        return this.canWrite();
     }
 
-    /** Whether the caller may delete this Investigation: the capability, and not a read-only listing (a Case member). */
-    canDelete(id: string): boolean {
-        return this.canWrite() && !(this.listed()?.find((i) => i.id === id)?.readOnly ?? false);
-    }
-
-    /** Delete an Investigation after a confirmation that says it cannot be undone; the list is refreshed when it was showing. */
+    /** Delete an Investigation after a confirmation that says it cannot be undone. */
     async deleteInvestigation(id: string, label: string): Promise<void> {
         const ok = await this.confirm.confirmDestructive(
             `Delete the Investigation “${label}”?\n\nIts log, its Working Sets and its Drafts are removed from the server. ` +
@@ -649,21 +620,6 @@ export class LinkAnalysisInvestigationComponent {
             { title: 'Delete Investigation?', confirmText: 'Delete', destructive: true },
         );
         if (!ok || !(await this.store.deleteInvestigation(id))) return;
-        if (this.listed() !== null) await this.listInvestigations();
-    }
-
-    /** Open a listed Investigation — remembered in the saved view like any other. */
-    openListed(item: InvestigationListItem): void {
-        this.order.set(null);
-        this.store.adopt(item.id, item.title ?? undefined, this.store.activeRef() ?? undefined);
-    }
-
-    openById(): void {
-        const id = this.openId.value.trim();
-        if (!id || this.openId.invalid) return;
-        this.order.set(null);
-        this.store.adopt(id, undefined, this.store.activeRef() ?? undefined);
-        this.openId.reset('');
     }
 
     /** LA-19: which days of the Investigation's own window have no rows at all (a gap is not innocence). */

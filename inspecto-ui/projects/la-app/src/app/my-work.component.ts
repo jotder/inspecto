@@ -26,9 +26,9 @@ import { CaseRow, caseRows, importedDatasets, lastImportLine } from './my-work';
             <h2 id="la-my-work-title" class="m-0 text-lg font-semibold">My work</h2>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <section class="bg-card flex flex-col gap-2 rounded-2xl border p-4" aria-labelledby="la-cases-title">
-                    <h3 id="la-cases-title" class="m-0 text-sm font-semibold">Cases</h3>
+                    <h3 id="la-cases-title" class="m-0 text-sm font-semibold">Saved views</h3>
                     <p class="text-secondary m-0 text-xs">
-                        A <inspecto-term term="case"></inspecto-term> is a saved graph and the
+                        A saved view is a graph you keep and the
                         <inspecto-term term="entity-list" label="Entity Lists"></inspecto-term> it uses. {{ notEvidence }}
                     </p>
                     @if (cases(); as cs) {
@@ -40,7 +40,7 @@ import { CaseRow, caseRows, importedDatasets, lastImportLine } from './my-work';
                                             class="font-semibold"
                                             [routerLink]="'/link-analysis'"
                                             [queryParams]="{ view: c.id }"
-                                            [attr.aria-label]="'Open the case ' + c.name"
+                                            [attr.aria-label]="'Open the saved view ' + c.name"
                                             >{{ c.name }}</a
                                         >
                                         @if (c.description) {
@@ -54,15 +54,15 @@ import { CaseRow, caseRows, importedDatasets, lastImportLine } from './my-work';
                             </ul>
                         } @else if (casesFailed()) {
                             <p class="m-0 text-sm" role="status" data-testid="la-cases-failed">
-                                The cases could not be read just now.
+                                The saved views could not be read just now.
                                 <button type="button" class="text-primary underline" (click)="ngOnInit()">
                                     Try again
                                 </button>
                             </p>
                         } @else {
                             <p class="m-0 text-sm" data-testid="la-cases-empty">
-                                No case yet. Draw a graph in
-                                <a routerLink="/link-analysis">Link Analysis</a>, then choose <em>Save as a case</em>.
+                                No saved view yet. Draw a graph in
+                                <a routerLink="/link-analysis">Link Analysis</a>, then choose <em>File ▸ Save view as…</em>.
                             </p>
                         }
                     } @else {

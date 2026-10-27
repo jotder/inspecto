@@ -248,6 +248,7 @@ import {
 } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
+import { LaOpenDialogData, LaOpenResult, LinkAnalysisOpenDialog } from './link-analysis-open.dialog';
 import {
     CaseStart,
     LinkAnalysisService,
@@ -523,7 +524,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
     @ViewChild('graphRegion') private graphRegion?: ElementRef<HTMLElement>;
     @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
-    @ViewChild('viewsTrigger') private viewsTrigger?: MatMenuTrigger;
+    @ViewChild('fileTrigger') private fileTrigger?: MatMenuTrigger;
 
     // ── workspace layout: [query dock] │ canvas │ [toolbox dock], Data as a bottom strip ──
     /** Full query form vs its collapsed selected-values summary (auto-collapses after a run). */
@@ -2012,9 +2013,100 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.queryPanel?.startExplore(datasetId);
     }
 
-    /** Starter card "Open a saved view": the same menu as the rail's saved-views button. */
+    /** Starter card "Open a saved view": File ▸ Open… on its Saved views tab. */
     openSavedViews(): void {
-        this.viewsTrigger?.openMenu();
+        this.openOpenDialog();
+    }
+
+    /** File ▸ Open… (§5.11): one dialog over saved views and Investigations; the list is re-read after, since it renames, copies and deletes. */
+    openOpenDialog(tab?: 'views' | 'investigations'): void {
+        const data: LaOpenDialogData = {
+            tab,
+            opsEnabled: !!this.opsEnabled(),
+            shareable: (v) => this.shareable(v),
+            history: (v) => this.openHistory(v),
+            comments: (v) => this.openComments(v),
+            tags: (v) => this.openTags(v),
+            offer: (v) => this.offer(v),
+            store: this.investigation,
+            canDeleteInvestigations: this.lens.canManageIncidents(),
+        };
+        this.dialog
+            .open<LinkAnalysisOpenDialog, LaOpenDialogData, LaOpenResult>(LinkAnalysisOpenDialog, {
+                data,
+                maxWidth: '95vw',
+            })
+            .afterClosed()
+            .subscribe((r) => {
+                this.reloadViews();
+                const open = this.openViewId();
+                if (open && !this.views().some((v) => v.id === open)) this.viewsService.get(open).subscribe((v) => !v && this.forgetOpenView());
+                if (r?.kind === 'view') void this.loadView(r.view);
+                else if (r?.kind === 'investigation') {
+                    this.investigation.adopt(r.id, r.title, this.investigation.activeRef() ?? undefined);
+                    this.openInvestigation();
+                }
+            });
+    }
+
+    /** File ▸ Save view: over the open saved view; with none open it asks for a name (Save view as…). */
+    async saveOpenView(): Promise<void> {
+        const open = this.views().find((v) => v.id === this.openViewId());
+        if (!open) {
+            this.fileTrigger?.openMenu();
+            setTimeout(() => this.saveTrigger?.openMenu());
+            return;
+        }
+        const view = this.viewFromState(open.id, open.name, open.description);
+        if (!view) return;
+        this.saving.set(true);
+        try {
+            await firstValueFrom(this.viewsService.save(view, { update: true }));
+            this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
+            this.toastr.success(`Saved the view “${view.name}”.`);
+        } catch (err) {
+            this.toastr.error(apiErrorMessage(err, 'Saving the view failed.'));
+        } finally {
+            this.saving.set(false);
+        }
+    }
+
+    /** What File ▸ Delete removes: the open Investigation, else the open saved view; '' = nothing to delete. */
+    readonly deleteLabel = computed<string>(() => {
+        if (this.investigation.active()) return this.lens.canManageIncidents() ? `Investigation ${this.investigation.displayTitle()}` : '';
+        const v = this.views().find((x) => x.id === this.openViewId());
+        return v ? `view ${v.name}` : '';
+    });
+
+    /** File ▸ Delete, after a confirm: the Investigation (server-side, audited) or the saved view; then back to the empty state. */
+    async deleteOpenWork(): Promise<void> {
+        const label = this.deleteLabel();
+        if (!label) return;
+        const invId = this.investigation.active() ? this.investigation.activeId() : null;
+        const ok = await this.confirm.confirmDestructive(
+            invId
+                ? `Delete the ${label}?
+
+Its log, its Working Sets and its Drafts are removed from the server. This cannot be undone. A record that it was deleted, by whom and when, is kept in the audit trail.`
+                : `Delete the saved ${label}?
+
+Its prior copies stay in its version history.`,
+            { title: invId ? 'Delete Investigation?' : 'Delete saved view?', confirmText: 'Delete', destructive: true },
+        );
+        if (!ok) return;
+        if (invId) {
+            if (!(await this.investigation.deleteInvestigation(invId))) return;
+        } else {
+            const id = this.openViewId()!;
+            try {
+                await firstValueFrom(this.viewsService.remove(id));
+            } catch (err) {
+                this.toastr.error(apiErrorMessage(err, 'Deleting the view failed.'));
+                return;
+            }
+            this.views.set(this.views().filter((v) => v.id !== id));
+        }
+        await this.closeOpenWork();
     }
 
     /** A ranking row was picked: highlight, select and centre that node on the canvas. */
@@ -3616,7 +3708,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.rememberOpenView(view.id); // what is on screen is now this saved view: a refresh reopens it
             this.saveForm.reset({ name: '', description: '' });
             this.saveTrigger?.closeMenu();
-            this.toastr.success(`Saved the case “${view.name}”.`);
+            this.fileTrigger?.closeMenu();
+            this.toastr.success(`Saved the view “${view.name}”.`);
         } catch (err) {
             this.toastr.error(apiErrorMessage(err, 'Saving the view failed.'));
         } finally {
@@ -3865,7 +3958,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const hide = (this.graph()?.nodes ?? [])
             .filter((n) => rawIdsOf(n).some((v) => members.has(v.trim().toUpperCase())))
             .map((n) => n.id);
-        if (hide.length) this.hideLocally(hide, 'on the case’s exclusion lists, hidden');
+        if (hide.length) this.hideLocally(hide, 'on the saved view’s exclusion lists, hidden');
     }
 
     /** Prior saved copies of a view — a Component like any other, so the shared history dialog works

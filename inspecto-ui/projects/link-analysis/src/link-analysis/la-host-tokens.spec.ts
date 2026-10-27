@@ -195,7 +195,9 @@ describe('Link Analysis host-service tokens', () => {
         });
         const fixture = TestBed.createComponent(LinkAnalysisComponent);
         fixture.detectChanges();
-        // the host's transfer menu rendered with the inputs the studio passes
+        // the host's transfer menu (File ▸ Import / export views) rendered with the inputs the studio passes
+        (fixture.nativeElement.querySelector('[data-testid="la-file"]') as HTMLElement).click();
+        fixture.detectChanges();
         const menu = fixture.debugElement.query(By.directive(FakeTransferMenuComponent))
             .componentInstance as FakeTransferMenuComponent;
         expect(menu.allowedKinds()).toEqual(['link-analysis-view']);
