@@ -316,7 +316,7 @@ Signals: `LA_FEATURES` (`la-host/la-host.ts:240-282`), `investigationsEnabled`, 
 | Show the rows | ✅ P2a — Dock: Rows tab (the toolbar toggle opens and closes the dock) |
 | Show the side panels, Close the analysis | ✅ P3 — Side panels: top bar right end. Close: File ▾ only (the right-end close icon was removed in P3a) |
 | Floating selection bar (Expand, Hide, Exclude, Merge, Attach, Clear) | ✅ P1a — Second toolbar (Expand = today's Grow until the P1b dialog) |
-| Right-click node menu | ✅ P1 — Kept (Expand…, Collapse, Hide, Exclude, Seed, Details) |
+| Right-click node menu (before: Exclude, Grow) | ✅ P1 — Kept (Exclude…, Collapse / unfold, Expand… which replaces Grow); Hide is on the selection toolbar. Corrected 2026-10-28: this row once listed Hide, Seed and Details, which the menu never had |
 | Domain profile picker | ✅ P3 — Removed. The Space pack applies; stored pack shown read-only; Template field (UIR-D9) |
 | Query panel (Dataset, entity columns, link type, attributes, mappings, root / depth / direction, Pipeline, Run, Edit, Refresh) | ✅ P2 — ⚙ Settings → Graph model; status-bar chips open it; status-bar Refresh (UIR-D16) |
 | "Change the query" pencil (status bar) | ✅ P2 — Opens ⚙ Settings → Graph model |
