@@ -220,6 +220,15 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
      * `datasetId` (Add data's *Explore in Link Analysis*, LA-ONBOARD-1 phase 4) picks that Dataset instead of opening the
      * picker, so the same suggest-then-run follows.
      */
+    /** The form was edited since it was last run (⚙ Settings asks before closing over it). */
+    isDirty(): boolean {
+        return this.queryForm.dirty || this.extraMappings.dirty || this.nodeMappings.dirty || this.edgeMappings.dirty;
+    }
+
+    markPristine(): void {
+        for (const c of [this.queryForm, this.extraMappings, this.nodeMappings, this.edgeMappings]) c.markAsPristine();
+    }
+
     startExplore(datasetId?: string): void {
         this.runAfterPick = true;
         if (datasetId) this.queryForm.controls.datasetId.setValue(datasetId);

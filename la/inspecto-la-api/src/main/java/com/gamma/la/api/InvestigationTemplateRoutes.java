@@ -107,7 +107,9 @@ public final class InvestigationTemplateRoutes implements RouteModule {
     private record Template(Path writeRoot, Map<String, Object> doc) {}
 
     /**
-     * {@code POST /inv/investigations/{id}/template} — body {@code {id?, title?}}. Gates: the Investigation's
+     * {@code POST /inv/investigations/{id}/template} — body {@code {id?, title?, pack?}}; {@code pack} names the Industry pack
+     * an instantiated Investigation reads under (UIR-D9) and is checked for shape only — an unknown pack falls back to the
+     * Space's in the client, as an unknown stored profile does. Gates: the Investigation's
      * {@link InvestigationRoutes#open} (503 · 422 · 403 · 404) → an unsafe template id 422 → escaping the store 403 →
      * nothing to template (no effective {@code seed}) 422 → id taken 409 → write CREATE_NEW.
      */
@@ -117,6 +119,10 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         String given = ApiContext.str(body, "id");
         String id = given != null ? given : "tpl-" + UUID.randomUUID();
         requireSafeId(id);
+        String pack = ApiContext.str(body, "pack");
+        if (pack != null && !SnapshotStore.SAFE_ID.matcher(pack).matches())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "investigation template pack must match "
+                    + SnapshotStore.SAFE_ID.pattern() + ", got '" + pack + "'");
 
         List<Map<String, Object>> log = new ArrayList<>();
         for (String line : inv.store().log(InvestigationStore.Scope.main(invId))) log.add(ApiContext.JSON.readValue(line, Map.class));
@@ -174,6 +180,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("id", id);
         doc.put("title", ApiContext.str(body, "title"));
+        if (pack != null) doc.put("pack", pack);   // only when named: a template without one is unchanged
         doc.put("owner", ApiContext.actor(ex));
         doc.put("createdAt", Instant.now().toString());
         doc.put("derivedFrom", ordered("investigation", invId, "steps", log.size(),
@@ -244,6 +251,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             header.put("eventsCol", override != null ? override : roles.get("eventsCol"));
         }
         header.put("template", ordered("id", templateId));
+        if (doc.get("pack") instanceof String pack) header.put("pack", pack);   // the Investigation reads under the template's pack
 
         List<Map<String, Object>> ops = new ArrayList<>();
         for (Map<String, Object> t : (List<Map<String, Object>>) doc.get("ops")) {
@@ -296,7 +304,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             if (subject.isPresent() && !subject.get().id().equals(doc.get("owner"))) continue;
             Map<String, Object> roles = doc.get("roles") instanceof Map<?, ?> r ? (Map<String, Object>) r : Map.of();
             Map<String, Object> from = doc.get("derivedFrom") instanceof Map<?, ?> d ? (Map<String, Object>) d : Map.of();
-            out.add(ordered("id", doc.get("id"), "title", doc.get("title"), "createdAt", doc.get("createdAt"),
+            out.add(ordered("id", doc.get("id"), "title", doc.get("title"), "pack", doc.get("pack"), "createdAt", doc.get("createdAt"),
                     "dataset", roles.get("dataset"), "investigation", from.get("investigation"),
                     "parameters", doc.get("parameters") instanceof List<?> p ? p.size() : 0,
                     "ops", doc.get("ops") instanceof List<?> o ? o.size() : 0));

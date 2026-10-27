@@ -618,13 +618,6 @@
                                 </button>
                             </div>
                         }
-                        <inspecto-link-analysis-display-rules
-                            [rules]="nodeRules()"
-                            [attributes]="nodeAttributeKeys()"
-                            [kinds]="nodeKinds()"
-                            [swatches]="swatches"
-                            (rulesChange)="setNodeRules($event)"
-                        />
                     </div>
                 </mat-menu>
 
@@ -734,8 +727,8 @@
                 (click)="toggleCanvasMaximized()"
                 [matTooltip]="
                     canvasMaximized()
-                        ? 'Show the query and toolbox panels'
-                        : 'Hide the query and toolbox panels (more room for the canvas)'
+                        ? 'Show the toolbox panel'
+                        : 'Hide the toolbox panel (more room for the canvas)'
                 "
                 [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Hide the side panels'"
             >
@@ -744,6 +737,16 @@
                         canvasMaximized() ? 'heroicons_outline:view-columns' : 'heroicons_outline:arrows-pointing-out'
                     "
                 ></mat-icon>
+            </button>
+            <!-- ⚙ Settings (§5.10): the right end of the top bar -->
+            <button
+                mat-icon-button
+                (click)="openSettings()"
+                matTooltip="Settings: graph model, Entity Types, display rules, data"
+                aria-label="Settings"
+                data-testid="la-settings-open"
+            >
+                <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon>
             </button>
         </div>
     </header>
@@ -1063,81 +1066,6 @@
         <div
             class="relative flex min-h-[26.25rem] min-w-0 flex-auto overflow-hidden max-md:min-h-[28rem] rounded-lg border max-md:!h-auto max-md:flex-col"
         >
-            <!-- left dock — Query (+ Filter); collapses to an icon rail -->
-            <aside
-                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-r max-md:!w-full max-md:border-b max-md:border-r-0"
-                [class.w-10]="!queryDockOpen()"
-                [style.width.px]="queryDockOpen() ? querySplit.width() : null"
-                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
-                aria-label="Query"
-            >
-                @if (queryDockOpen()) {
-                    <div
-                        class="flex shrink-0 items-center gap-1 border-b py-1 pl-3 pr-1"
-                        style="border-color: var(--gamma-border)"
-                    >
-                        <h2 class="text-xs font-semibold uppercase tracking-wide text-secondary">Query</h2>
-                        <button
-                            class="ml-auto"
-                            mat-icon-button
-                            (click)="queryDockOpen.set(false)"
-                            matTooltip="Hide the query panel"
-                            aria-label="Hide the query panel"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:chevron-double-left"></mat-icon>
-                        </button>
-                    </div>
-                    <div class="min-h-0 flex-auto overflow-y-auto p-3">
-                        <!-- Domain profile — shapes the working-set statistics and the suggested tools; saved with a view. -->
-                        <inspecto-option-picker
-                            class="mb-3 block"
-                            label="Domain profile"
-                            [formControl]="profileControl"
-                            [options]="profileOptions()"
-                            help="Names the statistics after the data and foregrounds the tools that matter for it."
-                        ></inspecto-option-picker>
-                        <!-- Query — the query-panel child owns the form + buildQuery; the host keeps sourceId and the
-                             run/save/load lifecycle, reached via a ViewChild. -->
-                        <inspecto-link-analysis-query-panel
-                            [sources]="sources"
-                            [datasets]="datasets()"
-                            [pipelines]="pipelines()"
-                            [sourceId]="sourceId()"
-                            [queryOpen]="queryOpen()"
-                            [loading]="loading()"
-                            [querySummary]="querySummary()"
-                            [sourceLabel]="sourceLabel()"
-                            (sourceIdChange)="sourceId.set($event)"
-                            (run)="run()"
-                            (edit)="editQuery()"
-                        ></inspecto-link-analysis-query-panel>
-                    </div>
-                } @else {
-                    <button
-                        mat-icon-button
-                        (click)="queryDockOpen.set(true)"
-                        matTooltip="Show the query panel"
-                        aria-label="Show the query panel"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:chevron-double-right"></mat-icon>
-                    </button>
-                    <button mat-icon-button (click)="editQuery()" matTooltip="Query" aria-label="Open the query form">
-                        <mat-icon svgIcon="heroicons_outline:circle-stack"></mat-icon>
-                    </button>
-                }
-            </aside>
-            <!-- Kept mounted (hidden, not @if'd) while collapsed so #querySplit stays resolvable. -->
-            <div
-                inspectoSplit="link-analysis.query"
-                #querySplit="inspectoSplit"
-                [min]="200"
-                [max]="560"
-                [defaultWidth]="220"
-                class="max-md:hidden"
-                [class.hidden]="!queryDockOpen()"
-                aria-label="Resize the query panel (arrow keys or drag)"
-            ></div>
-
             <!-- ══ canvas zone (graph + states + overlays) — the graph-fullscreen target ══ -->
             <div
                 #canvasZone
@@ -1680,21 +1608,35 @@
                 <!-- one line: a narrow window clips the chips instead of wrapping the title row onto a second and third -->
                 <div class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
                     @for (item of querySummary(); track item.label) {
-                        <inspecto-chip>
-                            <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
-                            <span class="text-secondary">{{ item.label }}:</span>
-                            {{ item.value }}
-                        </inspecto-chip>
+                        <!-- a chip opens ⚙ Settings → Graph model (§5.10) -->
+                        <button type="button" class="shrink-0" (click)="editQuery()" [attr.aria-label]="'Change ' + item.label + ' in the graph model'">
+                            <inspecto-chip>
+                                <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
+                                <span class="text-secondary">{{ item.label }}:</span>
+                                {{ item.value }}
+                            </inspecto-chip>
+                        </button>
                     }
                 </div>
                 <button
                     mat-icon-button
                     class="shrink-0"
                     (click)="editQuery()"
-                    matTooltip="Change the query"
-                    aria-label="Change the query"
+                    matTooltip="Change the graph model"
+                    aria-label="Change the graph model"
                 >
                     <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                </button>
+                <button
+                    mat-icon-button
+                    class="shrink-0"
+                    [disabled]="loading() || !lastRun()"
+                    (click)="refreshFromServer()"
+                    matTooltip="Refresh: run the same graph model again"
+                    aria-label="Refresh the graph"
+                    data-testid="la-status-refresh"
+                >
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
                 <span class="text-secondary shrink-0 whitespace-nowrap text-xs">
                     {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
@@ -1705,4 +1647,62 @@
         </div>
         </div>
     </div>
+    <!-- ══ ⚙ Settings (LA-STUDIO-UI-REORG-1 §5.10): sections are projected and only hidden, so the query panel stays this
+         component's ViewChild and a half-edited form survives closing ══ -->
+    <inspecto-la-settings
+        [(open)]="settingsOpen"
+        [(section)]="settingsSection"
+        [investigationOpen]="!!investigation.active()"
+        [isDirty]="settingsDirty"
+    >
+        <div laSection="graph-model" class="flex flex-col gap-3">
+            @if (profileLabel(); as pack) {
+                <p class="text-secondary m-0 text-xs" data-testid="la-settings-pack">
+                    Industry pack: <span class="font-medium">{{ pack }}</span>
+                </p>
+            }
+            <inspecto-link-analysis-query-panel
+                [sources]="sources"
+                [datasets]="datasets()"
+                [pipelines]="pipelines()"
+                [sourceId]="sourceId()"
+                [queryOpen]="true"
+                [loading]="loading()"
+                [querySummary]="querySummary()"
+                [sourceLabel]="sourceLabel()"
+                (sourceIdChange)="sourceId.set($event)"
+                (run)="run()"
+                (edit)="editQuery()"
+            ></inspecto-link-analysis-query-panel>
+            <div class="flex justify-end gap-2 border-t pt-3" style="border-color: var(--gamma-border)">
+                <!-- Run is the form's own submit (Run query) above; Refresh re-reads the last run from the server -->
+                <button mat-stroked-button [disabled]="loading() || !lastRun()" (click)="refreshFromServer()" data-testid="la-settings-refresh">
+                    <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                    Refresh
+                </button>
+            </div>
+        </div>
+        <div laSection="entity-types"><inspecto-la-entity-types /></div>
+        <div laSection="display-rules">
+            <inspecto-link-analysis-display-rules
+                [rules]="nodeRules()"
+                [attributes]="nodeAttributeKeys()"
+                [kinds]="nodeKinds()"
+                [swatches]="swatches"
+                (rulesChange)="setNodeRules($event)"
+            />
+        </div>
+        <!-- Data: mounted only while ⚙ is open, so the Investigation tab's copies (until P2a moves them) stay the one
+             consumer of a merge hand-off and the one reader on load -->
+        <div laSection="entity-lists">@if (settingsOpen()) {<inspecto-link-analysis-entity-lists />}</div>
+        <div laSection="identities">@if (settingsOpen()) {<inspecto-link-analysis-identities />}</div>
+        <div laSection="add-data">@if (settingsOpen()) {<inspecto-link-analysis-uploads />}</div>
+        <div laSection="investigation">
+            <!-- TODO(LA-STUDIO-UI-REORG-1 P2a): host the InvestigationSettingsSections component lane P2a creates here. -->
+            <p class="text-secondary m-0 text-sm" data-testid="la-settings-investigation-slot">
+                The open Investigation's settings move here with the Act panel (lane P2a). Until then they are in the
+                Investigation tab.
+            </p>
+        </div>
+    </inspecto-la-settings>
 </div>

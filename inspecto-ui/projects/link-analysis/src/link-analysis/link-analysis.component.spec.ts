@@ -986,9 +986,9 @@ describe('LinkAnalysisComponent', () => {
             'Mapping: source → target',
         ]);
 
-        c.queryDockOpen.set(false);
-        c.editQuery(); // the status-bar pencil reopens the query dock with the form expanded
-        expect(c.queryDockOpen()).toBe(true);
+        c.editQuery(); // the status-bar pencil opens ⚙ Settings → Graph model with the form expanded
+        expect(c.settingsOpen()).toBe(true);
+        expect(c.settingsSection()).toBe('graph-model');
         expect(c.queryOpen()).toBe(true);
     });
 
@@ -1070,20 +1070,19 @@ describe('LinkAnalysisComponent', () => {
         expect(c.toolboxDockOpen()).toBe(true);
         expect(c.toolboxTab()).toBe('analysis');
 
-        // Maximize hides both docks in one step and a second call restores them.
+        // Maximize hides the toolbox dock and a second call restores it; there is no left panel (§5.10).
         c.toggleCanvasMaximized();
         expect(c.canvasMaximized()).toBe(true);
         fixture.detectChanges();
         const el: HTMLElement = fixture.nativeElement;
-        expect(el.querySelector('[aria-label="Show the query panel"]')).not.toBeNull(); // the rail
         expect(el.querySelector('[aria-label="Show the toolbox"]')).not.toBeNull();
-        expect(el.querySelector('inspecto-link-analysis-query-panel')).toBeNull();
+        expect(el.querySelector('aside[aria-label="Query"]')).toBeNull();
         c.toggleCanvasMaximized();
-        expect(c.queryDockOpen()).toBe(true);
         expect(c.toolboxDockOpen()).toBe(true);
         fixture.detectChanges();
-        expect(el.querySelector('inspecto-link-analysis-query-panel')).not.toBeNull();
-        expect(el.querySelector('[aria-label="Resize the query panel (arrow keys or drag)"]')).not.toBeNull();
+        // the query panel lives in ⚙ Settings, mounted while the dialog is closed
+        expect(el.querySelector('inspecto-la-settings inspecto-link-analysis-query-panel')).not.toBeNull();
+        expect(el.querySelector('[aria-label="Resize the query panel (arrow keys or drag)"]')).toBeNull();
     });
 
     it('surfaces a failing source as an inline error, not a blank pane', async () => {
@@ -1318,7 +1317,7 @@ describe('LinkAnalysisComponent', () => {
         expect(c.workingSet().map((s) => s.label)).toEqual(['Nodes', 'Links']); // generic: no counts/attrs in GRAPH
         expect(c.profile().suggestedTools).toEqual([]);
 
-        c.profileControl.setValue('mobile-money');
+        c.boundProfile.set('mobile-money'); // as a saved view or a binding would (no picker, UIR-D9)
         expect(c.workingSet().map((s) => s.label)).toEqual(['Accounts', 'Transfers']);
         expect(c.profile().suggestedTools).toContain('scoring');
 
@@ -1328,6 +1327,8 @@ describe('LinkAnalysisComponent', () => {
 
         await c.loadView({ id: 'x', name: 'x', sourceId: 'entity-projection', query: c.lastRun()!.query });
         expect(c.profileId()).toBe('generic'); // a view without a profile reads the Space's profile: generic here
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('inspecto-option-picker[label="Domain profile"]')).toBeNull();
     });
     it('two-stage loop: a local predicate narrows the canvas for free; a push marks stranded nodes, never drops them', async () => {
         const FILTERED: G6GraphData = { nodes: GRAPH.nodes.slice(0, 3), edges: GRAPH.edges.slice(0, 2) }; // a–b–c only
@@ -2014,22 +2015,19 @@ describe('LinkAnalysisComponent', () => {
             const { el, tabs } = open();
             const positive = Array.from(el.querySelectorAll<HTMLElement>('[tabindex]')).filter((n) => n.tabIndex > 0);
             expect(positive).toEqual([]); // a positive tabindex reorders focus ahead of everything else
-            const query = el.querySelector('aside[aria-label="Query"]')!;
-            const toolbox = el.querySelector('aside[aria-label="Toolbox"]')!;
-            expect(query.compareDocumentPosition(toolbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            expect(el.querySelector('aside[aria-label="Query"]')).toBeNull(); // no left panel (§5.10)
+            expect(el.querySelector('aside[aria-label="Toolbox"]')).not.toBeNull();
             expect(tabs().filter((t) => t.tabIndex === 0)).toHaveLength(1);
         });
 
         it('stacks the three docks below md so 400% zoom / 320 px reflows (live-proven 2026-10-05: a row of two fixed-width docks left the canvas 0 px wide)', () => {
             const { el } = open();
-            const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+            const workspace = el.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
             expect(workspace.classList).toContain('max-md:flex-col');
-            for (const dock of ['Query', 'Toolbox']) {
-                expect(el.querySelector(`aside[aria-label="${dock}"]`)!.classList).toContain('max-md:!w-full'); // beats the inline px width
-            }
-            // the drag handles have nothing to drag once the docks stack
+            expect(el.querySelector('aside[aria-label="Toolbox"]')!.classList).toContain('max-md:!w-full'); // beats the inline px width
+            // the drag handle has nothing to drag once the docks stack
             const handles = Array.from(el.querySelectorAll('[aria-label^="Resize the"]'));
-            expect(handles).toHaveLength(2);
+            expect(handles).toHaveLength(1);
             for (const handle of handles) {
                 expect(handle.classList).toContain('max-md:hidden');
             }
@@ -2107,7 +2105,7 @@ describe('LinkAnalysisComponent', () => {
             const { el, rail } = await ready();
             expect(rail.getAttribute('aria-label')).toBe('Link Analysis tools');
             expect(rail.closest('header[data-testid="la-header"]')).toBeTruthy(); // the header IS the toolbar
-            const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+            const workspace = el.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
             expect(rail.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
             expect(rail.classList).toContain('flex-row');
         });
@@ -2171,14 +2169,14 @@ describe('LinkAnalysisComponent', () => {
             const { fixture, el, rail } = await ready();
             (el.querySelector('button[aria-label="Hide the side panels"]') as HTMLElement).click();
             fixture.detectChanges();
-            expect(el.querySelector('inspecto-link-analysis-query-panel')).toBeNull();
+            expect(fixture.componentInstance.toolboxDockOpen()).toBe(false);
             expect(el.querySelector('button[aria-label="Show the side panels"]')).not.toBeNull();
             expect(el.querySelector('nav[data-testid="la-tool-rail"]')).toBe(rail);
         });
 
         it('the workspace fills the remaining height instead of a fixed calc()', async () => {
             const { el } = await ready();
-            const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+            const workspace = el.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
             expect(workspace.classList).toContain('flex-auto');
             expect(workspace.style.height).toBe('');
         });
@@ -2465,7 +2463,6 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         const { fixture } = create();
         fixture.detectChanges();
         const c = fixture.componentInstance;
-        c.queryDockOpen.set(false);
         const panel = fixture.debugElement.query(By.directive(LinkAnalysisQueryPanelComponent))
             ?.componentInstance as LinkAnalysisQueryPanelComponent;
         const explore = vi
@@ -2473,7 +2470,8 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             .mockImplementation(() => undefined);
         fixture.detectChanges();
         card(fixture.nativeElement, 'starter-explore')!.click();
-        expect(c.queryDockOpen()).toBe(true);
+        expect(c.settingsOpen()).toBe(true);
+        expect(c.settingsSection()).toBe('graph-model');
         expect(explore).toHaveBeenCalledTimes(1);
         explore.mockRestore();
         expect(panel === undefined || panel instanceof LinkAnalysisQueryPanelComponent).toBe(true);
@@ -2533,11 +2531,11 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         expect(root.classList).toContain('h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)]');
         expect(root.classList).toContain('max-md:h-auto');
         expect(root.classList).not.toContain('h-full');
-        const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+        const workspace = el.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
         for (const c of ['min-h-[26.25rem]', 'flex-auto', 'overflow-hidden', 'max-md:min-h-[28rem]']) {
             expect(workspace.classList).toContain(c);
         }
-        for (const dock of ['Query', 'Toolbox']) {
+        for (const dock of ['Toolbox']) {
             const aside = el.querySelector(`aside[aria-label="${dock}"]`)!;
             expect(aside.classList).toContain('overflow-hidden');
             expect(aside.querySelector('.overflow-y-auto')).toBeTruthy(); // the dock body scrolls inside
@@ -2553,7 +2551,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         const { fixture } = create({ stubGraph: true });
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+        const workspace = el.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
         expect(workspace.classList).toContain('min-h-[26.25rem]'); // 26.25rem = 420px
         expect(workspace.classList).not.toContain('min-h-0');
         // the root floor (35rem) leaves room for the chrome above the row plus that 420px
@@ -2570,7 +2568,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         expect(status).toBeTruthy();
         expect(status.closest('header[data-testid="la-header"]')).toBeNull();
         expect(status.textContent).toContain('nodes');
-        expect(status.querySelector('button[aria-label="Change the query"]')).toBeTruthy();
+        expect(status.querySelector('button[aria-label="Change the graph model"]')).toBeTruthy();
         expect(el.querySelectorAll('[aria-label="Active query"]').length).toBe(1); // no second, separate panel
     });
 
@@ -2594,15 +2592,14 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             sessionStorage.clear();
         });
 
-        it('starts collapsed to its rail below 1300px and the Query dock stays open', () => {
+        it('starts collapsed to its rail below 1300px', () => {
             sessionStorage.clear();
             media(true);
             const { fixture } = create({ stubGraph: true });
             fixture.detectChanges();
             const c = fixture.componentInstance;
             expect(c.toolboxDockOpen()).toBe(false);
-            expect(c.queryDockOpen()).toBe(true);
-            expect(c.canvasMaximized()).toBe(false); // "Hide the side panels" is untouched
+            expect(c.canvasMaximized()).toBe(true); // only the toolbox dock remains, and it is collapsed
             expect(toolboxRail(fixture.nativeElement)).toBeTruthy();
         });
 
@@ -2649,13 +2646,11 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         });
     });
 
-    it('docks are narrower by default: Query 220px (min 200), Toolbox 340px', () => {
+    it('the Toolbox dock is 340px by default, and there is no Query dock', () => {
         const { fixture } = create({ stubGraph: true });
         fixture.detectChanges();
-        const q = fixture.debugElement.query(By.css('[inspectoSplit="link-analysis.query"]'));
+        expect(fixture.debugElement.query(By.css('[inspectoSplit="link-analysis.query"]'))).toBeNull();
         const t = fixture.debugElement.query(By.css('[inspectoSplit="link-analysis.toolbox"]'));
-        expect(q.nativeElement.getAttribute('aria-valuemin')).toBe('200');
-        expect(q.nativeElement.getAttribute('aria-valuenow')).toBe('220');
         expect(t.nativeElement.getAttribute('aria-valuenow')).toBe('340');
     });
 
@@ -2897,23 +2892,40 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         const bound = signal<'telecom' | null>(null);
         Object.defineProperty(c.investigation, 'boundProfileId', { value: bound });
         fixture.detectChanges();
-        expect(c.profileControl.value).toBe('generic');
+        expect(c.profileId()).toBe('generic');
         bound.set('telecom');
-        fixture.detectChanges();
-        expect(c.profileControl.value).toBe('telecom');
+        expect(c.profileId()).toBe('telecom');
     });
 
-    it('a canvas zone squeezed below the minimum collapses the Toolbox dock, then the Query dock', () => {
+    it('a canvas zone squeezed below the minimum collapses the Toolbox dock', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         c.toolboxDockOpen.set(true);
-        c.queryDockOpen.set(true);
         c.fitDocksToWidth(CANVAS_MIN_PX + 100);
-        expect([c.toolboxDockOpen(), c.queryDockOpen()]).toEqual([true, true]);
+        expect(c.toolboxDockOpen()).toBe(true);
         c.fitDocksToWidth(15);
-        expect([c.toolboxDockOpen(), c.queryDockOpen()]).toEqual([false, true]);
-        c.fitDocksToWidth(15);
-        expect([c.toolboxDockOpen(), c.queryDockOpen()]).toEqual([false, false]);
+        expect(c.toolboxDockOpen()).toBe(false);
+    });
+
+    it('⚙ Settings: the top-bar icon opens it, the status chips open Graph model, Refresh re-reads the last run', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el: HTMLElement = fixture.nativeElement;
+        expect(c.settingsOpen()).toBe(false); // a run closes it
+        c.settingsSection.set('entity-types');
+        (el.querySelector('[data-testid="la-settings-open"]') as HTMLButtonElement).click();
+        expect(c.settingsOpen()).toBe(true);
+        expect(c.settingsSection()).toBe('entity-types'); // remembers the last section
+        c.settingsOpen.set(false);
+        fixture.detectChanges();
+        (el.querySelector('[data-testid="la-status"] button[aria-label^="Change Dataset"]') as HTMLButtonElement).click();
+        expect(c.settingsSection()).toBe('graph-model');
+        const refresh = vi.spyOn(c, 'refreshFromServer').mockResolvedValue();
+        fixture.detectChanges();
+        (el.querySelector('[data-testid="la-status-refresh"]') as HTMLButtonElement).click();
+        expect(refresh).toHaveBeenCalledTimes(1);
     });
 });
 

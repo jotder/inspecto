@@ -26,7 +26,7 @@ import { NeighbourRow } from './neighbour-ranking';
 import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { QueuedSeed } from './la-starter';
-import { DegreePresets, DomainProfileId, domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
+import { DegreePresets, DomainProfileId, domainProfile, domainProfiles } from '@inspecto/link-analysis/graph/domain-profile';
 import {
     DegreeOutcome,
     degreeOutcome,
@@ -193,7 +193,11 @@ export class InvestigationSessionStore {
      * mapping binds its Dataset. The host switches its profile to this on open/reload; null = leave it as it is.
      */
     readonly boundProfileId = computed<DomainProfileId | null>(
-        () => this.activeRef()?.profileId ?? profileForDataset(this.header()?.dataset),
+        () =>
+            this.activeRef()?.profileId ??
+            // UIR-D9: an Investigation started from a template that named a pack reads under it
+            (domainProfiles().some((p) => p.id === this.header()?.pack) ? (this.header()!.pack as DomainProfileId) : null) ??
+            profileForDataset(this.header()?.dataset),
     );
     /** The "Expand anyway" steps in effect — their hub's contacts are kept out of the next degree's frontier. */
     readonly overrideSteps = computed(() => overrideSteps(this.log()?.entries ?? []));
