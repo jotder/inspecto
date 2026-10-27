@@ -58,7 +58,6 @@ import { stepReadSuffix } from './index-source';
 import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
-import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
 import {
     InvestigationSnapshotOpComponent,
     InvestigationThresholdOpComponent,
@@ -108,7 +107,6 @@ import { LaFoldComponent } from './la-fold.component';
         ChipComponent,
         InspectoOptionPickerComponent,
         LinkAnalysisDataStripComponent,
-        InvestigationExpandRungComponent,
         InvestigationWindowOpComponent,
         InvestigationThresholdOpComponent,
         InvestigationSnapshotOpComponent,
@@ -159,14 +157,11 @@ export class LinkAnalysisInvestigationComponent {
     readonly pending = input<PendingInvestigation | null>(null);
     /** The current profile's "Expand next degree" rung and the degree it stops at. */
     readonly degreePresets = input<DegreePresets>({});
-    /** The Space's four-eyes thresholds, for the expand form's "will need approval" note. */
-    readonly fourEyesLimits = computed(() => {
-        const l = this.laSettings.limits();
-        return { budgetAbove: l.fourEyesBudgetAbove ?? null, fanOutAbove: l.fourEyesFanOutAbove ?? null };
-    });
     readonly maxDegree = input(DEFAULT_MAX_DEGREE);
     /** The pending investigation was created (or abandoned) — the host drops it. */
     readonly pendingDone = output<void>();
+    /** "Expand…": the screen opens its Expand dialog (§5.4), which holds the read settings. */
+    readonly expandRequested = output<void>();
 
     constructor() {
         // Prefill the time column from the canvas / Dataset default; an analyst's own edit is never overwritten.
@@ -218,9 +213,6 @@ export class LinkAnalysisInvestigationComponent {
             if (this.purpose.invalid) this.pendingPurpose()?.focus();
             return;
         }
-        const form = this.rungForm();
-        const advanced = form ? form.rung() : null;
-        if (form && !advanced) return; // an Advanced field is out of bounds — the section opens on it
         const ok = await this.store.investigateNumber({
             projection: p.projection,
             purpose: this.purpose.value.trim(),
@@ -232,7 +224,6 @@ export class LinkAnalysisInvestigationComponent {
             maxDegree: p.maxDegree,
             degrees: 1,
             windowEnd: p.windowEnd,
-            advanced,
             profileId: p.profileId,
         });
         // Once created the Investigation is open — the pending form is done even when a later expand was refused.
@@ -250,12 +241,10 @@ export class LinkAnalysisInvestigationComponent {
             this.store.workingSet(),
             this.maxDegree(),
             this.store.degreeOutcomes(),
-            this.includeHubs(),
+            false,
             this.store.overrideSteps(),
         ),
     );
-    /** The analyst's "Include hubs" opt-in on the expand rung. */
-    readonly includeHubs = computed(() => this.rungForm()?.includeHubsOn() ?? false);
     /** The blocked reason worth its own line — a held degree already says it is waiting in the results list. */
     readonly blockedNote = computed(() => (this.store.awaitingApproval() ? null : this.degree().blocked));
 
@@ -307,11 +296,8 @@ export class LinkAnalysisInvestigationComponent {
     /** "Expand anyway" on one flagged entity (`expandHubs: [id]`), after the confirmation. */
     async expandAnyway(id: string): Promise<void> {
         if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
-        const form = this.rungForm();
-        const rung = form ? form.rung() : {};
-        if (!rung || !(await this.confirmOverride([id]))) return;
-        if (!(await this.store.expandHub(id, this.store.withPresets(this.degreePresets(), rung))))
-            form?.fail(this.store.error());
+        if (!(await this.confirmOverride([id]))) return;
+        await this.store.expandHub(id, this.store.withPresets(this.degreePresets(), {}));
     }
     /** 1 … maxDegree, for the indicator. */
     readonly degreeSteps = computed(() => Array.from({ length: this.maxDegree() }, (_, i) => i + 1));
@@ -319,12 +305,7 @@ export class LinkAnalysisInvestigationComponent {
 
     async expandNextDegree(): Promise<void> {
         if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
-        const held = this.includeHubs() ? this.degree().heldHubs : [];
-        const form = this.rungForm();
-        const advanced = form ? form.rung() : null;
-        if (form && !advanced) return; // an Advanced field is out of bounds — the section opens on it
-        if (held.length && !(await this.confirmOverride(held))) return;
-        await this.store.expandNextDegree(this.degreePresets(), this.maxDegree(), held.length > 0, advanced);
+        await this.store.expandNextDegree(this.degreePresets(), this.maxDegree());
     }
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 
@@ -497,33 +478,18 @@ export class LinkAnalysisInvestigationComponent {
             .then((ok) => ok && this.store.showWorkingSet.set(true));
     }
 
-    /** The expand form's Advanced rung fields (LA-SPA-OWED-SURFACES-1). */
-    private readonly rungForm = viewChild(InvestigationExpandRungComponent);
-
+    /**
+     * The quick one-hop expands (selected entity, whole Working Set) with the profile's presets. The read settings and
+     * the hub override live in the Expand dialog (LA-STUDIO-UI-REORG-1 §5.4).
+     */
     async expand(all = false): Promise<void> {
         if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
-        const form = this.rungForm();
-        const own = form ? form.rung() : {};
-        if (!own) return;
         // Every expand from the panel carries the profile's preset window and budget, like "Expand next degree".
-        const rung = this.store.withPresets(this.degreePresets(), own);
-        let scope: string[] = [];
-        if (rung.includeHubs) {
-            // Only an expand that actually reaches a flagged entity is an override worth confirming.
-            const flagged = new Set(this.hubs().map((e) => e.id));
-            scope = all ? [...flagged] : this.selectedInSet().filter((id) => flagged.has(id));
-            if (scope.length && !(await this.confirmOverride(scope))) return;
-            // No flagged entity in reach: nothing was confirmed, so the log must not record an override.
-            if (!scope.length) delete rung.includeHubs;
-        }
+        const rung = this.store.withPresets(this.degreePresets(), {});
         const ids = all ? undefined : this.selectedInSet();
-        const ok = await this.store.apply(ids ? { op: 'expand', ids, ...rung } : { op: 'expand', ...rung });
-        if (!ok) form?.fail(this.store.error());
-        else {
+        if (await this.store.apply(ids ? { op: 'expand', ids, ...rung } : { op: 'expand', ...rung })) {
             const step = this.store.lastStep();
             if (step?.status === 'pending' && step.pending?.id) this.store.markOneHop(step.pending.id, ids);
-            if (scope.length && step && step.status !== 'pending')
-                this.store.lastOverride.set({ step: step.step, ids: scope });
         }
     }
 
@@ -567,16 +533,11 @@ export class LinkAnalysisInvestigationComponent {
         if (!from || !list) return;
         const only = strongest ? list.rows.slice(0, STRONGEST_NEIGHBOURS).map((n) => n.id) : [...this.picked()];
         if (!only.length) return;
-        const form = this.rungForm();
-        const own = form ? form.rung() : {};
-        if (!own) return;
-        const rung = this.store.withPresets(this.degreePresets(), own);
+        const rung = this.store.withPresets(this.degreePresets(), {});
         // A flagged hub is only reached through the same confirmed override as "Expand anyway".
         const throughHub = this.selectedHubs().includes(from) && !this.isOverridden(from);
         if (throughHub && !(await this.confirmOverride([from]))) return;
-        const ok = await this.store.expandPicked(from, only, rung, throughHub);
-        if (!ok) form?.fail(this.store.error());
-        else this.picked.set(new Set());
+        if (await this.store.expandPicked(from, only, rung, throughHub)) this.picked.set(new Set());
     }
 
     /** The scope list's input: ids pasted one per line or comma-separated. */

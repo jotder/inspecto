@@ -211,24 +211,24 @@
             }
             <!-- outside @if (graph()): an Investigation canvas alone has something to seal too -->
             @if (graph() || workingSetCanvas()) {
-                <!-- LA-GROW-EXCLUDE-1: Grow (G) and Hidden by lists — plain words first, the term in the tooltip -->
+                <!-- LA-STUDIO-UI-REORG-1 §5.4: Expand… (G) and Hidden by lists — plain words first, the term in the tooltip -->
                 <button
                     mat-button
                     type="button"
-                    (click)="growExclude.growOpen() ? closeGrow() : openGrow()"
+                    (click)="growExclude.growOpen() ? closeExpand() : openExpand()"
                     [color]="growExclude.growOpen() ? 'primary' : undefined"
                     [attr.aria-expanded]="growExclude.growOpen()"
                     [matTooltip]="
                         growMode() === 'investigation'
-                            ? 'Grow: add the next ring of linked items — one recorded expand step (G)'
-                            : 'Grow: add the next ring of linked items to this graph — not recorded (G)'
+                            ? 'Expand: add linked items, one recorded expand step per degree (G)'
+                            : 'Expand: add linked items to this graph, degree by degree; not recorded (G)'
                     "
-                    aria-label="Grow"
+                    aria-label="Expand"
                     aria-keyshortcuts="G"
                     data-testid="la-grow-button"
                 >
                     <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
-                    Grow
+                    Expand…
                 </button>
                 <button
                     mat-button
@@ -973,20 +973,21 @@
                                 <span>Exclude{{ nodeMenuTargets().length > 1 ? ' ' + nodeMenuTargets().length : '' }}…</span>
                                 <span class="text-secondary ml-3 text-xs" aria-hidden="true">X</span>
                             </button>
-                            <button mat-menu-item type="button" (click)="growFromMenu()" data-testid="la-node-menu-grow">
+                            <button mat-menu-item type="button" (click)="expandFromMenu()" data-testid="la-node-menu-grow">
                                 <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
-                                <span>Grow from here…</span>
+                                <span>Expand…</span>
                                 <span class="text-secondary ml-3 text-xs" aria-hidden="true">G</span>
                             </button>
                         </mat-menu>
                         @if (growExclude.growOpen()) {
-                            <inspecto-link-analysis-grow
+                            <inspecto-link-analysis-expand
                                 class="absolute left-2 top-12 z-30"
                                 [ctx]="growContext()"
                                 [presets]="degreePresets()"
-                                (grow)="onGrow($event)"
-                                (closed)="closeGrow()"
-                            ></inspecto-link-analysis-grow>
+                                [limits]="fourEyesLimits()"
+                                (expand)="onExpand($event)"
+                                (closed)="closeExpand()"
+                            ></inspecto-link-analysis-expand>
                         }
                         @if (growExclude.exclusionsOpen()) {
                             <inspecto-link-analysis-exclusions
@@ -1373,6 +1374,7 @@
                                     [degreePresets]="degreePresets()"
                                     [maxDegree]="maxDegree()"
                                     (pendingDone)="pendingInvestigation.set(null)"
+                                    (expandRequested)="openExpand()"
                                 ></inspecto-link-analysis-investigation>
                             } @else {
                                 <div

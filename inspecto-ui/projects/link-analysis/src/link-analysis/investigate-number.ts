@@ -577,8 +577,8 @@ export function degreeState(
         blocked = `Degree ${current + 1} found no new entities — there is nothing further to expand.`;
     else if (!frontier.length && heldHubs.length)
         blocked =
-            `Every entity at degree ${current} is flagged high connectivity, so none is expanded. Tick ` +
-            '“Include hubs” or use “Expand anyway” on one of them.';
+            `Every entity at degree ${current} is flagged high connectivity, so none is expanded. Untick ` +
+            '“Hold supernodes” in Expand… or use “Expand anyway” on one of them.';
     // the server's cap on the ids one `expand` names (`investigation.max_frontier`)
     else if (frontier.length > laLimit('investigation.max_frontier'))
         blocked =

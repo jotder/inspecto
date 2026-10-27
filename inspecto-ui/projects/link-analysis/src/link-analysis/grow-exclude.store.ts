@@ -13,6 +13,7 @@ import {
     GrowContext,
     GrowRequest,
     PackTerms,
+    frontierCapStop,
     growExpandBody,
     growIds,
     heldReason,
@@ -181,26 +182,41 @@ export class GrowExcludeStore {
 
     // ── Investigation actions (each one recorded op) ──
 
-    /** Grow 1 or 2 steps: one `expand` per step; the second grows from what the first admitted. */
+    /**
+     * The Expand dialog's walk (LA-STUDIO-UI-REORG-1 §5.4): one recorded `expand` per degree, each from what the previous
+     * one admitted minus the held hubs (they go to the Held tray). It stops early at the frontier cap, when a degree admits
+     * nobody, and at a four-eyes hold — and says which. The steps it made are ONE change for Undo (newest first, OP-4).
+     */
     async growInvestigation(ctx: GrowContext, req: GrowRequest, presets: DegreePresets): Promise<boolean> {
         const inv = this.investigation;
+        const t = ctx.terms;
         let frontier = growIds(ctx, req);
-        let applied = 0;
         const made: number[] = [];
         let admitted = 0;
         let links = 0;
         let held = 0;
-        for (let s = 0; s < req.steps && frontier.length; s++) {
+        let stop = '';
+        for (let d = 1; d <= req.degrees && frontier.length; d++) {
             const body = growExpandBody(frontier, req, inv.withPresets(presets, {}));
-            if (!(await inv.apply(body))) break;
+            if (!(await inv.apply(body))) {
+                if (!made.length) return false;
+                stop = ` Degree ${d} was refused: ${inv.error()}`;
+                break;
+            }
             const step = inv.lastStep();
             if (step?.status === 'pending') {
-                this.lastChange.set({
-                    text: 'This Grow is waiting for a second person’s approval — nothing changes until it is approved.',
-                });
-                return true;
+                stop =
+                    d === 1
+                        ? ''
+                        : ` Degree ${d} needs a second person’s approval, so the walk stopped there.`;
+                if (d === 1) {
+                    this.lastChange.set({
+                        text: 'This Expand is waiting for a second person’s approval — nothing changes until it is approved.',
+                    });
+                    return true;
+                }
+                break;
             }
-            applied++;
             if (step) made.push(step.step);
             const added = step?.delta?.admitted ?? [];
             admitted += added.length;
@@ -208,15 +224,23 @@ export class GrowExcludeStore {
             const flagged = new Set(step?.read?.hubs?.map((h) => h.id) ?? []);
             held += flagged.size;
             frontier = added.filter((id) => !flagged.has(id));
+            if (d < req.degrees) {
+                const cap = frontierCapStop(frontier.length, ctx.frontierCap, d, t);
+                if (cap) {
+                    stop = ' ' + cap;
+                    break;
+                }
+                if (!frontier.length) stop = ` Degree ${d} found nothing new to grow from, so the walk stopped there.`;
+            }
         }
-        if (!applied) return false;
-        const t = ctx.terms;
+        if (!made.length) return false;
         const many = (n: number, one: string, more: string) => `${n.toLocaleString('en')} ${n === 1 ? one : more}`;
         this.lastChange.set({
             text:
-                `Grew ${applied === 1 ? 'one step' : `${applied} steps`}: ${many(admitted, t.node, t.nodes)} and ` +
+                `Expanded ${many(made.length, 'degree', 'degrees')}: ${many(admitted, t.node, t.nodes)} and ` +
                 `${many(links, t.link, t.links)} added` +
-                (held ? `; ${many(held, `busy ${t.node}`, `busy ${t.nodes}`)} held.` : '.'),
+                (held ? `; ${many(held, `busy ${t.node}`, `busy ${t.nodes}`)} held.` : '.') +
+                stop,
             ...this.undoOf(made),
         });
         return true;

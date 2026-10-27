@@ -26,10 +26,11 @@ const CTX: GrowContext = {
     linkKinds: [],
     hubThreshold: 500,
     terms: TERMS,
-    secondStepCap: 2000,
+    frontierCap: 2000,
+    maxDegree: 6,
     hasWindow: false,
 };
-const REQ: GrowRequest = { direction: 'either', steps: 1, linkKinds: null, window: 'inherit', hold: true, threshold: 500 };
+const REQ: GrowRequest = { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 };
 
 const step = (over: Partial<InvestigationStepResult> = {}): InvestigationStepResult =>
     ({
@@ -144,19 +145,52 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         expect(store.lists()).toBeNull();
     });
 
-    it('Grow 2 steps: two recorded expands, the second from what the first admitted minus the held; Undo reverts both', async () => {
+    it('Expand 3 degrees: one recorded expand per degree, each from what the previous admitted minus the held hubs; one Undo takes back all 3', async () => {
         const first = step({ read: { rowCount: 1, fingerprint: '', readAt: '', hubs: [{ id: 'c', degree: 900 }] } });
-        const { store, applied, session } = create({}, [first, step({ delta: { ...first.delta, admitted: ['d'], linksAdded: 1 } })]);
-        expect(await store.growInvestigation(CTX, { ...REQ, steps: 2 }, {})).toBe(true);
+        const second = step({ delta: { ...first.delta, admitted: ['d', 'e'], linksAdded: 1 } });
+        const third = step({ delta: { ...first.delta, admitted: ['f'], linksAdded: 2 } });
+        const { store, applied, session } = create({}, [first, second, third]);
+        expect(await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {})).toBe(true);
         expect(applied).toEqual([
             { op: 'expand', ids: ['a'], budget: 100, direction: 'either', hubThreshold: 500 },
             { op: 'expand', ids: ['b'], budget: 100, direction: 'either', hubThreshold: 500 },
+            { op: 'expand', ids: ['d', 'e'], budget: 100, direction: 'either', hubThreshold: 500 },
         ]);
-        expect(store.lastChange()?.text).toBe('Grew 2 steps: 3 numbers and 5 calls added; 1 busy number held.');
+        expect(store.lastChange()?.text).toBe('Expanded 3 degrees: 5 numbers and 7 calls added; 1 busy number held.');
         expect(await store.undoLast()).toBe(true);
-        expect(session.undo.mock.calls).toEqual([[2], [1]]); // each undo names its step, newest first
-        expect(store.lastChange()?.text).toBe('Undone (2 steps).');
+        expect(session.undo.mock.calls).toEqual([[3], [2], [1]]); // the group, newest first, each naming its step
+        expect(store.lastChange()?.text).toBe('Undone (3 steps).');
         expect(await store.undoLast()).toBe(false); // nothing of ours left: the screen's own Undo runs
+    });
+
+    it('stops at the frontier cap with a message naming the degree reached; the degrees made stay one Undo', async () => {
+        const wide = step({ delta: { ...step().delta, admitted: ['b', 'c', 'd'] } });
+        const { store, applied } = create({}, [wide]);
+        expect(await store.growInvestigation({ ...CTX, frontierCap: 2 }, { ...REQ, degrees: 4 }, {})).toBe(true);
+        expect(applied).toHaveLength(1);
+        expect(store.lastChange()?.text).toContain('Stopped after degree 1: the next degree would grow from 3 numbers, above the frontier cap of 2.');
+        expect(store.undoable()).toBe(true);
+    });
+
+    it('a four-eyes hold on degree 2 stops the walk there and says so; degree 1 stays undoable', async () => {
+        const held = step({ status: 'pending', pending: { id: 'p-1' } } as Partial<InvestigationStepResult>);
+        const { store, applied, session } = create({}, [step(), held]);
+        expect(await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {})).toBe(true);
+        expect(applied).toHaveLength(2);
+        expect(store.lastChange()?.text).toContain('Degree 2 needs a second person’s approval, so the walk stopped there.');
+        expect(await store.undoLast()).toBe(true);
+        expect(session.undo.mock.calls).toEqual([[1]]);
+    });
+
+    it('grouped Undo stops at the first 409 (a team member’s newer step) and says why', async () => {
+        const { store, session } = create({}, [step(), step({ delta: { ...step().delta, admitted: ['x'] } })]);
+        await store.growInvestigation(CTX, { ...REQ, degrees: 2 }, {});
+        const undo = store.lastChange()!.undo!;
+        // a peer's step lands after this browser's walk
+        await session.apply({ op: 'expand', ids: ['peer'] });
+        await undo();
+        expect(session.undo.mock.calls).toEqual([[2]]); // refused at the first: degree 1 is not undone under it
+        expect(store.lastChange()?.text).toContain('not the newest step');
     });
 
     it('Undo is offered only while the change is still the newest: a later step takes it away', async () => {
@@ -167,7 +201,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         expect(store.undoable()).toBe(false);
         expect(await store.undoLast()).toBe(false); // the screen's own Undo runs instead
         expect(session.undo).not.toHaveBeenCalled();
-        expect(store.lastChange()?.text).toContain('Grew one step');
+        expect(store.lastChange()?.text).toContain('Expanded 1 degree');
     });
 
     it('LA-GROW-EXCLUDE-UNDO-RACE-1: a step a team member recorded after this browser read the log is refused, never undone', async () => {

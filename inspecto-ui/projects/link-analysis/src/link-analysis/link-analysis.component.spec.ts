@@ -3407,7 +3407,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
         const { fixture, el } = await drawn({ expand });
         const grow = el.querySelector('[data-testid="la-grow-button"]') as HTMLButtonElement;
-        expect(grow.textContent).toContain('Grow');
+        expect(grow.textContent).toContain('Expand…');
         expect(grow.getAttribute('aria-keyshortcuts')).toBe('G');
         expect(el.querySelector('[data-testid="la-exclusions-button"]')?.getAttribute('aria-label')).toBe(
             'Hidden by lists: 0 hidden',
@@ -3415,14 +3415,14 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         press(el, { key: 'g' });
         await settle(fixture);
         await settle(fixture); // the panel's preview starts on its first render
-        const panel = el.querySelector('[data-testid="la-grow-panel"]') as HTMLElement;
+        const panel = el.querySelector('[data-testid="la-expand-dialog"]') as HTMLElement;
         expect(panel.closest('[data-testid="la-graph-region"]')).toBeTruthy(); // an overlay on the canvas
         expect(panel.textContent).toContain('(not recorded)');
-        expect(el.querySelector('[data-testid="la-grow-no-preview"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="la-expand-no-preview"]')).not.toBeNull();
         expect(grow.getAttribute('aria-expanded')).toBe('true');
         await expectNoA11yViolations(panel);
         // typing G in a field never opens it
-        fixture.componentInstance.closeGrow();
+        fixture.componentInstance.closeExpand();
         fixture.detectChanges();
         const input = document.createElement('input');
         el.appendChild(input);
@@ -3462,7 +3462,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             direction: 'either',
             hubThreshold: c.growThreshold(),
         });
-        expect(el.querySelector('[data-testid="la-grow-preview"]')?.textContent).toContain(
+        expect(el.querySelector('[data-testid="la-expand-preview"]')?.textContent).toContain(
             'This step adds about 4 nodes and 7 links.',
         );
 
@@ -3475,9 +3475,8 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         c.lastRun.update((r) => r && { ...r, query: { ...r.query, filter } });
         await c.growBasicAdapter.preview(['a'], {
             direction: 'out',
-            steps: 1,
+            degrees: 1,
             linkKinds: null,
-            window: 'inherit',
             hold: true,
             threshold: 500,
         });
@@ -3500,12 +3499,46 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         await settle(fixture);
         await settle(fixture);
         expect(c.growExclude.preview()).toMatchObject({ state: 'error', message: reason });
-        const shown = el.querySelector('[data-testid="la-grow-preview"]') as HTMLElement;
+        const shown = el.querySelector('[data-testid="la-expand-preview"]') as HTMLElement;
         expect(shown.textContent).toContain('The preview was refused');
         expect(shown.textContent).toContain(reason);
-        expect(el.querySelector('[data-testid="la-grow-no-preview"]')).toBeNull();
-        expect((el.querySelector('[data-testid="la-grow-go"]') as HTMLButtonElement).getAttribute('aria-disabled')).not.toBe('true');
-        await expectNoA11yViolations(el.querySelector('[data-testid="la-grow-panel"]') as HTMLElement);
+        expect(el.querySelector('[data-testid="la-expand-no-preview"]')).toBeNull();
+        expect((el.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).getAttribute('aria-disabled')).not.toBe('true');
+        await expectNoA11yViolations(el.querySelector('[data-testid="la-expand-dialog"]') as HTMLElement);
+    });
+
+    it('Basic Expand 3 degrees: each degree grows from what the previous added; one Ctrl+Z restores the graph', async () => {
+        const next: Record<string, string> = { c: 'x1', x1: 'x2', x2: 'x3', x3: 'x4' };
+        const expand = vi.fn(async (id: string) => ({
+            nodes: [{ id, data: { label: id, kind: 'entity' } }, { id: next[id], data: { label: next[id], kind: 'entity' } }],
+            edges: [{ id: id + '->' + next[id], source: id, target: next[id], data: { kind: 'link' } }],
+        }));
+        const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
+        c.onSelectionChange(['c']);
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        fixture.detectChanges();
+        expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1', 'x2']);
+        expect(c.graph()!.nodes.map((n) => n.id)).toEqual(expect.arrayContaining(['x1', 'x2', 'x3']));
+        expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain(
+            'Expanded 3 degrees: 3 nodes and 3 links added (not recorded).',
+        );
+        press(el, { key: 'z', ctrlKey: true });
+        expect(c.graph()!.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
+    });
+
+    it('Basic Expand stops at the frontier cap with a message naming the degree reached', async () => {
+        const expand = vi.fn(async (id: string) => {
+            const kids = Array.from({ length: 30 }, (_, i) => `${id}-${i}`);
+            return {
+                nodes: [{ id, data: { label: id, kind: 'entity' } }, ...kids.map((k) => ({ id: k, data: { label: k, kind: 'entity' } }))],
+                edges: kids.map((k) => ({ id: id + '->' + k, source: id, target: k, data: { kind: 'link' } })),
+            };
+        });
+        const { c } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
+        c.onSelectionChange(['c']);
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        expect(expand).toHaveBeenCalledTimes(1);
+        expect(c.growExclude.lastChange()?.text).toContain('Stopped after degree 1: the next degree would grow from 30 nodes, above the frontier cap of 25.');
     });
 
     it('Basic Grow: the explorer grows through neighbours in the chosen direction, says so, and Ctrl+Z undoes it', async () => {
@@ -3523,12 +3556,12 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
         expect(c.growContext()).toMatchObject({ mode: 'basic', frontier: ['c'], from: 'the 1 node you selected', blocked: null });
-        await c.onGrow({ direction: 'out', steps: 1, linkKinds: null, window: 'inherit', hold: true, threshold: 500 });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
         fixture.detectChanges();
         const ids = () => c.graph()!.nodes.map((n) => n.id).sort();
         expect(ids()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']); // the incoming g was not kept
         expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain(
-            'Grew one step: 1 node and 1 link added (not recorded).',
+            'Expanded one degree: 1 node and 1 link added (not recorded).',
         );
         press(el, { key: 'z', ctrlKey: true });
         fixture.detectChanges();
@@ -3543,7 +3576,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         }));
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['a']);
-        await c.onGrow({ direction: 'either', steps: 1, linkKinds: null, window: 'inherit', hold: true, threshold: 500 });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
         expect(c.growExclude.undoable()).toBe(true);
         await c.expandNode('b', 'B'); // another change to the graph
         fixture.detectChanges();
@@ -3570,7 +3603,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
 
     it('Basic Grow is blocked, with the reason, when the graph source has no neighbours read', async () => {
         const { c } = await drawn({ features: BASIC_EDITION_FEATURES });
-        expect(c.growContext().blocked).toBe('Grow needs a graph drawn from one Entity/Link mapping (its neighbours read).');
+        expect(c.growContext().blocked).toBe('Expand needs a graph drawn from one Entity/Link mapping (its neighbours read).');
     });
 
     it('X with nothing selected says to select first; with a selection it opens Exclude… and a Basic hide is undoable', async () => {
@@ -3651,7 +3684,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             c.investigation.lastStep.set({ step: ops.length, op: op.op, delta: { admitted: [], excluded: ['ws-hub'], linksAdded: 0 } } as never);
             return true;
         });
-        await c.onGrow({ direction: 'either', steps: 1, linkKinds: null, window: 'inherit', hold: true, threshold: 500 });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
         expect(ops).toEqual([{ op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500 }]);
         await c.removeHeld();
         expect(ops[1]).toEqual({ op: 'exclude', ids: ['ws-hub'], reason: 'busy node above 500 contacts' });
