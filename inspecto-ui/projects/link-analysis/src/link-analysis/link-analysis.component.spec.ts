@@ -1097,14 +1097,16 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
 
-        c.collapseBranch('b'); // a→b→c: hides c, keeps b
-        expect(c.displayed()?.nodes.map((n) => n.id)).toEqual(['a', 'b', 'd', 'e']);
+        c.collapseBranch('b'); // §5.5: b's pendant neighbours a and c fold (links read undirected); d links on to e
+        expect(c.displayed()?.nodes.map((n) => n.id)).toEqual(['b', 'd', 'e']);
+        expect(c.displayed()?.nodes.find((n) => n.id === 'b')?.data.folded).toBe(2);
         c.expandBranch('b');
         expect(c.displayed()?.nodes).toHaveLength(5);
 
+        // §5.5: a fold takes only PENDANT neighbours — a's neighbour b links on to c, so a folds nothing; d folds e
         c.collapseBranch('a');
         c.collapseBranch('d');
-        expect(c.displayed()?.nodes.map((n) => n.id)).toEqual(['a', 'd']);
+        expect(c.displayed()?.nodes.map((n) => n.id)).toEqual(['a', 'b', 'c', 'd']);
         c.expandAll();
         expect(c.displayed()?.nodes).toHaveLength(5);
     });
@@ -3202,10 +3204,10 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
     it('double click on a node with no branch to fold says so instead of doing nothing silently', async () => {
         const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
         const { c } = await drawn({ expand });
-        await c.onNodeDblClick('e'); // e has no outgoing link: expand first
-        expect(c.expandedNodeIds()).toContain('e');
-        await c.onNodeDblClick('e'); // expanded and nothing downstream
-        expect(c.collapsedRoots()).not.toContain('e');
+        await c.onNodeDblClick('c'); // not yet expanded: expand first
+        expect(c.expandedNodeIds()).toContain('c');
+        await c.onNodeDblClick('c'); // expanded, and its only neighbour b links on to a: no pendant to fold
+        expect(c.collapsedRoots()).not.toContain('c');
         expect(c.drawAnnouncement()).toContain('no branch to fold');
     });
 });

@@ -118,9 +118,7 @@ import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules
 import {
     analysisNodeCapValue,
     browserAlgorithmCapValue,
-    collapseBranches,
     louvainCommunities,
-    descendants,
     filterByKinds,
     filterByTime,
     isForest,
@@ -269,6 +267,8 @@ import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analys
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
+import { CleanupApply, LinkAnalysisCleanupComponent } from './link-analysis-cleanup.component';
+import { foldBranches, foldableOf } from '@inspecto/link-analysis/graph/graph-cleanup';
 import { autoStyle } from './auto-style';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
@@ -392,6 +392,7 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
         LinkAnalysisGlossaryComponent,
         LinkAnalysisDisplayRulesComponent,
         LinkAnalysisCapsComponent,
+        LinkAnalysisCleanupComponent,
         LinkAnalysisModulesComponent,
         ChipComponent,
         FormsModule,
@@ -1010,7 +1011,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** The collapsed graph BEFORE super-node folding — what the analyst actually has in hand. */
     private readonly collapsedGraph = computed<G6GraphData | null>(() => {
         const g = this.baseGraph();
-        return g ? collapseBranches(g, this.collapsedRoots()) : null;
+        return g ? foldBranches(g, this.collapsedRoots()) : null;
     });
     readonly displayed = computed<G6GraphData | null>(() => {
         const g = this.collapsedGraph();
@@ -1023,7 +1024,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** An open Investigation's Working Set, else the query graph — before the legend's link-kind hiding. */
     private readonly canvasSource = computed<G6GraphData | null>(() => {
         const inv = this.investigation.canvas();
-        if (inv) return inv;
+        // §5.5: Collapse is display state on the Working Set too — no op, the Working Set is unchanged.
+        if (inv) return foldBranches(inv, this.collapsedRoots());
         const g = this.displayed();
         const done = this.expandedNodeIds();
         // LA-UNEXPANDED-MARKER-1 (4): without an Investigation, the merged expand history is the browser's own record. Marked
@@ -2740,6 +2742,66 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.collapsedRoots.set([]);
     }
 
+    /** Collapse (`C`, right-click, §5.5): fold each node's pendant neighbours, or unfold it when already folded. */
+    toggleCollapse(ids: string[]): void {
+        const g = this.canvasData();
+        if (!g || !ids.length) return;
+        const folded = new Set(this.collapsedRoots());
+        const unfold = ids.filter((id) => folded.has(id));
+        const fold = ids.filter((id) => !folded.has(id) && foldableOf(g, id).length);
+        if (!unfold.length && !fold.length) {
+            this.drawAnnouncement.set('Nothing to collapse: no neighbour links only to the picked node.');
+            return;
+        }
+        this.recordHistory();
+        this.collapsedRoots.set([...this.collapsedRoots().filter((r) => !unfold.includes(r)), ...fold]);
+        this.drawAnnouncement.set(`Collapsed ${fold.length}, unfolded ${unfold.length}.`);
+    }
+
+    // ── Clean up (§5.6) ──
+
+    /** The clean-up seeds: the Investigation's seeds (hop 0) on the canvas, else the selection while exploring. */
+    readonly cleanupSeeds = computed<string[]>(() => {
+        const ws = this.investigation.canvas() ? this.investigation.workingSet() : null;
+        if (!ws) return this.selectedOnCanvas();
+        const seeds = new Set(ws.entities.filter((e) => e.hop === 0).map((e) => e.id));
+        return (this.canvasData()?.nodes ?? []).filter((n) => rawIdsOf(n).some((r) => seeds.has(r))).map((n) => n.id);
+    });
+    /** Trim spares held nodes (and the seeds, added by the tool). */
+    readonly cleanupSpare = computed<string[]>(() =>
+        (this.canvasData()?.nodes ?? []).filter((n) => n.data.held).map((n) => n.id),
+    );
+    readonly cleanupCap = (): number => analysisNodeCapValue();
+
+    async onCleanupApplied(a: CleanupApply): Promise<void> {
+        if (this.investigation.canvas() !== null) {
+            if (!this.writesToInvestigation()) return;
+            const ws = this.investigation.workingSet();
+            const nodes = (this.canvasData()?.nodes ?? []).filter((n) => a.ids.includes(n.id));
+            const ids = [...new Set(nodes.flatMap((n) => idsInWorkingSet(n, ws)))];
+            if (ids.length && !(await this.recordCleanup(ids, a.reason)))
+                this.toastr.error(this.investigation.error() || 'The clean-up was refused.');
+            return;
+        }
+        this.recordHistory();
+        this.hiddenNodeIds.update((h) => [...new Set([...h, ...a.ids])]);
+        this.toastr.info(`Hid ${a.ids.length} entities. Undo restores them.`);
+    }
+
+    /**
+     * ⚑UIR-A3 (not yet confirmed by the operator) — the ONE place an Investigation records a clean-up: a `hide` step over
+     * what the tool takes away, then an `annotate` step carrying the prefilled reason (a `hide` takes no reason). OP-1:
+     * the server's `keep` only protects from exclusion, it never hides the rest, so Keep only selected is a `hide` too.
+     */
+    private async recordCleanup(ids: string[], reason: string): Promise<boolean> {
+        if (!(await this.investigation.apply({ op: 'hide', ids }))) return false;
+        return this.investigation.apply({ op: 'annotate', ids, note: reason });
+    }
+
+    onCleanupHighlight(e: GraphEmphasis | null): void {
+        this.emphasis.set(e);
+    }
+
     // ── the canvas pointer model: box select, double click, keyboard view moves (operator 2026-10-15) ──
 
     /**
@@ -2911,12 +2973,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const node = this.canvasData()?.nodes.find((n) => n.id === id);
         if (!node) return;
         if (this.investigation.canvas() !== null) {
-            if (!node.data.unexpanded) {
-                this.drawAnnouncement.set(`${node.data.label} is already expanded.`);
+            if (node.data.unexpanded) {
+                if (this.writesToInvestigation()) await this.expandInInvestigation([node]);
                 return;
             }
-            if (this.writesToInvestigation()) await this.expandInInvestigation([node]);
-            return;
         }
         if (this.collapsedRoots().includes(id)) {
             this.expandBranch(id);
@@ -2924,13 +2984,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             return;
         }
         const canExpand = !!this.graphSources.byId(this.sourceId())?.expand;
-        if (!this.expandedNodeIds().includes(id) && canExpand) {
+        if (this.investigation.canvas() === null && !this.expandedNodeIds().includes(id) && canExpand) {
             await this.expandNode(id, node.data.label, node.data.spellings);
             this.drawAnnouncement.set(`Expanded ${node.data.label}.`);
             return;
         }
-        const g = this.baseGraph();
-        if (g && descendants(g, id).size) {
+        const g = this.canvasData();
+        if (g && foldableOf(g, id).length) {
             this.collapseBranch(id);
             this.drawAnnouncement.set(`Folded the branch of ${node.data.label}.`);
         } else this.drawAnnouncement.set(`${node.data.label} has no branch to fold.`);
@@ -2962,6 +3022,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         } else if (e.key.toLowerCase() === 'a' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
             e.preventDefault();
             this.selectAll();
+        } else if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            this.toggleCollapse(this.selectedNodeIds());
         } else if (e.key === 'Escape' && this.selectedNodeIds().length) {
             e.preventDefault();
             this.clearSelection();
@@ -3107,13 +3170,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                         // LA-08: a node mapping's `attributes` values (raw), one row per column.
                         ...Object.entries(node.data.attrs ?? {}).map(([k, v]) => ({ label: k, value: v ?? '—' })),
                     ],
-                    branch: onInvestigation
-                        ? undefined
-                        : collapsed
-                          ? 'expand'
-                          : descendants(g, id).size
-                            ? 'collapse'
-                            : undefined,
+                    branch: collapsed ? 'expand' : foldableOf(g, id).length ? 'collapse' : undefined,
                     objectRef,
                     pivotViews: objectRef ? ['map'] : undefined,
                     expandable: !onInvestigation && !!source?.expand,

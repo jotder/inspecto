@@ -347,6 +347,11 @@ On ship: update `okf/product/module/la-core/user-guide-end-user.md` (§4 The scr
 
 ## 8. Open points (for the builder, not the operator)
 - **OP-1:** Does the `keep` op already mean "keep only these"? If yes, *Keep only selected* records `keep`; otherwise `hide` over the complement (⚑UIR-A3).
+  **Answered (P1c, 2026-10-27): no.** `InvestigationEvaluator` (`case "keep"`) only adds the ids to `kept`, which
+  protects them from a later `exclude` / threshold; nothing else is hidden. So *Keep only selected* records `hide` over
+  the complement. A `hide` takes no reason, so the prefilled reason rides on a following `annotate` step over the same
+  ids. Both are recorded in one function, `recordCleanup` in `link-analysis.component.ts`, so ⚑UIR-A3 can switch there.
+  Grouped Undo of the pair waits on OP-4.
 - **OP-2:** Rename and thumbnails for saved views: is a new route needed (PUT with a new name, or a stored PNG)?
 - **OP-3:** Where does the embed viewer live? It is outside `projects/link-analysis`.
 - **OP-4:** Grouped Undo for an N-degree expand: the server's `{undoes: step}` takes one step; the client undoes the group newest-first and stops on a 409 (another person's newer step).
