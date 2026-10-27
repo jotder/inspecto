@@ -384,10 +384,18 @@ On ship: update `okf/product/module/la-core/user-guide-end-user.md` (§4 The scr
   own static SVG (one ring per hop, `layoutEmbedGraph`), with zoom, pan, Reset view, a find box over the Working Set
   table and Highlight. The §5.13 toolset rides on the G6 host (Canvas modes are its lasso and lens plugins, Layout is
   its layouts), so giving the embed page the same toolset means replacing its renderer with `GraphViewComponent` and
-  re-proving its no-login contract (one read, keyboard canvas, token scrub). Not done in P4: it is the open residual on
-  `LA-STUDIO-UI-REORG-1` in the BACKLOG. The Widget's toolset (§5.13) is built: `link-view-widget.component.ts`, its pure
-  half `link-view-widget-tools.ts` (filters, the six analyses, their blocks), and the Widget option `allowExport`
-  (Widget editor checkbox, passed through `viz-render` only when on).
+  re-proving its no-login contract (one read, keyboard canvas, token scrub). The Widget's toolset (§5.13) is built:
+  `link-view-widget.component.ts`, its pure half `link-view-widget-tools.ts` (filters, the six analyses, their blocks),
+  and the Widget option `allowExport` (Widget editor checkbox, passed through `viz-render` only when on).
+  **Done (2026-10-27):** the embed page now draws the Working Set (`embedGraphData`, ids exactly as returned) on
+  `GraphViewComponent` with the Widget's toolset from `link-view-widget-tools.ts` and `canvas-mode.ts`: zoom, Fit (was
+  Reset view), the four Canvas modes (lasso included), Hide selection, an entity-type filter and the six analyses. The
+  find box filters the table as before and, on Enter, selects and centres the matches; Highlight selects and centres one
+  entity; the Working Set table, scopes and edge/label limits are unchanged. The canvas group stays focusable: arrows pan,
+  +/- zoom, L/F/Esc switch modes. No Time filter (embed links carry no attributes). **No Export:** an embed grant has no
+  export flag (`POST …/embeds` takes only `ttl_hours`, `label`, `scope`, `masking_mode`), so the viewer offers none.
+  `embed-view.page.spec.ts` drives search, lasso, type filter, Hide and Shortest path over a recording `HttpBackend` and
+  pins exactly one request (`GET /public/investigations/{token}`) with no interceptor run.
 - **OP-4:** Grouped Undo for an N-degree expand: the server's `{undoes: step}` takes one step; the client undoes the group newest-first and stops on a 409 (another person's newer step).
   **Built (2026-10-27):** one mechanism, `GrowExcludeStore.undoOf(steps)`, serves the Expand dialog's N degrees AND a
   clean-up's `hide` + `annotate` pair. Undo (the change line's button or Ctrl+Z) is offered while those steps are still

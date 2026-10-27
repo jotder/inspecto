@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { apiUrl } from '@inspecto/core/api/api-base';
 import { isV1Envelope } from '@inspecto/core/api/v1';
+import type { G6GraphData } from '@inspecto/core/graph';
 
 /** The masked, read-only view `GET /public/investigations/{token}` answers (LA-EMBED-VIEW-1). */
 export interface EmbedView {
@@ -36,50 +37,18 @@ export class EmbedViewService {
     }
 }
 
-export interface EmbedGraphNode {
-    id: string;
-    type?: string;
-    hop: number;
-    x: number;
-    y: number;
-}
-
-export interface EmbedGraph {
-    /** Half the side of the square the drawing fits in, centred on (0, 0). */
-    extent: number;
-    nodes: EmbedGraphNode[];
-    edges: { source: string; target: string; kind: string; count: number; x1: number; y1: number; x2: number; y2: number }[];
-}
-
 /**
- * A static layout of the shared Working Set: one ring per hop from the seeds (hop 0 in the middle), each ring wide enough for its
- * entities. No physics and no services; hidden entities are skipped and an edge to a skipped one is dropped.
+ * The shared Working Set as the graph the shared G6 host draws (LA-STUDIO-UI-REORG-1 §5.13): one node per entity, labelled
+ * with its id exactly as returned (already masked), and one edge per link. Hidden entities are skipped and a link to a skipped
+ * one is dropped. No services and no call.
  */
-export function layoutEmbedGraph(ws: Pick<EmbedView['workingSet'], 'entities' | 'links'>): EmbedGraph {
-    const byHop = new Map<number, EmbedView['workingSet']['entities']>();
-    for (const e of ws.entities) {
-        if (e.hidden) continue;
-        const hop = Math.max(0, e.hop ?? 0);
-        byHop.set(hop, [...(byHop.get(hop) ?? []), e]);
-    }
-    const pos = new Map<string, EmbedGraphNode>();
-    let radius = 0;
-    let first = true;
-    for (const hop of [...byHop.keys()].sort((a, b) => a - b)) {
-        const ring = byHop.get(hop)!;
-        const needed = (ring.length * 18) / (2 * Math.PI);
-        const r = first && ring.length === 1 ? 0 : Math.max(radius + 90, needed);
-        ring.forEach((e, i) => {
-            const a = (2 * Math.PI * i) / ring.length - Math.PI / 2;
-            pos.set(e.entityId, { id: e.entityId, type: e.type, hop, x: r * Math.cos(a), y: r * Math.sin(a) });
-        });
-        radius = r;
-        first = false;
-    }
-    const edges = ws.links.flatMap((l) => {
-        const s = pos.get(l.source);
-        const t = pos.get(l.target);
-        return s && t ? [{ source: l.source, target: l.target, kind: l.kind, count: l.count ?? 1, x1: s.x, y1: s.y, x2: t.x, y2: t.y }] : [];
-    });
-    return { extent: Math.max(radius + 60, 200), nodes: [...pos.values()], edges };
+export function embedGraphData(ws: Pick<EmbedView['workingSet'], 'entities' | 'links'>): G6GraphData {
+    const nodes = ws.entities
+        .filter((e) => !e.hidden)
+        .map((e) => ({ id: e.entityId, data: { label: e.entityId, kind: e.type || 'entity' } }));
+    const ids = new Set(nodes.map((n) => n.id));
+    const edges = ws.links
+        .filter((l) => ids.has(l.source) && ids.has(l.target))
+        .map((l, i) => ({ id: 'l' + i, source: l.source, target: l.target, data: { kind: l.kind } }));
+    return { nodes, edges };
 }
