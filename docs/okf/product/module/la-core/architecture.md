@@ -1385,9 +1385,28 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
   - The second toolbar must not be `overflow-hidden`: it clipped the Clean up panel at every width, so every Clean up tool looked dead (`LA-REORG-CLEANUP-PANEL-CLIPPED-1`, fixed 2026-10-28). The toolbar fits at 1,300 px and folds into overflow menus below it, so nothing needs clipping.
   - The ⚙ Settings Esc handler ignores an Esc that another overlay already handled.
   - A case view sets `loading` before its awaits, and an unknown graph source clears it.
-- **Live drive 2026-10-28** (Demo Auth bundle, la-showcase, every Demo User):
-  - Embed minting: `fm.analyst` and `admin` get 200; `fm.manager` and `ra.analyst` get 403; `demo.manager`, a non-member, gets 404 on the embed list.
-  - The embed viewer and the `la_showcase_overview` dashboard Widget, opened as `ra.analyst`, run Centrality, Communities and Cycles with no server request.
+- **Live drive 2026-10-28** (a Demo Auth bundle on la-showcase; each Demo User was signed in through the sign-in picker in the browser):
+  - **Embed minting:** `fm.analyst` and `admin` get 200; `fm.manager` and `ra.analyst` get 403; `demo.manager`, a non-member, gets 404 on the embed list.
+  - **Read-only toolsets:** the embed viewer and the `la_showcase_overview` dashboard Widget (opened as `ra.analyst`) run Centrality, Communities and Cycles with no server request.
+  - **`fm.manager` and `admin`:** open `mule-hub-case` with the full File menu and ⚙ → Investigation settings. As `admin`, Share and embed offers *Create link*.
+  - **`demo.manager`:** gets "This Investigation is not available…", the same answer whether or not the Investigation exists.
+  - **`ra.analyst` (on Standard):** sees a "Read-only" banner. *Save this analysis* and *Delete* are off, with the reason. Expand…, Expand next degree and Expand the whole Working Set are off.
+  - **Esc in ⚙ Settings,** after a real Graph model edit: the first Esc asks to discard the change; the second Esc closes that confirm without reopening it, and Settings stays open.
+- **Edition and add-on locks, checked live the same day (UIR-D14).** The demo sign-in exists only on Advanced and Preview builds, and Basic has no sign-in at all. So Standard was run as the demo bundle without `inspecto-policy`, and Basic as a real `-Edition Basic` bundle.
+  - **Advanced with `-Daddons.laInvestigations=false`:**
+    - `/bootstrap` reports `laLevel: explorer`.
+    - ⚙ has no *This Investigation* group.
+    - File ▸ Close and Delete are off.
+    - *Run on the server* and *Start an Investigation* are locked (`aria-disabled`) with "Needs the Investigations add-on…".
+  - **Standard:**
+    - `/bootstrap` reports `edition: standard`, and the Investigations add-on is present.
+    - Geo, Entities and Alerts are in the navigation.
+  - **Basic:**
+    - `/bootstrap` reports `edition: basic` and `laLevel: explorer`, with `geoMap`, `entityPages` and `laWidgets` false and each with its reason.
+    - The graph draws without sign-in.
+    - Geo, Entities and Alerts are hidden from the navigation.
+    - *Run on the server* is locked with "Investigations are in Standard and above…".
+  - **Not driven:** the Widget picker hiding the Link analysis type on Basic. It is cosmetic by decision (D-LAE2).
 - **Deliberately not built:** Export in the embed viewer (it needs a grant flag first).
 
 ## 7. Host registration, Jobs and live detection
