@@ -31,7 +31,7 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { CANVAS_MIN_PX, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
+import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
 import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
 import { GRAPH_CACHE_TTL_MS, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { SpacesService } from '@inspecto/core/api';
@@ -1573,6 +1573,38 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         const bar = fixture.nativeElement.querySelector('[data-testid="la-canvas-toolbar"]') as HTMLElement;
         expect(bar.classList).not.toContain('overflow-hidden');
+    });
+
+    it('folds the canvas groups into "…" by the header row\'s own width, not the viewport (console side nav)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        const groups = ['la-group-selection', 'la-group-edits', 'la-group-held'].map(
+            (g) => el.querySelector(`[data-testid="${g}"]`) as HTMLElement,
+        );
+        const more = el.querySelector('[data-testid="la-canvas-tools-more"]') as HTMLElement;
+        const cleanupToggle = el.querySelector('[data-testid="cleanup-toggle"]') as HTMLElement;
+        const state = () => ({
+            groupsHidden: groups.map((g) => g.classList.contains('hidden')),
+            moreHidden: more.classList.contains('!hidden'),
+            cleanupHidden: cleanupToggle.classList.contains('!hidden'),
+        });
+        expect(state()).toEqual({ groupsHidden: [false, false, false], moreHidden: true, cleanupHidden: false }); // unmeasured = wide
+
+        c.fitCanvasToolsToWidth(1150); // the console at 1,440 px with its side nav open
+        fixture.detectChanges();
+        expect(state()).toEqual({ groupsHidden: [true, true, true], moreHidden: false, cleanupHidden: true });
+        expect(more.getAttribute('aria-label')).toBe('More canvas tools');
+
+        c.fitCanvasToolsToWidth(CANVAS_TOOLS_FOLD_PX);
+        fixture.detectChanges();
+        expect(state().moreHidden).toBe(true);
+        c.fitCanvasToolsToWidth(0); // an unmeasured read never flips the state
+        fixture.detectChanges();
+        expect(state().moreHidden).toBe(true);
     });
 
     it('below 1,300 px the overflow menu holds Collapse, the N collapsed chip and Clean up (LA-REORG-NARROW-CLEANUP-1)', async () => {

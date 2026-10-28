@@ -1373,6 +1373,7 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
   - The tool rail and the canvas toolbar share the header row (`la-toolbars`); File ▾ is the rail's first icon.
   - Every header button is icon-only, `aria-label` kept, name as `matTooltip`. A component style shrinks icon buttons to 30 px, with `!important` because the theme pins `.mat-mdc-icon-button` to 40 px with `!important`.
   - The rail does not shrink (it overlapped the canvas toolbar when it could), and the row container wraps as a last resort instead of clipping. The canvas toolbar is still not `overflow-hidden` (LA-REORG-CLEANUP-PANEL-CLIPPED-1). Measured: one row at 1,440 px with all 112 nodes selected and at 1,100 px folded.
+  - The canvas toolbar folds by the header row's OWN width (`CANVAS_TOOLS_FOLD_PX` = 1,350, a `ResizeObserver` on `la-header` → `canvasToolsFolded`), not a viewport media query, so the console's side nav counts. Measured: the console at 1,440 px with its nav open (header 1,129 px) is one row with 921 selected; at 1,100 px with the nav open (header ~790 px) the rail alone is 580 px and the canvas toolbar wraps under it, unclipped.
   - Expand uses `mat_outline:open_with` and Clean up `mat_outline:cleaning_services`, from the registered Material sets.
 - **Calls UIR-A1…A3, confirmed by the operator 2026-10-28** (proposed by the assistant, built as written):
   - A1: one ⚙ dialog that also holds *This Investigation*.

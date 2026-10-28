@@ -45,11 +45,11 @@ const TOOLS: { id: CleanupTool; label: string; icon: string }[] = [
     host: { class: 'relative inline-block' },
     imports: [MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule, ReactiveFormsModule, PenFieldComponent],
     template: `
-        <!-- below 1,300 px the Studio's second toolbar folds into one overflow menu, which offers these tools -->
+        <!-- when the Studio's second toolbar folds into one overflow menu, that menu offers these tools -->
         <button
             mat-icon-button
             type="button"
-            class="hidden min-[1300px]:inline-flex"
+            [class.!hidden]="folded()"
             [matMenuTriggerFor]="menu"
             matTooltip="Clean up"
             aria-label="Clean up the canvas"
@@ -118,6 +118,8 @@ const TOOLS: { id: CleanupTool; label: string; icon: string }[] = [
 export class LinkAnalysisCleanupComponent {
     /** What the canvas draws now. */
     readonly graph = input<G6GraphData | null>(null);
+    /** The host's toolbar is folded: hide the toggle (the host's overflow menu offers the tools); the panel still opens. */
+    readonly folded = input(false);
     /** Canvas ids of the seeds (an Investigation's seeds, or the selection while exploring). */
     readonly seeds = input<string[]>([]);
     readonly selection = input<string[]>([]);

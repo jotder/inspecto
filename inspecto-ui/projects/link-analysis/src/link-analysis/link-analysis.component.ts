@@ -340,6 +340,12 @@ const SERVER_PATH_LIMIT = 100;
 
 /** Below this viewport width the Toolbox dock starts collapsed to its rail (canvas width); wider windows start open. */
 export const TOOLBOX_NARROW_PX = 1300;
+/**
+ * Below this header-row width the canvas toolbar's Selection, Graph edits and Held groups fold into its "…" menu, so the
+ * tool rail and the canvas toolbar stay on one row. Measured on the Studio's own header, not the viewport, so it holds
+ * in the console beside its side nav as well as in la-app (one full row with a selection needs ~1,330 px).
+ */
+export const CANVAS_TOOLS_FOLD_PX = 1350;
 /** The narrowest canvas zone worth keeping beside the docks; below it a dock collapses to its rail. */
 export const CANVAS_MIN_PX = 320;
 const TOOLBOX_OPEN_KEY = 'inspecto.la.toolboxOpen';
@@ -568,6 +574,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild(LinkAnalysisCleanupComponent) private cleanup?: LinkAnalysisCleanupComponent;
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
+    @ViewChild('laHeader') private laHeader?: ElementRef<HTMLElement>;
+    /** True while the header row is narrower than {@link CANVAS_TOOLS_FOLD_PX}; unmeasured (jsdom) counts as wide. */
+    readonly canvasToolsFolded = signal(false);
     @ViewChild('graphRegion') private graphRegion?: ElementRef<HTMLElement>;
     @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
     @ViewChild('fileTrigger') private fileTrigger?: MatMenuTrigger;
@@ -653,6 +662,19 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         ro.observe(zone);
         this.destroyRef.onDestroy(() => ro.disconnect());
     });
+
+    private readonly watchHeaderWidth = afterNextRender(() => {
+        const header = this.laHeader?.nativeElement;
+        if (!header || typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver((entries) => this.fitCanvasToolsToWidth(entries[0]?.contentRect.width ?? 0));
+        ro.observe(header);
+        this.destroyRef.onDestroy(() => ro.disconnect());
+    });
+
+    /** Fold the canvas toolbar's groups into "…" when the header row cannot hold both toolbars (0 = unmeasured). */
+    fitCanvasToolsToWidth(headerWidth: number): void {
+        if (headerWidth > 0) this.canvasToolsFolded.set(headerWidth < CANVAS_TOOLS_FOLD_PX);
+    }
 
     /**
      * LA-ONBOARD-FIXES-1 (F-11): on a narrow canvas (a laptop's ~800 px) the open legend and Working set covered most
