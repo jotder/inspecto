@@ -93,7 +93,7 @@ export function runGuard(root, log = console.log) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     const failures = runGuard(path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
     if (failures) {
-        console.log(`\n${failures} theme-token violation(s): see src/@gamma/styles/themes.scss (filled-button-fills).`);
+        console.log(`\n${failures} theme-token violation(s): see src/@gamma/styles/themes.scss (the theme merge must keep _mat-system).`);
         process.exit(1);
     }
 }

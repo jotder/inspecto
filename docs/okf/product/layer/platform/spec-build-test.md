@@ -191,10 +191,10 @@ caught it. Two layers now pin the shape (both apply to `gamma` and `la-app`):
 `src/@gamma/styles/themes.scss` rebuilds each Material theme as `(color: …) + colours` to merge the gamma base colours, which
 drops the `_mat-system` map Material 22's M2 token functions read. Every system-derived colour token therefore comes out null:
 it is omitted, or emitted as an empty `color-mix(in srgb, , transparent)`. So `--mat-button-filled-container-color` was never declared and every `mat-flat-button color="primary|accent|warn"`
-rendered transparent in both apps and both schemes, with every build green. The fix restores only the filled-button fill and
-label from the palette (`filled-button-fills` in the same file). Keeping `_mat-system` would re-colour every Material component
-instead. Other system-derived tokens are still null and out of this fix's scope: the disabled fill, the state layers, an
-unthemed `mat-flat-button`, and the same gap in other components. **`inspecto-ui/tools/check-theme-tokens.mjs`** reads both apps' built
+rendered transparent in both apps and both schemes, with every build green. A first fix (`3fa647719`) restored only the
+filled-button fill; `UI-THEME-NULL-TOKENS-1` (2026-10-28) merges the base colours INTO the generated theme, so `_mat-system`
+survives and every component colour token (disabled fills, state layers, checkboxes, tabs, form fields) resolves from the
+palettes: the global stylesheet declares 747 distinct `--mat-*` tokens, up from 441. **`inspecto-ui/tools/check-theme-tokens.mjs`** reads both apps' built
 `dist/<app>/browser/styles-*.css` after the two builds (`npm run check:theme-tokens`, CI `ui.yml` after the bundle-shape guard).
 It fails when any `.theme-*` × light/dark × primary/accent/warn filled button lacks a concrete container or label colour.
 `tools/check-theme-tokens.test.mjs` falsifies it.
