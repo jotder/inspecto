@@ -337,7 +337,9 @@ Datasets in this Space*).
 
 * **Layout** — how nodes are arranged: *Layered, Grid, Force, Clustering force, Radial, Degree ordered, Circular,
   Information density, Fruchterman,* and tree layouts (*Mind map, Organization chart, …*) that are enabled only when
-  the data is tree-shaped.
+  the data is tree-shaped. *Layered* is off (the menu says why) when more than 60 nodes would share one rank — a
+  wide, shallow graph such as 300 claims under 20 providers, which Layered stacks into one column too tall for *Fit*
+  to show as anything but a sliver; use *Force*. A saved view that picked Layered opens in the default layout then.
 * **Overlays** — *Legend*, *Working set* (top-N counts), *Node labels*, *Link labels*, *Level of detail*, *Minimap*,
   *Grid*. On a canvas narrower than 1000 px (a laptop) the legend and Working set start as small pills you can
   expand; once you open or minimise one, this browser remembers your choice. *Level of detail* (drop labels on a

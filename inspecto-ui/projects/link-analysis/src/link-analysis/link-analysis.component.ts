@@ -286,7 +286,7 @@ import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
-import { laLayoutCaps, laLimit, layoutOverCapReason, overCapReason } from './la-limits';
+import { laLayoutCaps, laLimit, layeredShapeReason, layoutOverCapReason, overCapReason } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
@@ -1355,7 +1355,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const picked = this.pickedLayout();
         const g = this.canvasData();
         // Never an over-cap layout, even in the instant before {@link dropOverCapLayout} drops the pick.
-        if (!picked || layoutOverCapReason(picked, g?.nodes.length ?? 0))
+        if (!picked || this.layoutOffReason(picked))
             return defaultLayoutFor(g, this.investigation.canvas() !== null);
         return picked;
     });
@@ -1367,13 +1367,22 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private readonly dropOverCapLayout = effect(() => {
         const picked = this.pickedLayout();
         // Not while a run is in flight: the graph on screen is the OLD one, and a view opening over it would lose its pick.
-        if (picked && !this.loading() && layoutOverCapReason(picked, this.canvasData()?.nodes.length ?? 0))
+        if (picked && !this.loading() && this.layoutOffReason(picked))
             untracked(() => this.pickedLayout.set(null));
     });
     /** Why a layout button is disabled on this graph (tree shape or node cap); null when it can be picked. */
     layoutDisabledReason(l: { id: GraphLayoutId; tree?: boolean }): string | null {
         if (l.tree && !this.isTreeShaped()) return 'needs a tree-shaped graph';
-        return layoutOverCapReason(l.id, this.canvasData()?.nodes.length ?? 0);
+        return this.layoutOffReason(l.id);
+    }
+    /** Layered draws a wide, shallow graph as a sliver (LA-DAGRE-WIDE-SHALLOW-FIT-1): computed once per graph. */
+    private readonly layeredOffReason = computed(() => layeredShapeReason(this.canvasData()));
+    /** Why a layout cannot run on this graph (node cap, or Layered on a too-wide rank); null when it can. */
+    private layoutOffReason(id: GraphLayoutId): string | null {
+        return (
+            layoutOverCapReason(id, this.canvasData()?.nodes.length ?? 0) ??
+            (id === 'dagre' ? this.layeredOffReason() : null)
+        );
     }
     /** Some layout is off for its node cap: the menus add a "reduce first" hint. */
     readonly anyLayoutOverCap = computed(() => {
@@ -2858,7 +2867,7 @@ Its prior copies stay in its version history.`,
 
     /** Pick a graph layout (tree layouts are gated on {@link isTreeShaped} in the template). */
     setLayout(id: GraphLayoutId): void {
-        if (layoutOverCapReason(id, this.canvasData()?.nodes.length ?? 0)) return; // the menu item is disabled with the reason
+        if (this.layoutOffReason(id)) return; // the menu item is disabled with the reason
         this.recordHistory();
         this.pickedLayout.set(id);
     }
