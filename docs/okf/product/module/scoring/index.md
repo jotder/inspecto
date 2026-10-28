@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-SUSPICION-FACTORS-MASKED-1` | P3 | defect | the Suspicion score card's *Risk Score* column stays blank and *Factors* never open on a masked Space (found 2026-10-28, whitepaper demo… | — |
+| `LA-SUSPICION-FACTORS-INVESTIGATION-1` | P3 | defect | an Investigation canvas's *Factors* still 404 on a masked Space (residual of LA-SUSPICION-FACTORS-MASKED-1, 2026-10-28). | — |

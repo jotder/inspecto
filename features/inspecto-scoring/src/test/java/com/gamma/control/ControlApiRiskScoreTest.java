@@ -257,6 +257,42 @@ class ControlApiRiskScoreTest {
     }
 
     @Test
+    void aMaskedSpaceReadsTheScoreByTheLinkAnalysisAliasAndNeverAnswersTheRawKey(@TempDir Path root) throws Exception {
+        // LA-SUSPICION-FACTORS-MASKED-1: the Studio holds a masked node by its Space alias, not the raw key.
+        try (Ctx c = open(root)) {
+            ComponentStore store = new ComponentStore(c.config.resolve("registry"));
+            store.write("dataset", "topups", Map.of("physicalRef", "topups",
+                    "columns", List.of(Map.of("name", "msisdn"), Map.of("name", "topup_id"), Map.of("name", "status"))));
+            Map<String, Object> m = model(null);
+            store.write("risk-score", "subs", m);
+            RiskScoreModel model = RiskScoreModel.fromMap("subs", m);
+            var run = com.gamma.risk.RiskScoreEvaluator.evaluate(model, id -> com.gamma.query.DatasetRelation.relationSql(
+                    store.get("dataset", id).orElseThrow().content(), c.data, null),
+                    com.gamma.mask.EvidenceMasker.of(store, c.config, model.datasetIds()));
+            RiskScoreEvaluator.write(c.data, model, "v", "r1", Instant.now(), run.scored());
+            String alias = com.gamma.entitystore.MaskTokens.token(com.gamma.entitystore.MaskTokens.spaceKey(c.config), "m1");
+            String path = "/spaces/s1/risk-scores/subs/" + java.net.URLEncoder.encode(alias, java.nio.charset.StandardCharsets.UTF_8);
+
+            HttpResponse<String> r = send(c.port, "GET", path, null, "analyst");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode d = V1Body.of(r.body());
+            assertEquals(alias, d.get("entityKey").asText(), "the alias asked is echoed: " + r.body());
+            assertTrue(d.get("keyMasked").asBoolean());
+            assertTrue(d.get("factors").isArray() && d.get("factors").size() > 0, r.body());
+            assertFalse(r.body().contains("\"m1\""), "the raw key leaked: " + r.body());
+
+            JsonNode rev = V1Body.of(send(c.port, "GET", path, null, "revealer").body());
+            assertEquals("m1", rev.get("entityKey").asText(), "canRevealLinkEntities sees the raw key");
+
+            // An alias of no scored key is the same 404 as any unknown key, naming only the alias.
+            String other = com.gamma.entitystore.MaskTokens.token(com.gamma.entitystore.MaskTokens.spaceKey(c.config), "nobody");
+            HttpResponse<String> miss = send(c.port, "GET", "/spaces/s1/risk-scores/subs/"
+                    + java.net.URLEncoder.encode(other, java.nio.charset.StandardCharsets.UTF_8), null, "analyst");
+            assertEquals(404, miss.statusCode(), miss.body());
+        }
+    }
+
+    @Test
     void evidenceIsMaskedAtWriteTimeTheKeyOnReadAndNoRouteServesTheMaskKey(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // msisdn is classified MSISDN, topup_id PII; status is not classified.

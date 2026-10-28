@@ -461,7 +461,7 @@ Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA,
 | # | Result | Evidence (2026-10-28) |
 |---|---|---|
 | T1 | PASS | `check-module-deps` (13 extracted modules, enforcer rules match) and `check-engine-names-no-la` green |
-| T2 | **FAIL** | `mule_layering_ring` 113 nodes, 225 links, top suspicion 61; `mule_risk_score` triggered as `fm.manager`: "96 entit(ies) scored, 1 high", but the *Risk Score* column stays blank and *Factors* 404s: the Studio asks for the masked alias (defect `LA-SUSPICION-FACTORS-MASKED-1`). By raw key the API gives MULE-HUB-01 100 with three factors. Until fixed, show the factors from the API or say NOT shown live |
+| T2 | **FAIL** | `mule_layering_ring` 113 nodes, 225 links, top suspicion 61; `mule_risk_score` triggered as `fm.manager`: "96 entit(ies) scored, 1 high", but the *Risk Score* column stays blank and *Factors* 404s: the Studio asks for the masked alias (defect `LA-SUSPICION-FACTORS-MASKED-1`, fixed the same day for exploration views: the risk-score read now resolves the Space alias; an Investigation canvas is `LA-SUSPICION-FACTORS-INVESTIGATION-1`). By raw key the API gives MULE-HUB-01 100 with three factors. Until fixed, show the factors from the API or say NOT shown live |
 | T3 | PASS | 33 *Server* cards = 29 algorithms + 4 (row above); parity as the tour's 1.3 (re-driven today for Shortest path and Maximum flow) |
 | T4 | PASS | `la-demo-figures`: 2/2 (Pass-through 13, TILL-06 at 97 %); smoke Measures PASS |
 | T5 | PASS | Working Set all `masked:<hex>`; Reveal as `fm.analyst` inline "→ MULE-HUB-01 (reveal audited)"; smoke `ra.analyst` 403 on identities |

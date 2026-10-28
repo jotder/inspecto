@@ -735,6 +735,24 @@ describe('LinkAnalysisToolboxComponent - entity scores', () => {
         (el.querySelector('tbody button[aria-label^="Show the Risk Score of"]') as HTMLButtonElement).click();
         expect(['A1', 'B2']).toContain(c.riskEntity());
     });
+
+    it('on a masked Space Factors reads by the alias label, which the server resolves (LA-SUSPICION-FACTORS-MASKED-1)', () => {
+        const graph: G6GraphData = {
+            nodes: [
+                { id: 'entity:masked:aaaa', data: { label: 'masked:aaaa', kind: 'entity' } },
+                { id: 'entity:masked:bbbb', data: { label: 'masked:bbbb', kind: 'entity' } },
+            ],
+            edges: [{ id: 'e', source: 'entity:masked:aaaa', target: 'entity:masked:bbbb', data: { kind: 'link' } }],
+        };
+        const { c, fixture } = make(graph);
+        c.tab.set('scoring');
+        c.runScoring();
+        c.riskModel.set('m');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        (el.querySelector('tbody button[aria-label^="Show the Risk Score of"]') as HTMLButtonElement).click();
+        expect(['masked:aaaa', 'masked:bbbb']).toContain(c.riskEntity());
+    });
 });
 
 describe('LinkAnalysisToolboxComponent - DR-D5 results', () => {
