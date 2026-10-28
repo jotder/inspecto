@@ -46,4 +46,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-DAILY-INGEST-1` | P2 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | operator |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
 | `LA-INVESTIGATE-CARD-FOUR-EYES-HOLD-1` | P2 | defect | the *Investigate* start card ends at "waiting for approval" in every showcase Space. | — |
+| `LA-DAGRE-WIDE-SHALLOW-FIT-1` | P3 | defect | check whether the dagre layout draws a wide, shallow graph as an unreadable sliver. | — |
 | `LA-SUSPICION-FACTORS-DEMO-1` | P3 | defect | the Suspicion score's per-node "Factors" cannot be shown on any showcase Space (whitepaper claim T2). | — |

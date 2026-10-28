@@ -20,7 +20,8 @@ export const PASSWORD = 'Preview#LA2026';   // test value for the synthetic demo
 export const USERS = [
   ['demo.manager', 'Demo', 'Manager', ['manager', 'la-viewer']],
   ['ra.manager', 'Demo RA', 'Manager', ['manager']],
-  ['ra.analyst', 'Demo RA', 'Analyst', ['operations', 'la-viewer']],
+  // read-only reviewer, as in the demo roster (operator 2026-10-28): `operations` granted canManageIncidents
+  ['ra.analyst', 'Demo RA', 'Analyst', ['la-viewer']],
   ['fm.manager', 'Demo FM', 'Manager', ['manager', 'fraud-manager']],
   ['fm.analyst', 'Demo FM', 'Analyst', ['operations', 'fraud-analyst']],
   ['admin', 'Demo', 'Admin', ['super', 'admin', 'fraud-analyst', 'la-settings']],
@@ -64,6 +65,13 @@ for (const [u, given, family, groups] of USERS) {
   for (const g of groups) {
     const r = await call('PATCH', `/scim2/Groups/${gid[g]}`, { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [{ op: 'add', value: { members: [{ value: id, display: u }] } }] });
     if (r.status >= 300 && !/already/i.test(JSON.stringify(r.data))) console.log('  member', u, g, r.status, JSON.stringify(r.data).slice(0, 160));
+  }
+  // Reconcile: a user leaves any of this script's groups it is no longer listed in (re-runs stay idempotent).
+  for (const g of GROUPS.filter((x) => !groups.includes(x))) {
+    const members = (await call('GET', `/scim2/Groups/${gid[g]}`)).data.members ?? [];
+    if (!members.some((m) => m.value === id)) continue;
+    const r = await call('PATCH', `/scim2/Groups/${gid[g]}`, { schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [{ op: 'remove', path: `members[value eq "${id}"]` }] });
+    console.log('  removed', u, 'from', g, r.status);
   }
 }
 const claims = ['groups', 'username', 'givenname', 'lastname'].map((c) => ({ claim: { uri: `http://wso2.org/claims/${c}` }, mandatory: false }));

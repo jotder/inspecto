@@ -1368,7 +1368,7 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
   - The Domain profile picker is removed.
   - Dashboard Widgets and the embed viewer get a read-only toolset.
   - Editions lock single actions and hide whole areas.
-- **Calls UIR-A1…A3 are assistant-decided, built and in force; the operator may overturn them:**
+- **Calls UIR-A1…A3, confirmed by the operator 2026-10-28** (proposed by the assistant, built as written):
   - A1: one ⚙ dialog that also holds *This Investigation*.
   - A2: Value Measures appears only in the catalogue.
   - A3: in an Investigation, clean-up records `hide` + `annotate`, one grouped Undo (`GrowExcludeStore.cleanUp`, `recordCleanup`). `keep` is not "keep only".
@@ -1420,7 +1420,8 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
     - **`fm.manager`:** opens the Investigation; Share and embed shows no *Create link*.
     - **`admin`:** *Create link* is offered.
     - **`demo.manager`:** gets "This Investigation is not available…".
-    - **`ra.analyst`:** may change Investigations here. In WSO2 it is also in the built-in `operations` group, which grants `canManageIncidents`. The demo roster makes it a reviewer only, so this is the identity setup, not a defect.
+    - **`ra.analyst`:** may change Investigations here. In WSO2 it is also in the built-in `operations` group, which grants `canManageIncidents`. The demo roster makes it a reviewer only, so this is the identity setup, not a defect. Operator 2026-10-28: `ra.analyst` is a read-only reviewer on WSO2 too; `scripts/wso2-preview-la-setup.mjs` now lists it in `la-viewer` only and removes a user from any of its groups it is no longer listed in.
+- **Embed Export:** stays unbuilt (operator 2026-10-28, "not now").
 - **Full gate 2026-10-28 (`f0e8a50eb`):**
   - The reactor ran 56 of 56 modules: 11,280 tests, 0 failures, verdict guard PASS. The UI suite passed 6,779 tests.
   - Six stale tests that peer commits left on master were fixed first, none in the Link Analysis UI: two Job tests outran by the new retry, a new scoring route, a DELETE-only Investigation path, and two sign-in specs.
