@@ -188,6 +188,15 @@ describe('investigate-number - next degree', () => {
         expect(degreeState(ws(entity('s', 0), hub), 4, [], true).blocked).toBeNull();
     });
 
+    it('a degree held for its fan-out says what to do; one held for its budget does not offer a fan-out', () => {
+        const held = { degree: 1, admitted: 0, linksAdded: 0, truncated: false, fanOutCapped: 0, awaitingApproval: 'p1' };
+        const fan = degreeOutcomeMessage({ ...held, heldFor: ['maxFanOut unbounded (threshold 2000)'] });
+        expect(fan).toContain('a second person approves request p1');
+        expect(fan).toContain('four_eyes_fan_out_above');
+        expect(fan).toContain('Ask an approver, or use Expand… with a fan-out at or below the threshold.');
+        expect(degreeOutcomeMessage({ ...held, heldFor: ['budget 500 > 100'] })).not.toContain('Ask an approver');
+    });
+
     it('words the hub badge with the threshold when known, never a guessed contact count', () => {
         expect(hubBadgeText(500)).toBe('High connectivity — more than 500 contacts, not expanded');
         expect(hubBadgeText(null)).toBe('High connectivity — not expanded');

@@ -674,7 +674,11 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
     if (o.awaitingApproval)
         return `${head}: waiting for approval — this expand exceeds ${
             o.heldFor?.length ? `the Space's four-eyes limit (${thresholdWords(o.heldFor)})` : "the Space's four-eyes limit"
-        }, so it runs once a second person approves request ${o.awaitingApproval}.`;
+        }, so it runs once a second person approves request ${o.awaitingApproval}.${
+            o.heldFor?.some((r) => r.startsWith('maxFanOut'))
+                ? ' Ask an approver, or use Expand… with a fan-out at or below the threshold.'
+                : ''
+        }`;
     const parts = [
         `${o.override || o.oneHop ? head : `Degree ${o.degree}`}${o.range ? ` (${o.range})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
     ];

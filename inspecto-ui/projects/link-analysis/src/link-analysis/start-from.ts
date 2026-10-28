@@ -1,6 +1,6 @@
 import type { EntityProjection, G6GraphData } from '@inspecto/core/graph';
 import type { EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
-import { DEFAULT_MAX_DEGREE, DomainProfileId, domainProfiles } from '@inspecto/link-analysis/graph/domain-profile';
+import { DEFAULT_MAX_DEGREE, DomainProfileId, domainProfile, domainProfiles } from '@inspecto/link-analysis/graph/domain-profile';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
 import { PendingInvestigation, dayLabel } from './investigate-number';
 import type { LinkAnalysisView } from './link-analysis.service';
@@ -267,7 +267,8 @@ export function genericBinding(
         profileId,
         projection: { ...ds.mapping, entityType },
         ...(ds.timeCol ? { timeCol: ds.timeCol } : {}),
-        presets: {},
+        // the same presets as the toolbox expand (LA-INVESTIGATE-CARD-FOUR-EYES-HOLD-1), so the card and the panel agree
+        presets: domainProfile(profileId).investigate?.expand ?? {},
         maxDegree: DEFAULT_MAX_DEGREE,
     };
 }

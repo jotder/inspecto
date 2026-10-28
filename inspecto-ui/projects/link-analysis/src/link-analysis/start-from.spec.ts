@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
+import { domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
+import { installTelecomFixture } from '@inspecto/link-analysis/graph/domain-profile.testing';
+import { presetRung } from './investigate-number';
 import type { LinkAnalysisView } from './link-analysis.service';
 import {
     datasetForType,
@@ -148,6 +151,15 @@ describe('start-from (LA-ONBOARD-1 OB-9)', () => {
             presets: {},
             maxDegree: 6,
         });
+    });
+
+    it('genericBinding: the card sends the active profile presets, so its expand carries the same fan-out cap as the toolbox', () => {
+        installTelecomFixture();
+        const [d] = startCatalogue([ds('t', { primaryEntityType: 'msisdn', defaultLinkMapping: { from: 'a', to: 'b' } })], [], null)
+            .datasets;
+        const b = genericBinding('MULE-HUB-01', 'msisdn', d, 'telecom');
+        expect(b.presets).toEqual(domainProfile('telecom').investigate!.expand);
+        expect(presetRung(b.presets, false).maxFanOut).toBe(500);
     });
 
     it('parsePastedValues splits lines, commas, semicolons and tabs; trims; drops blanks and repeats', () => {

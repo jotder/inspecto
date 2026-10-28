@@ -1,0 +1,35 @@
+entityType: account
+highThreshold: 60
+factors[3]:
+  - id: cash_deposits_in
+    label: "Cash deposits paid into the account"
+    dataset: mule_transfers_dataset
+    key: PAYEE_ACCOUNT
+    measure: count
+    filters[1]:
+      - field: CHANNEL
+        op: "="
+        value: cash_deposit
+    weight: 0.5
+    cap: 40
+    evidence[3]: PAYER_ACCOUNT, AMOUNT, BOOKED_AT
+  - id: distinct_payers
+    label: "Distinct accounts paying into the account"
+    dataset: mule_transfers_dataset
+    key: PAYEE_ACCOUNT
+    measure: "countDistinct(PAYER_ACCOUNT)"
+    weight: 3
+    cap: 36
+    evidence[3]: PAYER_ACCOUNT, CHANNEL, AMOUNT
+  - id: wire_value_out
+    label: "Value wired out of the account (EUR)"
+    dataset: mule_transfers_dataset
+    key: PAYER_ACCOUNT
+    measure: "sum(AMOUNT)"
+    filters[1]:
+      - field: CHANNEL
+        op: "="
+        value: wire
+    weight: 0.0005
+    cap: 30
+    evidence[3]: PAYEE_ACCOUNT, AMOUNT, PAYEE_COUNTRY

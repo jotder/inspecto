@@ -423,8 +423,9 @@ timings are in the [whitepaper](brochure-inspecto-la-whitepaper.md) §6.4. What 
 * **Recalibrate thresholds on a full day.** The extract's thresholds fired hundreds to hundreds of thousands of times on
   the production day. A Dataset Measure Alert Rule is edge-triggered: resolving its Alert by hand does not re-arm it while the
   measure stays breached, and a restart rebuilds the open-breach state from OPEN Alerts.
-* **Four-eyes beat.** A plain degree expand is bounded by the UI default and does not wait for approval. Use *Expand
-  the whole Working Set* (or an expand with no ids) to show the held request.
+* **Four-eyes beat.** An expand carries the active Domain Profile's fan-out cap; where the profile sets none, the
+  expand is unbounded and is held above the Space's `four_eyes_fan_out_above` (the *Investigate* card too). The held
+  degree says so and what to do: ask an approver, or use *Expand…* with a fan-out at or below the threshold.
 * **Bundle.** `package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`. The la-app UI has no Incidents or Cases
   page, so show the Alert, Incident and Case through the full SPA or by API. The saved-view picker opens its submenu on
   hover; a plain click on the row only closes the menu.
@@ -436,7 +437,7 @@ For a CISO, lead architect and forensic reviewer: every PROVEN row of the [white
 | # | Claim (whitepaper §) | Scene | Evidence if challenged | Rehearsal 2026-10-24 |
 |---|---|---|---|---|
 | T1 | In-process, no external graph database (§4.1) | S1 | dependency fences: `tools/check-module-deps.mjs`, `tools/check-engine-names-no-la.mjs` | PASS: both guards green (13 extracted modules, enforcer rules match); the bundle's jars hold `inspecto-graph` and `inspecto-la-*`, no graph database |
-| T2 | Explainable Suspicion score, Propagated Risk (§3.2-§3.3) | S1 | `GraphSuspicionParityTest`, `ControlApiGraphRunTest` | **PARTIAL**: `mule_layering_ring` (113 nodes, 225 links after the drift file) ranks the hub first (the same token as its 0.979 pass-through row); the per-node **Factors** column appears only when a Risk Score model name is typed and no showcase Space ships one (row `LA-SUSPICION-FACTORS-DEMO-1`) |
+| T2 | Explainable Suspicion score, Propagated Risk (§3.2-§3.3) | S1 | `GraphSuspicionParityTest`, `ControlApiGraphRunTest` | **PARTIAL**: `mule_layering_ring` (113 nodes, 225 links after the drift file) ranks the hub first (the same token as its 0.979 pass-through row); for the per-node **Factors**, type `mule_account` in the *Risk Score model* field: the `la-showcase` template ships that Risk Score model and its `mule_risk_score` Job (every 10 minutes; trigger it once after the first ingest), and MULE-HUB-01 scores 100 from three factors (cash deposits in, distinct payers in, value wired out) |
 | T3 | 29 algorithms, TypeScript and Java parity (§3.1) | S5 | `GraphAlgorithmsParityTest` | PASS: "29 algorithms on the server"; client and server agree on every algorithm compared in the [tour](../../solution-pack/la-showcase/admin-guide-cross-vertical-tour.md) section 1.3 |
 | T4 | Value Measures, the 97 % cash-out (§3.4) | S6 | `ControlApiLaShowcaseFiguresTest` | PASS: Pass-through 2026-09-01 to 2026-09-04: 13 entities, the two relays at 0.98499982, the hub at 0.9793; the 97 % is `node tools/la-demo-figures.mjs` (2/2: Pass-through 13, TILL-06 at 97 %), not driven in the form (the picker resets while selecting) |
 | T5 | Keyed masking, audited Reveal (§5.2, §5.4) | S3, S4 | `ControlApiExplorationMaskingTest`, `ControlApiInvestigationOversightTest` | PASS: tokens only for `fm.analyst`; `admin` Reveal answers "→ MULE-HUB-01 (reveal audited)"; Settings > Link Analysis masking `all` saved and "In force: all", then restored to `typed`. Under `typed` every Account id is already masked on this Space, so typed versus all differ only for an unmasked Entity Type |

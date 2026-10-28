@@ -44,7 +44,7 @@ Two things the audience must not see go wrong:
 
 * **Click:** the seed leaves a pending request `p1` ("exceeds the Space's four-eyes limit: maxFanOut unbounded (threshold 100)"). Sign in as `mm.manager`, open the same Investigation, Investigation tab: *Approve*.
 * **Expect (read):** nothing in the log until the approval; then 300 to **494 entities / 1,436 links**, step "approved by mm.manager". The requester sees "Waiting for a different person with the approve-expansions capability"; `audit.lead` and `audit.committee` self or read-only approve answers 403 `canApproveLinkExpansions`.
-* **Trap (defect row `LA-INVESTIGATE-CARD-FOUR-EYES-HOLD-1`):** the *Investigate* start card seeds and then asks for an **unbounded** one-degree expand, so in every showcase Space it too is held ("Degree 1: waiting for approval… request p1"). Do not start a demo from that card; open a seeded Investigation, or set a fan-out first.
+* **Four-eyes on the *Investigate* card:** the card sends the active Domain Profile's expand presets; these Spaces set no profile fan-out, so its one-degree expand is held above `four_eyes_fan_out_above` and the degree line says to ask an approver or use *Expand…* with a smaller fan-out. For a solo demo, open a seeded Investigation or set a fan-out first.
 
 ### 1.3 Algorithms (A, B, C; 12 min). Client first, then **Run on server**, then compare
 
