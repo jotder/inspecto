@@ -2256,15 +2256,23 @@ View tab, the left Query panel and the Domain profile picker are gone). The end-
 [user-guide-end-user.md](user-guide-end-user.md) §4-§8; the design is archived as `docs/archived-documents/plans-archive/la-studio-ui-reorg-plan.md` and the as-built
 facts are in [architecture.md](architecture.md) §6.14.
 
-- **Top bar** (`header[data-testid="la-header"]`): **File ▾** first (`la-file`: New, Open…, Save view, Save view as…,
-  Save this analysis (Snapshot), Import / export views, Close, Delete), then search, filters, layout, time, the
-  Analysis / Investigation toggles, help, glossary, Display, undo/redo, fit, list, full screen, export, **Show the
-  rows** (opens the dock) and the side-panel toggle. **⚙ Settings** (`la-settings-open`) is in the page header.
-- **Second toolbar** (`la-canvas-toolbar`): groups `la-group-mode` (Canvas mode, `canvas-mode.ts`: `pan` | `lasso` |
+- **One header row (visual polish, operator 2026-10-28):** `header[data-testid="la-header"]` holds the title
+  **Link Analysis** (the page's one `<h1>`, `la-title`) with its explain **?**, then the tool rail and the canvas toolbar
+  **side by side** (`la-toolbars`), then the side-panel toggle and **⚙ Settings** (`la-settings-open`). Every control is a
+  30 px icon button with no text beside it: the name shows as a tooltip on hover and stays the `aria-label`. Counts
+  (Held, Hidden, N collapsed, Attach) are a small number on the icon; the selection chip shows the count only (the word
+  is screen-reader text and the tooltip). If a long selection row still cannot fit, the canvas toolbar drops under the
+  rail rather than being clipped. The status bar no longer carries the title or the page-info line.
+- **Tool rail** (`la-tool-rail`): **File ▾** is its first icon (`la-file`, tooltip *File*: New, Open…, Save view, Save
+  view as…, Save this analysis (Snapshot), Import / export views, Close, Delete), then search, filters, layout, time,
+  the Analysis / Investigation toggles, help, glossary, Display, undo/redo, fit, list, full screen (corner arrows),
+  export and **Show the rows** (opens the dock).
+- **Canvas toolbar** (`la-canvas-toolbar`): groups `la-group-mode` (Canvas mode, `canvas-mode.ts`: `pan` | `lasso` |
   `fisheye` | `linkFilter`; Pan = drag pans, Shift+drag lassos; Lasso is session-only, Fisheye and Link filter are
-  the saved view's plugin flags), `la-group-selection`, `la-group-edits` (Expand…, Collapse, Hide, Exclude and Merge
-  only with an Investigation canvas, Attach to Case), Clean up, `la-group-held` (Held (n), Hidden (n)); groups that do
-  not fit go to `la-canvas-tools-more`. The G6 `brush-select` box is removed; a saved view naming it opens as Pan.
+  the saved view's plugin flags), `la-group-selection`, `la-group-edits` (Expand… — outward arrows from a centre,
+  `mat_outline:open_with`, distinct from full screen —, Collapse, Hide, Exclude and Merge only with an Investigation
+  canvas, Attach to Case), Clean up (a broom, `mat_outline:cleaning_services`; heroicons has none), `la-group-held`
+  (Held, Hidden); below 1,300 px the groups after Canvas mode fold into `la-canvas-tools-more`. The G6 `brush-select` box is removed; a saved view naming it opens as Pan.
 - **Expand dialog** (replaces the Grow popover and the rung form): From, Direction, Degrees, *Hold supernodes above
   H links*, Advanced; preview line first; in an Investigation one `expand` step per degree under one undo group.
 - **Collapse** folds the pendant neighbours (links read undirected) into a `+n` badge; display state only, also in

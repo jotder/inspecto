@@ -3039,33 +3039,54 @@ describe('LinkAnalysisComponent - focus after the first draw (LA-A11Y-AUDIT-1 a,
     });
 });
 
-describe('LinkAnalysisComponent - header is the toolbar, the footer carries the title (operator 2026-10-15)', () => {
-    it('moves the title, the explain button and the page info to the footer status bar; the page keeps exactly one h1', async () => {
+describe('LinkAnalysisComponent - one header row: File, the title, both toolbars (operator 2026-10-28)', () => {
+    it('puts the title and its explain button, then the toolbox led by File, in the header; the footer keeps neither, nor the page info', async () => {
         const { fixture } = create();
         fixture.detectChanges(); // the landing state: no graph yet
         const el = fixture.nativeElement as HTMLElement;
         const header = el.querySelector('header[data-testid="la-header"]') as HTMLElement;
         const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
         expect(el.querySelector('inspecto-page-header')).toBeNull();
-        expect(header.querySelector('h1')).toBeNull(); // nothing of the title is left up there
-        expect(header.querySelector('nav[data-testid="la-tool-rail"]')).toBeTruthy(); // only the toolbar
-        expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
-        expect(status.querySelector('inspecto-ai-explain')).toBeTruthy();
-        expect(status.textContent).toContain('Draw a Dataset'); // the page info shows until a graph is drawn
+        const file = header.querySelector('[data-testid="la-file"]') as HTMLElement;
+        const rail = header.querySelector('nav[data-testid="la-tool-rail"]') as HTMLElement;
+        expect(rail.querySelector('button')).toBe(file); // File is the first icon of the toolbox
+        expect(file.getAttribute('aria-label')).toBe('File');
+        expect(file.textContent?.trim()).toBe(''); // icon only
+        const h1 = header.querySelector('h1') as HTMLElement;
+        expect(h1.textContent?.trim()).toBe('Link Analysis');
+        expect(header.querySelector('inspecto-ai-explain')).toBeTruthy();
+        expect(h1.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(status.querySelector('h1')).toBeNull();
+        expect(status.querySelector('inspecto-ai-explain')).toBeNull();
+        expect(el.textContent).not.toContain('Draw a Dataset'); // the page info line is gone
         expect(status.textContent).not.toMatch(/pipeline/i); // no Pipeline word on an Inspecto LA screen (LA-ONBOARD-1 acceptance)
         expect(el.querySelectorAll('h1')).toHaveLength(1);
-        expect(header.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('keeps the title in the footer after a query, next to the counts', async () => {
+    it('sets the canvas toolbar beside the tool rail in the header, with every toolbar button icon only and named', async () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
         fixture.detectChanges();
-        const status = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-status"]') as HTMLElement;
-        expect(status.querySelector('h1')?.textContent?.trim()).toBe('Link Analysis');
+        const el = fixture.nativeElement as HTMLElement;
+        const header = el.querySelector('header[data-testid="la-header"]') as HTMLElement;
+        const rail = header.querySelector('nav[data-testid="la-tool-rail"]') as HTMLElement;
+        const canvas = header.querySelector('nav[data-testid="la-canvas-toolbar"]') as HTMLElement;
+        expect(canvas).toBeTruthy();
+        expect(rail.parentElement).toBe(canvas.parentElement); // side by side, not stacked
+        expect(header.classList).toContain('flex-nowrap');
+        for (const b of Array.from(header.querySelectorAll<HTMLElement>('nav button, [data-testid="la-file"]'))) {
+            const label = b.getAttribute('aria-label') ?? '';
+            expect(label, b.outerHTML.slice(0, 120)).not.toBe('');
+        }
+        for (const id of ['la-grow-button', 'la-held-button', 'la-exclusions-button', 'cleanup-toggle']) {
+            const b = header.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+            expect(b.hasAttribute('mat-icon-button'), id).toBe(true);
+        }
+        const cleanup = header.querySelector('[data-testid="cleanup-toggle"] mat-icon') as HTMLElement;
+        expect(cleanup.getAttribute('svgIcon')).toBe('mat_outline:cleaning_services');
+        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
         expect(status.textContent).toContain('5 nodes');
-        expect(status.textContent).not.toContain('Draw a Dataset');
     });
 
     it('states the counts once in the footer, with Caps at its left edge and Installed modules at its right (operator 2026-10-16)', async () => {
@@ -3637,7 +3658,10 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
         const { fixture, el } = await drawn({ expand });
         const grow = el.querySelector('[data-testid="la-grow-button"]') as HTMLButtonElement;
-        expect(grow.textContent).toContain('Expand…');
+        // icon only, named by its aria-label; its glyph differs from Full screen's (operator 2026-10-28)
+        expect(grow.getAttribute('aria-label')).toBe('Expand');
+        expect(grow.textContent?.trim()).toBe('');
+        expect(grow.querySelector('mat-icon')?.getAttribute('svgIcon')).toBe('mat_outline:open_with');
         expect(grow.getAttribute('aria-keyshortcuts')).toBe('G');
         expect(el.querySelector('[data-testid="la-exclusions-button"]')?.getAttribute('aria-label')).toBe(
             'Hidden by lists: 0 hidden',

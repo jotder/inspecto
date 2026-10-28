@@ -1368,6 +1368,12 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
   - The Domain profile picker is removed.
   - Dashboard Widgets and the embed viewer get a read-only toolset.
   - Editions lock single actions and hide whole areas.
+- **Visual polish (operator, 2026-10-28):**
+  - The title and its explain button moved back up from the status bar; the page-info line is gone.
+  - The tool rail and the canvas toolbar share the header row (`la-toolbars`); File ▾ is the rail's first icon.
+  - Every header button is icon-only, `aria-label` kept, name as `matTooltip`. A component style shrinks icon buttons to 30 px, with `!important` because the theme pins `.mat-mdc-icon-button` to 40 px with `!important`.
+  - The rail does not shrink (it overlapped the canvas toolbar when it could), and the row container wraps as a last resort instead of clipping. The canvas toolbar is still not `overflow-hidden` (LA-REORG-CLEANUP-PANEL-CLIPPED-1). Measured: one row at 1,440 px with all 112 nodes selected and at 1,100 px folded.
+  - Expand uses `mat_outline:open_with` and Clean up `mat_outline:cleaning_services`, from the registered Material sets.
 - **Calls UIR-A1…A3, confirmed by the operator 2026-10-28** (proposed by the assistant, built as written):
   - A1: one ⚙ dialog that also holds *This Investigation*.
   - A2: Value Measures appears only in the catalogue.

@@ -473,6 +473,17 @@ function readDock(): { open: boolean; tab: DockTab } {
     // LA-GROW-EXCLUDE-1: Grow / Held / Exclude state sits beside it, for the same reason.
     providers: [InvestigationSessionStore, GrowExcludeStore],
     templateUrl: './link-analysis.component.html',
+    // operator 2026-10-28: both toolbars share one header row, so its icon buttons step down to 30 px (WCAG 2.2 target
+    // size is 24 px); ::ng-deep reaches the buttons of the hosted pieces (Clean up, explain, glossary) too, and
+    // !important outranks the theme's own `.mat-mdc-icon-button { width: 40px !important }`.
+    styles: `
+        .la-compact-bar ::ng-deep .mat-mdc-icon-button.mat-mdc-button-base {
+            --mat-icon-button-state-layer-size: 30px;
+            width: 30px !important;
+            height: 30px !important;
+            padding: 3px !important;
+        }
+    `,
     host: {
         '(document:fullscreenchange)': 'onFullscreenChange()',
         '(document:keydown)': 'onHistoryKeydown($event)',

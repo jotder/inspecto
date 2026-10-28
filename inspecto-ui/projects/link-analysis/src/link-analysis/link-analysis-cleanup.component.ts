@@ -3,6 +3,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import type { G6GraphData } from '@inspecto/core/graph/graph-types';
 import type { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
@@ -42,19 +43,20 @@ const TOOLS: { id: CleanupTool; label: string; icon: string }[] = [
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'relative inline-block' },
-    imports: [MatButtonModule, MatIconModule, MatMenuModule, ReactiveFormsModule, PenFieldComponent],
+    imports: [MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule, ReactiveFormsModule, PenFieldComponent],
     template: `
         <!-- below 1,300 px the Studio's second toolbar folds into one overflow menu, which offers these tools -->
         <button
-            mat-button
+            mat-icon-button
             type="button"
             class="hidden min-[1300px]:inline-flex"
             [matMenuTriggerFor]="menu"
+            matTooltip="Clean up"
             aria-label="Clean up the canvas"
             data-testid="cleanup-toggle"
         >
-            <mat-icon svgIcon="heroicons_outline:sparkles" aria-hidden="true"></mat-icon>
-            Clean up
+            <!-- a broom (operator 2026-10-28); heroicons has none, so the Material symbol -->
+            <mat-icon svgIcon="mat_outline:cleaning_services" aria-hidden="true"></mat-icon>
         </button>
         <mat-menu #menu="matMenu" aria-label="Clean-up tools">
             @for (t of tools; track t.id) {
