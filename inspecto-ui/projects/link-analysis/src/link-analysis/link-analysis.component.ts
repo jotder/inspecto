@@ -2348,10 +2348,12 @@ Its prior copies stay in its version history.`,
     /**
      * Remember what is open for this tab, so a Space switch (an app reload) can say what it closed. Keyed by
      * {@link pageSpace}, never the live Space: the switch changes that before the reload, and the record must still
-     * name the Space the item belongs to.
+     * name the Space the item belongs to. An Investigation counts only once its log has loaded: a deep link that this
+     * Space does not hold (404) never opened here, and must not be said to "stay in" it (LA-SPACE-SWITCH-TOAST-1).
      */
     private readonly rememberOpen = effect(() => {
-        const label = this.openWorkLabel();
+        const inv = this.investigation;
+        const label = inv.active() && !inv.log() ? '' : this.openWorkLabel();
         untracked(() => rememberOpenWork(label ? { space: this.pageSpace, actor: this.actor, label } : null));
     });
 

@@ -580,6 +580,8 @@ describe('LinkAnalysisComponent', () => {
         for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r));
         expect(fixture.componentInstance.investigation.error()).toContain('not available');
         expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
+        // LA-SPACE-SWITCH-TOAST-1: it never opened here, so a Space switch must not say it "stays in" this Space
+        expect(sessionStorage.getItem('inspecto.la.openWork')).toBeNull();
     });
 
     /** Run ngOnInit over a ?seed= link with the param-clearing navigation stubbed; returns the navigate spy. */

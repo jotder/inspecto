@@ -45,4 +45,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
 | `LA-SUSPICION-FACTORS-MASKED-1` | P3 | defect | the Suspicion score card's *Risk Score* column stays blank and *Factors* never open on a masked Space (found 2026-10-28, whitepaper demo… | — |
 | `LA-CONSOLE-EMBED-VIEWER-1` | P3 | defect | the console build mints embed links that it cannot show (found 2026-10-28, demo T11 / tour 1.5). | — |
-| `LA-SPACE-SWITCH-TOAST-1` | P3 | defect | a deep link opened in the wrong Space leaves a toast naming the wrong Space (found 2026-10-28). | — |
