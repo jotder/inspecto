@@ -37,12 +37,12 @@ Two things the audience must not see go wrong:
 ### 1.1 Ladder and masking (A, 3 min)
 
 * **Click:** Space *mobile money*; `?investigation=mm-structuring-case` (8 steps: seed, bounded expand, exclude with a reason, annotate, threshold, window, resolve, snapshot). Since the 2026-10-28 Studio reorganization there is no *Connect several numbers* field: seeds come from the query graph (Investigation tab > *Show the query graph (to pick seeds)*, pick the node, *Seed*), and the expand is the *Expand…* dialog (From *The whole Working Set*, a fan-out, the degree). Add `HUB-01`, `AG-39`, `AG-18`, `LOOP-1`, `DORMANT-1` that way (Working Set 8 to 11), then expand the whole Working Set three times at fan-out `30`.
-* **Expect (read):** 11, then 43, 96, **300 entities / 460 links** (2026-10-24 figures). Every id is `masked:<hex>` under `typed`. **Aliases are keyed per Investigation**, so the same wallet has a different alias in each Investigation and another in saved views and Entity pages (the Space key): never quote an alias across them. To find a named entity in a masked saved view, open *Entities* > the type > type the raw value: the profile's address is its Space alias. As `admin`, Oversight > *Masked entities* > *Reveal* answers inline "`→ MER-ELECTRIC (reveal audited)`" (it is an inline reveal, not a dialog).
-* **Trap:** the Investigation tab's first *Revoke* buttons are the **Members** ones. Revoking a member (even the owner's lead role) takes no confirmation (defect row `LA-REVOKE-DISCARD-NO-CONFIRM-1`). Target the embed *Revoke* by its own section.
+* **Expect (read):** 11, then 43, 96, **300 entities / 460 links** (2026-10-24 figures). Every id is `masked:<hex>` under `typed`. **Aliases are keyed per Investigation**, so the same wallet has a different alias in each Investigation and another in saved views and Entity pages (the Space key): never quote an alias across them. To find a named entity in a masked saved view, open *Entities* > the type > type the raw value: the profile's address is its Space alias. As `admin` (or any role with `canRevealLinkEntities`), the Investigation's *⋯* > *Settings…* > *Investigation settings* > *Oversight and approvals* > *Masked entities* > *Reveal* answers inline "`→ MER-ELECTRIC (reveal audited)`" (it is an inline reveal, not a dialog).
+* **Trap:** *Members* and *Share and embed* are separate folds of *Investigation settings*; target the embed *Revoke* in its own fold. Revoke and Discard ask to confirm since 2026-10-27 (`LA-REVOKE-DISCARD-NO-CONFIRM-1` closed).
 
 ### 1.2 Four-eyes (A, 3 min)
 
-* **Click:** the seed leaves a pending request `p1` ("exceeds the Space's four-eyes limit: maxFanOut unbounded (threshold 100)"). Sign in as `mm.manager`, open the same Investigation, Investigation tab: *Approve*.
+* **Click:** the seed leaves a pending request `p1` ("exceeds the Space's four-eyes limit: maxFanOut unbounded (threshold 100)"). Sign in as `mm.manager`, open the same Investigation, *⋯* > *Settings…* > *Investigation settings* > *Oversight and approvals*: *Approve*.
 * **Expect (read):** nothing in the log until the approval; then 300 to **494 entities / 1,436 links**, step "approved by mm.manager". The requester sees "Waiting for a different person with the approve-expansions capability"; `audit.lead` and `audit.committee` self or read-only approve answers 403 `canApproveLinkExpansions`.
 * **Four-eyes on the *Investigate* card:** the card sends the active Domain Profile's expand presets; these Spaces set no profile fan-out, so its one-degree expand is held above `four_eyes_fan_out_above` and the degree line says to ask an approver or use *Expand…* with a smaller fan-out. For a solo demo, open a seeded Investigation or set a fan-out first.
 
@@ -82,13 +82,13 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 ### 1.4 Dossier tamper by upload (B, 4 min)
 
-* **Click:** as `audit.lead`, `?investigation=vendor-v117-workpaper`, Investigation tab > Dossier > *Build dossier* > *Verify this manifest*. Then *Verify an uploaded manifest…* with a manifest file in which one hex digit of an artefact hash is changed (prepare it beforehand; the manifest is the `manifest` member of `GET …/dossier`).
+* **Click:** as `audit.lead`, `?investigation=vendor-v117-workpaper`, *⋯* > *Settings…* > *Investigation settings* > *Dossier* > *Build dossier* > *Verify this manifest*. Then *Verify an uploaded manifest…* with a manifest file in which one hex digit of an artefact hash is changed (prepare it beforehand; the manifest is the `manifest` member of `GET …/dossier`).
 * **Expect (read):** the untouched manifest: **Verified**, "Self-consistent yes", Changed / Missing / Added / Content changed all "none" (root `sha256:00e09f6c…` at step 7). The edited file: **NOT verified**, "The manifest's root does not match its own body", Self-consistent "no", **Changed: `log.jsonl#2`** (the part whose digit was flipped). On A the same flow showed "Verified" for the built Dossier (root `sha256:d5643c0c…`) and NOT verified for an edited upload.
 * **Drafts and Members on the same Investigation (extra):** the seeded Draft: *Conflicts* "No conflicts", *Rebase* "Rebased onto step 6", *Discard*; a fresh *Fork a Draft* > *Work on this Draft* > *Mark this position* > *Promote* made step 7 on the Investigation. Members: *Grant* `audit.outsider` as analyst, then *Revoke* (no confirmation).
 
 ### 1.5 Embed (C, 3 min)
 
-* **Click:** as `admin` (a lead member) in the claims Space: Investigation tab > *Share (embed link)* > *Create link* (the link is shown once; it looks like `…/embed/inv/<grant>.<secret>`). Open it in a second window with no session, then *Revoke* and confirm.
+* **Click:** as `admin` (a lead member) in the claims Space: *⋯* > *Settings…* > *Investigation settings* > *Share and embed* > *Create link*, then *Create link* in the dialog (label, contents, masking, lifetime; the link is shown once; the viewer page ships in the `-Ui la-app` build only: the console opens it as "Page not found", defect `LA-CONSOLE-EMBED-VIEWER-1`; it looks like `…/embed/inv/<grant>.<secret>`). Open it in a second window with no session, then *Revoke* and confirm.
 * **Expect (read):** the viewer opens at `/embed/inv/shared` (the token is scrubbed from the address bar): title "Staged-accident ring (masked:…)", "Read-only view at step N. Entity ids may be masked", graph and Working Set table, Notes. With the Space allow-list (`127.0.0.1:8099`), `python -m http.server 8099 --bind 127.0.0.1` in `spaces/_templates/la-claims/portal` and `partner-portal.html?host=http://127.0.0.1:<PORT>&link=<grant>.<secret>`, the partner page frames the same masked view (44 entities on 5 rings). After the revoke the public read is **404**. On A the same Share panel and viewer worked (494 entities, step 13); the panel's "0 views" does not refresh until reload (the server counted 1).
 
 ### 1.6 Alert to Case (A, 2 min)
@@ -137,4 +137,18 @@ No precision or detection rate (the plants are planted); the 40x dormant-wake fi
 
 Click-path notes from this pass (the text above is updated): no *Connect several numbers* (seed from the query graph); one Analysis catalogue with the *Browser* / *Server* toggle; server cards need an Investigation; aliases are per Investigation, so a named entity in a masked view is found through its Entity page. No product defect was found; the seed's Alert-stage warning is not re-driven here.
 
-**Still open:** a spoken run with an audience (needs a person); the portal on `:8140`; the B Alert beat.
+**2026-10-28, second pass (the full tour on fresh Spaces).** Same bundle, a fresh `:8099` root from all four seeders (every stage created; this time `seed-la-mm`'s Alert stage made `mm-structuring` CRITICAL, "Entities breaching structuring in mm-structuring-case is 1"). The browser pane was closed by the operator mid-run, so the beats below are evidenced by the smokes and the API rather than re-clicked; the Investigation-level click paths were confirmed on `mule-hub-case` (same Studio) and are written into 1.1, 1.2, 1.4 and 1.5.
+
+| Beat | Result | Evidence |
+|---|---|---|
+| A ladder and masking | PASS (API) | `la-mm-smoke` 10/10: masking typed (every Measure entity a token), bounded expand under the four-eyes threshold |
+| A four-eyes | PASS (API) | the unbounded expand is held (pending), not run; requester view "Waiting for a different person" seen in the browser on the showcase Space |
+| A algorithms | PASS (API) | shortest path 3 hops, maximum flow 25, one 4-node cycle around `LOOP-1`, structuring 1 entity / 25 legs / 25 payers, pass-through 0.98 |
+| B algorithms | PASS (API) | `la-audit-smoke` 30/30: Run on server accepts articulationPoints; the plants (V-117 / E-31, shell cluster of 10 pairs, 30 split invoices, E-07 70 %, 12 intercompany legs of 2 400 000, 13 duplicate pairs) |
+| C algorithms | PASS (API) | `la-claims-smoke --embed` 32/32: the nine server runs (Louvain, label propagation, cliques, triangles, PageRank, HITS, eigenvector, Katz, closeness) finish; three Geo Views project |
+| B Dossier tamper | PASS (API; UI on A) | untouched Dossier verifies, one altered hash fails; the same upload flow driven in the browser on `mule-hub-case` (NOT verified, Changed `log.jsonl#1`) |
+| C embed | PASS (API) / viewer FAIL in console | public GET with link-only headers, revoke, mangled and revoked both 404; console viewer missing (`LA-CONSOLE-EMBED-VIEWER-1`) |
+| A Alert to Case | PASS (API) | `mm-structuring` CRITICAL, aggregate only (no wallet in the message) |
+| B / C roles | PASS (API) | `audit.committee` and `partner.reviewer` read-only (403 on write), outsiders 404 |
+
+**Still open:** a spoken run with an audience (needs a person); the portal on `:8140`; the B Alert beat; a click-through of this second pass in the browser on an `-Ui la-app` bundle (with the embed viewer).

@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.scoring` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-SUSPICION-FACTORS-MASKED-1` | P3 | defect | the Suspicion score card's *Risk Score* column stays blank and *Factors* never open on a masked Space (found 2026-10-28, whitepaper demo… | — |
