@@ -287,6 +287,21 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
     });
 
+    it('Enter in the Note field records the annotation; an empty note writes nothing', async () => {
+        const { fixture, store, el, inv } = create();
+        await openInv(store);
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+        inv.appendInvestigationOp.mockClear?.();
+        penEdit(fixture, penByLabel(el, 'Note')!, '   ');
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+        penEdit(fixture, penByLabel(el, 'Note')!, 'seen at the depot');
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).toHaveBeenCalledTimes(1);
+        expect(JSON.stringify(inv.appendInvestigationOp.mock.calls[0])).toContain('seen at the depot');
+    });
+
     it('with the capability the read-only note is absent and Seed is enabled', async () => {
         const { fixture, store, el, button } = create();
         await openInv(store);

@@ -1009,6 +1009,7 @@
                                   ? 'At most 2000 characters.'
                                   : ''
                         "
+                        (keydown.enter)="note.value.trim() && annotate()"
                     />
                     <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !selectedInSet().length" (click)="annotate()">
                         Annotate
