@@ -81,7 +81,7 @@ const KINDS: { value: StartKind; label: string }[] = [
     template: `
         <h2 class="m-0 text-lg font-semibold" id="la-start-title">Start from...</h2>
         <p class="text-secondary mb-3 mt-1 text-sm">
-            Draw a few entities and who they are linked to, then Grow one step at a time - not the whole hairball. Pick
+            Draw a few entities and who they are linked to, then Expand one degree at a time - not the whole hairball. Pick
             a <inspecto-term term="dataset"></inspecto-term>, then an
             <inspecto-term term="entity-type"></inspecto-term> and one of its values.
         </p>
