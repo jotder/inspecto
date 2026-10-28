@@ -2272,7 +2272,7 @@ facts are in [architecture.md](architecture.md) §6.14.
   the saved view's plugin flags), `la-group-selection`, `la-group-edits` (Expand… — outward arrows from a centre,
   `mat_outline:open_with`, distinct from full screen —, Collapse, Hide, Exclude and Merge only with an Investigation
   canvas, Attach to Case), Clean up (a broom, `mat_outline:cleaning_services`; heroicons has none), `la-group-held`
-  (Held, Hidden); below 1,300 px the groups after Canvas mode fold into `la-canvas-tools-more`. The G6 `brush-select` box is removed; a saved view naming it opens as Pan.
+  (Held, Hidden); when the Studio header row is narrower than 1,350 px (its own width, so the console side nav counts) the groups after Canvas mode fold into `la-canvas-tools-more`. The G6 `brush-select` box is removed; a saved view naming it opens as Pan.
 - **Expand dialog** (replaces the Grow popover and the rung form): From, Direction, Degrees, *Hold supernodes above
   H links*, Advanced; preview line first; in an Investigation one `expand` step per degree under one undo group.
 - **Collapse** folds the pendant neighbours (links read undirected) into a `+n` badge; display state only, also in

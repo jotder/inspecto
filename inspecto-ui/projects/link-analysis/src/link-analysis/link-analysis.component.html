@@ -1,6 +1,6 @@
 <div #studioRoot class="flex h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)] min-h-0 min-w-0 flex-auto flex-col p-2 max-md:h-auto">
     <!-- ── header = File ▾, the title, then both toolbars side by side on ONE row of compact icon buttons (operator 2026-10-28) ── -->
-    <header class="la-compact-bar flex min-w-0 flex-nowrap items-center gap-1" data-testid="la-header">
+    <header #laHeader class="la-compact-bar flex min-w-0 flex-nowrap items-center gap-1" data-testid="la-header">
         <!-- LA-STUDIO-UI-REORG-1 §5.1 / §5.11: File ▾ - New, Open…, Save view, Save view as…, Snapshot, Import / export, Close, Delete -->
         <mat-menu #fileMenu="matMenu">
             <button mat-menu-item (click)="closeOpenWork()" [disabled]="investigation.busy()" data-testid="la-file-new">
@@ -732,7 +732,7 @@
             }
         </nav>
             @if (graph() || workingSetCanvas()) {
-                <!-- LA-STUDIO-UI-REORG-1 §5.2: the second toolbar - work on the canvas. Named groups; below 1,300 px the groups after
+                <!-- LA-STUDIO-UI-REORG-1 §5.2: the second toolbar - work on the canvas. Named groups; when the header row is narrower than CANVAS_TOOLS_FOLD_PX the groups after
                      Canvas mode fold into overflow menus, so it never wraps to a third row. -->
                 <nav
                     class="flex shrink-0 flex-nowrap items-center gap-0.5 rounded-lg border px-1"
@@ -761,7 +761,7 @@
                     <span class="mx-1 h-6 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
 
                     <!-- Selection -->
-                    <div class="hidden shrink-0 items-center min-[1300px]:flex" role="group" aria-label="Selection" data-testid="la-group-selection">
+                    <div class="flex shrink-0 items-center" [class.hidden]="canvasToolsFolded()" role="group" aria-label="Selection" data-testid="la-group-selection">
                         <button mat-icon-button type="button" (click)="selectAll()" matTooltip="Select all (Ctrl+A)" aria-label="Select all" aria-keyshortcuts="Control+A">
                             <mat-icon svgIcon="heroicons_outline:squares-plus" aria-hidden="true"></mat-icon>
                         </button>
@@ -795,10 +795,10 @@
                         <!-- the count alone keeps the shared header row short; the word is for screen readers and the tooltip -->
                         <inspecto-chip class="shrink-0" tone="primary" [matTooltip]="selectedOnCanvas().length + ' selected'" data-testid="la-selection-count">{{ selectedOnCanvas().length }}<span class="sr-only"> selected</span></inspecto-chip>
                     }
-                    <span class="mx-1 hidden h-6 w-px shrink-0 min-[1300px]:block" style="background: var(--gamma-border)" aria-hidden="true"></span>
+                    <span class="mx-1 block h-6 w-px shrink-0" [class.hidden]="canvasToolsFolded()" style="background: var(--gamma-border)" aria-hidden="true"></span>
 
                     <!-- Graph edits: act on the selection (the right-click menu acts on one node) -->
-                    <div class="hidden shrink-0 items-center min-[1300px]:flex" role="group" aria-label="Graph edits" data-testid="la-group-edits">
+                    <div class="flex shrink-0 items-center" [class.hidden]="canvasToolsFolded()" role="group" aria-label="Graph edits" data-testid="la-group-edits">
                         <button
                             mat-icon-button
                             type="button"
@@ -900,9 +900,10 @@
                         </button>
                     </div>
                     <!-- Clean up ▾ (lane P1c, §5.6) sits outside the group: its panel is anchored on this host, so the host stays
-                         visible below 1,300 px, where its own toggle hides and the overflow menu offers the tools -->
+                         visible when the toolbar folds, where its own toggle hides and the overflow menu offers the tools -->
                     <inspecto-link-analysis-cleanup
                         #cleanup
+                        [folded]="canvasToolsFolded()"
                         [graph]="canvasData()"
                         [seeds]="cleanupSeeds()"
                         [selection]="selectedOnCanvas()"
@@ -912,10 +913,10 @@
                         (highlight)="onCleanupHighlight($event)"
                         (findOnServer)="findPathsFromCleanup($event)"
                     />
-                    <span class="mx-1 hidden h-6 w-px shrink-0 min-[1300px]:block" style="background: var(--gamma-border)" aria-hidden="true"></span>
+                    <span class="mx-1 block h-6 w-px shrink-0" [class.hidden]="canvasToolsFolded()" style="background: var(--gamma-border)" aria-hidden="true"></span>
 
                     <!-- Held (n) / Hidden (n) -->
-                    <div class="hidden shrink-0 items-center min-[1300px]:flex" role="group" aria-label="Held and hidden" data-testid="la-group-held">
+                    <div class="flex shrink-0 items-center" [class.hidden]="canvasToolsFolded()" role="group" aria-label="Held and hidden" data-testid="la-group-held">
                         <button
                             mat-icon-button
                             type="button"
@@ -944,11 +945,11 @@
                         </button>
                     </div>
 
-                    <!-- below 1,300 px: one overflow menu holds the three groups above -->
+                    <!-- when the header row is too narrow (canvasToolsFolded): one overflow menu holds the three groups above -->
                     <button
                         mat-icon-button
                         type="button"
-                        class="shrink-0 min-[1300px]:!hidden"
+                        class="shrink-0" [class.!hidden]="!canvasToolsFolded()"
                         [matMenuTriggerFor]="canvasToolsMore"
                         matTooltip="Selection, graph edits, held and hidden"
                         aria-label="More canvas tools"
