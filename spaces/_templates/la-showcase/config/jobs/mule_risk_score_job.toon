@@ -1,0 +1,7 @@
+job:
+  name: mule_risk_score
+  type: risk.score
+  description: "Scores every mule-feed account with the mule_account Risk Score model (cash deposits in, distinct payers in, value wired out) so the Link Analysis Suspicion score table can open per-node Factors. Synthetic."
+  model: mule_account
+  cron: "*/10 * * * *"
+  enabled: true
