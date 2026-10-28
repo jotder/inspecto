@@ -55,7 +55,7 @@ export function embedErrorMessage(err: unknown, fallback: string): string {
     }
 }
 
-/** The shareable SPA link: the host origin + the la-app's `/embed/inv/<token>` viewer route (never the API URL). */
+/** The shareable SPA link: the host origin + the `/embed/inv/<token>` viewer route (console and la-app) (never the API URL). */
 export function embedAbsoluteLink(token: string): string {
     return location.origin + '/embed/inv/' + encodeURIComponent(token);
 }

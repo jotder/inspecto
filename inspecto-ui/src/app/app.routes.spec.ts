@@ -1,7 +1,17 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { LensService, SessionService } from 'app/inspecto/api';
-import { LENS_HOME, lensHomeRedirect } from './app.routes';
+import { LENS_HOME, appRoutes, lensHomeRedirect } from './app.routes';
+
+describe('public embed viewer route (LA-CONSOLE-EMBED-VIEWER-1)', () => {
+    it('serves the link the Share and embed dialog mints, outside the shell and with no guard', async () => {
+        const r = appRoutes.find((x) => x.path === 'embed/inv/:token');
+        expect(r).toBeTruthy();
+        expect(r!.canActivate).toBeUndefined();
+        expect(r!.component).toBeUndefined();
+        expect(await r!.loadComponent!()).toBeTruthy();
+    }, 60_000);
+});
 
 describe('lensHomeRedirect (W4 per-lens home page)', () => {
     beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
