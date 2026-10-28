@@ -19,9 +19,13 @@ import { LaSettingsSection, LinkAnalysisSettingsComponent } from './link-analysi
         <p laSection="graph-model" data-testid="gm">graph model</p>
         <p laSection="entity-types" data-testid="et">types</p>
         <p laSection="investigation" data-testid="inv">inv</p>
+        <form laSection="identities" data-testid="form" (submit)="$event.preventDefault(); submits = submits + 1">
+            <button type="submit" data-testid="submit">Assert</button>
+        </form>
     </inspecto-la-settings>`,
 })
 class Host {
+    submits = 0;
     readonly open = signal(true);
     readonly section = signal<LaSettingsSection>('graph-model');
     investigation = false;
@@ -107,6 +111,17 @@ describe('LinkAnalysisSettingsComponent (⚙ Settings, §5.10)', () => {
             await settle();
             expect(host.open()).toBe(false);
         }
+    });
+
+    it('a submit button inside a section still submits: the backdrop listener never cancels a click inside the panel', () => {
+        const { fixture, el, host } = make();
+        host.section.set('identities');
+        fixture.detectChanges();
+        const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+        (el.querySelector('[data-testid="submit"]') as HTMLButtonElement).dispatchEvent(click);
+        expect(click.defaultPrevented).toBe(false);
+        expect(host.submits).toBe(1);
+        expect(host.open()).toBe(true);
     });
 
     it('ignores an Esc another overlay handled, or one fired while a dialog is open (LA-SETTINGS-ESC-REOPENS-CONFIRM-1)', async () => {

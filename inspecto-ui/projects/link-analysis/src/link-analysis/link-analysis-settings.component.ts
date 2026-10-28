@@ -110,7 +110,7 @@ function storedSection(): LaSettingsSection | null {
             [class.flex]="open()"
             [class.hidden]="!open()"
             data-testid="la-settings"
-            (click)="$event.target === $event.currentTarget && requestClose()"
+            (click)="onBackdropClick($event)"
         >
             <div
                 #panel
@@ -222,6 +222,15 @@ export class LinkAnalysisSettingsComponent {
 
     show(id: LaSettingsSection): void {
         this.section.set(id);
+    }
+
+    /**
+     * Closes only on the backdrop itself. A method, never an inline `a && b()`: that expression is `false` for every click
+     * inside the panel, and Angular treats a listener returning `false` as `preventDefault()`, which made every submit
+     * button in a projected section do nothing (*Assert same entity* after *Merge with...*, 2026-10-28).
+     */
+    onBackdropClick(e: MouseEvent): void {
+        if (e.target === e.currentTarget) void this.requestClose();
     }
 
     async requestClose(): Promise<void> {
