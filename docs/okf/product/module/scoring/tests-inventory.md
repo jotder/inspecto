@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.scoring`](../../../../../product-map/module/scoring.toon).
 
-31 test class(es): 27 unit, 4 real-HTTP control-plane, 0 IT.
+32 test class(es): 28 unit, 4 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -39,6 +39,7 @@ mvn -o test -pl features/inspecto-scoring -Dtest=RiskScoreAlertTest,BypassAllowL
 | `TelcoBypassClusterGoldenTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/TelcoBypassClusterGoldenTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B3 golden test. The shipped {@code telco-bypass} Space Template, copied verbatim, |
 | `TelcoBypassGoldenTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/TelcoBypassGoldenTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B2 golden test. The shipped {@code telco-bypass} Space Template, copied verbatim, |
 | `AmlPackGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/AmlPackGoldenTest.java` | {@code PACK-AML-1}: the {@code aml} Space Template RUN end to end from a verbatim copy. The two Pipelines ingest the |
+| `LaShowcaseRiskScoreGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/LaShowcaseRiskScoreGoldenTest.java` | {@code LA-SUSPICION-FACTORS-DEMO-1}: the {@code la-showcase} template ships the {@code mule_account} Risk Score so |
 | `MobileMoneyRiskScoreGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/MobileMoneyRiskScoreGoldenTest.java` | {@code PACK-MOBILE-MONEY-1}: the {@code mobile-money} template's per-agent Risk Score ({@code mm_agent}), run over |
 | `PaymentFraudTemplateGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/PaymentFraudTemplateGoldenTest.java` | ASSURE-PACK-PAYMENT-FRAUD-1 slice 1: the {@code payment-fraud} Space Template, RUN end to end from a verbatim |
 | `RiskScoreCalculatedColumnWorkaroundTest` | `com.gamma.risk` | unit | `features/inspecto-scoring/src/test/java/com/gamma/risk/RiskScoreCalculatedColumnWorkaroundTest.java` | ASSURE-RISK-SCORE-RESIDUALS-1 item (7): a Risk Score factor has no arithmetic, so the supported workaround is to |
