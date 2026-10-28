@@ -1,0 +1,3 @@
+name: la_showcase_overview
+tiles[1]{widgetId,span}:
+  mule_layering_ring_graph,4

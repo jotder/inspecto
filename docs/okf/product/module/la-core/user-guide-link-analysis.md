@@ -2253,7 +2253,8 @@ The analyst's answer to *what data am I looking at*: a **Data strip** above the 
 
 This supersedes the layout parts of *Graph page UX* and *i2-gap work* below (the selection bar, the box select, the
 View tab, the left Query panel and the Domain profile picker are gone). The end-user walk-through is
-[user-guide-end-user.md](user-guide-end-user.md) §4-§8; the design is `docs/superpower/la-studio-ui-reorg-plan.md`.
+[user-guide-end-user.md](user-guide-end-user.md) §4-§8; the design is archived as `docs/archived-documents/plans-archive/la-studio-ui-reorg-plan.md` and the as-built
+facts are in [architecture.md](architecture.md) §6.14.
 
 - **Top bar** (`header[data-testid="la-header"]`): **File ▾** first (`la-file`: New, Open…, Save view, Save view as…,
   Save this analysis (Snapshot), Import / export views, Close, Delete), then search, filters, layout, time, the

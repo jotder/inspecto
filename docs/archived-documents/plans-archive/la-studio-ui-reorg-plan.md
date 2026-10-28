@@ -1,6 +1,6 @@
 # Link Analysis Studio — UI reorganization plan (`LA-STUDIO-UI-REORG-1`)
 
-Status: **P1-P4 ON MASTER (d7292300c, 2026-10-27); re-verification FAIL — its three new defects (`LA-REORG-OVERFLOW-CLEANUP-ENABLED-1`, `LA-SETTINGS-ESC-REOPENS-CONFIRM-1`, `LA-REORG-CASE-VIEW-LAYOUT-DROPPED-1`) fixed 2026-10-28, `LA-REVOKE-DISCARD-NO-CONFIRM-1` still open, P4 Widget not driven live, embed viewer toolset not built.** Direction decided by the operator in an interview (UIR-D1 … UIR-D16); assistant calls ⚑UIR-A1 … A3 await confirmation. Independent verification of P1-P3: **FAIL** (2026-10-27) — every §6 row has a home at ≥ 1,300 px, but the defects are open as `LA-SETTINGS-OVERLAY-NEVER-HIDES-1` (P1), the `LA-REORG-*` rows and the still-open `LA-REVOKE-DISCARD-NO-CONFIRM-1` in `docs/BACKLOG.md` §3.12. User guides and glossary updated for P1-P3.
+Status: **SHIPPED 2026-10-28 — archived.** P1-P4 on master; every verification defect closed; driven live 2026-10-28 on a Demo Auth bundle as every la-showcase Demo User (embed viewer and dashboard Widget included). As-built facts: `okf/product/module/la-core/architecture.md` §6.14. UIR-A1…A3 are built and in force as assistant calls the operator may overturn. The status lines below are history.
 Item: `module.la-core` (UI in `inspecto-ui/projects/link-analysis/`). Board row: `LA-STUDIO-UI-REORG-1` in
 `docs/BACKLOG.md` §3.12.
 

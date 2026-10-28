@@ -1566,6 +1566,15 @@ describe('LinkAnalysisComponent', () => {
         expect(item('remove').disabled).toBe(false);
     });
 
+    it('the canvas toolbar does not clip what opens below it, such as the Clean up panel (LA-REORG-CLEANUP-PANEL-CLIPPED-1)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const bar = fixture.nativeElement.querySelector('[data-testid="la-canvas-toolbar"]') as HTMLElement;
+        expect(bar.classList).not.toContain('overflow-hidden');
+    });
+
     it('below 1,300 px the overflow menu holds Collapse, the N collapsed chip and Clean up (LA-REORG-NARROW-CLEANUP-1)', async () => {
         const { fixture } = create();
         fixture.detectChanges();

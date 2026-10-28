@@ -1349,6 +1349,47 @@ Calls marked * were assistant-decided under operator delegation, pending confirm
 * **Still demand-gated\*:** the `pipeline.automation` feature and DT-17 trigger (item 3), no-code row filtering (6), a
   stored run summary for replace-vs-append (7), and the phase-8 notes; each is a feature, not a small change.
 
+### 6.14 Studio UI reorganization (LA-STUDIO-UI-REORG-1, as built 2026-10-28)
+
+The Studio was reorganized without removing a function; the layout is described in
+[user-guide-link-analysis.md](user-guide-link-analysis.md) *Studio layout*, and the plan with its "nothing removed" map
+is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-archive/la-studio-ui-reorg-plan.md) §6.
+
+- **Decisions (operator interview 2026-10-27, UIR-D1…D16):**
+  - The Investigation tab split into the Act panel, a bottom dock and one ⚙ Settings dialog. The dialog also holds the old left Query panel, Entity Types, display rules, Entity Lists, Identities and Add / Upload data.
+  - A second icon toolbar carries Canvas modes, selection and graph edits.
+  - Plain drag pans, Shift+drag lassos, and there is no box select.
+  - One Expand dialog for N degrees, with supernodes held.
+  - Collapse is visual only, everywhere.
+  - Four clean-up tools.
+  - Layouts and overlays over the cap are disabled with a reason.
+  - One Open dialog and a File menu.
+  - One algorithm catalogue with a Browser / Server toggle.
+  - The Domain profile picker is removed.
+  - Dashboard Widgets and the embed viewer get a read-only toolset.
+  - Editions lock single actions and hide whole areas.
+- **Calls UIR-A1…A3 are assistant-decided, built and in force; the operator may overturn them:**
+  - A1: one ⚙ dialog that also holds *This Investigation*.
+  - A2: Value Measures appears only in the catalogue.
+  - A3: in an Investigation, clean-up records `hide` + `annotate`, one grouped Undo (`GrowExcludeStore.cleanUp`, `recordCleanup`). `keep` is not "keep only".
+- **Industry pack (operator, 2026-10-28):**
+  - A saved view never applies its own pack; the Space's pack always applies.
+  - `loadView` clears `boundProfile`.
+  - The view's stored pack is only shown in the Open preview and saved back unchanged.
+  - Only an Investigation Template's `pack` binds one.
+- **Read-only toolset:** `link-view-widget-tools.ts` (`widgetGraph`, `runWidgetAnalysis`) is shared by the dashboard Widget (`LinkViewWidgetComponent`) and the embed page (`projects/la-app/src/app/embed-view.page.ts`, now drawn on `GraphViewComponent`). Everything runs in the browser and sends no request.
+  - Export appears only with the Widget's `allowExport`.
+  - The embed viewer never offers Export, because an embed grant has no export flag.
+  - Minting an embed needs `canShareInvestigation`, the lead role and `-Dla.embed.enabled=true` (503 otherwise).
+- **Gotchas found by the drives:**
+  - The second toolbar must not be `overflow-hidden`: it clipped the Clean up panel at every width, so every Clean up tool looked dead (`LA-REORG-CLEANUP-PANEL-CLIPPED-1`, fixed 2026-10-28). The toolbar fits at 1,300 px and folds into overflow menus below it, so nothing needs clipping.
+  - The ⚙ Settings Esc handler ignores an Esc that another overlay already handled.
+  - A case view sets `loading` before its awaits, and an unknown graph source clears it.
+- **Live drive 2026-10-28** (Demo Auth bundle, la-showcase, every Demo User):
+  - Embed minting: `fm.analyst` and `admin` get 200; `fm.manager` and `ra.analyst` get 403; `demo.manager`, a non-member, gets 404 on the embed list.
+  - The embed viewer and the `la_showcase_overview` dashboard Widget, opened as `ra.analyst`, run Centrality, Communities and Cycles with no server request.
+- **Deliberately not built:** Export in the embed viewer (it needs a grant flag first).
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (27); geo-link → `RouteModule` (4), `InvestigationMeasureProbe`,
