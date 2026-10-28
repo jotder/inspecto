@@ -950,7 +950,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - It runs in-process over Parquet, with no separate graph database or cluster, and the standard build provably cannot call hosted AI (`EgressGuardTest`). This is a strong sovereignty and air-gap story against Palantir/Quantexa-class SaaS or cluster deployments (general market).
   - The disclosure discipline is unusually honest: a claims register marking each claim PROVEN, MEASURED or NOT YET makes RFP answers defensible line by line.
 - **Gaps vs market / RFP risk:**
-  - Entity resolution is analyst-asserted or imported identity pairs plus merged traversal (`user-guide-link-analysis.md` §8.2–8.3). There is no probabilistic or ML entity resolution at scale, which is Quantexa's core (general market). **No row.**
+  - Entity resolution is analyst-asserted or imported identity pairs plus merged traversal (`user-guide.md` §11.7 and Part II *Identity resolution routes*). There is no probabilistic or ML entity resolution at scale, which is Quantexa's core (general market). **No row.**
   - It runs on a single host: measured to 10^8 edges, with 5×10^8 and 10^9 unmeasured (`LA-INDEX-SCALE-MEASURE-1`, P3). The two-host HA drill has not run (`ASSURE-OPERABILITY-1`, P2, platform). Embed links are not supported on the Postgres store.
   - Retention purge and legal hold were declined (D-U8; BACKLOG §6 standing refusal). Regulated buyers who need retention schedules or right-to-erasure will flag this.
   - Daily-feed completeness is open under `LA-DAILY-INGEST-1` (P2): no native Hive/Kerberos and no SCD2 as-of join. The whitepaper's "All read surfaces masked — NOT YET" row is partly stale: `OBJECT-READ-MASKING-RESIDUALS-1` closed 2026-10-18, and `BI-QUERY-MASKING-1` closed 2026-10-23, but free SQL can still test a key (P1 `BI-MASKING-FREE-SQL-ORACLES-1`).
@@ -1524,7 +1524,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Entity resolution is assertion-based. Fuzzy merge suggestions were retired (`LA-I2-GAPS-RESIDUALS-1`, D-M1). Quantexa's core value is probabilistic entity resolution at billions of records (general market). This is the largest functional gap: no row beyond the §6 retirement.
   - Scale and topology: 10^9 is not measured, and multi-pod is not complete. The Helm chart is `replicas: 1` (`SCALEOUT-HELM-NPOD-1` P2, `LA-INVESTIGATION-STORE-DESIGN-1` P3). The stakeholder Q&A says NOT YET for multi-pod and for a two-host drill.
   - Retention / legal hold of Investigation evidence is declined (`D-U8`), yet `docs/EDITIONS.md` and the Advanced brochure list "retention, legal hold, residency" as Advanced roadmap. That is a contradiction, and legal hold and residency have no row.
-  - Analyst ergonomics vs i2: no timeline / time-bar view (the G6 `timebar` was declined; only a timeline filter exists, `user-guide-manual.md` line 205), no i2 ANX import/export, no unstructured/document ingestion: no rows. Precision on real data is not measured (stakeholder Q&A line 201).
+  - Analyst ergonomics vs i2: no timeline / time-bar view (the G6 `timebar` was declined; only a timeline filter exists, `la-core/user-guide.md` §6), no i2 ANX import/export, no unstructured/document ingestion: no rows. Precision on real data is not measured (stakeholder Q&A line 201).
 - **RFP stance on the 5 most-asked requirements (link analysis / investigation):**
 
 | Requirement | Stance | Evidence or caveat |

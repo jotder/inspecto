@@ -9,7 +9,7 @@ timestamp: 2026-10-19T00:00:00Z
 # Link Analysis showcase — user guide
 
 The showcase is a demo Space; the screens are the standard Link Analysis studio described in the
-[end user guide](../../module/la-core/user-guide-end-user.md) and the [user manual](../../module/la-core/user-guide-manual.md).
+[Link Analysis user guide](../../module/la-core/user-guide.md).
 This page names what the Space holds so a walk-through lands on the planted story. Install: [architecture](architecture.md) and the [variants runbook](admin-guide-variants-runbook.md).
 
 ## Sign in

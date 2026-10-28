@@ -22,7 +22,7 @@ timestamp: 2026-07-07T00:00:00Z
 > The rest of Link Analysis (`geoLink`) stays on Basic.
 
 The Builder-lens studio at `/studio/geo-map` for the *where* of an investigation (sibling of
-[Link Analysis](../la-core/user-guide-link-analysis.md)'s *who-connects-to-whom*). Vocabulary:
+[Link Analysis](../la-core/user-guide.md)'s *who-connects-to-whom*). Vocabulary:
 [`GLOSSARY.md`](../../../../GLOSSARY.md) §11-Geo (GeoSource, GeoQuery, GeoPoint/GeoRoute, Geo View, Layer,
 Geocoder — never "marker/pin" in model names).
 
@@ -43,7 +43,7 @@ Geocoder — never "marker/pin" in model names).
   `uniqueNameValidator`).
 * **Status** — UI shipped; the geo Widget via the `VizPlugin` seam shipped (Phase 4a). **Server-side
   projection shipped** — `GeoRoutes` (`POST /geo/projection`, `POST /geo/routes`) is the DuckDB-side
-  fold of `projectPoints`/`projectRoutes` (mirrors [Link Analysis](../la-core/user-guide-link-analysis.md)'s
+  fold of `projectPoints`/`projectRoutes` (mirrors [Link Analysis](../la-core/user-guide.md)'s
   `POST /inv/projection`): valid-WGS84 point projection with a `skipped` count, and the O/D route fold
   as a `GROUP BY` (summed weight), scaling past the ~5k-point browser cap. Plain SQL — the DuckDB
   `spatial` extension is **deliberately deferred** (no geometry op is needed, and the hardened

@@ -2,7 +2,7 @@
 
 **Audience:** whoever runs the measurement on a larger machine. **Status:** plan only; nothing in it was run at 10^9 or 5x10^8
 by the author. Derived numbers are marked *derived*; measured ones cite the 2026-10-05 and 2026-10-13 runs recorded in
-[`okf/product/module/la-core/user-guide-link-analysis.md`](../la-core/user-guide-link-analysis.md) §*Index scale measurements*.
+[`okf/product/module/la-core/user-guide.md`](../la-core/user-guide.md) §*Index scale measurements*.
 Harness: `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexScaleBench.java` (the only harness needed;
 `DailyIndexScaleBench` and `DraftConcurrencyBench` are separate and not part of this clause).
 
@@ -171,7 +171,7 @@ Peak RSS and the spill peak are not printed by the bench: sample them with `watc
 maximum down (see follow-up 1). Compare against the 10^8 row; the pass criteria are in section 6.
 
 **Write the result back** (the person running this lane edits; this plan's author did not):
-1. `docs/okf/product/module/la-core/user-guide-link-analysis.md` §*Index scale measurements*: add the 5x10^8 and 10^9 rows to the table, replace the
+1. `docs/okf/product/module/la-core/user-guide.md` §*Index scale measurements*: add the 5x10^8 and 10^9 rows to the table, replace the
    2026-10-13 attempt bullet's "no 5x10^8 or 10^9 figure exists" sentence, and update the 34 GB / 2x rebuild-peak caveat.
 2. The `LA-INDEX-SCALE-MEASURE-1` row in `docs/BACKLOG.md`: close clause (3) with the measured figures, or narrow it to what is still open.
 3. Then re-evaluate the `DraftConcurrencyBench` 10^9 re-run noted in the row, and the sizing text in the stakeholder documents that quote 10^8.

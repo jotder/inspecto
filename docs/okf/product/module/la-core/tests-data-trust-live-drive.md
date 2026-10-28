@@ -2,7 +2,7 @@
 
 Driven 2026-10-14 on a fresh Enterprise `la-app` demo bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`, built from master `388651a19`), served on port 8147, with a Space `la-feed` created from the `la-daily-feed` template through `POST /spaces`. Personas copied from the `la-showcase` template (`roles.toon`, `demo-users.toon`, `link-analysis.toon`) because `la-daily-feed` ships none. Synthetic days came from a scratchpad script (nothing committed). The built-in browser drove the SPA for steps 3 and 4; the rest was driven over the control API as the Demo Users.
 
-Plan: [la-data-trust-plan.md](../../../../archived-documents/plans-archive/la-data-trust-plan.md). As-built: [link-analysis.md](user-guide-link-analysis.md), section *Data trust*.
+Plan: [la-data-trust-plan.md](../../../../archived-documents/plans-archive/la-data-trust-plan.md). As-built: [link-analysis.md](user-guide.md), section *Data trust*.
 
 ## Setup facts that matter for a demo
 

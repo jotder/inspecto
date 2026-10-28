@@ -10,7 +10,7 @@
 |---|---|
 | Status | ACTIVE PLAN — **status as of 2026-10-25 in §0a; live measurement and the RE-RANKED open list in §0b** (fake-auth Preview build, `f6c168147`) |
 | Trigger | Operator report 2026-10-24: "UI performance is poor" on Link Analysis (LA) |
-| Related | [`link-analysis-roadmap.md`](link-analysis-roadmap.md) (LA-06 and LA-07 are standing refusals — see P5) · [`la-separation-feasibility-plan`](../archived-documents/plans-archive/la-separation-feasibility-plan.md) §7.4 (the partitioned index and graph engine are the long-term fix) · [`../okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md) (stale caps, see §6) |
+| Related | [`link-analysis-roadmap.md`](link-analysis-roadmap.md) (LA-06 and LA-07 are standing refusals — see P5) · [`la-separation-feasibility-plan`](../archived-documents/plans-archive/la-separation-feasibility-plan.md) §7.4 (the partitioned index and graph engine are the long-term fix) · [`../okf/product/module/la-core/user-guide.md`](../okf/product/module/la-core/user-guide.md) (stale caps, see §6) |
 | Grounding | Two read-only code investigations, 2026-10-24: server `inspecto-la-api` / `inspecto-la-core` / `inspecto-la-storage`; browser `inspecto-ui/projects/link-analysis` and `inspecto-ui/src/app/inspecto/graph/graph-view.component.ts`. ⛔ Re-ground every cite before implementing |
 
 ---
@@ -351,4 +351,4 @@ with different row scope.
 
 ## 6. Documentation that must be corrected
 
-- `docs/okf/product/module/la-core/user-guide-link-analysis.md` says the projection cap is 500 and the analysis cap is 2,000 (lines around 321–322 and 398–401). Both caps are settings-driven now with defaults 1,000 and 2,500, and the same file contradicts itself near line 299. Fix in the same change that lands any perf work (per the doc rules: distil into the hub, do not add a new doc).
+- `docs/okf/product/module/la-core/user-guide.md` says the projection cap is 500 and the analysis cap is 2,000 (lines around 321–322 and 398–401). Both caps are settings-driven now with defaults 1,000 and 2,500, and the same file contradicts itself near line 299. Fix in the same change that lands any perf work (per the doc rules: distil into the hub, do not add a new doc).

@@ -9,7 +9,7 @@ timestamp: 2026-10-22T00:00:00Z
 # Link Analysis sample — user guide
 
 The `la-sample` Space Template is what **Try it with sample data** on the Inspecto LA *Getting started* page creates
-(LA-ONBOARD-1 phase 3, [end user guide](../../module/la-core/user-guide-end-user.md) § Getting started). It runs on
+(LA-ONBOARD-1 phase 3, [end user guide](../../module/la-core/user-guide.md) § Getting started). It runs on
 every edition, Basic included: it carries no Alert Rules, no Jobs and no sign-in personas. The richer, Advanced-only
 demo is [`la-showcase`](../la-showcase/index.md).
 

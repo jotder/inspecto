@@ -645,7 +645,7 @@ Inspecto LA accommodates different personas through two Angular shells that shar
 Both shells talk to the same server and, in Standard and above, sign in through the deployment's OpenID Connect provider. Deployment follows the platform:
 - **Per Space**: each Space switches Link Analysis on or off (the module gate, Section 5.1) and keeps its own Investigations, Entity Lists, link index and masking keys.
 - **On premises, offline**: DuckDB runs in process, and the bundle can embed its own Java runtime (a `jlink` image built by `package.ps1`); no internet access is needed and the data never leaves the operator's estate.
-- **Documentation**: analysts get an end-user guide and a full user manual (`user-guide-end-user.md`, `user-guide-manual.md` in this hub); every limit, its default and its range are listed in the product's own Settings (Section 6.3).
+- **Documentation**: analysts get one user guide (`user-guide.md` in this hub: Part I for analysts, Part II reference); every limit, its default and its range are listed in the product's own Settings (Section 6.3).
 
 ### 4.5 Spatio-temporal & cross-domain convergence
 
@@ -1083,7 +1083,7 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | | Full index build at $10^8$: $368\text{ s}$ (spike), $447\text{ s}$ (8 GB cap), $852\text{ s}$ (daily chain) | **PROVEN** | Three different benches and configurations: `InvIndexSpikeBench`, `IndexScaleBench`, `DailyIndexScaleBench` |
 | | Daily append at $10^8$: $30.6\text{ s}$ against $929\text{ s}$ for a full rebuild | **PROVEN** | `DailyIndexScaleBench`; append correctness by `IndexAppendTest` and `ScheduledIndexBuildTest` |
 | | 5-hop recursive path search on $10^6$ edges at warm p95 under $350\text{ ms}$ | **PROVEN** | `InvTraversalBench` (gate `G-R4`) |
-| | Index faster than flat through the real route from $10^7$ edges ($2\text{--}5\times$ a hop); not faster at $10^6$ | **MEASURED** | `okf/product/module/la-core/user-guide-link-analysis.md` index design record; not re-run at $10^8$ |
+| | Index faster than flat through the real route from $10^7$ edges ($2\text{--}5\times$ a hop); not faster at $10^6$ | **MEASURED** | `okf/product/module/la-core/user-guide.md` index design record; not re-run at $10^8$ |
 | | Index builds above $10^8$ edges ($2\times10^8$ to $10^9$) | **NOT YET** | $2\times10^8$ and $3\times10^8$ ran out of memory in the `nodes` phase at a 6 GB cap, $5\times10^8$ at 8 GB and at 12 GB (2026-10-21); the $10^9$ attempt stopped at the disk floor (2026-10-13); `docs/okf/product/module/la-storage/tests-index-scale-run.md`, backlog `LA-INDEX-SCALE-MEASURE-1` |
 | | One production-scale day (132 M records) profiled and indexed in the times of Section 6.4 | **MEASURED** | Single laptop run, private data, 2026-10-16 (the measurement note is kept with the data, outside the repo; aggregates only in Section 6.4); estimates in that section are marked as such |
 | **Editions** | Basic is the explorer (no sign-in, no Investigations); the Investigation surface answers 503 on Basic and works on Standard | **PROVEN** | `ControlApiBasicEditionLinkAnalysisTest` |
@@ -1113,7 +1113,7 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | | Draft promote linear in the sealed bytes: 800 steps in $3.3\text{ s}$ warm (was $34.9\text{ s}$); rebase $8.4\text{ s}$ (was $36.7\text{ s}$) | **PROVEN** | `DraftPromoteCostTest` (`LA-DRAFT-PROMOTE-COST-1`) |
 | | Retention purge of closed Investigations | **NOT YET** | **Declined** (decision `D-U8`, 2026-09-24): the store is deliberately append-only; reopen on a regulator's or customer's retention demand (backlog standing refusals) |
 | **Analytics** | 29 in-process graph algorithms; browser twins of 28 | **PROVEN** | `GraphAlgorithmsParityTest`, `GraphSuspicionParityTest`, `ControlApiGraphRunTest` (`propagatedRisk` has no TypeScript twin, by design) |
-| | Explainable Suspicion Score with a factor breakdown | **PROVEN** | `GraphSuspicionParityTest`, `ControlApiGraphRunTest`; the user manual `docs/okf/product/module/la-core/user-guide-manual.md` |
+| | Explainable Suspicion Score with a factor breakdown | **PROVEN** | `GraphSuspicionParityTest`, `ControlApiGraphRunTest`; the user guide `docs/okf/product/module/la-core/user-guide.md` |
 | | Propagated Risk with top-five attribution and a capped score | **PROVEN** | `ControlApiGraphRunTest.propagatedRiskAnswersWithScoresAndFactorsAndRefusesBadWeights422` |
 | | Showcase figures: `TILL-06` 97 % of cash-out from 8 payers; Pass-Through lists 13 accounts of which two are the planted relays | **PROVEN** | `ControlApiLaShowcaseFiguresTest`, `LaShowcaseGoldenTest` (planted data; no detection rate implied) |
 | | Entity profile pages: sections, honesty rules, masking, alias-only URLs | **PROVEN** | `ControlApiEntityProfileTest`; scale behaviour `ControlApiEntityProfileScaleTest` (sandbox scale) |

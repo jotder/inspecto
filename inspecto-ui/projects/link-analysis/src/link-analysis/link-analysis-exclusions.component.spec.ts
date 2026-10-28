@@ -73,7 +73,7 @@ describe('LinkAnalysisExclusionsComponent (LA-GROW-EXCLUDE-1 §3.3)', () => {
         const hint = () => el.querySelector('[data-testid="la-excl-hint"]') as HTMLElement | null;
         expect(hint()?.textContent).toContain('keeps numbers out of every step');
         expect(hint()?.textContent).toContain('Category lists come from your');
-        expect(hint()?.querySelector('[data-testid="la-hint-guide"]')?.textContent).toContain('Grow and clean a graph');
+        expect(hint()?.querySelector('[data-testid="la-hint-guide"]')?.textContent).toContain('Expand and clean up the graph');
         await expectNoA11yViolations(el);
         host.mode.set('basic');
         fixture.detectChanges();

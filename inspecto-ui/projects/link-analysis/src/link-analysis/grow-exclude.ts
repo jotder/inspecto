@@ -324,7 +324,7 @@ export function listTargets(
  * The user-guide chapter every first-time hint points to. The SPA serves no docs (they ship in the bundle's `docs/`
  * folder), so the hint names the chapter rather than linking to a page that is not there.
  */
-export const GROW_GUIDE = { chapter: 'Grow and clean a graph', where: 'Link Analysis manual, §5.4' } as const;
+export const GROW_GUIDE = { chapter: 'Expand and clean up the graph', where: 'Link Analysis user guide, §7' } as const;
 
 const HINT_PREFIX = 'inspecto.la.hint.';
 

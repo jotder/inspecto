@@ -54,7 +54,7 @@ describe('LinkAnalysisHeldTrayComponent (LA-GROW-EXCLUDE-1 §3.2)', () => {
         expect(tray.textContent).toContain('more than 500 contacts');
         expect(el.querySelector('[data-testid="la-held-hint"]')?.textContent).toContain('Call centres');
         expect(el.querySelector('[data-testid="la-held-hint"] [data-testid="la-hint-guide"]')?.textContent).toContain(
-            'Grow and clean a graph',
+            'Expand and clean up the graph',
         );
         await expectNoA11yViolations(el);
         buttons(el, 'Got it')[0].click();

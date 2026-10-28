@@ -31,8 +31,8 @@ the one verb for creating a data origin (GLOSSARY).
 
 Related: [DATA-TIERS-1 plan](../../../../superpower/data-tier-editions-plan.md) ·
 [LA-ONBOARD-1 plan](../../../../archived-documents/plans-archive/la-onboarding-plan.md) ·
-[ONBOARDING-FIRST-RUN-1 console plan](../../../../superpower/first-run-onboarding-plan.md) · [user manual](user-guide-manual.md) ·
-[end-user guide](user-guide-end-user.md) · [GLOSSARY](../../../../GLOSSARY.md).
+[ONBOARDING-FIRST-RUN-1 console plan](../../../../superpower/first-run-onboarding-plan.md) · [user guide](user-guide.md) ·
+[Space guide steps](user-guide.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
 
 ---
 

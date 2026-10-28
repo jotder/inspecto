@@ -24,7 +24,7 @@ deal with its files, its settings documents and its keys. Design detail: [spec](
 
 ## Configure
 
-- **Entity Types, masking, caps:** `link-analysis.toon` keys (`entity_types`, `maskingMode`, four-eyes thresholds, caps). An absent key inherits the shipped default; an empty `entity_types` list is refused. Prefer the Link Analysis settings screen ([la-core user guide](../la-core/user-guide-link-analysis.md)) over hand edits.
+- **Entity Types, masking, caps:** `link-analysis.toon` keys (`entity_types`, `maskingMode`, four-eyes thresholds, caps). An absent key inherits the shipped default; an empty `entity_types` list is refused. Prefer the Link Analysis settings screen ([la-core user guide](../la-core/user-guide.md)) over hand edits.
 - **Limits:** every Link Analysis limit is one item with a range. A write outside the range is refused 422; a hand-edited out-of-range value silently reads as the default. Reference: [la-core architecture](../la-core/architecture.md) §9-§10.
 - **Industry pack:** a Space selects one as its Domain Profile (`domain_profile` in `link-analysis.toon`). Packs ship inside jars; selecting a refused or absent pack is refused 422.
 

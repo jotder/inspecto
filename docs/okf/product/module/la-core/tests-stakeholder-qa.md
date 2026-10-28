@@ -11,9 +11,9 @@ How to read an answer: two to five plain sentences you can repeat, then **Eviden
 * **NOT YET** - an honest gap. Say so out loud; do not soften it.
 
 Terms follow [`GLOSSARY.md`](../../../../GLOSSARY.md) (Dataset, Collector, Pipeline, Incident, Measure, Alert Rule).
-Companion pages: the [user manual](user-guide-manual.md), the backend page
+Companion pages: the [user guide](user-guide.md) (Part I), the backend page
 [`okf/product/module/la-core/architecture.md`](architecture.md) (cited below as *backend §n*), the
-feature concept [`okf/product/module/la-core/user-guide-link-analysis.md`](user-guide-link-analysis.md) (*feature page*)
+feature concept [`okf/product/module/la-core/user-guide.md`](user-guide.md) (*Part II reference*)
 and the archived [demo readiness plan](../../../../archived-documents/plans-archive/la-demo-readiness-plan.md) (*defence matrix* = its section 2; every row built by 2026-10-13, kept as history).
 
 ---

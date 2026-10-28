@@ -1,13 +1,868 @@
 ---
 type: Feature
-title: Link Analysis
-description: The graph investigation studio — Entity Projection over Datasets rendered on the shared G6 host, with layout/algorithm toolboxes and saved Link-Analysis Views.
+title: Link Analysis — User Guide
+description: The one Link Analysis user guide — Part I walks an analyst through today's Studio (Start from, Expand, Clean up, the analysis catalogue, Investigations, evidence); Part II is the as-built reference (limits, Graph Run, the link index, Dossier bundle, records).
 resource: inspecto-ui/projects/link-analysis/src/link-analysis/
-tags: [feature, studio, graph, entity, link, g6, investigation]
-timestamp: 2026-07-07T00:00:00Z
+tags: [feature, studio, graph, entity, link, g6, investigation, user-guide]
+timestamp: 2026-10-28T00:00:00Z
 ---
 
-# Link Analysis
+# Inspecto LA (Link Analysis) — User Guide
+
+*For analysts who investigate fraud, revenue leakage, money laundering or telecom abuse, and for the engineers who
+support them. **Part I** is the analyst's path through today's Studio (the layout as reorganized on 2026-10-27,
+`LA-STUDIO-UI-REORG-1`); every control named there is a label or tooltip you see on screen. **Part II** is the
+as-built reference: limits, server analysis, the link index, evidence and the design records. This one guide replaces
+the former end-user guide, user manual and Link Analysis feature page (merged 2026-10-28). Moving between table, graph,
+map and timeline on one selection is in [Investigation Pivot](user-guide-investigation-pivot.md); the backend is in
+[architecture.md](architecture.md).*
+
+**Contents.** Part I: [1 What it is](#1-what-link-analysis-is) · [2 Quick start](#2-quick-start-from-a-blank-install-to-a-first-finding)
+· [3 Getting started and Add data](#3-signing-in-getting-started-and-add-data) · [4 The screen](#4-the-screen) ·
+[5 Building a graph](#5-building-a-graph) · [6 Looking at the graph](#6-looking-at-the-graph) ·
+[7 Expand and clean up](#7-expand-and-clean-up-the-graph) · [8 Analysis catalogue](#8-the-analysis-catalogue) ·
+[9 Pattern matching](#9-pattern-matching) · [10 Saving and the File menu](#10-saving-exporting-and-the-file-menu) ·
+[11 Investigations](#11-investigations) · [12 Entity Lists, Alerts, Geo](#12-entity-lists-alerts-and-geo) ·
+[13 Worked examples](#13-worked-examples) · [14 Who can do what](#14-who-can-do-what-roles-and-editions) ·
+[15 Limits](#15-limits-and-honest-behaviour) · [16 Troubleshooting](#16-troubleshooting) ·
+[17 Vocabulary](#17-vocabulary) · [18 If you used the old Studio](#18-if-you-used-the-old-studio). Part II:
+[Reference](#part-ii--reference).
+
+---
+
+# Part I — For analysts
+
+## 1. What Link Analysis is
+
+Link Analysis draws **who is connected to whom** from the rows of a **Dataset** — transfers between accounts, calls
+between numbers. Each account or number is a **node** (an Entity); each transfer or call is a **link**. You look at
+the picture, run tools that point at suspicious shapes and, when something matters, open an **Investigation**: a
+recorded, replayable list of the steps you took that can be handed over as evidence.
+
+It answers questions such as:
+
+* Who sits in the middle of this money chain, and does it look like layering?
+* Which accounts receive many small payments just under a reporting limit (**structuring**)?
+* Which agent till takes most of the cash-out, and from how many different payers?
+* Which subscribers share a device or partner and might be one person (**split identity**)?
+
+**Where:** *Studio → Link Analysis* in the console (`/studio/link-analysis`), or the standalone **Inspecto LA**
+application. **You need:** to be signed in; changing things needs the capabilities in [§14](#14-who-can-do-what-roles-and-editions).
+
+**Two modes — know which one you are in.**
+
+| | **Exploring** | **Investigation** |
+|---|---|---|
+| What it is | The canvas, its tools and the analysis catalogue over live data | A recorded **Op log** over a **Working Set** of entities |
+| Is it evidence? | **No.** A saved view re-reads live data; reopening it later may differ. | **Yes**, once you build a **Dossier** ([§11.9](#119-evidence-snapshot-dossier-sealed-bundle)). |
+| Use it to | Look around, try ideas, find leads | Work a case you may have to defend: replay it, fork it, hand it over |
+
+---
+
+## 2. Quick start: from a blank install to a first finding
+
+About ten minutes, with the screens alone. The example is the one the product is tested with (see the
+[onboarding live drive](tests-onboarding-live-drive.md)): a file of money transfers (`transfers.csv`) in which a
+few accounts pass money along a chain, a file describing the accounts (`accounts.csv`), and one very busy merchant
+that would otherwise hide everything.
+
+1. **Open Inspecto LA.** On a new installation the front page is **Getting started** ([§3](#3-signing-in-getting-started-and-add-data)).
+   To look around first, **Try the sample** loads invented transfers and opens a ready graph. For your own data,
+   **Create a Space**: name it after the data (*Mobile money*) and choose what kind of data it is.
+2. **Add data.** You land on **Onboard a file**. Choose *Events between entities* and drop `transfers.csv`. The
+   screen applies what it detected and says why; a choice that was only a guess is marked **A guess** — press
+   **Confirm** or change it.
+3. **Say what the columns hold.** `from_account` and `to_account` hold an **Account**; a link goes **From**
+   `from_account` **To** `to_account`; pick the time and amount columns if the screen did not. Press **Create and
+   run**. The result says how many transfers between how many accounts were kept, and anything set aside.
+4. **Add details (optional).** **Add details about these entities** brings in `accounts.csv`; say which column
+   identifies each account (`account_id`). Names and segments then show on the graph.
+5. **Start from one account.** **Explore in Link Analysis** opens **Start from...** with your Dataset picked. Keep
+   **One entity** and **Account**, type the first letters of the account you are worried about (`MULE`) and pick it
+   from the list, which shows how busy each match is. **Start** draws it and everyone it is linked to.
+6. **Expand and clean up.** **Expand…** (canvas toolbar, or **G**) says what the next step adds before it adds it;
+   very busy accounts are held, not drawn. An account that links to almost everyone (a big merchant) only hides the
+   pattern: right-click it, **Exclude…**, and add it to a list whose purpose is *Never follow these (exclusion)*, so
+   it stays out of every later step too.
+7. **Find something interesting.** Open the right panel's **Analysis** tab: **Who is busiest**, **Which groups stick
+   together** (the chain shows as one group) and **How does A reach B** (from the victim's account to the cash-out
+   account). Each answer is one sentence, with **Show on graph**, **Start from these** and **Add to a list**.
+8. **Save view.** **File ▸ Save view as…** asks a name, *Mule ring*. A saved view keeps the graph's start and the
+   lists it uses; it re-reads your data when it opens, so it is not evidence.
+9. **Come back.** The front page now shows **My work**: open *Mule ring* to draw it again over the data as it is
+   then. **What changed in your data** says when each file was last brought in; **Add a file** on the Dataset card
+   brings in next month's file.
+
+**When you are stuck.** **What can I do next?** (the light bulb in the left menu) is on every screen: it reads what
+your Space already holds and offers the next step, with one line saying why. A word with a **?** beside it
+(*Dataset*, *Entity Type*, *Entity List*, *case*) explains itself in one sentence; the **?** beside the Studio's
+title explains the page. An empty page always says why it is empty and offers the one thing that fills it.
+Something your edition or role does not include is greyed out with one line naming what has it; it is never a
+button that fails.
+
+---
+
+## 3. Signing in, Getting started and Add data
+
+1. Open the application and pick yourself on the sign-in page. A demonstration install lists Demo Users with no
+   password; a secured install shows **Sign in with SSO**.
+2. The front page offers **Link Analysis**, **Geo**, **Entity Lists** and **Alerts** (and **Settings** if you may
+   change them). The same areas sit in the slim menu down the left edge, with the Space switcher and your user menu.
+
+### 3.1 The Getting started page
+
+Until your Space holds data, the front page is **Getting started**: while there is no Space yet, or the current
+Space has no Dataset yet. Three ways in:
+
+* **Try it with sample data** — **Try the sample** creates a Space called *Sample: invented data*, loads three days
+  of invented money transfers with a planted money-mule ring, and opens Link Analysis with the ring drawn (the
+  `la-sample` Space Template; nothing in it is real). If part of the data does not load, the card names what failed
+  and still offers **Open the sample Space**.
+* **Use my own data** — **Create a Space** asks a **Name** (one Space per kind of data, such as *Mobile money* or
+  *Call records*) and **What kind of data?**: *Mobile Money*, *Telecom* or *Generic*, each with three example column
+  names. The choice sets the Space's **Industry pack**: the words Link Analysis uses for your data and the tools it
+  suggests. Then you land on **Add data**. When a Space already exists, the button is **Add data** itself.
+* **Open my team's data** — shown when Spaces exist: the Space switcher.
+
+A choice you cannot take is greyed out with one line saying why: with sign-in, only an administrator may create a
+Space; a server running a single Space cannot add a sample one. The **Space switcher** with no Space yet reads **No
+Space yet** and offers **New Space…** and **New from sample…** to anyone who may create a Space.
+
+**The Space guide** lists the setup steps and ticks each one from what the server holds: **Space**, **Data** (a
+Dataset exists), **What the columns hold**, **First graph** (a graph is saved in the Space) and, optional, **A list**.
+Click a line to go to that step; collapse it with the arrow (remembered in this browser). It disappears once the four
+required steps are ticked.
+
+**My work** (once the Space holds data):
+
+* **Saved views** — every view saved in the Space, the most recent first, with when it was saved and the Entity Lists
+  it uses (*Lists: started from Suspects; leaves out Busy merchants*). Click one to open its graph.
+* **What changed in your data** — one line per Dataset brought in with **Add data**, its last import first:
+  *transfers: imported 1 Oct 2026, +2,104 rows*; after **Add a file**, whether the file replaced or was added to the
+  rows and the net change (*transfers: replaced 3 Oct 2026, 2,104 → 2,000 rows (−104)*). Data a Pipeline keeps up to
+  date is not listed here.
+
+**Beginner counters.** Inspecto counts, on this server only, how far first-time users get (first Space, first
+Dataset, first graph, the Space guide finished, the step people stopped at). No names or values are kept and nothing
+is sent anywhere. Administrators see it in **Settings → Getting started counters**.
+
+### 3.2 Add data: onboard a file
+
+**Add data** opens **Onboard a file**: one of your files becomes a Dataset Link Analysis can draw, in four steps.
+
+1. **Drop or choose a file.** Say what is in it: *Events between entities* (transfers, calls, messages) or *Details
+   about entities* (customers, accounts, devices). Drop the file or press **Choose a file**. The screen lists what it
+   reads (CSV or TSV, Parquet, JSON or NDJSON; Excel when this installation includes it) and this Space's limits
+   (for example *up to 500 MB and 10,000,000 rows per file; 20 imports per Space*). *Read from a database or a remote
+   system* is locked on Basic, with the reason.
+2. **Check the columns.** What was detected is applied, with the reason beside it. A guess is highlighted and marked
+   **A guess**: **Confirm** it or change it. Rename a column, change its type or **Leave out** a column; a table shows
+   the first rows as they will be kept.
+3. **What does each column hold?** An *Entity Type* (Account, Phone number…) or *Nothing: a detail*. For events:
+   which column a link goes **From** and **To**, and optionally its kind, time and amount. For details: **Which
+   column identifies each entity?** Without a From and a To the screen warns that the Dataset cannot be drawn as a
+   graph.
+4. **Create and run.** The Dataset name comes from the file name (lower-case letters, digits and `_`). **Create and
+   run** waits until every guess is confirmed or changed; a very large file runs on the server and the screen
+   follows it.
+
+The result says how many rows were read and kept, rows set aside and why, whether the link index was built, and each
+Expectation on the data. Then **Explore in Link Analysis** (opens **Start from...** with the Dataset picked), **Add
+details about these entities**, or **Add another file**.
+
+**The Dataset card** says *one-time import* and shows the last import. **Add a file** brings in the next file (for
+events, choose whether it *replaces the data* or *adds its rows*; details are always replaced); **Run now** runs the
+import again. **Keep this up to date** is locked on Basic; on a secured installation it reads *Ask an administrator
+to keep this up to date*. If adding data is off in this Space the screen says why (*its data comes from Pipelines*);
+with sign-in an administrator turns it on per Space (**Settings → Add data**, *People may add data in this Space*), and
+you need the right to upload data.
+
+### 3.3 Entities: what the columns hold
+
+Two columns join up in the graph only when they hold the same **Entity Type**. The **Entities** page (left menu)
+shows and sets this.
+
+* **Entity Types** tab — one card per Entity Type some column of this Space's data holds, with its distinct count,
+  Datasets and data-as-of date; a Dataset's **primary** type comes first (*Primary in &lt;Dataset&gt;*). The others
+  wait, folded, under **Not in your data (n)**.
+* **Columns** tab (where the Space guide's *What the columns hold* step lands) — per Dataset, each column that looks
+  like an identifier, with what it holds or **Not set**. **Holds** sets the Entity Type at once and the page says what
+  changed (*"to_account" in transfers now holds Account.*); **Show every column** lists the rest. The picker beside
+  the Dataset name sets its **primary Entity Type**.
+* **New Entity Type** — a **Name**, an **Example value** (shows *Kept as …*) and **Compare values as**: *Upper case,
+  spaces trimmed*, *Digits only*, *Phone number* or *Case ignored*. A name the Space already has is refused before
+  anything is written.
+
+These changes need the right to edit Datasets when you sign in; without it they are greyed out with the reason.
+
+---
+
+## 4. The screen
+
+Act on the canvas, read in the dock, configure in **⚙ Settings**.
+
+* **One header row.** The title **Link Analysis** with its **?** (what this page is), then the **tool rail** and the
+  **canvas toolbar** side by side, then **Hide the side panels** and **⚙ Settings**. Every control is an icon: hover
+  it for its name. Counts (Held, Hidden, collapsed, Attach) are a small number on the icon. When the header is too
+  narrow, the canvas toolbar's groups after Canvas mode fold into **More canvas tools** (`⋯`), and a long selection
+  row drops under the rail rather than being clipped.
+* **Tool rail (file and view):** **File ▾** first ([§10](#10-saving-exporting-and-the-file-menu)), then **Search
+  nodes**, **Filter node types**, **Graph layout**, **Filter edges by time**, the **Analysis** and **Investigation**
+  toggles (they open the right panel at that tab), **Help**, **Glossary**, **Display options** (the brush), **Undo**
+  and **Redo** (display and filter changes), **Fit the graph to the screen**, **Show as list**, **Full screen**,
+  **Export** and **Show the rows** (opens the dock).
+* **Canvas toolbar (work on the canvas):** **Canvas mode** (Pan, Lasso, Fisheye, Link filter), the selection (**Select
+  all**, **Invert the selection**, **Add the neighbours to the selection**, **Clear the selection**, and the count), the
+  graph edits (**Expand…**, **Collapse**, **Hide**, **Exclude** and **Merge** on an Investigation's canvas, **Attach to
+  Case**), **Clean up** (the broom), and **Held** and **Hidden by lists**.
+* **Canvas:** the graph, with the legend, the Working set tiles and the minimap.
+* **Right panel**, two tabs: **Analysis** (*Find something interesting* and the one analysis catalogue,
+  [§8](#8-the-analysis-catalogue)) and **Investigation** (the Act panel, [§11](#11-investigations)).
+* **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus,
+  with an Investigation open, **Op log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
+  entities**. Drag its edge to resize; it remembers its tab and height in this browser.
+* **Status bar:** **Caps**, the graph-model chips (Dataset, Mapping, Link type, Attributes — click one, or the pencil,
+  to open ⚙ Settings ▸ Graph model), **Refresh** (runs the same graph model again), the counts and **Installed
+  modules** (each Link Analysis module and whether it is active, inert with the reason, switched off, or not
+  installed).
+
+A window about 1,300 px wide or more shows the canvas and the right panel side by side; narrower, the panel stacks
+under the canvas.
+
+### 4.1 ⚙ Settings
+
+One dialog for what you set rarely; the left side lists the sections, each with one line of help. It remembers the
+last section in this browser. Running the graph model closes it; closing it over an edit you did not run asks first.
+
+| Group | Sections |
+|---|---|
+| **This graph** | **Graph model** (Dataset, the two entity columns, link type, mappings, attribute columns, root, depth and direction; **Run query** and **Refresh** at the foot; the Space's Industry pack is shown read-only at the top) · **Entity Types** (the types the graph is drawn as, **New Entity Type**, **Retire**) · **Display rules** (node colour rules by attribute) |
+| **Data** | **Entity Lists** · **Identities** (identity resolution) · **Add / Upload data** (upload a CSV to an upload-enabled Collector) |
+| **This Investigation** (only while one is open) | **Investigation settings**: Case, Members, Share and embed, Drafts, Replay and drift, Pin to a Widget, Oversight and approvals, Measures and templates, Dossier, References |
+
+**Industry pack, not a profile picker.** The words and suggested tools follow the Space's Industry pack (Telecom:
+*subscribers* and *calls*; Mobile Money: *wallets* and *transfers*). There is no picker on the page; Graph model shows
+the pack in force.
+
+**Masked ids.** Names such as `masked:1d4d76be…` mean your Space hides sensitive ids. The same alias always stands for
+the same account, so you can still group, count, search, seed and follow it. Graph model says **Masking: typed (ids
+shown as aliases)**. Someone with Reveal rights can turn an alias back into the real id.
+
+---
+
+## 5. Building a graph
+
+### 5.1 Start from...
+
+The first screen is one **Start from...** box. Pick the **Dataset** first (already picked when you come from
+*Explore in Link Analysis*), then what to start from:
+
+* **One entity** — pick the **Entity Type** (the Dataset's main one is chosen: accounts for transfers, phone numbers
+  for calls), then type the value. Matches appear with how busy they are: *MULE-HUB-01 - 10 links, first seen 3 Sep
+  2026, last seen 30 Sep 2026*. A masked type suggests nothing: type the whole value, or, if you may reveal, choose
+  *Show its values* (each look-up is recorded).
+* **A list** — an Entity List (suspects, a watch list).
+* **A paste** — values, one per line (commas, semicolons and tabs work too).
+* **The whole Dataset** — every link at once. When the Dataset holds more entities than the node cap the box warns
+  first: the graph is cut to the busiest, and starting from one entity is usually clearer.
+
+**Start** draws what you chose plus **one ring** of everything linked to it, with busy entities held
+([§7.2](#72-held-busy-entities)), so **Expand…** continues from there. A line above the graph says what was drawn and
+lists any value not in the Dataset. A list or a paste draws at most 25 values in one start.
+
+With Investigations (Standard and above, with the add-on), **One entity** seeds an Investigation instead: state the
+**Purpose / legal basis** and press **Investigate**; it creates the Investigation, seeds the entity and expands one
+degree. A list or a paste is drawn and queued as the first seeds. **Investigate** on an Entity's page, and
+**Investigate … in Link Analysis** on an Incident or Case page, take the same path.
+
+Under the box: **Follow the money (example)** opens a ready-made view (when your Space has one), **Open a saved view**
+opens **File ▸ Open…**, **Explore a Dataset** opens Graph model, and **Add data** brings a file in.
+
+### 5.2 Graph model: draw a Dataset yourself
+
+**Explore a Dataset**, a status-bar chip or the pencil opens **⚙ Settings ▸ Graph model**:
+
+1. **Dataset.** The ones that look like links are listed first, each with the reason. **Entity/Link (several
+   Datasets)** puts up to 16 mappings in one graph; the same entity in more than one Dataset becomes **one node** that
+   lists every Dataset it came from. If you cannot read even one of them, the whole query is refused — never a
+   partial graph.
+2. **The two entity columns** (who → whom) are filled in when two columns look like the two ends of a link (payer /
+   payee, caller / callee, from / to…); change them if the link runs the other way. **Derive mapping** asks the
+   assistant to draft them and needs permission to author configuration.
+3. Optionally a **Link type column** (wire, card, cash_out, SMS…; kinds get colours and can be filtered) and
+   **Attribute columns** (amount, country, time — they feed the timeline, Value Measures and pattern tools). **Add
+   another mapping** stacks more column pairs. **Root**, **depth** and **direction** start from chosen entities and
+   grow outwards.
+4. **Run query.** Settings closes and the status bar says, for example, *20 nodes · 20 links drawn*. **Refresh**
+   runs the same model again later.
+
+### 5.3 Filters — two stages, deliberately
+
+1. **Apply locally** — instant, in your browser, over the links already loaded.
+2. **Push to server** — the same condition goes to the database, so it applies *before* the graph is folded and
+   counts stay right on large data.
+
+Conditions are a tree of AND/OR groups; a single bare condition is refused — wrap it in a group.
+
+> **Mind the "≥ 5 000" trap.** A view filtered to "amount ≥ 5 000" hides exactly the small payments structuring
+> consists of. Pattern and Measure tools run over the **whole Dataset**, not your filtered view, for this reason.
+
+### 5.4 Size limits — told honestly
+
+* By default the server returns at most **4 000 links** (ceiling 40 000), the canvas admits **1 000 nodes**, and
+  analysis in the browser runs up to **2 500 nodes** (heavier scores stop sooner and say so). **Caps** in the status
+  bar shows the caps in force. Every number is a setting ([§15](#15-limits-and-honest-behaviour)).
+* When a cap cuts data you see **Truncated** — never a silent "no results". Narrow the query or use the Server side
+  of the catalogue.
+* Each server read says where it was answered: *Answered from the link index v3* (with a stale note when rows were
+  added after the build) or *Answered from the Dataset because …*, with the reason in words.
+* Very busy hubs are folded into a **super-node**. Above 20 links on the canvas, link labels show on hover or click
+  only; *All link labels* in Display options overrides it.
+
+---
+
+## 6. Looking at the graph
+
+| To find | Use |
+|---|---|
+| A particular node | **Search nodes**; **Clear search and filters** resets |
+| Only some kinds of node | **Filter node types**, or the legend's chips |
+| A better layout | **Graph layout** |
+| Links in a time range | **Filter edges by time** (Timeline filter / Timeline cutoff); needs a time column among the Attribute columns |
+| The rows behind the picture | **Show as list**, or the dock's **Rows** tab (**Show the rows**) |
+| The same entities on a map | Geo Map: selecting an area there highlights the matching entities here, and back |
+
+**Layouts.** *Layered, Grid, Force, Clustering force, Radial, Degree ordered, Circular, Information density,
+Fruchterman*, and tree layouts (*Mind map, Organization chart…*) enabled only when the data is tree-shaped.
+**Layered is disabled, with the reason, on a wide shallow graph** (more than 60 nodes would share one rank — say 300
+claims under 20 providers — which it would stack into one column too tall to fit); use *Force*. A saved view that
+picked Layered opens in the default layout then.
+
+**Display options** (the brush) switch node and link labels, colours, shapes, node size and spacing, **Snap lines** and
+**Hover activate**, and the overlays: **Legend**, **Working set**, **Level of detail**, **Minimap**, **Grid**,
+**Community hulls**, **Group lone counterparties**, **Bubble sets** and **Link bundling**. Colour rules by attribute
+are in **⚙ Settings ▸ Display rules**. On a canvas narrower than 1,000 px the legend and Working set start as small
+pills. A layout or overlay the graph is too big for is greyed out and says why (*needs at most 300 nodes — this graph
+has 921*); reduce the graph first with Clean up, a filter or Collapse. The legend's link-kind chips change the
+drawing only — a hidden kind is still followed by the next expand; to leave it out, set link kinds in **Expand…** ▸
+**Advanced** (that is recorded).
+
+### 6.1 Canvas modes and selecting
+
+The **Canvas mode** decides what a drag on the empty canvas does. One is active at a time; the key is in the tooltip.
+
+| Mode | A drag on the canvas |
+|---|---|
+| **Pan** (default; **Esc** returns to it) | moves the view. **Shift+drag** draws a lasso that adds to the selection. |
+| **Lasso** (**L**) | draws a lasso (handy on a touchpad) |
+| **Fisheye** (**F**) | moves a magnifying lens over the graph |
+| **Link filter** | moves a lens; only the links inside it show |
+
+In every mode: scroll zooms, dragging a node moves it (and the whole selection), **Shift+click** adds or removes one
+node, **Ctrl+A** selects all (super-nodes excluded), and the arrow keys and **+** / **−** move and zoom.
+
+### 6.2 The node detail dialog
+
+Click a node for its rows (id, links, neighbours, Datasets, attributes), **Explain node** (why is it interesting?) and
+its canvas actions. On an Investigation's canvas, click once to select, then click the selected node again to open the
+dialog. Three sections look up only the entities they need on the server, so they work in a masked Space too
+(identifying values show as aliases and the section says *Entity masking is on*; numeric scores stay readable):
+
+* **Risk** — on a pack that maps an indicators Dataset (Telecom: `telecom_msisdn_indicators` by `msisdn`), the node's
+  **indicator score** and factor columns. **Compute risk** runs propagated risk on the server over the Investigation's
+  Working Set and shows the node's propagated score and its top contributing origins (*+28 from 99979100001, 3 hops,
+  weight 0.35*). Without an open Investigation, or the *Run link graph analysis* capability, it is held and says why.
+* **Enrichment** — the node's CRM/KYC row when the pack maps one (Telecom: `crm_kyc`), and the Entity Lists of its
+  type it is on.
+* **Case history** — Standard and up. Opening it reads the Incidents and Cases that reference the entity, newest
+  first; *Show* filters all / open / closed. A masked node is looked up by alias and the number is never shown.
+* **Actions** — **Add to watch list: …** / **Add to block list: …** asks for a reason (a list under four-eyes answers
+  *Waiting for approval*); needs *Manage incidents*. **Hide on canvas** (exploring only) takes the node off the canvas.
+
+---
+
+## 7. Expand and clean up the graph
+
+On an Investigation's canvas every change here is one **recorded** step of the Op log (`expand`, `exclude`,
+`excludeBy`, `hide`, `annotate` or `undo`, so replay and the Dossier are unchanged); while exploring it changes only
+what you see. Every change ends with a one-line result and **Undo** (also **Ctrl+Z**). In a shared Investigation an
+Undo takes back only the step it names: if a colleague recorded a newer step meanwhile, nothing is undone and the log
+shows theirs. The words follow the Industry pack (Telecom: *subscribers* and *calls*).
+
+### 7.1 Expand…
+
+**Expand…** (canvas toolbar, **G**, or right-click a node) opens one dialog:
+
+* **From**: the selection, the seeds, or the nodes not expanded yet (the first 25).
+* **Direction**: both ways, outgoing or incoming. **Degrees**: 1 up to the maximum in force.
+* **Hold supernodes with more than *H* links** — on by default, *H* = the Space's hub threshold (default 500).
+  Unticking it expands through every hub the walk reaches; it asks you to confirm and the override is sealed.
+* **Advanced**: the link kinds to follow, the time window (the Investigation's own, or all available data) and the
+  other limits.
+* A **preview line** says what it would add before anything changes: *This step adds about 342 numbers and 1,210
+  calls; 3 busy numbers will be held; 41 numbers are removed by your exclusion lists*. A step that would need
+  four-eyes approval says so. **Expand** runs it degree by degree; **Cancel** leaves the graph as it is. In an
+  Investigation each degree is a recorded `expand` step, and one Undo takes back the whole Expand. A server without
+  the preview shows *No preview on this server* and Expand still runs.
+
+Double-click a node not expanded yet to expand it one degree without the dialog. A node no expand has followed yet has
+a **dotted outline** (legend: *Dotted outline: not expanded yet*); on an Investigation's canvas *Next unexpanded* and
+*Only unexpanded* under that legend row help you go one node at a time.
+
+### 7.2 Held: busy entities
+
+Busy numbers — call centres, switchboards, shops — link to thousands of others and hide the real links. Expand holds
+them: they stay on the graph with a ring and a *held* badge, and **Held (n)** opens the held tray with their contact
+counts. **Remove held** takes them all out in one step (recorded as `exclude` with the reason *busy number above N
+contacts*); **Expand anyway** expands through one of them (the recorded override).
+
+### 7.3 Collapse
+
+**Collapse** (**C**, the canvas toolbar, or right-click) folds a node's branch — the neighbours that link to nothing
+else — into a **+n** badge; double-click an expanded node to fold or unfold it. It only changes what you see, also
+inside an Investigation: nothing is recorded and the Working Set does not change.
+
+### 7.4 Clean up
+
+**Clean up** (the broom) offers **Keep paths between seeds** (keep the seeds and every node on a path of at most *L*
+links between two of them), **Highlight shortest paths** (glow, nothing removed; **Esc** clears), **Trim dangling
+leaves**, **Keep only selected** and **Remove selected**. Each first says what it would do (*hides 16 of 112
+entities*) with **Apply** / **Cancel**. While exploring it hides with Undo; in an Investigation it is recorded as a
+`hide` with a reason filled in for you.
+
+### 7.5 Exclude… and Hidden by lists
+
+**Exclude** (canvas toolbar, right-click, or **X** with nodes selected):
+
+* *From this Investigation only* — one `exclude` step with your reason (exploring: *Hide from this graph*).
+* *Add to a list…* — an exclusion list of the entities' type, or a new one; they are added (four-eyes where the list
+  is governed) and the list is applied, so they stay out of every later step. A **category list** kept by your
+  administrator (VIPs, politicians) is offered only to a holder of *Manage exclusion categories*.
+
+**Hidden by lists (n)** shows the lists in force — *41 numbers hidden by 3 lists* — each with who keeps it and how
+many it removed; **Switch off** / **Switch on** a list, and **Show what was removed**. A **restricted** list's members
+are never listed to an analyst; its count is rounded (nearest 5, at least 5) here, in the Op log and in the Dossier.
+
+**First-time hints.** Expand…, the Held tray and Hidden by lists each explain themselves once and name this chapter;
+**Got it** hides the hint in this browser. Keyboard: **G** Expand…, **X** Exclude…, **C** Collapse, **Ctrl+Z** undo —
+not in a text field, grid, menu or dialog.
+
+---
+
+## 8. The analysis catalogue
+
+The right panel's **Analysis** tab.
+
+**Find something interesting** — three plain questions about the graph on screen:
+
+* **Who is busiest** — the five entities with the most links, each in one sentence (*MERCHANT-BIG takes part in 270
+  transfers, the most on this graph.*). When the busiest has at least 5 links and twice the next, it asks: *Add it to
+  an exclusion list?*
+* **Which groups stick together** — groups of three or more that link mostly among themselves (*Group 1: 9 accounts,
+  14 transfers among them within 3 days*).
+* **How does A reach B** — choose **From** and **To**: the shortest chain following the links' direction, or in either
+  direction when there is none (it says which).
+
+Every result row offers **Show on graph**, **Start from these** (a new graph from those entities and one ring) and
+**Add to a list** (purpose in plain words: *Watch these*, *Never follow these*, *Known good*, *Block*; a reason is
+recorded).
+
+**One catalogue, one entry per algorithm**, ordered by the question each answers. The **Browser | Server** switch
+sets where it runs: *Browser* works on the graph on screen; *Server* lists the server algorithms (29 on a standard
+install) and runs them over the whole Dataset or the open Investigation's Working Set, whatever its size, with the
+answer summarised in words and *Highlight on canvas*. Each row shows a badge (*both*, *server*) and its limit (*≤ 2500
+nodes in the browser*); over the browser limit Server is chosen for you and says why. The Server side is hidden on the
+Explorer level and on Basic, with one line saying what has it. Click a ranking row to select and centre that node; a
+long result has **Open in the dock** (the dock's **Results** tab).
+
+| Group | Answers |
+|---|---|
+| **Shortest path**, **All paths** | How are A and B connected? Parallel links between two nodes count as one route, shown with how many links it stands for. |
+| **Explain node** | A node's neighbourhood, degree and role in plain words |
+| **Centrality** | Who is most important or a broker: degree, betweenness, closeness, eigenvector, Katz, PageRank, HITS |
+| **Communities**, **Connected components** | Natural clusters (label propagation, Louvain) and separate islands |
+| **Cycles** | Money or calls that return to where they started, shortest first |
+| **Cut points** | The single node or link that holds the network together |
+| **Cohesive groups** | k-core, triangles, cliques |
+| **Similarity & prediction** | Who looks alike; which links are likely missing |
+| **Suspicion score** | An explainable 0–100 composite with a per-node breakdown; the top decile is highlighted |
+| **Pattern match** | Find a shape ([§9](#9-pattern-matching)) |
+| **Value Measures** | Who stands out by money flow: pass-through, velocity, cash-out concentration, structuring, benefit transfer |
+| **Burst and periodicity** | When activity spikes, and what repeats on a schedule |
+| **Propagated risk** (Server) | Risk spread from scored nodes over the links: *weights* per hop, *seeds*, *nodeScores* (**Fill from indicators**); a ranked table whose *Factors* expand to the contributing origins |
+
+**From a ranking to an Investigation.** Under a ranking, **Start an Investigation from the top results** queues the
+top five nodes on the **Investigation** tab; nothing is created until you give the purpose and press **Start
+Investigation with 5 queued seeds**. On Basic the hint says recorded Investigations are in Standard and above.
+
+**Value Measures** read the whole Dataset in a window of at most 31 days (UTC), not the filtered picture. Choose the
+Dataset and column roles (value, time, link kind) — prefilled from an open Investigation — a window and a Measure;
+**Run Measure** stays disabled, with the reason, until the form is valid.
+
+| Measure | Flags |
+|---|---|
+| **Pass-through** | Accounts forwarding nearly everything they receive (ratio; retention = 1 − ratio) |
+| **Velocity** | Accounts that forward money within hours of receiving it |
+| **Time to cash-out** | How fast received money reaches a cash-out |
+| **Cash-out concentration** | An agent/till taking a large share of all cash-out, and from how many payers (can be limited to an agent Entity List) |
+| **Structuring** | Payees collecting many in-band legs from several payers |
+| **Benefit transfer** | A benefit payment passed on to one counterparty (default: at least 5 recipients) |
+| **Value-weighted links** | Total value and count per pair (a weighting, not a test) |
+
+---
+
+## 9. Pattern matching
+
+**Pattern match** opens on the first pack, with its description; pick a **pattern pack** to pre-fill the motif, edit
+the thresholds (always visible) and run it. *Custom motif* with no kinds set says *Choose a pattern*.
+
+| Pack | Looks for |
+|---|---|
+| **Layering chain** | Money passed through a run of intermediaries |
+| **Pass-through intermediary** | Accounts that receive and immediately forward |
+| **Inbound collector** | Many payers into one account |
+| **Call-forwarding relay** | Calls bounced through a relay |
+| **Circular flow** | Value that loops back |
+| **Shared associates** | Different entities sharing the same contacts |
+| **Layering network (split and merge)** | Money split across three or more parallel intermediaries that re-converge |
+| **Circular financing (branching)** | Two successive split-and-merge rounds of value |
+| **Structuring (smurfing)** | Many small deposits in a band (default 900 ≤ amount < 1 000) → a few intermediaries → re-converging |
+
+A pack that pins link kinds needs a **link kind column**; one with a window or an order ("within N hours") needs a
+**time column**. Left blank, they are filled from the Industry pack (Telecom: `link_kind` and `first_seen`, *Using
+link_kind / first_seen for this pack*). With nothing to fall back on the run button is disabled and names what to set.
+**If a tool says it needs a time column:** add one under **Attribute columns** in ⚙ Settings ▸ Graph model, run the
+query again, then pick it as the **Time column** under **Filter edges by time**; the message is raised at the top of
+the right panel. The browser cannot add a kind column after the graph is drawn: set the link type column and re-run.
+When the data cannot answer the tool **says so and why** instead of "none"; when the loaded graph was truncated, the
+Server side repeats the search across the whole Dataset.
+
+---
+
+## 10. Saving, exporting and the File menu
+
+**File ▾** (the tool rail's first icon):
+
+| Item | What it does |
+|---|---|
+| **New** | Back to *Start from...* |
+| **Open…** | One dialog, two tabs. **Saved views**: search, filter by Tag, Dataset and last change; **Open**, **Rename**, **Duplicate**, **Delete** (asks first), **Version history**, **Comments**, **Tags**, **Offer for sharing**. **Investigations**: the ones you may read plus **Recent**; filter by owner, Dataset, date and status (Recent, Mine, Shared through a Case); type an id to open one directly. |
+| **Save view** | Saves over the open view (with none open it asks a name) |
+| **Save view as…** | A **Name** and optional description; names the lists the graph uses (the list it started from, the exclusion lists you added to) and says once that a saved view re-reads live data and is not evidence |
+| **Save this analysis (Snapshot)** | Freezes what is on screen (the Working Set while an Investigation is open) with a SHA-256 fingerprint; can attach it to a Case or **create a new Case from graph nodes** |
+| **Import / export views** | Moves views between Spaces as a file |
+| **Close** | Back to the start |
+| **Delete** | Deletes the open view or Investigation; names it and asks first |
+
+Without Investigations (Basic, or no Investigations add-on) the menu shows **Start an Investigation from this**
+locked, with one line naming what has it.
+
+A **saved view** keeps the graph's start, mapping, layout, display options, filters and the Entity Lists it uses.
+Opening it draws its start again over the data as it is then — the list's members as they are now, the entities you
+started from and expanded, each with one ring — and hides again whatever its exclusion lists hold now. A view saved
+from **Explore a Dataset** reruns that query. A view names a *Case* only by attaching: a Case is the Incident-management
+record you attach evidence to.
+
+| Other ways out | Notes |
+|---|---|
+| **Attach to Case** (canvas toolbar) | One step: seals what is on screen and attaches it to a Case — an existing one, or **create a new Case from the selected nodes**; with an Investigation open you may also link the Investigation. If a step after the seal fails, the dialog names the sealed snapshot and **Retry** never seals twice. Needs *Incident management*. A masked entity cannot become a Case member: link an Investigation instead, or ask for Reveal rights. |
+| **Export** (tool rail) | PNG, SVG, JSON, GraphML |
+| **Widget** | A view or an Investigation's Working Set on a Dashboard ([§11.10](#1110-widgets-sharing-and-embed)) |
+
+---
+
+## 11. Investigations
+
+Use an Investigation when you need an **auditable** trail: an ordered **Op log** over a **Working Set** you grow and
+prune deliberately. Every step is sealed with what it read, so it replays identically even if the data changes later.
+
+### 11.1 Start one
+
+From **Start from... ▸ One entity** with **Investigate** ([§5.1](#51-start-from)); from a ranking, **Start an
+Investigation from the top results**; or on the **Investigation** tab give a **Purpose / legal basis** and press
+**Start Investigation** (it binds the drawn graph's one Dataset mapping; the query's filter is not carried over and the
+panel says so). Reopen one with **File ▸ Open…** ▸ *Investigations*. Over a pre-aggregated Dataset (one row per pair
+with an event count, like `telecom_links`) the count column is bound so an expand counts events, not rows; the Telecom
+pack binds `events` for you.
+
+### 11.2 The Investigation tab (Act panel)
+
+Top to bottom:
+
+1. **Header:** id, purpose, Dataset, the data-trust chip (**Data details**), the Working Set counts and the degree
+   reached; its `⋯` menu has **Settings…** (⚙ Settings ▸ Investigation settings), **Close** and **Delete**.
+2. The **seed queue**, when it holds anything.
+3. **Expand…** and **Expand next degree** (one hop further, up to degree 4, hubs left out of the frontier and
+   counted), with the four-eyes waiting line when there is one.
+4. **Selected entity:** Seed, Keep, Hide, Exclude, Annotate, Expand one hop, **Choose neighbours…** (tick some, or
+   **Add the 10 strongest**: one expand to only those), its neighbours; **Expand the whole Working Set**.
+5. **Held** (high-connectivity entities, each with its sealed count — *High connectivity — 650 contacts (threshold
+   500), not expanded* — and **Expand anyway**).
+6. **Scope list:** entity ids to **Include (go through)** or **Leave out**.
+7. **More steps ▾:** Time window, Threshold, Snapshot marker, Compare, Connect seeds (each opens in place).
+8. **Last steps** (the last five) and **Open the Op log**.
+
+The full record is in the dock: **Op log** (with **Re-order steps**, which creates a fork), **Working Set rows**,
+**Coverage**, **Annotations** (entity and link) and **Excluded entities**. Clicking a node while an Investigation is
+open **selects** it for the next step.
+
+### 11.3 Steps you can take
+
+| Step | Effect |
+|---|---|
+| **seed** | Put starting entities into the Working Set (by id, or from an Entity List) |
+| **expand** | Follow links: direction, link kinds, time window, minimum events / distinct days, degree bounds, fan-out cap, budget, and the hub threshold (an added entity with more contacts is flagged *high connectivity* and not expanded further unless overridden) |
+| **window** | The time range later expands inherit: from / to, slot, days of the week and **Excluded dates (holidays)** — a date, `FROM..TO`, or a yearly rule `*-MM-DD`, `*-MM-DOW#N` (e.g. `*-11-THU#4`) or `*-MM-DOW#L`, at most 32 rules |
+| **exclude** | Remove entities — a **reason is required** |
+| **hide / keep** | Hide from view only; **keep** protects an entity from exclusion |
+| **annotate** | A note, with an optional confidence grade (NATO/Admiralty, e.g. `B2`), on an entity or a link |
+| **resolve** | Merge identifiers the Space knows to be one person ([§11.7](#117-identity-resolution)) |
+| **undo** | A recorded step that reverts an earlier one |
+
+### 11.4 Large expands need a second person (four-eyes)
+
+An expand whose budget or fan-out cap is above the Space's four-eyes thresholds does not run: it says **waiting for
+approval**, names the request (for example *p1*) and the limit crossed. Someone **other than you** with *Approve link
+expansions* opens the same Investigation, finds it under ⚙ Settings ▸ Investigation settings ▸ **Oversight and
+approvals** (in the console also **Approvals Inbox → Link expansions**), sees in plain words what it will read, and
+presses **Approve** (runs it as your step, stamped with who approved) or **Deny…** (optional reason). Nobody can approve
+their own request; where the Investigation has members only a lead or reviewer may decide. Before you press Expand, the
+form already says *Will need approval from a second person* when it would be held.
+
+### 11.5 Replay, drift, Drafts and Members
+
+* **Replay** re-checks that the log still produces the recorded Working Set; **Re-read** re-runs each recorded query
+  and shows **drift** — what changed in the data since. Both work read-only, so a reviewer can check.
+* **Re-order steps** creates a **fork**: a new Investigation showing its parent; the original is untouched.
+* **Drafts** (⚙ ▸ Investigation settings): **Fork a Draft** (optionally named, up to 80 characters; one live Draft per
+  person, up to 50 open in a Space) to try a side line, then **Conflicts**, **Rebase**, **Promote** (a promote with a
+  sensitive expand waits for four-eyes) or **Discard**.
+* **Members**: lead, analyst, reviewer. A lead can **Grant** and **Revoke**; the last lead cannot be removed.
+
+### 11.6 Working Set rows and Coverage
+
+**Working Set rows** lists entities, links or exclusions with paging and says if and where it is truncated.
+**Coverage** (**Check coverage**) shows which days of the window have no rows at all (*Days with no data* / *Every day
+has data*) — an empty result on a missing day says nothing about activity — and, where the Dataset can tell, days
+covered per Collector.
+
+### 11.7 Identity resolution
+
+Select two entities and **Merge** (canvas toolbar) to open ⚙ Settings ▸ **Identities** with the pair filled in; state
+that they are the same, with a reason. Keys are typed and normalised (`msisdn:+4477…`); a **mapping Dataset** imports
+many pairs at once. The **Identity Fact log** shows its head (fact number and hash) and *Chain verified* (re-checked on
+every read). Inside an Investigation the **resolve** step shows merged nodes; by default this is display only — choose
+**merged** on a step to treat a whole group as one entity. It is reversible: retract an assertion.
+
+### 11.8 Measures and Alert Rules
+
+The **Measures** strip (⚙ ▸ Investigation settings ▸ Measures and templates) shows entity, link and event counts,
+excluded count, deepest hop and links by kind. **Watch** on a Measure creates an **Alert Rule** over the sealed Working
+Set; it fires through the normal alert path, **once, on the count** of breaching entities, and can open an Incident. A
+fired Alert names the Investigation, not the entities — *Open Investigation* on the Alerts page reads them where access
+rules and masking apply. **Save as template** turns the method into a reusable recipe (seeds become parameters; ad-hoc
+exclusions are dropped and the preview says so); **Instantiate** builds a new Investigation from it.
+
+### 11.9 Evidence: snapshot, Dossier, sealed bundle
+
+1. **File ▸ Save this analysis** freezes the screen as a **snapshot** with a SHA-256 fingerprint. A *saved view*
+   re-reads live data; a *snapshot* does not change.
+2. **Build dossier** (⚙ ▸ Investigation settings ▸ Dossier): summary and topology, a ledger of every step with who
+   and why, exclusions, score tables and a **SHA-256 manifest**. Download the *steps* and *method* statements or the
+   JSON. Masked ids stay masked, even inside free-text reasons.
+3. **Verify this manifest** reports anything **changed, missing or added** since.
+4. **Download sealed bundle** — one file for someone outside the system (Dossier + references + a seal); *Verify a
+   bundle…* fails an edited file (*edited after export*).
+5. **Compare and seal** (More steps ▾ ▸ Compare) compares two windows and seals the difference as a step.
+6. **References** — pointers to records in other systems (system, type, id, optional URL); shown as text, never
+   opened, never edited — add a new one to supersede.
+
+### 11.10 Widgets, sharing and embed
+
+* **Case:** an Investigation is yours by default. **Link to Case** lets the owner or assignee of that open Case
+  *read* it until the Case closes. *Shared through Case … (read-only)* marks such a row in File ▸ Open….
+* **Pin to a Widget** puts a Working Set on a Dashboard: **Frozen** (as of a pinned step, the default) or **Live**.
+  Only readers of the Investigation see data; others see *Not available to you*.
+* **Share and embed** gives someone without an account a **read-only, sealed view** through a link (served at
+  `/embed/inv/<token>` by the console and by Inspecto LA). Off unless the host enables embedding; minting needs the
+  share capability **and** being a lead. **Create link** (label, lifetime up to the Space's maximum) shows the link
+  **once** — copy it before **Done**. Each link lists status, expiry and views; **Revoke** cuts access at once.
+* **Read-only toolset.** A Dashboard Widget and the embed viewer show the graph with the viewing tools only (search,
+  filters, layout, fit, display); nothing that changes the graph or the Investigation is offered there.
+
+---
+
+## 12. Entity Lists, Alerts and Geo
+
+* **Entity Lists:** named lists of accounts or numbers (watch lists, agent tills), with ranges, CIDR network ranges,
+  expiry and every change on the record. Add to one from a *Find something interesting* result (**Add to a list**),
+  **Exclude… ▸ Add to a list…**, or, with an Investigation open, the selection. A list can seed or exclude in bulk; a
+  governed list needs a second approver. A Space with no list is offered **first lists to start with** from its pack
+  (Telecom: *Call centres* to leave out, *Lines to watch*; Mobile Money: *Merchants*, *Wallets to watch*).
+* **Alerts:** fired Alerts, and a way into the Investigation behind a standing detection.
+* **Geo:** places entities and routes on a map, over a Dataset with coordinates.
+
+---
+
+## 13. Worked examples
+
+**Find a money-mule ring.** Press **Follow the money (example)**, or open `mule_layering_ring` (on the `la-showcase`
+Space Template: 112 accounts over three days). Analysis ▸ **Suspicion score** ▸ **Score nodes** puts the relays and
+the hub in the top decile. **Pattern match ▸ Structuring (smurfing)** finds `MULE-HUB-01`: 96 in-band legs from 12
+payers. **Value Measures ▸ Pass-through** flags 13 accounts (the two relays at ≈ 0.985, the hub at 0.979, `SHELL-A`
+above 1); **Velocity** shows them forwarding within hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub).
+**Start an Investigation from the top results**, state your purpose, expand one degree; **File ▸ Save this analysis**
+▸ *create a new Case from graph nodes*, tick the hub and relays; **Build dossier**, **Verify this manifest**, and send
+the sealed bundle to the reviewer.
+
+**Find the cash-out point.** **Value Measures ▸ Cash-out concentration** with cash-out kind `cash_out`: `TILL-06` holds
+97 % of cash-out value from 8 payers (reproduced by `ControlApiLaShowcaseFiguresTest`). **Benefit transfer** isolates
+`SKIMMER-01` (6 recipients).
+
+**Check for one person behind two identities.** In the `demo` Space open `roaming_imsi_footprint` (each roaming IMSI
+linked to the visited networks that billed it): IMSI `001010000000042` touches four partners in three days, which
+**Explain node** and **Centrality** surface. Spellings of one operator (*Cinder Wireless*, written four ways) merge into
+one node automatically; for a phone number and a SIM of one person, open an Investigation, **Merge** them (§11.7), then
+**resolve**. *(Unverified: whether the screen announces a count of possible split identities.)*
+
+**Telecom fraud.** The `la-showcase` Space also ships `telecom_fraud_network`, and the `demo` Space other views; the
+telecom demo's six walk-throughs are in [Part II, *Telecom fraud demo*](#telecom-fraud-demo-as-built-2026-10-12).
+
+---
+
+## 14. Who can do what: roles and editions
+
+If a control is greyed out, hover it: it names what is missing.
+
+| You want to | You need |
+|---|---|
+| Explore, analyse, save a view, export | Sign-in |
+| Start an Investigation, take steps, Drafts, link or attach to a Case, add to a watch or block list | *Incident management* (`canManageIncidents`) |
+| Run on the Server side of the catalogue, **Compute risk** | `canRunLinkGraphAnalysis` |
+| Build a link index | `canBuildLinkIndex` |
+| Approve or deny a held large expand (never your own) | *Approve link expansions* (`canApproveLinkExpansions`) |
+| **Watch** a Measure (bind an Alert Rule) | `canAuthorAlertRules` |
+| See real ids instead of aliases | *Reveal* (`canRevealLinkEntities`) |
+| Mint an embed link | `canShareInvestigation` and lead of the Investigation |
+| Change Link Analysis settings, set what a column holds, add an Entity Type | `canAuthorWorkbench` |
+
+**Read-only roles.** Without *Incident management* the Investigation tab says *Changing an Investigation needs the
+Incident management capability - you can read it*: you can open, read, replay, re-read and build, download and verify
+the Dossier; every write control is disabled with that sentence. Without `canAuthorWorkbench`, Settings → Link Analysis
+shows its values with no Save. A refusal shows the server's reason. *Not found* on an Investigation can mean it does
+not exist, is not yours, or its Dataset is no longer shared with you — the same answer on purpose. In the
+`la-showcase` demo, *Demo RA Analyst* and *Demo Manager* are read-only; *Demo FM Analyst* holds manage-incidents,
+graph-run, index-build and Alert Rule authoring; *Demo FM Manager* is the second approver; *Demo Admin* also holds
+`canAuthorWorkbench`.
+
+**Editions and levels.** Link Analysis is in every edition, but what it offers depends on the edition and on the
+Inspecto LA level (see [EDITIONS](../../../../EDITIONS.md) and the [level admin guide](admin-guide-la-level.md)):
+
+| | Basic / Explorer level | Standard and above, with Investigations |
+|---|---|---|
+| Start from..., Expand…, Clean up, Collapse, browser catalogue, saved views, Snapshot | ✓ (exploring only: nothing recorded) | ✓ |
+| Investigations, Op log, Dossier, four-eyes, Drafts, Case history | hidden or locked, with one line naming what has it (*Start an Investigation from this*) | ✓ |
+| Server side of the catalogue | hidden, with the reason | ✓ (with `canRunLinkGraphAnalysis`) |
+| *Read from a database*, *Keep this up to date* on Add data | locked | ✓ |
+
+**Masking.** Per Space, ids are shown *typed* (only sensitive types masked), *all* masked, or *none*; a Space that sets
+nothing uses *typed* in Standard and above and *none* in Basic. The same rule applies on the graph, the node list,
+paths, patterns, Value Measures and the Working Set.
+
+---
+
+## 15. Limits and honest behaviour
+
+* **Views are not evidence; snapshots and Dossiers are.**
+* Nothing is silently dropped: truncation, unmatched values, unvalued rows and refusals are all stated.
+* Time-based tools read times in a stated zone (UTC for Measures); naive timestamps are assumed UTC.
+* The server path search over a Dataset is certified at about one million links; above that the link index (Space
+  setting `index.enabled`, on by default) is measured to 100 million links.
+* An Alert on an Investigation watches its **sealed** Working Set, not live data.
+* **Every limit is a setting.** *Settings → Link Analysis* lists each with its default, range and value in force, in
+  three sections: **Analysis** (the Space's limits — expand budgets, hub threshold, four-eyes thresholds, path depth,
+  page sizes, masking mode, link index, Draft limits, embed link lifetimes — set by a Space administrator), **Host
+  resources** (Graph Run ceilings, index build memory, rate limits — a system administrator), and **My browser**
+  (canvas, labels, layouts and browser algorithm caps for your own machine, never above the Space's value; *Reset to
+  Space value*). A value outside its range is refused with the range. Exact keys and defaults: [Part II, *Grounded
+  limits and consequences*](#grounded-limits-and-consequences-code-read-2026-09-20--2026-09-22).
+* Rate limit: a burst of 20 requests per user, then one every 3 seconds.
+
+---
+
+## 16. Troubleshooting
+
+| You see | It means / do this |
+|---|---|
+| A control is greyed out | You lack the capability or edition named in its tooltip; ask your administrator |
+| **Truncated** | A cap cut the data. Narrow the query, or use the Server side of the catalogue |
+| *No preview on this server* in Expand… | The server is older than the preview; Expand anyway — the result line says what it added, with Undo |
+| Layered is greyed out | The graph is wide and shallow (more than 60 nodes on one rank); use Force |
+| `masked:…` everywhere | Your Space masks sensitive ids; ask for Reveal rights if you need real ids |
+| *Waiting for approval* | The expand is above the four-eyes limit; a second approver opens the Investigation (§11.4) |
+| *Investigation is not available* / not found | It does not exist, is not yours, or its Dataset is no longer shared; ask its owner to add you |
+| *No node on this graph can become a Case member* | The entities are masked; link an Investigation to the Case, or ask for Reveal rights |
+| A tool says it needs a time column | The pattern is time-ordered; see §9 |
+| A pattern finds nothing on a big graph but should | The browser graph was truncated; switch the catalogue to Server |
+| *Every node mapping needs a Dataset and an id column* | Fill every required field in Graph model before Run query |
+| Merged step refused | No **resolve** is in force at that point; add one first |
+| *The analysis was not saved* with a reason | The server refused it; usually a missing capability |
+| *That is over a size limit, so nothing was stored.* (413) | Narrow the step (fewer seeds, shorter window) or fork a smaller Investigation |
+| *Too many requests…* (429) | Wait a few seconds and retry |
+| Sign-in: **The server could not start a session** | The server's message is shown with **Try again**; an administrator fixes the configuration |
+| Sign-in: **Single sign-on isn't set up** | Ask the administrator |
+| *The server requires sign-in, but this page started without a session* | Reload to sign in |
+| *No Space is attached …* (503) | An administrator must add or create a Space |
+
+---
+
+## 17. Vocabulary
+
+| Word | Meaning |
+|---|---|
+| **Dataset** | A table of rows Link Analysis reads |
+| **Entity / node / link** | An account, number or device; a transfer or call folded from rows between two of them |
+| **Entity Type** | The kind of thing a column holds (Account, Phone number); two columns join only on the same type |
+| **Industry pack** | The Space's domain words and suggested tools (Telecom, Mobile Money, Generic) |
+| **Saved view** | A named graph start plus the Entity Lists it uses; re-reads live data |
+| **Snapshot** | A frozen copy of what was on screen, with a fingerprint |
+| **Investigation** | The recorded, replayable work |
+| **Working Set** | The entities an Investigation currently holds |
+| **Op log** | The ordered steps of an Investigation |
+| **Draft** | A side line forked from the main log |
+| **Dossier** | The evidence document built from an Investigation |
+| **Entity List** | A named set of entities (watch, exclusion, known good, block) |
+| **Identity resolution** | Declaring that two identifiers are one entity |
+| **Measure** | A computed figure over a Dataset or Working Set, such as pass-through ratio |
+| **Alert Rule** | A saved condition that raises an Alert when a Measure crosses a level |
+| **Incident / Case** | The operational records you escalate to |
+| **Space** | Your team's workspace, with its own Datasets, members and settings |
+
+---
+
+## 18. If you used the old Studio
+
+The Studio was reorganized on 2026-10-27 (`LA-STUDIO-UI-REORG-1`). Nothing was removed; this is where things went.
+
+| Old | Now |
+|---|---|
+| Query panel (left) | ⚙ Settings ▸ **Graph model** (status-bar chips and the pencil open it; **Refresh** in the status bar) |
+| Grow (popover, rung form) | **Expand…** dialog (**G**) — Degrees 1..N, *Hold supernodes*, Advanced: link kinds |
+| Domain profile picker | None — the Space's **Industry pack** applies, shown in Graph model |
+| Save as a case (saved view) | **File ▸ Save view** / **Save view as…** |
+| Open saved views | **File ▸ Open…** ▸ *Saved views* |
+| Toolbox → View tab | The tool rail (layout, filters, Display options) and **Canvas mode** |
+| Toolbox → Analysis tab, *All algorithms (server)* | Right panel ▸ **Analysis**: one catalogue with **Browser \| Server** |
+| Selection bar, box select | Canvas toolbar selection group; **Shift+drag** lasso in Pan, or Lasso mode |
+| Investigation tab's Case, Members, Drafts, Oversight, Dossier cards | ⚙ Settings ▸ **Investigation settings** |
+
+---
+
+# Part II — Reference
+
+*The as-built reference for engineers, support and power users: grounded limits, server analysis, the link index,
+evidence and the design records, each dated where it was built. Where it and Part I differ on a control's name, Part I
+(today's Studio) is right; the dated records below describe the behaviour, not the current layout.*
 
 > **Product vs capability (`ED-1`, 2026-10-17).** The product is **Inspecto LA (Link Analysis)**: the standalone `la-app`
 > (browser tab, rail brand, landing heading, sign-in screen) says *Inspecto LA*. The capability on this page keeps the
@@ -52,7 +907,7 @@ distinct ([`GLOSSARY.md`](../../../../GLOSSARY.md) §11): this studio works on *
   (column → source/target Entity, optional columns → Link type/attributes).
 * **Rendering** — the shared G6 host (`src/app/inspecto/graph/`), reused by the Catalog graph and the
   Geo co-location bridge. Nodes are canvas-drawn — verify inspector logic in unit tests, not preview clicks.
-* **Toolboxes** — Layout (14 G6 layouts; tree shapes gated to acyclic data) and Algorithm, plus
+* **Layout and algorithms** (Graph layout on the tool rail; the Analysis catalogue) — Layout (14 G6 layouts; tree shapes gated to acyclic data) and Algorithm, plus
   paths/neighborhood/centrality analysis. The **V2 algorithm depth** (2026-07-24) lives in the pure,
   framework-free `inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts` library (the extension seam — a new algorithm is a
   pure `(g: G6GraphData, …) ⇒ result` drop-in) and is surfaced as accordion groups in
@@ -85,7 +940,7 @@ distinct ([`GLOSSARY.md`](../../../../GLOSSARY.md) §11): this studio works on *
   → a Dataset named `<base>`, linked to its `id` column or a same-named column), so the Studio can
   pre-fill multi-mapping projections instead of requiring every column pair hand-picked. Self-references
   (e.g. `manager_id`) are included; unusable Datasets are skipped, not fatal.
-  **2026-07-24 shipped four V2 tracks** (see Toolboxes above): advanced traversal, the algorithm
+  **2026-07-24 shipped four V2 tracks** (see Layout and algorithms above): advanced traversal, the algorithm
   library, suspicion scoring, and pattern packs. **2026-07-24 also shipped the timeline**: a pure
   `filterByTime(g, attrCol, cutoff)` in `graph-analysis.ts` (edges only — an edge survives only when its
   `attrs[attrCol]` parses as a date on or before the cutoff; nodes are untouched, same non-mutating
@@ -480,7 +1335,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   most 31 days (a `from`/`to` with `Z` or an offset is normalised to UTC). No view filter is accepted, so a `≥ 5 000` view cannot hide structuring. An Alert Rule binds one
   through `POST /inv/investigations/{id}/alert-rules` with `valueMeasure:{…}` and fires when at least one entity
   breaches (one Alert per rule). Definitions, defaults and deviations: plan §2.6.1. **SPA** (2026-09-30): the
-  Investigation side pane's *Value Measures* panel and, since 2026-10-12, a *Value Measures* toolbox group (one entry, console studio and la-app alike; seeds the Query panel's Dataset and columns via the `mapping` input; Watch stays in the Investigation panel) (`link-analysis-value-measures.component`, `value-measures.ts`)
+  Investigation side pane's *Value Measures* panel and, since 2026-10-12, a *Value Measures* entry in the Analysis catalogue (one entry, console studio and la-app alike; seeds Graph model's Dataset and columns via the `mapping` input; Watch stays in the Investigation panel) (`link-analysis-value-measures.component`, `value-measures.ts`)
   — Dataset + role autocomplete, threshold fields left blank for the server default and re-filled with the values
   in force after a run, `truncated` / `unvalued` shown as counts, *Watch* only over the open Investigation's own
   Dataset and roles, sending the answered `measure` block verbatim. ⛔ `valueMeasureQuery` never sends a `filter`.
@@ -1289,10 +2144,9 @@ betweenness and suspicion).
 
 **Closed 2026-10-02:** `LA-COVERAGE-FLOOR-HOME-1` — the Link Analysis routes are tested in `inspecto-geo-link`, so geo-link's coverage profile writes `jacoco-aggregate/jacoco.csv` and `tools/check-coverage.mjs` keeps the best row per class (CI green on `950455149`; the floor stays 78.0%). `LA-INDEX-FINGERPRINT-COST-1` — the input-fingerprint file cap (`InputFingerprint.MAX_FILES`) is 10,000, not 100,000; above it the existing `too-many-files:` sentinel applies (the index claims nothing about staleness). `LA-INDEX-READER-POOL-1` — `IndexReader.borrow` reuses idle sealed connections per version directory (max 4 idle) and borrowing a newer sibling version closes the older one's handles; `IndexedRecursivePaths` uses it (nothing calls `evictAll()` at service close yet). `LA-INDEX-STAGE-RACE-1` — `IndexStore.stage()` retries on `FileAlreadyExistsException` (the directory creation is the atomic claim), covered by a 16-thread test. `LA-INDEX-BUILDER-TEST-TIMING-1` — the cancel test now polls for bytes in the stage instead of sleeping 1500 ms (the 30M-row size and its ~2 GB spill are unchanged). `LA-GRAPH-RUN-CANCEL-STARTER-COVERAGE-1` — a Case-team member who can read the Investigation but did not start the run now gets 404 on cancel (a mutant removing the route-level starter clause turns this into a 403 that would confirm the run exists; the new test kills it).
 
-**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-A11Y-AUDIT-1`. Also: `LA-APP-REAL-SIGNIN-1` (la-app OIDC never run against a real IAM). **Accessibility, second pass 2026-10-03** (`LA-A11Y-LIVE-REVERIFY-1` closed): axe 4.12.1 re-run in a real browser in both schemes — the loading-bar name, the Cliques result-button height (min 24 px) and the light scheme hold. Fixed in the shell and the Link Analysis panels: `<footer>`, `role="navigation"` on the nav host and `role="status"` on the loading bar (axe `region`), `ariaModal: true` on every Material dialog via `MAT_DIALOG_DEFAULT_OPTIONS` (⚠ that token REPLACES `new MatDialogConfig()`, so spread it or the dialog loses `role`), and `text-secondary` instead of `opacity-60` on the Query / Toolbox / Filter predicate headings (light contrast). The app has no scheme toggle, so light was driven through `GammaConfigService`; finish `document.getAnimations()` before an axe run after a live switch or stalled transitions read as a contrast failure. **Seventh pass 2026-10-05 (real browser, Demo User auth):** the docks STACK below `md` (`max-md:flex-col` on the workspace, `max-md:!w-full` on both asides, `max-md:hidden` on the drag handles) because a row of fixed-px docks left the canvas 0 px wide at 320 px (400% zoom); the Toolbox header row wraps; G6's stacked canvas layers are one tab stop (first 0, rest -1). Axe was clean on every driven state; screen-reader reading, forced-colors paint, Dossier / identity dialogs remain unverified (see the `LA-A11Y-AUDIT-1` row). **Third pass 2026-10-03 (specs only, not driven live):** the shared graph host `inspecto-graph-view` is `role="figure"` with an `aria-label` giving the node and link counts (`graphSummaryLabel`), and the positive `tabindex="1"` G6 puts on its canvas layers is reset to `0` once `render()` resolves (`demotePositiveTabindex`) — the canvas stays focusable for G6's keyboard behaviours but no longer jumps the tab order. The remaining option-D phases are in
+**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-A11Y-AUDIT-1`. Also: `LA-APP-REAL-SIGNIN-1` (la-app OIDC never run against a real IAM). **Accessibility, second pass 2026-10-03** (`LA-A11Y-LIVE-REVERIFY-1` closed): axe 4.12.1 re-run in a real browser in both schemes — the loading-bar name, the Cliques result-button height (min 24 px) and the light scheme hold. Fixed in the shell and the Link Analysis panels: `<footer>`, `role="navigation"` on the nav host and `role="status"` on the loading bar (axe `region`), `ariaModal: true` on every Material dialog via `MAT_DIALOG_DEFAULT_OPTIONS` (⚠ that token REPLACES `new MatDialogConfig()`, so spread it or the dialog loses `role`), and `text-secondary` instead of `opacity-60` on the panel and filter-predicate headings (light contrast). The app has no scheme toggle, so light was driven through `GammaConfigService`; finish `document.getAnimations()` before an axe run after a live switch or stalled transitions read as a contrast failure. **Seventh pass 2026-10-05 (real browser, Demo User auth):** the docks STACK below `md` (`max-md:flex-col` on the workspace, `max-md:!w-full` on both asides, `max-md:hidden` on the drag handles) because a row of fixed-px docks left the canvas 0 px wide at 320 px (400% zoom); the Toolbox header row wraps; G6's stacked canvas layers are one tab stop (first 0, rest -1). Axe was clean on every driven state; screen-reader reading, forced-colors paint, Dossier / identity dialogs remain unverified (see the `LA-A11Y-AUDIT-1` row). **Third pass 2026-10-03 (specs only, not driven live):** the shared graph host `inspecto-graph-view` is `role="figure"` with an `aria-label` giving the node and link counts (`graphSummaryLabel`), and the positive `tabindex="1"` G6 puts on its canvas layers is reset to `0` once `render()` resolves (`demotePositiveTabindex`) — the canvas stays focusable for G6's keyboard behaviours but no longer jumps the tab order. The remaining option-D phases are in
 [`la-separation-feasibility-plan.md`](../../../../archived-documents/plans-archive/la-separation-feasibility-plan.md) §7.8.
 
-* **Tool rail (2026-10-10, operator: "link analysis left menu, not top, we need more canvas height").** The old second row of ~22 icon buttons is now a vertical `<nav aria-label="Link Analysis tools" data-testid="la-tool-rail">` docked left of the workspace in one flex row (`link-analysis.component.html`); the same buttons, aria-labels, tooltips and DOM/keyboard order, except the four exports, which sit behind one *Export the graph* menu (items keep *Export as PNG/JSON/SVG/GraphML*) and *Attach to Case*, now icon-only with the count as a corner badge. A `nav`, not a `role="toolbar"`, because a toolbar promises roving focus and the rail mixes menu triggers and host slots. The workspace no longer has `height: calc(100dvh - 17rem)`: it is `flex-auto min-h-[28rem]` inside the `h-full` page, so the canvas fills the window (the G6 host's existing `ResizeObserver` re-fits it); the Data strip keeps its own height. Under `md` the rail wraps back into a row above the stacked docks. Measured in a real browser 2026-10-10 (`ng serve` proxied to the :8096 demo, 1440x900 and 935x700): the fill-mode `inspecto-graph-view` is `flex-auto`, which is inert in a block parent, so G6 kept its 480px default inside a 1012px zone; its wrapper is now `flex flex-col` (canvas 956px at 1440x900) with `max-md:min-h-[480px]` so the stacked layout does not shrink below the old height. **Viewport bound (2026-10-10, lane `la-viewport`).** The shell has no fixed height (header `h-16` + `main` + footer `h-14`, so the document is as tall as its content); the LA root is now `h-[calc(100dvh-var(--shell-chrome-height,7.5rem))] max-md:h-auto` (7.5rem = header 4rem + footer 3.5rem; a host with different chrome sets `--shell-chrome-height`), the workspace row is `min-h-0 overflow-hidden` (`max-md:min-h-[28rem]`), the dock bodies and the rail scroll internally, the Data strip stays `shrink-0`. Measured in a real browser as Demo FM Analyst, Space demo, mule_transfers_dataset (`md` is 960px in `tailwind.config.js`, not 768): 1440x900 document 900 = viewport (was 1414), root 780, row 638, footer 844-900 visible, Data strip 50px at 778-828, canvas 462x498 with both docks open (974x528 after *Hide the side panels*), Query body 579px client / 872 scroll, Toolbox 587/1101, rail 628 client / 856 scroll; 1280x720 document 720, row 458, canvas 302x239 (zone 318 wide), Query 399/872, rail 448/856; 1000x700 document 700 but with the 280px nav open the canvas zone is only 38px wide until the panels are hidden (pre-existing width squeeze, not height); 935x700 is stacked: page scrolls (2494), canvas 480 high, 870 wide, rail wraps to 88px (92 scroll). Spec: `bounds the page to the viewport at md+` (mutation-checked: root back to `h-full` goes red). The rail (`overflow-y: auto`) does not clip at either size; stacked, its wrapped row reports 4px of scroll overflow, visible. **Height and width pass (2026-10-10, lane `la-height`, operator decisions after the real-browser numbers above).** (1) *Short windows:* the root is `h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)]` and the workspace row `min-h-[26.25rem]` (420px), so a window too short for that scrolls the PAGE instead of crushing the canvas (the old 1280x720 canvas was 239px high). (2) *More height:* the shell's `classic-layout` hides its footer for a route with `data: { hideShellFooter: true }` (set on `link-analysis` in `studio.routes.ts`; `ClassicLayoutComponent.footerHidden` walks the active route chain on init and on every `NavigationEnd`) and then sets `--shell-chrome-height: 4rem` on its wrapper, which the LA root already reads, so other pages keep footer and 7.5rem; the dense layout and la-app (own chrome var) are untouched. The old *Active query* status panel is gone: its chips, the edit pencil and the node/link counts are projected into the compact page header's `[badge]` slot (`data-testid="la-status"`, one clipped line, and with a graph loaded it replaces the one-line subtitle so the title row never wraps); root padding `p-4` -> `p-2`, header gap `mt-3` -> `mt-1`, canvas-zone padding `p-2` -> `p-1`. The timeline playback bar was ALREADY conditional on a Timeline column being set, so it is unchanged. (3) *More width:* the Query dock's default is 220px (min 200, max 560; the Toolbox stays 340), and `initialToolboxOpen()` starts the Toolbox dock collapsed to its rail when `matchMedia('(max-width: 1299px)')` matches (a browser without `matchMedia`, such as jsdom, counts as wide); any later open or close is written to `sessionStorage` `inspecto.la.toolboxOpen` (the first value is not a choice and writes nothing) and wins on the next visit this session. A split width already stored by a user (`inspecto.split.link-analysis.query`) keeps winning over the new default. Measured in a real browser 2026-10-10 (Demo FM Analyst, Space demo, mule_transfers_dataset, `ng serve` proxied to :8096; ⚠ call `document.getAnimations().forEach(a => a.finish())` before measuring, the docks' width transition otherwise reads its start value): 1440x900 document 900 = viewport, no footer, header 40px, row 718, canvas 506x708 (was 462x498), Query 220, Toolbox 340 open; 1280x720 document 720, row 538, canvas 652x528 (was 302x239), Toolbox collapsed (opening it from the rail gives 346x480 and survives a reload); 1000x700 document 700, row 518, canvas 372x508 (was 22 wide), Toolbox collapsed; 1280x500 document 624 (page scrolls), row 442, canvas 637x432; `/home` still shows its footer. The rail scrolls inside itself (clientHeight < scrollHeight) and is not clipped. Specs: `keeps the canvas row at least 420px high`, `puts the active-query status chips in the page-header title row`, `Toolbox dock start state (width)` (four), `docks are narrower by default`, and the `classic.component.spec.ts` footer-by-route spec; each mutation-checked.
 * **Starter cards, Dataset suggestions and result actions (2026-10-10, operator walkthrough as Demo FM Analyst: "the screen gives a new user nothing to do").** (1) The empty canvas is `inspecto-link-analysis-starter-cards` (heading still "No graph yet"): *Follow the money (example)* loads the saved view `pickFollowTheMoney` chooses (an Entity/Link view over a Dataset this Space has, scored by money words in its name/description; `mule_layering_ring` in the demo; the card is **hidden** when none scores), *Explore a Dataset* shows the Query dock and calls `LinkAnalysisQueryPanelComponent.startExplore()` (opens the Dataset picker; the next pick that yields a full mapping also runs the query), *Open a saved view* opens the rail's own saved-views menu (hidden with no views). (2) `la-starter.ts` is the pure core: `suggestLinkColumns` (role pairs payer/payee, sender/receiver, caller/callee, src/dst, origin/destination, parent/child, source/target, from/to, a/b over string-like columns, a shared remainder such as `_ACCOUNT` scores higher), `rankDatasets` (link-shaped first, hint = reason + description first sentence + column preview), `topSeeds`. A Dataset that declares no columns is probed through the existing `DatasetRowsService.columns` seam, at most 12, in the background; row counts are NOT shown because no existing Dataset metadata carries one (no new route). Picking a Dataset pre-fills a blank Source/Target (never an existing mapping) and shows a note; `LaDataset` gained an optional `description`. `inspecto-option-picker` has an opt-in `outlined` input (bordered trigger) used by the Query dock; the default stays the borderless property row. The Derive mapping line explains in plain words why it is disabled for an analyst. (3) A ranking row in Centrality, Suspicion score and Similarity calls `pickNode` -> `nodePick` -> `onNodePick`: emphasis, `GraphViewComponent.centerOn` (`graph.focusElement`, no animation; measured: the node lands within 3px of the canvas centre) and, while an Investigation is open, selects it. `inspecto-link-analysis-result-next` adds the hint and **Start an Investigation from the top results**, which fills `InvestigationSessionStore.queuedSeeds` (top 5, masked pseudonyms skipped) and opens the Investigation tab; **nothing is created or seeded** until the analyst presses Start (one `seed` op with all queued raw ids, then the queue empties) or, on an open Investigation, *Seed the queued entities*. No route, inventory row or capability changed.
 * **Graph text alternative and toolbox tablist (2026-10-03, fourth accessibility pass).** The canvas toolbar's *Show as list* toggle (`aria-pressed`) swaps the `<canvas>` for `inspecto-link-analysis-node-list` over the same `canvasData()` (masked ids as drawn; the Working Set over an open Investigation): a `role="grid"` of nodes (roving tabindex, Arrow / Home / End; Enter or Space goes through `onNodeClick`, as a canvas click does) with the selected node's links under it, paged at 500 nodes and 500 links; the canvas is `inert` meanwhile and its figure name points to the list. The Analysis / View / Investigation switch is a `role="tablist"` with `tabpanel` panes (roving tabindex, Arrow / Home / End). Proved with axe 4.12.1 in a real browser (0 violations, G6 `tabindex` 0).
 
@@ -1905,7 +2759,7 @@ counts, never edge timestamps, so only the Dataset routes (which read the `timeC
   gained a "Series per: Each link / Each entity" selector (`series` on the wire); an entity finding highlights its NODE
   and is listed by name. ✅ Sealing a finding set as a `temporal` op shipped 2026-10-05 (below, *The `temporal` op*).
 * **SPA overlay (2026-10-05).** `link-analysis-temporal-findings.component.ts` is a panel under the Analysis tab of the
-  Toolbox (a sibling of the toolbox, shown/hidden with `[class.hidden]`). It needs a **time column** and an **edge mapping**
+  Analysis panel (a sibling of the catalogue, shown/hidden with `[class.hidden]`). It needs a **time column** and an **edge mapping**
   (the host's `traversalTargets`, the same ones server paths and the server pattern use), calls
   `InvService.temporalPattern` and hands the answer to the pure `temporal-findings.ts` (`temporalResultToState`).
   🔴 Unlike `recursivePathsToGraph` / `branchingResultToGraph` it **never adds nodes or links**: each finding's raw
@@ -2231,7 +3085,7 @@ gets 403; press it after seeding rather than waiting for the cron. The benign ta
 talking point (high connectivity is not guilt), not a defect. Offline smoke: `node tools/la-demo-smoke.mjs --telecom`. The same runner also probes the newer behaviour (empty-Dataset 409, read-only persona, settings round-trip, sign-in picker; `--embed` for the embed link when the host runs `-Dla.embed.enabled=true`).
 Live run recipe: build the bundle in a worktree and serve it on a free port (e.g. :8099), never the shared :8080.
 
-**Read-only access (client gates, 2026-10-12).** Every Link Analysis SPA write control asks the same `LensService` signal the server route gates on (`canManageIncidents`, `canAuthorAlertRules`, `canAuthorWorkbench`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`) and, without it, is disabled with a visible reason (`aria-describedby`) or replaced by a note: Investigation start and step handlers (also inert on Enter), Case link, Members grant/revoke, References add, Templates save/instantiate, bound-rule edit, the Identity Fact log (read AND import). The Dossier, bundle download and both verify POSTs are read-shaped and stay enabled. The user-facing table is `okf/product/module/la-core/user-guide-manual.md` section 11.
+**Read-only access (client gates, 2026-10-12).** Every Link Analysis SPA write control asks the same `LensService` signal the server route gates on (`canManageIncidents`, `canAuthorAlertRules`, `canAuthorWorkbench`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`) and, without it, is disabled with a visible reason (`aria-describedby`) or replaced by a note: Investigation start and step handlers (also inert on Enter), Case link, Members grant/revoke, References add, Templates save/instantiate, bound-rule edit, the Identity Fact log (read AND import). The Dossier, bundle download and both verify POSTs are read-shaped and stay enabled. The user-facing table is Part I [§14](#14-who-can-do-what-roles-and-editions).
 
 ## Data trust (LA-DATA-TRUST-1, as built 2026-10-14)
 
@@ -2251,9 +3105,9 @@ The analyst's answer to *what data am I looking at*: a **Data strip** above the 
 
 ## Studio layout (`LA-STUDIO-UI-REORG-1` phases 1-3, as built 2026-10-27)
 
-This supersedes the layout parts of *Graph page UX* and *i2-gap work* below (the selection bar, the box select, the
-View tab, the left Query panel and the Domain profile picker are gone). The end-user walk-through is
-[user-guide-end-user.md](user-guide-end-user.md) §4-§8; the design is archived as `docs/archived-documents/plans-archive/la-studio-ui-reorg-plan.md` and the as-built
+This supersedes the layout parts of *Graph page UX* and *i2-gap work* below (the older controls are gone; see
+[Part I §18](#18-if-you-used-the-old-studio)). The end-user walk-through is
+[Part I §4–§11](#4-the-screen); the design is archived as `docs/archived-documents/plans-archive/la-studio-ui-reorg-plan.md` and the as-built
 facts are in [architecture.md](architecture.md) §6.14.
 
 - **One header row (visual polish, operator 2026-10-28):** `header[data-testid="la-header"]` holds the title
@@ -2273,7 +3127,7 @@ facts are in [architecture.md](architecture.md) §6.14.
   `mat_outline:open_with`, distinct from full screen —, Collapse, Hide, Exclude and Merge only with an Investigation
   canvas, Attach to Case), Clean up (a broom, `mat_outline:cleaning_services`; heroicons has none), `la-group-held`
   (Held, Hidden); when the Studio header row is narrower than 1,350 px (its own width, so the console side nav counts) the groups after Canvas mode fold into `la-canvas-tools-more`. The G6 `brush-select` box is removed; a saved view naming it opens as Pan.
-- **Expand dialog** (replaces the Grow popover and the rung form): From, Direction, Degrees, *Hold supernodes above
+- **Expand dialog** (replaces the earlier popover and rung form): From, Direction, Degrees, *Hold supernodes above
   H links*, Advanced; preview line first; in an Investigation one `expand` step per degree under one undo group.
 - **Collapse** folds the pendant neighbours (links read undirected) into a `+n` badge; display state only, also in
   an Investigation. **Clean up** (`inspecto-link-analysis-cleanup`) states its effect, then Apply / Cancel; in an
@@ -2423,8 +3277,8 @@ The page-title row in the footer renders the explain control through the `LA_AI_
 
 ## Getting started (LA-ONBOARD-1, as built 2026-10-22)
 
-The beginner's path, step by step, is in the [end user guide](user-guide-end-user.md) §2 and §3; the reference is
-[user guide manual](user-guide-manual.md) §2. In short:
+The beginner's path, step by step, is in the [Part I §2 and §3](#2-quick-start-from-a-blank-install-to-a-first-finding); the reference is
+[Part I §5.1](#51-start-from). In short:
 
 - **Getting started page.** Until the current Space holds a Dataset (or while there is no Space), the la-app front page
   is **Getting started**: **Try the sample** (the `la-sample` Space Template: invented transfers with a planted mule
@@ -2454,7 +3308,7 @@ as *Data builder*; the id is unchanged in `roles.toon` and the console (2026-10-
 **Entities and Columns.** The **Entities** page lists the Entity Types the Space's data holds (primary types first,
 the rest under **Not in your data**); its **Columns** tab sets what each identifier-like column holds and each
 Dataset's primary Entity Type, and **New Entity Type** adds one. These writes need `canAuthorWorkbench` with sign-in.
-Detail: [user guide manual](user-guide-manual.md) §4.5.
+Detail: [Part I §3.3](#33-entities-what-the-columns-hold).
 
 ## Start from one entity, a list, a paste or a Dataset
 
@@ -2464,7 +3318,7 @@ The first screen of Link Analysis is the **Start from...** box: pick the **Datas
 reported) or **The whole Dataset** (warned first when it holds more Entities than the projection node cap). A list or
 paste draws its first 25 values and reports the rest as "N more values not drawn". A start
 draws through the neighbours read, one per value, holds busy neighbours above the Space's hub threshold and marks the
-starting entities as grown, so **Grow** continues from the ring. On the Investigations level, **One entity** seeds an
+starting entities as grown, so **Expand…** continues from the ring. On the Investigations level, **One entity** seeds an
 Investigation (a Domain Profile that investigates the type binds its own mapping); a list or a paste is drawn and queued
 as the first seeds. **Investigate** on an Entity profile takes the same path. Which Datasets can start a graph: the
 Dataset's `defaultLinkMapping`, else a Domain Profile `investigate` mapping, else the first saved view over it, else its
