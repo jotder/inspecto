@@ -579,9 +579,10 @@ optional pack field; no route was added.
   written, so an id such as `msisdn` (a data contract) passes while a label `MSISDN` does not. The pack term files are
   the only place the words may live. `IndustryPack.MEASURES` mirrors `ValueMeasures.ALERTABLE`
   (`ValueMeasuresPackKeysTest`).
-* **Residuals.** The SPA renders the concept, Entity Type and Measure relabels and the term table; `link_kind.*`,
-  `pattern.*` and `term.*` relabels are published and listed but not yet drawn on the canvas legend or the pattern
-  picker. The node-risk mapping and the pattern-pack column defaults in the SPA are still keyed by the `telecom` id.
+* **SPA relabels.** The SPA renders the concept, Entity Type and Measure relabels and the term table; the canvas
+  legend reads `link_kind.*` and the pattern picker `pattern.*` (label and definition), and the tool-rail glossary
+  popover lists the pack's typology terms `term.*` (2026-10-18, `link-analysis-glossary.component.ts`). The guard
+  above already bans every `term.*` label and abbreviation in core text. **Residuals.** The node-risk mapping and the pattern-pack column defaults in the SPA are still keyed by the `telecom` id.
 
 ## 4. Link index (la-storage)
 
