@@ -164,3 +164,60 @@ export function resetLaLimits(): void {
 export function clampLimit(v: number, min: number, max: number): number {
     return Math.min(Math.max(v, min), max);
 }
+
+/**
+ * The most nodes Layered (dagre LR) may stack in one rank. LR stacks a rank top to bottom, so a wide, shallow graph
+ * (300 claims under a handful of providers) draws as a column tens of thousands of pixels tall and a few hundred
+ * wide: Fit needs a zoom below the canvas floor (0.05), and even unclamped it is an unreadable sliver.
+ */
+export const LAYERED_MAX_RANK_WIDTH = 60;
+
+/**
+ * The size of the widest rank Layered would draw: longest-path ranks over the edges, with edges that close a cycle
+ * (found by a depth-first walk) left out — the ranking dagre starts from.
+ */
+export function layeredWidestRank(g: { nodes: { id: string }[]; edges: { source: string; target: string }[] }): number {
+    const out = new Map<string, string[]>(g.nodes.map((n) => [n.id, []]));
+    for (const e of g.edges) if (e.source !== e.target && out.has(e.target)) out.get(e.source)?.push(e.target);
+    // Iterative DFS: drop back edges, record a post-order (reverse = a topological order of what is left).
+    const state = new Map<string, 1 | 2>();
+    const post: string[] = [];
+    for (const root of out.keys()) {
+        if (state.has(root)) continue;
+        const stack: [string, number][] = [[root, 0]];
+        state.set(root, 1);
+        while (stack.length) {
+            const top = stack[stack.length - 1];
+            const next = out.get(top[0])!;
+            if (top[1] < next.length) {
+                const t = next[top[1]++];
+                if (state.get(t) === 1) next.splice(--top[1], 1);
+                else if (!state.has(t)) {
+                    state.set(t, 1);
+                    stack.push([t, 0]);
+                }
+            } else {
+                state.set(top[0], 2);
+                post.push(top[0]);
+                stack.pop();
+            }
+        }
+    }
+    const rank = new Map<string, number>();
+    for (let i = post.length - 1; i >= 0; i--) {
+        const r = rank.get(post[i]) ?? 0;
+        rank.set(post[i], r);
+        for (const t of out.get(post[i])!) rank.set(t, Math.max(rank.get(t) ?? 0, r + 1));
+    }
+    const width = new Map<number, number>();
+    for (const r of rank.values()) width.set(r, (width.get(r) ?? 0) + 1);
+    return Math.max(0, ...width.values());
+}
+
+/** Why Layered is off on this graph: one rank is too wide to read; null when it can be picked. */
+export function layeredShapeReason(g: Parameters<typeof layeredWidestRank>[0] | null): string | null {
+    const w = g ? layeredWidestRank(g) : 0;
+    return w > LAYERED_MAX_RANK_WIDTH
+        ? `draws an unreadable sliver — ${w.toLocaleString()} nodes in one rank (at most ${LAYERED_MAX_RANK_WIDTH})`
+        : null;
+}
