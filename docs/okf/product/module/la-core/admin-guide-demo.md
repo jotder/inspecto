@@ -423,8 +423,9 @@ timings are in the [whitepaper](brochure-inspecto-la-whitepaper.md) §6.4. What 
 * **Recalibrate thresholds on a full day.** The extract's thresholds fired hundreds to hundreds of thousands of times on
   the production day. A Dataset Measure Alert Rule is edge-triggered: resolving its Alert by hand does not re-arm it while the
   measure stays breached, and a restart rebuilds the open-breach state from OPEN Alerts.
-* **Four-eyes beat.** A plain degree expand is bounded by the UI default and does not wait for approval. Use *Expand
-  the whole Working Set* (or an expand with no ids) to show the held request.
+* **Four-eyes beat.** An expand carries the active Domain Profile's fan-out cap; where the profile sets none, the
+  expand is unbounded and is held above the Space's `four_eyes_fan_out_above` (the *Investigate* card too). The held
+  degree says so and what to do: ask an approver, or use *Expand…* with a fan-out at or below the threshold.
 * **Bundle.** `package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`. The la-app UI has no Incidents or Cases
   page, so show the Alert, Incident and Case through the full SPA or by API. The saved-view picker opens its submenu on
   hover; a plain click on the row only closes the menu.
