@@ -114,6 +114,7 @@ describe('landingGuard after a Demo User sign-in (real SessionService, real Menu
     async function signInAndLand(): Promise<{ http: HttpTestingController; landing: () => Promise<string> }> {
         sessionStorage.clear();
         localStorage.removeItem(RESUMABLE_KEY);
+        localStorage.removeItem('inspecto.currentSpace'); // a Space left active by an earlier spec scopes the re-read
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(withXhr(), withInterceptors([authInterceptor])),

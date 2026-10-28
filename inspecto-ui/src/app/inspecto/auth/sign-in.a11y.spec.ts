@@ -72,21 +72,21 @@ describe('SignInComponent (W6d)', () => {
 
         it('Demo User picker: a named list of buttons and a warning, no SSO button', async () => {
             const { el } = create({}, null, { demoUsers: USERS });
-            expect(el.querySelector('ul[aria-label="Demo Users"]')?.querySelectorAll('button')).toHaveLength(2);
+            expect(el.querySelector('ul[aria-label="Users"]')?.querySelectorAll('button')).toHaveLength(2);
             expect(el.textContent).not.toContain('Sign in with SSO');
             await expectNoA11yViolations(el);
         });
 
         it('Demo User picker with no user listed is not a role-less empty list', async () => {
             const { el } = create({}, null, { demoUsers: [] });
-            expect(el.querySelector('ul[aria-label="Demo Users"]')).toBeNull();
+            expect(el.querySelector('ul[aria-label="Users"]')).toBeNull();
             await expectNoA11yViolations(el);
         });
 
         it('server could not start a session: an alert with a retry button, no picker and no SSO button', async () => {
             const { el } = create({}, null, { bootstrapError: 'The store is unavailable', demoUsers: USERS });
             expect(el.querySelector('[data-testid="startup-error"] [role="alert"]')).toBeTruthy();
-            expect(el.querySelector('ul[aria-label="Demo Users"]')).toBeNull();
+            expect(el.querySelector('ul[aria-label="Users"]')).toBeNull();
             await expectNoA11yViolations(el);
         });
 

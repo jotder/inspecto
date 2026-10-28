@@ -58,7 +58,8 @@ class SqlTemplateJobSandboxTest {
         Path dataDir = dir.resolve("data");
         seedTransactions(dataDir);
         JobConfig job = new JobConfig("probe", "sql.template", null, null, true, false,
-                Map.of("sql", sql, "sources", "transactions", "sink_dataset", "probe_out"), null, null);
+                // retries: 0 - a sealed probe fails with an SQL error, which RetryPolicy would retry after 30 s
+                Map.of("sql", sql, "sources", "transactions", "sink_dataset", "probe_out", "retries", "0"), null, null);
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, dataDir.toString())) {

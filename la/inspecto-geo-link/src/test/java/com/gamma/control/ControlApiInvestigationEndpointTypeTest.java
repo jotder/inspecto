@@ -164,7 +164,7 @@ class ControlApiInvestigationEndpointTypeTest {
         try (Ctx c = open(cfg, root)) {
             assertTrue(data(create(c, "bad", ",\"entityType\":\"nosuch\""), 422).toString().contains("unknown Entity Type"));
             assertTrue(data(create(c, "bad", ",\"entityType\":\"msisdn\",\"sourceType\":\"msisdn\""), 422).toString().contains("not both"));
-            data(send(c, "GET", "/inv/investigations/bad", null), 404);
+            data(send(c, "GET", "/inv/investigations/bad/log", null), 404); // the bare id path is DELETE-only (405 on GET)
         }
     }
 }

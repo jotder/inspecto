@@ -41,6 +41,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -568,7 +569,15 @@ class TelcoFraudTemplateGoldenTest {
         Path space = createSpace(root);
         ingest(space);
         List<JobConfig> jobs = jobs(space.resolve("config")).stream()
-                .filter(j -> j.name().equals("fraud_irsf") || j.name().equals("fraud_premium_rate")).toList();
+                .filter(j -> j.name().equals("fraud_irsf") || j.name().equals("fraud_premium_rate"))
+                // retries: 0 - a malformed prefix fails with an SQL error, which RetryPolicy would retry after 30 s
+                .map(j -> {
+                    Map<String, String> p = j.params() == null ? new HashMap<>() : new HashMap<>(j.params());
+                    p.put("retries", "0");
+                    return new JobConfig(j.name(), j.type(), j.cron(), j.onPipeline(), j.enabled(), j.catchUp(), p,
+                            j.onSignal(), j.when(), j.args(), j.bind());
+                })
+                .toList();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
                      root.resolve("audit").toString(), null, null, space.resolve("data").toString())) {
