@@ -65,6 +65,14 @@ export const appRoutes: Route[] = [
             import('app/modules/admin/share/share-viewer.component').then((m) => m.ShareViewerComponent),
     },
 
+    // Read-only Investigation embed (LA-CONSOLE-EMBED-VIEWER-1) — the viewer the Share and embed dialog links to, the same
+    // library page la-app serves; the token is the credential, so no shell and no guard.
+    {
+        path: 'embed/inv/:token',
+        loadComponent: () =>
+            import('@inspecto/link-analysis/link-analysis/embed-view.page').then((m) => m.EmbedViewPageComponent),
+    },
+
     // Template OAuth flow, kept for reference (Inspecto uses operator tokens instead):
     // { path: 'signed-in-redirect', pathMatch: 'full', redirectTo: 'dashboard' },
     // {

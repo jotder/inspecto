@@ -27,7 +27,7 @@ export const laAppRoutes: Route[] = [
     // path is the credential, there is no sign-in redirect, and the page never touches the session.
     {
         path: 'embed/inv/:token',
-        loadComponent: () => import('./embed-view.page').then((m) => m.EmbedViewPageComponent),
+        loadComponent: () => import('@inspecto/link-analysis/link-analysis/embed-view.page').then((m) => m.EmbedViewPageComponent),
     },
     {
         path: '',

@@ -1397,7 +1397,7 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
   - `loadView` clears `boundProfile`.
   - The view's stored pack is only shown in the Open preview and saved back unchanged.
   - Only an Investigation Template's `pack` binds one.
-- **Read-only toolset:** `link-view-widget-tools.ts` (`widgetGraph`, `runWidgetAnalysis`) is shared by the dashboard Widget (`LinkViewWidgetComponent`) and the embed page (`projects/la-app/src/app/embed-view.page.ts`, now drawn on `GraphViewComponent`). Everything runs in the browser and sends no request.
+- **Read-only toolset:** `link-view-widget-tools.ts` (`widgetGraph`, `runWidgetAnalysis`) is shared by the dashboard Widget (`LinkViewWidgetComponent`) and the embed page (`projects/link-analysis/src/link-analysis/embed-view.page.ts`, drawn on `GraphViewComponent`; served at `/embed/inv/:token` by both the console and `la-app` since 2026-10-28, `LA-CONSOLE-EMBED-VIEWER-1`). Everything runs in the browser and sends no request.
   - Export appears only with the Widget's `allowExport`.
   - The embed viewer never offers Export, because an embed grant has no export flag.
   - Minting an embed needs `canShareInvestigation`, the lead role and `-Dla.embed.enabled=true` (503 otherwise).
