@@ -23,12 +23,16 @@ export function tileSpan(span: unknown): TileSpan {
     return n >= 1 && n <= GRID_COLUMNS ? (n as TileSpan) : 2;
 }
 
-/** The tile's `flex-basis` in a `flex-wrap gap-4` row: `span` columns plus the gaps between them. */
+/** The live column count: `--dashboard-columns` (styles.scss — 4 at desktop, 2 at tablet, 1 at phone). */
+const COLS = `var(--dashboard-columns, ${GRID_COLUMNS})`;
+
+/** The tile's `flex-basis` in a `flex-wrap gap-4` row: `span` columns plus the gaps between them. The span is
+ *  clamped to the live column count, so on a narrow screen a tile takes at most the full row. */
 export function tileBasis(span: unknown): string {
     const s = tileSpan(span);
     if (s === GRID_COLUMNS) return '100%';
-    const gaps = (GRID_COLUMNS - 1) * GAP_REM;
-    return `calc((100% - ${gaps}rem) * ${s} / ${GRID_COLUMNS} + ${(s - 1) * GAP_REM}rem)`;
+    const used = `min(${s}, ${COLS})`;
+    return `calc((100% - (${COLS} - 1) * ${GAP_REM}rem) * ${used} / ${COLS} + (${used} - 1) * ${GAP_REM}rem)`;
 }
 
 /** The next width when a tile's width button is pressed: quarter → half → three quarters → full → quarter. */

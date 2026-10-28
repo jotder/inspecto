@@ -462,3 +462,19 @@ select.bg-transparent optgroup {
         outline-offset: -2px;
     }
 }
+
+/* UIE-3 — the dashboard grid's column count (`tileBasis` in viz/dashboard-grid.ts reads it): four at desktop, two
+ * at tablet, one at phone, so a quarter-width KPI tile never squeezes below a readable width. */
+:root {
+    --dashboard-columns: 4;
+}
+@media (max-width: 1023.98px) {
+    :root {
+        --dashboard-columns: 2;
+    }
+}
+@media (max-width: 639.98px) {
+    :root {
+        --dashboard-columns: 1;
+    }
+}
