@@ -18,7 +18,7 @@ result on as a sealed dossier, a Case link or a standing detection. It is an opt
 extension of the one host process - no LA server, no LA main class.
 
 The full backend structure is in [Link Analysis backend architecture](architecture.md);
-behaviour and decisions in the [feature concept](user-guide.md). This page is the
+behaviour and decisions in the [feature concept](user-guide-link-analysis.md). This page is the
 module-level summary.
 
 ## Where it fits
@@ -34,4 +34,4 @@ module-level summary.
 They sit on two platform-base modules, `graph` (algorithms) and `entity-store` (Entity Types, Entity Lists,
 identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it reaches LA only through SPIs it owns.
 
-More: [screens](user-guide.md) · [API](api-link-analysis.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-link-analysis.md) · [API](api-link-analysis.md) · [architecture](architecture-overview.md).

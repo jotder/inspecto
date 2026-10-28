@@ -3,13 +3,13 @@
   Created 2026-10-05 by consolidating eight Link Analysis (LA) plan/design docs into ONE tracker; 2026-10-22 it also took the
   open items of six more archived LA plans (last section). This is the ONLY place that lists unbuilt LA work, besides
   the BACKLOG row LA-ONBOARD-RESIDUALS-1 (LA-ONBOARD-1 closed 2026-10-22, plan archived; LA-ONBOARD-DEFECTS-1 closed 2026-10-23). How LA works and how to use it today:
-  docs/okf/product/module/la-core/user-guide.md. Retire sections (distil into the OKF concept, rows to BACKLOG §3.12) as
+  docs/okf/product/module/la-core/user-guide-link-analysis.md. Retire sections (distil into the OKF concept, rows to BACKLOG §3.12) as
   each ships; archive this file when nothing is open.
 -->
 
 # Link Analysis — roadmap (everything not yet built)
 
-**The two Link Analysis documents.** (1) [`okf/product/module/la-core/user-guide.md`](../okf/product/module/la-core/user-guide.md) — Part I how to use it, Part II what is built and why; (2) **this file** — what is still open. Backlog rows `LA-*` live in [`BACKLOG.md`](../BACKLOG.md) §3.12; terms in [`GLOSSARY.md`](../GLOSSARY.md).
+**The two Link Analysis documents.** (1) [`okf/product/module/la-core/user-guide-link-analysis.md`](../okf/product/module/la-core/user-guide-link-analysis.md) — Part I how to use it, Part II what is built and why; (2) **this file** — what is still open. Backlog rows `LA-*` live in [`BACKLOG.md`](../BACKLOG.md) §3.12; terms in [`GLOSSARY.md`](../GLOSSARY.md).
 
 **Full original designs** (read only when you start the work; archived, never maintained) are in `archived-documents/plans-archive/`: `la-separation-feasibility-plan` · `la-separation-d7-design` · `la-embed-view-design` · `la-data-preparation-plan` · `investigation-store-design` · `link-analysis-entity-model-design` · `la-live-detection-design` · `link-analysis-ui-mockup.html`. Folded 2026-10-22 (last section): `la-demo-readiness-plan` · `la-whitepaper-demo-plan` · `la-edition-placement-changes-plan` · `la-analyst-upload-plan` · `la-ims-showcase-plan` · `la-multi-vertical-showcase-plan`.
 
@@ -504,7 +504,7 @@ Drawn from: `docs/archived-documents/plans-archive/investigation-store-design.md
 
 ## Link Analysis: Entity model (LA-17) and live detection (LA-LIVE-DETECTION-1) - what is still open
 
-Drawn from: `docs/archived-documents/plans-archive/link-analysis-entity-model-design.md`, `docs/archived-documents/plans-archive/la-live-detection-design.md`. Built behaviour lives in `docs/okf/product/module/la-core/user-guide.md` and `docs/okf/product/module/entity-list/spec.md`.
+Drawn from: `docs/archived-documents/plans-archive/link-analysis-entity-model-design.md`, `docs/archived-documents/plans-archive/la-live-detection-design.md`. Built behaviour lives in `docs/okf/product/module/la-core/user-guide-link-analysis.md` and `docs/okf/product/module/entity-list/spec.md`.
 
 ### 1. Entity model (LA-17)
 

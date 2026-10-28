@@ -85,7 +85,7 @@ sent, never by prompt inspection.
 ⚠ **The Link Analysis adopter is the one whose args the backend could not have resolved itself** — no tool
 or tool-layer route returns a Dataset's columns, so A3's "the pane's context *is* the args" is load-bearing
 there rather than merely convenient. As-built:
-[`../la-core/user-guide.md`](../la-core/user-guide.md#ai-derived-projection-mappings-v2-d-authoring-half--shipped-2026-07-27).
+[`../la-core/user-guide-link-analysis.md`](../la-core/user-guide-link-analysis.md#ai-derived-projection-mappings-v2-d-authoring-half--shipped-2026-07-27).
 
 Three gotchas that cost a debug cycle each — do not "clean these up":
 

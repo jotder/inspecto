@@ -11,7 +11,7 @@ cited below as "arch §n") with the running application. The claim-to-evidence m
 the archived [demo readiness plan](../../../../archived-documents/plans-archive/la-demo-readiness-plan.md) (all built by 2026-10-13; history only). The
 technical / security review cut of this script (T1-T13) is section 9 below: rehearsed by the
 assistant alone on 2026-10-24, the sceptical-reviewer rehearsal is still owed. Every control label below is the
-one on screen (see the [user manual](user-guide.md)). The variants (Personal bundle, Postgres
+one on screen (see the [user manual](user-guide-link-analysis.md)). The variants (Personal bundle, Postgres
 store) are in the [showcase variants runbook](../../solution-pack/la-showcase/admin-guide-variants-runbook.md).
 
 ---

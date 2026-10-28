@@ -21,7 +21,7 @@ export interface LinkAnalysisCommentsData {
 
 /**
  * Per-view comments dialog (D10) — the Link Analysis half of the generalized note model
- * (`docs/BACKLOG.md` D10, `okf/product/module/la-core/user-guide.md`). Talks to
+ * (`docs/BACKLOG.md` D10, `okf/product/module/la-core/user-guide-link-analysis.md`). Talks to
  * `/notes/link-analysis-view/{id}/comments` via {@link NotesService}; mirrors {@code ComponentHistoryDialog}'s
  * shape so the two "actions on a saved view" dialogs feel like one family.
  */

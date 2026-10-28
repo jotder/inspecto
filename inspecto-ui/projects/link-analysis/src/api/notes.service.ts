@@ -8,7 +8,7 @@ import { ObjectNote } from '@inspecto/core/api/models';
  * Kind-addressed notes (`/notes/{targetKind}/{targetId}/…`, BACKLOG D10) — the same {@link ObjectNote}
  * shape as `/objects/{id}/comments`, generalized to any target the backend's `AnnotationKinds` vocabulary
  * accepts (`"object"` + `ComponentStore.WRITABLE_TYPES`, e.g. `link-analysis-view`). The driving case is
- * a per-view comment thread on a saved Link Analysis view — see `okf/product/module/la-core/user-guide.md`.
+ * a per-view comment thread on a saved Link Analysis view — see `okf/product/module/la-core/user-guide-link-analysis.md`.
  */
 @Injectable({ providedIn: 'root' })
 export class NotesService {

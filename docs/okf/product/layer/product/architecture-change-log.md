@@ -286,7 +286,7 @@
   (`pipelines.md`→[`runs.md`](../../module/engine/user-guide-runs.md), `pipeline-detail.md`→[`run-detail.md`](../../module/engine/user-guide-run-detail.md),
   `flows.md`→[`pipelines.md`](../../module/etl/user-guide-pipelines.md)).
 * **Refreshed** to the shipped state: new [studio](user-guide-studio.md),
-  [geo-map](../../module/geo-link/user-guide-geo-map.md), [link-analysis](../../module/la-core/user-guide.md),
+  [geo-map](../../module/geo-link/user-guide-geo-map.md), [link-analysis](../../module/la-core/user-guide-link-analysis.md),
   [kpi-reports](../../module/analytics/user-guide-kpi-reports.md) features; [features index](../../index.md) regrouped to
   the Operations/Workbench/Studio/Catalog/Settings navigation (~35 screens);
   [overview](architecture-overview.md) + [api-and-data](spec-api-and-data.md) +

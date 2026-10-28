@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Link Analysis claims showcase — user guide
 
-Screens and controls are the shared studio ones: see the [la-showcase user guide](../la-showcase/user-guide.md) and the [Link Analysis user guide](../../module/la-core/user-guide.md). The scripted demo with expected values is the [runbook](admin-guide-showcase-runbook.md).
+Screens and controls are the shared studio ones: see the [la-showcase user guide](../la-showcase/user-guide.md) and the [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). The scripted demo with expected values is the [runbook](admin-guide-showcase-runbook.md).
 
 ## Who signs in
 

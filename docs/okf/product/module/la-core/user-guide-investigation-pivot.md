@@ -9,7 +9,7 @@ timestamp: 2026-07-20T00:00:00Z
 
 # Investigation Pivot
 
-Cross-cutting seam (not a routed screen) used by [Link Analysis](user-guide.md) and
+Cross-cutting seam (not a routed screen) used by [Link Analysis](user-guide-link-analysis.md) and
 [Geo Map Analysis](../geo-link/user-guide-geo-map.md): the ui-design-review R8 "pivot bar" — switching the *view*
 (table/graph/map/timeline) on the same selection, the natural growth of the drill-drawer pattern.
 Shipped 2026-07-20, scoped exactly to what the doc specified (design source:

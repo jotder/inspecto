@@ -14,7 +14,7 @@ the name Link Analysis.
 
 Grounded in a code read on 2026-10-09 (tip `957c554af`). This page is the **backend structure**; behaviour,
 decisions and measurements live in the feature concept
-[`okf/product/module/la-core/user-guide.md`](user-guide.md), open work in
+[`okf/product/module/la-core/user-guide-link-analysis.md`](user-guide-link-analysis.md), open work in
 [`superpower/link-analysis-roadmap.md`](../../../../superpower/link-analysis-roadmap.md). Class names are given
 without paths; locate them with `codegraph_explore`. Source of truth for module metadata is each module's
 `META-INF/inspecto/module.toon`, never this page.
@@ -703,7 +703,7 @@ the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all presen
 | Analyst upload | `POST /inv/uploads/{collector}?name=x.csv[&replace=true]`; `GET /inv/uploads` (upload-enabled Collectors), `GET /inv/uploads/{collector}` (own uploads + ingest state), `DELETE /inv/uploads/{collector}/{file}` (withdraw a pending upload) | `canUploadData` (§6.6); the list is the caller's own, the delete is uploader-or-`canAdminister` |
 | Index | `/inv/index`, `/inv/index/builds`, `/builds/{id}`, `/cancel` | `canBuildLinkIndex` on the POST that starts a build; the reads and cancel are not capability-gated |
 | Entity profiles (2026-10-15) | `GET /inv/entity-types`, `GET /inv/entity-types/{id}/profile`, `GET /inv/entities/{type}/{key}/profile`, `POST /inv/entities/{type}/resolve`, `POST /inv/entities/{type}/suggest` (2026-10-22, the Start box) (la-api `EntityProfileRoutes`) | none beyond a subject (like the exploration reads); Dataset view gate per binding; profiles rate-limited as expensive |
-| Data trust (LA-DATA-TRUST-1, 2026-10-14) | `GET /inv/datasets/{id}/files` (one row per File: outcome, event day, rows, error rows, index state; la-api `DatasetFilesRoutes`), `GET …/{id}/data-changes` (corrected-day warning; geo-link `InvestigationDataChangesRoutes`), `…/{id}/coverage` | read-only; Dataset view gate / Investigation `open` gate. As built: [frontend concept §Data trust](user-guide.md) |
+| Data trust (LA-DATA-TRUST-1, 2026-10-14) | `GET /inv/datasets/{id}/files` (one row per File: outcome, event day, rows, error rows, index state; la-api `DatasetFilesRoutes`), `GET …/{id}/data-changes` (corrected-day warning; geo-link `InvestigationDataChangesRoutes`), `…/{id}/coverage` | read-only; Dataset view gate / Investigation `open` gate. As built: [frontend concept §Data trust](user-guide-link-analysis.md) |
 | Embed link | `…/{id}/embeds` (POST mint, GET list), `…/embeds/{grantId}/revoke`, and the public `GET /public/investigations/{token}` | `canShareInvestigation` on mint and revoke (+ lead role); the list is read-gated; the public GET is authenticated by its token alone (§6.2) |
 | Measures & detection (geo-link) | `…/{id}/measures`, `…/alert-rules`, `…/standing-detection` | `canAuthorAlertRules` |
 
@@ -1092,7 +1092,7 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
 
 The analyst side of the plan (archived:
 [`la-grow-exclude-plan.md`](../../../../archived-documents/plans-archive/la-grow-exclude-plan.md); decisions GE-1…GE-12
-built as recommended). How it reads to a user: [user guide §7](user-guide.md#7-expand-and-clean-up-the-graph) "Expand and clean up the graph".
+built as recommended). How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-and-clean-up-the-graph) "Expand and clean up the graph".
 
 - **Seams.** `grow-exclude.ts` is the pure half (wording, the request a Grow sends, lists in force, what they removed,
   the hint store); `GrowExcludeStore` (provided beside `InvestigationSessionStore`) holds the session state and the
@@ -1365,7 +1365,7 @@ Calls marked * were assistant-decided under operator delegation, pending confirm
 ### 6.14 Studio UI reorganization (LA-STUDIO-UI-REORG-1, as built 2026-10-28)
 
 The Studio was reorganized without removing a function; the layout is described in
-[user-guide.md](user-guide.md#studio-layout-la-studio-ui-reorg-1-phases-1-3-as-built-2026-10-27) *Studio layout*, and the plan with its "nothing removed" map
+[user-guide-link-analysis.md](user-guide-link-analysis.md#studio-layout-la-studio-ui-reorg-1-phases-1-3-as-built-2026-10-27) *Studio layout*, and the plan with its "nothing removed" map
 is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-archive/la-studio-ui-reorg-plan.md) §6.
 
 - **Decisions (operator interview 2026-10-27, UIR-D1…D16):**

@@ -1524,7 +1524,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Entity resolution is assertion-based. Fuzzy merge suggestions were retired (`LA-I2-GAPS-RESIDUALS-1`, D-M1). Quantexa's core value is probabilistic entity resolution at billions of records (general market). This is the largest functional gap: no row beyond the §6 retirement.
   - Scale and topology: 10^9 is not measured, and multi-pod is not complete. The Helm chart is `replicas: 1` (`SCALEOUT-HELM-NPOD-1` P2, `LA-INVESTIGATION-STORE-DESIGN-1` P3). The stakeholder Q&A says NOT YET for multi-pod and for a two-host drill.
   - Retention / legal hold of Investigation evidence is declined (`D-U8`), yet `docs/EDITIONS.md` and the Advanced brochure list "retention, legal hold, residency" as Advanced roadmap. That is a contradiction, and legal hold and residency have no row.
-  - Analyst ergonomics vs i2: no timeline / time-bar view (the G6 `timebar` was declined; only a timeline filter exists, `la-core/user-guide.md` §6), no i2 ANX import/export, no unstructured/document ingestion: no rows. Precision on real data is not measured (stakeholder Q&A line 201).
+  - Analyst ergonomics vs i2: no timeline / time-bar view (the G6 `timebar` was declined; only a timeline filter exists, `la-core/user-guide-link-analysis.md` §6), no i2 ANX import/export, no unstructured/document ingestion: no rows. Precision on real data is not measured (stakeholder Q&A line 201).
 - **RFP stance on the 5 most-asked requirements (link analysis / investigation):**
 
 | Requirement | Stance | Evidence or caveat |

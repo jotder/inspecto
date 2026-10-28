@@ -17,7 +17,7 @@ timestamp: 2026-10-19T00:00:00Z
   and stays off.
 - **Entity Lists section inside an Investigation** —
   [`link-analysis-entity-lists.component.ts`](../../../../../inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-entity-lists.component.ts),
-  where a list can also exclude or seed the graph. See the [Link Analysis user guide](../la-core/user-guide.md).
+  where a list can also exclude or seed the graph. See the [Link Analysis user guide](../la-core/user-guide-link-analysis.md).
 
 The Risk Scores side is in the [scoring user guide](../scoring/user-guide-scoring-entity-lists.md).
 

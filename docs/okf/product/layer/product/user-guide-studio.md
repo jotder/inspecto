@@ -16,7 +16,7 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
 * **Panes** — the **Query Library** (`/studio/queries` — author SQL + `$`-Parameters, preview the Result Set offline),
   the **Viz Library** (searchable Widget gallery) with the **Widget Builder**, and the
   **Dashboard Builder** (quick-filter bar, drill-through drawer, time grain, PNG export). The
-  investigation studios live alongside: [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md) and [Link Analysis](../../module/la-core/user-guide.md).
+  investigation studios live alongside: [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md) and [Link Analysis](../../module/la-core/user-guide-link-analysis.md).
   ⚠ **Datasets is NOT a Studio pane** (corrected 2026-09-08): `/studio/datasets` — and the Studio root —
   redirect to `/catalog/datasets`, because a Dataset became a Catalog asset in Phase B.2.
 * **Visualization Types** come from the `VizPlugin` registry (`src/app/inspecto/viz/`) — charts, tables,

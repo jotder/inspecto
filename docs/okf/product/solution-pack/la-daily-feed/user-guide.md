@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Link Analysis daily feed — user guide
 
-The feed keeps the Link Analysis index current; investigation itself uses the standard studio ([end user guide](../../module/la-core/user-guide.md)).
+The feed keeps the Link Analysis index current; investigation itself uses the standard studio ([end user guide](../../module/la-core/user-guide-link-analysis.md)).
 
 ## Day to day
 

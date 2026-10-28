@@ -4,7 +4,7 @@
 [`la-onboarding-plan.md`](../../../../archived-documents/plans-archive/la-onboarding-plan.md) §1): a first-time user goes
 from an empty install to a finding with the screens alone. Run 2026-10-22 on the phase 8 worktree (base `5f39c3328`),
 results in §3 and §4. Re-run it after any change to the la-app first-run path; the beginner path it follows is the
-[end user guide](user-guide.md) §2 *Getting started*.*
+[end user guide](user-guide-link-analysis.md) §2 *Getting started*.*
 
 ## 1. Set-up
 
