@@ -827,7 +827,9 @@ Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-a
   `.sentinel_share` 20 (%), `.timeline_days` 400, `.relationship_threshold` 6; install layer (system admin, `la-limits.toon`):
   `entity_profile.memory_limit_mb` 4,096.
 * **Data as of** reads `GET /datasets/{id}/freshness`, a read gate only (D-EP7).
-* **Residuals:** `LA-ENTITY-PROFILE-RESIDUALS-1` in `BACKLOG.md`.
+* **Not built (retired to BACKLOG §6, operator 2026-10-28):** P4 — no scheduled `la.entity.profile` Job, profile Dataset, drift
+  Alert Rules or 30-day history, so a cold profile still reads the whole Dataset several times (about 10 minutes on a 132 M-row day at
+  2 threads). Reopen when a customer needs profile drift alerts or fast profiles on very large days. `LA-ENTITY-PROFILE-RESIDUALS-1` is closed.
 
 ### 6.4 Third-party integration (inbound) (as built 2026-10-17, LA-EDITIONS-1 phase 5)
 
