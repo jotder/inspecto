@@ -163,6 +163,13 @@ it holds. An **unscoped** model is readable by unscoped callers alone, because i
 rows. The entity key is a **bound parameter**. It is never spliced into SQL and never resolved as a path.
 Real-HTTP coverage with an armed Subject is in `ControlApiRiskScoreTest`.
 
+**The key may be a Link Analysis alias** (`LA-SUSPICION-FACTORS-MASKED-1`, 2026-10-28). On a masked Space the
+exploration holds a node by its `masked:` alias — the Space key's `MaskTokens` token, the same token this route
+masks the key with on read. A key starting `masked:` is resolved by tokenising the model's scored keys under
+the Space key; no match is the same 404, and the 404 names only the alias. The scan is bounded by
+`EntityCap.CEILING`. ⚠ An Investigation canvas masks with its own per-Investigation key, which this route
+cannot resolve (`LA-SUSPICION-FACTORS-INVESTIGATION-1`).
+
 ⚠ "Dataset data scopes" do not exist as a separate mechanism. `Subject.dataScopes` filters case-typed
 objects (SEC-7d), and nothing scopes Dataset rows. The route applies that rule to the model's optional
 `dataScope`.

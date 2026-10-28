@@ -9,6 +9,7 @@ import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.mask.EvidenceMasker;
+import com.gamma.entitystore.MaskTokens;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.control.AuditReadMasking;
@@ -164,6 +165,18 @@ public final class RiskScoreRoutes implements RouteModule {
         return out;
     }
 
+    /** The scored key of this model whose Space alias is {@code alias}, or null when none tokenises to it. */
+    private static String unalias(String relation, String modelId, byte[] spaceKey, String alias) throws Exception {
+        QueryExecutor.Result keys = QueryExecutor.run(new QueryExecutor.Request("scores", relation,
+                "SELECT DISTINCT \"entity_key\" FROM \"scores\" WHERE \"model\" = ?",
+                com.gamma.analytics.score.EntityCap.CEILING, 0, List.of(), List.of(), List.of(modelId)));
+        for (Map<String, Object> k : keys.rows()) {
+            String raw = String.valueOf(k.get("entity_key"));
+            if (MaskTokens.token(spaceKey, raw).equals(alias)) return raw;
+        }
+        return null;
+    }
+
     /**
      * D-P8 mask on read: put {@code entityKey} raw for a caller holding {@link AuditReadMasking#UNMASK_CAPABILITY}
      * (or no Subject at all — auth off), else as the Space {@code masked:} token, plus a {@code keyMasked} flag.
@@ -298,20 +311,27 @@ public final class RiskScoreRoutes implements RouteModule {
         if (ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && s.scoped()
                 && (model.dataScope() == null || !s.dataScopes().contains(model.dataScope())))
             throw notFound(modelId, entityKey);
+        if (!Files.isDirectory(dataRoot.resolve(model.scoresDataset()))) throw notFound(modelId, entityKey);
+        String relation = DatasetRelation.relationSql(Map.of("physicalRef", model.scoresDataset()), dataRoot, null);
+
+        // LA-SUSPICION-FACTORS-MASKED-1: on a masked Space the Studio holds a node by its alias (the Space key's
+        // MaskTokens token, the same token the key is masked with on read), never the raw key. Resolve it to the
+        // scored key it tokenises; errors keep the alias, so the raw key is never answered for it.
+        boolean alias = entityKey.startsWith(MaskTokens.TOKEN_PREFIX);
+        String key = alias ? unalias(relation, modelId, MaskTokens.spaceKey(writeRoot), entityKey) : entityKey;
+        if (key == null) throw notFound(modelId, entityKey);
         Map<String, Object> resource = new LinkedHashMap<>();
-        resource.put("id", modelId + "/" + entityKey);
+        resource.put("id", modelId + "/" + key);
         resource.put("model", modelId);
         resource.put("entityType", model.entityType());
-        resource.put("entityKey", entityKey);
+        resource.put("entityKey", key);
         if (model.dataScope() != null) resource.put("dataScope", model.dataScope());
         if (!RowScope.visible(ex, TYPE, resource)) throw notFound(modelId, entityKey);
 
-        if (!Files.isDirectory(dataRoot.resolve(model.scoresDataset()))) throw notFound(modelId, entityKey);
-        String relation = DatasetRelation.relationSql(Map.of("physicalRef", model.scoresDataset()), dataRoot, null);
         QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request("scores", relation,
                 "SELECT * FROM \"scores\" WHERE \"model\" = ? AND \"entity_key\" = ? "
                         + "ORDER BY \"scored_at\" DESC, \"run_id\" DESC LIMIT 1",
-                1, 0, List.of(), List.of(), List.of(modelId, entityKey)));
+                1, 0, List.of(), List.of(), List.of(modelId, key)));
         if (r.rows().isEmpty()) throw notFound(modelId, entityKey);
         Map<String, Object> row = r.rows().get(0);
 
