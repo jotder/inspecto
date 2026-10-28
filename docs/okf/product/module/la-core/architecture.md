@@ -1411,8 +1411,16 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
     - The saved `la_showcase_overview` Widget still draws. That is by decision: the offer is cosmetic (D-LAE2).
     - Embed and Investigation routes answer 503 with the reason.
   - **Real `-Edition Standard` build with WSO2 sign-in:** `/bootstrap` reports `standard` / `investigations` / `oidc`.
-    - Per-user sign-in there was not driven. The browser does not trust the local WSO2 self-signed certificate, and trusting it is the operator's call.
-    - The per-user Standard checks above ran on the demo bundle without `inspecto-policy`, which runs the same Studio code.
+  - **Every user was signed in on that real Standard build.** The browser started SSO and kept its own state, PKCE verifier and nonce.
+    - The browser does not trust the local WSO2 self-signed certificate. So only the IdP login form was completed by a localhost script, using the synthetic users from `scripts/wso2-preview-la-setup.mjs`.
+    - The browser then opened the returned callback, and the app finished its own exchange.
+    - The la-showcase seed ran with real WSO2 tokens.
+  - **Results per user:**
+    - **`fm.analyst`:** the full File menu, Investigation settings with *Create link*, and *Expand…* available.
+    - **`fm.manager`:** opens the Investigation; Share and embed shows no *Create link*.
+    - **`admin`:** *Create link* is offered.
+    - **`demo.manager`:** gets "This Investigation is not available…".
+    - **`ra.analyst`:** may change Investigations here. In WSO2 it is also in the built-in `operations` group, which grants `canManageIncidents`. The demo roster makes it a reviewer only, so this is the identity setup, not a defect.
 - **Full gate 2026-10-28 (`f0e8a50eb`):**
   - The reactor ran 56 of 56 modules: 11,280 tests, 0 failures, verdict guard PASS. The UI suite passed 6,779 tests.
   - Six stale tests that peer commits left on master were fixed first, none in the Link Analysis UI: two Job tests outran by the new retry, a new scoring route, a DELETE-only Investigation path, and two sign-in specs.
