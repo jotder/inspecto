@@ -39,7 +39,7 @@
                             <button
                                 mat-icon-button
                                 type="button"
-                                [attr.aria-label]="'Edit role ' + card.role.name"
+                                [attr.aria-label]="'Edit role ' + label(card.role.name)"
                                 matTooltip="Edit"
                                 [disabled]="saving()"
                                 (click)="edit(card.role)"
@@ -51,7 +51,7 @@
                                     mat-icon-button
                                     type="button"
                                     [attr.aria-label]="
-                                        'Revert role ' + card.role.name + ' to its seed defaults or remove it'
+                                        'Revert role ' + label(card.role.name) + ' to its seed defaults or remove it'
                                     "
                                     matTooltip="Revert to seed / remove"
                                     [disabled]="saving()"

@@ -71,6 +71,19 @@ function create(
 }
 
 describe('AccessRolesComponent', () => {
+
+    it('shows a role by its label, card and button names alike, when a labels map is passed', () => {
+        const role: RoleDef = { name: 'pipeline-developer', capabilities: ['canOperateRuns'], source: 'authored' };
+        const { fixture } = create({ roles: [role] });
+        fixture.componentRef.setInput('labels', { 'pipeline-developer': 'Data builder' });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).toContain('Data builder');
+        expect(el.textContent).not.toContain('pipeline-developer');
+        const names = Array.from(el.querySelectorAll('button[aria-label]')).map((b) => b.getAttribute('aria-label')!);
+        expect(names).toContain('Edit role Data builder');
+        expect(names.some((n) => n.includes('pipeline-developer'))).toBe(false);
+    });
     it('renders one card per role with its source and capability chips', () => {
         const { fixture, c } = create();
         expect(c.cards().map((card) => card.role.name)).toEqual(['operations', 'fraud-analyst']);

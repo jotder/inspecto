@@ -113,7 +113,7 @@ export class AccessRolesComponent {
     async revert(role: RoleDef): Promise<void> {
         if (!this.canEdit() || this.saving()) return;
         const ok = await this.confirm.confirmDestructive(
-            `Remove the authored definition of '${role.name}'? A seed role falls back to its shipped defaults; a custom role is removed. Grants change on the next request.`,
+            `Remove the authored definition of '${this.label(role.name)}'? A seed role falls back to its shipped defaults; a custom role is removed. Grants change on the next request.`,
             { title: 'Revert role?', confirmText: 'Revert' },
         );
         if (!ok) return;
