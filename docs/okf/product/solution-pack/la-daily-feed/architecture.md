@@ -19,6 +19,8 @@ Template: `spaces/_templates/la-daily-feed/` (LA-DAILY-INGEST-1 T2).
    - Job `la_index_build` (`la.index.build`) appends the day to the Link Analysis index: `MSISDN` to `OTHER_PARTY`, kind `REC_TYPE`, time `START_AT`, attributes `IMSI,IMEI,DIRECTION`; the first run is a full build (`allow_full`). It runs as `owner` (`admin` in the template; re-stamped to whoever applies the template on a server with sign-in, unless that user holds `canConfigureAccess`), with `timeout_seconds: 600` and `wait_seconds: 300` (how long a run waits behind another build of the same index before it gives up as `BUILD_IN_PROGRESS`).
    - Job `la_rows_band_evaluate` (`expectation.evaluate`) runs the row-count Expectation, so an odd day opens an Incident.
 
+**Parquet days (as built 2026-10-28).** The same chain takes daily Parquet files instead of CSV: set `file_pattern` to `*.parquet` and `parsing.frontend: parquet`, and name the schema selectors by column (CSV selectors are positions). The template ships CSV; the Parquet variant runs on the poll scheduler alone in `ScheduledDailyChainTest#aParquetDailyFeedFlowsTheSameChainOnTheScheduleAlone` (FULL on day one, APPEND after, one build per day). Hive-style partition directories are covered by `HiveParquetDailyLandingTest`. Hive JDBC and the `db` Collector stay deferred (`D-ING5`).
+
 ## Monitors
 
 | Monitor | Kind | Fires when |

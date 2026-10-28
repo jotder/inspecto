@@ -21,6 +21,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.DriverManager;
+import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -59,18 +61,24 @@ class ScheduledDailyChainTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
 
+    /** CSV reads fields by position; the Parquet frontend reads them by column name. */
+    private static String schema(boolean parquet) {
+        String[] sel = parquet ? new String[]{"S", "T", "KIND", "TS", "C", "EVENT_DATE"} : new String[]{"0", "1", "2", "3", "4", "5"};
+        return SCHEMA.formatted((Object[]) sel);
+    }
+
     private static final String SCHEMA = """
             partitionKey: EVENT_DATE
             raw:
               name: xdr
               format: CSV
               fields[6]{name,selector,type}:
-                S,"0",VARCHAR
-                T,"1",VARCHAR
-                KIND,"2",VARCHAR
-                TS,"3",TIMESTAMP
-                C,"4",VARCHAR
-                EVENT_DATE,"5",DATE
+                S,"%s",VARCHAR
+                T,"%s",VARCHAR
+                KIND,"%s",VARCHAR
+                TS,"%s",TIMESTAMP
+                C,"%s",VARCHAR
+                EVENT_DATE,"%s",DATE
             mapping:
               canonicalName: xdr
               rawName: xdr
@@ -89,9 +97,9 @@ class ScheduledDailyChainTest {
             "C,D,call,2026-03-02 09:00:00,y,2026-03-02\n",
             "D,E,call,2026-03-03 09:00:00,y,2026-03-03\n");
 
-    private static Path pipeline(Path cfg, Path store) throws Exception {
+    private static Path pipeline(Path cfg, Path store, boolean parquet) throws Exception {
         Path schema = cfg.resolve("xdr_schema.toon");
-        Files.writeString(schema, SCHEMA);
+        Files.writeString(schema, schema(parquet));
         String r = cfg.toString().replace('\\', '/');
         Path p = cfg.resolve("xdrfeed_pipeline.toon");
         Files.writeString(p, """
@@ -110,14 +118,15 @@ class ScheduledDailyChainTest {
                   format: PARQUET
                 processing:
                   threads: 1
-                  file_pattern: "glob:**/*.csv"
+                  file_pattern: "glob:**/*.%4$s"
                   schema_file: "%2$s"
                   csv_settings:
                     delimiter: ","
                     has_header: true
                     date_formats[1]: "%%Y-%%m-%%d"
                     timestamp_formats[1]: "%%Y-%%m-%%d %%H:%%M:%%S"
-                """.formatted(r, schema.toString().replace('\\', '/'), store.toAbsolutePath().toString().replace('\\', '/')));
+                """.formatted(r, schema.toString().replace('\\', '/'), store.toAbsolutePath().toString().replace('\\', '/'),
+                parquet ? "parquet" : "csv") + (parquet ? "parsing:\n  frontend: parquet\n" : ""));
         return p;
     }
 
@@ -168,6 +177,28 @@ class ScheduledDailyChainTest {
 
     @Test
     void aSampleDailyFeedFlowsCollectorPipelinePartitionedDatasetIndexOnTheScheduleAlone(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        runChain(cfg, root, false);
+    }
+
+    /** The same chain with each day delivered as a Parquet file read by {@code parsing.frontend: parquet}. */
+    @Test
+    void aParquetDailyFeedFlowsTheSameChainOnTheScheduleAlone(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        runChain(cfg, root, true);
+    }
+
+    /** Writes one day as a typed Parquet file beside the inbox, then moves it in so the poll never sees a partial file. */
+    private static void landParquet(Path cfg, Path inbox, String day, String rows) throws Exception {
+        Path csv = cfg.resolve("gen_" + day + ".csv"), tmp = cfg.resolve("gen_" + day + ".parquet");
+        Files.writeString(csv, "S,T,KIND,TS,C,EVENT_DATE\n" + rows);
+        try (var c = DriverManager.getConnection("jdbc:duckdb:"); var st = c.createStatement()) {
+            st.execute("COPY (SELECT S, T, KIND, CAST(TS AS TIMESTAMP) AS TS, C, CAST(EVENT_DATE AS DATE) AS EVENT_DATE FROM read_csv('"
+                    + csv.toString().replace('\\', '/') + "', header=true, all_varchar=true)) TO '"
+                    + tmp.toString().replace('\\', '/') + "' (FORMAT parquet)");
+        }
+        Files.move(tmp, inbox.resolve("XDR_" + day + ".parquet"), StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    private void runChain(Path cfg, Path root, boolean parquet) throws Exception {
         Authenticators.forTest(ex -> "Bearer owner".equals(String.valueOf(ex.getRequestHeaders().getFirst("Authorization")))
                 ? Optional.of(new Subject("analyst-1", Set.of("canBuildLinkIndex"))) : Optional.empty());
         InputFingerprintCache.forTest(System::currentTimeMillis, 0L);
@@ -175,7 +206,7 @@ class ScheduledDailyChainTest {
         Path store = Path.of("database").resolve(storeName);
         Path inbox = Files.createDirectories(cfg.resolve("inbox"));
         System.setProperty("assist.write.root", root.toString());
-        CollectorService svc = new CollectorService(List.of(pipeline(cfg, store)), List.of(), List.of(job()), 1, 1, null);
+        CollectorService svc = new CollectorService(List.of(pipeline(cfg, store, parquet)), List.of(), List.of(job()), 1, 1, null);
         ControlApi api = null;
         try {
             new ComponentStore(root.resolve("registry")).write("dataset", "xdr_ds",
@@ -186,7 +217,8 @@ class ScheduledDailyChainTest {
 
             for (int d = 0; d < FEED.size(); d++) {
                 String day = "2026030" + (d + 1);
-                Files.writeString(inbox.resolve("XDR_" + day + ".csv"), "S,T,KIND,TS,C,EVENT_DATE\n" + FEED.get(d));
+                if (parquet) landParquet(cfg, inbox, day, FEED.get(d));
+                else Files.writeString(inbox.resolve("XDR_" + day + ".csv"), "S,T,KIND,TS,C,EVENT_DATE\n" + FEED.get(d));
 
                 JobRun run = awaitRun(svc, d + 1);
                 assertEquals("SUCCESS", run.status(), run.message());
