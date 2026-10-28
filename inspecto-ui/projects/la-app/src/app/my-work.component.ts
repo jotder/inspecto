@@ -137,7 +137,7 @@ export class MyWorkComponent implements OnInit {
                     ? forkJoin(
                           ds.map((d) =>
                               this.runs.batches(d.pipeline).pipe(
-                                  map((b) => lastImportLine(d.id, Array.isArray(b) ? b : [])),
+                                  map((b) => lastImportLine(d.id, Array.isArray(b) ? b : [], d.last)),
                                   catchError(() => of(null)),
                               ),
                           ),

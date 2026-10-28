@@ -2478,8 +2478,8 @@ On the la-app front page, after the Space guide, **My work** lists:
   and excluded through), most recent first, with the lists it uses; opening one draws its start again over the data as
   it is then and hides what its exclusion lists hold now. A case re-reads live data: it is not evidence.
 - **What changed in your data** — one line per Dataset imported with **Add data**: the last successful import's date,
-  rows loaded and rows set aside, read from the ingest audit ledger (`GET /runs/{pipeline}/batches`). It does not say
-  whether a re-import replaced or appended rows.
+  rows loaded and rows set aside, read from the ingest audit ledger (`GET /runs/{pipeline}/batches`). After *Add a
+  file* it also says replaced or appended and the net change in rows, from the Dataset's `lastImport`.
 
 **Find something interesting** (top of the Analysis tab) asks *Who is busiest*, *Which groups stick together* and *How
 does A reach B*, each answered in one sentence with **Show on graph**, **Start from these** and **Add to a list**.

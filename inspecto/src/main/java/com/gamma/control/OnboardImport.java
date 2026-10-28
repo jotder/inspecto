@@ -543,6 +543,9 @@ final class OnboardImport {
         void run() throws Exception;
     }
 
+    /** The registry entry's key for {@link Job#lastImport}. */
+    static final String LAST_IMPORT = "lastImport";
+
     /** One run of an import Pipeline: commit, Add a file or Run now. */
     static final class Job {
         final Space space;
@@ -553,6 +556,8 @@ final class OnboardImport {
         final Deque<Undo> undo = new ArrayDeque<>();
         Path landed;
         Path aside;
+        /** The ledger's {@code consignment_id} of the last batch {@link #runChecked} saw this run add; null if none. */
+        String runBatch;
 
         Job(Space space, String id, String kind, Path source, String fileName, Map<String, Object> dataset, boolean replace) {
             this.space = space;
@@ -600,6 +605,7 @@ final class OnboardImport {
         Map<String, Object> finishCommit(Path draftDir) throws IOException {
             Map<String, Object> summary = runChecked(0);
             ComponentStore registry = new ComponentStore(space.writeRoot().resolve("registry"));
+            dataset.put(LAST_IMPORT, lastImport(summary));
             registry.write("dataset", id, dataset);
             undo.push(() -> registry.delete("dataset", id));
             followOn(summary);
@@ -633,6 +639,7 @@ final class OnboardImport {
             List<Map<String, Object>> quarantined = new ArrayList<>();
             for (Map<String, String> b : space.service().statusStore().batches(cfg)) {
                 if (batchesBefore.contains(String.valueOf(b.get("consignment_id")))) continue;
+                runBatch = String.valueOf(b.get("consignment_id"));
                 parsed += parseLong(b.get("total_input_rows"));
                 rejected += parseLong(b.get("rejected_rows"));
             }
@@ -659,6 +666,34 @@ final class OnboardImport {
                         + "; nothing was kept - check the column types and formats and try again");
             }
             return s;
+        }
+
+        /**
+         * LA-ONBOARD-RESIDUALS-1 (7): what this import did, kept on the Dataset's registry entry so the home page's
+         * <i>What changed in your data</i> can say replaced or appended and the net change. Run now records none. The
+         * card matches {@code batch} to the ledger's last run (no clock comparison: the ledger's times carry no zone).
+         */
+        Map<String, Object> lastImport(Map<String, Object> summary) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("at", Instant.now().toString());
+            m.put("replaced", replace);
+            m.put("rowsBefore", summary.get("rowsBefore"));
+            m.put("rowsAfter", summary.get("rowsAfter"));
+            if (runBatch != null) m.put("batch", runBatch);
+            if (fileName != null) m.put("file", fileName);
+            return m;
+        }
+
+        /**
+         * Add a file: write {@link #lastImport} onto the entry as it stands now (it may have been edited since). A result
+         * stamp, so not archived as a version (it would push real edits out of the history).
+         */
+        void recordLastImport(Map<String, Object> summary) throws IOException {
+            ComponentStore registry = new ComponentStore(space.writeRoot().resolve("registry"));
+            Map<String, Object> current = new LinkedHashMap<>(registry.get("dataset", id)
+                    .map(ComponentRegistry.Component::content).orElse(dataset));
+            current.put(LAST_IMPORT, lastImport(summary));
+            registry.write("dataset", id, current, false);
         }
 
         /** DT-16: the import's own follow-on work, inside the user's run (unless the Space's Jobs do it). */
@@ -914,6 +949,7 @@ final class OnboardImport {
                     s.put("rowsBefore", before);
                     s.put("rowsChanged", ((Number) s.get("rowsAfter")).longValue() - before);
                     s.put("dataset", id);
+                    j.recordLastImport(s);   // before the old rows are dropped: a failed write still restores them
                     j.dropAside();
                     j.followOn(s);
                     j.undo.clear();

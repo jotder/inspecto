@@ -429,19 +429,30 @@ class ControlApiOnboardFilesTest {
             String id = uniqueId("ledger");
             JsonNode d = draft(c, "transfers.csv", "stream", transfers(100), null);
             data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            ComponentStore registry = new ComponentStore(root.resolve("registry"));
+            assertLastImport(registry, id, false, 0, 100, "transfers.csv");
 
             JsonNode rep = data(send(c, "POST", "/datasets/" + id + "/files?name=october.csv", transfers(60).getBytes(StandardCharsets.UTF_8), null), 200);
+            assertLastImport(registry, id, true, 100, 60, "october.csv");
             assertTrue(rep.get("replaced").asBoolean());
             assertEquals(100, rep.get("rowsBefore").asLong(), rep.toString());
             assertEquals(60, rep.get("rowsAfter").asLong());
             assertEquals(-40, rep.get("rowsChanged").asLong(), "a re-import says how many rows changed");
 
+            int versions = registry.versions("dataset", id).size();
             JsonNode app = data(send(c, "POST", "/datasets/" + id + "/files?name=november.csv&mode=append",
                     transfers(30).getBytes(StandardCharsets.UTF_8), null), 200);
             assertEquals(90, app.get("rowsAfter").asLong());
             assertEquals(30, app.get("rowsChanged").asLong());
+            assertEquals(versions, registry.versions("dataset", id).size(), "the lastImport stamp archives no version");
+            assertLastImport(registry, id, false, 60, 90, "november.csv");
 
+            String appended = String.valueOf(((Map<?, ?>) registry.get("dataset", id).orElseThrow().content().get("lastImport")).get("batch"));
+            JsonNode ledger = data(json(c, "GET", "/runs/" + id + "/batches", null, null), 200);
+            assertEquals(appended, ledger.get(ledger.size() - 1).get("consignment_id").asText(), "the card matches the ledger's last run by id");
             JsonNode now = data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
+            assertLastImport(registry, id, false, 60, 90, "november.csv");   // Run now imports no file: the entry is unchanged
+            assertEquals(appended, String.valueOf(((Map<?, ?>) registry.get("dataset", id).orElseThrow().content().get("lastImport")).get("batch")));
             assertEquals(90, now.get("rowsAfter").asLong(), now.toString());
             assertEquals(0, now.get("rowsChanged").asLong());
             assertTrue(now.get("followOnInRun").asBoolean());
@@ -456,6 +467,18 @@ class ControlApiOnboardFilesTest {
             assertEquals(409, json(c, "POST", "/datasets/piped/run", null, null).statusCode());
             assertEquals(404, json(c, "POST", "/datasets/nope/run", null, null).statusCode());
         }
+    }
+
+    /** LA-ONBOARD-RESIDUALS-1 (7): the registry entry keeps the last import's replace-or-append and row counts. */
+    private static void assertLastImport(ComponentStore registry, String id, boolean replaced, long before, long after, String file) {
+        Map<?, ?> last = (Map<?, ?>) registry.get("dataset", id).orElseThrow().content().get("lastImport");
+        assertNotNull(last, "no lastImport on " + id);
+        assertEquals(replaced, last.get("replaced"), last.toString());
+        assertEquals(before, ((Number) last.get("rowsBefore")).longValue(), last.toString());
+        assertEquals(after, ((Number) last.get("rowsAfter")).longValue(), last.toString());
+        assertEquals(file, last.get("file"));
+        assertNotNull(java.time.Instant.parse(String.valueOf(last.get("at"))));
+        assertFalse(String.valueOf(last.get("batch")).isBlank(), "the run's ledger batch");
     }
 
     /** A file named .txt / .tab / upper-case lands under the import's own extension, so its file_pattern picks it up. */

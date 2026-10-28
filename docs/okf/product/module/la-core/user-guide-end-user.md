@@ -114,9 +114,10 @@ are ticked.
   saved and the Entity Lists it uses (*Lists: started from Suspects; leaves out Busy merchants*). Click one to open
   its graph. A saved view re-reads your data each time it opens: it is not evidence.
 * **What changed in your data** - one line per Dataset you brought in with **Add data**, its last import first:
-  *transfers: imported 1 Oct 2026, +2,104 rows*, or after another file *transfers: re-imported 3 Oct 2026, 2,300
-  rows loaded* (the line counts what the run loaded; it does not say whether the new file replaced the rows or was
-  added to them). Rows a run set aside are counted too. Data a Pipeline keeps up to date is not listed here.
+  *transfers: imported 1 Oct 2026, +2,104 rows*; after **Add a file** it says whether the new file replaced the rows
+  or was added to them, and the net change: *transfers: replaced 3 Oct 2026, 2,104 → 2,000 rows (−104)* or
+  *transfers: appended 3 Oct 2026, +196 rows (now 2,300)*. After **Run now** it reads *re-imported …, 2,300 rows
+  loaded*. Rows a run set aside are counted too. Data a Pipeline keeps up to date is not listed here.
 
 ### Add data: onboard a file
 

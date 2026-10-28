@@ -54,17 +54,43 @@ function listsLine(v: LinkAnalysisView, title: (id: string) => string): string {
     return `Lists: ${parts.join('; ')}`;
 }
 
-/** An imported Dataset as the home page reads it: its id and the Pipeline Add data wrote for it. */
+/** An imported Dataset as the home page reads it: its id, the Pipeline Add data wrote for it, and its last import. */
 export interface ImportedDataset {
     id: string;
     pipeline: string;
+    /** The entry's `lastImport` (LA-ONBOARD-RESIDUALS-1 item 7); absent on imports made before it was recorded. */
+    last?: LastImport;
+}
+
+/** What the last commit or Add a file did, as the server keeps it on the Dataset's registry entry. */
+export interface LastImport {
+    at: number;
+    replaced: boolean;
+    rowsBefore: number;
+    rowsAfter: number;
+    /** The ledger's `consignment_id` of the run that made it. */
+    batch: string;
+}
+
+function lastImport(v: unknown): LastImport | undefined {
+    if (!v || typeof v !== 'object') return undefined;
+    const r = v as Record<string, unknown>;
+    const at = Date.parse(String(r['at'] ?? ''));
+    const before = Number(r['rowsBefore']);
+    const after = Number(r['rowsAfter']);
+    const batch = typeof r['batch'] === 'string' ? r['batch'] : '';
+    if (!batch || !Number.isFinite(at) || !Number.isFinite(before) || !Number.isFinite(after)) return undefined;
+    return { at, replaced: r['replaced'] === true, rowsBefore: before, rowsAfter: after, batch };
 }
 
 /** The Datasets Add data created (`origin: import` with an `importPipeline`), from the registry's `dataset` entries. */
 export function importedDatasets(defs: readonly ComponentDef[]): ImportedDataset[] {
     return defs
         .filter((d) => d.content?.['origin'] === 'import' && typeof d.content?.['importPipeline'] === 'string')
-        .map((d) => ({ id: d.name, pipeline: d.content['importPipeline'] as string }))
+        .map((d) => {
+            const last = lastImport(d.content['lastImport']);
+            return { id: d.name, pipeline: d.content['importPipeline'] as string, ...(last ? { last } : {}) };
+        })
         .sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -73,22 +99,35 @@ const num = (v: string | undefined): number => {
     return Number.isFinite(n) ? n : 0;
 };
 const rows = (n: number): string => `${n.toLocaleString('en')} ${n === 1 ? 'row' : 'rows'}`;
+const signed = (n: number): string => `${n < 0 ? '−' : '+'}${Math.abs(n).toLocaleString('en')}`;
 
 /**
- * One Dataset's last import in words, from its Pipeline's run ledger (`GET /runs/{pipeline}/batches`, oldest first):
- * "transfers: imported 1 Oct 2026, +2,104 rows" the first time, "re-imported" after. The ledger records what each run
- * loaded, not whether a re-import replaced the rows or added to them, so a re-import says "rows loaded", never a net
- * change. Null when the Dataset has no successful run yet.
+ * One Dataset's last import in words. With the entry's `lastImport` (item 7) a re-import says whether it replaced the
+ * rows or added to them, and the net change: "transfers: replaced 3 Oct 2026, 2,104 → 2,300 rows (+196)", "transfers:
+ * appended 3 Oct 2026, +196 rows (now 2,300)". The run ledger (`GET /runs/{pipeline}/batches`, oldest first) gives the
+ * rows set aside, and wins when its last run is not `lastImport.batch` (Run now records no `lastImport`; matched by
+ * id, since the ledger's times carry no zone) or the import has no record: then a re-import says "rows loaded", never a net change. Null when the Dataset has no successful run yet.
  */
-export function lastImportLine(datasetId: string, batches: readonly AuditRow[]): { text: string; at: number } | null {
+export function lastImportLine(
+    datasetId: string,
+    batches: readonly AuditRow[],
+    last?: LastImport,
+): { text: string; at: number } | null {
     const ok = batches.filter((b) => (b['status'] ?? '').toUpperCase() === 'SUCCESS');
-    const last = ok[ok.length - 1];
-    if (!last) return null;
-    const when = Date.parse(last['end_time'] || last['start_time'] || '');
-    const day = Number.isFinite(when) ? ` ${dayLabel(when)}` : '';
-    const loaded = num(last['total_output_rows']);
-    const setAside = num(last['rejected_rows']);
+    const latest = ok[ok.length - 1];
+    if (!latest) return null;
+    const when = Date.parse(latest['end_time'] || latest['start_time'] || '');
+    const setAside = num(latest['rejected_rows']);
     const aside = setAside ? `, ${rows(setAside)} set aside` : '';
+    if (last && ok.length > 1 && latest['consignment_id'] === last.batch) {
+        const net = last.rowsAfter - last.rowsBefore;
+        const text = last.replaced
+            ? `${datasetId}: replaced ${dayLabel(last.at)}, ${last.rowsBefore.toLocaleString('en')} → ${rows(last.rowsAfter)} (${signed(net)})${aside}`
+            : `${datasetId}: appended ${dayLabel(last.at)}, ${signed(net)} ${Math.abs(net) === 1 ? 'row' : 'rows'} (now ${last.rowsAfter.toLocaleString('en')})${aside}`;
+        return { text, at: last.at };
+    }
+    const day = Number.isFinite(when) ? ` ${dayLabel(when)}` : '';
+    const loaded = num(latest['total_output_rows']);
     const text =
         ok.length === 1
             ? `${datasetId}: imported${day}, +${rows(loaded)}${aside}`

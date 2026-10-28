@@ -501,8 +501,10 @@ optional pack field; no route was added.
   from `GET /entity-lists`, each a link to `/link-analysis?view=<id>` (phase 3's param). **What changed in your data** reads
   no new route: the registry's `dataset` entries with `origin: import` + `importPipeline`, then `GET /runs/{pipeline}/batches`
   (the ingest audit ledger, ungated, Basic) - the last `SUCCESS` batch's `end_time`, `total_output_rows`, `rejected_rows`. The
-  run summary itself is persisted nowhere, and the ledger does not say whether a re-import replaced or appended, so the first
-  import reads `+N rows` and a re-import `N rows loaded`, never a net change.
+  first import reads `+N rows`; a re-import reads the entry's `lastImport` (§6.10, 2026-10-28): *replaced …, 2,104 → 2,300
+  rows (+196)* or *appended …, +196 rows (now 2,300)*. When the ledger's last `SUCCESS` batch is not `lastImport.batch` (a
+  Run now, which records none) or the entry has no `lastImport`, it falls back to *N rows loaded*, never a stale net change.
+  Matched by `consignment_id`, not by clock: the ledger's `end_time` is server-local time with no zone.
 * **Find something interesting** (`discover.ts` pure, `link-analysis-discover.component.ts`, top of the Analysis tab):
   *Who is busiest* = `degreeCentrality` top 5 (super nodes skipped; the hint "X has N links. Add it to an exclusion list?" on
   the top row when it has at least 5 links and twice the next one's); *Which groups stick together* = `louvainCommunities`, groups
@@ -1196,6 +1198,14 @@ limits and the commit's write order are in
   not a signal-driven `la.index.build` Job. Skipped (and said so) where `pipeline.automation` is present; that
   feature is declared by no module yet, so today every edition builds in-run. The summary reports
   `index:{result, edges, nodes}`.
+- **The entry keeps its last import (`LA-ONBOARD-RESIDUALS-1` item 7, as built 2026-10-28).** The commit and *Add a file*
+  write `lastImport {at, replaced, rowsBefore, rowsAfter, batch, file}` onto the Dataset's registry entry
+  (`OnboardImport.Job.lastImport`; `batch` = the run's ledger `consignment_id`). The commit puts it in the entry it
+  registers; Add a file re-reads the entry (an edit made meanwhile is kept) and writes it with `archive=false` (a result
+  stamp, no version in the history) BEFORE the replaced rows are dropped, so a failed write still restores them. No new route: the home page's *What changed in your data* already lists these entries.
+  *Run now* imports no file and records none. Session decision (assistant-decided under operator delegation, pending
+  confirmation): only the LAST import is kept, not a history - the card shows one line per Dataset. Pinned by
+  `ControlApiOnboardFilesTest.addAFileReplacesOrAppendsAndRunNowReRuns`.
 - **Change a column's Entity Type later:** `PUT /datasets/{id}/columns/{column}` (`canAuthorWorkbench`, edit access
   to the Dataset). The profile cache keys on the binding signature, so the next read re-assesses.
 - **Deleting an Add data Dataset retires its import Pipeline** (`LA-ONBOARD-ORPHAN-PIPELINE-1`, `LA-ONBOARD-RETIRE-GAPS-1`).
