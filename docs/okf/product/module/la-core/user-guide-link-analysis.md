@@ -201,22 +201,22 @@ These changes need the right to edit Datasets when you sign in; without it they 
 
 Act on the canvas, read in the dock, configure in **⚙ Settings**.
 
-* **One header row.** The title **Link Analysis** with its **?** (what this page is), then the **tool rail** and the
-  **canvas toolbar** side by side, then **Hide the side panels** and **⚙ Settings**. Every control is an icon: hover
+* **One header row.** The title **Link Analysis**, then the **tool rail** and the **canvas toolbar** side by side,
+  then **Full screen**, **About** (what this page is and its terms) and **⚙ Settings**. Every control is an icon: hover
   it for its name. Counts (Held, Hidden, collapsed, Attach) are a small number on the icon. When the header is too
   narrow, the canvas toolbar's groups after Canvas mode fold into **More canvas tools** (`⋯`), and a long selection
   row drops under the rail rather than being clipped.
 * **Tool rail (file and view):** **File ▾** first ([§10](#10-saving-exporting-and-the-file-menu)), then **Search
-  nodes**, **Filter node types**, **Graph layout**, **Filter edges by time**, the **Analysis** and **Investigation**
-  toggles (they open the right panel at that tab), **Help**, **Glossary**, **Display options** (the brush), **Undo**
-  and **Redo** (display and filter changes), **Fit the graph to the screen**, **Show as list**, **Full screen**,
-  **Export** and **Show the rows** (opens the dock).
+  nodes**, **Filter node types**, **Graph layout**, **Filter edges by time**, **Help**, **Glossary**, **Display
+  options** (the brush), **Undo** and **Redo** (display and filter changes), **Fit the graph to the screen**, **Show
+  as list**, **Export** and **Show the rows** (opens the dock).
 * **Canvas toolbar (work on the canvas):** **Canvas mode** (Pan, Lasso, Fisheye, Link filter), the selection (**Select
-  all**, **Invert the selection**, **Add the neighbours to the selection**, **Clear the selection**, and the count), the
+  all**, **Invert the selection**, **Select neighbours**, **Clear the selection**, and the count), the
   graph edits (**Expand…**, **Collapse**, **Hide**, **Exclude** and **Merge** on an Investigation's canvas, **Attach to
   Case**), **Clean up** (the broom), and **Held** and **Hidden by lists**.
 * **Canvas:** the graph, with the legend, the Working set tiles and the minimap.
-* **Right panel**, two tabs: **Analysis** (*Find something interesting* and the one analysis catalogue,
+* **Right panel**, collapsed to a thin rail (**Show the toolbox**, **Analysis**, **Investigation**) or open with two
+  tabs (**«** collapses it again): **Analysis** (*Find something interesting* and the one analysis catalogue,
   [§8](#8-the-analysis-catalogue)) and **Investigation** (the Act panel, [§11](#11-investigations)).
 * **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus,
   with an Investigation open, **Op log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
@@ -3111,16 +3111,19 @@ This supersedes the layout parts of *Graph page UX* and *i2-gap work* below (the
 facts are in [architecture.md](architecture.md) §6.14.
 
 - **One header row (visual polish, operator 2026-10-28):** `header[data-testid="la-header"]` holds the title
-  **Link Analysis** (the page's one `<h1>`, `la-title`) with its explain **?**, then the tool rail and the canvas toolbar
-  **side by side** (`la-toolbars`), then the side-panel toggle and **⚙ Settings** (`la-settings-open`). Every control is a
+  **Link Analysis** (the page's one `<h1>`, `la-title`, `text-lg` since 2026-10-29), then the tool rail and the canvas
+  toolbar **side by side** (`la-toolbars`), then **Full screen** (`la-fullscreen`), the one **About** explain button
+  (`la-about`) and **⚙ Settings** (`la-settings-open`). The header carries no side-panel toggle and no Analysis /
+  Investigation shortcuts (operator 2026-10-29): the right toolbox panel opens, collapses and switches tab from its
+  own rail (*Show the toolbox*, *Open the analysis tools*, *Open the Investigation*) and its tabs. Every control is a
   30 px icon button with no text beside it: the name shows as a tooltip on hover and stays the `aria-label`. Counts
   (Held, Hidden, N collapsed, Attach) are a small number on the icon; the selection chip shows the count only (the word
   is screen-reader text and the tooltip). If a long selection row still cannot fit, the canvas toolbar drops under the
   rail rather than being clipped. The status bar no longer carries the title or the page-info line.
 - **Tool rail** (`la-tool-rail`): **File ▾** is its first icon (`la-file`, tooltip *File*: New, Open…, Save view, Save
   view as…, Save this analysis (Snapshot), Import / export views, Close, Delete), then search, filters, layout, time,
-  the Analysis / Investigation toggles, help, glossary, Display, undo/redo, fit, list, full screen (corner arrows),
-  export and **Show the rows** (opens the dock).
+  help, glossary, Display, undo/redo, fit, list (`share` icon while the list shows: *Show graph*), export and **Show
+  the rows** (opens the dock). *Select neighbours* (selection group) uses `cursor-arrow-ripple`.
 - **Canvas toolbar** (`la-canvas-toolbar`): groups `la-group-mode` (Canvas mode, `canvas-mode.ts`: `pan` | `lasso` |
   `fisheye` | `linkFilter`; Pan = drag pans, Shift+drag lassos; Lasso is session-only, Fisheye and Link filter are
   the saved view's plugin flags), `la-group-selection`, `la-group-edits` (Expand… — outward arrows from a centre,

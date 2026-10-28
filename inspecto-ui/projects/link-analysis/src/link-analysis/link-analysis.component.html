@@ -72,12 +72,7 @@
             </button>
         </mat-menu>
         <!-- the page title and its info (back up from the footer, operator 2026-10-28): the page's one h1 -->
-        <h1 class="m-0 shrink-0 whitespace-nowrap px-1 text-sm font-semibold leading-6" data-testid="la-title">Link Analysis</h1>
-        <inspecto-la-host-slot
-            class="shrink-0"
-            [component]="aiExplain"
-            [inputs]="{ screen: 'Link Analysis', terms: ['Entity', 'Link', 'Dataset', 'Pipeline'] }"
-        />
+        <h1 class="m-0 shrink-0 whitespace-nowrap px-1 text-lg font-semibold leading-6" data-testid="la-title">Link Analysis</h1>
         <!-- the two toolbars sit side by side; only when a long selection row cannot fit does the canvas toolbar drop
              under the rail, so nothing is clipped (the canvas toolbar must never be overflow-hidden) -->
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1" data-testid="la-toolbars">
@@ -242,32 +237,7 @@
                         </div>
                     </mat-menu>
                 }
-
-                <span
-                    class="my-1 h-px w-6 max-md:mx-1 max-md:my-0 max-md:h-5 max-md:w-px"
-                    style="background: var(--gamma-border)"
-                    aria-hidden="true"
-                ></span>
-                <!-- graph-algorithms toolbox (opens the right dock's Analysis tab) -->
-                <button
-                    mat-icon-button
-                    (click)="openAnalysis()"
-                    [color]="toolboxDockOpen() && toolboxTab() === 'analysis' ? 'primary' : undefined"
-                    matTooltip="Graph algorithms"
-                    aria-label="Open the graph-algorithms toolbox"
-                >
-                    <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
-                </button>
-                <!-- LA-10: the Investigation op log (opens the right dock's Investigation tab; locked there on the Explorer level) -->
-                <button
-                    mat-icon-button
-                    (click)="openInvestigation()"
-                    [color]="investigation.active() ? 'primary' : undefined"
-                    matTooltip="Investigation — an ordered, replayable op log"
-                    aria-label="Open the Investigation"
-                >
-                    <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
-                </button>
+                <!-- Analysis and Investigation open from the right toolbox panel's own rail and tabs (operator 2026-10-29) -->
 
                 @if (search() || kindFilter().length || timeColumn()) {
                     <button
@@ -281,16 +251,6 @@
                 }
             }
 
-            <span class="flex-auto max-md:hidden"></span>
-
-            <inspecto-la-host-slot
-                [component]="aiExplain"
-                [inputs]="{
-                    screen: 'Link Analysis',
-                    label: 'About Link Analysis tools',
-                    terms: ['Entity', 'Link', 'Entity Projection', 'Link-Analysis View', 'Dataset', 'Widget'],
-                }"
-            />
 
 
             <mat-menu #saveMenu="matMenu">
@@ -670,24 +630,6 @@
                         [svgIcon]="listMode() ? 'heroicons_outline:share' : 'heroicons_outline:queue-list'"
                     ></mat-icon>
                 </button>
-                <button
-                    mat-icon-button
-                    (click)="toggleFullscreen('graph')"
-                    [matTooltip]="
-                        fullscreen() === 'graph' ? 'Exit full screen' : 'Full screen (browser-level, canvas only)'
-                    "
-                    [attr.aria-label]="
-                        fullscreen() === 'graph' ? 'Exit graph full screen' : 'View the graph in full screen'
-                    "
-                >
-                    <mat-icon
-                        [svgIcon]="
-                            fullscreen() === 'graph'
-                                ? 'heroicons_outline:arrows-pointing-in'
-                                : 'heroicons_outline:arrows-pointing-out'
-                        "
-                    ></mat-icon>
-                </button>
                 <!-- Export group: one rail icon, the four formats as menu items -->
                 <button
                     mat-icon-button
@@ -774,10 +716,10 @@
                             (click)="addNeighboursToSelection()"
                             [disabled]="!selectedOnCanvas().length"
                             [disabledInteractive]="true"
-                            [matTooltip]="selectedOnCanvas().length ? 'Add the neighbours to the selection' : 'Select a node first'"
-                            aria-label="Add the neighbours to the selection"
+                            [matTooltip]="selectedOnCanvas().length ? 'Select neighbours' : 'Select a node first'"
+                            aria-label="Select neighbours"
                         >
-                            <mat-icon svgIcon="heroicons_outline:share" aria-hidden="true"></mat-icon>
+                            <mat-icon svgIcon="heroicons_outline:cursor-arrow-ripple" aria-hidden="true"></mat-icon>
                         </button>
                         <button
                             mat-icon-button
@@ -1009,23 +951,39 @@
                 </nav>
             }
         </div>
+        <!-- the right end reads Full screen · About · ⚙ Settings (operator 2026-10-29); the toolbox panel opens and
+             collapses from its own rail -->
         <div class="flex shrink-0 items-center gap-0.5">
-            <button
-                mat-icon-button
-                (click)="toggleCanvasMaximized()"
-                [matTooltip]="
-                    canvasMaximized()
-                        ? 'Show the toolbox panel'
-                        : 'Hide the toolbox panel (more room for the canvas)'
-                "
-                [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Hide the side panels'"
-            >
-                <mat-icon
-                    [svgIcon]="
-                        canvasMaximized() ? 'heroicons_outline:view-columns' : 'heroicons_outline:arrows-pointing-out'
+            @if (graph() || workingSetCanvas()) {
+                <button
+                    mat-icon-button
+                    (click)="toggleFullscreen('graph')"
+                    [matTooltip]="
+                        fullscreen() === 'graph' ? 'Exit full screen' : 'Full screen (browser-level, canvas only)'
                     "
-                ></mat-icon>
-            </button>
+                    [attr.aria-label]="
+                        fullscreen() === 'graph' ? 'Exit graph full screen' : 'View the graph in full screen'
+                    "
+                    data-testid="la-fullscreen"
+                >
+                    <mat-icon
+                        [svgIcon]="
+                            fullscreen() === 'graph'
+                                ? 'heroicons_outline:arrows-pointing-in'
+                                : 'heroicons_outline:arrows-pointing-out'
+                        "
+                    ></mat-icon>
+                </button>
+            }
+            <inspecto-la-host-slot
+                data-testid="la-about"
+                [component]="aiExplain"
+                [inputs]="{
+                    screen: 'Link Analysis',
+                    label: 'About',
+                    terms: ['Entity', 'Link', 'Entity Projection', 'Link-Analysis View', 'Dataset', 'Widget'],
+                }"
+            />
             <!-- ⚙ Settings (§5.10): the right end of the top bar -->
             <button
                 mat-icon-button

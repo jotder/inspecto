@@ -1072,14 +1072,12 @@ describe('LinkAnalysisComponent', () => {
         expect(c.toolboxDockOpen()).toBe(true);
         expect(c.toolboxTab()).toBe('analysis');
 
-        // Maximize hides the toolbox dock and a second call restores it; there is no left panel (§5.10).
-        c.toggleCanvasMaximized();
-        expect(c.canvasMaximized()).toBe(true);
+        // The dock collapses to its rail and the rail's own button restores it; there is no left panel (§5.10).
+        c.toolboxDockOpen.set(false);
         fixture.detectChanges();
         const el: HTMLElement = fixture.nativeElement;
-        expect(el.querySelector('[aria-label="Show the toolbox"]')).not.toBeNull();
         expect(el.querySelector('aside[aria-label="Query"]')).toBeNull();
-        c.toggleCanvasMaximized();
+        (el.querySelector('button[aria-label="Show the toolbox"]') as HTMLElement).click();
         expect(c.toolboxDockOpen()).toBe(true);
         fixture.detectChanges();
         // the query panel lives in ⚙ Settings, mounted while the dialog is closed
@@ -2235,13 +2233,10 @@ describe('LinkAnalysisComponent', () => {
                 'Filter node types',
                 'Graph layout',
                 'Attach to Case',
-                'Open the graph-algorithms toolbox',
-                'Open the Investigation',
                 'Undo the last display/filter change',
                 'Redo the last undone display/filter change',
                 'Fit the graph to the screen',
                 'Show as list',
-                'View the graph in full screen',
                 'Export the graph',
             ]) {
                 expect(
@@ -2263,13 +2258,30 @@ describe('LinkAnalysisComponent', () => {
             }
         });
 
-        it('Hide the side panels still collapses both docks and the rail stays', async () => {
-            const { fixture, el, rail } = await ready();
-            (el.querySelector('button[aria-label="Hide the side panels"]') as HTMLElement).click();
+        it('ends the header with Full screen · About · Settings and drops the toolbox shortcuts (operator 2026-10-29)', async () => {
+            const { el } = await ready();
+            const header = el.querySelector('[data-testid="la-header"]') as HTMLElement;
+            const end = header.querySelector('[data-testid="la-fullscreen"]')!.parentElement!;
+            expect(Array.from(end.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))).toEqual([
+                'View the graph in full screen',
+                'About',
+                'Settings',
+            ]);
+            expect(header.querySelectorAll('inspecto-la-host-slot').length).toBe(1); // one About only
+            for (const gone of ['Open the graph-algorithms toolbox', 'Open the Investigation', 'Hide the side panels']) {
+                expect(header.querySelector(`button[aria-label="${gone}"]`), gone).toBeNull();
+            }
+            expect(header.querySelector('[data-testid="la-title"]')!.classList).toContain('text-lg');
+        });
+
+        it('the toolbox panel still opens Analysis and Investigation from its own rail', async () => {
+            const { fixture, el } = await ready();
+            const c = fixture.componentInstance;
+            c.toolboxDockOpen.set(false);
             fixture.detectChanges();
-            expect(fixture.componentInstance.toolboxDockOpen()).toBe(false);
-            expect(el.querySelector('button[aria-label="Show the side panels"]')).not.toBeNull();
-            expect(el.querySelector('nav[data-testid="la-tool-rail"]')).toBe(rail);
+            (el.querySelector('button[aria-label="Open the analysis tools"]') as HTMLElement).click();
+            expect(c.toolboxDockOpen()).toBe(true);
+            expect(c.toolboxTab()).toBe('analysis');
         });
 
         it('the workspace fills the remaining height instead of a fixed calc()', async () => {
@@ -2697,7 +2709,6 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             fixture.detectChanges();
             const c = fixture.componentInstance;
             expect(c.toolboxDockOpen()).toBe(false);
-            expect(c.canvasMaximized()).toBe(true); // only the toolbox dock remains, and it is collapsed
             expect(toolboxRail(fixture.nativeElement)).toBeTruthy();
         });
 
@@ -3373,7 +3384,7 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         expect(Array.from(sel.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))).toEqual([
             'Select all',
             'Invert the selection',
-            'Add the neighbours to the selection',
+            'Select neighbours',
             'Clear the selection',
         ]);
         // the toolbar is always there, so a selection never changes the layout or re-fits the canvas

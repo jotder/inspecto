@@ -714,8 +714,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (window.matchMedia?.('(max-width: 959px)').matches) return; // stacked: the canvas has the full width
         if (this.toolboxDockOpen()) this.toolboxDockOpen.set(false);
     }
-    /** The docks give the canvas their width in one step (and take it back). */
-    readonly canvasMaximized = computed(() => !this.toolboxDockOpen());
 
     // ── View toolbox: canvas plugins and behaviors (each a G6 v5 built-in), persisted with a saved view ──
     // Fisheye, Link filter, Snap lines and Hover activate all start OFF (operator 2026-10-26).
@@ -2805,11 +2803,6 @@ Its prior copies stay in its version history.`,
     openInvestigation(): void {
         this.toolboxDockOpen.set(true);
         this.toolboxTab.set('investigation');
-    }
-
-    /** Collapse both docks so the canvas takes the row; a second call restores them. */
-    toggleCanvasMaximized(): void {
-        this.toolboxDockOpen.set(this.canvasMaximized());
     }
 
     // ── display options ──
