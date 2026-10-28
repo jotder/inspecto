@@ -1406,7 +1406,16 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
     - The graph draws without sign-in.
     - Geo, Entities and Alerts are hidden from the navigation.
     - *Run on the server* is locked with "Investigations are in Standard and above…".
-  - **Not driven:** the Widget picker hiding the Link analysis type on Basic. It is cosmetic by decision (D-LAE2).
+  - **Real `-Edition Basic` build with the console UI:**
+    - The Widget picker's *Investigation views* offers only Reconciliation; there is no Link analysis or Geo map type.
+    - The saved `la_showcase_overview` Widget still draws. That is by decision: the offer is cosmetic (D-LAE2).
+    - Embed and Investigation routes answer 503 with the reason.
+  - **Real `-Edition Standard` build with WSO2 sign-in:** `/bootstrap` reports `standard` / `investigations` / `oidc`.
+    - Per-user sign-in there was not driven. The browser does not trust the local WSO2 self-signed certificate, and trusting it is the operator's call.
+    - The per-user Standard checks above ran on the demo bundle without `inspecto-policy`, which runs the same Studio code.
+- **Full gate 2026-10-28 (`f0e8a50eb`):**
+  - The reactor ran 56 of 56 modules: 11,280 tests, 0 failures, verdict guard PASS. The UI suite passed 6,779 tests.
+  - Six stale tests that peer commits left on master were fixed first, none in the Link Analysis UI: two Job tests outran by the new retry, a new scoring route, a DELETE-only Investigation path, and two sign-in specs.
 - **Deliberately not built:** Export in the embed viewer (it needs a grant flag first).
 
 ## 7. Host registration, Jobs and live detection
