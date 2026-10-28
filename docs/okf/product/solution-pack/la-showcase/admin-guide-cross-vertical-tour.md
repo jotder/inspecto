@@ -1,6 +1,6 @@
 # Inspecto LA: the 30-minute cross-vertical tour (mobile money, audit, claims)
 
-*Status: written 2026-10-24 from a full browser rehearsal on one locally packaged Demo Auth bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`, build `31539d9c5`, `serve-demo.bat` on a free port with `-Dla.embed.enabled=true`), driven as the real Demo Users in the built-in browser. Row `LA-SHOWCASE-REHEARSAL-1`. Every figure below was read on screen in that pass unless marked **not driven**. Synthetic data only; the plants are planted, so no figure here is a detection rate.*
+*Status: written 2026-10-24 from a full browser rehearsal on one locally packaged Demo Auth bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`, build `31539d9c5`, `serve-demo.bat` on a free port with `-Dla.embed.enabled=true`), driven as the real Demo Users in the built-in browser. Row `LA-SHOWCASE-REHEARSAL-1`. Every figure below was read on screen in that pass unless marked **not driven**. The items left then were driven on 2026-10-28 on the reorganized Studio (section 5). Synthetic data only; the plants are planted, so no figure here is a detection rate.*
 
 The tour shows three verticals back to back on **one server**: A [`la-mobile-money`](../la-mobile-money/admin-guide-showcase-runbook.md) (the agent who never sleeps), B [`la-audit`](../la-audit/admin-guide-showcase-runbook.md) (the vendor and the journal), C [`la-claims`](../la-claims/admin-guide-showcase-runbook.md) (one garage, one lawyer, twelve strangers). The per-vertical runbooks stay the detailed scripts; this page is the order, the clicks that worked and the numbers to expect. Beats: the ladder and masking (A), four-eyes (A), the algorithms (A, B, C), the Dossier tamper (B), the embed (C), Alert to Case (A).
 
@@ -36,8 +36,8 @@ Two things the audience must not see go wrong:
 
 ### 1.1 Ladder and masking (A, 3 min)
 
-* **Click:** Space *mobile money*; `?investigation=mm-structuring-case` (8 steps: seed, bounded expand, exclude with a reason, annotate, threshold, window, resolve, snapshot). Investigation tab > *Connect several numbers*: type `HUB-01, AG-39, AG-18, LOOP-1, DORMANT-1`, press *Connect seeds* (Working Set 8 to 11). Set *Maximum fan-out per entity* to `30` and press *Expand the whole Working Set* three times.
-* **Expect (read):** 11, then 43, 96, **300 entities / 460 links**. Every id is `masked:<hex>` under `typed`; `HUB-01` reads `masked:38e1059cd3858e90`. As `admin`, Oversight > *Masked entities* > *Reveal* answers inline "`→ MER-ELECTRIC (reveal audited)`" (it is an inline reveal, not a dialog).
+* **Click:** Space *mobile money*; `?investigation=mm-structuring-case` (8 steps: seed, bounded expand, exclude with a reason, annotate, threshold, window, resolve, snapshot). Since the 2026-10-28 Studio reorganization there is no *Connect several numbers* field: seeds come from the query graph (Investigation tab > *Show the query graph (to pick seeds)*, pick the node, *Seed*), and the expand is the *Expand…* dialog (From *The whole Working Set*, a fan-out, the degree). Add `HUB-01`, `AG-39`, `AG-18`, `LOOP-1`, `DORMANT-1` that way (Working Set 8 to 11), then expand the whole Working Set three times at fan-out `30`.
+* **Expect (read):** 11, then 43, 96, **300 entities / 460 links** (2026-10-24 figures). Every id is `masked:<hex>` under `typed`. **Aliases are keyed per Investigation**, so the same wallet has a different alias in each Investigation and another in saved views and Entity pages (the Space key): never quote an alias across them. To find a named entity in a masked saved view, open *Entities* > the type > type the raw value: the profile's address is its Space alias. As `admin`, Oversight > *Masked entities* > *Reveal* answers inline "`→ MER-ELECTRIC (reveal audited)`" (it is an inline reveal, not a dialog).
 * **Trap:** the Investigation tab's first *Revoke* buttons are the **Members** ones. Revoking a member (even the owner's lead role) takes no confirmation (defect row `LA-REVOKE-DISCARD-NO-CONFIRM-1`). Target the embed *Revoke* by its own section.
 
 ### 1.2 Four-eyes (A, 3 min)
@@ -47,6 +47,8 @@ Two things the audience must not see go wrong:
 * **Four-eyes on the *Investigate* card:** the card sends the active Domain Profile's expand presets; these Spaces set no profile fan-out, so its one-degree expand is held above `four_eyes_fan_out_above` and the degree line says to ask an approver or use *Expand…* with a smaller fan-out. For a solo demo, open a seeded Investigation or set a fan-out first.
 
 ### 1.3 Algorithms (A, B, C; 12 min). Client first, then **Run on server**, then compare
+
+Since 2026-10-28 the Analysis tab is **one catalogue** with a *Browser* / *Server* toggle at its top: run a card on *Browser*, flip to *Server*, open the same card and press *Run on server*. Server cards need an open Investigation (on a saved view they say "Running on the server works on an Investigation's Working Set"). Pickers list masked aliases (see 1.1).
 
 Run times are the server's own "Ran on the server in N ms" line.
 
@@ -116,6 +118,23 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 No precision or detection rate (the plants are planted); the 40x dormant-wake figure of M-10 is arithmetic from the KYC reference (prior volume 150.00) and the six legs of 11 and 12 October: the Entity profile of `DORMANT-1` shows opened 2 Nov 2025, active on 11 and 12 Oct with six rows each, not the 150.00; the **client versus server parity** above is for the Working Set shown, not for the whole graph.
 
-## 5. Not driven in this pass
+## 5. Rehearsal record
 
-A: Shortest path and Maximum flow by picking `HUB-01` and `AG-39` (the pickers list aliases; the smoke covers it); the portal on `:8140`. B: Jaccard and Link prediction on the `ap_vendor_identity` view (the planted `V-136` proposal), Find similar (needs a node pick), the Alert beat. C: the identity-resolution beat (`CL-0332` and `CL-0141`), the Geo View, the saved view `claims_shared_identity`. All: a spoken run with an audience.
+**2026-10-24** (first pass): everything in sections 1 and 2 above.
+
+**2026-10-28** (the items left on 2026-10-24), driven by the assistant alone in the built-in browser on the Advanced Demo Auth console bundle of current master (the reorganized Studio at `/studio/link-analysis`), a second server on `:8099` over a fresh Spaces root laid down by `seed-la-mm` / `seed-la-audit` / `seed-la-claims --scaffold`, then `--apply` (all three seeds created everything; `seed-la-mm`'s optional Alert stage warned that no `mm-structuring` Alert appeared after 20 polls of `la_detect` and was skipped).
+
+| Vertical | Item | Result | Evidence (what the screen showed) |
+|---|---|---|---|
+| A | Shortest path `HUB-01` to `AG-39` | **PASS** | Investigation `rehearsal-chain` (seeds `HUB-01`, `AG-39`, three bounded expands at fan-out 100, the smoke's set-up; 219 nodes, 277 links). Browser: 4 nodes, 3 hops. Server: "Ran on the server in 3 ms over 219 nodes and 277 links", 4 nodes and 3 links selected. Runbook M-4: 3 hops |
+| A | Maximum flow `HUB-01` to `AG-39` | **PASS** | Browser (the max-flow and backbone card): "Max flow = 25; 2 min-cut link(s) highlighted". Server: 3 ms, "Maximum capacity between the two nodes: 25", minimum cut 2 links. Runbook: 25 |
+| A | M-10 `DORMANT-1` Entity profile | **PASS** (as documented) | *Entities* > Wallet > `DORMANT-1`: first seen 2 Nov 2025, last seen 12 Oct 2026, 3 active days of 389 (1 row on 2 Nov, 6 on 11 Oct, 6 on 12 Oct); *Where* lists `mm_kyc_dataset.wallet_id` 1 row. No 150.00 anywhere on the profile: the 40x stays the presenter's arithmetic (section 4) |
+| B | Link prediction on `ap_vendor_identity` (`V-136`) | **PASS** | View drawn 291 nodes, 1 787 links. Browser *Predict links*: 13 pairs; `V-136` is proposed with `V-134`, `V-135`, `V-133` and the account `BA-7701` at 1.12 (ranks 8 to 11; seven unrelated pairs at 1.44 rank above, because this view also carries `paid_to`). The runbook's "top three" is the shares-links-only server run |
+| B | Find similar / Jaccard from `V-131` | **PASS** (order) | Browser: `V-132` 0.71; `V-133`, `V-134`, `V-135`, `BA-7701` 0.57; `V-136` 0.13 last. The runbook's 1.0 / 0.33 is on the approved plus paid_to graph; this view's scores differ, the order holds. Server Jaccard needs an Investigation (not run on the view) |
+| C | `claims_shared_identity` | **PASS** | 227 nodes, 343 links, community hulls drawn (runbook: 227 / 343) |
+| C | Geo View `claims_junction_cluster_map` | **PASS** | *Geo Map Analysis* > saved views > *Load view*: one cluster badge **11** at the junction (`claims_night_unreported_dataset`, lat/lon, entity `accident_id`); runbook: 11 |
+| C | Identity resolution `CL-0332` + `CL-0141` | **PASS** | Investigation `rehearsal-identity` as `siu.analyst`: seed both, *Expand* (fan-out 40), *Resolve*: Working Set **12 entities, 12 links**; the two records share one identity group. Runbook: 12 |
+
+Click-path notes from this pass (the text above is updated): no *Connect several numbers* (seed from the query graph); one Analysis catalogue with the *Browser* / *Server* toggle; server cards need an Investigation; aliases are per Investigation, so a named entity in a masked view is found through its Entity page. No product defect was found; the seed's Alert-stage warning is not re-driven here.
+
+**Still open:** a spoken run with an audience (needs a person); the portal on `:8140`; the B Alert beat.
