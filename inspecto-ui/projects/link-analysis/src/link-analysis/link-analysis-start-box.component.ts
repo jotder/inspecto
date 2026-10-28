@@ -541,8 +541,8 @@ export class LinkAnalysisStartBoxComponent {
             return 'Seeds an Investigation from it: you give a purpose, and it expands one degree of who it is linked to.';
         const ring =
             kind === 'entity'
-                ? 'Draws it and everything linked to it - one ring - with busy ones held; Grow continues from there.'
-                : 'Draws them and everything linked to them - one ring - with busy ones held; Grow continues from there.';
+                ? 'Draws it and everything linked to it - one ring - with busy ones held; Expand… continues from there.'
+                : 'Draws them and everything linked to them - one ring - with busy ones held; Expand… continues from there.';
         return this.investigations() ? `${ring} They are queued as the first seeds of an Investigation.` : ring;
     });
 

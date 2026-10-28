@@ -216,7 +216,7 @@ export function startOutcome(o: {
     if (o.unknown.length) parts.push(`Not in ${o.dataset}: ${someValues(o.unknown)}.`);
     if (o.notDrawn)
         parts.push(`${plural(o.notDrawn, 'more value')} not drawn: one start draws at most ${START_MAX_SEEDS}.`);
-    parts.push('Grow (G) continues one step at a time.');
+    parts.push('Expand… (G) continues one degree at a time.');
     return parts.join(' ');
 }
 

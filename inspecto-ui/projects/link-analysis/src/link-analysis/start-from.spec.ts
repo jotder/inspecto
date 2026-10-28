@@ -196,7 +196,7 @@ describe('start-from (LA-ONBOARD-1 OB-9)', () => {
             }),
         ).toBe(
             'Drew 2 starts and 10 linked accounts from Transfers. 1 busy account held - Grow does not go through them. ' +
-                'Not in Transfers: NOPE. Grow (G) continues one step at a time.',
+                'Not in Transfers: NOPE. Expand… (G) continues one degree at a time.',
         );
         expect(wholeDatasetWarning(312, 1000, 'Transfers', 'Account')).toBeNull();
         expect(wholeDatasetWarning(null, 10, 'Transfers', 'Account')).toBeNull();
