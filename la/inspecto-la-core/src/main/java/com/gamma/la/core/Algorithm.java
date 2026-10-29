@@ -31,99 +31,99 @@ public enum Algorithm {
 
     // ── SYNC hints (linear-ish) ─────────────────────────────────────────────────────────────────────────────────────
     /** 2 / 11 / 543 ms. */
-    SHORTEST_PATH("shortestPath", "Shortest path", Cost.SYNC, 100_000, ResultKind.SELECTION, false, true, true, false,
+    SHORTEST_PATH("shortestPath", "Shortest path", "Fewest hops between two nodes", Cost.SYNC, 100_000, ResultKind.SELECTION, false, true, true, false,
             Param.DIRECTION),
     /** 4 / 35 / 828 ms (3 hops). */
-    NEIGHBORHOOD("neighborhood", "Neighbourhood", Cost.SYNC, 100_000, ResultKind.GRAPH, false, false, false, true,
+    NEIGHBORHOOD("neighborhood", "Neighbourhood", "Nodes within a number of hops of one node", Cost.SYNC, 100_000, ResultKind.GRAPH, false, false, false, true,
             Param.integer("hops", "Hops", "How many links out from the node", 1, 0, 100), Param.DIRECTION),
     /** Not benched: {@code neighborhood} at one hop. */
-    EGO_NETWORK("egoNetwork", "Ego network", Cost.SYNC, 100_000, ResultKind.GRAPH, false, false, false, true, Param.DIRECTION),
+    EGO_NETWORK("egoNetwork", "Ego network", "One node, its neighbours and the links among them", Cost.SYNC, 100_000, ResultKind.GRAPH, false, false, false, true, Param.DIRECTION),
     /** 2 / 8 / 189 ms. */
-    DEGREE_CENTRALITY("degreeCentrality", "Degree centrality", Cost.SYNC, 100_000, ResultKind.SCORES, false, false, false, false),
+    DEGREE_CENTRALITY("degreeCentrality", "Degree centrality", "Ranks nodes by how many links they have", Cost.SYNC, 100_000, ResultKind.SCORES, false, false, false, false),
     /** 4 / 30 / 615 ms. */
-    CONNECTED_COMPONENTS("connectedComponents", "Connected components", Cost.SYNC, 100_000, ResultKind.GROUPS, false, false,
+    CONNECTED_COMPONENTS("connectedComponents", "Connected components", "Parts of the graph not linked to each other", Cost.SYNC, 100_000, ResultKind.GROUPS, false, false,
             false, false),
     /** 6 / 46 / 629 ms after LA-GRAPH-QUADRATIC-1 (bucket queue; was 21 / 672 / t). 10⁵ is 0.6-2.1 s with the machine busy: kept at 10⁴. */
-    K_CORE("kCore", "k-core", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false),
+    K_CORE("kCore", "k-core", "How deep each node sits in a dense core", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false),
     /** 14 / 143 / 4 418 ms. */
-    TRIANGLE_COUNT("triangleCount", "Triangle count", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false),
+    TRIANGLE_COUNT("triangleCount", "Triangle count", "How many closed triangles each node is in", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false),
     /** 10 / 38 / 866 ms. */
-    ARTICULATION_POINTS("articulationPoints", "Cut points", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false,
+    ARTICULATION_POINTS("articulationPoints", "Cut points", "Nodes whose removal splits the graph", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false,
             false),
     /** 3 / 35 / 878 ms. */
-    BRIDGES("bridges", "Bridges", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, false),
+    BRIDGES("bridges", "Bridges", "Links whose removal splits the graph", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, false),
     /** 2 / 16 / 254 ms. */
-    IS_FOREST("isForest", "Free of cycles?", Cost.SYNC, 100_000, ResultKind.FLAG, false, false, false, false),
+    IS_FOREST("isForest", "Free of cycles?", "Checks whether the graph has any cycles", Cost.SYNC, 100_000, ResultKind.FLAG, false, false, false, false),
     /** 2 / 12 / 224 ms. */
-    DESCENDANTS("descendants", "Descendants", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, true),
+    DESCENDANTS("descendants", "Descendants", "Every node reached from one node by outgoing links", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, true),
     /** 10 / 100 / 931 ms after LA-GRAPH-QUADRATIC-1 (binary heap; was 46 / 1 740 / t). 10⁵ is 0.9-2.8 s with the machine busy: 10⁴. */
-    WEIGHTED_SHORTEST_PATH("weightedShortestPath", "Strongest path", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
+    WEIGHTED_SHORTEST_PATH("weightedShortestPath", "Strongest path", "The path with the strongest links between two nodes", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
             true, true, false, Param.DIRECTION),
     /** 8 / 73 / 1 066 ms. */
-    MAXIMUM_SPANNING_FOREST("maximumSpanningForest", "Strongest backbone", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
+    MAXIMUM_SPANNING_FOREST("maximumSpanningForest", "Strongest backbone", "The strongest links that keep each part connected", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
             false, false, false),
     /** 13 / 385 / 36 898 ms (the biggest hub at 10⁵: input-dependent). */
-    JACCARD_SIMILARITY("jaccardSimilarity", "Jaccard similarity", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false,
+    JACCARD_SIMILARITY("jaccardSimilarity", "Jaccard similarity", "Nodes that share the most neighbours with one node", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false,
             true),
     /** 61 / 356 / 11 610 ms. */
-    PAGE_RANK("pageRank", "PageRank", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false,
+    PAGE_RANK("pageRank", "PageRank", "Ranks nodes by how well linked their neighbours are", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false,
             Param.decimal("damping", "Damping", "Chance of following a link rather than jumping", 0.85, 0, 1),
             Param.integer("iterations", "Iterations", Param.ITERATIONS_HINT, 60, 0, 10_000)),
 
     // ── JOB hints (super-linear or unbounded) ──────────────────────────────────────────────────────────────────────
     /** 1 335 / t / - ms — quadratic; ceiling by extrapolation (see the class comment). */
-    BETWEENNESS_CENTRALITY("betweennessCentrality", "Betweenness centrality", Cost.JOB, 500, ResultKind.SCORES, false, false,
+    BETWEENNESS_CENTRALITY("betweennessCentrality", "Betweenness centrality", "Ranks nodes by how often they sit between others", Cost.JOB, 500, ResultKind.SCORES, false, false,
             false, false),
     /** 393 / t / - ms. */
-    CLOSENESS_CENTRALITY("closenessCentrality", "Closeness centrality", Cost.JOB, 1_000, ResultKind.SCORES, false, false,
+    CLOSENESS_CENTRALITY("closenessCentrality", "Closeness centrality", "Ranks nodes by how near they are to all others", Cost.JOB, 1_000, ResultKind.SCORES, false, false,
             false, false),
     /** 1 366 / t / - ms — composes betweenness; ceiling by extrapolation. */
-    SUSPICION_SCORE("suspicionScore", "Suspicion score", Cost.JOB, 500, ResultKind.SUSPICION, false, false, false, false,
+    SUSPICION_SCORE("suspicionScore", "Suspicion score", "Combines five link signals into one score per node", Cost.JOB, 500, ResultKind.SUSPICION, false, false, false, false,
             Param.decimal("degree", "Links weight", "Weight of how many links a node has", 1, 0, 1_000),
             Param.decimal("betweenness", "Bridging weight", "Weight of how often a node sits between others", 1, 0, 1_000),
             Param.decimal("pageRank", "Influence weight", "Weight of how well linked its neighbours are", 1, 0, 1_000),
             Param.decimal("core", "Core weight", "Weight of how deep it sits in a dense core", 1, 0, 1_000),
             Param.decimal("triangles", "Triangles weight", "Weight of how many closed triangles it is in", 1, 0, 1_000)),
     /** 39 / 616 / 4 642 ms. */
-    LOUVAIN_COMMUNITIES("louvainCommunities", "Louvain", Cost.JOB, 10_000, ResultKind.COMMUNITIES, false, false,
+    LOUVAIN_COMMUNITIES("louvainCommunities", "Louvain", "Groups that link mostly among themselves", Cost.JOB, 10_000, ResultKind.COMMUNITIES, false, false,
             false, false),
     /** 14 / 239 / 8 831 ms. */
-    DETECT_COMMUNITIES("detectCommunities", "Label spread", Cost.JOB, 10_000, ResultKind.COMMUNITIES, false,
+    DETECT_COMMUNITIES("detectCommunities", "Label spread", "Groups found by spreading labels between neighbours", Cost.JOB, 10_000, ResultKind.COMMUNITIES, false,
             false, false, false, Param.integer("maxIterations", "Iterations", "Most rounds of label spreading", 20, 0, 10_000)),
     /** 38 / 2 376 / t ms — worst case exponential in clique count. */
-    CLIQUES("cliques", "Cliques", Cost.JOB, 1_000, ResultKind.GROUPS, false, false, false, false,
+    CLIQUES("cliques", "Cliques", "Groups where every node links to every other", Cost.JOB, 1_000, ResultKind.GROUPS, false, false, false, false,
             Param.integer("minSize", "Smallest group", "Fewest nodes in a reported clique", 3, 0, 1_000)),
     /** 0 / 21 / 292 ms (limit 50, 8 hops) — input-dependent. */
-    FIND_CYCLES("findCycles", "Cycles", Cost.JOB, 100_000, ResultKind.SELECTIONS, false, false, false, false,
+    FIND_CYCLES("findCycles", "Cycles", "Loops of links that return to their start", Cost.JOB, 100_000, ResultKind.SELECTIONS, false, false, false, false,
             Param.integer("limit", "Most results", "Stop after this many cycles", 50, 0, 10_000),
             Param.integer("maxLen", "Longest cycle", "Most links in one cycle", 8, 1, 64)),
     /** 3 / 44 / 16 839 ms (limit 10, 8 hops; 2.9 GB allocated at 10⁵) — input-dependent. */
-    ALL_PATHS("allPaths", "All paths", Cost.JOB, 10_000, ResultKind.SELECTIONS, false, true, true, false,
+    ALL_PATHS("allPaths", "All paths", "Every route between two nodes, up to a limit", Cost.JOB, 10_000, ResultKind.SELECTIONS, false, true, true, false,
             Param.integer("limit", "Most results", "Stop after this many paths", 10, 0, 10_000),
             Param.integer("maxHops", "Longest path", "Most hops in one path", 8, 1, 64), Param.DIRECTION),
     /** 76 / 7 308 / t ms. */
-    MAX_FLOW("maxFlow", "Maximum flow", Cost.JOB, 1_000, ResultKind.FLOW, true, true, true, false),
+    MAX_FLOW("maxFlow", "Maximum flow", "The most that can flow between two nodes", Cost.JOB, 1_000, ResultKind.FLOW, true, true, true, false),
     /** 140 / 2 327 / t ms after LA-GRAPH-QUADRATIC-1 (2-hop candidates; was 129 / 13 728 / t). Output-bound: pairs sharing a hub neighbour. */
-    LINK_PREDICTION("linkPrediction", "Predict links", Cost.JOB, 1_000, ResultKind.LINKS, false, false, false, false,
+    LINK_PREDICTION("linkPrediction", "Predict links", "Likely missing links, from shared neighbours", Cost.JOB, 1_000, ResultKind.LINKS, false, false, false, false,
             Param.choice("method", "Method", "How shared neighbours are counted", "adamic-adar",
                     List.of("common-neighbors", "adamic-adar"), List.of("Shared neighbours", "Adamic-Adar (rare ones count more)")),
             Param.integer("limit", "Most results", "Stop after this many predicted links", 20, 0, 10_000)),
     /** 60 / 1 725 / 52 999 ms. */
-    EIGENVECTOR_CENTRALITY("eigenvectorCentrality", "Eigenvector centrality", Cost.JOB, 1_000, ResultKind.SCORES, false,
+    EIGENVECTOR_CENTRALITY("eigenvectorCentrality", "Eigenvector centrality", "Ranks nodes by links to other well-linked nodes", Cost.JOB, 1_000, ResultKind.SCORES, false,
             false, false, false, Param.integer("iterations", "Iterations", Param.ITERATIONS_HINT, 100, 0, 10_000)),
     /** 78 / 1 623 / 48 699 ms. */
-    KATZ_CENTRALITY("katzCentrality", "Katz centrality", Cost.JOB, 1_000, ResultKind.SCORES, false, false, false, false,
+    KATZ_CENTRALITY("katzCentrality", "Katz centrality", "Ranks nodes by all the routes that reach them", Cost.JOB, 1_000, ResultKind.SCORES, false, false, false, false,
             Param.decimal("alpha", "Alpha", "How much each further hop counts", 0.1, 0, 1),
             Param.decimal("beta", "Beta", "Base score every node starts with", 1, 0, 1_000),
             Param.integer("iterations", "Iterations", Param.ITERATIONS_HINT, 100, 0, 10_000)),
     /** 91 / 1 823 / 49 213 ms. */
-    HITS("hits", "HITS hubs and authorities", Cost.JOB, 1_000, ResultKind.HITS, false, false, false, false,
+    HITS("hits", "HITS hubs and authorities", "Ranks nodes as hubs or authorities", Cost.JOB, 1_000, ResultKind.HITS, false, false, false, false,
             Param.integer("iterations", "Iterations", Param.ITERATIONS_HINT, 100, 0, 10_000)),
     /**
      * Not benched; server-side only (no TypeScript twin). One BFS per origin, at most {@code weights.size()} (≤ 6) hops deep:
      * never more than {@code closenessCentrality}'s unbounded BFS per node, so it takes closeness's ceiling.
      */
-    PROPAGATED_RISK("propagatedRisk", "Propagated risk", Cost.JOB, 1_000, ResultKind.PROPAGATED_RISK, false, false, false,
+    PROPAGATED_RISK("propagatedRisk", "Propagated risk", "Spreads risk from scored nodes to the nodes linked to them", Cost.JOB, 1_000, ResultKind.PROPAGATED_RISK, false, false, false,
             false, Param.scoreMap("nodeScores", "Risk scores", "Each node's own risk, 0 to 100", 0, 100, Param.MAX_ENTRIES),
             Param.idList("seeds", "Risk origins", "Only these nodes pass on risk; empty uses every scored node", Param.MAX_ENTRIES),
             Param.decimalList("weights", "Weight per hop", "Share of risk passed on at each hop, 0 to 1",
@@ -141,6 +141,7 @@ public enum Algorithm {
 
     private final String id;
     private final String label;
+    private final String description;
     private final Cost cost;
     private final int inlineNodeCeiling;
     private final ResultKind resultKind;
@@ -150,10 +151,11 @@ public enum Algorithm {
     private final boolean needsNode;
     private final List<Param> params;
 
-    Algorithm(String id, String label, Cost cost, int inlineNodeCeiling, ResultKind resultKind, boolean needsWeights,
-              boolean needsSource, boolean needsTarget, boolean needsNode, Param... params) {
+    Algorithm(String id, String label, String description, Cost cost, int inlineNodeCeiling, ResultKind resultKind,
+              boolean needsWeights, boolean needsSource, boolean needsTarget, boolean needsNode, Param... params) {
         this.id = id;
         this.label = label;
+        this.description = description;
         this.cost = cost;
         this.inlineNodeCeiling = inlineNodeCeiling;
         this.resultKind = resultKind;
@@ -171,6 +173,11 @@ public enum Algorithm {
 
     public String label() {
         return label;
+    }
+
+    /** What the algorithm does, in one plain line for a UI hint (LA-UI-TEXT-PASS-1 T-118). */
+    public String description() {
+        return description;
     }
 
     public Cost cost() {

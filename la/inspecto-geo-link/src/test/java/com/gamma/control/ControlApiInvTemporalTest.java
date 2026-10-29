@@ -104,6 +104,7 @@ class ControlApiInvTemporalTest {
             assertEquals("2026-01-01T10:00", b.get("start").asText().substring(0, 16));
             assertEquals(1, d.get("skippedNoTime").asInt(), "the NULL-time row is counted, not silently dropped");
             assertFalse(d.get("truncated").asBoolean());
+            assertEquals("Times are read as stored, with no time-zone conversion.", d.get("timeNote").asText(), "T-129: plain words");
             // twin: a stricter bar finds nothing, so the answer above is the threshold at work
             assertEquals(List.of(), links(ok(c, body("burst", "\"windowSeconds\":30,\"minEvents\":7"))));
         }
@@ -176,6 +177,8 @@ class ControlApiInvTemporalTest {
             HttpResponse<String> r = post(c, body("burst", ""));
             assertEquals(403, r.statusCode(), r.body());
             assertTrue(r.body().contains("four-eyes"), r.body());
+            assertTrue(r.body().contains("A temporal scan (up to ") && r.body().contains("needs four-eyes approval (rows "), r.body());
+            assertFalse(r.body().matches("(?s).*\\((D-|LA-|GLOSSARY-).*"), "no ticket id in the sentence: " + r.body());
         }
     }
 

@@ -77,9 +77,16 @@ class GraphEngineRequestTest {
                 EnumSet.copyOf(java.util.Arrays.stream(Algorithm.values()).filter(Algorithm::needsWeights).toList()));
     }
 
-    /** LA-UI-TEXT-PASS-1 X1: every parameter carries the words a UI shows, never only its wire name. */
+    /** LA-UI-TEXT-PASS-1 X1 + T-118: every algorithm and parameter carries the words a UI shows, never only its wire name. */
     @Test
-    void everyParameterHasALabelAndAOneLineDescription() {
+    void everyAlgorithmAndParameterHasALabelAndAOneLineDescription() {
+        for (Algorithm a : Algorithm.values()) {                              // T-118: the algorithm itself, too
+            assertTrue(a.label() != null && !a.label().isBlank() && !a.label().equals(a.id()), a.id() + " label");
+            String d = a.description();
+            assertTrue(d != null && !d.isBlank(), a.id() + " description");
+            assertTrue(!d.contains("\n") && !d.endsWith("."), a.id() + " one line, no full stop");
+            assertTrue(d.split("\\s+").length <= 11, a.id() + " compact: " + d);
+        }
         for (Algorithm a : Algorithm.values())
             for (Algorithm.Param p : a.params()) {
                 String at = a.id() + "." + p.name();

@@ -201,6 +201,8 @@ export interface GraphAlgorithmParam {
 export interface GraphAlgorithm {
     id: string;
     label: string;
+    /** What it does, in one line (T-118); an older server may not send it. */
+    description?: string;
     cost: 'SYNC' | 'JOB';
     /** Largest Working Set a request WAITS for; above it the answer is a 202 the caller polls. Not a limit. */
     inlineNodeCeiling: number;

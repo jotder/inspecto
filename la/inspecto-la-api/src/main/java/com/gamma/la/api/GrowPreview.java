@@ -151,8 +151,8 @@ final class GrowPreview {
         out.put("excludedByLists", List.of());
         out.put("truncated", false);
         out.put("readPath", null);
-        out.put("reason", "this expand is sensitive " + sensitive.get("exceeded") + " - four-eyes approval applies (D-U7), so it is "
-                + "not previewed; appending it holds it for a second person");
+        // The thresholds crossed, e.g. "budget 500 > 100": the UI words the rest ("a second person must approve…").
+        out.put("reason", String.join(", ", ((List<?>) sensitive.get("exceeded")).stream().map(String::valueOf).toList()));
         out.put("needsApproval", true);
         out.put("exceeded", sensitive.get("exceeded"));
         return out;

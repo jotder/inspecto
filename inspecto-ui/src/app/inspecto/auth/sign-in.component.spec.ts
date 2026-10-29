@@ -179,15 +179,14 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
             expect(el.textContent).not.toMatch(/secured/i);
             expect(el.textContent).not.toMatch(/single sign-on|\bSSO\b/i);
             expect(text(el.querySelector('h1'))).toBe('Inspecto MFS');
-            expect(text(el.querySelector('h1 + p'))).toBe(
-                'Running on this computer only. Choose a user to see Inspecto as that person would.',
-            );
+            expect(el.querySelector('h1 + p'), 'T-001: the panel does not repeat the card').toBeNull();
             expect(text(el.querySelector('h2 + p'))).toBe('Choose a user to continue.');
+            expect(el.textContent!.match(/Choose a user/g), 'T-001: said once').toHaveLength(1);
+            expect(el.textContent).not.toContain('Pick who you are');
+            expect(el.textContent).toContain('Need access? Ask your Space administrator.'); // T-002
             expect(el.textContent).not.toContain('Every Pipeline, every Run');
             expect(el.querySelector('mat-icon')?.getAttribute('data-mat-icon-name')).toBe('user-circle');
-            expect(text(el.querySelector('inspecto-alert'))).toContain(
-                'Not secure, local only. Pick who you are.',
-            );
+            expect(text(el.querySelector('inspecto-alert'))).toContain('Not secure, local only.');
             await expectNoA11yViolations(el);
         });
 
@@ -199,9 +198,6 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
             const { el } = create({ demoUsers: DEMO, productName: 'Inspecto LA' });
             expect(brand(el)).toBe('Inspecto LA');
             expect(text(el.querySelector('h1'))).toBe('Inspecto LA MFS');
-            expect(text(el.querySelector('h1 + p'))).toBe(
-                'Running on this computer only. Choose a user to see Inspecto LA as that person would.',
-            );
             await expectNoA11yViolations(el);
         });
 

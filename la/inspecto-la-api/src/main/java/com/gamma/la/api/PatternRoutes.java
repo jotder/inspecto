@@ -227,8 +227,9 @@ public final class PatternRoutes implements RouteModule {
             out.put("truncated", limited || rowCapped);
             out.put("rowCapped", rowCapped);
             out.put("skippedNoTime", skipped);
-            out.put("timeNote", "Times are the Dataset's own wall-clock values read as written, in UTC-neutral milliseconds; "
-                    + "gaps are exact differences of those values, so a time column read in a zone other than UTC is compared as stored");
+            // The Dataset's wall-clock values, read as written in UTC-neutral millis; gaps are exact differences of those values,
+            // so a column read in a zone other than UTC is compared as stored. Shown under the findings (LA-UI-TEXT-PASS-1 T-129).
+            out.put("timeNote", TIME_NOTE);
             Map<String, Object> f = new LinkedHashMap<>();
             f.put("maxRows", maxRows);
             f.put("maxResults", maxLimit);
@@ -269,6 +270,9 @@ public final class PatternRoutes implements RouteModule {
 
     private static final Set<String> TEMPORAL_KEYS = Set.of("dataset", "sourceCol", "targetCol", "timeCol", "mode", "filter", "limit",
             "windowSeconds", "minEvents", "maxCv", "series");
+
+    /** The plain line a UI shows under burst and periodicity findings. */
+    static final String TIME_NOTE = "Times are read as stored, with no time-zone conversion.";
 
     /** The Dataset's wall-clock value back as text: no zone is claimed, since none is known (see {@code timeNote}). */
     private static String wall(long epochMs) {

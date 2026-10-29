@@ -2613,7 +2613,7 @@ public final class InvestigationRoutes implements RouteModule {
         String purpose = ApiContext.str(body, "purpose");
         if (purpose == null || purpose.isBlank())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'purpose' — the stated purpose / legal basis of this "
-                    + "Investigation (D-U5); it is recorded in the sealed header and shown in the Dossier, not enforced");
+                    + "Investigation; it is recorded in the sealed header and shown in the Dossier, not enforced");   // D-U5
         int max = SpaceLimits.get(writeRoot, LaLimit.INPUT_PURPOSE_LENGTH);
         if (purpose.length() > max)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'purpose' is at most " + max + " chars");

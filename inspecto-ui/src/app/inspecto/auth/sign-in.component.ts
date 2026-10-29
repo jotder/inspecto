@@ -41,14 +41,11 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                         </div>
                     }
                     <!-- R2-17: a demo build is shown to business audiences — neutral copy, no builder jargon. -->
+                    <!-- T-001: the card says "Choose a user to continue." once; the panel does not repeat it. -->
                     @if (demo()) {
                         <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
                             {{ product }} MFS
                         </h1>
-                        <p class="text-secondary max-w-md text-lg">
-                            Running on this computer only. Choose a user to see {{ product }} as that
-                            person would.
-                        </p>
                     } @else {
                         <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
                             {{ pitch.title }}
@@ -114,7 +111,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                         <!-- No picker and no SSO button: either would lead to a session the server cannot serve. -->
                     } @else if (demo()) {
                         <inspecto-alert class="mt-4 block text-left" variant="warning" title="Local sign-in">
-                            Not secure, local only. Pick who you are.
+                            Not secure, local only.
                         </inspecto-alert>
                         @if (noSpace()) {
                             <inspecto-alert
@@ -165,7 +162,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                             }
                         </button>
                     }
-                    <p class="text-secondary mt-6 border-t pt-4 text-sm">Need access? Ask your space administrator.</p>
+                    <p class="text-secondary mt-6 border-t pt-4 text-sm">Need access? Ask your Space administrator.</p>
                 </div>
             </div>
         </main>

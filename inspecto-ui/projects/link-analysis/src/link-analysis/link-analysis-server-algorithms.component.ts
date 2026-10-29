@@ -364,6 +364,7 @@ export class LinkAnalysisServerAlgorithmsComponent {
         this.algorithms().map((a) => ({
             value: a.id,
             label: apiOnlyParams(a).length ? `${a.label} (not available here)` : a.label,
+            hint: a.description?.trim() || undefined,
         })),
     );
     readonly picked = signal('');

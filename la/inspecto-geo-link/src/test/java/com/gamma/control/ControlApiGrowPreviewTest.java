@@ -248,6 +248,7 @@ class ControlApiGrowPreviewTest {
             assertTrue(p.get("needsApproval").asBoolean(), p.toString());
             assertTrue(p.get("addsNodes").isNull(), "nothing is read before approval: " + p);
             assertEquals("[\"budget 500 > 100\"]", p.get("exceeded").toString());
+            assertEquals("budget 500 > 100", p.get("reason").asText(), "the thresholds crossed, with no ticket id");
             assertEquals(lines, logLines(root, "s"), "nothing was appended");
             JsonNode log = data(send(c, "GET", "/inv/investigations/s/log", null, null), 200);
             assertTrue(log.path("pending").isMissingNode() || log.path("pending").isNull() || log.path("pending").isEmpty(),

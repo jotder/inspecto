@@ -500,7 +500,7 @@ final class GraphDossierBuilder {
                 + "GET /inv/investigations/{id}/coverage, whose days and collectors parts name them, and until you have, "
                 + "a gap in the data is indistinguishable from innocence"));
         m.put("measures", measures);
-        m.put("datasetVersion", Map.of("pinned", false, "note", "no version-addressable read exists (D-E3): each read "
+        m.put("datasetVersion", Map.of("pinned", false, "note", "no version-addressable read exists: each read "   // D-E3
                 + "is sealed at use and its time recorded as weak provenance, not a replay pin"));
         return m;
     }

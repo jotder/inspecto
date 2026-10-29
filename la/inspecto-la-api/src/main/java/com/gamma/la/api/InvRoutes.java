@@ -1102,10 +1102,10 @@ public final class InvRoutes implements RouteModule {
             exceeded.add("rows " + rows + " > " + s.fourEyesBudgetAbove());
         if (s.fourEyesFanOutAbove() != null && fanOut > s.fourEyesFanOutAbove())
             exceeded.add("fan-out " + fanOut + " > " + s.fourEyesFanOutAbove());
-        if (!exceeded.isEmpty())
-            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, what + " is a sensitive read " + exceeded + " — four-eyes applies (D-U7) and "
-                    + "this route has no Investigation to hold a request for approval; lower the bound, or expand "
-                    + "from an Investigation, where a second person can approve the step");
+        if (!exceeded.isEmpty())                                             // D-U7; no ticket id in the user's sentence
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, Character.toUpperCase(what.charAt(0)) + what.substring(1)
+                    + " needs four-eyes approval (" + String.join(", ", exceeded) + "), and only an Investigation can hold "
+                    + "the request. Narrow the read, or Expand from an Investigation so a second person can approve it.");
     }
 
     /**

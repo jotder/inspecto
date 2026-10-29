@@ -59,7 +59,7 @@ const CATALOGUE = {
     engine: 'memory',
     algorithms: [
         alg('connectedComponents', { resultKind: 'GROUPS' }),
-        alg('kCore'),
+        alg('kCore', { label: 'k-core', description: 'How deep each node sits in a dense core' }),
         alg('triangleCount'),
         alg('isForest', { resultKind: 'FLAG' }),
         alg('descendants', { resultKind: 'IDS', needsNode: true }),
@@ -318,6 +318,21 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         expect(enumOptionsOf({ name: 'd', type: 'ENUM', default: 'in', allowed: ['in'] })).toEqual([
             { value: 'in', label: 'in' },
         ]);
+    });
+
+    it('T-118: each algorithm in the list carries its one-line description as the hint', async () => {
+        const { fixture, c, el } = make();
+        const k = c.algorithmOptions().find((o) => o.value === 'kCore')!;
+        expect(k.label).toBe('k-core');
+        expect(k.hint).toBe('How deep each node sits in a dense core');
+        expect(
+            c.algorithmOptions().find((o) => o.value === 'triangleCount')!.hint,
+            'an older server: no hint',
+        ).toBeUndefined();
+        el.querySelector<HTMLElement>('inspecto-option-picker button')!.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(document.body.textContent).toContain('How deep each node sits in a dense core');
     });
 
     it('T-114: an algorithm the panel cannot edit says so in plain words, with no route or parameter names', () => {

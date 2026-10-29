@@ -210,6 +210,7 @@ class ControlApiGraphRunTest {
             assertEquals("damping", pr.get("params").get(0).get("name").asText());
             assertEquals("Damping", pr.get("params").get(0).get("label").asText(), "X1: the label a UI shows");
             assertFalse(pr.get("params").get(0).get("description").asText().isBlank(), "X1: a one-line hint");
+            assertEquals(Algorithm.PAGE_RANK.description(), pr.get("description").asText(), "T-118: the algorithm's own hint");
             JsonNode sp = null;
             for (JsonNode a : d.get("algorithms")) if ("shortestPath".equals(a.get("id").asText())) sp = a;
             assertEquals(List.of("Outgoing", "Incoming", "Both ways"), texts(sp.get("params").get(0).get("allowedLabels")));

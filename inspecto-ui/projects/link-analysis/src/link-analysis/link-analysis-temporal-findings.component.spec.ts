@@ -28,7 +28,7 @@ const RESULT: TemporalPatternResult = {
     truncated: true,
     rowCapped: true,
     skippedNoTime: 2,
-    timeNote: 'Times are the Dataset own wall-clock values.',
+    timeNote: 'Times are read as stored, with no time-zone conversion.',
     fences: { maxRows: 200000, maxResults: 1000, timeoutMs: 5000 },
     source: { kind: 'dataset', reason: 'no_index' },
 };

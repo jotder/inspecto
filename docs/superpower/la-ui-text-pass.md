@@ -15,12 +15,7 @@
 
 **Left (fix next):**
 - **M/L rows not yet reached:** T-028, T-045, T-056–061, T-064, T-065, T-067, T-070, T-074, T-075, T-077, T-079, T-080, T-082, T-083, T-152–155, T-170, T-171 (per-row line), T-178, T-179, T-185–187, T-190, T-193, T-196–198, T-209.
-- **Other screens:**
-  - T-001/002: sign-in, outside the Studio.
-  - T-118: algorithm-level descriptions need a catalogue field.
-  - T-129: the pattern time note comes from `PatternRoutes.java`.
 - **Residuals:**
-  - The four-eyes "sensitive read" 403 still shows the server sentence, with its ticket id.
   - The glossary row for Graph Run cleans badly; nothing asks for it today.
   - The root cause is backend: `GlossaryLoader` parses the first line only. That is `INTELLIGENCE-GLOSSARY-ANNOTATED-1`; Data browser and Catalog now show "No definition found." for Dataset and Table until it is fixed.
 

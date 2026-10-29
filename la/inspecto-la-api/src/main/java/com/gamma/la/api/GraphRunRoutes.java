@@ -188,6 +188,7 @@ public final class GraphRunRoutes implements RouteModule {
             Map<String, Object> o = new LinkedHashMap<>();
             o.put("id", a.id());
             o.put("label", a.label());
+            o.put("description", a.description());
             o.put("cost", a.cost().name());
             o.put("inlineNodeCeiling", inlineNodeCeiling(a, api.writeRoot()));
             List<Object> params = new ArrayList<>();
