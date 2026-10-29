@@ -50,6 +50,7 @@ const PREVIEW: GrowPreview = {
     template: `<inspecto-link-analysis-expand
         [ctx]="ctx()"
         [embedded]="embedded()"
+        [onScreen]="active()"
         [presets]="{ budget: 100 }"
         [limits]="limits()"
         (expand)="runs.push($event)"
@@ -59,6 +60,7 @@ const PREVIEW: GrowPreview = {
 class Host {
     readonly ctx = signal<GrowContext>(CTX);
     readonly embedded = signal(false);
+    readonly active = signal(true);
     readonly limits = signal<{ budgetAbove: number | null; fanOutAbove: number | null } | null>(null);
     readonly runs: ExpandRun[] = [];
     closed = 0;
@@ -307,7 +309,7 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
 
     it('embedded in the Investigation tab: no dialog chrome, no Cancel, no focus grab; focus() lands on From', async () => {
         const { fixture, el, cmp, host } = create({ embedded: true });
-        await settle(fixture);
+        await settle(fixture, 350); // the tab section reads its preview after a 300 ms settle
         expect(q(el, 'la-expand-dialog')).toBeNull();
         const section = q(el, 'la-expand-section')!;
         expect(section.getAttribute('role')).toBeNull();
@@ -325,6 +327,40 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         expect(q(el, 'la-expand-preview')?.textContent).toContain('This step adds about 42 numbers');
         expect(q(el, 'la-expand-needs-approval')).not.toBeNull();
         await expectNoA11yViolations(el);
+    });
+
+    it('embedded: previews are read once things settle (300 ms), never per selection click, and never while off screen', async () => {
+        const { fixture, inv, host } = create({ embedded: true });
+        // real time only: whenStable would wait out the debounce itself
+        // the inputs reach the component on detectChanges, so render first, then let real time pass
+        const wait = async (ms: number) => {
+            fixture.detectChanges();
+            await new Promise((r) => setTimeout(r, ms));
+            fixture.detectChanges();
+        };
+        fixture.detectChanges();
+        expect(inv.previewExpand).toHaveBeenCalledTimes(0); // not on mount
+        await wait(400);
+        expect(inv.previewExpand).toHaveBeenCalledTimes(1);
+        // three selections in quick succession: one read, for the last one
+        for (const ids of [['x'], ['x', 'y'], ['y']]) {
+            const sel = { value: 'selection' as const, label: 'The selection', frontier: ids, heldFrontier: [], from: ids.join(','), blocked: null };
+            host.ctx.set({ ...CTX, sources: [sel, ...CTX.sources!] });
+            await wait(50);
+        }
+        expect(inv.previewExpand).toHaveBeenCalledTimes(1);
+        await wait(400);
+        expect(inv.previewExpand).toHaveBeenCalledTimes(2);
+        expect(inv.previewExpand).toHaveBeenLastCalledWith('inv-1', expect.objectContaining({ ids: ['y'] }));
+        // off screen (the toolbox collapsed): a change reads nothing; back on screen, one read
+        host.active.set(false);
+        host.ctx.set({ ...CTX });
+        await wait(400);
+        expect(inv.previewExpand).toHaveBeenCalledTimes(2);
+        host.active.set(true);
+        await wait(400);
+        expect(inv.previewExpand).toHaveBeenCalledTimes(3);
+        expect(inv.previewExpand).toHaveBeenLastCalledWith('inv-1', expect.objectContaining({ ids: ['a', 'b'] }));
     });
 
     it('embedded: a new selection makes it the From again (a right-click Expand starts from the node)', async () => {

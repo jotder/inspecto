@@ -1311,7 +1311,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly lodLabelsOff = computed(
         () => this.levelOfDetail() && (this.displayed()?.nodes.length ?? 0) > this.lodLabelCap(),
     );
-    /** The published size limits the footer states — the server-side projection cap and the browser analysis cap. */
     /**
      * The limits currently IN FORCE, read live rather than captured, so a deployment's override reaches
      * the Limits popover (both read the limits store, a signal, so the template re-renders when they change).
@@ -1322,6 +1321,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     /** What the Graph counts overlay's Limits icon states (operator 2026-10-29: the footer strip is gone). */
     readonly graphLimits = computed<GraphLimits>(() => ({ ...this.caps, graphRun: this.serverRunCeiling() }));
+    /** What the canvas draws (the Working Set while an Investigation is open): the Graph counts card's first line. */
+    readonly onScreenCounts = computed(() => {
+        const g = this.canvasData();
+        return g ? { nodes: g.nodes.length, links: g.edges.length } : null;
+    });
 
     /** A flagged node's Connectivity row — the same threshold, count and override state the Investigation panel shows. */
     hubBadgeFor(serverId: string, contacts?: number | null): string {

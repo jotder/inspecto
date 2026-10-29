@@ -17,7 +17,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { debounceTime, merge } from 'rxjs';
+import { Subject, debounceTime, merge } from 'rxjs';
 import type { ExpandRung } from '@inspecto/link-analysis/api/inv.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
@@ -358,11 +358,23 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     readonly limits = input<FourEyesLimits | null>(null);
     /** A section of the Investigation tab (no dialog chrome, no Cancel, no focus grab) rather than the canvas popup. */
     readonly embedded = input(false);
+    /** The tab section is on screen (the toolbox is open on the Investigation tab): previews are read only then. */
+    readonly onScreen = input(true);
     readonly expand = output<ExpandRun>();
     readonly closed = output<void>();
 
     readonly store = inject(GrowExcludeStore);
     private destroyRef = inject(DestroyRef);
+    /**
+     * The tab section outlives selections and steps, so a change of start re-reads the preview once things settle
+     * (300 ms), not on every selection click; the popup reads at once, as it opens.
+     */
+    private readonly startChanged = new Subject<void>();
+    private readonly debouncedPreview = this.startChanged
+        .pipe(debounceTime(300), takeUntilDestroyed())
+        .subscribe(() => {
+            if (this.previewKey() !== this.previewedKey) this.refresh();
+        });
     private host: ElementRef<HTMLElement> = inject(ElementRef);
 
     readonly guide = GROW_GUIDE;
@@ -579,7 +591,8 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         const max = Math.max(1, this.ctx().maxDegree);
         if (this.form.controls.degrees.value > max) this.form.controls.degrees.setValue(max, { emitEvent: false });
         this.formValue.set(this.form.getRawValue());
-        if (this.previewKey() !== this.previewedKey) this.refresh();
+        if (this.embedded()) this.startChanged.next();
+        else if (this.previewKey() !== this.previewedKey) this.refresh();
     }
 
     /** The Advanced read settings as the server takes them; `{}` on the explorer graph. */
@@ -605,8 +618,8 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
 
     /** Re-read the preview for the current choice (it covers degree 1). */
     refresh(): void {
-        // the tab section stays mounted while an Expand walks: its degrees re-read nothing (the next change after does)
-        if (this.embedded() && this.store.busy()) return;
+        // the tab section reads nothing while it is off screen, or while an Expand walks (the next change after does)
+        if (this.embedded() && (!this.onScreen() || this.store.busy())) return;
         this.previewedKey = this.previewKey();
         if (this.thresholdError() || this.kinds()?.length === 0 || this.rungInvalid()) {
             this.store.resetPreview();

@@ -86,7 +86,7 @@ const answer = (over: Partial<EntitySuggestions> = {}): EntitySuggestions => ({
         [addData]="addData()"
         [mode]="mode()"
         [maskingMode]="masking()"
-        [maxDegree]="2"
+        [maxDegree]="maxDegree()"
         [graphOnScreen]="graphOnScreen()"
         [canWrite]="canWrite()"
         (start)="starts.push($event)"
@@ -106,6 +106,7 @@ class Host {
     readonly masking = signal<string | null>('none');
     readonly graphOnScreen = signal<{ name: string } | null>(null);
     readonly canWrite = signal(true);
+    readonly maxDegree = signal(2);
     readonly starts: StartRequest[] = [];
     readonly creates: NewInvestigationRequest[] = [];
     addDataClicks = 0;
@@ -512,6 +513,21 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
             },
         ]);
         expect(box.degreeMax()).toBe(2);
+    });
+
+    it('Expand on start stops at 3 below a deeper Industry pack, and says it is the form’s own limit, not the pack’s', () => {
+        const { fixture, el } = createNew();
+        fixture.componentInstance.maxDegree.set(6);
+        fixture.detectChanges();
+        const degrees = q(el, 'new-degrees')!;
+        const spin = degrees.querySelector('[role="spinbutton"]') as HTMLElement;
+        expect(spin.getAttribute('aria-valuemax')).toBe('3');
+        for (let i = 0; i < 4; i++) (degrees.querySelector('[data-testid="stepper-increment"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(spin.getAttribute('aria-valuenow')).toBe('3');
+        const why = degrees.querySelector('[data-testid="stepper-reason"]')!.textContent!.trim();
+        expect(why).toBe('Expand on start goes up to 3 degrees; expand further from the Investigation tab.');
+        expect(why).not.toContain('Industry pack');
     });
 
     it('with a graph drawn, Start from offers "Graph on screen": a start over its mapping with no start entities', () => {

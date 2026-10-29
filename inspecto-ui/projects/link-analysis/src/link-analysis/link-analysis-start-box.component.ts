@@ -24,7 +24,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
-import { DISABLED_REASON, mostDegrees } from './disabled-reasons';
+import { DISABLED_REASON, expandOnStartCap, mostDegrees } from './disabled-reasons';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import {
     EntityProfileService,
@@ -563,7 +563,10 @@ export class LinkAnalysisStartBoxComponent {
     readonly degreeMax = computed(() => Math.max(0, Math.min(MOST_DEGREES_ON_START, this.maxDegree())));
     readonly degreeText = (d: number): string => (d === 0 ? "Don't expand" : String(d));
     readonly noExpandReason = DISABLED_REASON.noExpand;
-    readonly degreeMaxReason = computed(() => mostDegrees(this.degreeMax()));
+    /** The pack's limit only when the pack stops first; otherwise the form's own cap, said as the form's. */
+    readonly degreeMaxReason = computed(() =>
+        this.maxDegree() > MOST_DEGREES_ON_START ? expandOnStartCap(MOST_DEGREES_ON_START) : mostDegrees(this.degreeMax()),
+    );
     readonly nameError = computed(() => {
         this.tried();
         const c = this.form.controls.name;

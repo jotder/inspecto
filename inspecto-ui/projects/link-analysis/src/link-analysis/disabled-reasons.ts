@@ -15,6 +15,10 @@ export const DISABLED_REASON = {
     noExpand: "Already set to Don't expand.",
 } as const;
 
+/** The New form's Expand on start at its own top (lower than the Industry pack's): where to go further. */
+export const expandOnStartCap = (cap: number): string =>
+    `Expand on start goes up to ${cap} degrees; expand further from the Investigation tab.`;
+
 /** The degree stepper at its top (Expand, Expand on start): the Industry pack's maximum. */
 export const mostDegrees = (max: number): string =>
     `${max} ${max === 1 ? 'degree is' : 'degrees is'} the most this Industry pack allows.`;

@@ -1365,7 +1365,7 @@
                             [open]="legendOpen()"
                             (openChange)="setOverlayOpen('legend', $event)"
                         ></inspecto-link-analysis-legend>
-                        <!-- render strip: what the render left out and the level-of-detail state; the counts, the caps and the modules live in the footer status bar -->
+                        <!-- render strip: what the render left out and the level-of-detail state; the counts and Limits are on the Graph counts card, the modules in ⚙ Settings -->
                         <div
                             class="text-secondary absolute bottom-1 left-2 right-2 z-10 flex flex-wrap items-center gap-x-3 text-[11px]"
                             role="group"
@@ -1396,6 +1396,7 @@
                             [mode]="strandedCount() ? strandedCount() + ' unlinked' : 'Top results by count'"
                             [open]="workingSetOpen()"
                             [limits]="graphLimits()"
+                            [onScreen]="onScreenCounts()"
                             (openChange)="setOverlayOpen('workingSet', $event)"
                         ></inspecto-link-analysis-working-set>
                         <!-- The text alternative of the canvas: the SAME canvasData(), as a keyboard-navigable list. -->
@@ -1605,11 +1606,17 @@
                                             #tabExpand
                                             laExpand
                                             [embedded]="true"
+                                            [onScreen]="toolboxDockOpen()"
                                             [ctx]="growContext()"
                                             [presets]="degreePresets()"
                                             [limits]="fourEyesLimits()"
                                             (expand)="onExpand($event)"
                                         ></inspecto-link-analysis-expand>
+                                    } @else if (!investigation.showWorkingSet()) {
+                                        <!-- the full graph is drawn instead of the Working Set: say why the section has no form -->
+                                        <p laExpand class="text-secondary m-0 text-sm" data-testid="expand-full-graph">
+                                            Expand works on the Working Set; untick “Show the full graph to pick start entities”.
+                                        </p>
                                     }
                                     <!-- LA-PANELS-REDESIGN-1: ONE New Investigation form (File ▸ New lands here) -->
                                     <inspecto-link-analysis-start-box

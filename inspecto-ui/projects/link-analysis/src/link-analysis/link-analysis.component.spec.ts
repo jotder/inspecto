@@ -1887,16 +1887,23 @@ describe('LinkAnalysisComponent', () => {
         expect(dataAt(2).graph).toBe(c.canvasData());
         expect(dataAt(2).graph.nodes).toHaveLength(5);
     });
-    it('the canvas draws the Working Set while an Investigation is open, not the query graph (the footer strip that counted it is gone)', async () => {
+    it('Graph counts states what the canvas draws, open and minimised: the query graph, then the Working Set', async () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
         fixture.detectChanges();
         const c = fixture.componentInstance;
-        // operator 2026-10-29: no strip under the canvas; Graph counts and the Investigation tab say the counts
-        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-status"]')).toBeNull();
-        const counts = (): string => `${c.canvasData()!.nodes.length} nodes · ${c.canvasData()!.edges.length} links on screen`;
-        expect(counts()).toBe(`${c.displayed()!.nodes.length} nodes · ${c.displayed()!.edges.length} links on screen`);
+        const el = fixture.nativeElement as HTMLElement;
+        // operator 2026-10-29: no strip under the canvas; the Graph counts card states the on-screen counts
+        expect(el.querySelector('[data-testid="la-status"]')).toBeNull();
+        const text = (id: string) => el.querySelector(`[data-testid="${id}"]`)?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
+        c.setOverlayOpen('workingSet', true);
+        fixture.detectChanges();
+        expect(text('working-set-on-screen')).toBe('5 nodes · 3 links on screen');
+        expect(text('working-set-counts')).toBe('Totals for the full graph, before grouping:'); // the tiles, labelled
+        c.setOverlayOpen('workingSet', false);
+        fixture.detectChanges();
+        expect(text('working-set-pill-on-screen')).toBe('· 5 nodes · 3 links on screen');
         c.investigation.activeId.set('inv-9');
         c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
         c.investigation.workingSet.set({
@@ -1907,7 +1914,10 @@ describe('LinkAnalysisComponent', () => {
         } as never);
         fixture.detectChanges();
         expect(c.displayed()!.nodes.length).not.toBe(2); // the query graph is still loaded underneath
-        expect(counts()).toBe('2 nodes · 1 links on screen');
+        expect(text('working-set-pill-on-screen')).toBe('· 2 nodes · 1 link on screen');
+        c.setOverlayOpen('workingSet', true);
+        fixture.detectChanges();
+        expect(text('working-set-on-screen')).toBe('2 nodes · 1 link on screen');
         fixture.destroy();
     });
     it('LA-UNEXPANDED-MARKER-1 (b): Next unexpanded picks each unexpanded node in turn; Only unexpanded draws just the frontier', async () => {
@@ -4296,6 +4306,30 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const onExpand = vi.spyOn(c, 'onExpand').mockResolvedValue();
         (section()!.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).click();
         expect(onExpand).toHaveBeenCalledWith(expect.objectContaining({ ctx: expect.objectContaining({ mode: 'investigation' }) }));
+    });
+
+    it('LA-INV-EXPAND-1: with the full graph shown instead of the Working Set, the Expand section says why it has no form', async () => {
+        const { fixture, c, el } = await drawn();
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({ header: { sourceCol: 's', targetCol: 't', title: 'Ring' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'ws-a', hop: 0, hidden: false }],
+            links: [],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        c.openInvestigation();
+        fixture.detectChanges();
+        const section = () => el.querySelector('[data-testid="degrees"]') as HTMLElement;
+        expect(section().querySelector('[data-testid="la-expand-section"]')).not.toBeNull();
+        expect(section().querySelector('[data-testid="expand-full-graph"]')).toBeNull();
+        c.investigation.showWorkingSet.set(false);
+        fixture.detectChanges();
+        expect(c.growMode()).toBe('basic');
+        expect(section().querySelector('[data-testid="la-expand-section"]')).toBeNull();
+        expect(section().querySelector('[data-testid="expand-full-graph"]')!.textContent!.trim()).toBe(
+            'Expand works on the Working Set; untick “Show the full graph to pick start entities”.',
+        );
     });
 
     it('Investigation: Grow appends ONE expand from the outer ring; held busy nodes carry the badge; Remove held is one exclude', async () => {

@@ -333,6 +333,10 @@ export class LinkAnalysisLegendComponent {
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:minus"></mat-icon>
                     </button>
                 </div>
+                @if (onScreenText(); as shown) {
+                    <!-- what the canvas draws (the Working Set while an Investigation is open); the tiles below are totals -->
+                    <p class="m-0 mt-0.5 font-semibold tabular-nums" data-testid="working-set-on-screen">{{ shown }}</p>
+                }
                 @if (countsNote()) {
                     <p class="text-secondary m-0 mt-0.5 text-[11px] leading-snug" data-testid="working-set-counts">
                         {{ countsNote() }}
@@ -378,7 +382,9 @@ export class LinkAnalysisLegendComponent {
                 aria-label="Show graph counts"
             >
                 Graph counts
-                @if (countsNote()) {
+                @if (onScreenText(); as shown) {
+                    <span class="text-secondary font-normal tabular-nums" data-testid="working-set-pill-on-screen">· {{ shown }}</span>
+                } @else if (countsNote()) {
                     <span class="text-secondary font-normal">· {{ countsOf() }}</span>
                 }
                 @if (truncated()) {
@@ -408,11 +414,22 @@ export class LinkAnalysisWorkingSetComponent {
      *  draws an Investigation's Working Set instead; '' = say nothing. */
     readonly countsGraph = input<'' | 'query' | 'query-under-investigation'>('');
     readonly countsOf = computed(() => (this.countsGraph() ? 'graph on screen' : ''));
+    /** What the canvas draws, counted by the page (`canvasData`); null = not stated (the card shows only its tiles). */
+    readonly onScreen = input<{ nodes: number; links: number } | null>(null);
+    /** "12 nodes · 1 link on screen": the card's first line and the minimised chip (operator 2026-10-29: no footer). */
+    readonly onScreenText = computed(() => {
+        const c = this.onScreen();
+        if (!c) return '';
+        const n = (k: number, one: string) => `${k.toLocaleString('en')} ${k === 1 ? one : one + 's'}`;
+        return `${n(c.nodes, 'node')} · ${n(c.links, 'link')} on screen`;
+    });
     readonly countsNote = computed(() =>
         this.countsGraph() === 'query-under-investigation'
             ? 'Totals for the full graph. The canvas shows the Investigation’s Working Set (its counts are in the Investigation tab).'
             : this.countsGraph() === 'query'
-              ? 'Totals for the graph on screen.'
+              ? this.onScreen()
+                  ? 'Totals for the full graph, before grouping:'
+                  : 'Totals for the graph on screen.'
               : '',
     );
     readonly open = input(true);
