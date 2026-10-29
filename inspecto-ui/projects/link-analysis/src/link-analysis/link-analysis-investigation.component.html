@@ -508,7 +508,85 @@
             @if (store.error()) {
                 <inspecto-alert variant="error" title="Investigation">{{ store.error() }}</inspecto-alert>
             }
-            @if (!store.active()) {
+            <!-- the page projects ONE Expand form; captured once, stamped where it shows (a slot in an unrendered branch swallows it) -->
+            <ng-template #expandSlot><ng-content select="[laExpand]" /></ng-template>
+            @if (!store.active() && store.unsaved(); as u) {
+                <!-- ── LA-UNSAVED-INVESTIGATION-1: working before Save ── -->
+                <div class="flex flex-wrap items-center gap-2" data-testid="unsaved-header">
+                    <h3 class="m-0 text-base font-semibold">Investigation</h3>
+                    <inspecto-chip variant="soft" tone="warning" data-testid="unsaved-marker">Unsaved</inspecto-chip>
+                    <span class="ml-auto inline-flex" [matTooltip]="canWrite() ? '' : saveNeeds">
+                        <button
+                            mat-flat-button
+                            color="primary"
+                            type="button"
+                            data-testid="unsaved-save"
+                            [disabled]="!canWrite() || store.busy()"
+                            [disabledInteractive]="true"
+                            [attr.aria-describedby]="canWrite() ? null : 'unsaved-save-why'"
+                            (click)="canWrite() && saveRequested.emit()"
+                        >
+                            Save…
+                        </button>
+                    </span>
+                    <button
+                        mat-icon-button
+                        type="button"
+                        matTooltip="Close"
+                        aria-label="Close the unsaved Investigation"
+                        data-testid="unsaved-close"
+                        (click)="closeRequested.emit()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
+                @if (!canWrite()) {
+                    <p id="unsaved-save-why" class="text-secondary m-0 text-sm" data-testid="unsaved-save-why">{{ saveNeeds }}</p>
+                }
+                <p class="text-secondary m-0 text-sm">
+                    Nothing is recorded yet. Save asks for a Name and a Purpose, then records these steps in order.
+                </p>
+                <section class="flex flex-col gap-1" aria-labelledby="unsaved-steps-title" data-testid="unsaved-steps">
+                    <h3 id="unsaved-steps-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
+                        Steps so far
+                    </h3>
+                    @if (u.steps.length) {
+                        <ol class="m-0 flex flex-col gap-0.5 pl-5 text-sm">
+                            @for (s of u.steps; track $index) {
+                                <li>{{ stepLine(s) }}</li>
+                            }
+                        </ol>
+                    } @else {
+                        <p class="text-secondary m-0 text-sm">No start entities yet: select some on the graph.</p>
+                    }
+                </section>
+                <section class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" aria-labelledby="unsaved-expand-title">
+                    <h3 id="unsaved-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
+                    <ng-container [ngTemplateOutlet]="expandSlot" />
+                </section>
+                <section class="flex flex-col gap-1" aria-labelledby="unsaved-start-title" data-testid="unsaved-start-entities">
+                    <h3 id="unsaved-start-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Start entities</h3>
+                    <div>
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-testid="unsaved-start-selected"
+                            [disabled]="!selectionCount() || store.busy()"
+                            [disabledInteractive]="true"
+                            [matTooltip]="selectionCount() ? '' : pickNode"
+                            (click)="startFromSelected.emit()"
+                        >
+                            Start from selected{{ selectionCount() ? ' (' + selectionCount() + ')' : '' }}
+                        </button>
+                    </div>
+                    @if (!selectionCount()) {
+                        <p class="text-secondary m-0 text-xs">{{ pickNode }}</p>
+                    }
+                </section>
+                <p class="text-secondary m-0 text-sm" data-testid="unsaved-save-first">
+                    Keep, Hide, Exclude, Annotate and the other steps change a recorded Working Set: Save first.
+                </p>
+            } @else if (!store.active()) {
                 <!-- ── start ── -->
                 @if (pending(); as q) {
                     <!-- "Investigate a number" (deep link / starter card): the binding is the profile's, the purpose is asked -->
@@ -768,8 +846,8 @@
                 </section>
             }
             @if (store.active()) {
-            <!-- ── LA-INV-EXPAND-1: Expand lives here (From · Degrees · Direction · Expand + preview · filters), with the quick
-                 "Expand next degree" beside the degree reached. Every Expand entry point opens this tab and focuses it. ── -->
+            <!-- ── LA-INV-EXPAND-1: Expand lives here (From · Degrees · Direction · Expand + preview · filters), beside the
+                 degree reached; ONE control (the outer ring is a From). Every Expand entry point opens this tab and focuses it. ── -->
             <section class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" aria-labelledby="act-expand-title" data-testid="degrees">
                 <div class="flex flex-wrap items-center gap-2">
                     <h3 id="act-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
@@ -787,18 +865,8 @@
                             </li>
                         }
                     </ol>
-                    <button
-                        mat-stroked-button
-                        type="button"
-                        class="ml-auto"
-                        data-testid="expand-next-degree"
-                        [disabled]="!canWrite() || store.busy() || store.chainRunning() || !!degree().blocked"
-                        (click)="expandNextDegree()"
-                    >
-                        Expand next degree
-                    </button>
                 </div>
-                <!-- the degree notes belong to the line above (Expand next degree), so they come before the form -->
+                <!-- the degree notes belong to the line above (the degree reached), so they come before the form -->
                 @if (windowNote(); as w) {
                     <p class="text-secondary m-0 text-sm" data-testid="degree-window">Window: {{ w }}</p>
                 }
@@ -824,15 +892,12 @@
                     </ul>
                 }
                 @if (canWrite()) {
-                    <!-- the page projects the Expand form (it holds the screen's start, presets and four-eyes limits) -->
-                    <ng-content select="[laExpand]" />
+                    <!-- the page projects the ONE Expand form (it holds the screen's start, presets and four-eyes limits) -->
+                    <ng-container [ngTemplateOutlet]="expandSlot" />
                 } @else {
                     <p class="text-secondary m-0 text-sm" data-testid="expand-read-only">{{ expandNeeds }}</p>
                 }
             </section>
-            <mat-checkbox [ngModel]="!store.showWorkingSet()" (ngModelChange)="store.showWorkingSet.set(!$event)">
-                Show the full graph to pick start entities
-            </mat-checkbox>
     
             @if (store.truncatedSteps().length) {
                 <inspecto-alert variant="warning" title="Incomplete Working Set">
@@ -1104,6 +1169,45 @@
                     }
                 </section>
                 }
+                <!-- 7. Steps, in visible groups: each action is a button and opens in place, one at a time -->
+                <section class="flex flex-col gap-2" aria-labelledby="act-steps-title" data-testid="act-step-groups">
+                    <h3 id="act-steps-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Steps</h3>
+                    @for (g of stepGroups; track g.title) {
+                        <div class="flex flex-col gap-1" role="group" [attr.aria-label]="g.title" [attr.data-testid]="'step-group-' + g.id">
+                            <span class="text-sm font-semibold">{{ g.title }}</span>
+                            <div class="flex flex-wrap gap-1">
+                                @for (m of g.steps; track m.id) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        [attr.data-testid]="'step-' + m.id"
+                                        [attr.aria-expanded]="moreStep() === m.id"
+                                        (click)="moreStep.set(moreStep() === m.id ? null : m.id)"
+                                    >
+                                        {{ m.label }}
+                                    </button>
+                                }
+                            </div>
+                            @if (moreStepIn(g); as m) {
+                                <div class="flex flex-col gap-1 rounded-md border p-2" style="border-color: var(--gamma-border)" data-testid="step-open">
+                                    <div class="flex items-center">
+                                        <span class="text-sm font-semibold">{{ moreStepLabel() }}</span>
+                                        <button mat-icon-button class="ml-auto" (click)="moreStep.set(null)" aria-label="Close this step">
+                                            <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                        </button>
+                                    </div>
+                                    @switch (m) {
+                                        @case ('window') { <inspecto-la-window-op></inspecto-la-window-op> }
+                                        @case ('threshold') { <inspecto-la-threshold-op></inspecto-la-threshold-op> }
+                                        @case ('snapshot') { <inspecto-la-snapshot-op></inspecto-la-snapshot-op> }
+                                        @case ('compare') { <inspecto-la-compare-op></inspecto-la-compare-op> }
+                                        @case ('connect') { <inspecto-la-connect-op [presets]="degreePresets()"></inspecto-la-connect-op> }
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </section>
             <section
                 class="flex flex-col gap-2 "
     
@@ -1179,37 +1283,6 @@
                     </p>
                 }
             </section>
-                <!-- 7. More steps ▾: each step opens in place, one at a time -->
-                <section class="flex flex-col gap-2" aria-label="More steps" data-testid="act-more-steps">
-                    <div>
-                        <button mat-stroked-button type="button" [matMenuTriggerFor]="moreMenu" data-testid="more-steps">
-                            More steps
-                            <mat-icon iconPositionEnd svgIcon="heroicons_outline:chevron-down"></mat-icon>
-                        </button>
-                        <mat-menu #moreMenu="matMenu">
-                            @for (m of moreSteps; track m.id) {
-                                <button mat-menu-item (click)="moreStep.set(m.id)">{{ m.label }}</button>
-                            }
-                        </mat-menu>
-                    </div>
-                    @if (moreStep(); as m) {
-                        <div class="flex flex-col gap-1 rounded-md border p-2" style="border-color: var(--gamma-border)">
-                            <div class="flex items-center">
-                                <span class="text-sm font-semibold">{{ moreStepLabel() }}</span>
-                                <button mat-icon-button class="ml-auto" (click)="moreStep.set(null)" aria-label="Close this step">
-                                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                                </button>
-                            </div>
-                            @switch (m) {
-                                @case ('window') { <inspecto-la-window-op></inspecto-la-window-op> }
-                                @case ('threshold') { <inspecto-la-threshold-op></inspecto-la-threshold-op> }
-                                @case ('snapshot') { <inspecto-la-snapshot-op></inspecto-la-snapshot-op> }
-                                @case ('compare') { <inspecto-la-compare-op></inspecto-la-compare-op> }
-                                @case ('connect') { <inspecto-la-connect-op [presets]="degreePresets()"></inspecto-la-connect-op> }
-                            }
-                        </div>
-                    }
-                </section>
                 <!-- 8. Links: the steps are the bottom dock's Step log (with Undo and Re-order); Replay is in Settings -->
                 <div class="flex flex-wrap items-center gap-x-4 text-sm" data-testid="act-links">
                     <button

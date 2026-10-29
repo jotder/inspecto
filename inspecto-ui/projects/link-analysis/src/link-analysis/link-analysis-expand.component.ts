@@ -49,6 +49,8 @@ import { laLimit } from './la-limits';
 export interface ExpandRun {
     ctx: GrowContext;
     req: GrowRequest;
+    /** The "From" chosen (an unsaved Investigation records an outer-ring Expand without naming ids). */
+    from: ExpandFrom | null;
 }
 
 /**
@@ -653,7 +655,7 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
             this.tried.set(true);
         }
         if (this.goWhyNot()) return;
-        this.expand.emit({ ctx: this.active(), req: this.request() });
+        this.expand.emit({ ctx: this.active(), req: this.request(), from: this.formValue().from });
     }
 }
 

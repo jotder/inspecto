@@ -43,6 +43,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §9-§10; plan archived l… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-UI-TEXT-RESIDUALS-1` | P3 | chore | the few Link Analysis text items left after the UI text pass | — |
+| `LA-UNSAVED-INVESTIGATION-1` | P2 | feature | start and Expand an Investigation unsaved; Save asks for the Name and Purpose, creates it and replays the steps in order; the Investigati… | — |
 | `LA-PRODUCT-NEXT-1` | P2 | feature | Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "Wh… | — |
 | `LA-INVESTIGATION-EDIT-HARDENING-1` | P3 | defect | what is left of hardening the Investigation rename route (PATCH /inv/investigations/{id}): a Postgres run and one product call | — |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |

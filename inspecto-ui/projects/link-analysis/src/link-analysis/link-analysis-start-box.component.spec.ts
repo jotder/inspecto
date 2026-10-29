@@ -7,13 +7,13 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { penByLabel, penEdit, penError, penText, pickerSet } from '@inspecto/core/testing/pen-field';
+import { penByLabel, pickerSet } from '@inspecto/core/testing/pen-field';
 import { EntityProfileService, EntitySuggestions } from '@inspecto/link-analysis/api/entity-profile.service';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
 import {
     NewInvestigationInput,
-    NewInvestigationRequest,
+    UnsavedStartRequest,
     StartCatalogue,
     StartRequest,
     newInvestigationDefaults,
@@ -80,7 +80,6 @@ const answer = (over: Partial<EntitySuggestions> = {}): EntitySuggestions => ({
         [catalogue]="catalogue()"
         [lists]="lists()"
         [dataset]="dataset()"
-        [investigations]="investigations()"
         [nodeCap]="200"
         [notice]="notice()"
         [addData]="addData()"
@@ -91,7 +90,7 @@ const answer = (over: Partial<EntitySuggestions> = {}): EntitySuggestions => ({
         [canWrite]="canWrite()"
         (start)="starts.push($event)"
         (create)="creates.push($event)"
-        (newInvestigation)="newClicks = newClicks + 1"
+        [columns]="columns()"
         (openAddData)="addDataClicks = addDataClicks + 1"
     ></inspecto-link-analysis-start-box>`,
 })
@@ -99,7 +98,7 @@ class Host {
     readonly catalogue = signal<StartCatalogue>(CATALOGUE);
     readonly lists = signal<EntityListSummary[]>([LIST]);
     readonly dataset = signal<string | null>('transfers');
-    readonly investigations = signal(false);
+    readonly columns = signal<{ name: string; type: string }[]>([]);
     readonly notice = signal<StartNotice | null>(null);
     readonly addData = signal(true);
     readonly mode = signal<'draw' | 'investigation'>('draw');
@@ -108,9 +107,8 @@ class Host {
     readonly canWrite = signal(true);
     readonly maxDegree = signal(2);
     readonly starts: StartRequest[] = [];
-    readonly creates: NewInvestigationRequest[] = [];
+    readonly creates: UnsavedStartRequest[] = [];
     addDataClicks = 0;
-    newClicks = 0;
 }
 
 function create(suggest = vi.fn((..._a: unknown[]) => of(answer())), mayReveal = false) {
@@ -358,34 +356,14 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         expect(q(el, 'start-whole-note')?.textContent).toContain('Draws the whole of Transfers');
     });
 
-    it('draws on every level: its links; on Investigations it offers New Investigation (no step of its own)', () => {
-        const { fixture, el } = create();
+    it('draws on the Explorer level: its links, and never asks for a name or a purpose', () => {
+        const { el } = create();
         expect(q(el, 'start-what')?.textContent).toContain('Draws it and its links');
         expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Draw');
-        expect(q(el, 'start-new-investigation')).toBeNull();
+        expect(q(el, 'start-new-investigation')).toBeNull(); // D1: the start form lives only in the Investigation tab
         expect(q(el, 'start-file-hint')?.textContent).toContain('File menu');
-        fixture.componentInstance.investigations.set(true);
-        fixture.detectChanges();
-        expect(q(el, 'start-what')?.textContent).toContain('Draws it and its links');
-        expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Draw');
-        expect(q(el, 'start-new-investigation')?.textContent?.trim()).toBe('New Investigation');
-        (q(el, 'start-new-investigation') as HTMLButtonElement).click();
-        expect(fixture.componentInstance.newClicks).toBe(1);
-        // the draw box never asks for a name or a purpose
-        expect(q(el, 'new-name')).toBeNull();
-        expect(q(el, 'new-purpose')).toBeNull();
-    });
-
-    it('New Investigation is disabled with the reason for a role that cannot start one (T-033)', () => {
-        const { fixture, el } = create();
-        fixture.componentInstance.investigations.set(true);
-        fixture.componentInstance.canWrite.set(false);
-        fixture.detectChanges();
-        const button = q(el, 'start-new-investigation') as HTMLButtonElement;
-        expect(button.disabled).toBe(true);
-        expect(button.getAttribute('aria-label')).toBe(
-            'New Investigation: Read-only: starting an Investigation needs Incident management.',
-        );
+        expect(q(el, 'new-time-col')).toBeNull();
+        expect(penByLabel(el, 'Purpose')).toBeFalsy();
     });
 
     it('with no Dataset that has a link: says so, points to File ▸ Explore Dataset and offers Add data', async () => {
@@ -412,7 +390,7 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
     });
 });
 
-describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-REDESIGN-1)', () => {
+describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-UNSAVED-INVESTIGATION-1)', () => {
     function createNew(masking: string | null = 'none') {
         const made = create();
         made.fixture.componentInstance.mode.set('investigation');
@@ -420,102 +398,77 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         made.fixture.detectChanges();
         return made;
     }
-    const name = (el: HTMLElement) => penText(q(el, 'new-name')!);
-    const purpose = (el: HTMLElement) => penText(q(el, 'new-purpose')!);
 
-    it('starts with a Start from picker and only that choice’s inputs, then Name and Purpose; passes axe', async () => {
+    it('asks for no Name or Purpose: Start from, its inputs, Time column, Time zone, Degrees; passes axe', async () => {
         const { fixture, el } = createNew();
         expect(q(el, 'start-kind')?.tagName.toLowerCase()).toBe('inspecto-option-picker');
         expect(q(el, 'start-type')).not.toBeNull();
         expect(q(el, 'start-value')).not.toBeNull();
-        expect(q(el, 'start-paste')).toBeNull();
-        kind(fixture, 'paste');
-        expect(q(el, 'start-value')).toBeNull();
-        expect(q(el, 'start-paste')).not.toBeNull();
+        expect(penByLabel(el, 'Purpose')).toBeFalsy();
+        expect(penByLabel(el, 'Name')).toBeFalsy();
+        expect(q(el, 'new-name')).toBeNull();
+        expect(q(el, 'new-purpose')).toBeNull();
+        expect(q(el, 'new-more')).toBeNull(); // no "More" fold: two plain pickers
+        expect(q(el, 'new-time-col')?.tagName.toLowerCase()).toBe('inspecto-option-picker');
+        expect(q(el, 'new-time-zone')?.tagName.toLowerCase()).toBe('inspecto-option-picker');
+        expect(q(el, 'new-degrees')).not.toBeNull();
+        expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Start');
+        expect(q(el, 'start-what')?.textContent).toContain('Nothing is recorded until you Save');
         kind(fixture, 'dataset');
-        expect(q(el, 'start-paste')).toBeNull();
-        expect(q(el, 'new-expand')).toBeNull(); // nothing to expand from the whole Dataset
-        expect(q(el, 'new-name')).not.toBeNull();
-        expect(q(el, 'new-purpose')).not.toBeNull();
-        expect(penByLabel(el, 'Purpose')).toBeTruthy();
-        expect(penByLabel(el, 'Reason')).toBeFalsy(); // G1: the New form says Purpose
-        expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Start Investigation');
-        expect(q(el, 'start-new-investigation')).toBeNull();
+        expect(q(el, 'new-degrees')).toBeNull(); // nothing to expand from the whole Dataset
         await expectNoA11yViolations(el);
     });
 
-    it('defaults the Name and Purpose from the input, and re-defaults them when the input changes', async () => {
-        const { fixture, box, el } = createNew();
-        box.form.controls.value.setValue('MULE-HUB-01');
-        await settle();
+    it('the Time column picker offers the Dataset’s own column as the blank choice, date columns first', () => {
+        const { fixture, box } = createNew();
+        fixture.componentInstance.catalogue.set({
+            ...CATALOGUE,
+            datasets: CATALOGUE.datasets.map((d) => (d.id === 'transfers' ? { ...d, timeCol: 'booked_at' } : d)),
+        });
+        fixture.componentInstance.columns.set([
+            { name: 'note', type: 'string' },
+            { name: 'booked_at', type: 'date' },
+            { name: 'settled_at', type: 'date' },
+        ]);
         fixture.detectChanges();
-        expect(name(el)).toBe('Account MULE-HUB-01');
-        expect(purpose(el)).toBe('Review of an Account and its links');
-        kind(fixture, 'list');
-        pickerSet(fixture, '[data-testid="start-list"]', 'suspects');
-        expect(name(el)).toBe('Members of “Suspects”');
-        expect(purpose(el)).toBe('Review of the members of “Suspects” and their links');
-        kind(fixture, 'paste');
-        box.form.controls.paste.setValue('a\nb\nc');
-        fixture.detectChanges();
-        expect(name(el)).toBe('3 pasted Account values');
-        expect(purpose(el)).toBe('Review of 3 pasted values and their links');
+        expect(box.timeColumnOptions().map((o) => o.value)).toEqual(['', 'settled_at', 'note']);
+        expect(box.timeColumnOptions()[0].label).toBe("booked_at (the Dataset's)");
+        pickerSet(fixture, '[data-testid="new-time-col"]', 'settled_at');
+        pickerSet(fixture, '[data-testid="new-time-zone"]', 'Europe/London');
         kind(fixture, 'dataset');
-        expect(name(el)).toBe('Transfers');
-        expect(purpose(el)).toBe('Review of the links in Transfers');
+        submit(fixture);
+        expect(fixture.componentInstance.creates[0]).toEqual(
+            expect.objectContaining({ timeCol: 'settled_at', timeColZone: 'Europe/London', degrees: 0 }),
+        );
     });
 
-    it('keeps the analyst’s own Name and Purpose when the input changes', () => {
-        const { fixture, el } = createNew();
-        penEdit(fixture, q(el, 'new-name')!, 'Operation Larch');
-        penEdit(fixture, penByLabel(el, 'Purpose')!, 'Warrant 7');
-        kind(fixture, 'dataset');
-        expect(name(el)).toBe('Operation Larch');
-        expect(purpose(el)).toBe('Warrant 7');
-    });
-
-    it('a masked Space keeps the value out of the default Name (a title is stored and shown like a value)', async () => {
-        const { fixture, box, el } = createNew('masked');
-        box.form.controls.value.setValue('MULE-HUB-01');
-        await settle();
-        fixture.detectChanges();
-        expect(name(el)).toBe('Account');
-        expect(purpose(el)).toBe('Review of an Account and its links');
-    });
-
-    it('Start Investigation hands over the start, the name, the purpose and Expand on start in ONE request', async () => {
+    it('Start hands over the start, the Degrees (a − n + stepper from 1) and the default Name and Purpose for Save', async () => {
         const { fixture, box } = createNew();
         box.form.controls.value.setValue('MULE-HUB-01');
         await settle();
         fixture.detectChanges();
-        // Expand on start is a − N + stepper from 0 = "Don't expand"
         const degrees = fixture.nativeElement.querySelector('[data-testid="new-degrees"]') as HTMLElement;
         const spin = degrees.querySelector('[role="spinbutton"]') as HTMLElement;
-        expect(spin.textContent!.trim()).toBe("Don't expand");
-        expect(spin.getAttribute('aria-valuetext')).toBe("Don't expand");
+        expect(spin.getAttribute('aria-valuenow')).toBe('1');
         expect(degrees.querySelector('[data-testid="stepper-decrement"]')!.getAttribute('aria-disabled')).toBe('true');
         for (let i = 0; i < 3; i++) (degrees.querySelector('[data-testid="stepper-increment"]') as HTMLButtonElement).click();
         fixture.detectChanges();
-        // Expand on start offers no more than the profile's last degree
-        expect(spin.getAttribute('aria-valuenow')).toBe('2');
-        expect(spin.getAttribute('aria-valuemax')).toBe('2');
+        expect(spin.getAttribute('aria-valuenow')).toBe('2'); // the profile's last degree
         expect(degrees.querySelector('[data-testid="stepper-reason"]')!.textContent).toContain('2 degrees is the most this Industry pack allows.');
         submit(fixture);
         expect(fixture.componentInstance.starts).toEqual([]); // never the draw
         expect(fixture.componentInstance.creates).toEqual([
             {
                 start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
-                title: 'Account MULE-HUB-01',
-                purpose: 'Review of an Account and its links',
+                defaults: { name: 'Account MULE-HUB-01', purpose: 'Review of an Account and its links' },
                 timeCol: '',
                 timeColZone: '',
                 degrees: 2,
             },
         ]);
-        expect(box.degreeMax()).toBe(2);
     });
 
-    it('Expand on start stops at 3 below a deeper Industry pack, and says it is the form’s own limit, not the pack’s', () => {
+    it('Degrees stops at 3 below a deeper Industry pack, and says it is the form’s own limit', () => {
         const { fixture, el } = createNew();
         fixture.componentInstance.maxDegree.set(6);
         fixture.detectChanges();
@@ -525,48 +478,42 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         for (let i = 0; i < 4; i++) (degrees.querySelector('[data-testid="stepper-increment"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(spin.getAttribute('aria-valuenow')).toBe('3');
-        const why = degrees.querySelector('[data-testid="stepper-reason"]')!.textContent!.trim();
-        expect(why).toBe('Expand on start goes up to 3 degrees; expand further from the Investigation tab.');
-        expect(why).not.toContain('Industry pack');
+        expect(degrees.querySelector('[data-testid="stepper-reason"]')!.textContent!.trim()).toBe(
+            'Expand on start goes up to 3 degrees; expand further from the Investigation tab.',
+        );
     });
 
-    it('with a graph drawn, Start from offers "Graph on screen": a start over its mapping with no start entities', () => {
+    it('a masked Space keeps the value out of the default Name handed to Save', async () => {
+        const { fixture, box } = createNew('masked');
+        box.form.controls.value.setValue('MULE-HUB-01');
+        await settle();
+        fixture.detectChanges();
+        submit(fixture);
+        expect(fixture.componentInstance.creates[0].defaults).toEqual({ name: 'Account', purpose: 'Review of an Account and its links' });
+    });
+
+    it('with a graph drawn, Start from offers "Graph on screen": a seedless start over its mapping', () => {
         const { fixture, box, el } = createNew();
         expect(box.kindOptions().map((o) => o.value)).toEqual(['entity', 'list', 'paste', 'dataset']);
         fixture.componentInstance.graphOnScreen.set({ name: 'mule_layering_ring' });
         fixture.detectChanges();
-        expect(box.kindOptions().map((o) => o.label)).toEqual(['One entity', 'Entity List', 'Pasted values', 'Whole Dataset', 'Graph on screen']);
-        // its hint names the drawn graph in Start entity words (it once read "no seed yet" beside a drawn graph)
         expect(box.kindOptions().at(-1)?.hint).toBe('mule_layering_ring, no start entities yet');
         kind(fixture, 'graph');
-        expect(q(el, 'start-dataset')).toBeNull(); // the drawn graph names its own Dataset
-        expect(q(el, 'new-expand')).toBeNull(); // no seed to expand from
-        expect(q(el, 'start-graph-note')?.textContent).toContain('mule_layering_ring');
-        expect(name(el)).toBe('mule_layering_ring');
-        expect(purpose(el)).toBe('Review of the graph on screen');
+        expect(q(el, 'start-dataset')).toBeNull();
+        expect(q(el, 'new-degrees')).toBeNull();
         submit(fixture);
         expect(fixture.componentInstance.creates).toEqual([
             {
                 start: { kind: 'graph' },
-                title: 'mule_layering_ring',
-                purpose: 'Review of the graph on screen',
+                defaults: { name: 'mule_layering_ring', purpose: 'Review of the graph on screen' },
                 timeCol: '',
                 timeColZone: '',
                 degrees: 0,
             },
         ]);
-        // the graph leaves the screen: the choice goes with it
         fixture.componentInstance.graphOnScreen.set(null);
         fixture.detectChanges();
         expect(box.form.controls.kind.value).toBe('entity');
-    });
-
-    it('the graph on screen is not named in a masked Space', () => {
-        const { fixture, el } = createNew('masked');
-        fixture.componentInstance.graphOnScreen.set({ name: 'mule_layering_ring' });
-        fixture.detectChanges();
-        kind(fixture, 'graph');
-        expect(name(el)).toBe('Graph on screen');
     });
 
     it('the draw box never offers the graph on screen', () => {
@@ -576,63 +523,30 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         expect(box.kindOptions().map((o) => o.value)).not.toContain('graph');
     });
 
-    it('a cleared Purpose refuses the start and says why on the field', () => {
-        const { fixture, el } = createNew();
-        kind(fixture, 'dataset');
-        penEdit(fixture, penByLabel(el, 'Purpose')!, '   ');
-        submit(fixture);
-        expect(fixture.componentInstance.creates).toEqual([]);
-        expect(penError(q(el, 'new-purpose')!)).toBe('A purpose is required.');
-    });
-
-    it('a cleared Name refuses the start too: the same rule as Settings ▸ General (T-034)', () => {
-        const { fixture, el } = createNew();
-        kind(fixture, 'dataset');
-        penEdit(fixture, q(el, 'new-name')!, '   ');
-        submit(fixture);
-        expect(fixture.componentInstance.creates).toEqual([]);
-        expect(penError(q(el, 'new-name')!)).toBe('A name is required.');
-    });
-
-    it('without the capability one read-only line replaces the form (T-203)', async () => {
+    it('a reader without Incident management can still start (unsaved), and is told that saving needs it', async () => {
         const { fixture, box, el } = createNew();
         fixture.componentInstance.canWrite.set(false);
         fixture.detectChanges();
-        const note = q(el, 'new-locked');
-        expect(note?.textContent).toContain('Read-only: starting an Investigation needs Incident management.');
-        expect(note?.textContent).toContain('Open existing ones with File ▸ Open…');
-        expect(q(el, 'start-box')).toBeNull();
-        expect(q(el, 'start-submit')).toBeNull();
-        expect(box.form.disabled).toBe(true);
-        box.submit();
-        expect(fixture.componentInstance.creates).toEqual([]);
-        await expectNoA11yViolations(el);
-
-        fixture.componentInstance.canWrite.set(true);
-        fixture.detectChanges();
-        expect(q(el, 'new-locked')).toBeNull();
         expect(box.form.enabled).toBe(true);
+        expect((q(el, 'start-submit') as HTMLButtonElement).disabled).toBe(false);
+        expect(q(el, 'new-save-needs')?.textContent).toContain('Saving needs Incident management.');
+        kind(fixture, 'dataset');
+        submit(fixture);
+        expect(fixture.componentInstance.creates).toHaveLength(1);
+        await expectNoA11yViolations(el);
     });
 
-    it('resetNew starts fresh: the start inputs clear, Name and Purpose re-default and follow the input again', async () => {
-        const { fixture, box, el } = createNew();
-        penEdit(fixture, q(el, 'new-name')!, 'Operation Larch');
-        penEdit(fixture, penByLabel(el, 'Purpose')!, 'Warrant 7');
+    it('resetNew starts fresh: the start inputs clear and Degrees goes back to 1', () => {
+        const { fixture, box } = createNew();
         kind(fixture, 'paste');
         box.form.controls.paste.setValue('a\nb');
+        box.form.controls.degrees.setValue(2);
         box.resetNew();
         fixture.detectChanges();
         expect(box.form.controls.kind.value).toBe('entity');
         expect(box.form.controls.paste.value).toBe('');
-        expect(box.form.controls.name.value).toBe(''); // nothing picked yet: no Name
-        expect(purpose(el)).toBe('Review of an Account and its links');
-        expect(box.form.controls.name.pristine).toBe(true);
+        expect(box.form.controls.degrees.value).toBe(1);
         expect(box.tried()).toBe(false);
-        // the "edited" flags are reset, so the defaults follow the input again
-        box.form.controls.value.setValue('MULE-HUB-01');
-        await settle();
-        fixture.detectChanges();
-        expect(name(el)).toBe('Account MULE-HUB-01');
     });
 });
 

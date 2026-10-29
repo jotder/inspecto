@@ -53,6 +53,14 @@ import {
     windowLabel,
 } from './investigate-number';
 import { laLimit } from './la-limits';
+import { growExpandBody } from './grow-exclude';
+import {
+    UnsavedBinding,
+    UnsavedInvestigation,
+    UnsavedSaveOutcome,
+    UnsavedStep,
+    replayStopMessage,
+} from './unsaved-investigation';
 
 /** The query parameter that keeps the open Investigation across a reload (`?investigation=<id>`). */
 export const INVESTIGATION_PARAM = 'investigation';
@@ -139,6 +147,97 @@ export class InvestigationSessionStore {
                 replaceUrl: true,
             });
         });
+    }
+
+    /**
+     * LA-UNSAVED-INVESTIGATION-1: the Investigation being worked on before Save — its binding, default Name and Purpose
+     * and the ordered steps taken; null = none. Nothing of it is on the server until {@link saveUnsaved}.
+     */
+    readonly unsaved = signal<UnsavedInvestigation | null>(null);
+
+    /** Start working unsaved over this binding (any open Investigation is left first). */
+    beginUnsaved(binding: UnsavedBinding, defaults: { name: string; purpose: string }, steps: UnsavedStep[] = []): void {
+        this.close();
+        this.unsaved.set({ binding, defaults, draft: null, steps: [...steps] });
+    }
+
+    /** Append the steps just run on the canvas; nothing happens without unsaved work. */
+    recordUnsaved(...steps: UnsavedStep[]): void {
+        this.unsaved.update((u) => (u ? { ...u, steps: [...u.steps, ...steps] } : u));
+    }
+
+    /** Drop the newest unsaved step (the canvas Undo reversed it). */
+    popUnsaved(): void {
+        this.unsaved.update((u) => (u ? { ...u, steps: u.steps.slice(0, -1) } : u));
+    }
+
+    /** Keep the Save dialog's edits, so a cancelled Save opens with them next time. */
+    keepSaveDraft(name: string, purpose: string): void {
+        this.unsaved.update((u) => (u ? { ...u, draft: { name, purpose } } : u));
+    }
+
+    discardUnsaved(): void {
+        this.unsaved.set(null);
+    }
+
+    /**
+     * Save: create the Investigation with this Name and Purpose, then replay the unsaved steps in order through the step
+     * route, so the server records each one. A refused create keeps the unsaved work; a step refused or held partway stops
+     * the replay — the Investigation stays open with the steps before it, and the outcome names what was not recorded.
+     */
+    async saveUnsaved(name: string, purpose: string): Promise<UnsavedSaveOutcome> {
+        const u = this.unsaved();
+        if (!u) return { created: false, recorded: 0, message: '' };
+        const b = u.binding;
+        const created = await this.start(
+            b.projection,
+            purpose,
+            name,
+            b.timeCol,
+            b.timeColZone,
+            b.eventsCol,
+            b.projection.entityType,
+            b.profileId,
+        );
+        if (!created) return { created: false, recorded: 0, message: this.error() };
+        this.unsaved.set(null);
+        this.windowEnd.set(b.windowEnd ?? null);
+        const id = this.activeId();
+        for (let i = 0; i < u.steps.length; i++) {
+            const step = u.steps[i];
+            const ok = step.kind === 'seed' ? await this.replaySeed(step) : await this.replayExpand(step, b);
+            if (this.activeId() !== id) return { created: true, recorded: i, message: '' };
+            if (ok === 'held') return { created: true, recorded: i + 1, message: replayStopMessage(u.steps, i + 1, 'held') };
+            if (!ok) {
+                const message = replayStopMessage(u.steps, i + 1, 'refused', this.error());
+                this.error.set(message);
+                return { created: true, recorded: i, message };
+            }
+        }
+        return { created: true, recorded: u.steps.length, message: '' };
+    }
+
+    private async replaySeed(step: Extract<UnsavedStep, { kind: 'seed' }>): Promise<boolean> {
+        const ok = await this.apply({ op: 'seed', ids: step.ids, ...(step.entityType ? { entityType: step.entityType } : {}) });
+        if (ok) this.showWorkingSet.set(true);
+        return ok;
+    }
+
+    /** One unsaved Expand, degree by degree as `growInvestigation` walks it: the outer ring (or the named values) first. */
+    private async replayExpand(step: Extract<UnsavedStep, { kind: 'expand' }>, b: UnsavedBinding): Promise<boolean | 'held'> {
+        let frontier = step.ids;
+        if (step.from === 'outer') {
+            const d = degreeState(this.workingSet(), b.maxDegree, this.degreeOutcomes(), !step.req.hold, this.overrideSteps());
+            frontier = step.req.hold ? d.frontier : [...d.frontier, ...d.heldHubs];
+        }
+        for (let d = 1; d <= step.req.degrees && frontier.length; d++) {
+            if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}))))) return false;
+            const done = this.lastStep();
+            if (done?.status === 'pending') return 'held';
+            const flagged = new Set(done?.read?.hubs?.map((h) => h.id) ?? []);
+            frontier = (done?.delta?.admitted ?? []).filter((x) => !flagged.has(x));
+        }
+        return true;
     }
 
     /** Every Investigation this screen knows about (created here or restored from a saved view). */

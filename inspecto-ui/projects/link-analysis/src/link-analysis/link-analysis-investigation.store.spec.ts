@@ -1056,3 +1056,108 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
         });
     });
 });
+
+describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIGATION-1)', () => {
+    const RING = { direction: 'either' as const, degrees: 1, linkKinds: null, hold: true, threshold: 500 };
+    const begin = (store: InvestigationSessionStore) =>
+        store.beginUnsaved({ projection: P, timeCol: 'call_ts', presets: { budget: 2000 }, maxDegree: 3 }, { name: 'Phone number', purpose: 'Review' }, [
+            { kind: 'seed', ids: ['a'], entityType: 'msisdn' },
+            { kind: 'expand', from: 'outer', ids: [], req: RING },
+            { kind: 'expand', from: 'ids', ids: ['b'], req: { ...RING, direction: 'out' } },
+        ]);
+
+    /** The fake server: a seed puts its ids at hop 0, an expand admits `<id>-n` at the next hop. */
+    function server(t: ReturnType<typeof setup>, refuseAt?: number, holdAt?: number) {
+        const sent: Record<string, unknown>[] = [];
+        t.sets['inv-1'] = ws([]);
+        t.inv.appendInvestigationOp.mockImplementation((_id: string, op: Record<string, unknown>) => {
+            sent.push(op);
+            const n = sent.length;
+            if (n === refuseAt) return throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } }));
+            const ids = op['ids'] as string[];
+            const cur = t.sets['inv-1'];
+            const admitted = op['op'] === 'seed' ? ids : ids.map((id) => id + '-n');
+            const hop = op['op'] === 'seed' ? 0 : Math.max(0, ...cur.entities.map((e) => e.hop)) + 1;
+            t.sets['inv-1'] = {
+                ...cur,
+                entities: [...cur.entities, ...admitted.map((id) => ({ ...ws([id]).entities[0], hop }))],
+                hash: `h${n}`,
+            };
+            t.logs['inv-1'] = { ...t.logs['inv-1'], entries: [...t.logs['inv-1'].entries, entry(n, { op: op['op'] as never })] };
+            return of({ ...step(n, op['op'] as string), status: n === holdAt ? 'pending' : undefined, delta: { ...step(n, '').delta, admitted } });
+        });
+        return sent;
+    }
+
+    it('records steps while unsaved, drops one on Undo, and keeps the Save dialog edits', () => {
+        const { store, inv } = setup();
+        begin(store);
+        store.recordUnsaved({ kind: 'seed', ids: ['c'] });
+        expect(store.unsaved()!.steps).toHaveLength(4);
+        store.popUnsaved();
+        expect(store.unsaved()!.steps).toHaveLength(3);
+        store.keepSaveDraft('Operation Larch', 'Warrant 7');
+        expect(store.unsaved()!.draft).toEqual({ name: 'Operation Larch', purpose: 'Warrant 7' });
+        expect(store.unsaved()!.defaults).toEqual({ name: 'Phone number', purpose: 'Review' });
+        expect(inv.createInvestigation).not.toHaveBeenCalled(); // nothing on the server while unsaved
+        store.discardUnsaved();
+        expect(store.unsaved()).toBeNull();
+    });
+
+    it('Save creates with the Name and Purpose, then replays every step in order through the step route', async () => {
+        const t = setup();
+        const sent = server(t);
+        begin(t.store);
+        const out = await t.store.saveUnsaved('Operation Larch', 'Warrant 7');
+        expect(t.inv.createInvestigation).toHaveBeenCalledWith(
+            expect.objectContaining({ title: 'Operation Larch', purpose: 'Warrant 7', timeCol: 'call_ts', entityType: 'msisdn' }),
+        );
+        expect(sent.map((o) => [o['op'], o['ids']])).toEqual([
+            ['seed', ['a']],
+            ['expand', ['a']], // the outer ring of the replayed Working Set
+            ['expand', ['b']], // the named values
+        ]);
+        expect(sent[1]).toEqual(expect.objectContaining({ direction: 'either', hubThreshold: 500, budget: 2000 }));
+        expect(sent[2]).toEqual(expect.objectContaining({ direction: 'out' }));
+        expect(out).toEqual({ created: true, recorded: 3, message: '' });
+        expect(t.store.unsaved()).toBeNull();
+        expect(t.store.activeId()).toBe('inv-1');
+    });
+
+    it('a step refused partway stops the replay: the steps before it are saved, the rest named as not recorded', async () => {
+        const t = setup();
+        const sent = server(t, 2);
+        begin(t.store);
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(sent).toHaveLength(2); // the third step is never sent
+        expect(out.created).toBe(true);
+        expect(out.recorded).toBe(1);
+        expect(out.message).toContain('Saved with 1 step. Step 2 (Expand 1 degree from the outer ring, both ways) was refused');
+        expect(out.message).toContain('Step 3 was not recorded.');
+        expect(t.store.error()).toBe(out.message);
+        expect(t.store.activeId()).toBe('inv-1'); // the saved Investigation is open
+    });
+
+    it('a replayed step held for four-eyes approval stops the replay there', async () => {
+        const t = setup();
+        const sent = server(t, undefined, 2);
+        begin(t.store);
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(sent).toHaveLength(2);
+        expect(out.recorded).toBe(2);
+        expect(out.message).toContain("Step 2 (Expand 1 degree from the outer ring, both ways) is waiting for a second person's approval.");
+        expect(out.message).toContain('Step 3 was not recorded.');
+    });
+
+    it('a refused create keeps the unsaved work, so nothing is lost', async () => {
+        const t = setup();
+        t.inv.createInvestigation.mockImplementation(() =>
+            throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: 'no' } } })) as never,
+        );
+        begin(t.store);
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(out.created).toBe(false);
+        expect(t.inv.appendInvestigationOp).not.toHaveBeenCalled();
+        expect(t.store.unsaved()!.steps).toHaveLength(3);
+    });
+});

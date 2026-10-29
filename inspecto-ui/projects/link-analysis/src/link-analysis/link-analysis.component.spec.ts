@@ -252,7 +252,8 @@ describe('LinkAnalysisComponent', () => {
     it('renders the empty state, is a11y-clean, and validates the mapping before querying', async () => {
         const { fixture, queried } = create();
         fixture.detectChanges();
-        expect(fixture.nativeElement.textContent).toContain('Start a graph');
+        // the Investigations level: the empty canvas points to the start form in the Investigation tab (D1)
+        expect(fixture.nativeElement.textContent).toContain('Start from the Investigation tab');
         await fixture.componentInstance.run(); // no mapping picked yet
         expect(fixture.componentInstance.loadError()).toMatch(/From and To columns/);
         expect(queried).toHaveLength(0);
@@ -528,7 +529,7 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         expect(c.graph()).toBeNull();
         expect(c.lastRun()).toBeNull();
-        expect(el.textContent).toContain('Start a graph');
+        expect(el.textContent).toContain('Start from the Investigation tab');
         expect(c.openWorkLabel()).toBe('');
     }, 45_000);
 
@@ -2734,7 +2735,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
     };
 
     it('replaces the empty canvas with the Start box; Open, Explore and the examples moved to the File menu', () => {
-        const { fixture } = create();
+        const { fixture } = create({ features: { ...STANDARD_EDITION_FEATURES, investigations: signal(false) } }); // the Explorer level keeps the centre box (D1)
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.textContent).toContain('Start a graph');
@@ -4089,7 +4090,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         }));
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
         fixture.detectChanges();
         expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1', 'x2']);
         expect(c.graph()!.nodes.map((n) => n.id)).toEqual(expect.arrayContaining(['x1', 'x2', 'x3']));
@@ -4120,7 +4121,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             })),
         } as never;
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
         expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1']);
         expect(c.growExclude.basicHeld().get('x2')).toBe(900);
     });
@@ -4135,7 +4136,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         });
         const { c } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
         expect(expand).toHaveBeenCalledTimes(1);
         expect(c.growExclude.lastChange()?.text).toContain('Stopped after degree 1: the next degree would grow from 30 nodes, above the frontier cap of 25.');
     });
@@ -4155,7 +4156,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
         expect(c.growContext()).toMatchObject({ mode: 'basic', frontier: ['c'], from: 'the 1 node you selected', blocked: null });
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
         fixture.detectChanges();
         const ids = () => c.graph()!.nodes.map((n) => n.id).sort();
         expect(ids()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']); // the incoming g was not kept
@@ -4175,7 +4176,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         }));
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['a']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
         expect(c.growExclude.undoable()).toBe(true);
         await c.expandNode('b', 'B'); // another change to the graph
         fixture.detectChanges();
@@ -4301,14 +4302,14 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         await settle(fixture, 10);
         (document.querySelector('[data-testid="la-node-menu-grow"]') as HTMLButtonElement).click();
         await landed('node menu');
-        // the section is the real Expand form, recorded: its Expand walks the Investigation (Expand next degree stays beside it)
-        expect(section()!.closest('[data-testid="degrees"]')!.querySelector('[data-testid="expand-next-degree"]')).not.toBeNull();
+        // the section is the real Expand form, recorded: its Expand walks the Investigation (ONE control, no "Expand next degree")
+        expect(section()!.closest('[data-testid="degrees"]')!.querySelector('[data-testid="expand-next-degree"]')).toBeNull();
         const onExpand = vi.spyOn(c, 'onExpand').mockResolvedValue();
         (section()!.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).click();
         expect(onExpand).toHaveBeenCalledWith(expect.objectContaining({ ctx: expect.objectContaining({ mode: 'investigation' }) }));
     });
 
-    it('LA-INV-EXPAND-1: with the full graph shown instead of the Working Set, the Expand section says why it has no form', async () => {
+    it('LA-UNSAVED-INVESTIGATION-1 D3: no "Show the full graph" checkbox, and ONE Expand control (no "Expand next degree")', async () => {
         const { fixture, c, el } = await drawn();
         c.investigation.activeId.set('inv-9');
         c.investigation.log.set({ header: { sourceCol: 's', targetCol: 't', title: 'Ring' }, entries: [] } as never);
@@ -4320,18 +4321,12 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         } as never);
         c.openInvestigation();
         fixture.detectChanges();
-        const section = () => el.querySelector('[data-testid="degrees"]') as HTMLElement;
-        expect(section().querySelector('[data-testid="la-expand-section"]')).not.toBeNull();
-        expect(section().querySelector('[data-testid="expand-full-graph"]')).toBeNull();
-        c.investigation.showWorkingSet.set(false);
-        fixture.detectChanges();
-        expect(c.growMode()).toBe('basic');
-        expect(section().querySelector('[data-testid="la-expand-section"]')).toBeNull();
-        expect(section().querySelector('[data-testid="expand-full-graph"]')!.textContent!.trim()).toBe(
-            'Expand works on the Working Set; untick “Show the full graph to pick start entities”.',
-        );
+        const section = el.querySelector('[data-testid="degrees"]') as HTMLElement;
+        expect(section.querySelector('[data-testid="la-expand-section"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="expand-next-degree"]')).toBeNull();
+        expect(el.textContent).not.toContain('Show the full graph');
+        expect(el.querySelector('[data-testid="expand-full-graph"]')).toBeNull();
     });
-
     it('Investigation: Grow appends ONE expand from the outer ring; held busy nodes carry the badge; Remove held is one exclude', async () => {
         const { c } = await drawn();
         c.investigation.activeId.set('inv-9');
@@ -4370,11 +4365,11 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             c.investigation.lastStep.set({ step: ops.length, op: op.op, delta: { admitted: [], excluded: ['ws-hub'], linksAdded: 0 } } as never);
             return true;
         });
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
         expect(ops).toEqual([{ op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500 }]);
         // Hold off goes through hubs: a sealed override, so it asks first; No sends nothing
         const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 }, from: null });
         expect(ask).toHaveBeenCalledWith(expect.stringContaining('1 held busy entity'), expect.anything());
         expect(ops).toHaveLength(1);
         await c.removeHeld();
@@ -4731,7 +4726,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect([...c.expandedNodeIds()].sort()).toEqual(['S-1', 'S-2']);
     });
 
-    it('LA-PANELS-REDESIGN-1: the New form starts a list Investigation in ONE press - drawn, every member seeded, expanded as asked', async () => {
+    it('LA-UNSAVED-INVESTIGATION-1: a list start draws its members UNSAVED - nothing created, seed and ring recorded', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
         const { fixture } = create({
@@ -4741,31 +4736,26 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         await settle(fixture);
         const c = fixture.componentInstance;
-        const chain = vi.spyOn(c.investigation, 'investigateNumber').mockResolvedValue(true);
-        await c.createInvestigation({
+        const start = vi.spyOn(c.investigation, 'start');
+        await c.startUnsaved({
             start: { kind: 'list', datasetId: 'transfers', listId: 'suspects' },
-            title: 'Investigation — list Suspects',
-            purpose: 'Review of the members of list Suspects and their links',
+            defaults: { name: 'Members of “Suspects”', purpose: 'Review of the members' },
             timeCol: '',
             timeColZone: 'Europe/London',
             degrees: 1,
         });
-        expect(chain).toHaveBeenCalledWith(
-            expect.objectContaining({
-                seeds: ['S-1', 'S-2'],
-                projection: expect.objectContaining({ entityType: 'account' }),
-                title: 'Investigation — list Suspects',
-                purpose: 'Review of the members of list Suspects and their links',
-                timeColZone: 'Europe/London',
-                degrees: 1,
-            }),
-        );
-        // no second form: nothing pending, nothing queued
-        expect(c.pendingInvestigation()).toBeNull();
-        expect(c.investigation.queuedSeeds()).toEqual([]);
+        expect(start).not.toHaveBeenCalled(); // no Name, no Purpose, nothing on the server
+        const u = c.investigation.unsaved()!;
+        expect(u.binding.timeColZone).toBe('Europe/London');
+        expect(u.binding.projection).toEqual(expect.objectContaining({ entityType: 'account' }));
+        expect(u.defaults.name).toBe('Members of “Suspects”');
+        expect(u.steps).toEqual([
+            { kind: 'seed', ids: ['S-1', 'S-2'], entityType: 'account' },
+            { kind: 'expand', from: 'outer', ids: [], req: expect.objectContaining({ degrees: 1, direction: 'either', hold: true }) },
+        ]);
         expect(c.graph()).not.toBeNull();
+        expect(c.openWorkLabel()).toBe('the unsaved Investigation');
     });
-
     it('LA-PANELS-REDESIGN-1: the start box only draws a list on the Investigations level - no pending form, no queue', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
@@ -4787,6 +4777,8 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await settle(fixture);
         fixture.detectChanges();
         const reread = vi.spyOn(fixture.componentInstance as unknown as { refreshEntityLists(): void }, 'refreshEntityLists');
+        fixture.componentInstance.openNewInvestigation(); // the start form lives in the Investigation tab (D1)
+        fixture.detectChanges();
         const box = fixture.debugElement.query((d) => d.name === 'inspecto-link-analysis-start-box');
         const kind = (box.componentInstance as { form: { controls: { kind: { setValue(v: string): void } } } }).form.controls.kind;
         kind.setValue('paste');
@@ -4867,26 +4859,93 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    it('Investigations level, one entity from the New form: an account seeds an Investigation over its Dataset (generic binding, OB-9)', async () => {
+    it('LA-UNSAVED-INVESTIGATION-1: one entity starts unsaved over its binding; Degrees 2 walks one more degree, recorded', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'Account', purpose: 'Review of an Account and its links' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 2,
+        });
+        const u = c.investigation.unsaved()!;
+        expect(u.binding.projection).toEqual(MAPPING);
+        expect(u.steps.map((x) => x.kind)).toEqual(['seed', 'expand', 'expand']);
+        expect(u.steps[0]).toEqual({ kind: 'seed', ids: ['MULE-HUB-01'], entityType: MAPPING.entityType });
+        expect(u.steps[2]).toEqual(expect.objectContaining({ from: 'outer', req: expect.objectContaining({ degrees: 1 }) }));
+        expect(c.investigateIssue()).toBe('');
+        expect(c.toolboxTab()).toBe('investigation');
+    });
+
+    it('LA-UNSAVED-INVESTIGATION-1: an unsaved Expand the Space would hold for four-eyes is refused before it runs', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
+        const calls = expand.mock.calls.length;
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        expect(expand.mock.calls.length).toBe(calls); // nothing read
+        expect(c.investigation.unsaved()!.steps).toHaveLength(2); // nothing recorded
+        expect(c.growExclude.lastChange()?.text).toContain('cannot run unsaved. Save first');
+    });
+
+    it('LA-UNSAVED-INVESTIGATION-1: an unsaved Expand is recorded, and its Undo drops the step', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const ctx = c.growContext();
+        await c.onExpand({ ctx, req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        const steps = c.investigation.unsaved()!.steps;
+        expect(steps).toHaveLength(3);
+        expect(steps[2]).toEqual({ kind: 'expand', from: 'outer', ids: [], req: expect.objectContaining({ direction: 'out' }) });
+        c.growExclude.lastChange()!.undo!();
+        expect(c.investigation.unsaved()!.steps).toHaveLength(2);
+    });
+
+    it('LA-UNSAVED-INVESTIGATION-1: Close with unsaved steps asks Save, Discard or Cancel', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
-        const chain = vi.spyOn(c.investigation, 'investigateNumber').mockResolvedValue(true);
-        await c.createInvestigation({
-            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
-            title: 'Investigation — Account MULE-HUB-01',
-            purpose: 'Review of Account MULE-HUB-01 and its links',
-            timeCol: '',
-            timeColZone: '',
-            degrees: 0,
-        });
-        expect(chain).toHaveBeenCalledWith(
-            expect.objectContaining({ seed: 'MULE-HUB-01', projection: MAPPING, presets: {}, degrees: 0 }),
-        );
-        expect(c.pendingInvestigation()).toBeNull(); // no second form
-        expect(c.investigateIssue()).toBe('');
+        c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
+            { kind: 'seed', ids: ['A-1'] },
+        ]);
+        const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmUnsavedChanges').mockResolvedValue('cancel');
+        await c.closeOpenWork();
+        expect(ask).toHaveBeenCalledWith(expect.stringContaining('not saved (one step)'), expect.objectContaining({ discardText: 'Discard' }));
+        expect(c.investigation.unsaved()).not.toBeNull(); // Cancel keeps it
+        ask.mockResolvedValue('discard');
+        await c.newWork();
+        expect(c.investigation.unsaved()).toBeNull();
+        // Save without Incident management: refused with the reason, the work stays
+        c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' });
+        Object.defineProperty(c, 'canStartInvestigation', { value: () => false });
+        ask.mockResolvedValue('save');
+        await c.closeOpenWork();
+        expect(c.investigation.unsaved()).not.toBeNull();
+        // the browser asks before a reload drops it
+        const e = { preventDefault: vi.fn(), returnValue: undefined } as unknown as BeforeUnloadEvent;
+        c.onBeforeUnload(e);
+        expect(e.preventDefault).toHaveBeenCalled();
     });
-
     it('Investigations level, the start box draws one entity with its ring - it seeds nothing', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
@@ -4927,7 +4986,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(form?.textContent).toContain('New Investigation');
     });
 
-    it('the start box’s New Investigation… switches the dock to the Investigation tab at once, as File ▸ New does', async () => {
+    it('the centre pointer opens the Investigation tab at its start form (D1), dropping a queue that would hide it', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         fixture.detectChanges();
@@ -4937,94 +4996,76 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         c.investigation.queueSeeds([{ id: 'q', label: 'q', ids: ['q'] }]); // e.g. a deep link that could not bind
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        (el.querySelector('[data-testid="start-new-investigation"]') as HTMLButtonElement).click();
+        (el.querySelector('[data-testid="la-start-pointer"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(c.toolboxTab()).toBe('investigation');
         expect(el.querySelector('#la-toolbox-tab-investigation')!.getAttribute('aria-selected')).toBe('true');
-        expect(c.investigation.queuedSeeds()).toEqual([]); // nothing hides the New form
+        expect(c.investigation.queuedSeeds()).toEqual([]); // nothing hides the start form
         expect(el.querySelector('[laNewInvestigation] [data-testid="start-kind"]')).not.toBeNull();
     });
-
-    it('the New form’s whole Dataset draws it, then creates the Investigation over its mapping with the profile bound', async () => {
+    it('the start form’s whole Dataset draws it and starts unsaved over its mapping with the profile bound, no steps yet', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
-        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
-        await c.createInvestigation({
+        const start = vi.spyOn(c.investigation, 'start');
+        await c.startUnsaved({
             start: { kind: 'dataset', datasetId: 'transfers' },
-            title: 'Investigation — whole Transfers',
-            purpose: 'Review of the links in Transfers',
+            defaults: { name: 'Transfers', purpose: 'Review of the links in Transfers' },
             timeCol: '',
             timeColZone: '',
             degrees: 0,
         });
         expect(c.graph()).not.toBeNull();
-        expect(start).toHaveBeenCalledWith(
-            MAPPING,
-            'Review of the links in Transfers',
-            'Investigation — whole Transfers',
-            undefined,
-            '',
-            undefined,
-            MAPPING.entityType,
-            expect.any(String),
+        expect(start).not.toHaveBeenCalled();
+        expect(c.investigation.unsaved()).toEqual(
+            expect.objectContaining({ binding: expect.objectContaining({ projection: MAPPING }), steps: [] }),
         );
         expect(c.boundProfile()).not.toBeNull();
     });
-
-    it('the New form’s whole Dataset creates NOTHING when the draw fails', async () => {
+    it('the start form’s whole Dataset starts nothing when the draw fails', async () => {
         const { fixture } = create({ datasets: [TRANSFERS], fail: true });
         await settle(fixture);
         const c = fixture.componentInstance;
-        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
-        await c.createInvestigation({
+        await c.startUnsaved({
             start: { kind: 'dataset', datasetId: 'transfers' },
-            title: 'x',
-            purpose: 'y',
+            defaults: { name: 'x', purpose: 'y' },
             timeCol: '',
             timeColZone: '',
             degrees: 0,
         });
         expect(c.graph()).toBeNull();
-        expect(start).not.toHaveBeenCalled();
+        expect(c.investigation.unsaved()).toBeNull();
     });
-
-    it('the New form’s "The graph on screen" starts a seedless Investigation over the drawn mapping', async () => {
+    it('the start form’s "The graph on screen" starts unsaved over the drawn mapping, with its time column', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
         Object.defineProperty(c, 'investigationProjection', { value: () => MAPPING });
-        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
-        const chain = vi.spyOn(c.investigation, 'investigateNumber');
-        await c.createInvestigation({
+        await c.startUnsaved({
             start: { kind: 'graph' },
-            title: 'Investigation — Transfers',
-            purpose: 'Review of the graph on screen',
+            defaults: { name: 'Graph on screen', purpose: 'Review of the graph on screen' },
             timeCol: 'booked_at',
             timeColZone: 'UTC',
             degrees: 0,
         });
-        expect(start).toHaveBeenCalledWith(MAPPING, 'Review of the graph on screen', 'Investigation — Transfers', 'booked_at', 'UTC');
-        expect(chain).not.toHaveBeenCalled(); // no seed step
-        expect(c.investigation.showWorkingSet()).toBe(false); // seedless: the drawn graph stays, seeds are picked there
+        expect(c.investigation.unsaved()!.binding).toEqual(
+            expect.objectContaining({ projection: MAPPING, timeCol: 'booked_at', timeColZone: 'UTC' }),
+        );
+        expect(c.investigation.unsaved()!.steps).toEqual([]);
     });
-
-    it('a whole-Dataset Investigation keeps the drawn graph on the canvas, not its empty Working Set (UI test 2026-10-29)', async () => {
+    it('a whole-Dataset start keeps the drawn graph on the canvas while unsaved (no Working Set yet)', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
-        vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
-        await c.createInvestigation({
+        await c.startUnsaved({
             start: { kind: 'dataset', datasetId: 'transfers' },
-            title: 'Investigation — whole Transfers',
-            purpose: 'Review of the links in Transfers',
+            defaults: { name: 'Transfers', purpose: 'Review' },
             timeCol: '',
             timeColZone: '',
             degrees: 0,
         });
         expect(c.graph()?.nodes.length).toBeGreaterThan(0);
-        expect(c.investigation.showWorkingSet()).toBe(false);
-        expect(c.workingSetCanvas()).toBe(false); // the canvas draws the query graph
+        expect(c.workingSetCanvas()).toBe(false); // the canvas draws the explorer graph
     });
 });
 
@@ -5851,26 +5892,22 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.destroy();
     });
 
-    it('with the New form in the Investigation tab, the centre shows a pointer instead of a second form', () => {
+    it('D1: on the Investigations level the centre is a pointer to the Investigation tab, never a second start form', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         const el = fixture.nativeElement as HTMLElement;
         c.toolboxDockOpen.set(true);
-        c.toolboxTab.set('investigation');
-        fixture.detectChanges();
-        expect(c.newFormInDock()).toBe(true);
-        const pointer = el.querySelector('[data-testid="la-start-pointer"]')?.textContent ?? '';
-        expect(pointer).toContain('Investigation tab');
-        expect(pointer).not.toMatch(/on the right|below/); // the dock stacks on narrow screens: no position words
-        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the New form only
         c.toolboxTab.set('browser');
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="la-start-pointer"]')).toBeNull();
-        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the centre box is back
+        const pointer = el.querySelector('[data-testid="la-start-pointer"]')?.textContent ?? '';
+        expect(pointer).toContain('Start from the Investigation tab');
+        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(0); // the tab is not open
+        c.toolboxTab.set('investigation');
+        fixture.detectChanges();
+        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the tab's form only
         fixture.destroy();
     });
-
-    it('File ▸ New resets the New form: the last typed Name does not survive Close then New', async () => {
+    it('File ▸ New resets the start form: the last typed value does not survive Close then New', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         c.toolboxDockOpen.set(true);
@@ -5880,16 +5917,14 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
             .queryAll(By.directive(LinkAnalysisStartBoxComponent))
             .map((d) => d.componentInstance as LinkAnalysisStartBoxComponent)
             .find((b) => b.mode() === 'investigation')!;
-        form.form.controls.name.setValue('Ring 7 typed by hand');
-        form.form.controls.name.markAsDirty();
+        form.form.controls.value.setValue('typed by hand');
+        form.form.controls.degrees.setValue(3);
         await c.newWork();
         fixture.detectChanges();
-        expect(form.form.controls.name.value).not.toBe('Ring 7 typed by hand');
-        expect(form.form.controls.name.value).toBe(form.defaults().name);
-        expect(form.form.controls.name.pristine).toBe(true);
+        expect(form.form.controls.value.value).toBe('');
+        expect(form.form.controls.degrees.value).toBe(1);
         fixture.destroy();
     });
-
     it('a refused full screen says so in a toast instead of doing nothing', async () => {
         const { fixture } = create();
         fixture.detectChanges();
@@ -5915,7 +5950,7 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.destroy();
     });
 
-    it('an empty Working Set on the canvas says so, with a one-click "Show the query graph"', async () => {
+    it('an empty Working Set on the canvas says so, and how to pick start entities (no checkbox, no toggle)', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         // a real signal BEFORE the first read, so the page's computeds depend on it (as the layout-cap specs do)
@@ -5929,8 +5964,8 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.detectChanges();
         const empty = fixture.nativeElement.querySelector('[data-testid="la-empty-working-set"]') as HTMLElement;
         expect(empty?.textContent).toContain('The Working Set is empty');
-        (empty.querySelector('button') as HTMLButtonElement).click();
-        expect(c.investigation.showWorkingSet()).toBe(false);
+        expect(empty?.textContent).toContain('Start from selected');
+        expect(empty.querySelector('button')).toBeNull();
         fixture.destroy();
     });
 });

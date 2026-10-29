@@ -11,7 +11,7 @@ import {
     untracked,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -19,10 +19,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { catchError, combineLatest, debounceTime, distinctUntilChanged, map, of, startWith, switchMap } from 'rxjs';
-import { LensService } from '@inspecto/core/api';
+import { LensService, needsPermission } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
-import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
 import { DISABLED_REASON, expandOnStartCap, mostDegrees } from './disabled-reasons';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
@@ -32,10 +31,8 @@ import {
     EntitySuggestions,
 } from '@inspecto/link-analysis/api/entity-profile.service';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
-import { LaFoldComponent } from './la-fold.component';
-import { laLimit } from './la-limits';
 import {
-    NewInvestigationRequest,
+    UnsavedStartRequest,
     StartCatalogue,
     StartKind,
     StartRequest,
@@ -70,10 +67,10 @@ function listHint(l: EntityListSummary, types: readonly { id: string; label: str
 const MOST_DEGREES_ON_START = 3;
 
 /**
- * Why the New Investigation form is locked. The gate is literally `canManageIncidents` (`POST /inv/investigations`,
- * `InvestigationRoutes`), whose plain name is Incident management.
+ * Why Save is not offered to this user (LA-UNSAVED-INVESTIGATION-1): starting and expanding unsaved is open to everyone,
+ * saving creates the Investigation, and `POST /inv/investigations` is gated on `canManageIncidents` (Incident management).
  */
-export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs Incident management.';
+export const SAVE_NEEDS = needsPermission('canManageIncidents');
 
 /**
  * **Start from...** (LA-ONBOARD-1 phase 6, OB-9; UC-09), in two modes.
@@ -83,9 +80,9 @@ export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs I
  *   list** (an Entity List), **a paste** (values, unknown ones reported after) or **the whole Dataset** (allowed, warned
  *   above the node cap). The page draws the chosen entities plus one ring, busy ones held. On the Investigations level
  *   *New Investigation…* below opens the form that starts one.
- * - `investigation` (LA-PANELS-REDESIGN-1, the Investigation tab's **New Investigation** form): the same Start from
- *   choice and inputs, then a **Name** and a **Purpose** pre-filled from the input (re-defaulted until edited), the time
- *   column under *More*, and an optional *Expand on start*. One press creates the Investigation, seeds it and expands.
+ * - `investigation` (the Investigation tab's start form, LA-UNSAVED-INVESTIGATION-1): the same Start from choice and
+ *   inputs, a **Time column** and a **Time zone** picker and the **Degrees** stepper. Start draws the start UNSAVED: no
+ *   Name or Purpose is asked; Save asks for them later and records the steps (the default Name and Purpose travel along).
  *
  * Open…, Explore dataset… and the examples live in the File menu.
  */
@@ -103,8 +100,6 @@ export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs I
         ReactiveFormsModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
-        LaFoldComponent,
-        PenFieldComponent,
         StepperFieldComponent,
     ],
     host: { class: 'block w-full max-w-3xl', '[class.p-4]': "mode() === 'draw'" },
@@ -116,19 +111,11 @@ export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs I
             </p>
         } @else {
             <h3 class="m-0 text-base font-semibold" [id]="titleId()">New Investigation</h3>
-            @if (locked()) {
-                <!-- the lock comes first: the inputs below are disabled, so say why before anyone tries them -->
-                <inspecto-alert class="mt-2 block" variant="info" title="Read-only" data-testid="new-locked">
-                    {{ lockedReason }} Open existing ones with File ▸ Open…
-                </inspecto-alert>
-            }
             <p class="text-secondary mb-2 mt-1 text-sm">
-                Records every step, with who, when and why, so it can be replayed.
+                Start, then Expand. Nothing is recorded until you Save; Save asks for a Name and a Purpose.
             </p>
         }
-        @if (locked()) {
-            <!-- a read-only role sees the reason only: a form of disabled inputs says nothing more (T-203) -->
-        } @else if (catalogue().datasets.length) {
+        @if (catalogue().datasets.length) {
             <form
                 class="flex flex-col gap-3"
                 [class.start-box]="mode() === 'draw'"
@@ -259,96 +246,52 @@ export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs I
                                 Draws the whole of {{ datasetName() }} (busiest
                                 {{ nodeCap().toLocaleString('en-GB') }} nodes).
                                 @if (mode() === 'investigation') {
-                                    The Investigation starts empty: pick start entities from the graph.
+                                    Then select start entities on the graph and choose Start from selected.
                                 }
                             </p>
                         }
                     }
                 }
                 @if (mode() === 'investigation') {
-                    <inspecto-pen-field
-                        data-testid="new-name"
-                        label="Name"
-                        formControlName="name"
-                        [maxlength]="200"
-                        [required]="true"
-                        [error]="nameError()"
+                    <inspecto-option-picker
+                        data-testid="new-time-col"
+                        label="Time column"
+                        formControlName="timeCol"
+                        [options]="timeColumnOptions()"
+                        help="Used for time windows and the coverage check."
                     />
-                    <div>
-                        <inspecto-pen-field
-                            data-testid="new-purpose"
-                            label="Purpose"
-                            [required]="true"
-                            [multiline]="true"
-                            formControlName="purpose"
-                            [maxlength]="purposeMax()"
-                            [error]="purposeError()"
-                        />
-                        <p class="text-secondary m-0 text-xs">
-                            Why you are investigating (stated reason or legal basis). Shown in the Dossier.
-                        </p>
-                    </div>
-                    <la-fold title="More" data-testid="new-more">
-                        <div class="flex flex-col gap-2 p-2">
-                            <div>
-                                <inspecto-pen-field
-                                    label="Time column"
-                                    formControlName="timeCol"
-                                    [maxlength]="200"
-                                    [placeholder]="picked()?.timeCol ?? ''"
-                                />
-                                <p class="text-secondary m-0 text-xs">
-                                    Used for time windows and the coverage check.{{
-                                        picked()?.timeCol ? ' Blank uses ' + picked()!.timeCol + '.' : ''
-                                    }}
-                                </p>
-                            </div>
-                            <inspecto-option-picker
-                                label="Time column zone"
-                                formControlName="timeColZone"
-                                [options]="timeZones"
-                                help="Time zone for a column that has none."
-                            />
-                        </div>
-                    </la-fold>
+                    <inspecto-option-picker
+                        data-testid="new-time-zone"
+                        label="Time zone"
+                        formControlName="timeColZone"
+                        [options]="timeZones"
+                        help="Time zone for a column that has none."
+                    />
                     @if (kind() !== 'dataset' && kind() !== 'graph') {
-                        <la-fold title="Expand on start" data-testid="new-expand">
-                            <div class="flex flex-col gap-2 p-2">
-                                <inspecto-stepper-field
-                                    data-testid="new-degrees"
-                                    label="Degrees"
-                                    formControlName="degrees"
-                                    decrementLabel="Fewer degrees"
-                                    incrementLabel="More degrees"
-                                    [min]="0"
-                                    [max]="degreeMax()"
-                                    [valueText]="degreeText"
-                                    [minReason]="noExpandReason"
-                                    [maxReason]="degreeMaxReason()"
-                                />
-                                <p class="text-secondary m-0 text-xs">
-                                    Each degree is one recorded step. Busy entities are held.
-                                </p>
-                            </div>
-                        </la-fold>
+                        <inspecto-stepper-field
+                            data-testid="new-degrees"
+                            label="Degrees"
+                            formControlName="degrees"
+                            decrementLabel="Fewer degrees"
+                            incrementLabel="More degrees"
+                            [min]="1"
+                            [max]="degreeMax()"
+                            [minReason]="fewestDegrees"
+                            [maxReason]="degreeMaxReason()"
+                        />
                     }
                 }
                 <p class="text-secondary m-0 text-xs" data-testid="start-what">{{ whatHappens() }}</p>
                 <div>
-                    <!-- disabled-with-reason: the tooltip sits on a wrapper (a disabled button fires no hover) -->
-                    <span class="inline-flex" [matTooltip]="locked() ? lockedReason : ''">
-                        <button
-                            mat-flat-button
-                            color="primary"
-                            type="submit"
-                            data-testid="start-submit"
-                            [disabled]="busy() || locked()"
-                            [attr.aria-label]="locked() ? submitLabel() + ': ' + lockedReason : null"
-                        >
-                            {{ submitLabel() }}
-                        </button>
-                    </span>
+                    <button mat-flat-button color="primary" type="submit" data-testid="start-submit" [disabled]="busy()">
+                        {{ submitLabel() }}
+                    </button>
                 </div>
+                @if (mode() === 'investigation' && !canWrite()) {
+                    <p class="text-secondary m-0 text-xs" data-testid="new-save-needs">
+                        You can start and Expand. Saving needs Incident management.
+                    </p>
+                }
             </form>
         } @else {
             <p class="m-0 text-sm" data-testid="start-no-dataset">
@@ -366,24 +309,6 @@ export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs I
             <p class="text-secondary m-0 mt-4 text-sm" data-testid="start-file-hint">
                 Open, Explore Dataset and Examples are in the File menu.
             </p>
-            @if (investigations()) {
-                <div class="mt-2">
-                    <!-- disabled-with-reason: the tooltip sits on a wrapper (a disabled button fires no hover) -->
-                    <span class="inline-flex" [matTooltip]="canWrite() ? '' : lockedReason">
-                        <button
-                            mat-stroked-button
-                            type="button"
-                            data-testid="start-new-investigation"
-                            [disabled]="!canWrite()"
-                            [attr.aria-label]="canWrite() ? null : 'New Investigation: ' + lockedReason"
-                            (click)="newInvestigation.emit()"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon>
-                            New Investigation
-                        </button>
-                    </span>
-                </div>
-            }
             @if (addData()) {
                 <ul class="m-0 mt-3 grid list-none gap-3 p-0 grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
                     <li>
@@ -443,32 +368,27 @@ export class LinkAnalysisStartBoxComponent {
     readonly lists = input<EntityListSummary[]>([]);
     /** The Dataset to preselect (`?dataset=<id>`, Add data's *Explore in Link Analysis*); null = the first. */
     readonly dataset = input<string | null>(null);
-    /** The Investigations level: *New Investigation…* is offered under the draw. */
-    readonly investigations = input(false);
     readonly nodeCap = input(1000);
-    /** The longest purpose the Space accepts (`input.purpose_length`), as the Investigation settings use it. */
-    readonly purposeMax = computed(() => laLimit('input.purpose_length'));
     readonly notice = input<StartNotice | null>(null);
     readonly busy = input(false);
     /** The host has an Add data screen (`/add-data`): the card is offered. */
     readonly addData = input(false);
-    /** `draw` = the Query zone's start; `investigation` = the Investigation tab's New Investigation form. */
+    /** `draw` = the Explorer level's centre start; `investigation` = the Investigation tab's start form. */
     readonly mode = input<'draw' | 'investigation'>('draw');
     /** The Space's masking mode (`InvService.masking`): an entity value enters the default Name only when it is `none`. */
     readonly maskingMode = input<string | null>(null);
-    /** The profile's last degree: Expand on start offers no more. */
+    /** The profile's last degree: Degrees offers no more. */
     readonly maxDegree = input(3);
-    /** Starting an Investigation needs the Incident management capability. */
+    /** Saving an Investigation needs Incident management; starting unsaved does not (the form says so under Start). */
     readonly canWrite = input(true);
-    /** The New form without the capability: the lock note leads, every input is disabled and the button says why. */
-    readonly locked = computed(() => this.mode() === 'investigation' && !this.canWrite());
-    readonly lockedReason = START_LOCKED_REASON;
+    /** The picked Dataset's columns (the page reads them); the Time column picker offers them. */
+    readonly columns = input<readonly { name: string; type: string }[]>([]);
+    /** The Dataset whose columns {@link columns} are: the page reads them when this changes. */
+    readonly datasetPicked = output<string>();
 
     readonly start = output<StartRequest>();
-    /** The New Investigation form's answer (`investigation` mode). */
-    readonly create = output<NewInvestigationRequest>();
-    /** *New Investigation…* under the draw box (Investigations level): the page opens the form in the Investigation tab. */
-    readonly newInvestigation = output<void>();
+    /** The start form's answer (`investigation` mode): the page draws it and starts working unsaved. */
+    readonly create = output<UnsavedStartRequest>();
     readonly openAddData = output<void>();
     /** "A list" was chosen: the host re-reads the Space's Entity Lists, so a list made elsewhere since is offered. */
     readonly listsWanted = output<void>();
@@ -492,18 +412,10 @@ export class LinkAnalysisStartBoxComponent {
         value: new FormControl('', { nonNullable: true }),
         listId: new FormControl('', { nonNullable: true }),
         paste: new FormControl('', { nonNullable: true }),
-        // ── the New Investigation form only ──
-        name: new FormControl('', {
-            nonNullable: true,
-            validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(200)],
-        }),
-        purpose: new FormControl('', {
-            nonNullable: true,
-            validators: [Validators.required, Validators.pattern(/\S/), (c) => Validators.maxLength(laLimit('input.purpose_length'))(c)],
-        }),
-        timeCol: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+        // ── the Investigation tab's start form only ──
+        timeCol: new FormControl('', { nonNullable: true }),
         timeColZone: new FormControl('', { nonNullable: true }),
-        degrees: new FormControl(0, { nonNullable: true }),
+        degrees: new FormControl(1, { nonNullable: true }),
     });
     private readonly datasetId = toSignal(this.form.controls.dataset.valueChanges, { initialValue: '' });
     readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: 'entity' as StartKind | 'graph' });
@@ -544,9 +456,9 @@ export class LinkAnalysisStartBoxComponent {
             })),
     );
 
-    // ── the New Investigation form: default Name and Purpose, Expand on start ──
+    // ── the Investigation tab's start form: the default Name and Purpose Save offers, Time column, Degrees ──
 
-    /** The default Name and Purpose for the current input (LA-PANELS-REDESIGN-1). */
+    /** The default Name and Purpose for the current input (LA-PANELS-REDESIGN-1); Save's dialog opens with them. */
     readonly defaults = computed(() =>
         newInvestigationDefaults({
             kind: this.kind(),
@@ -559,44 +471,30 @@ export class LinkAnalysisStartBoxComponent {
             maskingMode: this.maskingMode(),
         }),
     );
-    /** The Degrees stepper (LA-INV-EXPAND-1): 0 = "Don't expand" … the profile's maximum, at most three on start. */
-    readonly degreeMax = computed(() => Math.max(0, Math.min(MOST_DEGREES_ON_START, this.maxDegree())));
-    readonly degreeText = (d: number): string => (d === 0 ? "Don't expand" : String(d));
-    readonly noExpandReason = DISABLED_REASON.noExpand;
+    /**
+     * The Time column picker: blank = the Dataset's own time column (or none), then the Dataset's date columns, then the
+     * rest - a column of another type may still hold times as text.
+     */
+    readonly timeColumnOptions = computed<PickerOption[]>(() => {
+        const own = this.picked()?.timeCol;
+        const cols = [...this.columns()].sort((a, b) => Number(b.type === 'date') - Number(a.type === 'date'));
+        return [
+            { value: '', label: own ? `${own} (the Dataset's)` : 'None' },
+            ...cols.filter((c) => c.name !== own).map((c) => ({ value: c.name, label: c.name, hint: c.type })),
+        ];
+    });
+    /** The Degrees stepper (LA-INV-EXPAND-1): the start draws one ring, so 1 … the profile's maximum, at most three. */
+    readonly degreeMax = computed(() => Math.max(1, Math.min(MOST_DEGREES_ON_START, this.maxDegree())));
+    readonly fewestDegrees = DISABLED_REASON.fewestDegrees;
     /** The pack's limit only when the pack stops first; otherwise the form's own cap, said as the form's. */
     readonly degreeMaxReason = computed(() =>
         this.maxDegree() > MOST_DEGREES_ON_START ? expandOnStartCap(MOST_DEGREES_ON_START) : mostDegrees(this.degreeMax()),
     );
-    readonly nameError = computed(() => {
-        this.tried();
-        const c = this.form.controls.name;
-        if (c.hasError('maxlength')) return 'At most 200 characters.';
-        return this.tried() && c.invalid ? 'A name is required.' : '';
-    });
-    readonly purposeError = computed(() => {
-        this.tried();
-        const c = this.form.controls.purpose;
-        if (c.hasError('maxlength')) return `At most ${this.purposeMax()} characters.`;
-        return this.tried() && c.invalid ? 'A purpose is required.' : '';
-    });
 
     constructor() {
-        // A locked New form is read-only: its inputs are disabled, not merely its button (UI test 2026-10-29).
-        effect(() => {
-            if (this.locked()) this.form.disable({ emitEvent: false });
-            else if (this.form.disabled) this.form.enable({ emitEvent: false });
-        });
         // The graph left the screen: *The graph on screen* is no longer a choice.
         effect(() => {
             if (!this.graphOnScreen() && this.form.controls.kind.value === 'graph') this.form.controls.kind.setValue('entity');
-        });
-        // The Name and Purpose follow the input until the analyst edits them; an edit is kept from then on.
-        effect(() => {
-            const d = this.defaults();
-            if (this.mode() !== 'investigation') return;
-            const { name, purpose } = this.form.controls;
-            if (name.pristine && name.value !== d.name) name.setValue(d.name);
-            if (purpose.pristine && purpose.value !== d.purpose) purpose.setValue(d.purpose);
         });
         // The Dataset: the page's preselect (`?dataset=`) when it can start a graph, else keep a valid pick, else the first.
         effect(() => {
@@ -612,6 +510,8 @@ export class LinkAnalysisStartBoxComponent {
         // A-7b: a new Dataset preselects its primary Entity Type (else its first link-end type).
         this.form.controls.dataset.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => {
             this.form.controls.entityType.setValue(this.defaultType(id));
+            this.form.controls.timeCol.setValue('');
+            if (id) this.datasetPicked.emit(id);
         });
         // T-028: the Entity Types read can answer AFTER the Dataset was picked, so the default above was taken from a
         // partial catalogue (blank, or a type the Space does not keep). Re-default once the catalogue moves, unless the
@@ -715,7 +615,7 @@ export class LinkAnalysisStartBoxComponent {
     });
 
     readonly submitLabel = computed(() => {
-        if (this.mode() === 'investigation') return 'Start Investigation';
+        if (this.mode() === 'investigation') return 'Start';
         switch (this.kind()) {
             case 'list':
                 return 'Start from this list';
@@ -732,10 +632,9 @@ export class LinkAnalysisStartBoxComponent {
     readonly whatHappens = computed(() => {
         const kind = this.kind();
         if (this.mode() === 'investigation') {
-            if (kind === 'graph') return 'Creates an Investigation over the graph on screen, with no start entities yet.';
-            if (kind === 'dataset')
-                return 'Draws the whole Dataset and creates an Investigation over it, with no start entities yet.';
-            return 'Creates the Investigation and records the start as step 1.';
+            if (kind === 'graph') return 'Works on the graph on screen, with no start entities yet. Nothing is recorded until you Save.';
+            if (kind === 'dataset') return 'Draws the whole Dataset, with no start entities yet. Nothing is recorded until you Save.';
+            return 'Draws the start and its links. Nothing is recorded until you Save.';
         }
         if (kind === 'dataset') return 'Draws the whole Dataset at once.';
         return kind === 'entity'
@@ -743,12 +642,7 @@ export class LinkAnalysisStartBoxComponent {
             : 'Draws them and their links. Busy entities are held; Expand… goes further.';
     });
 
-    /**
-     * Each File ▸ New / *New Investigation…* starts fresh (UI test 2026-10-29: after Close then New the Name kept the last
-     * typed one). The form stays mounted while an Investigation is open (the page projects it), so a new one resets it:
-     * the start inputs are cleared, the Name and Purpose are re-derived from the defaults, and every "edited" flag
-     * (pristine / touched, the submit attempt) is reset so the defaults follow the input again.
-     */
+    /** Each File ▸ New starts fresh: the start inputs are cleared (the form stays mounted while an Investigation is open). */
     resetNew(): void {
         const c = this.form.controls;
         c.kind.setValue('entity');
@@ -757,17 +651,13 @@ export class LinkAnalysisStartBoxComponent {
         c.paste.setValue('');
         c.timeCol.setValue('');
         c.timeColZone.setValue('');
-        c.degrees.setValue(0);
-        const d = this.defaults();
-        c.name.setValue(d.name);
-        c.purpose.setValue(d.purpose);
+        c.degrees.setValue(1);
         this.form.markAsPristine();
         this.form.markAsUntouched();
         this.tried.set(false);
     }
 
     submit(): void {
-        if (this.locked()) return;
         this.tried.set(true);
         const v = this.form.getRawValue();
         const graph = this.mode() === 'investigation' && v.kind === 'graph';
@@ -778,19 +668,12 @@ export class LinkAnalysisStartBoxComponent {
             if (req.kind !== 'graph') this.start.emit(req);
             return;
         }
-        const { name, purpose } = this.form.controls;
-        if (name.invalid || purpose.invalid) {
-            name.markAsTouched();
-            purpose.markAsTouched();
-            return;
-        }
         this.create.emit({
             start: req,
-            title: v.name.trim(),
-            purpose: v.purpose.trim(),
-            timeCol: v.timeCol.trim(),
+            defaults: this.defaults(),
+            timeCol: v.timeCol,
             timeColZone: v.timeColZone,
-            degrees: req.kind === 'dataset' || req.kind === 'graph' ? 0 : Number(v.degrees) || 0,
+            degrees: req.kind === 'dataset' || req.kind === 'graph' ? 0 : Math.max(1, Number(v.degrees) || 1),
         });
     }
 
