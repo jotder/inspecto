@@ -11,7 +11,13 @@ export const DISABLED_REASON = {
     setWindow: 'Set a window first.',
     searching: 'Searching…',
     openInvestigation: 'Open an Investigation first.',
+    fewestDegrees: 'One degree is the fewest.',
+    noExpand: "Already set to Don't expand.",
 } as const;
+
+/** The degree stepper at its top (Expand, Expand on start): the Industry pack's maximum. */
+export const mostDegrees = (max: number): string =>
+    `${max} ${max === 1 ? 'degree is' : 'degrees is'} the most this Industry pack allows.`;
 
 /** "Needs <permission>." (G14): the permission's plain name, never an id or the word "capability". */
 export const needsPermission = (permission: string): string => `Needs ${permission}.`;

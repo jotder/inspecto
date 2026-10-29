@@ -22,12 +22,9 @@ function make(modules: () => ReturnType<GraphRunsService['modules']>) {
         providers: [provideNoopAnimations(), { provide: GraphRunsService, useValue: { modules: spy } }],
     });
     const fixture = TestBed.createComponent(LinkAnalysisModulesComponent);
-    fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    const open = () => {
-        el.querySelector<HTMLButtonElement>('[data-testid=modules-toggle]')!.click();
-        fixture.detectChanges();
-    };
+    /** The page creates the section only when ⚙ Settings shows it: its first render is the opening. */
+    const open = () => fixture.detectChanges();
     return { el, open, spy };
 }
 
@@ -37,7 +34,7 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
         expect(['storage', 'agent', 'lake'].some(isLinkAnalysisModule)).toBe(false);
     });
 
-    it('loads only when opened, lists only Link Analysis modules, and says why one is not active', () => {
+    it('loads once when shown, lists only Link Analysis modules, and says why one is not active', () => {
         const { el, open, spy } = make(() =>
             of({
                 hostBuildId: 'h',
@@ -80,14 +77,15 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
         );
     });
 
-    it('draws the list as an opaque card above the canvas, so graph labels do not bleed through it', () => {
-        const { el, open } = make(() => of({ hostBuildId: 'h', modules: [m('geo-link')] }));
+    it('is a ⚙ Settings section: the list in the page flow, no toggle and no popover (operator 2026-10-29)', () => {
+        const { el, open, spy } = make(() => of({ hostBuildId: 'h', modules: [m('geo-link')] }));
         open();
-        const card = el.querySelector<HTMLElement>('[data-testid=modules-list]')!.parentElement!; // the popover card
-        expect(card.getAttribute('style')).toContain('--gamma-bg-card');
-        expect(card.classList.contains('z-30')).toBe(true);
-        expect(card.className).toContain('bottom-full'); // opens upward from the footer
-        expect(card.className).toContain('right-0');
+        open();
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(el.querySelector('[data-testid=modules-toggle]')).toBeNull();
+        expect(el.querySelector('button')).toBeNull();
+        const card = el.querySelector<HTMLElement>('[data-testid=modules-list]')!.parentElement!;
+        expect(card.className).not.toContain('absolute');
     });
 
     it('states a failed read instead of an empty list', () => {
@@ -98,12 +96,6 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
     });
 
     describe('accessibility (axe, LA-A11Y-AUDIT-1)', () => {
-        it('closed: a named toggle that says it is collapsed', async () => {
-            const { el } = make(() => of({ hostBuildId: 'h', modules: [] }));
-            expect(el.querySelector('[data-testid=modules-toggle]')!.getAttribute('aria-expanded')).toBe('false');
-            await expectNoA11yViolations(el);
-        });
-
         it('open with an active, an inert, a switched-off and a not-installed module', async () => {
             const { el, open } = make(() =>
                 of({

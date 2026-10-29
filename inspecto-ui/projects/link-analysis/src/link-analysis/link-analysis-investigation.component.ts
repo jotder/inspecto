@@ -175,8 +175,8 @@ export class LinkAnalysisInvestigationComponent {
     readonly maxDegree = input(DEFAULT_MAX_DEGREE);
     /** The pending investigation was created (or abandoned) — the host drops it. */
     readonly pendingDone = output<void>();
-    /** "Expand…": the screen opens its Expand dialog (§5.4), which holds the read settings. */
-    readonly expandRequested = output<void>();
+    /** Why the Expand section shows no form (LA-INV-EXPAND-1): expanding is a change to the Investigation. */
+    readonly expandNeeds = needsPermission('canManageIncidents');
     /** Which part of the Investigation this instance draws (§5.8 / §5.9); every instance shares the one store. */
     readonly section = input<InvestigationSection>('act');
     /** "Settings…" in the header's ⋯ menu: the screen opens the Investigation's settings. */
@@ -188,8 +188,6 @@ export class LinkAnalysisInvestigationComponent {
     readonly moreSteps = MORE_STEPS;
     readonly moreStep = signal<MoreStepId | null>(null);
     readonly moreStepLabel = computed(() => MORE_STEPS.find((m) => m.id === this.moreStep())?.label ?? '');
-    /** The Act panel's last five steps, newest first. */
-    readonly lastSteps = computed(() => (this.store.log()?.entries ?? []).slice(-5).reverse());
 
     // ── Settings ▸ General: rename and restate the purpose (LA-INVESTIGATION-RENAME-1) ──
     /** The caller's role on the open Investigation (members route): null = no Subject, nothing enforced; 'reader' = not a member; undefined = not read yet. */

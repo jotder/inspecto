@@ -581,7 +581,7 @@ export function degreeState(
     else if (!frontier.length && heldHubs.length)
         blocked =
             `Every entity at degree ${current} is busy, so none is expanded. Untick ` +
-            '“Hold busy entities” in Expand… or use “Expand anyway” on one of them.';
+            '“Hold busy entities” under Expand ▸ Limits, or use “Expand anyway” on one of them.';
     // the server's cap on the ids one `expand` names (`investigation.max_frontier`)
     else if (frontier.length > laLimit('investigation.max_frontier'))
         blocked =
@@ -676,7 +676,7 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
             o.heldFor?.length ? `the Space's four-eyes limit (${thresholdWords(o.heldFor)})` : "the Space's four-eyes limit"
         }, so it runs once a second person approves request ${o.awaitingApproval}.${
             o.heldFor?.some((r) => r.startsWith('maxFanOut'))
-                ? ' Ask an approver, or use Expand… with a fan-out at or below the threshold.'
+                ? ' Ask an approver, or use Expand with a fan-out at or below the threshold (Expand ▸ Limits).'
                 : ''
         }`;
     const parts = [

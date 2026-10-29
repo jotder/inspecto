@@ -1121,6 +1121,7 @@ describe('LinkAnalysisComponent', () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
+        fixture.componentInstance.setOverlayOpen('workingSet', true); // the Graph counts card carries the Limits icon
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         const names = new Map<string, Set<string>>();
@@ -1134,7 +1135,7 @@ describe('LinkAnalysisComponent', () => {
             expect(names.get(icon)?.size ?? 0, `${icon}: ${[...(names.get(icon) ?? [])].join(' | ')}`).toBeLessThanOrEqual(1);
         expect([...(names.get('pause-circle') ?? [])]).toEqual(['Held']);
         expect(names.get('table-cells')).toEqual(new Set(['Show the table']));
-        expect(names.get('circle-stack')).toContain('Change Dataset in the graph model');
+        expect([...(names.get('scale') ?? [])]).toEqual(['Limits']);
         fixture.destroy();
     });
 
@@ -1886,14 +1887,15 @@ describe('LinkAnalysisComponent', () => {
         expect(dataAt(2).graph).toBe(c.canvasData());
         expect(dataAt(2).graph.nodes).toHaveLength(5);
     });
-    it('the status bar counts what the canvas draws: the Working Set while an Investigation is open, not the query graph', async () => {
+    it('the canvas draws the Working Set while an Investigation is open, not the query graph (the footer strip that counted it is gone)', async () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
         fixture.detectChanges();
         const c = fixture.componentInstance;
-        const counts = (): string =>
-            (fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-status-counts"]')!.textContent!.replace(/\s+/g, ' ').trim();
+        // operator 2026-10-29: no strip under the canvas; Graph counts and the Investigation tab say the counts
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-status"]')).toBeNull();
+        const counts = (): string => `${c.canvasData()!.nodes.length} nodes · ${c.canvasData()!.edges.length} links on screen`;
         expect(counts()).toBe(`${c.displayed()!.nodes.length} nodes · ${c.displayed()!.edges.length} links on screen`);
         c.investigation.activeId.set('inv-9');
         c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
@@ -2833,11 +2835,8 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             expect(aside.classList).toContain('overflow-hidden');
             expect(aside.querySelector('.overflow-y-auto')).toBeTruthy(); // the dock body scrolls inside
         }
-        // the data strip is hidden entirely until the toolbox table icon is pressed; the status bar is the footer strip
-        const strip = Array.from(el.querySelectorAll<HTMLElement>('div.shrink-0.rounded-lg.border')).find((d) =>
-            d.querySelector('[data-testid="la-status"]'),
-        );
-        expect(strip).toBeTruthy();
+        // operator 2026-10-29: there is no footer strip under the canvas any more (the dock stays)
+        expect(el.querySelector('[data-testid="la-status"]')).toBeNull();
     });
 
     it('keeps the canvas row at least 420px high (short windows scroll the page) and the page header floor holds it', () => {
@@ -2851,18 +2850,17 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         expect((el.firstElementChild as HTMLElement).className).toContain(',35rem)]');
     });
 
-    it('puts the active-query status chips in the status bar at the footer, not in the header', async () => {
+    it('operator 2026-10-29: no footer strip - the graph model and Refresh are in ⚙ Settings ▸ Graph model', async () => {
         const { fixture } = create({ stubGraph: true });
         fixture.detectChanges();
         await runQuery(fixture);
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
-        expect(status).toBeTruthy();
-        expect(status.closest('header[data-testid="la-header"]')).toBeNull();
-        expect(status.textContent).toContain('nodes');
-        expect(status.querySelector('button[aria-label="Change the graph model"]')).toBeTruthy();
-        expect(el.querySelectorAll('[aria-label="Active query"]').length).toBe(1); // no second, separate panel
+        expect(el.querySelector('[data-testid="la-status"]')).toBeNull();
+        expect(el.querySelector('[aria-label="Active query"]')).toBeNull();
+        const model = el.querySelector('[laSection="graph-model"]') as HTMLElement;
+        expect(model.querySelector('inspecto-link-analysis-query-panel')).toBeTruthy();
+        expect(model.querySelector('[data-testid="la-settings-refresh"]')).toBeTruthy();
     });
 
     describe('Toolbox dock start state (width)', () => {
@@ -3176,7 +3174,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         expect(c.toolboxDockOpen()).toBe(false);
     });
 
-    it('⚙ Settings: the top-bar icon opens it, the status chips open Graph model, Refresh re-reads the last run', async () => {
+    it('⚙ Settings: the top-bar icon opens it, editQuery opens Graph model, Refresh re-reads the last run', async () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
@@ -3189,11 +3187,12 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         expect(c.settingsSection()).toBe('entity-types'); // remembers the last section
         c.settingsOpen.set(false);
         fixture.detectChanges();
-        (el.querySelector('[data-testid="la-status"] button[aria-label^="Change Dataset"]') as HTMLButtonElement).click();
+        c.editQuery();
         expect(c.settingsSection()).toBe('graph-model');
+        expect(c.settingsOpen()).toBe(true);
         const refresh = vi.spyOn(c, 'refreshFromServer').mockResolvedValue();
         fixture.detectChanges();
-        (el.querySelector('[data-testid="la-status-refresh"]') as HTMLButtonElement).click();
+        (el.querySelector('[data-testid="la-settings-refresh"]') as HTMLButtonElement).click();
         expect(refresh).toHaveBeenCalledTimes(1);
     });
 });
@@ -3269,7 +3268,7 @@ describe('LinkAnalysisComponent - one header row: File, the title, both toolbars
         fixture.detectChanges(); // the landing state: no graph yet
         const el = fixture.nativeElement as HTMLElement;
         const header = el.querySelector('header[data-testid="la-header"]') as HTMLElement;
-        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
+        expect(el.querySelector('[data-testid="la-status"]')).toBeNull(); // no footer strip at all (operator 2026-10-29)
         expect(el.querySelector('inspecto-page-header')).toBeNull();
         const file = header.querySelector('[data-testid="la-file"]') as HTMLElement;
         const rail = header.querySelector('nav[data-testid="la-tool-rail"]') as HTMLElement;
@@ -3280,10 +3279,9 @@ describe('LinkAnalysisComponent - one header row: File, the title, both toolbars
         expect(h1.textContent?.trim()).toBe('Link Analysis');
         expect(header.querySelector('inspecto-ai-explain')).toBeTruthy();
         expect(h1.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(status.querySelector('h1')).toBeNull();
-        expect(status.querySelector('inspecto-ai-explain')).toBeNull();
+        expect(el.querySelectorAll('inspecto-ai-explain')).toHaveLength(1);
         expect(el.textContent).not.toContain('Draw a Dataset'); // the page info line is gone
-        expect(status.textContent).not.toMatch(/pipeline/i); // no Pipeline word on an Inspecto LA screen (LA-ONBOARD-1 acceptance)
+        expect(header.textContent).not.toMatch(/pipeline/i); // no Pipeline word on an Inspecto LA screen (LA-ONBOARD-1 acceptance)
         expect(el.querySelectorAll('h1')).toHaveLength(1);
     });
 
@@ -3309,27 +3307,40 @@ describe('LinkAnalysisComponent - one header row: File, the title, both toolbars
         }
         const cleanup = header.querySelector('[data-testid="cleanup-toggle"] mat-icon') as HTMLElement;
         expect(cleanup.getAttribute('svgIcon')).toBe('mat_outline:cleaning_services');
-        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
-        expect(status.textContent).toContain('5 nodes');
     });
 
-    it('states the counts once in the footer, with Caps at its left edge and Installed modules at its right (operator 2026-10-16)', async () => {
+    it('operator 2026-10-29: Limits ride on the Graph counts overlay; Installed modules are a ⚙ Settings section', async () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
         fixture.detectChanges();
+        const c = fixture.componentInstance;
         const el = fixture.nativeElement as HTMLElement;
-        const status = el.querySelector('[data-testid="la-status"]') as HTMLElement;
-        const modules = status.querySelector('inspecto-link-analysis-modules') as HTMLElement;
-        expect(modules).toBeTruthy();
-        expect(status.lastElementChild).toBe(modules); // the right-most item
-        expect(status.firstElementChild?.tagName.toLowerCase()).toBe('inspecto-link-analysis-caps'); // the left-most item
-        expect(el.querySelectorAll('inspecto-link-analysis-modules')).toHaveLength(1); // no longer on the canvas strip
+        c.setOverlayOpen('workingSet', true);
+        fixture.detectChanges();
+        // Limits: one icon at the Graph counts card's bottom right, and nowhere else
+        const counts = el.querySelector('inspecto-link-analysis-working-set') as HTMLElement;
+        const caps = el.querySelectorAll('inspecto-link-analysis-caps');
+        expect(caps).toHaveLength(1);
+        expect(counts.contains(caps[0])).toBe(true);
+        expect(caps[0].parentElement!.lastElementChild).toBe(caps[0]);
+        expect(caps[0].classList).toContain('ml-auto');
+        const toggle = caps[0].querySelector('[data-testid="caps-toggle"]') as HTMLButtonElement;
+        expect(toggle.getAttribute('aria-label')).toBe('Limits');
+        toggle.click();
+        fixture.detectChanges();
+        expect(caps[0].querySelector('[data-testid="caps-list"]')!.textContent).toContain(`Graph drawn: up to ${c.caps.projection.toLocaleString('en')} nodes`);
+        // the render strip says neither
         const strip = el.querySelector('[aria-label="Render status"]') as HTMLElement;
         expect(strip.textContent).not.toContain('links drawn');
-        expect(strip.querySelector('inspecto-link-analysis-modules')).toBeNull();
-        expect(strip.textContent).not.toContain('caps:'); // the caps are a popover in the footer now
-        expect(strip.querySelector('inspecto-link-analysis-caps')).toBeNull();
+        expect(strip.textContent).not.toContain('caps:');
+        // Installed modules: not on the page until ⚙ Settings shows that section, then read once
+        expect(el.querySelector('inspecto-link-analysis-modules')).toBeNull();
+        c.openSettings('modules');
+        fixture.detectChanges();
+        const section = el.querySelector('[laSection="modules"]') as HTMLElement;
+        expect(section.querySelector('inspecto-link-analysis-modules')).toBeTruthy();
+        expect(el.querySelector('[data-testid="la-settings-nav-modules"]')!.textContent).toContain('Installed modules');
     });
 });
 
@@ -3539,7 +3550,7 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         expect(c.selectedOnCanvas()).toEqual(['a', 'b']);
         expect(stub.selection).toEqual(['a', 'b']);
         expect(el.querySelector('[data-testid="la-selection-count"]')?.textContent).toContain('2 selected');
-        expect(el.querySelector('[data-testid="la-status-selected"]')?.textContent).toContain('2 selected');
+        expect(el.querySelector('[data-testid="la-status-selected"]')).toBeNull(); // the footer strip is gone (operator 2026-10-29)
         expect(el.querySelector('[data-testid="la-selection-announcement"]')?.textContent).toContain(
             '3 nodes selected',
         );
@@ -3644,6 +3655,40 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
         Array.from(el.querySelectorAll('[role="tablist"][aria-label="Dock tab"] [role="tab"]')).map((t) =>
             t.textContent?.trim(),
         );
+
+    it('operator 2026-10-29: the tab strip is plain text tabs (no cell borders), one row that scrolls sideways, axe-clean', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.openDock('oplog');
+        fixture.detectChanges();
+        const list = el.querySelector('[data-testid="la-dock-tabs"]') as HTMLElement;
+        expect(list.getAttribute('role')).toBe('tablist');
+        expect(list.classList).toContain('flex-nowrap');
+        expect(list.classList).toContain('overflow-x-auto');
+        expect(list.classList).not.toContain('flex-wrap');
+        const all = Array.from(list.querySelectorAll<HTMLElement>('[role="tab"]'));
+        expect(all.length).toBeGreaterThan(2);
+        for (const t of all) {
+            expect(t.classList.contains('border'), t.textContent!).toBe(false); // no boxed cell
+            expect(t.getAttribute('style') ?? '').not.toContain('border-color');
+            expect(t.classList).toContain('whitespace-nowrap');
+        }
+        const active = list.querySelector<HTMLElement>('[aria-selected="true"]')!;
+        expect(active.textContent!.trim()).toBe('Step log');
+        expect(active.classList).toContain('text-primary');
+        expect(active.style.boxShadow).toContain('var(--gamma-primary)'); // the underline marks it
+        expect(all.filter((t) => t.getAttribute('tabindex') === '0')).toEqual([active]);
+        // arrow keys still move along the strip
+        active.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        fixture.detectChanges();
+        expect(list.querySelector('[aria-selected="true"]')).not.toBe(active);
+        await expectNoA11yViolations(el.querySelector('[data-testid="la-dock"]') as HTMLElement);
+    });
 
     it('shows the Investigation tabs only while one is open, collapses to its tabs and remembers itself', async () => {
         const { fixture } = create();
@@ -4188,6 +4233,69 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         await settle(fixture);
         expect(c.growExclude.growOpen()).toBe(true);
         expect(c.growContext().from).toBe('the 2 nodes you selected');
+    });
+
+    it('LA-INV-EXPAND-1: every Expand entry point opens the Investigation tab at its Expand section, never a canvas popup', async () => {
+        const { fixture, c, el, stub } = await drawn();
+        c.investigation.activeId.set('inv-9');
+        // no Dataset in the header: the tab's data strip (its own reads) is not what this test is about
+        c.investigation.log.set({ header: { sourceCol: 's', targetCol: 't', title: 'Ring' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [
+                { id: 'ws-a', hop: 0, hidden: false },
+                { id: 'ws-b', hop: 1, hidden: false },
+            ],
+            links: [{ source: 'ws-a', target: 'ws-b', kind: 'calls', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        fixture.detectChanges();
+        const section = () => el.querySelector('[data-testid="la-expand-section"]') as HTMLElement | null;
+        const reset = () => {
+            c.toolboxTab.set('browser');
+            c.toolboxDockOpen.set(false);
+            (document.activeElement as HTMLElement | null)?.blur?.();
+            fixture.detectChanges();
+            expect(section()).toBeNull();
+        };
+        const landed = async (how: string) => {
+            await settle(fixture, 5);
+            await settle(fixture, 5); // the tab renders, then focus lands after its scroll reset
+            expect(c.toolboxTab(), how).toBe('investigation');
+            expect(c.toolboxDockOpen(), how).toBe(true);
+            expect(section(), how).not.toBeNull();
+            expect(section()!.closest('#la-toolbox-panel-investigation'), how).not.toBeNull();
+            expect(c.growExclude.growOpen(), how).toBe(false);
+            expect(el.querySelector('[data-testid="la-expand-dialog"]'), how).toBeNull();
+            expect(section()!.contains(document.activeElement), how + ': focus').toBe(true);
+        };
+        // 1. the toolbar's Expand
+        reset();
+        const grow = el.querySelector('[data-testid="la-grow-button"]') as HTMLButtonElement;
+        expect(grow.getAttribute('aria-expanded')).toBeNull(); // it opens a tab section, not a popup
+        grow.click();
+        await landed('toolbar');
+        // 2. G
+        reset();
+        press(el, { key: 'g' });
+        await landed('G');
+        // 3. the More menu's Expand…
+        reset();
+        (el.querySelector('[data-testid="la-canvas-tools-more"]') as HTMLButtonElement).click();
+        await settle(fixture, 10);
+        (Array.from(document.querySelectorAll('.cdk-overlay-container button')).find((b) => b.textContent?.trim() === 'Expand…') as HTMLButtonElement).click();
+        await landed('More menu');
+        // 4. right-click a node → Expand…: the tab section starts from that node
+        reset();
+        stub.nodeContextMenu.emit({ id: c.canvasData()!.nodes[0].id, x: 4, y: 4 });
+        await settle(fixture, 10);
+        (document.querySelector('[data-testid="la-node-menu-grow"]') as HTMLButtonElement).click();
+        await landed('node menu');
+        // the section is the real Expand form, recorded: its Expand walks the Investigation (Expand next degree stays beside it)
+        expect(section()!.closest('[data-testid="degrees"]')!.querySelector('[data-testid="expand-next-degree"]')).not.toBeNull();
+        const onExpand = vi.spyOn(c, 'onExpand').mockResolvedValue();
+        (section()!.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).click();
+        expect(onExpand).toHaveBeenCalledWith(expect.objectContaining({ ctx: expect.objectContaining({ mode: 'investigation' }) }));
     });
 
     it('Investigation: Grow appends ONE expand from the outer ring; held busy nodes carry the badge; Remove held is one exclude', async () => {

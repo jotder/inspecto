@@ -23,6 +23,8 @@ import { LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
+import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
+import { DISABLED_REASON, mostDegrees } from './disabled-reasons';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import {
     EntityProfileService,
@@ -64,8 +66,8 @@ function listHint(l: EntityListSummary, types: readonly { id: string; label: str
     return [type, members, purpose].filter(Boolean).join(' · ');
 }
 
-/** Expand on start: how many degrees, capped at the profile's maximum. */
-const DEGREE_CHOICES = [0, 1, 2, 3];
+/** Expand on start: at most this many degrees (0 = don't expand), and never past the profile's maximum. */
+const MOST_DEGREES_ON_START = 3;
 
 /**
  * Why the New Investigation form is locked. The gate is literally `canManageIncidents` (`POST /inv/investigations`,
@@ -103,6 +105,7 @@ export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs I
         InspectoOptionPickerComponent,
         LaFoldComponent,
         PenFieldComponent,
+        StepperFieldComponent,
     ],
     host: { class: 'block w-full max-w-3xl', '[class.p-4]': "mode() === 'draw'" },
     template: `
@@ -311,11 +314,17 @@ export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs I
                     @if (kind() !== 'dataset' && kind() !== 'graph') {
                         <la-fold title="Expand on start" data-testid="new-expand">
                             <div class="flex flex-col gap-2 p-2">
-                                <inspecto-option-picker
+                                <inspecto-stepper-field
                                     data-testid="new-degrees"
                                     label="Degrees"
                                     formControlName="degrees"
-                                    [options]="degreeOptions()"
+                                    decrementLabel="Fewer degrees"
+                                    incrementLabel="More degrees"
+                                    [min]="0"
+                                    [max]="degreeMax()"
+                                    [valueText]="degreeText"
+                                    [minReason]="noExpandReason"
+                                    [maxReason]="degreeMaxReason()"
                                 />
                                 <p class="text-secondary m-0 text-xs">
                                     Each degree is one recorded step. Busy entities are held.
@@ -494,7 +503,7 @@ export class LinkAnalysisStartBoxComponent {
         }),
         timeCol: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
         timeColZone: new FormControl('', { nonNullable: true }),
-        degrees: new FormControl('0', { nonNullable: true }),
+        degrees: new FormControl(0, { nonNullable: true }),
     });
     private readonly datasetId = toSignal(this.form.controls.dataset.valueChanges, { initialValue: '' });
     readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: 'entity' as StartKind | 'graph' });
@@ -550,12 +559,11 @@ export class LinkAnalysisStartBoxComponent {
             maskingMode: this.maskingMode(),
         }),
     );
-    readonly degreeOptions = computed<PickerOption[]>(() =>
-        DEGREE_CHOICES.filter((d) => d <= this.maxDegree()).map((d) => ({
-            value: String(d),
-            label: d === 0 ? "Don't expand" : `${d} ${d === 1 ? 'degree' : 'degrees'}`,
-        })),
-    );
+    /** The Degrees stepper (LA-INV-EXPAND-1): 0 = "Don't expand" … the profile's maximum, at most three on start. */
+    readonly degreeMax = computed(() => Math.max(0, Math.min(MOST_DEGREES_ON_START, this.maxDegree())));
+    readonly degreeText = (d: number): string => (d === 0 ? "Don't expand" : String(d));
+    readonly noExpandReason = DISABLED_REASON.noExpand;
+    readonly degreeMaxReason = computed(() => mostDegrees(this.degreeMax()));
     readonly nameError = computed(() => {
         this.tried();
         const c = this.form.controls.name;
@@ -746,7 +754,7 @@ export class LinkAnalysisStartBoxComponent {
         c.paste.setValue('');
         c.timeCol.setValue('');
         c.timeColZone.setValue('');
-        c.degrees.setValue('0');
+        c.degrees.setValue(0);
         const d = this.defaults();
         c.name.setValue(d.name);
         c.purpose.setValue(d.purpose);

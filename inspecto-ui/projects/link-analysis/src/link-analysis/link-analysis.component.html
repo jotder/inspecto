@@ -808,10 +808,10 @@
                             type="button"
                             (click)="growExclude.growOpen() ? closeExpand() : openExpand()"
                             [color]="growExclude.growOpen() ? 'primary' : undefined"
-                            [attr.aria-expanded]="growExclude.growOpen()"
+                            [attr.aria-expanded]="growMode() === 'investigation' ? null : growExclude.growOpen()"
                             [matTooltip]="
                                 growMode() === 'investigation'
-                                    ? 'Expand (G): recorded as one step'
+                                    ? 'Expand (G): in the Investigation tab, recorded'
                                     : 'Expand (G): not recorded'
                             "
                             aria-label="Expand"
@@ -1270,7 +1270,8 @@
                                 <span class="text-secondary ml-3 text-xs" aria-hidden="true">G</span>
                             </button>
                         </mat-menu>
-                        @if (growExclude.growOpen()) {
+                        <!-- the explorer graph (nothing recorded) keeps Expand as a popup; an Investigation's is in its tab -->
+                        @if (growExclude.growOpen() && growMode() !== 'investigation') {
                             <inspecto-link-analysis-expand
                                 class="absolute left-2 top-12 z-30 flex max-h-[calc(100%-3.5rem)] flex-col"
                                 [ctx]="growContext()"
@@ -1394,6 +1395,7 @@
                             [countsGraph]="workingSetCanvas() ? 'query-under-investigation' : 'query'"
                             [mode]="strandedCount() ? strandedCount() + ' unlinked' : 'Top results by count'"
                             [open]="workingSetOpen()"
+                            [limits]="graphLimits()"
                             (openChange)="setOverlayOpen('workingSet', $event)"
                         ></inspecto-link-analysis-working-set>
                         <!-- The text alternative of the canvas: the SAME canvasData(), as a keyboard-navigable list. -->
@@ -1594,10 +1596,21 @@
                                     [degreePresets]="degreePresets()"
                                     [maxDegree]="maxDegree()"
                                     (pendingDone)="pendingInvestigation.set(null)"
-                                    (expandRequested)="openExpand()"
                                     (settingsRequested)="openSettings('investigation')"
                                     (dockRequested)="openDock($event)"
                                 >
+                                    <!-- LA-INV-EXPAND-1: for an open Investigation, Expand is a section of this tab -->
+                                    @if (growMode() === 'investigation') {
+                                        <inspecto-link-analysis-expand
+                                            #tabExpand
+                                            laExpand
+                                            [embedded]="true"
+                                            [ctx]="growContext()"
+                                            [presets]="degreePresets()"
+                                            [limits]="fourEyesLimits()"
+                                            (expand)="onExpand($event)"
+                                        ></inspecto-link-analysis-expand>
+                                    }
                                     <!-- LA-PANELS-REDESIGN-1: ONE New Investigation form (File ▸ New lands here) -->
                                     <inspecto-link-analysis-start-box
                                         #newInvForm
@@ -1693,16 +1706,18 @@
                     [defaultWidth]="280"
                     aria-label="Resize the dock (arrow keys or drag)"
                 ></div>
-            <div class="flex items-center gap-1 px-2 py-0.5">
-                <div class="flex flex-wrap" role="tablist" aria-label="Dock tab">
+            <div class="flex min-w-0 items-center gap-1 px-2">
+                <!-- plain text tabs on one baseline, the active one underlined; a narrow dock scrolls them sideways (operator 2026-10-29) -->
+                <div class="flex min-w-0 flex-nowrap overflow-x-auto" role="tablist" aria-label="Dock tab" data-testid="la-dock-tabs">
                     @for (t of dockTabs(); track t.id) {
                         <button
                             type="button"
                             role="tab"
-                            class="border px-3 py-1 text-xs"
-                            style="border-color: var(--gamma-border)"
+                            class="la-dock-tab hover:bg-hover shrink-0 whitespace-nowrap rounded-t px-3 pb-1.5 pt-2 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2"
                             [id]="'la-dock-tab-' + t.id"
                             [class.font-semibold]="dockTabShown() === t.id"
+                            [class.text-primary]="dockTabShown() === t.id"
+                            [class.text-secondary]="dockTabShown() !== t.id"
                             [style.boxShadow]="bottomOpen() && dockTabShown() === t.id ? 'inset 0 -2px 0 var(--gamma-primary)' : null"
                             [attr.aria-selected]="dockTabShown() === t.id"
                             [attr.aria-controls]="bottomOpen() && dockTabShown() === t.id ? 'bottom-panel-body' : null"
@@ -1821,69 +1836,6 @@
             }
         </div>
         }
-        <!-- ══ Status bar (footer): the active query as chips — edit-to-change + the counts ══ -->
-        <div class="shrink-0 rounded-lg border px-3 py-1">
-        <div
-            class="flex min-w-0 flex-1 items-center gap-2"
-            role="group"
-            aria-label="Active query"
-            data-testid="la-status"
-        >
-            <!-- the stated node caps: the left-most item of the footer, a popover opening upward (operator 2026-10-16) -->
-            <inspecto-link-analysis-caps
-                class="shrink-0"
-                [projection]="caps.projection"
-                [analysis]="caps.analysis"
-                [graphRun]="serverRunCeiling()"
-            />
-            @if (selectedOnCanvas().length) {
-                <span class="shrink-0 text-xs font-medium" data-testid="la-status-selected">· {{ selectedOnCanvas().length }} selected</span>
-            }
-            @if (graph()) {
-                <mat-icon class="icon-size-4 shrink-0" svgIcon="heroicons_outline:circle-stack"></mat-icon>
-                <span class="shrink-0 text-sm font-medium">{{ sourceLabel() }}</span>
-                <!-- one line: a narrow window clips the chips instead of wrapping the title row onto a second and third -->
-                <div class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
-                    @for (item of querySummary(); track item.label) {
-                        <!-- a chip opens ⚙ Settings → Graph model (§5.10) -->
-                        <button type="button" class="shrink-0" (click)="editQuery()" [attr.aria-label]="'Change ' + item.label + ' in the graph model'">
-                            <inspecto-chip>
-                                <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
-                                <span class="text-secondary">{{ item.label }}:</span>
-                                {{ item.value }}
-                            </inspecto-chip>
-                        </button>
-                    }
-                </div>
-                <button
-                    mat-icon-button
-                    class="shrink-0"
-                    (click)="editQuery()"
-                    matTooltip="Change the graph model"
-                    aria-label="Change the graph model"
-                >
-                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
-                </button>
-                <button
-                    mat-icon-button
-                    class="shrink-0"
-                    [disabled]="loading() || !lastRun()"
-                    (click)="refreshFromServer()"
-                    matTooltip="Refresh: run the same graph model again"
-                    aria-label="Refresh the graph"
-                    data-testid="la-status-refresh"
-                >
-                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-path"></mat-icon>
-                </button>
-                <!-- what the canvas draws (the Working Set while an Investigation is open), so it matches the Working Set count -->
-                <span class="text-secondary shrink-0 whitespace-nowrap text-xs" data-testid="la-status-counts">
-                    {{ canvasData()?.nodes?.length ?? 0 }} nodes · {{ canvasData()?.edges?.length ?? 0 }} links on screen
-                </span>
-            }
-            <!-- Installed Link Analysis modules: the right-most item of the footer; its list opens upward over the canvas -->
-            <inspecto-link-analysis-modules class="ml-auto shrink-0" />
-        </div>
-        </div>
     </div>
     <!-- ══ ⚙ Settings (LA-STUDIO-UI-REORG-1 §5.10): sections are projected and only hidden, so the query panel stays this
          component's ViewChild and a half-edited form survives closing ══ -->
@@ -1959,6 +1911,12 @@
                 <p class="text-secondary m-0 text-sm" data-testid="la-settings-investigation-slot">
                     Open an Investigation to see its settings here.
                 </p>
+            }
+        </div>
+        <!-- Installed modules (operator 2026-10-29: moved from the footer strip); read when the section is first shown -->
+        <div laSection="modules">
+            @if (settingsOpen() && settingsSection() === 'modules') {
+                <inspecto-link-analysis-modules />
             }
         </div>
     </inspecto-la-settings>

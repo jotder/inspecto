@@ -13,7 +13,8 @@ export type LaSettingsSection =
     | 'entity-lists'
     | 'identities'
     | 'add-data'
-    | 'investigation';
+    | 'investigation'
+    | 'modules';
 
 interface NavGroup {
     title: string;
@@ -78,6 +79,17 @@ const NAV: NavGroup[] = [
             },
         ],
     },
+    {
+        title: 'This Studio',
+        items: [
+            {
+                id: 'modules',
+                label: 'Installed modules',
+                icon: 'heroicons_outline:puzzle-piece',
+                help: 'The Link Analysis modules on this server: active, inert (and why), switched off in this Space, or not installed.',
+            },
+        ],
+    },
 ];
 
 const SECTION_KEY = 'inspecto.la.settings.section';
@@ -92,8 +104,8 @@ function storedSection(): LaSettingsSection | null {
 }
 
 /**
- * **⚙ Settings** (LA-STUDIO-UI-REORG-1 §5.10, UIR-D16 + UIR-A1): one modal with a left nav in three groups — This
- * graph, Data, This Investigation — for configuration changed rarely. The sections are PROJECTED by the host
+ * **⚙ Settings** (LA-STUDIO-UI-REORG-1 §5.10, UIR-D16 + UIR-A1): one modal with a left nav in four groups — This
+ * graph, Data, This Investigation, This Studio (Installed modules) — for configuration changed rarely. The sections are PROJECTED by the host
  * (`<div laSection="graph-model">…</div>`) and only hidden, never destroyed, so the host keeps its ViewChild on the
  * query panel and a half-edited form survives closing. It is an in-page overlay, not a MatDialog, for that reason.
  * The last section is remembered per browser; closing with unsaved changes asks first.
@@ -170,6 +182,7 @@ function storedSection(): LaSettingsSection | null {
                         <div [hidden]="section() !== 'identities'"><ng-content select="[laSection=identities]" /></div>
                         <div [hidden]="section() !== 'add-data'"><ng-content select="[laSection=add-data]" /></div>
                         <div [hidden]="section() !== 'investigation'"><ng-content select="[laSection=investigation]" /></div>
+                        <div [hidden]="section() !== 'modules'"><ng-content select="[laSection=modules]" /></div>
                     </div>
                 </div>
             </div>

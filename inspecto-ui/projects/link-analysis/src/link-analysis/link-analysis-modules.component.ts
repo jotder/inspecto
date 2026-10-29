@@ -1,5 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { GraphRunsService, ModuleView } from '@inspecto/link-analysis/api/graph-runs.service';
 
@@ -11,25 +10,17 @@ export function isLinkAnalysisModule(id: string): boolean {
 /**
  * **Installed Link Analysis modules** (DR-U12): a small read-only view of `GET /modules` filtered to the Link Analysis
  * modules - which are installed, active or inert (and why), switched off in this Space, or not in this bundle at all.
- * Loads when first opened.
+ * A section of ⚙ Settings (LA-INV-EXPAND-1, operator 2026-10-29: the footer strip is gone); the page creates it only
+ * while that section is shown, so it reads the list when first shown.
  */
 @Component({
     selector: 'inspecto-link-analysis-modules',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    // The footer hosts it at the right edge; the list is a popover anchored above its button, never in the footer's flow.
-    host: { class: 'relative inline-block' },
-    imports: [MatButtonModule, ChipComponent],
+    host: { class: 'block' },
+    imports: [ChipComponent],
     template: `
-        <button mat-button data-testid="modules-toggle" (click)="toggle()" [attr.aria-expanded]="open()">
-            Installed modules
-        </button>
-        @if (open()) {
-            <!-- Opens upward over the canvas: an opaque card above the footer, or the graph labels bleed through. -->
-            <div
-                class="absolute bottom-full right-0 z-30 mb-1 w-max max-w-[90vw] rounded border p-2 text-sm"
-                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
-            >
+            <div class="text-sm">
                 @if (error()) {
                     <p class="text-secondary text-sm" role="status" data-testid="modules-error">{{ error() }}</p>
                 } @else if (!modules()) {
@@ -57,28 +48,23 @@ export function isLinkAnalysisModule(id: string): boolean {
                     </ul>
                 }
             </div>
-        }
     `,
 })
-export class LinkAnalysisModulesComponent {
+export class LinkAnalysisModulesComponent implements OnInit {
     private readonly runs = inject(GraphRunsService);
-    readonly open = signal(false);
     readonly modules = signal<ModuleView[] | null>(null);
     readonly error = signal('');
     /** Every listed module's plain name by id (T-083), so a reason naming another module says its name, not its id. */
     private readonly titles = signal(new Map<string, string>());
 
-    toggle(): void {
-        this.open.update((o) => !o);
-        if (this.open() && !this.modules()) {
-            this.runs.modules().subscribe({
-                next: (r) => {
-                    this.titles.set(new Map(r.modules.filter((m) => m.title).map((m) => [m.id, m.title])));
-                    this.modules.set(r.modules.filter((m) => isLinkAnalysisModule(m.id)));
-                },
-                error: () => this.error.set('The module list could not be read.'),
-            });
-        }
+    ngOnInit(): void {
+        this.runs.modules().subscribe({
+            next: (r) => {
+                this.titles.set(new Map(r.modules.filter((m) => m.title).map((m) => [m.id, m.title])));
+                this.modules.set(r.modules.filter((m) => isLinkAnalysisModule(m.id)));
+            },
+            error: () => this.error.set('The module list could not be read.'),
+        });
     }
 
     /** A server reason with each module id it names replaced by that module's title ("requires la-core" → "requires Link analysis core and ports"). */

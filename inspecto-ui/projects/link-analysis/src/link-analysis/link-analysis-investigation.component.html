@@ -768,10 +768,12 @@
                 </section>
             }
             @if (store.active()) {
-            <!-- ── LA-STUDIO-UI-REORG-1 §5.4: Expand… (the dialog, N degrees) and the quick "Expand next degree" ── -->
-            <section class="flex flex-col gap-1" aria-label="Degrees" data-testid="degrees">
+            <!-- ── LA-INV-EXPAND-1: Expand lives here (From · Degrees · Direction · Expand + preview · filters), with the quick
+                 "Expand next degree" beside the degree reached. Every Expand entry point opens this tab and focuses it. ── -->
+            <section class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" aria-labelledby="act-expand-title" data-testid="degrees">
                 <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-sm font-semibold" data-testid="degree-label">
+                    <h3 id="act-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
+                    <span class="text-secondary text-sm" data-testid="degree-label">
                         Degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}
                     </span>
                     <ol class="m-0 flex list-none gap-1 p-0" aria-hidden="true">
@@ -785,24 +787,10 @@
                             </li>
                         }
                     </ol>
-                </div>
-                <div class="flex flex-wrap gap-1">
-                    <!-- nothing seeded = nothing to expand from: Expand… is locked with Expand next degree (the reason shows below) -->
-                    <button
-                        mat-flat-button
-                        color="primary"
-                        type="button"
-                        data-testid="expand-dialog-open"
-                        aria-keyshortcuts="G"
-                        matTooltip="Expand 1–{{ maxDegree() }} degrees with a preview (G)"
-                        [disabled]="!canWrite() || store.busy() || store.chainRunning() || degree().current < 0"
-                        (click)="expandRequested.emit()"
-                    >
-                        Expand…
-                    </button>
                     <button
                         mat-stroked-button
                         type="button"
+                        class="ml-auto"
                         data-testid="expand-next-degree"
                         [disabled]="!canWrite() || store.busy() || store.chainRunning() || !!degree().blocked"
                         (click)="expandNextDegree()"
@@ -810,6 +798,7 @@
                         Expand next degree
                     </button>
                 </div>
+                <!-- the degree notes belong to the line above (Expand next degree), so they come before the form -->
                 @if (windowNote(); as w) {
                     <p class="text-secondary m-0 text-sm" data-testid="degree-window">Window: {{ w }}</p>
                 }
@@ -820,7 +809,7 @@
                     <p class="text-secondary m-0 text-sm" data-testid="degree-hubs">
                         {{ degree().heldHubs.length }} busy
                         {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} held. Untick “Hold busy
-                        entities” in Expand…, or choose Expand anyway on one.
+                        entities” under Expand ▸ Limits, or choose Expand anyway on one.
                     </p>
                 }
                 @if (store.degreeOutcomes().length) {
@@ -833,6 +822,12 @@
                             <li [class.text-warn]="o.truncated">{{ outcomeMessage(o) }}</li>
                         }
                     </ul>
+                }
+                @if (canWrite()) {
+                    <!-- the page projects the Expand form (it holds the screen's start, presets and four-eyes limits) -->
+                    <ng-content select="[laExpand]" />
+                } @else {
+                    <p class="text-secondary m-0 text-sm" data-testid="expand-read-only">{{ expandNeeds }}</p>
                 }
             </section>
             <mat-checkbox [ngModel]="!store.showWorkingSet()" (ngModelChange)="store.showWorkingSet.set(!$event)">
@@ -1215,28 +1210,25 @@
                         </div>
                     }
                 </section>
-                <!-- 8. Last 5 steps; the full log is the dock's Op log tab -->
-                <section class="flex flex-col gap-1" aria-label="Last steps" data-testid="act-last-steps">
-                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Last steps</h3>
-                    @if (lastSteps().length) {
-                        <ol class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
-                            @for (e of lastSteps(); track e.step) {
-                                <li class="flex gap-2" [class.line-through]="e.undoneBy != null">
-                                    <span class="font-mono tabular-nums">{{ e.step }}</span>
-                                    <span class="font-semibold">{{ opLabel(e) }}</span>
-                                    <span class="min-w-0 flex-1 truncate" [attr.title]="e.text">{{ e.text }}</span>
-                                </li>
-                            }
-                        </ol>
-                    } @else {
-                        <p class="text-secondary m-0 text-sm">No steps yet. Pick a start entity to begin.</p>
-                    }
-                    <div>
-                        <button mat-button type="button" data-testid="open-op-log" (click)="dockRequested.emit('oplog')">
-                            Open the step log
-                        </button>
-                    </div>
-                </section>
+                <!-- 8. Links: the steps are the bottom dock's Step log (with Undo and Re-order); Replay is in Settings -->
+                <div class="flex flex-wrap items-center gap-x-4 text-sm" data-testid="act-links">
+                    <button
+                        type="button"
+                        class="text-primary cursor-pointer border-0 bg-transparent p-0 underline"
+                        data-testid="open-op-log"
+                        (click)="dockRequested.emit('oplog')"
+                    >
+                        Open the Step log
+                    </button>
+                    <button
+                        type="button"
+                        class="text-primary cursor-pointer border-0 bg-transparent p-0 underline"
+                        data-testid="act-settings-link"
+                        (click)="settingsRequested.emit()"
+                    >
+                        Investigation settings…
+                    </button>
+                </div>
             }
         }
     }

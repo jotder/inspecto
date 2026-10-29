@@ -228,11 +228,11 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   opens as a list in a popup.
 * **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus,
   with an Investigation open, **Step log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
-  entities**. Drag its edge to resize; it remembers its tab and height in this browser.
-* **Status bar:** **Limits**, the graph-model chips (Dataset, Mapping, Link type, Attributes — click one, or the pencil,
-  to open ⚙ Settings ▸ Graph model), **Refresh** (runs the same graph model again), the counts and **Installed
-  modules** (each Link Analysis module and whether it is active, inert with the reason, switched off, or not
-  installed).
+  entities**. Its tabs are plain text tabs, the open one underlined; on a narrow screen they scroll sideways. Drag its
+  edge to resize; it remembers its tab and height in this browser.
+* There is no status bar under the canvas (2026-10-29). The graph model and **Refresh** are in **⚙ Settings ▸ Graph
+  model**; the counts are on the **Graph counts** card on the canvas, whose **Limits** icon (bottom right) shows the
+  node limits in force; **Installed modules** is a section of ⚙ Settings.
 
 A window about 1,300 px wide or more shows the canvas and the right panel side by side; narrower, the panel stacks
 under the canvas.
@@ -304,8 +304,8 @@ open a short *Investigate {number}* form in the Investigation tab that asks only
    **Attribute columns** (amount, country, time — they feed the timeline, Value Measures and pattern tools). **Add
    another mapping** stacks more column pairs. **Root**, **depth** and **direction** start from chosen entities and
    grow outwards.
-4. **Run query.** Settings closes and the status bar says, for example, *20 nodes · 20 links drawn*. **Refresh**
-   runs the same model again later.
+4. **Run query.** Settings closes and the graph is drawn; the **Graph counts** card says how many nodes and links.
+   **Refresh** (here in Graph model) runs the same model again later.
 
 ### 5.3 Filters — two stages, deliberately
 
@@ -321,8 +321,8 @@ Conditions are a tree of AND/OR groups; a single bare condition is refused — w
 ### 5.4 Size limits — told honestly
 
 * By default the server returns at most **4 000 links** (ceiling 40 000), the canvas admits **1 000 nodes**, and
-  analysis in the browser runs up to **2 500 nodes** (heavier scores stop sooner and say so). **Limits** in the status
-  bar shows the node limits in force: *Graph drawn*, *On screen tools* and *Whole Dataset tools*. Every number is a setting ([§15](#15-limits-and-honest-behaviour)).
+  analysis in the browser runs up to **2 500 nodes** (heavier scores stop sooner and say so). The **Limits** icon at
+  the bottom right of the **Graph counts** card shows the node limits in force (Escape closes it): *Graph drawn*, *On screen tools* and *Whole Dataset tools*. Every number is a setting ([§15](#15-limits-and-honest-behaviour)).
 * When a cap cuts data you see **Truncated** — never a silent "no results". Narrow the query or use the Server side
   of the catalogue.
 * Each server read says where it was answered: *Answered from the link index v3* (with a stale note when rows were
@@ -357,8 +357,8 @@ card. Colour rules by attribute
 are in **⚙ Settings ▸ Display rules**. On a canvas narrower than 1,000 px the legend and Working set start as small
 pills. A layout or overlay the graph is too big for is greyed out and says why (*needs at most 300 nodes (this graph
 has 921)*); reduce the graph first with Clean up, a filter or Collapse. The legend's link-kind chips change the
-drawing only — a hidden kind is still followed by the next expand; to leave it out, set link kinds in **Expand…** ▸
-**Advanced** (that is recorded).
+drawing only — a hidden kind is still followed by the next expand; to leave it out, set link kinds in **Expand** ▸
+**Links** (that is recorded).
 
 ### 6.1 Canvas modes and selecting
 
@@ -402,21 +402,34 @@ what you see. Every change ends with a one-line result and **Undo** (also **Ctrl
 Undo takes back only the step it names: if a colleague recorded a newer step meanwhile, nothing is undone and the log
 shows theirs. The words follow the Industry pack (Telecom: *subscribers* and *calls*).
 
-### 7.1 Expand…
+### 7.1 Expand
 
-**Expand…** (canvas toolbar, **G**, or right-click a node) opens one dialog:
+**Expand** (canvas toolbar, **G**, the canvas toolbar's **More** menu, or right-click a node) opens one form. With an
+Investigation open it is the **Expand** section of the **Investigation** tab: the tab opens and the form takes focus
+(right-clicking a node makes that node the *From*). On a graph you are only exploring it opens over the canvas, and
+**Cancel** closes it. The form, most important first:
 
-* **From**: the selection, the start entities, or the nodes not expanded yet (the first 25).
-* **Direction**: both ways, outgoing or incoming. **Degrees**: 1 up to the maximum in force.
-* **Hold busy entities (more than *H* linked)**: on by default, *H* = the Space's **busy limit** (default 500).
-  Unticking it expands through every busy entity the Expand reaches; it asks you to confirm and the override is logged.
-* **Advanced**: the link kinds to follow, the time window (the Investigation's own, or all available data) and the
-  other limits.
-* A **preview line** says what it would add before anything changes: *This step adds about 342 numbers and 1,210
-  calls; 3 busy numbers will be held; 41 numbers are removed by your exclusion lists*. A step that would need
-  four-eyes approval says so. **Expand** runs it degree by degree; **Cancel** leaves the graph as it is. In an
-  Investigation each degree is a recorded `expand` step, and one Undo takes back the whole Expand. A server without
-  the preview shows *No preview on this server* and Expand still runs.
+* **From**: the selection, the outer ring (next degree), the start entities or the whole Working Set; the line under it
+  says what that is, for example *From the 1 wallet started from*.
+* **Degrees**: a **− 3 +** stepper, from 1 up to the Industry pack's maximum. The arrow keys step it, Home and End jump
+  to the ends; at an end the button says why it does nothing.
+* **Direction**: *Both ways*, *Outgoing* or *Incoming* (and *Reciprocal* in an Investigation), chosen from a popup.
+* **Expand** with its **preview line**, which says what it would add before anything changes: *This step adds about
+  342 numbers and 1,210 calls; 3 busy numbers will be held; 41 numbers are removed by your exclusion lists*. A step
+  that would need four-eyes approval says so. **Expand** runs it degree by degree. In an Investigation each degree is
+  a recorded `expand` step, and one Undo takes back the whole Expand. A server without the preview shows *No preview
+  on this server* and Expand still runs.
+* The **filters**, in three folds that start closed and each say on one line what is set:
+  * **Links** (*All link kinds · at least 3 events*): the link kinds to follow, the minimum events per link and the
+    minimum distinct days.
+  * **Time** (Investigation only, *Investigation window*): the Investigation's own window, all available data, or a
+    window for this Expand only.
+  * **Limits** (*Busy over 500 links*): **Hold busy entities (more than *H* linked)**, on by default with *H* = the
+    Space's **busy limit** (default 500) — unticking it expands through every busy entity the Expand reaches, asks you
+    to confirm and logs the override —, the fewest and most links a neighbour may have, the most neighbours per entity
+    and the row limit per degree.
+
+  A field in error opens its fold when you press Expand. A blank field uses the Industry pack's setting.
 
 Double-click a node not expanded yet to expand it one degree without the dialog. A node no expand has followed yet has
 a **dotted outline** (legend: *Dotted outline: not expanded yet*); on an Investigation's canvas *Next unexpanded* and
@@ -648,14 +661,15 @@ management.* Fill it in top to bottom:
    something to name. In a Space that masks values, the default leaves the value out (*Phone number*), because a name
    is stored and shown like a value; the Purpose never holds a value.
 5. **More** (folded): the **Time column** (blank uses the Dataset's) and its **zone**.
-6. **Expand on start** (folded): *Don't expand* (the default), or 1, 2 or 3 degrees, up to the profile's last degree.
+6. **Expand on start** (folded): a **− 0 +** degree stepper from *Don't expand* (the default) to 1, 2 or 3 degrees,
+   up to the profile's last degree.
 
 **Start Investigation** does it all in one press. It creates the Investigation and records the start as step 1,
 then expands the degrees you asked for, each a recorded step with busy entities held. A list or a paste is drawn first,
 and only the values found in the Dataset are the start. The whole Dataset is drawn, and the Investigation is created
 over it with no start entities yet: the canvas keeps the drawn graph (*Show the full graph to pick start entities* is
-ticked) so you pick them from it, and **Expand…** stays locked with **Expand next degree** until there is a start. If
-the canvas shows an empty Working Set, it says so. **Expand…** on the canvas goes further later.
+ticked) so you pick them from it, and **Expand** says *There is nothing to expand from yet* (and **Expand next
+degree** is locked) until there is a start. If the canvas shows an empty Working Set, it says so.
 
 From a ranking, **Start an Investigation from the top results** queues the entities. The Investigation tab then shows
 *Start Investigation with N queued start entities*: give a **Purpose** and the queued entities become the first
@@ -668,24 +682,28 @@ binds `events` for you.
 
 ### 11.2 The Investigation tab (Act panel)
 
-Top to bottom:
+Top to bottom, most important first:
 
-1. **Header:** id, purpose, Dataset, the data-trust chip (**Data details**), the Working Set counts and the degree
-   reached; its `⋯` menu has **Settings…** (⚙ Settings ▸ Investigation settings), **Close** and **Delete**.
+1. **Header:** the **Name** (a lead renames it in place: label · value · ✎), purpose, Dataset, the data-trust chip
+   (**Data details**) and the Working Set counts; its `⋯` menu has **Settings…** (⚙ Settings ▸ Investigation
+   settings), **Close** and **Delete**.
 2. The **queued start entities**, when there are any.
-3. **Expand…** and **Expand next degree** (one degree further, up to degree 4, busy entities held and
-   counted), with the four-eyes waiting line when there is one.
+3. **Expand** ([§7.1](#71-expand)): the degree reached (*Degree 1 of 4*) with **Expand next degree** beside it (one
+   degree further, busy entities held and counted), then the Expand form — From, Degrees, Direction, **Expand** with
+   its preview and four-eyes line, and the Links / Time / Limits folds. A reader sees *Needs Incident management.*
+   instead of the form.
 4. **Selected entity:** Start, Keep, Hide, Exclude, Annotate, Expand one hop, **Pick neighbours…** (tick some, or
    **Add the 10 strongest**: one expand to only those), its neighbours; **Expand all**.
 5. **Busy entities** (each with its sealed count, *Busy: 650 linked entities (limit 500), not expanded*, and
    **Expand anyway**).
 6. **Scope list:** entity ids to **Include** or **Leave out**.
 7. **More steps ▾:** Time window, Threshold, Snapshot marker, Compare, Connect seeds (each opens in place).
-8. **Last steps** (the last five, each named by its kind: Start, Expand, Exclude by list…) and **Open the step log**.
+8. Two links: **Open the Step log** (the dock's Step log tab) and **Investigation settings…**.
 
-The full record is in the dock: **Step log** (with **Re-order steps…**, which creates a fork), **Working Set rows**,
-**Coverage**, **Annotations** (entity and link) and **Excluded entities**. Clicking a node while an Investigation is
-open **selects** it for the next step.
+The tab lists no steps: the full record is in the dock's **Step log** (with **Undo** and **Re-order steps…**, which
+creates a fork), beside **Working Set rows**, **Coverage**, **Annotations** (entity and link) and **Excluded
+entities**. **Replay** is in ⚙ Settings ▸ Investigation settings ▸ *Replay and drift*. Clicking a node while an
+Investigation is open **selects** it for the next step.
 
 ### 11.3 Steps you can take
 
@@ -934,8 +952,9 @@ The Studio was reorganized on 2026-10-27 (`LA-STUDIO-UI-REORG-1`). Nothing was r
 
 | Old | Now |
 |---|---|
-| Query panel (left) | ⚙ Settings ▸ **Graph model** (status-bar chips and the pencil open it; **Refresh** in the status bar) |
-| Grow (popover, rung form) | **Expand…** dialog (**G**) — Degrees 1..N, *Hold busy entities*, Advanced: link kinds |
+| Query panel (left) | ⚙ Settings ▸ **Graph model** (with **Refresh**; the status bar was removed on 2026-10-29) |
+| Grow (popover, rung form) | **Expand** (**G**) — in an Investigation, a section of the Investigation tab: From, a − N + Degrees stepper, Direction, then the Links / Time / Limits folds |
+| Status bar: Limits, Installed modules | The **Limits** icon on the Graph counts card; ⚙ Settings ▸ **Installed modules** |
 | Domain profile picker | None — the Space's **Industry pack** applies, shown in Graph model |
 | Save as a case (saved view) | **File ▸ Save view** / **Save view as…** |
 | Open saved views | **File ▸ Open…** ▸ *Saved views* |
@@ -1278,7 +1297,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   toolbox's `applyCatalogueResult`, which feeds it BY KIND into the same views the browser algorithms fill: `SCORES` /
   `HITS` (PageRank, k-core, triangle count, Jaccard, centralities) → the ranking; `COMMUNITIES` and connected
   components' disjoint `GROUPS` → the communities. Cliques (overlapping `GROUPS`) are not a partition and stay summary-only.
-  The footer's `link-analysis-modules.component.ts` filters
+  The ⚙ Settings ▸ *Installed modules* section (`link-analysis-modules.component.ts`, the footer until 2026-10-29) filters
   `GET /modules` to `geo-link` + `la-*`. The browser still runs the 21 with local code (the earlier "27" count was stale).
   Older line follows: the algorithms run in the browser, on the main thread. The backend does SQL fold and filter only
   (`InvRoutes.java:36-39`, deliberate). Supported graph size is therefore bounded by one tab.
@@ -2262,6 +2281,7 @@ betweenness and suspicion).
 * **Residual pass (2026-10-18, `LA-A11Y-AUDIT-1`; decided under operator delegation).** BUILT: a *Skip to main content* link is the first tab stop of the console shell (`classic.component.html`, hidden until focused; `skipToContent()` focuses `main#main-content` without touching the URL, because a `#` href would reach the router), so a keyboard user no longer passes every nav stop and the PerfectScrollbar thumb first; the lens and Space switcher triggers are named *<visible label>, switch lens* / *<visible label>, switch space* (WCAG 2.5.3 label in name). Specs: `classic.component.spec.ts`, `lens-switcher.component.spec.ts`, `space-switcher.component.spec.ts`. DRIVEN LIVE (dev server over a stub API): Tab lands on the skip link, Enter focuses `main`, axe 4.12.1 0 violations on Home. DECIDED: the ag-Grid pair stays a **documented vendor exception with no workaround** - it reproduces only in a hidden Browser pane, where ag-Grid's own `visibility:hidden` header cells make axe see an empty row; a visible pane is clean, and overriding ag-Grid's ARIA to satisfy a hidden-pane artefact would risk the real reading. The shell not re-reading `isScreenSmall` on an EMULATED viewport resize is not a defect (a real zoom fires the media queries). Left for a person: a screen-reader reading, forced-colors paint, WebGL map canvases, Dossier / identity dialogs and Geo at narrow widths over real data.
 * **la-app Settings, split by audience (2026-10-16, operator: "similar style like main inspecto settings, drawer like compact format; split user and admin configuration; a user views/changes whichever they are privileged to").** `projects/la-app/src/app/settings.page.ts` is the console's master-detail Settings (menu of drawers left, common panel right, `:section` route matched by one config for `/settings` and `/settings/<section>`) in compact form, with the drawers grouped by who the setting is for: **My settings** (*My browser*: personal limits, no privilege), **This Space** (*Link Analysis* settings via `canAuthorWorkbench`, *Analysis limits* via the server's per-item `editable`, *Access* = the console's `AccessRolesComponent` roles editor via `canConfigureAccess`), **This server** (*Host resources*, system admin via `editable`). Every section is listed for every user; one the user may not change opens read-only and carries a *Read-only* chip in the menu (the server stays the judge: its 403 is shown). Settings is in the rail for everyone. The console components gained default-preserving inputs so one page can draw one part: `LinkAnalysisLimitsComponent.sections` (`analysis | host | browser`, all three by default) and `LinkAnalysisSettingsComponent.withLimits` (true by default); the console's Settings > Link Analysis is unchanged. No unsaved-changes guard on a section switch yet. Role ASSIGNMENT stays in the IdP (WSO2 groups = role names).
 * **Footer status bar carries the page's status items (2026-10-16, operator: counts live in the footer, so not on the canvas).** The canvas "Render status" strip no longer states "N nodes · M links drawn" (the footer states the counts) and no longer carries the caps or *Installed modules*; it keeps only what the render left out (the render-limit note, *Investigation Working Set*, labels off above N nodes). In the footer, left to right: **Caps** (`inspecto-link-analysis-caps`: projection / analysis / graph-run node caps, read from values the page already holds) at the left edge, the title and query chips, the counts, and **Installed modules** at the right edge. Both are `relative` hosts whose list is an opaque card anchored `bottom-full` (opening upward over the canvas, never in the footer's flow). The strip is `role="group"` because it can be empty and axe refuses an `aria-label` on a role-less empty `div`. The counts read *N nodes · M links on screen* and count what the canvas draws (`canvasData`): the Working Set while an Investigation is open, so they match its count (2026-10-29; they once counted the query graph underneath). The *Last neighbour expand* note names the Dataset it read and is hidden while a Working Set is drawn, which has its own read line.
+* **The footer strip is gone; Expand lives in the Investigation tab (2026-10-29, `LA-INV-EXPAND-1`, operator).** The bullet above is history. (1) **No status bar under the canvas** (the bottom dock stays): the graph model and Refresh are in ⚙ Settings ▸ Graph model, the counts are the Graph counts card's, the selection count is the canvas toolbar chip. **Limits** is `inspecto-link-analysis-caps` rendered by the Graph counts card (`LinkAnalysisWorkingSetComponent [limits]`, the host's `graphLimits()`) at the card's bottom right: an icon button (`heroicons_outline:scale`, aria-label *Limits*, `aria-expanded`, `aria-controls`) whose popover opens under it (`top-full right-0`); Escape closes it and returns focus to the button. **Installed modules** is the ⚙ Settings section `modules` (group *This Studio*); the host creates the component only while that section is shown, so `GET /modules` is read when first shown, not at page load. (2) **Expand** (`LinkAnalysisExpandComponent`) has an `embedded` input: for an open Investigation the host projects it into the Investigation tab (`<ng-content select="[laExpand]">`, inside the Expand section, only for a writer; a reader sees *Needs Incident management.*) and every entry point (toolbar, G, More ▸ Expand…, right-click ▸ Expand…) calls `openExpand()`, which opens the tab and, after the next render, calls the section's `focus()`. The explorer graph (nothing recorded) keeps the canvas popup. The form's order: From, Degrees (`inspecto-stepper-field`, shared in `inspecto/components/`: `role="spinbutton"`, arrows / Home / End, *Fewer degrees* / *More degrees* buttons inert at a bound with a reason from `disabled-reasons.ts`), Direction (`inspecto-option-picker`), the Expand button with its preview, four-eyes and why-not lines, then the Links / Time / Limits `la-fold`s, closed, each with a one-line `hint` summary; a filter in error opens its fold on Expand. The embedded form re-picks the default From when the set of starts changes (a new selection), and skips a preview read while an Expand walks. The New form's *Expand on start* uses the same stepper (0 = *Don't expand*, value text). The Investigation tab lists no steps any more: one line, **Open the Step log** / **Investigation settings…**; Replay stays in Settings ▸ *Replay and drift*. (3) The dock's tab strip is plain text tabs (no cell borders), the active one `text-primary` with the `--gamma-primary` underline, `flex-nowrap overflow-x-auto` so a narrow dock scrolls them.
 
 * **LIVE axe pass, forced-colors audit, dialogs over real Case data, keyboard walk (2026-10-14, `LA-A11Y-AUDIT-1`).** Real browser, a fresh Enterprise `la-app` Demo-Auth bundle built from the worktree, seeded `la-showcase` (Cases, Drafts, Entity Lists, identities), Demo FM Analyst, axe 4.12.1 (wcag2a/aa/21a/21aa/22aa + best-practice), dark AND light (the `light` class on html and body, every running animation finished first). **0 violations, both schemes:** Link Analysis idle, the graph (112 nodes, G6 drew), the node list, Analysis / View / Investigation tabs with every section open (Members, Share, Drafts, Connect several numbers, Compare, Coverage, Oversight, Working Set rows, Dossier built and verified, References, Entity Lists, Identity resolution), Installed modules, Alerts, Entity Lists, Geo and its Dataset picker, Settings, the embed viewer on a minted link (`-Dla.embed.enabled=true`; axe is served from the app's own origin because the viewer's CSP blocks any other script source), and every dialog opened below. **FOUND AND FIXED (each with a spec, live re-verified on the rebuilt bundle):** (1) `aria-valid-attr-value`: the data-table toggle carried `aria-controls="bottom-panel-body"` while that panel was not rendered (now only while open); (2) `target-size` (2.5.8): the legend's link-kind toggles were 20 px high (`min-height: 24px`); (3) the la-app's dialogs were `aria-modal="false"` (the gamma host's `MAT_DIALOG_DEFAULT_OPTIONS` was never copied into `projects/la-app`; every dialog was affected: option picker, New Entity List, node detail, Attach to Case); (4) every listed Investigation had a bare *Open* button (now *Open Investigation <title>*); (5) the two *About Link Analysis* buttons were back (the later `screen` restore reverted the ninth-pass rename): `<inspecto-ai-explain>` has an optional `label` input and the tool rail passes *About Link Analysis tools*; (6) a pressed toggle (`aria-pressed`) differed from an unpressed one by colour only: `styles.scss` forced-colors rule gives it a `Highlight` outline (`forced-colors.spec.ts` pins the rule exists). **ag-Grid pair, settled:** `aria-required-children` on `.ag-header-row` and `scrollable-region-focusable` appear ONLY while ag-Grid's `ag-delay-render` class is still on `.ag-root` (every header cell computes `visibility: hidden`); that class is cleared by an animation frame, and the Browser pane does not deliver frames while Claude's window is hidden or behind another (the tool says so). With the pane painting (headers `visible`, no `ag-delay-render`) the Working Set rows grid, Installed modules and Alerts all report 0. It is a frame-starvation artefact, not a product defect; run the grids after a successful screenshot. **Dialogs over real Case data, driven with real key events** (Enter opens, 12-14 Tab presses stay inside, Escape closes, focus returns to the opener): the identity picker (*First identifier type*), New Entity List, the node detail dialog (named by the node id; Fetch neighbors closed it, focus returned to the node row and the expand result was announced), Attach to Case (112-node analysis) with its nested Case picker over the seeded Case: Escape closes the top dialog only and returns focus to *Select*, a second Escape returns it to the button. All 0 axe violations in both schemes. The Dossier and the identity assertions are INLINE panels, not dialogs: *Include snapshots*, *Build dossier* and *Verify this manifest* driven (Enter moves focus to *Reload snapshots*; built and verified states clean in both schemes). **Keyboard walk, real keys:** shell nav, header, Query dock (every field a named button or a Material field with a 3 px wrapper outline), landing cards, canvas toolbar, *Show as list* (focus stays on the toggle, which becomes *Show graph*), the tool rail, the node list (roving row; Down Down Enter opens the node dialog); every stop had a rendered focus ring. **(a) FIXED 2026-10-14 (operator: focus goes to the graph canvas):** the canvas wrapper is `role="region"` named *Link graph* with `tabindex="-1"` (programmatic focus only, not a tab stop, so it does not duplicate the node list); on the FIRST draw out of the landing state (`execute()`, whichever card or query started it) focus moves there, only if it is still on the removed trigger or on `body` (a user who tabbed away mid-draw is not pulled back), never on a later run, refresh or expand, and a sr-only `role="status"` line says *Graph drawn, N nodes, M links* (`link-analysis.component.spec.ts`, 3 specs; spec-level only, NOT DRIVEN in a real browser). **RECORDED, NOT FIXED:** (b) Material menu overlays (Switch space, User menu) report the best-practice `region` rule (menu content sits outside a landmark: CDK overlay pattern, vendor); (c) the shell PerfectScrollbar tab stop, skip link and the switcher label-in-name items of the seventh pass stand. **FORCED COLORS: NOT DRIVEN** (the Browser pane cannot emulate `forced-colors` or `prefers-contrast`); CSS audit only: the focus ring is an outline (survives), the form-field wrapper outline survives, Tailwind `outline-none` is a transparent outline (survives), status badges and chips carry their status as text (the colour is a second cue), selected tab / row and now pressed toggle have `Highlight` outlines; Material buttons and the G6 canvas colours were not judged. **Still manual:** a screen-reader reading, the WebGL Geo map canvases and Geo with data (no latitude / longitude Dataset in `la-showcase`), and how forced colors paints.
 

@@ -41,7 +41,8 @@ import { configureLaLimits, resetLaLimits } from './la-limits';
         (pendingDone)="pending.set(null)"
         (settingsRequested)="settingsAsked = true"
         (dockRequested)="dockAsked = $event"
-    ><p laNewInvestigation data-testid="projected-new-form">New Investigation form</p></inspecto-link-analysis-investigation>
+    ><p laNewInvestigation data-testid="projected-new-form">New Investigation form</p
+    ><p laExpand data-testid="projected-expand">Expand form</p></inspecto-link-analysis-investigation>
     <!-- §5.8/§5.9: the parts the Act panel handed to the dock and the settings sections, over the same store -->
     @for (s of sections; track s) {
         <inspecto-link-analysis-investigation [section]="s" [attr.data-section]="s"></inspecto-link-analysis-investigation>
@@ -1008,7 +1009,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(first[1]['includeHubs']).toBeUndefined();
         store.degreeOutcomes.set([]); // the stub admitted nothing; clear it so the degree is not "blocked"
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold busy entities” in Expand…');
+        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold busy entities” under Expand ▸ Limits');
     });
 
     it('badges a hub with the sealed count its step read answered when the Working Set row has none', async () => {
@@ -1048,22 +1049,36 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(el.textContent).not.toContain('waiting for approval');
     });
 
-    it('"Expand…" asks the screen for the Expand dialog (the read settings live there, §5.4)', async () => {
+    it('LA-INV-EXPAND-1: the Expand section holds the projected Expand form under its heading and the degree reached', async () => {
         const { fixture, store, el } = create({ ws: HUB_WS });
         await openInv(store);
         fixture.detectChanges();
-        const asked = vi.fn();
-        (fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent)).componentInstance as LinkAnalysisInvestigationComponent).expandRequested.subscribe(asked);
-        (el.querySelector('[data-testid="expand-dialog-open"]') as HTMLButtonElement).click();
-        expect(asked).toHaveBeenCalledTimes(1);
-        expect(el.textContent).not.toContain('Advanced expand settings');
+        const section = el.querySelector('[data-testid="degrees"]') as HTMLElement;
+        expect(section.getAttribute('aria-labelledby')).toBe('act-expand-title');
+        expect(section.querySelector('#act-expand-title')!.textContent!.trim()).toBe('Expand');
+        const form = section.querySelector('[data-testid="projected-expand"]')!;
+        expect(form).not.toBeNull();
+        // the quick "Expand next degree" sits beside the degree reached, above the form
+        const next = section.querySelector('[data-testid="expand-next-degree"]')!;
+        expect(next.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // the old "Expand…" opener is gone: the form is right here
+        expect(el.querySelector('[data-testid="expand-dialog-open"]')).toBeNull();
+        expect(section.querySelector('[data-testid="expand-read-only"]')).toBeNull();
+        await expectNoA11yViolations(section);
     });
 
-    it('nothing seeded: "Expand…" is locked with "Expand next degree", and the reason shows (UI test 2026-10-29)', async () => {
+    it('LA-INV-EXPAND-1: a reader gets no Expand form, only why', async () => {
+        const { fixture, store, el } = create({ canManage: false });
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="projected-expand"]')).toBeNull();
+        expect(el.querySelector('[data-testid="expand-read-only"]')!.textContent).toContain('Needs Incident management.');
+    });
+
+    it('nothing seeded: "Expand next degree" is locked, and the reason shows (UI test 2026-10-29)', async () => {
         const { fixture, store, el } = create({ ws: { ...WS, entities: [], links: [] } });
         await openInv(store);
         fixture.detectChanges();
-        expect((el.querySelector('[data-testid="expand-dialog-open"]') as HTMLButtonElement).disabled).toBe(true);
         expect((el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement).disabled).toBe(true);
         expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Seed an entity first.');
     });
@@ -1145,7 +1160,7 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
         fixture.detectChanges();
         const panel = act(el);
         expect(panel.querySelector('la-fold')).toBeNull();
-        const order = ['act-header', 'degrees', 'act-selected', 'scope-list', 'act-more-steps', 'act-last-steps'].map(
+        const order = ['act-header', 'degrees', 'act-selected', 'scope-list', 'act-more-steps', 'act-links'].map(
             (id) => panel.querySelector(`[data-testid="${id}"]`),
         );
         expect(order.every(Boolean)).toBe(true);
@@ -1312,20 +1327,23 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
         });
     });
 
-    it('lists the last steps newest first; Open the Op log and Settings… ask the screen', async () => {
+    it('LA-INV-EXPAND-1: no step list in the tab; one line opens the Step log dock, another the settings', async () => {
         const { fixture, store, el } = create();
         await openInv(store);
         fixture.detectChanges();
-        const steps = Array.from(act(el).querySelectorAll('[data-testid="act-last-steps"] li')).map((li) =>
-            li.textContent?.trim().slice(0, 1),
-        );
-        expect(steps).toEqual(['2', '1']);
-        (act(el).querySelector('[data-testid="open-op-log"]') as HTMLButtonElement).click();
+        // the steps are the dock's Step log only (it has them all, with Undo and Re-order)
+        expect(act(el).querySelector('[data-testid="act-last-steps"]')).toBeNull();
+        expect(act(el).querySelector('[aria-label="Last steps"]')).toBeNull();
+        expect(act(el).textContent).not.toContain('Last steps');
+        expect(part(el, 'oplog').querySelectorAll('section[aria-label="Step log"] ol > li').length).toBe(2);
+        const links = act(el).querySelector('[data-testid="act-links"]') as HTMLElement;
+        const open = links.querySelector('[data-testid="open-op-log"]') as HTMLButtonElement;
+        expect(open.textContent!.trim()).toBe('Open the Step log');
+        open.click();
         expect(fixture.componentInstance.dockAsked).toBe('oplog');
-        const cmp = fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent))
-            .componentInstance as LinkAnalysisInvestigationComponent;
-        cmp.settingsRequested.emit();
+        (links.querySelector('[data-testid="act-settings-link"]') as HTMLButtonElement).click();
         expect(fixture.componentInstance.settingsAsked).toBe(true);
+        await expectNoA11yViolations(links);
     });
 
     it('draws no dock part while no Investigation is open', () => {

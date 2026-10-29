@@ -193,6 +193,7 @@ import {
     legendItemsFor,
     toggleHiddenKind,
     CanvasOverlay,
+    GraphLimits,
     LinkAnalysisLegendComponent,
     LinkAnalysisWorkingSetComponent,
     overlayStartsOpen,
@@ -280,7 +281,6 @@ import { LinkAnalysisInvestigationComponent } from './link-analysis-investigatio
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { InvestigationSettingsSections } from './investigation-settings-sections.component';
 import { InvestigationSection } from './link-analysis-investigation.component';
-import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
 import { CleanupApply, LinkAnalysisCleanupComponent } from './link-analysis-cleanup.component';
 import { foldBranches, foldableOf } from '@inspecto/link-analysis/graph/graph-cleanup';
 import { autoStyle } from './auto-style';
@@ -456,7 +456,6 @@ function readDock(): { open: boolean; tab: DockTab } {
         LinkAnalysisEntityListsComponent,
         LinkAnalysisIdentitiesComponent,
         LinkAnalysisUploadsComponent,
-        LinkAnalysisCapsComponent,
         LinkAnalysisCleanupComponent,
         LinkAnalysisModulesComponent,
         ChipComponent,
@@ -626,6 +625,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild(LinkAnalysisCleanupComponent) private cleanup?: LinkAnalysisCleanupComponent;
     /** The Investigation tab's New Investigation form (page-projected, so it outlives an open Investigation). */
     @ViewChild('newInvForm') private newInvForm?: LinkAnalysisStartBoxComponent;
+    /** The Investigation tab's Expand section (LA-INV-EXPAND-1); absent on the explorer graph and for a reader. */
+    @ViewChild('tabExpand') private tabExpand?: LinkAnalysisExpandComponent;
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
     @ViewChild('laHeader') private laHeader?: ElementRef<HTMLElement>;
@@ -1313,11 +1314,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** The published size limits the footer states — the server-side projection cap and the browser analysis cap. */
     /**
      * The limits currently IN FORCE, read live rather than captured, so a deployment's override reaches
-     * the footer (both read the limits store, a signal, so the template re-renders when they change).
+     * the Limits popover (both read the limits store, a signal, so the template re-renders when they change).
      */
     get caps(): { projection: number; analysis: number } {
         return { projection: projectionNodeCapValue(), analysis: analysisNodeCapValue() };
     }
+
+    /** What the Graph counts overlay's Limits icon states (operator 2026-10-29: the footer strip is gone). */
+    readonly graphLimits = computed<GraphLimits>(() => ({ ...this.caps, graphRun: this.serverRunCeiling() }));
 
     /** A flagged node's Connectivity row — the same threshold, count and override state the Investigation panel shows. */
     hubBadgeFor(serverId: string, contacts?: number | null): string {
@@ -4747,10 +4751,21 @@ Its prior copies stay in its version history.`,
         };
     }
 
-    /** Open the Expand dialog (§5.4): G, the toolbar's Expand…, right-click → Expand…, the Investigation tab. */
+    /**
+     * Open Expand (§5.4): G, the toolbar's Expand, the More menu's Expand…, right-click → Expand…. For an open
+     * Investigation it is a section of the Investigation tab (LA-INV-EXPAND-1): the tab opens and the section takes
+     * focus. The explorer graph keeps its popup over the canvas.
+     */
     openExpand(): void {
         if (!this.graph() && !this.workingSetCanvas()) return;
         this.growExclude.exclusionsOpen.set(false);
+        if (this.growMode() === 'investigation') {
+            this.growExclude.growOpen.set(false);
+            this.openInvestigation();
+            // after the tab renders and its scroll is reset (a microtask), bring the section into view
+            afterNextRender(() => setTimeout(() => this.tabExpand?.focus()), { injector: this.injector });
+            return;
+        }
         this.growExclude.growOpen.set(true);
     }
 

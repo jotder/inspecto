@@ -36,6 +36,7 @@ import {
             ]"
             [truncated]="true"
             [countsGraph]="counts()"
+            [limits]="limits()"
             [open]="wsOpen()"
             (openChange)="wsOpen.set($event)"
         ></inspecto-link-analysis-working-set>
@@ -45,6 +46,7 @@ class Host {
     readonly legendOpen = signal(true);
     readonly wsOpen = signal(true);
     readonly counts = signal<'' | 'query' | 'query-under-investigation'>('query');
+    readonly limits = signal<{ projection: number; analysis: number; graphRun: number | null } | null>(null);
     readonly hidden = signal<string[]>([]);
     readonly toggled: string[] = [];
     readonly toggle = toggleHiddenKind;
@@ -91,6 +93,38 @@ describe('Link Analysis working set - which graph it counts (LA-STUDIO-UI-REORG-
         fixture.componentInstance.wsOpen.set(false);
         fixture.detectChanges();
         expect(el.textContent).toContain('graph on screen');
+    });
+});
+
+describe('Link Analysis Graph counts - the Limits icon (operator 2026-10-29: the footer strip is gone)', () => {
+    it('sits at the card’s bottom right and opens the limits in force; Escape closes it back onto the icon', async () => {
+        TestBed.configureTestingModule({ imports: [Host], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(Host);
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('[data-testid="caps-toggle"]')).toBeNull(); // no limits given, no icon
+        fixture.componentInstance.limits.set({ projection: 1000, analysis: 2500, graphRun: 5000 });
+        fixture.detectChanges();
+        const card = el.querySelector('inspecto-link-analysis-working-set > div') as HTMLElement;
+        const caps = card.querySelector('inspecto-link-analysis-caps') as HTMLElement;
+        expect(card.lastElementChild!.lastElementChild).toBe(caps); // the last row, its last item
+        expect(caps.classList).toContain('ml-auto'); // pushed to the right
+        const button = caps.querySelector('[data-testid="caps-toggle"]') as HTMLButtonElement;
+        expect(button.getAttribute('aria-label')).toBe('Limits');
+        expect(button.getAttribute('aria-expanded')).toBe('false');
+        await expectNoA11yViolations(el);
+        button.click();
+        fixture.detectChanges();
+        const list = caps.querySelector('[data-testid="caps-list"]') as HTMLElement;
+        expect(list.textContent).toContain('Graph drawn: up to 1,000 nodes');
+        expect(list.textContent).toContain('On screen tools: up to 2,500 nodes');
+        expect(list.textContent).toContain('Whole Dataset tools: up to 5,000 nodes');
+        expect(button.getAttribute('aria-expanded')).toBe('true');
+        await expectNoA11yViolations(el);
+        list.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        fixture.detectChanges();
+        expect(caps.querySelector('[data-testid="caps-list"]')).toBeNull();
+        expect(document.activeElement).toBe(button);
     });
 });
 

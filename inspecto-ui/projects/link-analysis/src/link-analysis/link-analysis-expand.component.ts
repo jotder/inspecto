@@ -14,7 +14,6 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -24,6 +23,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
+import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
 import type { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
 import {
     ExpandFrom,
@@ -37,10 +37,12 @@ import {
     markHintSeen,
     previewSentence,
 } from './grow-exclude';
+import { DISABLED_REASON, mostDegrees } from './disabled-reasons';
 import { GrowExcludeStore } from './grow-exclude.store';
 import { FourEyesLimits, expandApproval } from './investigate-number';
-import { rungForm, rungOf, windowForm } from './investigation-rung-form';
+import { parseKinds, rungForm, rungOf, windowForm } from './investigation-rung-form';
 import { InvestigationWindowFieldsComponent } from './investigation-window-fields.component';
+import { LaFoldComponent } from './la-fold.component';
 import { laLimit } from './la-limits';
 
 /** What the Expand dialog hands the screen: the start it was run from, and the choice. */
@@ -50,19 +52,24 @@ export interface ExpandRun {
 }
 
 /**
- * LA-STUDIO-UI-REORG-1 §5.4 (UIR-D5) — the **Expand** dialog: one form for every multi-degree expand. Basic fields
- * (From, Direction, Degrees 1…N, Hold supernodes), the read settings under Advanced, and a preview line of degree 1
- * before anything changes. It only ASKS: `(expand)` hands the choice to the screen, which walks it degree by degree
- * (recorded `expand` steps in an Investigation, neighbours reads on the explorer graph).
+ * LA-STUDIO-UI-REORG-1 §5.4 (UIR-D5) — the **Expand** form: one form for every multi-degree expand. In order of
+ * importance: From, Degrees (a − N + stepper), Direction (a popup choice), the Expand button with a preview line of
+ * degree 1, then the filters in closed folds (Links · Time · Limits) that each say what is set. It only ASKS: `(expand)`
+ * hands the choice to the screen, which walks it degree by degree (recorded `expand` steps in an Investigation,
+ * neighbours reads on the explorer graph).
+ *
+ * `embedded` (LA-INV-EXPAND-1): for an open Investigation the form is a section of the Investigation tab, with no dialog
+ * chrome; the explorer graph (nothing recorded) keeps it as a popup over the canvas.
  */
 @Component({
     selector: 'inspecto-link-analysis-expand',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
+    // Escape closes the popup (the tab section has nothing to close)
+    host: { '(keydown.escape)': 'embedded() || closed.emit()' },
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
-        MatButtonToggleModule,
         MatCheckboxModule,
         MatIconModule,
         MatTooltipModule,
@@ -70,25 +77,30 @@ export interface ExpandRun {
         ChipComponent,
         InspectoOptionPickerComponent,
         PenFieldComponent,
+        StepperFieldComponent,
+        LaFoldComponent,
         InvestigationWindowFieldsComponent,
     ],
     template: `
         <section
-            class="flex max-h-[75vh] min-h-0 w-[28rem] max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-y-auto rounded-lg border p-3 shadow-lg"
-            style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
-            role="dialog"
-            aria-labelledby="la-expand-title"
-            data-testid="la-expand-dialog"
-            (keydown.escape)="closed.emit()"
+            class="flex min-h-0 flex-col gap-3"
+            [class]="embedded() ? '' : 'max-h-[75vh] w-[28rem] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border p-3 shadow-lg bg-card'"
+            [style.border-color]="embedded() ? null : 'var(--gamma-border)'"
+            [attr.role]="embedded() ? null : 'dialog'"
+            [attr.aria-label]="embedded() ? 'Expand' : null"
+            [attr.aria-labelledby]="embedded() ? null : 'la-expand-title'"
+            [attr.data-testid]="embedded() ? 'la-expand-section' : 'la-expand-dialog'"
         >
-            <div class="flex items-center gap-2">
-                <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
-                <h2 id="la-expand-title" class="m-0 text-sm font-semibold">Expand</h2>
-                <span class="text-secondary text-xs">({{ ctx().mode === 'investigation' ? 'recorded' : 'not recorded' }})</span>
-                <button mat-icon-button class="ml-auto" type="button" aria-label="Close Expand" (click)="closed.emit()">
-                    <mat-icon svgIcon="heroicons_outline:x-mark" aria-hidden="true"></mat-icon>
-                </button>
-            </div>
+            @if (!embedded()) {
+                <div class="flex items-center gap-2">
+                    <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
+                    <h2 id="la-expand-title" class="m-0 text-sm font-semibold">Expand</h2>
+                    <span class="text-secondary text-xs">({{ ctx().mode === 'investigation' ? 'recorded' : 'not recorded' }})</span>
+                    <button mat-icon-button class="ml-auto" type="button" aria-label="Close Expand" (click)="closed.emit()">
+                        <mat-icon svgIcon="heroicons_outline:x-mark" aria-hidden="true"></mat-icon>
+                    </button>
+                </div>
+            }
 
             @if (showHint()) {
                 <div class="rounded-md border p-2 text-xs" style="border-color: var(--gamma-border)" data-testid="la-expand-hint">
@@ -98,7 +110,8 @@ export interface ExpandRun {
                 </div>
             }
 
-            <form [formGroup]="form" class="flex flex-col gap-3" (ngSubmit)="submit()">
+            <form [formGroup]="form" class="flex flex-col gap-1" (ngSubmit)="submit()">
+                <!-- 1. From: the start entities -->
                 @if (fromOptions().length > 1) {
                     <inspecto-option-picker
                         label="From"
@@ -109,165 +122,34 @@ export interface ExpandRun {
                 }
                 <p class="text-secondary m-0 text-xs" data-testid="la-expand-from-line">From {{ active().from }}</p>
 
-                <div class="flex flex-col gap-1">
-                    <span class="text-xs font-semibold" id="la-expand-direction">Direction</span>
-                    <mat-button-toggle-group formControlName="direction" aria-labelledby="la-expand-direction" class="w-full">
-                        @for (d of directions(); track d.value) {
-                            <mat-button-toggle class="flex-1" [value]="d.value" [matTooltip]="d.hint">
-                                <span class="inline-flex items-center gap-1 text-xs">
-                                    <mat-icon class="icon-size-4" [svgIcon]="d.icon" aria-hidden="true"></mat-icon>
-                                    {{ d.label }}
-                                </span>
-                            </mat-button-toggle>
-                        }
-                    </mat-button-toggle-group>
-                </div>
+                <!-- 2. Degrees: − N + -->
+                <inspecto-stepper-field
+                    label="Degrees"
+                    formControlName="degrees"
+                    decrementLabel="Fewer degrees"
+                    incrementLabel="More degrees"
+                    [min]="1"
+                    [max]="maxDegree()"
+                    [minReason]="fewestDegrees"
+                    [maxReason]="mostDegreesReason()"
+                    data-testid="la-expand-degrees"
+                ></inspecto-stepper-field>
+                @if (formValue().degrees > 1) {
+                    <p class="text-secondary m-0 text-xs">
+                        Stops early if a degree would expand from more than {{ ctx().frontierCap.toLocaleString('en-GB') }} {{ t().nodes }}.
+                    </p>
+                }
 
-                <div class="flex flex-col gap-1">
-                    <span class="text-xs font-semibold" id="la-expand-degrees">Degrees</span>
-                    <mat-button-toggle-group formControlName="degrees" aria-labelledby="la-expand-degrees" data-testid="la-expand-degrees">
-                        @for (d of degreeChoices(); track d) {
-                            <mat-button-toggle [value]="d" [matTooltip]="d === 1 ? 'One degree' : d + ' degrees, undone together'">
-                                <span class="text-xs">{{ d }}</span>
-                            </mat-button-toggle>
-                        }
-                    </mat-button-toggle-group>
-                    @if (formValue().degrees > 1) {
-                        <p class="text-secondary m-0 text-xs">
-                            Stops early if a degree would expand from more than {{ ctx().frontierCap.toLocaleString('en-GB') }} {{ t().nodes }}.
-                        </p>
-                    }
-                </div>
-
-                <div class="flex flex-col gap-1">
-                    <mat-checkbox
-                        formControlName="hold"
-                        [matTooltip]="'Busy ' + t().nodes + ' stay on the graph and go to the Held tray; they are not expanded'"
-                        data-testid="la-expand-hold"
-                    >
-                        <span class="text-xs">Hold busy entities (more than {{ thresholdLabel() }} linked)</span>
-                    </mat-checkbox>
-                    @if (form.controls.hold.value) {
-                        <inspecto-pen-field
-                            class="ml-8"
-                            label="Busy limit"
-                            type="number"
-                            [min]="1"
-                            [default]="ctx().hubThreshold"
-                            [placeholder]="ctx().hubThreshold.toLocaleString('en-GB') + ' (the limit in force)'"
-                            formControlName="threshold"
-                            [error]="thresholdError()"
-                        ></inspecto-pen-field>
-                    } @else {
-                        <p class="text-secondary m-0 text-xs" data-testid="la-expand-no-hold">
-                            Busy {{ t().nodes }} will be expanded through too, recorded as an override in the step log.
-                        </p>
-                    }
-                </div>
-
-                <button
-                    mat-button
-                    type="button"
-                    class="self-start"
-                    [attr.aria-expanded]="moreOpen()"
-                    aria-controls="la-expand-advanced"
-                    data-testid="la-expand-advanced-toggle"
-                    (click)="moreOpen.set(!moreOpen())"
-                >
-                    <mat-icon
-                        [svgIcon]="moreOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"
-                        aria-hidden="true"
-                    ></mat-icon>
-                    Advanced
-                </button>
-                <div id="la-expand-advanced" class="flex flex-col gap-2 pl-2" [class.hidden]="!moreOpen()">
-                    @if (ctx().linkKinds.length) {
-                        <div class="flex flex-col gap-1" role="group" aria-labelledby="la-expand-kinds">
-                            <span class="text-xs font-semibold" id="la-expand-kinds">{{ linkKindsLabel }}</span>
-                            @for (k of ctx().linkKinds; track k) {
-                                <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">
-                                    <span class="text-xs">{{ k }}</span>
-                                </mat-checkbox>
-                            }
-                        </div>
-                    } @else if (ctx().mode === 'investigation') {
-                        <ng-container [formGroup]="rung">
-                            <inspecto-pen-field
-                                label="Link kinds"
-                                formControlName="linkKinds"
-                                placeholder="e.g. call, transfer"
-                                [error]="rung.controls.linkKinds.invalid ? 'At most ' + maxKinds() + ' kinds.' : ''"
-                            />
-                        </ng-container>
-                        <p class="text-secondary m-0 text-xs">Comma-separated; blank means all kinds. Needs the Investigation's link kind column.</p>
-                    } @else {
-                        <p class="text-secondary m-0 text-xs">This graph has one kind of {{ t().link }}, so there is nothing to choose.</p>
-                    }
-                    @if (ctx().mode === 'investigation') {
-                        <div class="flex flex-col gap-2" [formGroup]="rung" data-testid="la-expand-rung">
-                            <p class="text-secondary m-0 text-xs">A blank field uses the Industry pack's setting.</p>
-                            @if (ctx().hasWindow) {
-                                <inspecto-option-picker label="Time window" formControlName="window" [options]="windowOptions" />
-                                @if (rung.controls.window.value === 'override') {
-                                    <div class="rounded-md border p-2" style="border-color: var(--gamma-border)">
-                                        <p class="text-secondary m-0 mb-1 text-xs">This Expand only; the Investigation's own window is not changed.</p>
-                                        <inspecto-la-window-fields [form]="override"></inspecto-la-window-fields>
-                                    </div>
-                                }
-                            }
-                            <inspecto-pen-field
-                                label="Minimum events per link"
-                                formControlName="minEvents"
-                                type="number"
-                                placeholder="1"
-                                [error]="rung.controls.minEvents.invalid ? 'A whole number of at least 1.' : ''"
-                            />
-                            <inspecto-pen-field
-                                label="Minimum distinct days"
-                                formControlName="minDistinctDays"
-                                type="number"
-                                [error]="rung.controls.minDistinctDays.invalid ? 'A whole number of at least 1.' : ''"
-                            />
-                            <p class="text-secondary m-0 text-xs">Needs the Investigation's time column.</p>
-                            <inspecto-pen-field
-                                label="Fewest links a neighbour may have"
-                                formControlName="candidateDegreeMin"
-                                type="number"
-                                [error]="rung.controls.candidateDegreeMin.invalid ? 'A whole number of at least 0.' : ''"
-                            />
-                            <inspecto-pen-field
-                                label="Most links a neighbour may have"
-                                formControlName="candidateDegreeMax"
-                                type="number"
-                                [error]="rung.controls.candidateDegreeMax.invalid ? 'A whole number of at least 1.' : ''"
-                            />
-                            @if (rung.hasError('degreeOrder')) {
-                                <p class="text-warn m-0 text-xs" role="alert">The minimum degree must not exceed the maximum.</p>
-                            }
-                            <inspecto-pen-field
-                                label="Most neighbours per entity"
-                                formControlName="maxFanOut"
-                                type="number"
-                                [error]="rung.controls.maxFanOut.invalid ? 'A whole number of at least 1.' : ''"
-                            />
-                            <p class="text-secondary m-0 text-xs">Strongest first. Blank means no limit.</p>
-                            <inspecto-pen-field
-                                label="Row limit per degree"
-                                formControlName="budget"
-                                type="number"
-                                [placeholder]="(presets().budget ?? defaultBudget()).toString()"
-                                [error]="rung.controls.budget.invalid ? 'A whole number from 1 to ' + maxBudget() + '.' : ''"
-                            />
-                            <p class="text-secondary m-0 text-xs">Stops at this many rows; the step is marked incomplete.</p>
-                        </div>
-                    } @else {
-                        <p class="text-secondary m-0 text-xs" data-testid="la-expand-basic-note">
-                            More options appear when an Investigation is open.
-                        </p>
-                    }
-                </div>
+                <!-- 3. Direction: a popup choice, like From -->
+                <inspecto-option-picker
+                    label="Direction"
+                    formControlName="direction"
+                    [options]="directionOptions()"
+                    data-testid="la-expand-direction"
+                ></inspecto-option-picker>
             </form>
 
+            <!-- 4. The Expand button with its preview line -->
             <div role="status" aria-live="polite" class="text-xs" data-testid="la-expand-preview">
                 @switch (pv().state) {
                     @case ('loading') {
@@ -315,8 +197,10 @@ export interface ExpandRun {
                 <inspecto-alert id="la-expand-blocked-why" variant="info" data-testid="la-expand-blocked">{{ why }}</inspecto-alert>
             }
 
-            <div class="flex items-center justify-end gap-2">
-                <button mat-button type="button" (click)="closed.emit()">Cancel</button>
+            <div class="flex flex-wrap items-center gap-2" [class.justify-end]="!embedded()">
+                @if (!embedded()) {
+                    <button mat-button type="button" (click)="closed.emit()">Cancel</button>
+                }
                 <button
                     mat-flat-button
                     color="primary"
@@ -334,9 +218,135 @@ export interface ExpandRun {
             <!-- T-193: a blocked start already says why in the alert above; the reason is never shown twice -->
             @if (goWhyNot(); as why) {
                 @if (!active().blocked) {
-                    <p id="la-expand-why" class="text-secondary m-0 text-right text-xs">{{ why }}</p>
+                    <p id="la-expand-why" class="text-secondary m-0 text-xs" [class.text-right]="!embedded()">{{ why }}</p>
                 }
             }
+
+            <!-- 5. The filters: foldable groups, closed, each saying what is set -->
+            <div class="flex flex-col gap-2" data-testid="la-expand-filters">
+                <la-fold title="Links" [hint]="linksSummary()" [forceOpen]="tried() && linksInvalid()" data-testid="la-expand-fold-links">
+                    @if (ctx().linkKinds.length) {
+                        <div class="flex flex-col gap-1" role="group" aria-labelledby="la-expand-kinds">
+                            <span class="text-xs font-semibold" id="la-expand-kinds">{{ linkKindsLabel }}</span>
+                            @for (k of ctx().linkKinds; track k) {
+                                <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">
+                                    <span class="text-xs">{{ k }}</span>
+                                </mat-checkbox>
+                            }
+                        </div>
+                    } @else if (ctx().mode === 'investigation') {
+                        <ng-container [formGroup]="rung">
+                            <inspecto-pen-field
+                                label="Link kinds"
+                                formControlName="linkKinds"
+                                placeholder="e.g. call, transfer"
+                                [error]="rung.controls.linkKinds.invalid ? 'At most ' + maxKinds() + ' kinds.' : ''"
+                            />
+                        </ng-container>
+                        <p class="text-secondary m-0 text-xs">Comma-separated; blank means all kinds. Needs the Investigation's link kind column.</p>
+                    } @else {
+                        <p class="text-secondary m-0 text-xs">This graph has one kind of {{ t().link }}, so there is nothing to choose.</p>
+                    }
+                    @if (ctx().mode === 'investigation') {
+                        <div class="flex flex-col gap-2" [formGroup]="rung">
+                            <inspecto-pen-field
+                                label="Minimum events per link"
+                                formControlName="minEvents"
+                                type="number"
+                                placeholder="1"
+                                [error]="rung.controls.minEvents.invalid ? 'A whole number of at least 1.' : ''"
+                            />
+                            <inspecto-pen-field
+                                label="Minimum distinct days"
+                                formControlName="minDistinctDays"
+                                type="number"
+                                [error]="rung.controls.minDistinctDays.invalid ? 'A whole number of at least 1.' : ''"
+                            />
+                            <p class="text-secondary m-0 text-xs">Distinct days need the Investigation's time column. A blank field uses the Industry pack's setting.</p>
+                        </div>
+                    }
+                </la-fold>
+
+                @if (ctx().mode === 'investigation' && ctx().hasWindow) {
+                    <la-fold title="Time" [hint]="timeSummary()" [forceOpen]="tried() && timeInvalid()" data-testid="la-expand-fold-time">
+                        <div class="flex flex-col gap-2" [formGroup]="rung">
+                            <inspecto-option-picker label="Time window" formControlName="window" [options]="windowOptions" />
+                            @if (rung.controls.window.value === 'override') {
+                                <div class="rounded-md border p-2" style="border-color: var(--gamma-border)">
+                                    <p class="text-secondary m-0 mb-1 text-xs">This Expand only; the Investigation's own window is not changed.</p>
+                                    <inspecto-la-window-fields [form]="override"></inspecto-la-window-fields>
+                                </div>
+                            }
+                        </div>
+                    </la-fold>
+                }
+
+                <la-fold title="Limits" [hint]="limitsSummary()" [forceOpen]="tried() && limitsInvalid()" data-testid="la-expand-fold-limits">
+                    <div class="flex flex-col gap-1" [formGroup]="form">
+                        <mat-checkbox
+                            formControlName="hold"
+                            [matTooltip]="'Busy ' + t().nodes + ' stay on the graph and go to the Held tray; they are not expanded'"
+                            data-testid="la-expand-hold"
+                        >
+                            <span class="text-xs">Hold busy entities (more than {{ thresholdLabel() }} linked)</span>
+                        </mat-checkbox>
+                        @if (form.controls.hold.value) {
+                            <inspecto-pen-field
+                                class="ml-8"
+                                label="Busy limit"
+                                type="number"
+                                [min]="1"
+                                [default]="ctx().hubThreshold"
+                                [placeholder]="ctx().hubThreshold.toLocaleString('en-GB') + ' (the limit in force)'"
+                                formControlName="threshold"
+                                [error]="thresholdError()"
+                            ></inspecto-pen-field>
+                        } @else {
+                            <p class="text-secondary m-0 text-xs" data-testid="la-expand-no-hold">
+                                Busy {{ t().nodes }} will be expanded through too, recorded as an override in the step log.
+                            </p>
+                        }
+                    </div>
+                    @if (ctx().mode === 'investigation') {
+                        <div class="flex flex-col gap-2" [formGroup]="rung" data-testid="la-expand-rung">
+                            <inspecto-pen-field
+                                label="Fewest links a neighbour may have"
+                                formControlName="candidateDegreeMin"
+                                type="number"
+                                [error]="rung.controls.candidateDegreeMin.invalid ? 'A whole number of at least 0.' : ''"
+                            />
+                            <inspecto-pen-field
+                                label="Most links a neighbour may have"
+                                formControlName="candidateDegreeMax"
+                                type="number"
+                                [error]="rung.controls.candidateDegreeMax.invalid ? 'A whole number of at least 1.' : ''"
+                            />
+                            @if (rung.hasError('degreeOrder')) {
+                                <p class="text-warn m-0 text-xs" role="alert">The minimum degree must not exceed the maximum.</p>
+                            }
+                            <inspecto-pen-field
+                                label="Most neighbours per entity"
+                                formControlName="maxFanOut"
+                                type="number"
+                                [error]="rung.controls.maxFanOut.invalid ? 'A whole number of at least 1.' : ''"
+                            />
+                            <p class="text-secondary m-0 text-xs">Strongest first. Blank means no limit.</p>
+                            <inspecto-pen-field
+                                label="Row limit per degree"
+                                formControlName="budget"
+                                type="number"
+                                [placeholder]="(presets().budget ?? defaultBudget()).toString()"
+                                [error]="rung.controls.budget.invalid ? 'A whole number from 1 to ' + maxBudget() + '.' : ''"
+                            />
+                            <p class="text-secondary m-0 text-xs">Stops at this many rows; the step is marked incomplete.</p>
+                        </div>
+                    } @else {
+                        <p class="text-secondary m-0 text-xs" data-testid="la-expand-basic-note">
+                            More options appear when an Investigation is open.
+                        </p>
+                    }
+                </la-fold>
+            </div>
         </section>
     `,
 })
@@ -346,6 +356,8 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     readonly presets = input<DegreePresets>({});
     /** The Space's four-eyes thresholds; null = not known (no approval note). */
     readonly limits = input<FourEyesLimits | null>(null);
+    /** A section of the Investigation tab (no dialog chrome, no Cancel, no focus grab) rather than the canvas popup. */
+    readonly embedded = input(false);
     readonly expand = output<ExpandRun>();
     readonly closed = output<void>();
 
@@ -359,7 +371,8 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         { value: 'full', label: 'All available data', hint: 'Ignore the window for this Expand' },
         { value: 'override', label: 'Custom window', hint: 'A window for this Expand only' },
     ];
-    readonly moreOpen = signal(false);
+    /** An Expand was asked for with a filter in error: the fold holding it opens (an error behind a closed fold is invisible). */
+    readonly tried = signal(false);
     readonly showHint = signal(!hintSeen('grow'));
     readonly t = computed(() => this.ctx().terms);
     readonly pv = this.store.preview;
@@ -384,10 +397,18 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     readonly formValue = signal(this.form.getRawValue());
     private readonly rungValue = signal(this.rung.getRawValue());
 
-    readonly directions = computed(() =>
-        GROW_DIRECTIONS.filter((d) => d.value !== 'reciprocal' || this.ctx().mode === 'investigation'),
+    /** Direction as a popup choice (Both ways / Outgoing / Incoming, and Both ways, mutual in an Investigation). */
+    readonly directionOptions = computed<PickerOption[]>(() =>
+        GROW_DIRECTIONS.filter((d) => d.value !== 'reciprocal' || this.ctx().mode === 'investigation').map((d) => ({
+            value: d.value,
+            label: d.label,
+            hint: d.hint,
+        })),
     );
-    readonly degreeChoices = computed(() => Array.from({ length: Math.max(1, this.ctx().maxDegree) }, (_, i) => i + 1));
+    /** The Degrees stepper's top: the Industry pack's maximum degree. */
+    readonly maxDegree = computed(() => Math.max(1, this.ctx().maxDegree));
+    readonly fewestDegrees = DISABLED_REASON.fewestDegrees;
+    readonly mostDegreesReason = computed(() => mostDegrees(this.maxDegree()));
     readonly fromOptions = computed<PickerOption[]>(() =>
         (this.ctx().sources ?? []).map((s) => ({ value: s.value, label: s.label, hint: s.blocked ?? s.from })),
     );
@@ -454,9 +475,76 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         }
         if (this.kinds()?.length === 0) return 'Choose at least one link kind to follow.';
         if (this.thresholdError()) return 'Fix the busy limit first.';
-        if (this.rungInvalid()) return 'Fix the Advanced fields first.';
+        if (this.rungInvalid()) return 'Fix the filters first.';
         return null;
     });
+
+    // ── the filter folds: what each one has set, and whether it holds an error ──
+
+    private readonly inv = computed(() => this.ctx().mode === 'investigation');
+    private bad(...names: (keyof typeof this.rung.controls)[]): boolean {
+        this.rungValue();
+        return this.inv() && names.some((n) => this.rung.controls[n].invalid);
+    }
+    readonly linksInvalid = computed(() => this.kinds()?.length === 0 || this.bad('linkKinds', 'minEvents', 'minDistinctDays'));
+    readonly timeInvalid = computed(() => {
+        this.rungValue();
+        return this.inv() && this.rung.controls.window.value === 'override' && this.override.invalid;
+    });
+    readonly limitsInvalid = computed(
+        () =>
+            !!this.thresholdError() ||
+            this.bad('candidateDegreeMin', 'candidateDegreeMax', 'maxFanOut', 'budget') ||
+            (this.inv() && this.rung.hasError('degreeOrder')),
+    );
+    /** "All link kinds · at least 3 events · on 2+ days". */
+    readonly linksSummary = computed(() => {
+        const v = this.rungValue();
+        const all = this.ctx().linkKinds;
+        const on = this.kinds();
+        const typed = this.inv() && !all.length ? parseKinds(String(v.linkKinds ?? '')) : [];
+        const parts = [
+            all.length && on !== null
+                ? `${on.length} of ${all.length} link kinds`
+                : typed.length
+                  ? typed.join(', ')
+                  : 'All link kinds',
+        ];
+        if (this.inv()) {
+            const ev = whole(v.minEvents);
+            const days = whole(v.minDistinctDays);
+            if (ev !== null) parts.push(`at least ${ev} events`);
+            if (days !== null) parts.push(`on ${days}+ days`);
+        }
+        return parts.join(' · ');
+    });
+    readonly timeSummary = computed(() => {
+        const w = this.rungValue().window;
+        return this.windowOptions.find((o) => o.value === w)?.label ?? '';
+    });
+    /** "Busy over 50 links · 20 per entity · 5,000 rows". */
+    readonly limitsSummary = computed(() => {
+        const f = this.formValue();
+        const parts = [f.hold ? `Busy over ${this.thresholdLabel()} links` : 'Busy expanded through'];
+        if (this.inv()) {
+            const v = this.rungValue();
+            const lo = whole(v.candidateDegreeMin);
+            const hi = whole(v.candidateDegreeMax);
+            if (lo !== null || hi !== null) parts.push(`neighbours with ${lo ?? 0}–${hi ?? 'any'} links`);
+            const fan = whole(v.maxFanOut);
+            if (fan !== null) parts.push(`${fan.toLocaleString('en-GB')} per entity`);
+            const budget = whole(v.budget);
+            if (budget !== null) parts.push(`${budget.toLocaleString('en-GB')} rows`);
+        }
+        return parts.join(' · ');
+    });
+
+    /** Bring the form into view and put focus on its first control (every Expand entry point lands here). */
+    focus(): void {
+        const el = this.host.nativeElement;
+        el.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+        el.querySelector<HTMLElement>('[data-testid="la-expand-from"] button, [role="spinbutton"]')?.focus();
+    }
 
     ngOnInit(): void {
         this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.formValue.set(this.form.getRawValue()));
@@ -467,10 +555,12 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
             .pipe(debounceTime(300), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
                 if (this.previewKey() !== this.previewedKey) this.refresh();
             });
-        queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('mat-button-toggle button')?.focus());
+        // the popup takes focus when it opens; the tab section is focused by the screen, only when Expand is asked for
+        if (!this.embedded()) queueMicrotask(() => this.focus());
     }
 
     private previewedKey = '';
+    private sourceKeys: string | null = null;
     private previewKey(): string {
         const { degrees: _degrees, ...rest } = this.request();
         const a = this.active();
@@ -478,11 +568,14 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     }
 
     ngOnChanges(): void {
-        // the default "From": the first start that can be used
-        if (!this.form.controls.from.value || !this.ctx().sources?.some((s) => s.value === this.form.controls.from.value)) {
+        // the default "From": the first start that can be used. The tab section outlives a selection, so a new set of
+        // starts (a selection made or cleared) picks the default again - a right-click on a node starts from it.
+        const keys = (this.ctx().sources ?? []).map((s) => s.value).join();
+        if (keys !== this.sourceKeys || !this.ctx().sources?.some((s) => s.value === this.form.controls.from.value)) {
             const first = this.ctx().sources?.find((s) => !s.blocked) ?? this.ctx().sources?.[0];
             this.form.controls.from.setValue(first?.value ?? null, { emitEvent: false });
         }
+        this.sourceKeys = keys;
         const max = Math.max(1, this.ctx().maxDegree);
         if (this.form.controls.degrees.value > max) this.form.controls.degrees.setValue(max, { emitEvent: false });
         this.formValue.set(this.form.getRawValue());
@@ -512,6 +605,8 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
 
     /** Re-read the preview for the current choice (it covers degree 1). */
     refresh(): void {
+        // the tab section stays mounted while an Expand walks: its degrees re-read nothing (the next change after does)
+        if (this.embedded() && this.store.busy()) return;
         this.previewedKey = this.previewKey();
         if (this.thresholdError() || this.kinds()?.length === 0 || this.rungInvalid()) {
             this.store.resetPreview();
@@ -539,12 +634,19 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     }
 
     submit(): void {
-        if (this.rungInvalid()) {
+        if (this.rungInvalid() || this.linksInvalid() || this.limitsInvalid()) {
             this.rung.markAllAsTouched();
             this.override.markAllAsTouched();
-            this.moreOpen.set(true);
+            this.tried.set(true);
         }
         if (this.goWhyNot()) return;
         this.expand.emit({ ctx: this.active(), req: this.request() });
     }
+}
+
+/** A typed whole number, or null for a blank or non-number field (the fold summaries say only what is set). */
+function whole(v: unknown): number | null {
+    if (v === null || v === undefined || String(v).trim() === '') return null;
+    const n = Number(v);
+    return Number.isInteger(n) ? n : null;
 }

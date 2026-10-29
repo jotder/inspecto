@@ -1,26 +1,39 @@
-import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
+import { ChangeDetectionStrategy, Component, ElementRef, input, signal, viewChild } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 /**
- * **Caps in force** (the footer's left-most item, the counterpart of *Installed modules* at its right edge): the node caps
- * the server and this browser enforce, stated rather than hit silently. A small read-only popover that opens upward over
- * the canvas; it reads values the page already holds, so it makes no request.
+ * **Limits** (LA-INV-EXPAND-1, operator 2026-10-29: the footer strip is gone): the node caps the server and this browser
+ * enforce, stated rather than hit silently. An icon button at the bottom right of the *Graph counts* overlay opens a small
+ * read-only popover under it; it reads values the page already holds, so it makes no request. Escape closes it and puts
+ * focus back on the button.
  */
 @Component({
     selector: 'inspecto-link-analysis-caps',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    // The footer hosts it at the left edge; the list is a popover anchored above its button, never in the footer's flow.
-    host: { class: 'relative inline-block' },
-    imports: [MatButtonModule],
+    // The popover is anchored under its button, never in the overlay's flow.
+    host: { class: 'relative inline-block', '(keydown.escape)': 'close($event)' },
+    imports: [MatIconModule, MatTooltipModule],
     template: `
-        <button mat-button data-testid="caps-toggle" (click)="open.set(!open())" [attr.aria-expanded]="open()">
-            Limits
+        <button
+            #toggle
+            type="button"
+            class="hover:bg-hover flex h-6 w-6 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+            data-testid="caps-toggle"
+            aria-label="Limits"
+            matTooltip="Limits"
+            aria-controls="la-caps-list"
+            [attr.aria-expanded]="open()"
+            (click)="open.set(!open())"
+        >
+            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:scale" aria-hidden="true"></mat-icon>
         </button>
         @if (open()) {
-            <!-- Opens upward over the canvas: an opaque card above the footer, or the graph labels bleed through. -->
+            <!-- an opaque card, or the graph labels bleed through -->
             <div
-                class="absolute bottom-full left-0 z-30 mb-1 w-max max-w-[90vw] rounded border p-2 text-sm"
+                id="la-caps-list"
+                class="absolute right-0 top-full z-30 mt-1 w-max max-w-[90vw] rounded border p-2 text-sm shadow-sm"
                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                 data-testid="caps-list"
                 role="group"
@@ -43,4 +56,13 @@ export class LinkAnalysisCapsComponent {
     /** The server's hard ceiling on a graph run; null until the algorithm catalogue answers. */
     readonly graphRun = input<number | null>(null);
     readonly open = signal(false);
+    private readonly toggle = viewChild.required<ElementRef<HTMLButtonElement>>('toggle');
+
+    /** Escape closes the popover and returns focus to its button (it goes no further than this component). */
+    close(e: Event): void {
+        if (!this.open()) return;
+        e.stopPropagation();
+        this.open.set(false);
+        this.toggle().nativeElement.focus();
+    }
 }

@@ -487,7 +487,18 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         box.form.controls.value.setValue('MULE-HUB-01');
         await settle();
         fixture.detectChanges();
-        pickerSet(fixture, '[data-testid="new-degrees"]', '2');
+        // Expand on start is a − N + stepper from 0 = "Don't expand"
+        const degrees = fixture.nativeElement.querySelector('[data-testid="new-degrees"]') as HTMLElement;
+        const spin = degrees.querySelector('[role="spinbutton"]') as HTMLElement;
+        expect(spin.textContent!.trim()).toBe("Don't expand");
+        expect(spin.getAttribute('aria-valuetext')).toBe("Don't expand");
+        expect(degrees.querySelector('[data-testid="stepper-decrement"]')!.getAttribute('aria-disabled')).toBe('true');
+        for (let i = 0; i < 3; i++) (degrees.querySelector('[data-testid="stepper-increment"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        // Expand on start offers no more than the profile's last degree
+        expect(spin.getAttribute('aria-valuenow')).toBe('2');
+        expect(spin.getAttribute('aria-valuemax')).toBe('2');
+        expect(degrees.querySelector('[data-testid="stepper-reason"]')!.textContent).toContain('2 degrees is the most this Industry pack allows.');
         submit(fixture);
         expect(fixture.componentInstance.starts).toEqual([]); // never the draw
         expect(fixture.componentInstance.creates).toEqual([
@@ -500,8 +511,7 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
                 degrees: 2,
             },
         ]);
-        // Expand on start offers no more than the profile's last degree
-        expect(box.degreeOptions().map((o) => o.value)).toEqual(['0', '1', '2']);
+        expect(box.degreeMax()).toBe(2);
     });
 
     it('with a graph drawn, Start from offers "Graph on screen": a start over its mapping with no start entities', () => {

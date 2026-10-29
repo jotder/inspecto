@@ -19,6 +19,7 @@ import { LaSettingsSection, LinkAnalysisSettingsComponent } from './link-analysi
         <p laSection="graph-model" data-testid="gm">graph model</p>
         <p laSection="entity-types" data-testid="et">types</p>
         <p laSection="investigation" data-testid="inv">inv</p>
+        <p laSection="modules" data-testid="mods">modules</p>
         <form laSection="identities" data-testid="form" (submit)="$event.preventDefault(); submits = submits + 1">
             <button type="submit" data-testid="submit">Assert</button>
         </form>
@@ -61,6 +62,20 @@ describe('LinkAnalysisSettingsComponent (⚙ Settings, §5.10)', () => {
         expect(shown('et')).toBe(true);
         expect(el.querySelector('[data-testid="gm"]')).not.toBeNull(); // hidden, never destroyed
         expect(localStorage.getItem('inspecto.la.settings.section')).toBe('entity-types');
+        await expectNoA11yViolations(el);
+    });
+
+    it('operator 2026-10-29: Installed modules is a section under This Studio, last in the nav, always listed', async () => {
+        const { fixture, el, host } = make();
+        const nav = el.querySelector('[data-testid="la-settings-nav-modules"]') as HTMLButtonElement;
+        expect(nav.textContent!.trim()).toBe('Installed modules');
+        const groups = Array.from(el.querySelectorAll('nav[aria-label="Settings sections"] h3')).map((h) => h.textContent!.trim());
+        expect(groups.at(-1)).toBe('This Studio');
+        nav.click();
+        fixture.detectChanges();
+        expect(host.section()).toBe('modules');
+        expect((el.querySelector('[data-testid="mods"]')!.parentElement as HTMLElement).hidden).toBe(false);
+        expect(el.querySelector('[data-testid="la-settings-help"]')!.textContent).toContain('Link Analysis modules on this server');
         await expectNoA11yViolations(el);
     });
 

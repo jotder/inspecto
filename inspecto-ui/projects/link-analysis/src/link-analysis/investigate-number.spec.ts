@@ -193,7 +193,7 @@ describe('investigate-number - next degree', () => {
         const fan = degreeOutcomeMessage({ ...held, heldFor: ['maxFanOut unbounded (threshold 2000)'] });
         expect(fan).toContain('a second person approves request p1');
         expect(fan).toContain('four_eyes_fan_out_above');
-        expect(fan).toContain('Ask an approver, or use Expand… with a fan-out at or below the threshold.');
+        expect(fan).toContain('Ask an approver, or use Expand with a fan-out at or below the threshold (Expand ▸ Limits).');
         expect(degreeOutcomeMessage({ ...held, heldFor: ['budget 500 > 100'] })).not.toContain('Ask an approver');
     });
 

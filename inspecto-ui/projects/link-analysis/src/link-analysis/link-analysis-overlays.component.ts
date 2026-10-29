@@ -10,6 +10,7 @@ import { WorkingSetStat } from '@inspecto/link-analysis/graph/working-set-stats'
 import { entityTypeIcon, nodeColor } from '@inspecto/core/graph/catalog-graph';
 import { baseEdgeKind } from '@inspecto/core/graph/graph-view.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
+import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
 
 /** One swatch row of the legend. */
 export interface LegendItem {
@@ -305,7 +306,7 @@ export class LinkAnalysisLegendComponent {
     selector: 'inspecto-link-analysis-working-set',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, MatIconModule, MatTooltipModule],
+    imports: [MatButtonModule, MatIconModule, MatTooltipModule, LinkAnalysisCapsComponent],
     host: { class: 'block' },
     template: `
         @if (open()) {
@@ -350,11 +351,22 @@ export class LinkAnalysisLegendComponent {
                         {{ n }} possible split {{ n === 1 ? 'identity' : 'identities' }}
                     </p>
                 }
-                @if (customizable()) {
-                    <button type="button" class="text-primary mt-1 text-[11px] underline" (click)="customize.emit()">
-                        Customise counts
-                    </button>
-                }
+                <div class="mt-1 flex items-center">
+                    @if (customizable()) {
+                        <button type="button" class="text-primary text-[11px] underline" (click)="customize.emit()">
+                            Customise counts
+                        </button>
+                    }
+                    @if (limits(); as l) {
+                        <!-- the node caps in force, at the card's bottom right (the footer strip is gone) -->
+                        <inspecto-link-analysis-caps
+                            class="ml-auto"
+                            [projection]="l.projection"
+                            [analysis]="l.analysis"
+                            [graphRun]="l.graphRun"
+                        />
+                    }
+                </div>
             </div>
         } @else {
             <button
@@ -404,6 +416,15 @@ export class LinkAnalysisWorkingSetComponent {
               : '',
     );
     readonly open = input(true);
+    /** The node caps in force, behind the Limits icon at the card's bottom right; null = no Limits button. */
+    readonly limits = input<GraphLimits | null>(null);
     readonly openChange = output<boolean>();
     readonly customize = output<void>();
+}
+
+/** What the Limits popover states: the drawn graph's and the On screen tools' node caps, and the server's ceiling. */
+export interface GraphLimits {
+    projection: number;
+    analysis: number;
+    graphRun: number | null;
 }
