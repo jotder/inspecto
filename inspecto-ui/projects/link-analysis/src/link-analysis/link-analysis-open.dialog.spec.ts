@@ -181,7 +181,7 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         expect(el.querySelector('[data-testid="la-open-inv-pack"]')?.textContent?.trim()).toBe('mobile-money');
         (el.querySelector('[data-testid="la-open-inv-inv-2"]') as HTMLButtonElement).click();
         await settle();
-        expect(el.querySelector('[data-testid="la-open-inv-pack"]')?.textContent?.trim()).toBe("none (the Space's pack)");
+        expect(el.querySelector('[data-testid="la-open-inv-pack"]')?.textContent?.trim()).toBe('Space default');
 
         c.setTab('views');
         await settle();

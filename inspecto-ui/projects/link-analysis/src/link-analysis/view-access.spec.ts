@@ -17,7 +17,7 @@ describe('saved view access (mirrors the /components write gates)', () => {
     it('saving needs canAuthorWorkbench, said in plain words', () => {
         expect(viewSaveBlock(author)).toBe('');
         expect(viewSaveBlock(reader)).toBe(VIEW_AUTHOR_REASON);
-        expect(VIEW_AUTHOR_REASON).toBe('Saving views needs the Workbench author permission.');
+        expect(VIEW_AUTHOR_REASON).toBe('Needs Workbench author.');
     });
 
     it('deleting needs canAuthorWorkbench even for an unshared example view', () => {

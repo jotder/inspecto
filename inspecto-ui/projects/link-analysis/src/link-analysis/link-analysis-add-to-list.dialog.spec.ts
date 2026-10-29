@@ -79,7 +79,7 @@ describe('LinkAnalysisAddToListDialog - Add to a list (LA-ONBOARD-1 phase 7, UC-
         const { c } = create();
         const offered = Object.fromEntries(c.purposeOptions.map((o) => [o.value, o.label]));
         for (const p of ENTITY_LIST_PURPOSES) expect(offered[p.value]).toBe(purposeWords(p.value));
-        expect(offered['exclusion']).toBe('Never follow these (exclusion)');
+        expect(offered['exclusion']).toBe('Exclusion: leave out of analyses');
         expect(offered['watch']).toBe('Watch these');
     });
 
@@ -103,7 +103,7 @@ describe('LinkAnalysisAddToListDialog - Add to a list (LA-ONBOARD-1 phase 7, UC-
     it('creates a new list with the purpose the busiest hint asked for (exclusion), then adds', async () => {
         const { f, el, close, go, createEntityList } = create({ lists: [], purpose: 'exclusion' });
         // no list of this type yet: the new list is the one choice, already picked
-        penEdit(f, penByLabel(el, 'New list name')!, 'Busy merchants');
+        penEdit(f, penByLabel(el, 'Name')!, 'Busy merchants');
         await go();
         expect(createEntityList).toHaveBeenCalledWith({
             title: 'Busy merchants',
@@ -121,7 +121,7 @@ describe('LinkAnalysisAddToListDialog - Add to a list (LA-ONBOARD-1 phase 7, UC-
         pickerSet(f, '[data-testid="la-add-list-pick"]', '__new__');
         penEdit(f, penByLabel(el, 'Reason')!, '  ');
         await go();
-        expect(penError(penByLabel(el, 'New list name')!)).toBe('Name the new list.');
+        expect(penError(penByLabel(el, 'Name')!)).toBe('Name the new list.');
         expect(penError(penByLabel(el, 'Reason')!)).toContain('A reason is required');
         expect(changeEntityListMembers).not.toHaveBeenCalled();
         expect(close).not.toHaveBeenCalled();
@@ -144,7 +144,7 @@ describe('LinkAnalysisAddToListDialog - Add to a list (LA-ONBOARD-1 phase 7, UC-
 
     it('no list can take them and no Entity Type: says why and where to make one, never an empty choice alone', async () => {
         const { el } = create({ entityType: null, lists: [] });
-        expect(el.querySelector('[data-testid="la-add-list-none"]')?.textContent).toContain('Entity Lists page');
+        expect(el.querySelector('[data-testid="la-add-list-none"]')?.textContent).toContain('Settings ▸ Entity Lists');
         await expectNoA11yViolations(el);
     });
 });

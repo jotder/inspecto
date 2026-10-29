@@ -10,7 +10,7 @@ import { EmbedGrantList, EmbedGrantSummary, InvService } from '@inspecto/link-an
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EMBED_SCOPES, EmbedMintData, LinkAnalysisEmbedMintDialog, embedErrorMessage } from './link-analysis-embed-mint.dialog';
 
-const FLAG_HINT = 'Embed links are disabled on this host; set -Dla.embed.enabled=true to enable them.';
+const FLAG_HINT = 'Embed links are turned off. Ask an administrator.';
 
 /**
  * **Share (embed link)** (LA-EMBED-SPA-1) - the read-only embeddable view of the open Investigation: the grant list
@@ -67,12 +67,11 @@ const FLAG_HINT = 'Embed links are disabled on this host; set -Dla.embed.enabled
             }
             @if (!lens.canShareInvestigation()) {
                 <p class="text-secondary m-0">
-                    Read-only - minting and revoking embed links needs the canShareInvestigation capability and being a
-                    lead of this Investigation.
+                    Only a lead with Investigation sharing can create embed links.
                 </p>
             } @else if (!loading() && !isLead()) {
                 <p class="text-secondary m-0">
-                    Read-only - only a lead of this Investigation can mint or revoke embed links.
+                    Only a lead of this Investigation can create or revoke embed links.
                 </p>
             }
             @if (lens.canShareInvestigation() && isLead()) {

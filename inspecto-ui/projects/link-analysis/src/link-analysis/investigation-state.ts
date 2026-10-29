@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { EntityProjection, EntityTypeRef, G6Node, typedEntityKey } from '@inspecto/core/graph';
 import { InvestigationLogEntry, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { apiErrorMessage, needsPermission } from '@inspecto/core/api';
 import type { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { resolveEntityId } from '@inspecto/core/graph';
 import { ProjectedGraph, projectTriples } from './entity-projection';
@@ -168,6 +168,39 @@ export function moveStep(order: number[], index: number, delta: number): number[
 }
 
 /**
+ * The plain name of each step kind (LA-UI-TEXT-PASS-1 X9; G2, G4): the step log row, the "That step failed."
+ * error and aria names all read it, so an op id (`seed`, `excludeBy`) never reaches the screen. The API keeps the ids.
+ */
+const STEP_NAMES: Readonly<Record<string, string>> = {
+    seed: 'Start',
+    seedBy: 'Start from list',
+    expand: 'Expand',
+    window: 'Time window',
+    exclude: 'Exclude',
+    excludeBy: 'Exclude by list',
+    hide: 'Hide',
+    keep: 'Keep',
+    resolve: 'Resolve identities',
+    annotate: 'Annotation',
+    connect: 'Connect',
+    threshold: 'Link count filter',
+    snapshot: 'Snapshot',
+    compare: 'Compare',
+    temporal: 'Time pattern',
+    undo: 'Undo',
+    merge: 'Merge',
+};
+
+/** "Exclude by list" for `excludeBy`; an op this list does not know reads as words ("someNewOp" → "Some new op"). */
+export function stepName(op: string | null | undefined): string {
+    if (!op) return 'Step';
+    const known = STEP_NAMES[op];
+    if (known) return known;
+    const words = op.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase().trim();
+    return words ? words[0].toUpperCase() + words.slice(1) : 'Step';
+}
+
+/**
  * A readable message for an Investigation route failure. 404 is deliberately ambiguous: the server answers it
  * for an unknown id AND for someone else's Investigation (owner-only), and for a bound Dataset the caller can
  * no longer view. 403 is the capability gate (`canManageIncidents`). 409 and 422 carry the server's own reason.
@@ -179,27 +212,17 @@ export function investigationErrorMessage(err: unknown, fallback: string): strin
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 404:
-            return (
-                'This Investigation is not available — it does not exist, it is not yours, or its Dataset is no ' +
-                'longer shared with you (the server answers the same for all three). Server: ' +
-                server
-            );
+            return 'This Investigation is not available: it does not exist, is not yours, or its Dataset is no longer shared with you.';
         case 403:
             // a four-eyes refusal (the neighbours read of a node above the fan-out limit) is not a missing capability
-            if (/four-eyes/i.test(server)) return 'Refused — ' + server;
-            return (
-                'You are not allowed to change Investigations (it needs the Incident-management capability). Server: ' +
-                server
-            );
+            if (/four-eyes/i.test(server)) return 'Refused: ' + server;
+            return needsPermission('canManageIncidents');
         case 409:
-            return 'Refused — ' + server;
+            return 'Refused: ' + server;
         case 422:
-            return 'The server refused this step: ' + server;
+            return 'That step was refused: ' + server;
         case 503:
-            return (
-                'Investigations are not available here — the link-analysis module or a write root is missing. Server: ' +
-                server
-            );
+            return 'Investigations are not available: the Link Analysis module is missing or the Space is read-only.';
         default:
             return server;
     }
@@ -215,7 +238,7 @@ export function entityListErrorMessage(
     err: unknown,
     fallback: string,
     onInvestigation = false,
-    forbidden = 'You are not allowed to change Entity Lists (it needs the Incident-management capability).',
+    forbidden = needsPermission('canManageIncidents'),
 ): string {
     const limit = limitRefusalMessage(err);
     if (limit) return limit;
@@ -224,18 +247,16 @@ export function entityListErrorMessage(
     switch (status) {
         case 404:
             return onInvestigation
-                ? 'The Entity List or the Investigation is not available (the server answers the same when either ' +
-                      'does not exist or is not yours). Server: ' +
-                      server
-                : 'This Entity List does not exist (any more). Server: ' + server;
+                ? 'The Entity List or the Investigation is not available: it does not exist or is not yours.'
+                : 'This Entity List no longer exists.';
         case 403:
-            return forbidden + ' Server: ' + server;
+            return forbidden;
         case 409:
-            return 'Refused — ' + server;
+            return 'Refused: ' + server;
         case 422:
-            return 'The server refused this: ' + server;
+            return 'Refused: ' + server;
         case 503:
-            return 'Entity Lists are not available here — the link-analysis module or a write root is missing.';
+            return 'Entity Lists are not available: the Link Analysis module is missing or the Space is read-only.';
         default:
             return server;
     }
@@ -257,6 +278,9 @@ export function identityKeyOf(type: EntityTypeRef | undefined, value: string): s
  * capability too (under masking the group read is a membership oracle), so a 403 may come from a read. 409 is a
  * retract of an unknown or already-retracted assertion; 422 carries the server's reason. 503 is a deployment state.
  */
+/** Identities are readable only to those who may change them (T-206). */
+export const IDENTITIES_NEED = 'Identities need Incident management, also to read.';
+
 export function identityErrorMessage(err: unknown, fallback: string): string {
     const limit = limitRefusalMessage(err);
     if (limit) return limit;
@@ -264,13 +288,13 @@ export function identityErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return 'Identity resolution needs the Incident-management capability. Server: ' + server;
+            return IDENTITIES_NEED;
         case 409:
-            return 'Refused — ' + server;
+            return 'Refused: ' + server;
         case 422:
-            return 'The server refused this: ' + server;
+            return 'Refused: ' + server;
         case 503:
-            return 'Identity resolution is not available here — the link-analysis module or a write root is missing.';
+            return 'Identities are not available: the Link Analysis module is missing or the Space is read-only.';
         default:
             return server;
     }

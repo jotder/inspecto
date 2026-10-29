@@ -207,7 +207,7 @@ describe('MultiProjectionGraphSource + invErrorMessage', () => {
         const src = new MultiProjectionGraphSource(inv);
         await expect(
             src.query({ multi: { nodes: [{ dataset: 'secret', idColumn: 'id' }], edges: [] } }),
-        ).rejects.toThrow(/not available to you.*no partial graph.*no dataset 'secret'/);
+        ).rejects.toThrow(/^A Dataset in this query is unavailable \(missing or not shared with you\)\. Nothing was drawn\.$/);
     });
 
     it('surfaces a 422 as the server message', () => {
@@ -346,6 +346,6 @@ describe('MultiProjectionGraphSource - node attributes, edge filter and expand (
             src.expand('n', 'x', {
                 multi: { nodes: [], edges: [{ dataset: 'd', sourceColumn: 'a', targetColumn: 'b' }] },
             }),
-        ).rejects.toThrow(/not available to you/);
+        ).rejects.toThrow(/is unavailable \(missing or not shared with you\)/);
     });
 });

@@ -41,13 +41,14 @@ export function glossaryEntries(profile: DomainProfile): GlossaryEntry[] {
                 type="button"
                 [matMenuTriggerFor]="glossaryMenu"
                 laFormMenu
-                matTooltip="Glossary"
-                aria-label="Glossary of the Industry pack's terms"
+                matTooltip="Industry pack glossary"
+                aria-label="Industry pack glossary"
                 data-testid="la-glossary"
             >
                 <mat-icon svgIcon="heroicons_outline:book-open"></mat-icon>
             </button>
             <mat-menu #glossaryMenu="matMenu">
+                <div class="max-w-sm px-4 pt-2 text-sm font-semibold">Industry pack glossary</div>
                 <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control -->
                 <dl class="m-0 flex max-h-96 max-w-sm flex-col gap-2 overflow-y-auto px-4 py-2" (click)="$event.stopPropagation()">
                     @for (e of entries(); track e.id) {

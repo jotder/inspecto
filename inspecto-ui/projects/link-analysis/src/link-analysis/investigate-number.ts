@@ -714,10 +714,10 @@ export function hubBadgeText(threshold?: number | null, contacts?: number | null
     const state = overridden ? 'expanded through override' : 'not expanded';
     if (contacts != null)
         return (
-            `High connectivity — ${plural(contacts, 'contact')}` +
-            `${threshold != null ? ` (threshold ${threshold.toLocaleString('en')})` : ''}, ${state}`
+            `Busy: ${plural(contacts, 'linked entity', 'linked entities')}` +
+            `${threshold != null ? ` (limit ${threshold.toLocaleString('en-GB')})` : ''}, ${state}`
         );
     return threshold != null
-        ? `High connectivity — more than ${threshold.toLocaleString('en')} contacts, ${state}`
-        : `High connectivity — ${state}`;
+        ? `Busy: more than ${threshold.toLocaleString('en-GB')} linked entities, ${state}`
+        : `Busy: ${state}`;
 }

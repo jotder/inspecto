@@ -198,12 +198,12 @@ describe('investigate-number - next degree', () => {
     });
 
     it('words the hub badge with the threshold when known, never a guessed contact count', () => {
-        expect(hubBadgeText(500)).toBe('High connectivity — more than 500 contacts, not expanded');
-        expect(hubBadgeText(null)).toBe('High connectivity — not expanded');
+        expect(hubBadgeText(500)).toBe('Busy: more than 500 linked entities, not expanded');
+        expect(hubBadgeText(null)).toBe('Busy: not expanded');
         // The entity's own sealed count, when served; null (old logs) falls back to the threshold wording.
-        expect(hubBadgeText(500, 650)).toBe('High connectivity — 650 contacts (threshold 500), not expanded');
-        expect(hubBadgeText(null, 1200)).toBe('High connectivity — 1,200 contacts, not expanded');
-        expect(hubBadgeText(500, null)).toBe('High connectivity — more than 500 contacts, not expanded');
+        expect(hubBadgeText(500, 650)).toBe('Busy: 650 linked entities (limit 500), not expanded');
+        expect(hubBadgeText(null, 1200)).toBe('Busy: 1,200 linked entities, not expanded');
+        expect(hubBadgeText(500, null)).toBe('Busy: more than 500 linked entities, not expanded');
         const base = { degree: 2, admitted: 1, linksAdded: 1, truncated: false, fanOutCapped: 0, hubsFlagged: 1 };
         expect(degreeOutcomeMessage({ ...base, hubDegreeSource: 'index' })).toContain(
             '1 high-connectivity number shown but not expanded (contacts counted from the link index).',
@@ -392,7 +392,7 @@ describe('investigate-number - third live run fixes', () => {
             { entityId: 7, contacts: 3 },
         ]);
         expect([...m]).toEqual([['h', 650]]);
-        expect(hubBadgeText(500, m.get('h'))).toBe('High connectivity — 650 contacts (threshold 500), not expanded');
+        expect(hubBadgeText(500, m.get('h'))).toBe('Busy: 650 linked entities (limit 500), not expanded');
     });
 
     it('labels a held and an approved "Expand anyway" by the same hop: one past the hub', () => {
@@ -489,7 +489,7 @@ describe('investigate-number - fourth live run fixes', () => {
         expect(sealedHubThreshold(entries)).toBe(500);
         expect(sealedHubThreshold([] as never)).toBeNull();
         expect(hubBadgeText(500, 650, true)).toBe(
-            'High connectivity — 650 contacts (threshold 500), expanded through override',
+            'Busy: 650 linked entities (limit 500), expanded through override',
         );
     });
 

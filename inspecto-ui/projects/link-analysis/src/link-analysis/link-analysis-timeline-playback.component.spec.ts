@@ -64,7 +64,8 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
 
     it('starts idle with accessible, named controls', async () => {
         const { el, q, host } = setup();
-        expect(q('playback-play').getAttribute('aria-label')).toBe('Play timeline');
+        expect(q('playback-play').getAttribute('aria-label')).toBe('Play');
+        expect(q('playback-scrub').getAttribute('aria-label')).toBe('Timeline position'); // T-076
         expect(q('playback-back').getAttribute('aria-label')).toBe('Previous slice');
         expect(q('playback-forward').getAttribute('aria-label')).toBe('Next slice');
         expect(q('playback-status').textContent).toContain('Not started');
@@ -87,14 +88,15 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         q('playback-back').click();
         fixture.detectChanges();
         expect(host.lit).toHaveBeenLastCalledWith({ nodeIds: ['a', 'b'], edgeIds: ['e1'] });
-        expect(q('playback-back').disabled).toBe(true);
+        // disabled with its reason: still focusable, so the tooltip says why (T-076)
+        expect(q('playback-back').getAttribute('aria-disabled')).toBe('true');
     });
 
     it('plays on a timer, pauses on demand, and stops at the end', () => {
         const { fixture, host, q } = setup();
         q('playback-play').click();
         fixture.detectChanges();
-        expect(q('playback-play').getAttribute('aria-label')).toBe('Pause playback');
+        expect(q('playback-play').getAttribute('aria-label')).toBe('Pause');
         expect(q('playback-status').getAttribute('aria-live')).toBe('off');
         vi.advanceTimersByTime(3000);
         fixture.detectChanges();
@@ -111,7 +113,7 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         vi.advanceTimersByTime(PLAYBACK_SLICES * 1000);
         fixture.detectChanges();
         expect(q('playback-status').textContent).toContain(`Slice ${PLAYBACK_SLICES} of ${PLAYBACK_SLICES}`);
-        expect(q('playback-play').getAttribute('aria-label')).toBe('Play timeline');
+        expect(q('playback-play').getAttribute('aria-label')).toBe('Play');
         expect(host.lit).toHaveBeenLastCalledWith({ nodeIds: ['b', 'c'], edgeIds: ['e2'] });
     });
 

@@ -131,8 +131,8 @@ export function overlayStartsOpen(stored: boolean | null, canvasWidth: number): 
                         mat-icon-button
                         class="ml-auto !h-6 !w-6 !p-0"
                         (click)="openChange.emit(false)"
-                        matTooltip="Minimize the legend"
-                        aria-label="Minimize the legend"
+                        matTooltip="Minimise the legend"
+                        aria-label="Minimise the legend"
                     >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:minus"></mat-icon>
                     </button>
@@ -235,8 +235,7 @@ export function overlayStartsOpen(stored: boolean | null, canvasWidth: number): 
                     </ul>
                     <!-- LA-UNEXPANDED-MARKER-1 decision: a hide here is the drawing only, never what an expand reads or the log records -->
                     <div class="text-secondary mt-1 text-[11px]" data-testid="legend-kinds-note">
-                        Hiding a kind only changes the drawing. Expand still follows it; set Link kinds in the expand
-                        settings to leave one out.
+                        Hiding only changes the drawing. Expand still follows hidden link kinds.
                     </div>
                 }
                 @if (hint()) {
@@ -315,10 +314,10 @@ export class LinkAnalysisLegendComponent {
                 style="background: var(--gamma-bg-card)"
             >
                 <div class="flex items-center gap-1">
-                    <span class="font-semibold">Working set</span>
+                    <span class="font-semibold">Graph counts</span>
                     @if (truncated()) {
-                        <span class="text-warn font-semibold" title="The server returned a bounded slice">
-                            truncated
+                        <span class="text-warn font-semibold" title="The server cut this result at its limit">
+                            cut short
                         </span>
                     } @else {
                         <span class="text-secondary">{{ mode() }}</span>
@@ -327,8 +326,8 @@ export class LinkAnalysisLegendComponent {
                         mat-icon-button
                         class="ml-auto !h-6 !w-6 !p-0"
                         (click)="openChange.emit(false)"
-                        matTooltip="Minimize the working set"
-                        aria-label="Minimize the working set"
+                        matTooltip="Minimise graph counts"
+                        aria-label="Minimise graph counts"
                     >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:minus"></mat-icon>
                     </button>
@@ -338,7 +337,7 @@ export class LinkAnalysisLegendComponent {
                         {{ countsNote() }}
                     </p>
                 }
-                <dl class="mt-1 grid grid-cols-2 gap-1" aria-label="Working set statistics">
+                <dl class="mt-1 grid grid-cols-2 gap-1" aria-label="Graph counts">
                     @for (s of stats(); track s.label) {
                         <div class="rounded-md border px-2 py-1" [title]="s.hint ?? ''">
                             <dt class="text-secondary truncate text-[10px] font-semibold">{{ s.label }}</dt>
@@ -353,7 +352,7 @@ export class LinkAnalysisLegendComponent {
                 }
                 @if (customizable()) {
                     <button type="button" class="text-primary mt-1 text-[11px] underline" (click)="customize.emit()">
-                        Customize statistics
+                        Customise counts
                     </button>
                 }
             </div>
@@ -364,17 +363,17 @@ export class LinkAnalysisLegendComponent {
                 style="background: var(--gamma-bg-card)"
                 (click)="openChange.emit(true)"
                 aria-expanded="false"
-                aria-label="Show the working set"
+                aria-label="Show graph counts"
             >
-                Working set
+                Graph counts
                 @if (countsNote()) {
                     <span class="text-secondary font-normal">· {{ countsOf() }}</span>
                 }
                 @if (truncated()) {
-                    <span class="text-warn">· truncated</span>
+                    <span class="text-warn">· cut short</span>
                 }
                 @if (splitIdentityCount()) {
-                    <span class="text-warn" [title]="splitIdentityHint()">· split ids</span>
+                    <span class="text-warn" [title]="splitIdentityHint()">· split identities</span>
                 }
             </button>
         }
@@ -396,12 +395,12 @@ export class LinkAnalysisWorkingSetComponent {
     /** Which graph the tiles count (LA-STUDIO-UI-REORG-1 §1): `query`, or `query-under-investigation` while the canvas
      *  draws an Investigation's Working Set instead; '' = say nothing. */
     readonly countsGraph = input<'' | 'query' | 'query-under-investigation'>('');
-    readonly countsOf = computed(() => (this.countsGraph() ? 'query graph' : ''));
+    readonly countsOf = computed(() => (this.countsGraph() ? 'graph on screen' : ''));
     readonly countsNote = computed(() =>
         this.countsGraph() === 'query-under-investigation'
-            ? 'Counts the query graph. The canvas shows the Investigation’s Working Set (its counts are in the Investigation panel).'
+            ? 'Totals for the full graph. The canvas shows the Investigation’s Working Set (its counts are in the Investigation tab).'
             : this.countsGraph() === 'query'
-              ? 'Counts the query graph.'
+              ? 'Totals for the graph on screen.'
               : '',
     );
     readonly open = input(true);

@@ -6,12 +6,12 @@
                 style="border-color: var(--gamma-border)"
                 data-testid="masking-badge"
                 [attr.title]="m.basis"
-                >Masking: {{ m.mode }}{{ m.masked === true ? ' (ids shown as aliases)' : '' }}</span
+                >{{ m.mode === 'none' ? 'Masking off' : 'Masking on' }}{{ m.masked === true ? ': ids shown as aliases' : '' }}</span
             >
         }
         <inspecto-option-picker
             class="w-full"
-            label="Graph source"
+            label="Graph built from"
             [options]="sourceOptions()"
             [ngModel]="sourceId()"
             [ngModelOptions]="{ standalone: true }"
@@ -30,13 +30,13 @@
                 ></inspecto-option-picker>
                 <inspecto-option-picker
                     class="w-full"
-                    label="Source entity column"
+                    label="From column"
                     formControlName="sourceCol"
                     [options]="columnOptions()"
                 ></inspecto-option-picker>
                 <inspecto-option-picker
                     class="w-full"
-                    label="Target entity column"
+                    label="To column"
                     formControlName="targetCol"
                     [options]="columnOptions()"
                 ></inspecto-option-picker>
@@ -48,7 +48,7 @@
                 }
                 <inspecto-option-picker
                     class="w-full"
-                    label="Link type column (optional)"
+                    label="Link kind column (optional)"
                     formControlName="linkKindCol"
                     [options]="optionalColumnOptions()"
                 ></inspecto-option-picker>
@@ -172,7 +172,7 @@
                     >
                         <inspecto-option-picker
                             class="w-full"
-                            label="Edge Dataset"
+                            label="Link Dataset"
                             formControlName="datasetId"
                             [options]="datasetOptions()"
                         ></inspecto-option-picker>
@@ -204,11 +204,11 @@
                             mat-icon-button
                             type="button"
                             (click)="removeEdgeMapping(i)"
-                            [attr.aria-label]="'Remove edge mapping ' + (i + 1)"
+                            [attr.aria-label]="'Remove link mapping ' + (i + 1)"
                         >
                             <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                         </button>
-                        <div class="w-full" role="group" [attr.aria-label]="'Filter for edge mapping ' + (i + 1)">
+                        <div class="w-full" role="group" [attr.aria-label]="'Filter for link mapping ' + (i + 1)">
                             <p class="text-secondary m-0 text-xs">
                                 Filter (this mapping only; narrows its rows before they fold, and is combined with the
                                 predicate below).
@@ -229,7 +229,7 @@
                 </button>
                 <button mat-stroked-button type="button" (click)="addEdgeMapping()">
                     <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                    Add edge mapping
+                    Add link mapping
                 </button>
             }
             @case ('lineage') {
@@ -279,7 +279,7 @@
                 >
             }
             @default {
-                <p class="text-secondary self-center text-sm">Graphs every registered component and its references.</p>
+                <p class="text-secondary self-center text-sm">Draws every registered component and its references.</p>
             }
         }
 
@@ -298,14 +298,14 @@
                 [outputs]="aiAssistOutputs"
             />
             <p class="text-secondary w-full text-xs" data-testid="derive-mapping-help">
-                Derive mapping asks the assistant to draft the columns, and needs permission to author configuration.
+                Derive mapping drafts the columns with the assistant. Needs Workbench author.
                 Without it, use the columns filled in above.
             </p>
         }
 
         <button mat-flat-button color="primary" type="submit" [disabled]="loading()" class="self-center">
             <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
-            Run query
+            Run
         </button>
     </form>
 } @else {
@@ -316,7 +316,7 @@
                 style="border-color: var(--gamma-border)"
                 data-testid="masking-badge"
                 [attr.title]="m.basis"
-                >Masking: {{ m.mode }}{{ m.masked === true ? ' (ids shown as aliases)' : '' }}</span
+                >{{ m.mode === 'none' ? 'Masking off' : 'Masking on' }}{{ m.masked === true ? ': ids shown as aliases' : '' }}</span
             >
         }
         <div class="flex items-center gap-2 text-sm">
@@ -337,7 +337,7 @@
         </button>
         <button mat-stroked-button (click)="run.emit()" [disabled]="loading()">
             <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
-            Re-run
+            Run again
         </button>
     </div>
 }

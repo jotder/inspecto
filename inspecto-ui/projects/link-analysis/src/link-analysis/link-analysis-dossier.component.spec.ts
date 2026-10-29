@@ -337,7 +337,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         });
         await c.loadSnapshots();
         f.detectChanges();
-        expect(el.textContent).toContain('Investigations are not available here');
+        expect(el.textContent).toContain('Investigations are not available: the Link Analysis module is missing');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 

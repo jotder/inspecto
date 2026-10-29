@@ -103,13 +103,13 @@ describe('CreateEntityListDialog (LA-17)', () => {
         await f.componentInstance.save();
         f.detectChanges();
         expect(close).not.toHaveBeenCalled();
-        expect(el.querySelector('inspecto-alert [role="alert"]')?.textContent).toContain('Refused — id already used');
+        expect(el.querySelector('inspecto-alert [role="alert"]')?.textContent).toContain('Refused: id already used');
 
         createEntityList.mockImplementation(http(503, 'not installed'));
         await f.componentInstance.save();
         f.detectChanges();
         expect(el.querySelector('inspecto-alert [role="status"]')?.textContent).toContain(
-            'Entity Lists are not available here',
+            'Entity Lists are not available',
         );
     });
 
@@ -137,7 +137,7 @@ describe('CreateEntityListDialog (LA-17)', () => {
         configure({ entityTypes: [] });
         const f = TestBed.createComponent(CreateEntityListDialog);
         f.detectChanges();
-        expect((f.nativeElement as HTMLElement).textContent).toContain('No Entity Types are in force');
+        expect((f.nativeElement as HTMLElement).textContent).toContain('No Entity Types are set up');
     });
 });
 

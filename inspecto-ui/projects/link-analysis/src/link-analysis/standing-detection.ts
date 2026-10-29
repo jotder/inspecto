@@ -79,21 +79,13 @@ export function standingDetectionErrorMessage(err: unknown): string {
     const server = apiErrorMessage(err, 'Could not enable standing detection.');
     switch (status) {
         case 403:
-            return (
-                'Only the Investigation owner, holding the Alert Rule authoring capability, can enable standing detection. Server: ' +
-                server
-            );
+            return 'Only the Investigation owner can enable standing detection. Needs Alert Rule authoring.';
         case 404:
-            return (
-                'That Alert Rule is not bound to this Investigation (or the Investigation is not yours). Server: ' +
-                server
-            );
+            return 'That Alert Rule is not bound to this Investigation, or the Investigation is not yours.';
         case 409:
-            return (
-                'The rule was edited after it was bound. Delete it and bind it again, then enable. Server: ' + server
-            );
+            return 'The Alert Rule was edited after it was bound. Delete it, bind it again, then enable.';
         case 503:
-            return 'Standing detection needs the alert engine and a write root. Server: ' + server;
+            return 'Standing detection needs the alert engine, which is not running here.';
         default:
             return server;
     }

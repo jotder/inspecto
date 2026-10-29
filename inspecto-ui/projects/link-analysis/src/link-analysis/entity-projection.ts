@@ -340,14 +340,10 @@ export function invErrorMessage(err: unknown, fallback: string): string {
         const msg = apiErrorMessage(err, '');
         // An empty Dataset store: the server's own plain words, plus the reassurance that the query itself is fine.
         if (msg.includes('has no data yet'))
-            return `${msg} Nothing is wrong with your query or mapping - the Dataset stays empty until a Pipeline run fills it.`;
+            return `${msg} Nothing is wrong with your query or mapping: the Dataset stays empty until a Pipeline run fills it.`;
     }
     if (err instanceof HttpErrorResponse && err.status === 404) {
-        return (
-            'A Dataset in this query is not available to you (unknown, or not shared with you) — ' +
-            'the whole query was refused, so no partial graph is shown. Server: ' +
-            apiErrorMessage(err, 'not found')
-        );
+        return 'A Dataset in this query is unavailable (missing or not shared with you). Nothing was drawn.';
     }
     return apiErrorMessage(err, fallback);
 }

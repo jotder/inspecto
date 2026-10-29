@@ -46,9 +46,10 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
                 type="button"
                 data-test="playback-back"
                 aria-label="Previous slice"
-                matTooltip="Previous slice"
+                [matTooltip]="index() <= 0 ? 'At the first slice' : 'Previous slice'"
+                [disabledInteractive]="true"
                 [disabled]="index() <= 0"
-                (click)="step(-1)"
+                (click)="index() > 0 && step(-1)"
             >
                 <mat-icon svgIcon="heroicons_outline:backward"></mat-icon>
             </button>
@@ -56,7 +57,8 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
                 mat-icon-button
                 type="button"
                 data-test="playback-play"
-                [attr.aria-label]="playing() ? 'Pause playback' : 'Play timeline'"
+                [attr.aria-label]="playing() ? 'Pause' : 'Play'"
+                [matTooltip]="playing() ? 'Pause' : 'Play'"
                 [disabled]="!playing() && atEnd()"
                 (click)="toggle()"
             >
@@ -67,9 +69,10 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
                 type="button"
                 data-test="playback-forward"
                 aria-label="Next slice"
-                matTooltip="Next slice"
+                [matTooltip]="atEnd() ? 'At the last slice' : 'Next slice'"
+                [disabledInteractive]="true"
                 [disabled]="atEnd()"
-                (click)="step(1)"
+                (click)="!atEnd() && step(1)"
             >
                 <mat-icon svgIcon="heroicons_outline:forward"></mat-icon>
             </button>
@@ -79,6 +82,7 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
                     class="w-full"
                     type="range"
                     data-test="playback-scrub"
+                    aria-label="Timeline position"
                     min="0"
                     [max]="count() - 1"
                     step="1"

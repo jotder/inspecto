@@ -161,7 +161,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         const items = Array.from(el.querySelectorAll('[aria-label="Entity Lists of this Space"] li'));
         expect(items).toHaveLength(2);
         expect(items[0].textContent).toContain('Known mules');
-        expect(items[0].textContent).toContain('Never follow these (exclusion) · MSISDN · 40 members');
+        expect(items[0].textContent).toContain('Exclusion: leave out of analyses · MSISDN · 40 members');
         expect(items[0].querySelector('inspecto-status-badge')).toBeNull();
         expect(items[1].textContent).toContain('Watch these · MSISDN · 1 member');
         expect(items[1].querySelector('inspecto-status-badge')?.textContent).toContain('Retired');
@@ -338,7 +338,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         await settle();
         button('Add the selected entity to Known mules')!.click();
         await settle();
-        expect(el.querySelector('inspecto-alert')?.textContent).toContain('Refused — list is retired');
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain('Refused: list is retired');
 
         store.restore([{ id: 'inv-1' }]);
         await store.open('inv-1');
@@ -347,14 +347,14 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         button('Seed by list Known mules')!.click();
         await settle();
         expect(store.error()).toContain('The Entity List or the Investigation is not available');
-        expect(store.error()).toContain('unknown list');
+        expect(store.error()).not.toContain('unknown list'); // X5: the reason only, never the raw server text
 
         inv.listEntityLists.mockReturnValue(http(503, 'not installed') as never);
         button('Refresh the Entity Lists')!.click();
         await settle();
         const alert = el.querySelector('inspecto-alert');
         expect(alert?.querySelector('[role="status"]')).not.toBeNull(); // info, not an error
-        expect(alert?.textContent).toContain('Entity Lists are not available here');
+        expect(alert?.textContent).toContain('Entity Lists are not available');
         expect(el.querySelector('[aria-label="Entity Lists of this Space"]')).toBeNull();
     });
 
@@ -384,7 +384,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         inv.registerEntityListDataset.mockReturnValue(http(409, 'a Dataset already exists') as never);
         button('Register Known mules as a Dataset')!.click();
         await settle();
-        expect(el.querySelector('inspecto-alert')?.textContent).toContain('Refused — a Dataset already exists');
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain('Refused: a Dataset already exists');
         expect(el.textContent).not.toContain('registered as the Dataset');
     });
 
@@ -395,7 +395,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         button('Register Known mules as a Dataset')!.click();
         await settle();
         const alert = el.querySelector('inspecto-alert')?.textContent;
-        expect(alert).toContain('needs the Workbench-authoring capability');
+        expect(alert).toContain('Needs Workbench author.');
         expect(alert).not.toContain('Incident-management');
     });
 
@@ -446,7 +446,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
                 await settle();
                 const offered = el.querySelector('[data-testid="la-suggested-lists"]') as HTMLElement;
                 expect(offered.textContent).toContain('Call centres');
-                expect(offered.textContent).toContain('Never follow these (exclusion)');
+                expect(offered.textContent).toContain('Exclusion: leave out of analyses');
                 expect(offered.textContent).toContain('Busy numbers call almost everyone.');
                 await expectNoA11yViolations(el);
                 (el.querySelector('button[aria-label="Create the list Call centres"]') as HTMLButtonElement).click();

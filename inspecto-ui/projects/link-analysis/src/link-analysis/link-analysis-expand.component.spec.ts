@@ -127,9 +127,9 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         ]);
         // an Investigation also offers Reciprocal
         expect(el.textContent).toContain('Reciprocal');
-        expect(q(el, 'la-expand-hold')?.textContent).toContain('Hold supernodes with more than 500 calls');
+        expect(q(el, 'la-expand-hold')?.textContent).toContain('Hold busy entities (more than 500 linked)');
         expect(q(el, 'la-expand-from-line')?.textContent).toContain('the outer ring (degree 1): 3 numbers');
-        expect(q(el, 'la-expand-hint')?.textContent).toContain('One Undo (Ctrl+Z) takes back every degree');
+        expect(q(el, 'la-expand-hint')?.textContent).toContain('one Undo (Ctrl+Z) reverses it');
         await expectNoA11yViolations(el);
     });
 
@@ -234,7 +234,7 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
     it('every start item held: Expand says untick Hold; a blocked context says why beside the button', async () => {
         const held = create({ ctx: { frontier: [], sources: undefined } });
         await settle(held.fixture);
-        expect(held.el.querySelector('#la-expand-why')?.textContent).toContain('Untick “Hold supernodes”');
+        expect(held.el.querySelector('#la-expand-why')?.textContent).toContain('Untick “Hold busy entities”');
         TestBed.resetTestingModule();
         const blocked = create({ ctx: { blocked: 'This changes the Investigation log and needs the Incident management capability.' } });
         await settle(blocked.fixture);

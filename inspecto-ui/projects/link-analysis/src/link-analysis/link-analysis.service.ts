@@ -21,7 +21,7 @@ import type { InvestigationRef } from './investigation-state';
  * with the same name; in investigative use that is a false finding, not a stale cache.
  */
 export const SAVED_VIEW_NOT_EVIDENCE =
-    'Saved views re-project live data — a reopened view may differ from the one you saved.';
+    'a saved view re-reads live data, so it may differ when reopened.';
 
 export interface LinkAnalysisView {
     id: string;

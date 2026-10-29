@@ -11,7 +11,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { LA_DATASETS, LaDataset } from '@inspecto/link-analysis/la-host';
 import { IdentityGroupIndex, IdentityImportResult, InvService } from '@inspecto/link-analysis/api/inv.service';
-import { entityListErrorMessage } from './investigation-state';
+import { IDENTITIES_NEED, entityListErrorMessage } from './investigation-state';
 
 /**
  * What the head read of the Identity Fact log says, in words. The server re-verifies the WHOLE hash chain on every
@@ -28,7 +28,7 @@ export function chainMessage(err: unknown, fallback: string): string {
         err,
         fallback,
         false,
-        'Identity facts need the Incident-management capability (they are readable only to those who may change them).',
+        IDENTITIES_NEED,
     ));
 }
 

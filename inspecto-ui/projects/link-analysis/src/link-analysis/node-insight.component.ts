@@ -5,7 +5,7 @@ import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { DatePipe } from '@angular/common';
 import { RouterLink, UrlTree } from '@angular/router';
 import { firstValueFrom, forkJoin, of, catchError, map } from 'rxjs';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { apiErrorMessage, needsPermission } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
@@ -84,7 +84,7 @@ interface Membership {
             <h3 id="ni-risk" class="text-base font-semibold">Risk</h3>
             @if (!mapping()) {
                 <p class="text-secondary text-sm" data-testid="risk-unmapped">
-                    No indicators Dataset is mapped for this domain profile.
+                    No risk data for this Industry pack.
                 </p>
             } @else {
                 @if (indicators()?.truncated) {
@@ -209,7 +209,7 @@ interface Membership {
                         }
                     } @else {
                         <span class="ml-1">{{
-                            ms.length ? 'on none of ' + ms.length : 'no list for this Entity Type'
+                            ms.length ? 'on none (' + ms.length + ' checked)' : 'no list for this Entity Type'
                         }}</span>
                     }
                 } @else if (listsError()) {
@@ -338,7 +338,7 @@ interface Membership {
                             [disabled]="!ctx().canManageLists || busy()"
                             (click)="addTo(l)"
                         >
-                            Add to {{ l.purpose }} list: {{ l.title }}
+                            Add to {{ l.title }}
                         </button>
                     }
                     @if (ctx().canHide) {
@@ -463,7 +463,7 @@ export class NodeInsightComponent implements OnInit {
     readonly historyBlocked = computed(() => {
         const c = this.ctx();
         if (!this.historyMasked() && !c.entityType)
-            return 'Case history needs an Entity Type, and this domain profile names none.';
+            return 'This node has no Entity Type, so its Case history cannot be looked up.';
         return '';
     });
 
@@ -584,7 +584,7 @@ export class NodeInsightComponent implements OnInit {
             this.actionNote.set({
                 variant: 'error',
                 text: forbidden
-                    ? 'You are not allowed to change Entity Lists (it needs the Manage incidents capability).'
+                    ? needsPermission('canManageIncidents')
                     : apiErrorMessage(e, 'The entity could not be added to the list.'),
             });
         } finally {

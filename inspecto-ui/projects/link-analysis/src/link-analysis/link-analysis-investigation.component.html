@@ -10,11 +10,11 @@
     <la-fold title="General" [forceOpen]="true">
                 <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm" data-testid="inv-settings-general">
                     <!-- LA-INVESTIGATION-RENAME-1: a lead with the capability renames it and restates its purpose in place -->
-                    <dt class="text-secondary">Title</dt>
+                    <dt class="text-secondary">Name</dt>
                     <dd class="m-0 min-w-0">
                         @if (canEditDetails()) {
                             <inspecto-pen-field
-                                ariaLabel="Title"
+                                ariaLabel="Name"
                                 [formControl]="detailsTitle"
                                 [maxlength]="200"
                                 [error]="detailsTitleError()"
@@ -42,9 +42,9 @@
                     <dt class="text-secondary">Dataset</dt>
                     <dd class="m-0">{{ h.dataset }}</dd>
                     <dt class="text-secondary">Time column</dt>
-                    <dd class="m-0">{{ h.timeCol ? h.timeCol + ' (' + (h.timeColZone || 'UTC') + ')' : 'none (timeless)' }}</dd>
-                    <dt class="text-secondary">Lineage</dt>
-                    <dd class="m-0">{{ h.parent ? 'Branched from ' + h.parent.id + ' after ' + h.parent.parentSteps + ' steps' : 'Original' }}</dd>
+                    <dd class="m-0">{{ h.timeCol ? h.timeCol + ' (' + (h.timeColZone || 'UTC') + ')' : '—' }}</dd>
+                    <dt class="text-secondary">Copied from</dt>
+                    <dd class="m-0">{{ h.parent ? 'Branched from ' + h.parent.id + ' after ' + h.parent.parentSteps + ' steps' : '—' }}</dd>
                     <dt class="text-secondary">Industry pack</dt>
                     <dd class="m-0">{{ h.pack || "The Space's pack" }}</dd>
                 </dl>
@@ -93,7 +93,7 @@
                         [disabled]="!!store.activeDraftId()"
                         (ngModelChange)="reread.set($event)"
                     >
-                        Re-read current data (drift check)
+                        Compare with current data
                     </mat-checkbox>
                     <button
                         mat-stroked-button
@@ -106,16 +106,16 @@
                 </div>
                 @if (store.activeDraftId()) {
                     <p class="text-secondary m-0 text-sm">
-                        Replay checks the Draft's log; a Draft has no re-read of current data (drift check).
+                        A Draft cannot be compared with current data.
                     </p>
                 }
                 @if (store.replayResult(); as r) {
                     @if (r.equivalent) {
-                        <inspecto-alert variant="success" title="Replay is equivalent">
-                            Re-evaluating the sealed log from step 1 gives the same Working Set at every step.
+                        <inspecto-alert variant="success" title="Replay matches">
+                            Every step gives the same result.
                         </inspecto-alert>
                     } @else {
-                        <inspecto-alert variant="error" title="Replay is NOT equivalent">
+                        <inspecto-alert variant="error" title="Replay differs">
                             The Working Set differs from what was recorded at step {{ r.mismatches.join(', ') }}.
                         </inspecto-alert>
                     }
@@ -236,9 +236,9 @@
         }
         @case ('oplog') {
             @if (store.active()) {
-            <section aria-label="Op log">
+            <section aria-label="Step log">
                 <div class="mb-1 flex items-center gap-1">
-                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Op log</h3>
+                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Step log</h3>
                     <button
                         mat-button
                         class="ml-auto"
@@ -284,7 +284,7 @@
                             </p>
                         }
                     } @else {
-                        <p class="text-secondary m-0 text-sm">No steps yet — seed an entity to begin.</p>
+                        <p class="text-secondary m-0 text-sm">No steps yet. Pick a start entity to begin.</p>
                     }
                 }
             </section>
@@ -337,12 +337,11 @@
                         [disabled]="!canWrite() || store.busy() || store.effectiveSteps().length < 2 || !!store.activeDraftId()"
                         (click)="beginReorder()"
                     >
-                        Re-order steps (creates a fork)…
+                        Re-order steps…
                     </button>
                     @if (store.activeDraftId()) {
                         <p class="text-secondary m-0 text-sm">
-                            Re-ordering forks the Investigation's main log, not a Draft — go back to the Investigation to
-                            re-order.
+                            Not available on a Draft.
                         </p>
                     }
                 }
@@ -527,25 +526,25 @@
                             Creates an Investigation over <strong>{{ q.projection.datasetId }}</strong> ({{
                                 q.projection.sourceCol
                             }}
-                            → {{ q.projection.targetCol }}), seeds {{ q.seed }} and expands one degree (Choose neighbours goes further) —
+                            → {{ q.projection.targetCol }}), starts from {{ q.seed }} and expands one degree. Use Expand… to go further:
                             {{ pendingSummary() }}.
                         </p>
                         <inspecto-pen-field
-                            label="Title"
+                            label="Name"
                             [formControl]="title"
                             [maxlength]="200"
                             [error]="title.hasError('maxlength') ? 'At most 200 characters.' : ''"
                         />
                         <inspecto-pen-field
                             #pendingPurpose
-                            label="Purpose / legal basis"
+                            label="Purpose"
                             [required]="true"
                             [formControl]="purpose"
                             [maxlength]="1000"
                             [error]="purpose.hasError('maxlength') ? 'At most 1000 characters.' : ''"
                             data-testid="investigate-purpose"
                         />
-                        <p class="text-secondary m-0 text-sm">Recorded with the Investigation and shown in its Dossier.</p>
+                        <p class="text-secondary m-0 text-sm">Why you are investigating (stated reason or legal basis). Shown in the Dossier.</p>
                         @if (pendingTried() && purpose.invalid && !purpose.hasError('maxlength')) {
                             <p
                                 class="text-warn m-0 text-sm"
@@ -571,38 +570,38 @@
                     <!-- LA-PANELS-REDESIGN-1: the New Investigation form (the page projects it; File ▸ New lands here) -->
                     <ng-content select="[laNewInvestigation]" />
                 } @else if (projection(); as p) {
-                    <!-- Top results queued from the Browser / Server tools: they become the first seed step -->
+                    <!-- Top results queued from the On screen / Whole Dataset tools: they become the first step -->
                     <p class="text-secondary m-0 text-sm" data-testid="investigation-queued-start">
                         An Investigation is an ordered, append-only log of steps over <strong>{{ p.datasetId }}</strong> ({{
                             p.sourceCol
                         }}
-                        → {{ p.targetCol }}). Each step is recorded with who, when and why, and the reads are sealed so the log
-                        replays identically. It reads the whole Dataset — the query's filter is not applied.
+                        → {{ p.targetCol }}). Each step is recorded with who, when and why, so the step log replays
+                        identically. It reads the whole Dataset: the query's filter is not applied.
                     </p>
                     <inspecto-pen-field
-                        label="Title (optional)"
+                        label="Name (optional)"
                         [formControl]="title"
                         [maxlength]="200"
                         [error]="title.hasError('maxlength') ? 'At most 200 characters.' : ''"
                         (keydown.enter)="start()"
                     />
                     <inspecto-pen-field
-                        label="Purpose / legal basis"
+                        label="Purpose"
                         [required]="true"
                         [formControl]="purpose"
                         [maxlength]="1000"
                         [error]="purpose.hasError('maxlength') ? 'At most 1000 characters.' : ''"
                     />
-                    <p class="text-secondary m-0 text-sm">Recorded with the Investigation and shown in its Dossier.</p>
+                    <p class="text-secondary m-0 text-sm">Why you are investigating (stated reason or legal basis). Shown in the Dossier.</p>
                     <inspecto-pen-field label="Time column (optional)" [formControl]="timeColumn" [placeholder]="timeCol()" />
                     <p class="text-secondary m-0 text-sm">
-                        The event time windows and the coverage check read{{ timeCol() ? ' — blank uses ' + timeCol() : '' }}.
+                        Used for time windows and the coverage check.{{ timeCol() ? ' Blank uses ' + timeCol() + '.' : '' }}
                     </p>
                     <inspecto-option-picker
                         label="Time column zone (optional)"
                         [formControl]="timeColumnZone"
                         [options]="timeZones"
-                        help="The zone a plain TIMESTAMP time column is read in. A column that already carries a zone refuses one."
+                        help="Time zone for a column that has none."
                     />
                     <button
                         mat-flat-button
@@ -611,7 +610,7 @@
                         (click)="start()"
                     >
                         Start Investigation{{
-                            store.queuedSeeds().length ? ' with ' + store.queuedSeeds().length + ' queued seeds' : ''
+                            store.queuedSeeds().length ? ' with ' + store.queuedSeeds().length + ' queued start entities' : ''
                         }}
                     </button>
                 } @else {
@@ -620,13 +619,11 @@
                 <!-- the New form carries its own lock note at its top; this one serves the pending and queued starts -->
                 @if (!canWrite() && (pending() || store.queuedSeeds().length)) {
                     <inspecto-alert variant="info" title="Read-only" data-testid="investigation-read-only">
-                        Your role can't start Investigations (needs Incident management) - you can open and read existing
-                        ones.
+                        Read-only: starting an Investigation needs Incident management.
                     </inspecto-alert>
                 }
                 <p class="text-secondary m-0 text-sm">
-                    File ▸ Open… lists the ones you may read (Recent: the ones this screen opened);
-                    saving the view keeps them with it.
+                    Open an existing Investigation with File ▸ Open…
                 </p>
             } @else {
                 @if (store.header(); as h) {
@@ -656,7 +653,7 @@
                             </button>
                             <button mat-menu-item (click)="store.close()" aria-label="Close the Investigation">
                                 <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                                <span>Close (it stays remembered)</span>
+                                <span>Close</span>
                             </button>
                             @if (canDelete(h.id)) {
                                 <button
@@ -667,7 +664,7 @@
                                     data-testid="delete-investigation"
                                 >
                                     <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
-                                    <span>Delete (cannot be undone)</span>
+                                    <span>Delete…</span>
                                 </button>
                             }
                         </mat-menu>
@@ -689,30 +686,29 @@
                             style="border-color: var(--gamma-border)"
                             aria-label="Lineage"
                         >
-                            <strong>Fork</strong> of <code>{{ parent.id }}</code> — its effective steps re-applied in the order
-                            {{ parent.order.join(', ') }} (the parent had {{ parent.parentSteps }} log entries and is
-                            unchanged).
+                            <strong>Fork</strong> of <code>{{ parent.id }}</code>: its steps re-applied in the order
+                            {{ parent.order.join(', ') }}. The parent ({{ parent.parentSteps }} steps) is unchanged.
                             @if (parentRemembered()) {
                                 <button mat-button class="!ml-1" (click)="openParent()">Open the parent</button>
                             }
                         </div>
                     }
                 } @else if (!store.busy()) {
-                    <button mat-stroked-button (click)="store.forget(store.activeId()!)">Forget this Investigation</button>
+                    <button mat-stroked-button (click)="store.forget(store.activeId()!)">Remove from recent</button>
                 }
                 @if (!canWrite()) {
                     <inspecto-alert variant="info" title="Read-only" data-testid="investigation-read-only">
-                        Your role can't change Investigations (needs Incident management) - you can read this one.
+                        Read-only: changing an Investigation needs Incident management.
                     </inspecto-alert>
                 }
                 @if (store.activeDraftId(); as draft) {
                     <inspecto-alert variant="info" title="Working on a Draft">
                         Steps and Undo go to Draft <code>{{ draft }}</code
-                        >, not to the Investigation — promote it from Drafts.
+                        >, not to the Investigation. Promote it from Drafts.
                     </inspecto-alert>
                 }
                 <p class="m-0 text-sm tabular-nums" aria-label="Working Set">
-                    <strong>Working Set:</strong> {{ counts().entities }} entities · {{ counts().links }} links ·
+                    <strong>Working Set:</strong> {{ counts().entities }} {{ counts().entities === 1 ? 'entity' : 'entities' }} · {{ counts().links }} {{ counts().links === 1 ? 'link' : 'links' }} ·
                     {{ counts().excluded }} excluded · {{ counts().hidden }} hidden · {{ counts().kept }} kept
                 </p>
             }
@@ -721,10 +717,10 @@
                 <section
                     class="flex flex-col gap-1 rounded-md border p-2"
                     style="border-color: var(--gamma-border)"
-                    aria-label="Queued seed entities"
+                    aria-label="Queued start entities"
                     data-testid="queued-seeds"
                 >
-                    <div class="text-sm font-semibold">Queued seed entities ({{ store.queuedSeeds().length }})</div>
+                    <div class="text-sm font-semibold">Queued start entities ({{ store.queuedSeeds().length }})</div>
                     <ul class="m-0 flex list-none flex-wrap gap-1 p-0 text-sm">
                         @for (q of store.queuedSeeds(); track q.id) {
                             <li
@@ -736,7 +732,7 @@
                                     type="button"
                                     class="flex items-center"
                                     (click)="store.unqueueSeed(q.id)"
-                                    [attr.aria-label]="'Remove ' + q.label + ' from the queued seeds'"
+                                    [attr.aria-label]="'Remove ' + q.label + ' from the queued start entities'"
                                 >
                                     <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
@@ -745,16 +741,16 @@
                     </ul>
                     <p class="text-secondary m-0 text-sm">
                         @if (store.active()) {
-                            These are not in the Working Set yet. Seed them to add them as one recorded step.
+                            These are not in the Working Set yet. Start from them to add them as one recorded step.
                         } @else {
-                            They become the first seed step once you fill in the title and purpose below and press Start.
+                            They become the first step once you fill in the name and purpose below and press Start.
                             Nothing is created until then.
                         }
                     </p>
                     <div class="flex flex-wrap gap-1">
                         @if (store.active()) {
                             <button mat-flat-button color="primary" [disabled]="!canWrite() || store.busy()" (click)="seedQueued()">
-                                Seed the queued entities
+                                Start from queued entities
                             </button>
                         }
                         <button mat-button type="button" (click)="store.clearQueuedSeeds()">Clear the queue</button>
@@ -788,7 +784,7 @@
                         type="button"
                         data-testid="expand-dialog-open"
                         aria-keyshortcuts="G"
-                        matTooltip="Expand 1 to {{ maxDegree() }} degrees with hubs held, read settings and a preview (G)"
+                        matTooltip="Expand 1–{{ maxDegree() }} degrees with a preview (G)"
                         [disabled]="!canWrite() || store.busy() || store.chainRunning() || degree().current < 0"
                         (click)="expandRequested.emit()"
                     >
@@ -812,9 +808,9 @@
                 }
                 @if (degree().heldHubs.length) {
                     <p class="text-secondary m-0 text-sm" data-testid="degree-hubs">
-                        {{ degree().heldHubs.length }} high-connectivity
-                        {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} left out of the next degree.
-                        Untick “Hold supernodes” in Expand…, or use “Expand anyway” on one.
+                        {{ degree().heldHubs.length }} busy
+                        {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} held. Untick “Hold busy
+                        entities” in Expand…, or choose Expand anyway on one.
                     </p>
                 }
                 @if (store.degreeOutcomes().length) {
@@ -830,18 +826,18 @@
                 }
             </section>
             <mat-checkbox [ngModel]="!store.showWorkingSet()" (ngModelChange)="store.showWorkingSet.set(!$event)">
-                Show the query graph (to pick seeds)
+                Show the full graph to pick start entities
             </mat-checkbox>
     
             @if (store.truncatedSteps().length) {
                 <inspecto-alert variant="warning" title="Incomplete Working Set">
                     The expand at step {{ store.truncatedSteps().join(', ') }} hit its row limit — some neighbours were not
-                    read. Name fewer entities to expand, or exclude a hub first.
+                    read. Name fewer entities to expand, or exclude a busy one first.
                 </inspecto-alert>
             }
             @if (store.workingSetGraph()?.truncated) {
                 <inspecto-alert variant="warning" title="Not all drawn">
-                    The Working Set has more entities than the canvas node cap — the drawing is partial; the counts above
+                    The Working Set has more entities than the canvas can draw. The drawing is partial; the counts above
                     are complete.
                 </inspecto-alert>
             }
@@ -850,9 +846,9 @@
             }
             @if (store.lastOverride(); as o) {
                 <p class="m-0 text-sm" role="status" data-testid="hub-override-recorded">
-                    Override recorded at step {{ o.step }}: expanded through high-connectivity
-                    {{ o.ids.slice(0, 5).join(', ') }}{{ o.ids.length > 5 ? ', …' : '' }} — sealed in the log, with your
-                    name.
+                    Override recorded at step {{ o.step }}: expanded through busy
+                    {{ o.ids.slice(0, 5).join(', ') }}{{ o.ids.length > 5 ? ', …' : '' }}. Logged in the step log with
+                    your name.
                 </p>
             }
             @if (store.lastStep()?.protected?.length) {
@@ -883,7 +879,7 @@
                         }
                     </div>
                     <div class="flex flex-wrap gap-1">
-                        <button mat-stroked-button [disabled]="!canWrite() || store.busy()" (click)="seed()">Seed</button>
+                        <button mat-stroked-button [disabled]="!canWrite() || store.busy()" (click)="seed()">Start</button>
                         @if (selectedHubs().length && !isOverridden(selectedHubs()[0])) {
                             <button
                                 mat-stroked-button
@@ -927,7 +923,7 @@
                                 [disabled]="store.busy()"
                                 (click)="toggleNeighbours()"
                             >
-                                {{ neighboursOpen() ? 'Hide neighbours' : 'Choose neighbours…' }}
+                                {{ neighboursOpen() ? 'Hide neighbours' : 'Pick neighbours…' }}
                             </button>
                             @if (neighboursOpen()) {
                                 @if (neighbourList(); as list) {
@@ -1003,7 +999,7 @@
                         </div>
                     }
                     <inspecto-pen-field
-                        label="Reason to exclude"
+                        label="Reason"
                         [formControl]="reason"
                         [maxlength]="200"
                         [error]="
@@ -1047,17 +1043,16 @@
                     </button>
                 } @else {
                     <p class="text-secondary m-0 text-sm">
-                        Click an entity on the canvas to act on it. Seed from the query graph; expand, keep, hide or exclude
-                        entities of the Working Set.
+                        Click an entity on the canvas to act on it.
                     </p>
                 }
                 <button
                     mat-button
                     [disabled]="!canWrite() || store.busy() || !counts().entities"
                     (click)="expand(true)"
-                    matTooltip="Expand one hop from every entity in the Working Set (at most 1 000)"
+                    matTooltip="Expand one degree from every entity in the Working Set (at most 1,000)"
                 >
-                    Expand the whole Working Set
+                    Expand all
                 </button>
             </section>
             </div>
@@ -1065,14 +1060,14 @@
                 <section
                     class="flex flex-col gap-1 "
     
-                    aria-label="High connectivity"
+                    aria-label="Busy entities"
                     data-testid="hub-list"
                 >
                     <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
-                        High connectivity ({{ hubs().length }})
+                        Busy entities ({{ hubs().length }})
                     </h3>
                     <p class="text-secondary m-0 text-sm">
-                        Shown, but not expanded further: each has more contacts than the hub threshold. Expanding through
+                        Shown, but not expanded: each has more linked entities than the busy limit. Expanding through
                         one is an override you confirm, and it is recorded.
                     </p>
                     <ul class="m-0 flex list-none flex-col gap-1 p-0 text-sm">
@@ -1112,7 +1107,7 @@
             >
                 <span class="text-sm font-semibold">Scope list (this Investigation)</span>
                 <inspecto-pen-field
-                    label="Entity ids to include or leave out (one per line or comma-separated)"
+                    label="Entity ids"
                     [formControl]="scopeIds"
                 />
                 <div class="flex flex-wrap gap-1">
@@ -1123,7 +1118,7 @@
                         [disabled]="!canWrite() || store.busy()"
                         (click)="scopeAdd()"
                     >
-                        Include (go through)
+                        Include
                     </button>
                     <button
                         mat-stroked-button
@@ -1174,7 +1169,7 @@
                         Only these (an expand admits nothing outside the list)
                     </mat-checkbox>
                     <p class="text-secondary m-0 text-sm">
-                        Every expand goes through the listed supernodes{{ store.scope().only ? ' and admits only them' : '' }};
+                        Every expand goes through the listed busy entities{{ store.scope().only ? ' and admits only them' : '' }};
                         each step records what it used. Excluded entities stay out of every expand (Undo reverses).
                     </p>
                 }
@@ -1224,11 +1219,11 @@
                             }
                         </ol>
                     } @else {
-                        <p class="text-secondary m-0 text-sm">No steps yet — seed an entity to begin.</p>
+                        <p class="text-secondary m-0 text-sm">No steps yet. Pick a start entity to begin.</p>
                     }
                     <div>
                         <button mat-button type="button" data-testid="open-op-log" (click)="dockRequested.emit('oplog')">
-                            Open the Op log
+                            Open the step log
                         </button>
                     </div>
                 </section>

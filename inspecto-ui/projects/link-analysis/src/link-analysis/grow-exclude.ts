@@ -28,25 +28,25 @@ export const GROW_DIRECTIONS: readonly { value: GrowDirection; label: string; ic
         value: 'either',
         label: 'Both ways',
         icon: 'heroicons_outline:arrows-right-left',
-        hint: 'Links in either direction (expand direction: either)',
+        hint: 'Links in either direction',
     },
     {
         value: 'out',
         label: 'Outgoing',
         icon: 'heroicons_outline:arrow-up-right',
-        hint: 'Only links that start at the grown items (expand direction: out)',
+        hint: 'Only links that start at the chosen items',
     },
     {
         value: 'in',
         label: 'Incoming',
         icon: 'heroicons_outline:arrow-down-left',
-        hint: 'Only links that end at the grown items (expand direction: in)',
+        hint: 'Only links that end at the chosen items',
     },
     {
         value: 'reciprocal',
         label: 'Reciprocal',
         icon: 'heroicons_outline:arrow-path',
-        hint: 'Only pairs linked in both directions (expand direction: reciprocal)',
+        hint: 'Only pairs linked in both directions',
     },
 ];
 
@@ -313,7 +313,7 @@ export function listTargets(
             list: l,
             whyNot:
                 l.ownerKind === 'admin' && !canManageCategories
-                    ? 'A category list is kept by an administrator (it needs the Manage exclusion categories capability).'
+                    ? 'A category list is kept by an administrator. Needs Manage exclusion categories.'
                     : null,
         }));
 }
@@ -324,7 +324,7 @@ export function listTargets(
  * The user-guide chapter every first-time hint points to. The SPA serves no docs (they ship in the bundle's `docs/`
  * folder), so the hint names the chapter rather than linking to a page that is not there.
  */
-export const GROW_GUIDE = { chapter: 'Expand and clean up the graph', where: 'Link Analysis user guide, §7' } as const;
+export const GROW_GUIDE = { chapter: 'Expand and clean up the graph', where: 'Link Analysis user guide' } as const;
 
 const HINT_PREFIX = 'inspecto.la.hint.';
 

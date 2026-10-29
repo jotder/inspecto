@@ -225,7 +225,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
             [],
         );
         await click(f, button(el, 'Fork a Draft'));
-        expect(el.textContent).toContain('Drafts limit (50 open Drafts)');
+        expect(el.textContent).toContain('limit of 50 open Drafts');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 
@@ -237,7 +237,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
             [],
         );
         await click(f, button(el, 'Fork a Draft'));
-        expect(el.textContent).toContain('already have a live Draft');
+        expect(el.textContent).toContain('already have a Draft on this Investigation');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 
@@ -288,7 +288,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
             promoteDraft: vi.fn(() => throwError(() => http(409, 'must rebase: the draft is based on step 3'))),
         });
         await click(f, button(el, 'Promote'));
-        expect(el.textContent).toContain('rebase this Draft onto the current head');
+        expect(el.textContent).toContain('The Investigation has moved on. Rebase this Draft');
     });
 
     it('LA-UI-DRAFT-POLISH-1: words a promote refused for undone steps from the server reason', async () => {
@@ -303,7 +303,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         const msg = 'must rebase: the index version this draft pinned expired';
         const { f, el } = await create({ promoteDraft: vi.fn(() => throwError(() => http(409, msg))) });
         await click(f, button(el, 'Promote'));
-        expect(el.textContent).toContain('pinned has expired');
+        expect(el.textContent).toContain('link index version this Draft uses has expired');
     });
 
     it('LA-UI-DRAFT-POLISH-1: falls back to a generic rebase wording for an unknown reason', async () => {
@@ -311,7 +311,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
             promoteDraft: vi.fn(() => throwError(() => http(409, 'must rebase: something new'))),
         });
         await click(f, button(el, 'Promote'));
-        expect(el.textContent).toContain('must be rebased before it can be promoted');
+        expect(el.textContent).toContain('Rebase this Draft before you promote it.');
     });
 
     it('discards a Draft', async () => {

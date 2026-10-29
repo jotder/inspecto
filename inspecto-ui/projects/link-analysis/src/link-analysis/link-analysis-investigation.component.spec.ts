@@ -264,7 +264,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         host.timeCol.set('booked_at');
         fixture.detectChanges();
         expect(penText(penByLabel(el, 'Time column (optional)')!)).toBe('booked_at');
-        penEdit(fixture, penByLabel(el, 'Purpose / legal basis')!, 'warrant 7');
+        penEdit(fixture, penByLabel(el, 'Purpose')!, 'warrant 7');
         button('Start Investigation').click();
         await fixture.whenStable();
         expect(inv.createInvestigation).toHaveBeenCalledWith(expect.objectContaining({ timeCol: 'booked_at' }));
@@ -276,12 +276,12 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
-            "Your role can't change Investigations (needs Incident management)",
+            'Read-only: changing an Investigation needs Incident management.',
         );
         // Mark this position sits behind More steps ▾ (§5.8 block 7)
         (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).moreStep.set('snapshot');
         fixture.detectChanges();
-        for (const label of ['Seed', 'Expand the whole Working Set', 'Undo', 'Mark this position', 'Fork a Draft']) {
+        for (const label of ['Start', 'Expand all', 'Undo', 'Mark this position', 'Fork a Draft']) {
             expect(button(label)?.disabled, label).toBe(true);
         }
     });
@@ -290,13 +290,16 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         const ro = create({ canManage: false });
         ro.store.queueSeeds(QUEUED);
         ro.fixture.detectChanges();
-        penEdit(ro.fixture, penByLabel(ro.el, 'Purpose / legal basis')!, 'warrant 7');
+        penEdit(ro.fixture, penByLabel(ro.el, 'Purpose')!, 'warrant 7');
         expect(ro.button('Start Investigation').disabled).toBe(true);
         expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
+            'Read-only: starting an Investigation needs Incident management.',
+        );
+        expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).not.toContain(
             "Your role can't start Investigations (needs Incident management)",
         );
         // Enter in a field commits it and asks to start: with no capability that must write nothing
-        penEdit(ro.fixture, penByLabel(ro.el, 'Title')!, 'a title');
+        penEdit(ro.fixture, penByLabel(ro.el, 'Name')!, 'a title');
         await ro.fixture.whenStable();
         expect(ro.inv.createInvestigation).not.toHaveBeenCalled();
 
@@ -305,7 +308,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await openInv(store);
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
-        penEdit(fixture, penByLabel(el, 'Reason to exclude')!, 'because');
+        penEdit(fixture, penByLabel(el, 'Reason')!, 'because');
         await fixture.whenStable();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
     });
@@ -331,7 +334,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="investigation-read-only"]')).toBeNull();
-        expect(button('Seed').disabled).toBe(false);
+        expect(button('Start').disabled).toBe(false);
     });
 
     it('nothing open and nothing queued: the page-projected New Investigation form shows, and no Open… button (File menu)', () => {
@@ -347,12 +350,12 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="projected-new-form"]')).toBeNull();
         expect(el.textContent).toContain("the query's filter is not applied");
-        expect(el.textContent).toContain('File ▸ Open… lists the ones you may read');
+        expect(el.textContent).toContain('Open an existing Investigation with File ▸ Open…');
         await expectNoA11yViolations(el);
 
         // D-U5: no purpose, no start — the server would answer 422.
         expect(button('Start Investigation').disabled).toBe(true);
-        penEdit(fixture, penByLabel(el, 'Purpose / legal basis')!, 'warrant 7');
+        penEdit(fixture, penByLabel(el, 'Purpose')!, 'warrant 7');
         button('Start Investigation').click();
         await fixture.whenStable();
         expect(inv.createInvestigation).toHaveBeenCalledWith(
@@ -366,17 +369,17 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
 
-        const steps = Array.from(el.querySelectorAll('[aria-label="Op log"] li')).map((li) => li.textContent);
+        const steps = Array.from(el.querySelectorAll('[aria-label="Step log"] li')).map((li) => li.textContent);
         expect(steps).toHaveLength(2);
         expect(steps[0]).toContain('Seeded 1 entity: a.');
-        expect(steps[1]).toContain('expand');
+        expect(steps[1]).toContain('Expand'); // the step name, never the op id (X9)
         await expectNoA11yViolations(el);
 
         button('Exclude').click();
         fixture.detectChanges();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
         refresh(fixture);
-        expect(penError(penByLabel(el, 'Reason to exclude')!)).toContain('needs a reason');
+        expect(penError(penByLabel(el, 'Reason')!)).toContain('needs a reason');
     });
 
     it('re-order explains the fork on screen, then forks with the new order', async () => {
@@ -384,7 +387,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await openInv(store);
         fixture.detectChanges();
 
-        expect(button('Re-order steps').textContent).toContain('creates a fork'); // DR-D8
+        expect(button('Re-order steps').textContent?.trim()).toBe('Re-order steps…'); // the fork is explained when it opens (DR-D8)
         button('Re-order steps').click();
         fixture.detectChanges();
         expect(el.textContent).toContain('Re-ordering creates a fork');
@@ -405,12 +408,12 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         store.activeDraftId.set('d-1');
         fixture.detectChanges();
         expect(button('Re-order steps').disabled).toBe(true);
-        expect(el.textContent).toContain('go back to the Investigation to re-order');
+        expect(el.textContent).toContain('Not available on a Draft.');
         await fixture.whenStable(); // ngModel applies [disabled] asynchronously
         fixture.detectChanges();
         const reread = el.querySelector('[aria-label="Replay"] input[type="checkbox"]') as HTMLInputElement;
         expect(reread.disabled).toBe(true);
-        expect(el.textContent).toContain('a Draft has no re-read of current data');
+        expect(el.textContent).toContain('A Draft cannot be compared with current data.');
     });
 
     it('read-only: Replay and the Re-read (drift check) stay usable and call the service; mutating buttons stay disabled', async () => {
@@ -565,7 +568,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await fixture.whenStable();
         fixture.detectChanges();
         expect(el.querySelector('inspecto-alert')?.textContent).toContain(
-            "The server refused this step: 'a' is not in the Working Set",
+            "That step was refused: 'a' is not in the Working Set",
         );
         expect(el.querySelector('[aria-label="Annotations"]')).toBeNull();
         expect(comp.note.value).toBe('burner pattern'); // kept for a retry
@@ -706,9 +709,9 @@ describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 20
         store.queueSeeds(SEEDS);
         fixture.detectChanges();
         const queued = el.querySelector('[data-testid="queued-seeds"]') as HTMLElement;
-        expect(queued.textContent).toContain('Queued seed entities (2)');
+        expect(queued.textContent).toContain('Queued start entities (2)');
         expect(queued.textContent).toContain('Nothing is created until then');
-        expect(button('Start Investigation').textContent).toContain('with 2 queued seeds');
+        expect(button('Start Investigation').textContent).toContain('with 2 queued start entities');
         expect(inv.createInvestigation).not.toHaveBeenCalled();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
         await expectNoA11yViolations(el);
@@ -718,7 +721,7 @@ describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 20
         const { fixture, store, el, inv, button } = create();
         store.queueSeeds(SEEDS);
         fixture.detectChanges();
-        penEdit(fixture, penByLabel(el, 'Purpose / legal basis')!, 'warrant 7');
+        penEdit(fixture, penByLabel(el, 'Purpose')!, 'warrant 7');
         button('Start Investigation').click();
         await fixture.whenStable();
         expect(inv.createInvestigation).toHaveBeenCalledTimes(1);
@@ -734,7 +737,7 @@ describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 20
         const { fixture, store, el, button } = create();
         store.queueSeeds(SEEDS);
         fixture.detectChanges();
-        (el.querySelector('[aria-label="Remove A from the queued seeds"]') as HTMLButtonElement).click();
+        (el.querySelector('[aria-label="Remove A from the queued start entities"]') as HTMLButtonElement).click();
         expect(store.queuedSeeds().map((s) => s.id)).toEqual(['b']);
         fixture.detectChanges();
         button('Clear the queue').click();
@@ -747,7 +750,7 @@ describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 20
         store.queueSeeds(SEEDS);
         fixture.detectChanges();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
-        button('Seed the queued entities').click();
+        button('Start from queued entities').click();
         await fixture.whenStable();
         expect(inv.appendInvestigationOp).toHaveBeenCalledWith('inv-1', {
             op: 'seed',
@@ -765,10 +768,10 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         store.selected.set({ id: 'n1', data: { label: 'acct-a', kind: 'entity' } } as never);
         fixture.detectChanges();
         inv.appendInvestigationOp.mockReturnValueOnce(throwError(() => new Error('refused')));
-        button('Seed').click();
+        button('Start').click();
         await fixture.whenStable();
         expect(store.showWorkingSet()).toBe(false);
-        button('Seed').click();
+        button('Start').click();
         await fixture.whenStable();
         expect(inv.appendInvestigationOp).toHaveBeenLastCalledWith(
             'inv-1',
@@ -798,7 +801,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         expect(form.textContent).toContain('Investigate 966501');
         expect(form.textContent).toContain('at least 2 events per link');
         // masking not known to be off: the raw number never goes into the title
-        expect(penText(penByLabel(form, 'Title')!)).toBe('Suspect number');
+        expect(penText(penByLabel(form, 'Name')!)).toBe('Suspect number');
         await expectNoA11yViolations(el);
 
         // no purpose: nothing is created and the error is on screen
@@ -906,7 +909,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         await openInv(store);
         fixture.detectChanges();
         const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
-        expect(list.textContent).toMatch(/High connectivity — 650 contacts( \(threshold [\d,]+\))?, not expanded/);
+        expect(list.textContent).toMatch(/Busy: 650 linked entities( \(limit [\d,]+\))?, not expanded/);
     });
 
     it('badges the flagged entity, and "Expand anyway" confirms, then sends expandHubs and says it is recorded', async () => {
@@ -917,10 +920,10 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         fixture.detectChanges();
 
         const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
-        expect(list.textContent).toContain('High connectivity (1)');
-        expect(list.textContent).toContain('High connectivity — not expanded');
+        expect(list.textContent).toContain('Busy entities (1)');
+        expect(list.textContent).toContain('Busy: not expanded');
         // The next degree leaves the hub out and says so.
-        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('left out of the next degree');
+        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('1 busy entity is held');
         await expectNoA11yViolations(el);
 
         (list.querySelector('button[aria-label="Expand anyway from hub"]') as HTMLButtonElement).click();
@@ -974,7 +977,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
         // threshold from the sealed step, contacts from the Working Set rows — not "more than 500"
         expect(list.textContent).toContain(
-            'High connectivity — 650 contacts (threshold 500), expanded through override',
+            'Busy: 650 linked entities (limit 500), expanded through override',
         );
         expect(list.querySelector('button[aria-label="Expand anyway from hub"]')).toBeNull();
     });
@@ -1004,7 +1007,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(first[1]['includeHubs']).toBeUndefined();
         store.degreeOutcomes.set([]); // the stub admitted nothing; clear it so the degree is not "blocked"
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold supernodes” in Expand…');
+        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold busy entities” in Expand…');
     });
 
     it('badges a hub with the sealed count its step read answered when the Working Set row has none', async () => {
@@ -1013,7 +1016,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         store.hubContacts.set(new Map([['hub', 650]]));
         fixture.detectChanges();
         const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
-        expect(list.textContent).toContain('650 contacts');
+        expect(list.textContent).toContain('650 linked entities');
         expect(list.textContent).not.toContain('more than');
     });
 
@@ -1154,7 +1157,7 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
         // UIR-A2: Value Measures live only in the algorithm catalogue
         expect(el.querySelector('inspecto-link-analysis-value-measures')).toBeNull();
         expect(part(el, 'settings').querySelector('la-fold[title="Members"]')).not.toBeNull();
-        expect(part(el, 'oplog').querySelector('section[aria-label="Op log"]')).not.toBeNull();
+        expect(part(el, 'oplog').querySelector('section[aria-label="Step log"]')).not.toBeNull();
         await expectNoA11yViolations(panel);
     });
 
@@ -1169,8 +1172,8 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
         const text = general.textContent!.replace(/\s+/g, ' ');
         expect(text).toContain('Burners');
         expect(text).toContain('calls');
-        expect(text).toContain('none (timeless)');
-        expect(text).toContain('Original');
+        expect(text).toMatch(/Time column ?— ?Copied from ?—/); // T-159: no "(timeless)", no "Original"
+
         expect(text).toContain("The Space's pack");
         expect(settings.querySelector('[data-testid="inv-settings-delete"]')).not.toBeNull();
         await expectNoA11yViolations(settings);
@@ -1214,7 +1217,7 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
             fixture.detectChanges();
             penEdit(fixture, pen(el, 'inv-settings-title')!, '   ');
             refresh(fixture);
-            expect(penError(pen(el, 'inv-settings-title')!)).toBe('A title is required.');
+            expect(penError(pen(el, 'inv-settings-title')!)).toBe('A name is required.');
             expect(inv.editInvestigation).not.toHaveBeenCalled();
         });
 
@@ -1243,7 +1246,7 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
             expect(settings.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
             expect(settings.querySelector('[data-testid="inv-settings-general"]')!.textContent).toContain('Burners');
             expect(settings.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
-                'Only a lead of this Investigation',
+                'Only a lead can change the name or purpose.',
             );
             TestBed.resetTestingModule();
 
@@ -1255,7 +1258,7 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
             const s2 = part(nocap.el, 'settings');
             expect(s2.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
             expect(s2.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
-                'Incident management capability',
+                'Needs Incident management.',
             );
         });
     });

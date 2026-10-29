@@ -50,6 +50,7 @@ import {
     PipelinesService,
     SpacesService,
     apiErrorMessage,
+    needsPermission,
 } from '@inspecto/core/api';
 import { GraphRunResult, GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { graphRunRows, summarizeGraphRun } from './graph-run-summary';
@@ -77,7 +78,7 @@ import {
     seedNodeOf,
     startCatalogue,
     startOutcome,
-    someValues,
+    notInDatasetMessage,
 } from './start-from';
 import { QueuedSeed, pickFollowTheMoney } from './la-starter';
 import { CANVAS_MODES, CanvasMode, canvasInteractionFor, canvasModeForKey, canvasModeOptions } from './canvas-mode';
@@ -338,6 +339,9 @@ interface PresentationSnapshot {
  * GraphSource, shape a query, render through the shared {@link GraphViewComponent}, analyze with the
  * pure `graph-analysis` library, and save the investigation as a `link-analysis-view` Component.
  */
+/** The File menu's two reasons for an item with nothing to act on (T-003, R6). */
+export const OPEN_FIRST = 'Open an Investigation or saved view first.';
+export const DRAW_FIRST = 'Draw a graph first.';
 /** LA-11: paths asked for per search — a readable list; the server says `truncated` when more exist. */
 const SERVER_PATH_LIMIT = 100;
 
@@ -571,6 +575,18 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const open = this.views().find((v) => v.id === this.openViewId());
         return this.viewSaveBlocked() || (open ? viewEditBlock(open, this.viewAccess()) : '');
     });
+    /**
+     * Why each File item is off, said for every disabled one (LA-UI-TEXT-PASS-1 T-003 / T-004, R6): a disabled menu item
+     * shows no tooltip, so the File menu prints the reason under the item and names it in the item's aria-label.
+     */
+    readonly saveViewWhyNot = computed(() => this.viewOverwriteBlocked() || (this.graph() ? '' : DRAW_FIRST));
+    readonly saveViewAsWhyNot = computed(() => this.viewSaveBlocked() || (this.graph() ? '' : DRAW_FIRST));
+    readonly closeWhyNot = computed(() => (this.openWorkLabel() ? '' : OPEN_FIRST));
+    readonly deleteWhyNot = computed(() => {
+        if (this.deleteBlocked()) return this.deleteBlocked();
+        if (this.investigation.active() && !this.lens.canManageIncidents()) return needsPermission('canManageIncidents');
+        return this.deleteLabel() ? '' : OPEN_FIRST;
+    });
     private datasetsService = inject(LA_DATASETS);
     private readonly limits = inject(LinkAnalysisSettingsService);
     /** Installs the Space's Industry packs into the Domain Profile registry (LA-EDITIONS-1). */
@@ -650,8 +666,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly investigationsLockedReason = computed(() => investigationsLockedReason(this.laFeatures));
     /** LA-PANELS-REDESIGN-1: what runs in the browser, what runs on the server, and the Investigation. */
     private readonly allToolboxTabs: readonly { id: ToolboxTab; label: string }[] = [
-        { id: 'browser', label: 'Browser' },
-        { id: 'server', label: 'Server' },
+        // G16 (operator 2026-10-29): named for where the tools look, the ids stay 'browser' | 'server'
+        { id: 'browser', label: 'On screen' },
+        { id: 'server', label: 'Whole Dataset' },
         { id: 'investigation', label: 'Investigation' },
     ];
     /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels) - the same on every level. */
@@ -1905,6 +1922,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (!ds || this.starting()) return;
         this.forgetOpenView(); // the Start box, Discover's "Start from these" and a Dataset all draw something new
         this.startNotice.set(null);
+        // The box is re-created after the draw (the canvas shows the loading state meanwhile): it keeps the picked Dataset,
+        // so a "not in <Dataset>" notice never sits under a picker that has jumped to another one (T-016).
+        this.startDataset.set(ds.id);
         if (req.kind === 'dataset') {
             this.sourceId.set('entity-projection');
             this.queryPanel?.patchFormFromView({ id: '', name: '', sourceId: 'entity-projection', query: { projection: ds.mapping } });
@@ -2174,7 +2194,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             if (!found.length) {
                 this.startNotice.set({
                     variant: 'warning',
-                    text: `Not in ${ds.name}: ${someValues(unknown)}. Nothing was drawn - check the spelling, or pick another Dataset.`,
+                    text: notInDatasetMessage(unknown, ds.name),
                 });
                 return [];
             }
@@ -2892,17 +2912,17 @@ Its prior copies stay in its version history.`,
 
     /** Why "Save this analysis" is unavailable to this user — empty when it is available. Sealing a snapshot needs `canManageIncidents`. */
     readonly snapshotUnavailable = computed(() =>
-        this.lens.canManageIncidents() ? '' : 'Saving an analysis needs the Incident management capability.',
+        this.lens.canManageIncidents() ? '' : needsPermission('canManageIncidents'),
     );
 
     /** Why "Attach to Case" is unavailable to this user — empty when it is available. Attaching needs `canManageIncidents`. */
     readonly attachUnavailable = computed(() =>
-        this.lens.canManageIncidents() ? '' : 'Attaching to a Case needs the Incident management capability.',
+        this.lens.canManageIncidents() ? '' : needsPermission('canManageIncidents'),
     );
 
     /** LA-17 "Merge with...": enabled only inside an Investigation, with the capability, on two unmasked typed entities. */
     readonly mergeUnavailable = computed(() => {
-        if (!this.lens.canManageIncidents()) return 'Merging identities needs the Incident management capability.';
+        if (!this.lens.canManageIncidents()) return needsPermission('canManageIncidents');
         const ws = this.investigation.workingSet();
         const ids = this.selectedOnCanvas().flatMap((id) => {
             const node = (this.canvasData()?.nodes ?? []).find((n) => n.id === id);
@@ -3370,7 +3390,7 @@ Its prior copies stay in its version history.`,
     private writesToInvestigation(): boolean {
         if (this.investigation.canvas() === null) return false;
         if (!this.lens.canManageIncidents()) {
-            this.toastr.info('This changes the Investigation log and needs the Incident management capability.');
+            this.toastr.info('Needs Incident management to change the step log.');
             return false;
         }
         return true;
@@ -3607,7 +3627,8 @@ Its prior copies stay in its version history.`,
             key,
             listKey: ws?.exploreAliases?.[key],
             profileId: this.profileId() ?? 'generic',
-            entityType: this.profile().investigate?.entityType,
+            // the node's own type first, then the type the graph was drawn as (T-042: a start from an Entity Type has one)
+            entityType: (node.data.entityType as string | undefined) ?? this.growEntityType() ?? undefined,
             investigationId: invId,
             graphKey: invId && ws ? `${invId}:${ws.hash}` : null,
             serverId: ids?.serverNode(id) ?? null,
@@ -3637,7 +3658,7 @@ Its prior copies stay in its version history.`,
                             value: `${outgoing.length + incoming.length} (${outgoing.length} out · ${incoming.length} in)`,
                         },
                         {
-                            label: 'Neighbors',
+                            label: 'Neighbours',
                             value:
                                 neighbors.slice(0, 8).join(', ') +
                                 (neighbors.length > 8 ? ` … +${neighbors.length - 8}` : ''),
@@ -3902,7 +3923,7 @@ Its prior copies stay in its version history.`,
             // Monotonic on purpose: only a fresh `run()` replaces the graph and so resets it.
             if ((extra as ProjectedGraph).truncated) this.truncated.set(true);
         } catch (err) {
-            this.toastr.error(invErrorMessage(err, 'Could not fetch neighbors for this node.'));
+            this.toastr.error(invErrorMessage(err, 'Could not expand this node.'));
         }
     }
 
@@ -4409,7 +4430,7 @@ Its prior copies stay in its version history.`,
     /** Why an Investigation action cannot run for this user; empty = it can. */
     readonly growWriteWhyNot = computed(() =>
         this.growMode() === 'investigation' && !this.lens.canManageIncidents()
-            ? 'This changes the Investigation log and needs the Incident management capability.'
+            ? 'Needs Incident management to change the step log.'
             : '',
     );
     /** The Entity Type the items on the canvas are (what an exclusion list is typed by); null = unknown. */
@@ -4521,7 +4542,7 @@ Its prior copies stay in its version history.`,
                 cap,
             );
             const seeds = shown.filter((e) => e.hop === 0).map((e) => e.id);
-            add(split('seeds', 'The seeds', seeds, `the ${many(seeds.length)} seeded`), cap);
+            add(split('seeds', 'The start entities', seeds, `the ${many(seeds.length)} started from`), cap);
             const all = shown.map((e) => e.id);
             add(split('all', 'The whole Working Set', all, `the whole Working Set: ${many(all.length)}`), cap);
             return pick('investigation', this.growWriteWhyNot() || null, cap, !!this.investigation.header()?.timeCol);
@@ -4669,14 +4690,13 @@ Its prior copies stay in its version history.`,
     private confirmHubOverride(held: string[]): Promise<boolean> {
         const purpose = this.investigation.header()?.purpose;
         const what = held.length
-            ? `${held.length} held high-connectivity ${held.length === 1 ? 'entity' : 'entities'} and any the walk reaches`
-            : 'any high-connectivity entity the walk reaches';
+            ? `${held.length} held busy ${held.length === 1 ? 'entity' : 'entities'} and any the Expand reaches`
+            : 'any busy entity the Expand reaches';
         return this.confirm.confirmDestructive(
-            `Expand through ${what}? A hub can pull in many unrelated numbers.\n\n` +
-                'The override is sealed in each step of the Investigation log, with your name, and is shown in the log ' +
-                'and the Dossier' +
-                (purpose ? ` under the stated purpose: “${purpose}”.` : '.'),
-            { title: 'Expand through high connectivity?', confirmText: 'Expand anyway', destructive: false },
+            `Expand through ${what}? Busy entities can pull in many unrelated entities.\n\n` +
+                'The override is logged with your name and shown in the Dossier' +
+                (purpose ? `, under the stated purpose: “${purpose}”.` : '.'),
+            { title: 'Expand through busy entities?', confirmText: 'Expand anyway', destructive: false },
         );
     }
 
@@ -4743,14 +4763,14 @@ Its prior copies stay in its version history.`,
                     stop = ' ' + cap;
                     break;
                 }
-                if (!frontier.length) stop = ` Degree ${d} found nothing new to grow from, so the walk stopped there.`;
+                if (!frontier.length) stop = ` Degree ${d} found nothing new, so it stopped.`;
             }
         }
         const nodes = (this.graph()?.nodes.length ?? 0) - startNodes;
         const links = (this.graph()?.edges.length ?? 0) - startLinks;
         const text =
-            `Expanded ${applied === 1 ? 'one degree' : `${applied} degrees`}: ${nodes.toLocaleString('en')} ${nodes === 1 ? t.node : t.nodes} ` +
-            `and ${links.toLocaleString('en')} ${links === 1 ? t.link : t.links} added (not recorded).` +
+            `Expanded ${applied === 1 ? 'one degree' : `${applied} degrees`}: added ${nodes.toLocaleString('en-GB')} ${nodes === 1 ? t.node : t.nodes} ` +
+            `and ${links.toLocaleString('en-GB')} ${links === 1 ? t.link : t.links} (not recorded).` +
             stop;
         const after = this.graph();
         this.growExclude.lastChange.set({
@@ -4892,7 +4912,7 @@ Its prior copies stay in its version history.`,
     );
     /** Why *Add to a list* cannot run (list writes need the Incident management capability; the server asks the same). */
     readonly discoverListWhyNot = computed(() =>
-        this.lens.canManageIncidents() ? '' : 'Adding to a list needs the Incident management capability.',
+        this.lens.canManageIncidents() ? '' : needsPermission('canManageIncidents'),
     );
 
     /** The Dataset the graph on screen was drawn from, when a start can draw over it. */
@@ -5023,7 +5043,7 @@ Its prior copies stay in its version history.`,
     );
     readonly createListWhyNot = computed(() =>
         !this.lens.canManageIncidents()
-            ? 'Creating a list needs the Incident management capability.'
+            ? needsPermission('canManageIncidents')
             : !this.growEntityType()
               ? 'This graph has no Entity Type, so a list cannot be made for it.'
               : '',

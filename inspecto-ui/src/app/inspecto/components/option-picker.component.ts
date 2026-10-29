@@ -89,7 +89,10 @@ const SEARCH_THRESHOLD = 8;
                 }
             </div>
             @if (!shown().length) {
-                <p class="text-secondary m-0 px-2 py-3 text-sm">No choice matches “{{ filter() }}”.</p>
+                <!-- no options at all is not a failed filter: never "No choice matches “”" (T-089) -->
+                <p class="text-secondary m-0 px-2 py-3 text-sm" data-testid="picker-empty">
+                    {{ filter().trim() ? 'No choice matches “' + filter().trim() + '”.' : 'No options' }}
+                </p>
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -193,7 +196,7 @@ export class OptionPickerDialog {
                 </button>
             </div>
             @if (invalid()) {
-                <p class="text-warn m-0 text-xs" role="alert" [id]="errorId">{{ label() }} is required</p>
+                <p class="text-warn m-0 text-xs" role="alert" [id]="errorId">{{ label() }} is required.</p>
             } @else if (help()) {
                 <p class="text-secondary m-0 text-xs">{{ help() }}</p>
             }

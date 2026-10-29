@@ -36,7 +36,7 @@ import {
     InvestigationLogEntry,
     WorkingSetRelationName,
 } from '@inspecto/link-analysis/api/inv.service';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { apiErrorMessage, needsPermission } from '@inspecto/core/api';
 import { WORKING_SET_PLUGIN } from '@inspecto/core/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
@@ -57,7 +57,7 @@ import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.component';
 import { stepReadSuffix } from './index-source';
-import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
+import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf, stepName } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import {
@@ -91,7 +91,7 @@ export type InvestigationSection = 'act' | 'settings' | 'oplog' | 'ws-rows' | 'c
 export const INVESTIGATION_SECTION_LABELS: Record<InvestigationSection, string> = {
     act: 'Investigation',
     settings: 'Investigation settings',
-    oplog: 'Investigation op log',
+    oplog: 'Investigation step log',
     'ws-rows': 'Investigation Working Set rows',
     coverage: 'Investigation coverage',
     annotations: 'Investigation annotations',
@@ -199,9 +199,9 @@ export class LinkAnalysisInvestigationComponent {
     );
     /** Why Title and Purpose are read-only; '' while they are editable or the role is still being read. */
     readonly detailsReadOnlyReason = computed(() => {
-        if (!this.canWrite()) return 'Renaming an Investigation needs the Incident management capability.';
+        if (!this.canWrite()) return needsPermission('canManageIncidents');
         if (this.detailsRole() === undefined || this.canEditDetails()) return '';
-        return 'Only a lead of this Investigation can rename it or change its purpose.';
+        return 'Only a lead can change the name or purpose.';
     });
     readonly detailsTitle = new FormControl('', { nonNullable: true });
     readonly detailsPurpose = new FormControl('', { nonNullable: true });
@@ -215,7 +215,8 @@ export class LinkAnalysisInvestigationComponent {
         const error = field === 'title' ? this.detailsTitleError : this.detailsPurposeError;
         const v = value.trim();
         if (!v) {
-            error.set(field === 'title' ? 'A title is required.' : 'A purpose is required.');
+            error.set(field === 'title' ? 'A name is required.' : 'A purpose is required.');
+            this.showDetails(); // the field goes back to the value in force, never a bare "—" (T-034)
             return;
         }
         error.set('');
@@ -377,14 +378,13 @@ export class LinkAnalysisInvestigationComponent {
         const purpose = this.store.header()?.purpose;
         const what =
             ids.length === 1
-                ? `the high-connectivity entity ${ids[0]}`
-                : `${ids.length} high-connectivity entities (${ids.slice(0, 5).join(', ')}${ids.length > 5 ? ', …' : ''})`;
+                ? `the busy entity ${ids[0]}`
+                : `${ids.length} busy entities (${ids.slice(0, 5).join(', ')}${ids.length > 5 ? ', …' : ''})`;
         return this.confirm.confirmDestructive(
-            `Expand through ${what}? A hub can pull in many unrelated numbers.\n\n` +
-                'The override is sealed in this step of the Investigation log, with your name, and is shown in the log ' +
-                'and the Dossier' +
-                (purpose ? ` under the stated purpose: “${purpose}”.` : '.'),
-            { title: 'Expand through high connectivity?', confirmText: 'Expand anyway', destructive: false },
+            `Expand through ${what}? Busy entities can pull in many unrelated entities.\n\n` +
+                'The override is logged with your name and shown in the Dossier' +
+                (purpose ? `, under the stated purpose: “${purpose}”.` : '.'),
+            { title: 'Expand through busy entities?', confirmText: 'Expand anyway', destructive: false },
         );
     }
 
@@ -804,7 +804,7 @@ export class LinkAnalysisInvestigationComponent {
     }
 
     opLabel(e: InvestigationLogEntry): string {
-        return e.kind === 'undo' ? 'undo' : (e.op ?? '');
+        return stepName(e.kind === 'undo' ? 'undo' : e.op);
     }
 
     time(at: string): string {

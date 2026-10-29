@@ -103,7 +103,7 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         });
         await f.whenStable();
         f.detectChanges();
-        expect(el.textContent).toContain('Incident-management capability');
+        expect(el.textContent).toContain('Identities need Incident management, also to read.');
         expect(el.textContent).not.toContain('Chain NOT verified');
     });
 

@@ -24,8 +24,9 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { limitRefusalMessage } from './limit-refusal';
+import { stepName } from './investigation-state';
 
-/** A Draft refusal in an analyst's words; the server's own reason (which names the step or the limit) is kept. */
+/** A Draft refusal in an analyst's words: the reason only, never the server's raw text (X5); 409 and 422 carry the server's reason. */
 export function draftErrorMessage(err: unknown, fallback: string): string {
     const limit = limitRefusalMessage(err);
     if (limit) return limit;
@@ -33,37 +34,25 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return 'Your role does not allow that on this Draft. Server: ' + server;
+            return 'Your role does not allow that on this Draft.';
         case 404:
-            return 'Not available — the Draft or Investigation is gone or not visible to you. Server: ' + server;
+            return 'Not available: the Draft or Investigation is gone or not visible to you.';
         case 409:
             if (/open Drafts/.test(server))
-                return (
-                    'This Space has reached its Drafts limit (50 open Drafts). Discard or promote one, or wait for an idle one to expire, then fork again. Server: ' +
-                    server
-                );
+                return 'This Space has reached its limit of 50 open Drafts. Discard or promote one, then fork again.';
             if (/already have a live draft/.test(server))
-                return (
-                    'You already have a live Draft on this Investigation — continue it, promote it or discard it before forking another. Server: ' +
-                    server
-                );
+                return 'You already have a Draft on this Investigation. Continue, promote or discard it first.';
             if (/must rebase/.test(server) && /undone steps/.test(server))
-                return 'The Draft holds undone steps — rebase it to compact them away, then promote. Server: ' + server;
+                return 'The Draft holds undone steps. Rebase it, then promote.';
             if (/must rebase/.test(server) && /index version/.test(server))
-                return (
-                    'The index version this Draft pinned has expired — rebase it to re-pin, then promote. Server: ' +
-                    server
-                );
+                return 'The link index version this Draft uses has expired. Rebase it, then promote.';
             if (/must rebase/.test(server) && /based on step/.test(server))
-                return (
-                    'The main log has moved on — rebase this Draft onto the current head, then promote. Server: ' +
-                    server
-                );
+                return 'The Investigation has moved on. Rebase this Draft, then promote.';
             if (/must rebase/.test(server))
-                return 'This Draft must be rebased before it can be promoted. Server: ' + server;
-            return 'Refused as the Draft stands now — ' + server;
+                return 'Rebase this Draft before you promote it.';
+            return 'Refused: ' + server;
         case 422:
-            return 'The server refused the request: ' + server;
+            return 'Refused: ' + server;
         default:
             return server;
     }
@@ -227,7 +216,7 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                             }
                             @for (c of r.conflicts; track c.step) {
                                 <span>
-                                    Step {{ c.step }} ({{ c.op }}) — <strong>{{ c.kind }}</strong
+                                    Step {{ c.step }} ({{ stepName(c.op) }}): <strong>{{ c.kind }}</strong
                                     >: {{ c.detail }}
                                     @if (c.requiresConfirm) {
                                         <em class="text-secondary"> — Rebase drops it, and asks you to confirm.</em>
@@ -242,6 +231,8 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
     `,
 })
 export class LinkAnalysisDraftsComponent {
+    /** The plain step name, never the op id (X9). */
+    readonly stepName = stepName;
     readonly investigationId = input.required<string>();
     readonly promoted = output<void>();
     /** The Draft that is the host's working scope (null = the main log). */

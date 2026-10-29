@@ -180,15 +180,15 @@ describe('LinkAnalysisIdentitiesComponent (LA-17 slice 2)', () => {
         const { el, settle } = create({ listError: 403 });
         await settle();
         const alert = el.querySelector('inspecto-alert')?.textContent ?? '';
-        expect(alert).toContain('Incident-management capability');
-        expect(alert).toContain('no capability');
+        expect(alert).toContain('Identities need Incident management, also to read.');
+        expect(alert).not.toContain('no capability'); // X5
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
 
     it('explains a 503 in an info alert and hides the forms, and passes axe', async () => {
         const { el, settle } = create({ listError: 503 });
         await settle();
-        expect(el.querySelector('inspecto-alert')?.textContent).toContain('not available here');
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain('Identities are not available');
         expect(el.querySelector('form')).toBeNull();
         await expectNoA11yViolations(el);
     });

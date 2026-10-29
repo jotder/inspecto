@@ -39,7 +39,7 @@ export interface NewInvestigationRequest {
     degrees: number;
 }
 
-/** What the default Name and Reason are made from: the Start from choice and its current input. */
+/** What the default Name and Purpose are made from: the Start from choice and its current input. */
 export interface NewInvestigationInput {
     kind: StartKind | 'graph';
     /** The graph on screen's name: its saved view, else its Dataset. */
@@ -57,46 +57,65 @@ export interface NewInvestigationInput {
     maskingMode?: string | null;
 }
 
+/** "a Party", "an Account": the article for a label (blank = "an entity"). */
+function aOrAn(label: string): string {
+    const l = label.trim() || 'entity';
+    return `${/^[aeiou]/i.test(l) ? 'an' : 'a'} ${l}`;
+}
+
 /**
- * The New form's default Name and Reason for an input (LA-PANELS-REDESIGN-1). The analyst may change both; the form
- * re-defaults them only until they are edited. An entity value enters the defaults only where the Space is known not to
- * mask (the same rule as `suspectTitle`) - otherwise the default names the Entity Type alone.
+ * The New form's default Name and Purpose for an input (LA-PANELS-REDESIGN-1; LA-UI-TEXT-PASS-1 X7 and G1). The
+ * analyst may change both; the form re-defaults them only until they are edited.
+ *
+ * - The Name is blank until there is something to name (a value, a list, pasted values); it never carries an
+ *   "Investigation" prefix, the field already says what it is.
+ * - The Purpose never holds a raw identifier: a value enters only the Name, and only where the Space is known not to
+ *   mask (the same rule as `suspectTitle`).
+ * - Blank inputs never leave a gap: a blank Entity Type is "entity", a blank Dataset name is "the Dataset".
+ *
+ * | Start from    | Name                              | Purpose                                                   |
+ * |---------------|-----------------------------------|-----------------------------------------------------------|
+ * | one entity    | "<Type> <value>" (masked: "<Type>")| "Review of a <Type> and its links"                       |
+ * | Entity List   | "Members of “<title>”"            | "Review of the members of “<title>” and their links"      |
+ * | pasted values | "N pasted <Type> values"          | "Review of N pasted values and their links"               |
+ * | whole Dataset | "<Dataset>"                       | "Review of the links in <Dataset>"                        |
+ * | graph         | "<graph name>" (masked: "Graph on screen") | "Review of the graph on screen"                  |
  */
-export function newInvestigationDefaults(i: NewInvestigationInput): { name: string; reason: string } {
+export function newInvestigationDefaults(i: NewInvestigationInput): { name: string; purpose: string } {
+    const type = (i.typeLabel ?? '').trim();
     switch (i.kind) {
-        case 'graph':
+        case 'graph': {
+            const graph = (i.graphName ?? '').trim();
             return {
-                // the same rule as a value: a name enters only where the Space is known not to mask
-                name: i.maskingMode === 'none' && i.graphName ? `Investigation — ${i.graphName}` : 'Investigation — graph on screen',
-                reason: 'Review of the graph on screen',
+                name: i.maskingMode === 'none' && graph ? graph : 'Graph on screen',
+                purpose: 'Review of the graph on screen',
             };
+        }
         case 'list': {
-            const list = i.listTitle.trim() || 'an Entity List';
-            return {
-                name: `Investigation — list ${list}`,
-                reason: `Review of the members of list ${list} and their links`,
-            };
+            const title = (i.listTitle ?? '').trim();
+            if (!title) return { name: '', purpose: 'Review of the members of an Entity List and their links' };
+            return { name: `Members of “${title}”`, purpose: `Review of the members of “${title}” and their links` };
         }
         case 'paste': {
             const n = i.pasted;
-            const what = `${n} pasted ${n === 1 ? 'value' : 'values'}`;
+            if (!(n > 0)) return { name: '', purpose: '' };
+            const values = plural(n, type ? `pasted ${type} value` : 'pasted value', type ? `pasted ${type} values` : 'pasted values');
             return {
-                name: `Investigation — ${what}`,
-                reason: `Review of ${n} pasted ${i.typeLabel} ${n === 1 ? 'value' : 'values'} and their links`,
+                name: values[0].toUpperCase() + values.slice(1),
+                purpose: `Review of ${plural(n, 'pasted value', 'pasted values')} and ${n === 1 ? 'its' : 'their'} links`,
             };
         }
-        case 'dataset':
-            return {
-                name: `Investigation — whole ${i.datasetName}`,
-                reason: `Review of the links in ${i.datasetName}`,
-            };
+        case 'dataset': {
+            const ds = (i.datasetName ?? '').trim();
+            return { name: ds || 'Whole Dataset', purpose: `Review of the links in ${ds || 'the Dataset'}` };
+        }
         default: {
-            const value = i.maskingMode === 'none' ? i.value.trim() : '';
-            const subject = value ? `${i.typeLabel} ${value}` : i.typeLabel;
-            return {
-                name: `Investigation — ${subject}`,
-                reason: `Review of ${value ? subject : `the ${i.typeLabel}`} and its links`,
-            };
+            const value = (i.value ?? '').trim();
+            const purpose = `Review of ${aOrAn(type)} and its links`;
+            if (!value) return { name: '', purpose };
+            const shown = i.maskingMode === 'none' ? value : '';
+            const name = [type, shown].filter(Boolean).join(' ') || 'Entity';
+            return { name, purpose };
         }
     }
 }
@@ -273,6 +292,16 @@ export function someValues(values: readonly string[], max = 5): string {
         : `${values.slice(0, max).join(', ')} and ${values.length - max} more`;
 }
 
+/**
+ * Values a start found nothing for, with the next step (T-016 / T-035): "X is not in Calls. Check the spelling or pick
+ * another Dataset."; several: "None of these are in Calls: X, Y. …".
+ */
+export function notInDatasetMessage(unknown: readonly string[], dataset: string): string {
+    const said =
+        unknown.length === 1 ? `${unknown[0]} is not in ${dataset}.` : `None of these are in ${dataset}: ${someValues(unknown)}.`;
+    return `${said} Check the spelling or pick another Dataset.`;
+}
+
 /** What an explorer start drew, in words (the box's notice after it). */
 export function startOutcome(o: {
     drawn: number;
@@ -283,17 +312,19 @@ export function startOutcome(o: {
     dataset: string;
     terms: { node: string; nodes: string };
 }): string {
+    const linked = Math.max(0, o.nodes - o.drawn);
     const parts = [
-        `Drew ${plural(o.drawn, 'start')} and ${plural(Math.max(0, o.nodes - o.drawn), 'linked ' + o.terms.node, 'linked ' + o.terms.nodes)} from ${o.dataset}.`,
+        `Drew ${plural(o.drawn, 'entity', 'entities')} and ${plural(linked, 'linked ' + o.terms.node, 'linked ' + o.terms.nodes)}.`,
     ];
-    if (o.held)
-        parts.push(
-            `${plural(o.held, 'busy ' + o.terms.node, 'busy ' + o.terms.nodes)} held - Grow does not go through them.`,
-        );
-    if (o.unknown.length) parts.push(`Not in ${o.dataset}: ${someValues(o.unknown)}.`);
+    if (o.unknown.length)
+        parts.push(`${someValues(o.unknown)} ${o.unknown.length === 1 ? 'is' : 'are'} not in ${o.dataset}.`);
     if (o.notDrawn)
         parts.push(`${plural(o.notDrawn, 'more value')} not drawn: one start draws at most ${START_MAX_SEEDS}.`);
-    parts.push('Expand… (G) continues one degree at a time.');
+    parts.push(
+        o.held
+            ? `${plural(o.held, 'busy ' + o.terms.node, 'busy ' + o.terms.nodes)} ${o.held === 1 ? 'is' : 'are'} held; Expand… (G) goes one degree further.`
+            : 'Expand… (G) goes one degree further.',
+    );
     return parts.join(' ');
 }
 
@@ -306,8 +337,8 @@ export function wholeDatasetWarning(
 ): string | null {
     if (distinct == null || distinct <= cap) return null;
     return (
-        `${dataset} holds about ${distinct.toLocaleString('en')} ${typeLabel} entities, more than the ${cap.toLocaleString('en')}-node cap: ` +
-        `the graph is cut to the busiest ${cap.toLocaleString('en')}. Starting from one entity or a list is usually clearer.`
+        `${dataset} holds about ${distinct.toLocaleString('en-GB')} ${typeLabel || 'linked'} entities: only the busiest ` +
+        `${cap.toLocaleString('en-GB')} are drawn. One entity or an Entity List is usually clearer.`
     );
 }
 

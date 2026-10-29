@@ -6,7 +6,7 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { AiExplainDialog, isUserFacingDoc } from './ai-explain.dialog';
+import { AiExplainDialog, cleanGlossaryDefinition, guideTitle, isUserFacingDoc } from './ai-explain.dialog';
 
 /** A term the glossary does not define — the real tool answers 422, which drives the docs fallback. */
 const NO_DEFINITION = new HttpErrorResponse({ status: 422, error: { error: { message: 'no canonical definition' } } });
@@ -46,7 +46,7 @@ describe('AiExplainDialog', () => {
         expect(runTool).toHaveBeenCalledWith('glossary_lookup', { term: 'Pipeline' });
         expect(runTool).toHaveBeenCalledWith('glossary_lookup', { term: 'Step' });
         expect(fixture.componentInstance.entries().map((e) => e.term)).toEqual(['Pipeline', 'Step']);
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('definition of Pipeline');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Definition of Pipeline.');
     });
 
     it('never invokes a mutating tool — the whole surface is two read tools', () => {
@@ -67,40 +67,37 @@ describe('AiExplainDialog', () => {
 
         expect(runTool).toHaveBeenCalledWith('docs_search', { query: 'Widget' });
         expect(fixture.componentInstance.entries()[0].citations).toHaveLength(1);
-        // The citation is what makes the fallback trustworthy — it is shown, not just the snippet.
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('okf/product/x/user-guide-x.md:12');
+        // The citation is what makes the fallback trustworthy: the guide is named, the path is in the tooltip.
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).toContain('No definition. Mentioned in the guides:');
+        expect(el.textContent).toContain('User guide: x');
+        expect(el.querySelector('li')?.getAttribute('title')).toBe('okf/product/x/user-guide-x.md:12');
     });
 
-    it('a pane-supplied definition answers a term the glossary lacks, and the docs are never searched for it', () => {
-        runTool.mockImplementation((tool: string) =>
-            tool === 'glossary_lookup' ? throwError(() => NO_DEFINITION) : of({ hits: [] }),
-        );
-        const fixture = create(['Link'], { Link: 'A business edge between two Entities.' });
+    it('a pane-supplied definition wins: the glossary and the docs are never asked for that term (X2)', () => {
+        runTool.mockReturnValue(of({ term: 'Link', definition: 'raw row `LA-10` ⛔ never' }));
+        const fixture = create(['Link'], { Link: 'A call or transaction between two Entities.' });
 
-        expect(runTool.mock.calls.map((c) => c[0])).toEqual(['glossary_lookup']);
-        expect(fixture.componentInstance.entries()[0].definition).toBe('A business edge between two Entities.');
-        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('No canonical definition');
+        expect(runTool).not.toHaveBeenCalled();
+        expect(fixture.componentInstance.entries()[0].definition).toBe('A call or transaction between two Entities.');
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('No definition');
     });
 
-    it('with the intelligence module absent (503) it still shows the definitions the pane supplied, and says where they came from', () => {
+    it('with the intelligence module absent (503) it still shows the definitions the pane supplied', () => {
         runTool.mockReturnValue(throwError(() => MODULE_ABSENT));
-        const fixture = create(['Entity', 'Link'], { Entity: 'A business node.', Link: 'A business edge.' });
+        const fixture = create(['Entity', 'Link'], { Entity: 'A thing on the graph.', Link: 'A call between two.' });
         const el = fixture.nativeElement as HTMLElement;
 
-        expect(el.textContent).not.toContain('AI assistance unavailable');
-        expect(el.textContent).toContain('A business node.');
-        expect(el.textContent).toContain('A business edge.');
-        const source = el.querySelector('[data-testid="explain-source"]')?.textContent ?? '';
-        expect(source).toContain('as this screen defines them');
-        expect(source).not.toContain('from the project glossary');
+        expect(el.textContent).not.toContain('Definitions unavailable');
+        expect(el.textContent).toContain('A thing on the graph.');
+        expect(el.textContent).toContain('A call between two.');
+        expect(el.querySelector('[data-testid="explain-source"]')?.textContent?.trim()).toBe('Terms used on this screen.');
     });
 
-    it('says "from the project glossary" only when the glossary answered', () => {
-        runTool.mockImplementation((_tool: string, args: { term: string }) => of({ term: args.term, definition: 'canonical' }));
-        const fixture = create(['Dataset'], { Dataset: 'own words' });
-        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="explain-source"]')?.textContent).toContain(
-            'from the project glossary',
-        );
+    it('cleans a glossary answer before showing it', () => {
+        runTool.mockReturnValue(of({ term: 'Dossier', definition: 'The *report* (`GET /inv/x`) of the `LA-10` thing. ⛔ Not a Case.' }));
+        const fixture = create(['Dossier']);
+        expect(fixture.componentInstance.entries()[0].definition).toBe('The report of the thing.');
     });
 
     it('never cites a deployment, operations or internal README in the docs fallback', () => {
@@ -142,7 +139,7 @@ describe('AiExplainDialog', () => {
         expect(fixture.componentInstance.unavailable()).toBe(true);
         // A 503 is the module being absent, so the docs fallback cannot help either — one call per term.
         expect(runTool).toHaveBeenCalledTimes(2);
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('AI assistance unavailable');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Definitions are unavailable here. Everything else works.');
     });
 
     it('renders a term that resolves to nothing rather than dropping it', () => {
@@ -152,7 +149,7 @@ describe('AiExplainDialog', () => {
         const fixture = create(['Nonsense']);
 
         expect(fixture.componentInstance.entries()).toHaveLength(1);
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('No canonical definition found.');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('No definition found.');
     });
 
     it('has no a11y violations', async () => {
@@ -160,5 +157,48 @@ describe('AiExplainDialog', () => {
         const fixture = create(['Pipeline']);
 
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
+    /** A nasty GLOSSARY row with every kind of engineer markup the About used to print. */
+    const NASTY =
+        '*(Link Analysis; `/inv/investigations`, `D-E1`)* — The Link Analysis **enquiry object**: an ordered, replayable log ' +
+        'of analyst ops (`seed`, `expand`, `exclude`) over a graph \\| per [Space](okf/x.md), plus the Working Set it ' +
+        'evaluates to (`InvestigationRoutes`, `LA-10`, GLOSSARY-CASE-1). ⛔ It is a child of a Case. ✅ Backend built ' +
+        '(internal document - not shipped). Named by operator decision `D16`.';
+
+    it('renders a nasty row as one clean, complete sentence', () => {
+        const clean = cleanGlossaryDefinition(NASTY);
+        expect(clean).toBe(
+            'The Link Analysis enquiry object: an ordered, replayable log of analyst ops (seed, expand, exclude) over a graph per Space, plus the Working Set it evaluates to.',
+        );
+        for (const junk of ['`', '*', '⛔', '✅', '\\|', '|', 'D-E1', 'LA-10', 'GLOSSARY-CASE-1', '/inv', 'internal document', 'Named by', 'InvestigationRoutes', '()'])
+            expect(clean, junk).not.toContain(junk);
+    });
+
+    it('keeps the first sentence only, and does not split on e.g.', () => {
+        expect(cleanGlossaryDefinition('A list of keys, e.g. phone numbers. Second sentence here.')).toBe(
+            'A list of keys, e.g. phone numbers.',
+        );
+    });
+
+    it('adds the closing full stop, capitalises, and cuts an over-long sentence at a word with an ellipsis', () => {
+        expect(cleanGlossaryDefinition('a thing on the graph')).toBe('A thing on the graph.');
+        const long = cleanGlossaryDefinition('word '.repeat(80).trim());
+        expect(long.length).toBeLessThanOrEqual(221);
+        expect(long.endsWith('word…')).toBe(true);
+    });
+
+    it('keeps SHA-256 and answers blank for a row with nothing readable', () => {
+        expect(cleanGlossaryDefinition('A SHA-256 chain of custody.')).toBe('A SHA-256 chain of custody.');
+        expect(cleanGlossaryDefinition('⛔ Never this.')).toBe('');
+        expect(cleanGlossaryDefinition('`LA-10` (`/inv/x`)')).toBe('');
+    });
+
+    it('names cited docs by title', () => {
+        expect(guideTitle('GLOSSARY.md')).toBe('Glossary');
+        expect(guideTitle(['okf', 'user-guide-link-analysis.md'].join('\\'))).toBe('User guide: link analysis');
+        expect(guideTitle('okf/product/module/la-core/admin-guide.md')).toBe('Admin guide');
     });
 });

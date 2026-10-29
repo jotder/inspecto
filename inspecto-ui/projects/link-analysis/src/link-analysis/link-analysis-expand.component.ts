@@ -92,9 +92,7 @@ export interface ExpandRun {
 
             @if (showHint()) {
                 <div class="rounded-md border p-2 text-xs" style="border-color: var(--gamma-border)" data-testid="la-expand-hint">
-                    <p class="m-0">Expand adds the {{ t().nodes }} linked to what is on the graph, one degree at a time.</p>
-                    <p class="m-0">You see what degree 1 would add before anything changes.</p>
-                    <p class="m-0">One Undo (Ctrl+Z) takes back every degree of one Expand.</p>
+                    <p class="m-0">Adds linked items one degree at a time. You see a preview first; one Undo (Ctrl+Z) reverses it.</p>
                     <p class="text-secondary m-0" data-testid="la-hint-guide">More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).</p>
                     <button mat-button type="button" class="mt-1" (click)="dismissHint()">Got it</button>
                 </div>
@@ -129,14 +127,14 @@ export interface ExpandRun {
                     <span class="text-xs font-semibold" id="la-expand-degrees">Degrees</span>
                     <mat-button-toggle-group formControlName="degrees" aria-labelledby="la-expand-degrees" data-testid="la-expand-degrees">
                         @for (d of degreeChoices(); track d) {
-                            <mat-button-toggle [value]="d" [matTooltip]="d === 1 ? 'One ring (one expand step)' : d + ' rings: ' + d + ' expand steps, undone together'">
+                            <mat-button-toggle [value]="d" [matTooltip]="d === 1 ? 'One degree' : d + ' degrees, undone together'">
                                 <span class="text-xs">{{ d }}</span>
                             </mat-button-toggle>
                         }
                     </mat-button-toggle-group>
                     @if (formValue().degrees > 1) {
                         <p class="text-secondary m-0 text-xs">
-                            Stops early if a degree would grow from more than {{ ctx().frontierCap.toLocaleString('en') }} {{ t().nodes }}.
+                            Stops early if a degree would expand from more than {{ ctx().frontierCap.toLocaleString('en-GB') }} {{ t().nodes }}.
                         </p>
                     }
                 </div>
@@ -144,25 +142,25 @@ export interface ExpandRun {
                 <div class="flex flex-col gap-1">
                     <mat-checkbox
                         formControlName="hold"
-                        [matTooltip]="'Busy ' + t().nodes + ' are supernodes (hub threshold): shown and sent to the Held tray, not expanded further'"
+                        [matTooltip]="'Busy ' + t().nodes + ' stay on the graph and go to the Held tray; they are not expanded'"
                         data-testid="la-expand-hold"
                     >
-                        <span class="text-xs">Hold supernodes with more than {{ thresholdLabel() }} {{ t().links }}</span>
+                        <span class="text-xs">Hold busy entities (more than {{ thresholdLabel() }} linked)</span>
                     </mat-checkbox>
                     @if (form.controls.hold.value) {
                         <inspecto-pen-field
                             class="ml-8"
-                            label="Hub threshold"
+                            label="Busy limit"
                             type="number"
                             [min]="1"
                             [default]="ctx().hubThreshold"
-                            [placeholder]="ctx().hubThreshold.toLocaleString('en') + ' (the threshold in force)'"
+                            [placeholder]="ctx().hubThreshold.toLocaleString('en-GB') + ' (the limit in force)'"
                             formControlName="threshold"
                             [error]="thresholdError()"
                         ></inspecto-pen-field>
                     } @else {
                         <p class="text-secondary m-0 text-xs" data-testid="la-expand-no-hold">
-                            Busy {{ t().nodes }} will be expanded through too, recorded as an override in the log.
+                            Busy {{ t().nodes }} will be expanded through too, recorded as an override in the step log.
                         </p>
                     }
                 </div>
@@ -185,7 +183,7 @@ export interface ExpandRun {
                 <div id="la-expand-advanced" class="flex flex-col gap-2 pl-2" [class.hidden]="!moreOpen()">
                     @if (ctx().linkKinds.length) {
                         <div class="flex flex-col gap-1" role="group" aria-labelledby="la-expand-kinds">
-                            <span class="text-xs font-semibold" id="la-expand-kinds">{{ linkKindsLabel() }}</span>
+                            <span class="text-xs font-semibold" id="la-expand-kinds">{{ linkKindsLabel }}</span>
                             @for (k of ctx().linkKinds; track k) {
                                 <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">
                                     <span class="text-xs">{{ k }}</span>
@@ -197,17 +195,17 @@ export interface ExpandRun {
                             <inspecto-pen-field
                                 label="Link kinds"
                                 formControlName="linkKinds"
-                                placeholder="kind_a, kind_b"
+                                placeholder="e.g. call, transfer"
                                 [error]="rung.controls.linkKinds.invalid ? 'At most ' + maxKinds() + ' kinds.' : ''"
                             />
                         </ng-container>
-                        <p class="text-secondary m-0 text-xs">Comma-separated; blank = all kinds. Needs the Investigation's link-kind column.</p>
+                        <p class="text-secondary m-0 text-xs">Comma-separated; blank means all kinds. Needs the Investigation's link kind column.</p>
                     } @else {
                         <p class="text-secondary m-0 text-xs">This graph has one kind of {{ t().link }}, so there is nothing to choose.</p>
                     }
                     @if (ctx().mode === 'investigation') {
                         <div class="flex flex-col gap-2" [formGroup]="rung" data-testid="la-expand-rung">
-                            <p class="text-secondary m-0 text-xs">Blank = the pack's preset, else the server default.</p>
+                            <p class="text-secondary m-0 text-xs">A blank field uses the Industry pack's setting.</p>
                             @if (ctx().hasWindow) {
                                 <inspecto-option-picker label="Time window" formControlName="window" [options]="windowOptions" />
                                 @if (rung.controls.window.value === 'override') {
@@ -232,40 +230,39 @@ export interface ExpandRun {
                             />
                             <p class="text-secondary m-0 text-xs">Needs the Investigation's time column.</p>
                             <inspecto-pen-field
-                                label="Candidate degree, minimum"
+                                label="Fewest links a neighbour may have"
                                 formControlName="candidateDegreeMin"
                                 type="number"
                                 [error]="rung.controls.candidateDegreeMin.invalid ? 'A whole number of at least 0.' : ''"
                             />
                             <inspecto-pen-field
-                                label="Candidate degree, maximum"
+                                label="Most links a neighbour may have"
                                 formControlName="candidateDegreeMax"
                                 type="number"
                                 [error]="rung.controls.candidateDegreeMax.invalid ? 'A whole number of at least 1.' : ''"
                             />
-                            <p class="text-secondary m-0 text-xs">Skips hubs: a neighbour with more links in the window is not admitted.</p>
                             @if (rung.hasError('degreeOrder')) {
                                 <p class="text-warn m-0 text-xs" role="alert">The minimum degree must not exceed the maximum.</p>
                             }
                             <inspecto-pen-field
-                                label="Maximum fan-out per entity"
+                                label="Most neighbours per entity"
                                 formControlName="maxFanOut"
                                 type="number"
                                 [error]="rung.controls.maxFanOut.invalid ? 'A whole number of at least 1.' : ''"
                             />
-                            <p class="text-secondary m-0 text-xs">Strongest links first; blank = unbounded.</p>
+                            <p class="text-secondary m-0 text-xs">Strongest first. Blank means no limit.</p>
                             <inspecto-pen-field
-                                label="Row budget"
+                                label="Row limit per degree"
                                 formControlName="budget"
                                 type="number"
-                                [placeholder]="(presets().budget ?? 2000).toString()"
+                                [placeholder]="(presets().budget ?? defaultBudget()).toString()"
                                 [error]="rung.controls.budget.invalid ? 'A whole number from 1 to ' + maxBudget() + '.' : ''"
                             />
-                            <p class="text-secondary m-0 text-xs">Rows read per degree; a breach marks the step incomplete.</p>
+                            <p class="text-secondary m-0 text-xs">Stops at this many rows; the step is marked incomplete.</p>
                         </div>
                     } @else {
                         <p class="text-secondary m-0 text-xs" data-testid="la-expand-basic-note">
-                            Time window, minimum events, degree band, fan-out and row budget apply to an Investigation's recorded steps.
+                            More options appear when an Investigation is open.
                         </p>
                     }
                 </div>
@@ -303,8 +300,8 @@ export interface ExpandRun {
 
             @if (approval(); as a) {
                 <p class="text-secondary m-0 text-xs" data-testid="la-expand-effective">
-                    Each degree reads at most {{ a.budget.toLocaleString('en') }} rows, fan-out
-                    {{ a.fanOut === null ? 'unbounded' : 'capped at ' + a.fanOut.toLocaleString('en') }}.
+                    Rows read per degree, at most {{ a.budget.toLocaleString('en-GB') }}. Neighbours per entity:
+                    {{ a.fanOut === null ? 'no limit' : 'at most ' + a.fanOut.toLocaleString('en-GB') }}.
                 </p>
                 @if (a.exceeded.length) {
                     <p class="text-warn m-0 text-xs" role="status" data-testid="la-expand-needs-approval">
@@ -355,9 +352,9 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
 
     readonly guide = GROW_GUIDE;
     readonly windowOptions: PickerOption[] = [
-        { value: 'inherit', label: 'The Investigation’s window', hint: 'The window set for this Investigation' },
+        { value: 'inherit', label: 'Investigation window', hint: 'The window set for this Investigation' },
         { value: 'full', label: 'All available data', hint: 'Ignore the window for this Expand' },
-        { value: 'override', label: 'A window for this Expand…' },
+        { value: 'override', label: 'Custom window', hint: 'A window for this Expand only' },
     ];
     readonly moreOpen = signal(false);
     readonly showHint = signal(!hintSeen('grow'));
@@ -365,6 +362,8 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     readonly pv = this.store.preview;
     readonly maxKinds = computed(() => laLimit('input.link_kinds'));
     readonly maxBudget = computed(() => laLimit('investigation.expand_budget_max'));
+    /** The server's row limit for a degree that states none: the field's placeholder and the summary agree (T-162). */
+    readonly defaultBudget = computed(() => laLimit('investigation.expand_budget_default'));
 
     readonly form = new FormGroup({
         from: new FormControl<ExpandFrom | null>(null),
@@ -412,10 +411,8 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         const v = this.formValue().threshold;
         return v != null && !(Number.isInteger(v) && v >= 1) ? 'A whole number of at least 1.' : '';
     });
-    readonly linkKindsLabel = computed(() => {
-        const l = this.t().links;
-        return l.charAt(0).toUpperCase() + l.slice(1) + ' to follow';
-    });
+    /** The canonical word on every surface (T-164, G6): the legend says Link kinds too. */
+    readonly linkKindsLabel = 'Link kinds to follow';
     /** What each degree will read and whether the Space holds it for a second approver (Investigation only). */
     readonly approval = computed(() => {
         const limits = this.limits();
@@ -445,11 +442,15 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         if (!growIds(ctx, { hold: this.formValue().hold }).length) {
             const t = this.t();
             return ctx.heldFrontier.length
-                ? `Every ${t.node} at the start is a held supernode. Untick “Hold supernodes” to expand through them, or use Expand anyway in the Held tray.`
+                ? `${
+                      ctx.heldFrontier.length === 1
+                          ? `The ${t.node} to expand from is held.`
+                          : `All ${ctx.heldFrontier.length.toLocaleString('en-GB')} ${t.nodes} to expand from are held.`
+                  } Untick “Hold busy entities” or use Expand anyway.`
                 : `There is nothing to expand from yet.`;
         }
-        if (this.kinds()?.length === 0) return `Choose at least one kind of ${this.t().link} to follow.`;
-        if (this.thresholdError()) return 'Fix the hub threshold first.';
+        if (this.kinds()?.length === 0) return 'Choose at least one link kind to follow.';
+        if (this.thresholdError()) return 'Fix the busy limit first.';
         if (this.rungInvalid()) return 'Fix the Advanced fields first.';
         return null;
     });

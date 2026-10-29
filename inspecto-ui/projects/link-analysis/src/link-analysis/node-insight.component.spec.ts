@@ -311,7 +311,7 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         TestBed.inject(MatDialog).open = vi.fn(() => ({ afterClosed: () => of('r') })) as never;
         await c.addTo(c.addTargets()[0]);
         fixture.detectChanges();
-        expect(el.textContent).toContain('You are not allowed to change Entity Lists');
+        expect(el.textContent).toContain('Needs Incident management.');
     });
 
     it('disables list actions with the stated reason when the user cannot manage incidents; Hide closes with hide', async () => {

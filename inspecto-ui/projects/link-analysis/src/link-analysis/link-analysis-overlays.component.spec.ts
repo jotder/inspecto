@@ -59,16 +59,16 @@ describe('Link Analysis overlays', () => {
         expect(el.querySelectorAll('[aria-label="Node kinds"] li')).toHaveLength(2);
         expect(el.querySelectorAll('[aria-label="Link kinds"] button')).toHaveLength(2);
         expect(el.textContent).toContain('6 / 9');
-        expect(el.textContent).toContain('truncated');
+        expect(el.textContent).toContain('cut short');
         await expectNoA11yViolations(el);
 
-        (el.querySelector('[aria-label="Minimize the legend"]') as HTMLButtonElement).click();
-        (el.querySelector('[aria-label="Minimize the working set"]') as HTMLButtonElement).click();
+        (el.querySelector('[aria-label="Minimise the legend"]') as HTMLButtonElement).click();
+        (el.querySelector('[aria-label="Minimise graph counts"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(fixture.componentInstance.legendOpen()).toBe(false);
         expect(el.querySelector('[aria-label="Node kinds"]')).toBeNull();
-        const pill = el.querySelector('[aria-label="Show the working set"]') as HTMLButtonElement;
-        expect(pill.textContent).toContain('truncated'); // the loop signal survives minimising
+        const pill = el.querySelector('[aria-label="Show graph counts"]') as HTMLButtonElement;
+        expect(pill.textContent).toContain('cut short'); // the loop signal survives minimising
         await expectNoA11yViolations(el);
 
         pill.click();
@@ -84,13 +84,13 @@ describe('Link Analysis working set - which graph it counts (LA-STUDIO-UI-REORG-
         fixture.detectChanges();
         const el: HTMLElement = fixture.nativeElement;
         const note = () => el.querySelector('[data-testid="working-set-counts"]')?.textContent?.trim();
-        expect(note()).toBe('Counts the query graph.');
+        expect(note()).toBe('Totals for the graph on screen.');
         fixture.componentInstance.counts.set('query-under-investigation');
         fixture.detectChanges();
         expect(note()).toContain('The canvas shows the Investigation’s Working Set');
         fixture.componentInstance.wsOpen.set(false);
         fixture.detectChanges();
-        expect(el.textContent).toContain('query graph');
+        expect(el.textContent).toContain('graph on screen');
     });
 });
 

@@ -13,7 +13,7 @@ import { limitRefusalMessage } from './limit-refusal';
 
 const ROLES: readonly InvestigationRole[] = ['lead', 'analyst', 'reviewer'];
 
-/** A member change refused by the server, in an analyst's words; the server's own reason is always kept. */
+/** A member change refused by the server, in an analyst's words; the reason only, never the server's raw text (X5). */
 export function memberErrorMessage(err: unknown, fallback: string): string {
     const limit = limitRefusalMessage(err);
     if (limit) return limit;
@@ -21,19 +21,13 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return 'Only a lead of this Investigation can grant or revoke members. Server: ' + server;
+            return 'Only a lead can grant or revoke members.';
         case 404:
-            return (
-                'Not available — you are not a member of this Investigation, or the person is not a member. Server: ' +
-                server
-            );
+            return 'Not available: you or that person are not a member of this Investigation.';
         case 422:
-            return (
-                'The change was refused — an Investigation always keeps at least one lead, so make someone else a lead first. Server: ' +
-                server
-            );
+            return 'Refused: an Investigation always keeps one lead. Make someone else a lead first.';
         case 409:
-            return 'Someone changed the members at the same moment — reload and try again. Server: ' + server;
+            return 'Someone changed the members at the same time. Reload and try again.';
         default:
             return server;
     }

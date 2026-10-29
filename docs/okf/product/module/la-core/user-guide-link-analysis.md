@@ -53,7 +53,7 @@ application. **You need:** to be signed in; changing things needs the capabiliti
 
 | | **Exploring** | **Investigation** |
 |---|---|---|
-| What it is | The canvas, its tools and the analysis catalogue over live data | A recorded **Op log** over a **Working Set** of entities |
+| What it is | The canvas, its tools and the analysis catalogue over live data | A recorded **step log** over a **Working Set** of entities |
 | Is it evidence? | **No.** A saved view re-reads live data; reopening it later may differ. | **Yes**, once you build a **Dossier** ([§11.9](#119-evidence-snapshot-dossier-sealed-bundle)). |
 | Use it to | Look around, try ideas, find leads | Work a case you may have to defend: replay it, fork it, hand it over |
 
@@ -77,12 +77,12 @@ that would otherwise hide everything.
    run**. The result says how many transfers between how many accounts were kept, and anything set aside.
 4. **Add details (optional).** **Add details about these entities** brings in `accounts.csv`; say which column
    identifies each account (`account_id`). Names and segments then show on the graph.
-5. **Start from one account.** **Explore in Link Analysis** opens **Start from...** with your Dataset picked. Keep
+5. **Start from one account.** **Explore in Link Analysis** opens **Start a graph** with your Dataset picked. Keep
    **One entity** and **Account**, type the first letters of the account you are worried about (`MULE`) and pick it
    from the list, which shows how busy each match is. **Start** draws it and everyone it is linked to.
 6. **Expand and clean up.** **Expand…** (canvas toolbar, or **G**) says what the next step adds before it adds it;
    very busy accounts are held, not drawn. An account that links to almost everyone (a big merchant) only hides the
-   pattern: right-click it, **Exclude…**, and add it to a list whose purpose is *Never follow these (exclusion)*, so
+   pattern: right-click it, **Exclude…**, and add it to a list whose purpose is *Exclusion: leave out of analyses*, so
    it stays out of every later step too.
 7. **Find something interesting.** Open the right panel's **Analysis** tab: **Who is busiest**, **Which groups stick
    together** (the chain shows as one group) and **How does A reach B** (from the victim's account to the cash-out
@@ -167,7 +167,7 @@ is sent anywhere. Administrators see it in **Settings → Getting started counte
    follows it.
 
 The result says how many rows were read and kept, rows set aside and why, whether the link index was built, and each
-Expectation on the data. Then **Explore in Link Analysis** (opens **Start from...** with the Dataset picked), **Add
+Expectation on the data. Then **Explore in Link Analysis** (opens **Start a graph** with the Dataset picked), **Add
 details about these entities**, or **Add another file**.
 
 **The Dataset card** says *one-time import* and shows the last import. **Add a file** brings in the next file (for
@@ -228,7 +228,7 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   everywhere: **label · value · ✎** (click the pencil or the value, Enter keeps it, Escape drops it), and a choice
   opens as a list in a popup.
 * **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus,
-  with an Investigation open, **Op log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
+  with an Investigation open, **Step log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
   entities**. Drag its edge to resize; it remembers its tab and height in this browser.
 * **Status bar:** **Caps**, the graph-model chips (Dataset, Mapping, Link type, Attributes — click one, or the pencil,
   to open ⚙ Settings ▸ Graph model), **Refresh** (runs the same graph model again), the counts and **Installed
@@ -254,16 +254,16 @@ last section in this browser. Running the graph model closes it; closing it over
 the pack in force.
 
 **Masked ids.** Names such as `masked:1d4d76be…` mean your Space hides sensitive ids. The same alias always stands for
-the same account, so you can still group, count, search, seed and follow it. Graph model says **Masking: typed (ids
-shown as aliases)**. Someone with Reveal rights can turn an alias back into the real id.
+the same account, so you can still group, count, search, seed and follow it. Graph model says **Masking on: ids
+shown as aliases**. Someone with Reveal rights can turn an alias back into the real id.
 
 ---
 
 ## 5. Building a graph
 
-### 5.1 Start from...
+### 5.1 Start a graph
 
-The first screen is one **Start from...** box. Pick the **Dataset** first (already picked when you come from
+The first screen is one **Start a graph** box. Pick the **Dataset** first (already picked when you come from
 *Explore in Link Analysis*), then what to start from:
 
 * **One entity** — pick the **Entity Type** (the Dataset's main one is chosen: accounts for transfers, phone numbers
@@ -287,12 +287,12 @@ in one press. While that form shows in the Investigation tab, the centre shows o
 do one job. **Investigate** on an Entity's page, and **Investigate … in Link Analysis** on an Incident or Case page,
 open a short *Investigate {number}* form in the Investigation tab that asks only for the purpose.
 
-**Open…**, **Explore dataset…** and **Examples ▸ Follow the money** are in the **File** menu
+**Open…**, **Explore Dataset…** and **Examples ▸ Follow the money** are in the **File** menu
 ([§10](#10-saving-exporting-and-the-file-menu)). Under the box, **Add data** brings a file in.
 
 ### 5.2 Graph model: draw a Dataset yourself
 
-**File ▸ Explore dataset…**, a status-bar chip or the pencil opens **⚙ Settings ▸ Graph model**:
+**File ▸ Explore Dataset…**, a status-bar chip or the pencil opens **⚙ Settings ▸ Graph model**:
 
 1. **Dataset.** The ones that look like links are listed first, each with the reason. **Entity/Link (several
    Datasets)** puts up to 16 mappings in one graph; the same entity in more than one Dataset becomes **one node** that
@@ -388,7 +388,7 @@ dialog. Three sections look up only the entities they need on the server, so the
   type it is on.
 * **Case history** — Standard and up. Opening it reads the Incidents and Cases that reference the entity, newest
   first; *Show* filters all / open / closed. A masked node is looked up by alias and the number is never shown.
-* **Actions** — **Add to watch list: …** / **Add to block list: …** asks for a reason (a list under four-eyes answers
+* **Actions** — **Add to <list name>** asks for a reason (a list under four-eyes answers
   *Waiting for approval*); needs *Manage incidents*. **Hide on canvas** (exploring only) takes the node off the canvas.
 
 ---
@@ -405,10 +405,10 @@ shows theirs. The words follow the Industry pack (Telecom: *subscribers* and *ca
 
 **Expand…** (canvas toolbar, **G**, or right-click a node) opens one dialog:
 
-* **From**: the selection, the seeds, or the nodes not expanded yet (the first 25).
+* **From**: the selection, the start entities, or the nodes not expanded yet (the first 25).
 * **Direction**: both ways, outgoing or incoming. **Degrees**: 1 up to the maximum in force.
-* **Hold supernodes with more than *H* links** — on by default, *H* = the Space's hub threshold (default 500).
-  Unticking it expands through every hub the walk reaches; it asks you to confirm and the override is sealed.
+* **Hold busy entities (more than *H* linked)**: on by default, *H* = the Space's **busy limit** (default 500).
+  Unticking it expands through every busy entity the Expand reaches; it asks you to confirm and the override is logged.
 * **Advanced**: the link kinds to follow, the time window (the Investigation's own, or all available data) and the
   other limits.
 * A **preview line** says what it would add before anything changes: *This step adds about 342 numbers and 1,210
@@ -423,9 +423,9 @@ a **dotted outline** (legend: *Dotted outline: not expanded yet*); on an Investi
 
 ### 7.2 Held: busy entities
 
-Busy numbers — call centres, switchboards, shops — link to thousands of others and hide the real links. Expand holds
-them: they stay on the graph with a ring and a *held* badge, and **Held (n)** opens the held tray with their contact
-counts. **Remove held** takes them all out in one step (recorded as `exclude` with the reason *busy number above N
+Busy entities link to thousands of others and hide the real links. Expand holds them: they stay on the graph with a
+ring and a *held* badge, and **Held (n)** opens the held tray with how many entities each links to. **Exclude held**
+(**Hide held** while exploring) takes them all out in one step (recorded as `exclude` with the reason *busy number above N
 contacts*); **Expand anyway** expands through one of them (the recorded override).
 
 ### 7.3 Collapse
@@ -465,7 +465,7 @@ not in a text field, grid, menu or dialog.
 
 The right panel's **Browser** and **Server** tabs.
 
-**Find something interesting** (Browser tab): three plain questions about the graph on screen.
+**Find something interesting** (On screen tab): three plain questions about the graph on screen.
 
 * **Who is busiest** — the five entities with the most links, each in one sentence (*MERCHANT-BIG takes part in 270
   transfers, the most on this graph.*). When the busiest has at least 5 links and twice the next, it asks: *Add it to
@@ -476,27 +476,27 @@ The right panel's **Browser** and **Server** tabs.
   direction when there is none (it says which).
 
 Every result row offers **Show on graph**, **Start from these** (a new graph from those entities and one ring) and
-**Add to a list** (purpose in plain words: *Watch these*, *Never follow these*, *Known good*, *Block*; a reason is
+**Add to a list** (purpose in plain words: *Watch these*, *Exclusion*, *Known good*, *Block*; a reason is
 recorded).
 
 **One catalogue, one entry per algorithm**, ordered by the question each answers. It is split by where a tool runs:
 
-* **The Browser tab** works on the graph on screen. It holds every tool that runs in the browser, including those that
+* **The On screen tab** works on the graph on screen. It holds every tool that runs in the browser, including those that
   can also run on the server (*both*).
-* **The Server tab** lists the server algorithms (29 on a standard install). It runs them over the whole Dataset or
+* **The Whole Dataset tab** lists the server algorithms (29 on a standard install). It runs them over the whole Dataset or
   the open Investigation's Working Set, whatever its size, with the answer summarised in words and *Highlight on
   canvas*. It also holds the tools that only read the server: *Find paths (server)*, *Value Measures*, *Burst and
   periodicity* and *Edge index*.
 * **A *both* tool** shows only that side's controls in each tab. *Explain node* runs its neighbourhood in the browser;
-  its edge-index reads are in the Server tab. *Pattern match* finds matches in the Browser tab, and its **Run on
-  server** is in the Server tab.
+  its edge-index reads are in the Whole Dataset tab. *Pattern match* finds matches in the On screen tab, and its **Run on
+  server** is in the Whole Dataset tab.
 
 Each row shows a badge (*both*, *server*) and its limit (*≤ 2500 nodes in the browser*). Over the browser limit, the
-Browser tab says so. That tool's **Run on server** is then in the Server tab, listed with the same settings.
+On screen tab says so. That tool's **Run on server** is then in the Whole Dataset tab, listed with the same settings.
 
 The tools keep their results when you switch tabs.
 
-On the Explorer level and on Basic, the Server tab still runs the Dataset reads that need no Investigation:
+On the Explorer level and on Basic, the Whole Dataset tab still runs the Dataset reads that need no Investigation:
 *Find paths (server)*, *Value Measures*, *Burst and periodicity* and the pattern's **Run on server**. One locked line
 after them, *Run a server algorithm*, says what has the server algorithms.
 
@@ -573,14 +573,14 @@ Server side repeats the search across the whole Dataset.
 
 | Item | What it does |
 |---|---|
-| **New** | Closes what is open. With Investigations it opens the **New Investigation** form in the Investigation tab ([§11.1](#111-start-one)); without them, back to *Start from...* |
-| **Open…** | One dialog, two tabs. **Saved views**: search, filter by Tag, Dataset and last change; **Open**, **Rename**, **Duplicate**, **Delete** (asks first), **Version history**, **Comments**, **Tags**, **Offer for sharing**. **Investigations**: the ones you may read plus **Recent**; filter by owner, Dataset, date and status (Recent, Mine, Shared through a Case); type an id to open one directly. |
-| **Explore dataset…** | Opens ⚙ Settings ▸ Graph model with its guided Dataset picker: choose a Dataset and its from and to columns yourself ([§5.2](#52-graph-model-draw-a-dataset-yourself)) |
+| **New Investigation** (**New** without Investigations) | Closes what is open. With Investigations it opens the **New Investigation** form in the Investigation tab ([§11.1](#111-start-one)); without them, back to *Start a graph* |
+| **Open…** | One dialog, two tabs. **Saved views**: search, filter by Tag, Dataset and last change; **Open**, **Rename**, **Duplicate**, **Delete** (asks first), **Version history**, **Comments**, **Tags**, **Share…**. **Investigations**: the ones you may read plus **Recent**; filter by owner, Dataset, date and **Show** (All, Recent, Mine, Via a Case); type an id to open one directly. |
+| **Explore Dataset…** | Opens ⚙ Settings ▸ Graph model with its guided Dataset picker: choose a Dataset and its From and To columns yourself ([§5.2](#52-graph-model-draw-a-dataset-yourself)) |
 | **Examples ▸ Follow the money** | Opens the Space's ready-made money-mule view and draws it now. Greyed out when the Space has none |
-| **Save view** | Saves over the open view (with none open it asks a name). Saving, renaming, duplicating and deleting views needs the *Workbench author* permission (`canAuthorWorkbench`); without it these items are greyed out and the menu says why. A view shared with others may be deleted only by its owner |
-| **Save view as…** | A **Name** and optional description; names the lists the graph uses (the list it started from, the exclusion lists you added to) and says once that a saved view re-reads live data and is not evidence |
-| **Save this analysis (Snapshot)** | Freezes what is on screen (the Working Set while an Investigation is open) with a SHA-256 fingerprint; can attach it to a Case or **create a new Case from graph nodes** |
-| **Import / export views** | Moves views between Spaces as a file |
+| **Save view** | Saves over the open view (with none open it asks a name). Saving, renaming, duplicating and deleting views needs the *Workbench author* permission; without it these items are greyed out and the menu says *Needs Workbench author.* under them. Every greyed-out File item says why (*Draw a graph first.*, *Open an Investigation or saved view first.*). A view shared with others may be deleted only by its owner |
+| **Save view as** | A **Name** and optional description; names the lists the graph uses (the list it started from, the exclusion lists you added to) and says once that a saved view re-reads live data and is not evidence |
+| **Save snapshot…** | Freezes what is on screen (the Working Set while an Investigation is open) with a SHA-256 fingerprint; can attach it to a Case or **create a new Case from graph nodes** |
+| **Import or export** | Moves views between Spaces as a file |
 | **Close** | Back to the start; the page keeps its full height |
 | **Delete** | Deletes the open view or Investigation; names it and asks first |
 
@@ -609,44 +609,45 @@ prune deliberately. Every step is sealed with what it read, so it replays identi
 ### 11.1 Start one
 
 **File ▸ New**, or the Investigation tab with nothing open, shows the **New Investigation** form (LA-PANELS-REDESIGN-1,
-2026-10-29). Each **New** starts it fresh: the inputs are cleared and the Name and Reason are the defaults again. Without
-*Incident management* the form opens with a *Read-only* note at its top (*Your role can't start Investigations (needs
-Incident management)*), its fields are disabled and **Start Investigation** says why. Fill it in top to bottom:
+2026-10-29). Each **New** starts it fresh: the inputs are cleared and the Name and Purpose are the defaults again. Without
+*Incident management* the form is replaced by one line: *Read-only: starting an Investigation needs Incident
+management.* Fill it in top to bottom:
 
-1. **Start from** (a popup, like the Entity Type): **One entity**, **A list**, **A paste** or **The whole Dataset**.
-   While a graph is drawn (a saved view, or a graph drawn with Explore dataset…), it also offers **The graph on
+1. **Start from** (a popup, like the Entity Type): **One entity**, **Entity List**, **Pasted values** or **Whole Dataset**.
+   While a graph is drawn (a saved view, or a graph drawn with Explore Dataset…), it also offers **Graph on
    screen**:
-   * It starts an Investigation over that graph's one mapping, with no seed yet.
-   * Its default Name is the view's or the Dataset's (*Investigation — mule_layering_ring*).
-   * Its default Reason is *Review of the graph on screen*.
+   * It starts an Investigation over that graph's one mapping, with no start entities yet.
+   * Its default Name is the view's or the Dataset's (*mule_layering_ring*).
+   * Its default Purpose is *Review of the graph on screen*.
 2. The **Dataset**.
 3. The input for that choice, and only that one:
-   * one entity: the Entity Type and the value, with the same matches as [§5.1](#51-start-from);
+   * one entity: the Entity Type and the value, with the same matches as [§5.1](#51-start-a-graph);
    * a list: the Entity List;
    * a paste: the values;
    * the whole Dataset: nothing more. A warning shows when it is above the node cap.
-4. **Name** and **Reason**, both pre-filled from the input. The Reason is the purpose or legal basis, recorded and
-   shown in the Dossier. Examples:
-   * *Investigation — Account MULE-HUB-01* / *Review of Account MULE-HUB-01 and its links*;
-   * *Investigation — list Suspects*;
-   * *Investigation — 3 pasted values*;
-   * *Investigation — whole Transfers*.
+4. **Name** and **Purpose**, both pre-filled from the input and both required. The Purpose is why you are
+   investigating (the stated reason or legal basis), shown in the Dossier. Examples:
+   * *Account MULE-HUB-01* / *Review of an Account and its links*;
+   * *Members of “Suspects”* / *Review of the members of “Suspects” and their links*;
+   * *3 pasted Account values* / *Review of 3 pasted values and their links*;
+   * *Transfers* / *Review of the links in Transfers*.
 
-   They follow the input until you edit them; from then on your own text is kept. In a Space that masks values, the
-   default leaves the value out (*Investigation — Phone number*), because a name is stored and shown like a value.
+   They follow the input until you edit them; from then on your own text is kept. The Name stays blank until there is
+   something to name. In a Space that masks values, the default leaves the value out (*Phone number*), because a name
+   is stored and shown like a value; the Purpose never holds a value.
 5. **More** (folded): the **Time column** (blank uses the Dataset's) and its **zone**.
 6. **Expand on start** (folded): *Don't expand* (the default), or 1, 2 or 3 degrees, up to the profile's last degree.
 
-**Start Investigation** does it all in one press. It creates the Investigation and records the start as its seed step,
+**Start Investigation** does it all in one press. It creates the Investigation and records the start as step 1,
 then expands the degrees you asked for, each a recorded step with busy entities held. A list or a paste is drawn first,
-and only the values found in the Dataset are seeded. The whole Dataset is drawn, and the Investigation is created over
-it with no seed yet: the canvas keeps the drawn graph (*Show the query graph* is ticked) so you pick seeds from it, and
-**Expand…** stays locked with **Expand next degree** until something is seeded. If the canvas shows an empty Working
-Set, it says so with a one-click **Show the query graph**. **Expand…** on the canvas goes further later.
+and only the values found in the Dataset are the start. The whole Dataset is drawn, and the Investigation is created
+over it with no start entities yet: the canvas keeps the drawn graph (*Show the full graph to pick start entities* is
+ticked) so you pick them from it, and **Expand…** stays locked with **Expand next degree** until there is a start. If
+the canvas shows an empty Working Set, it says so. **Expand…** on the canvas goes further later.
 
 From a ranking, **Start an Investigation from the top results** queues the entities. The Investigation tab then shows
-*Start Investigation with N queued seeds*: give a **Purpose / legal basis** and the queued entities become the first
-seed step. It binds the drawn graph's one Dataset mapping; the query's filter is not carried over, and the panel says
+*Start Investigation with N queued start entities*: give a **Purpose** and the queued entities become the first
+step. It binds the drawn graph's one Dataset mapping; the query's filter is not carried over, and the panel says
 so.
 
 Reopen an Investigation with **File ▸ Open…** ▸ *Investigations*. Over a pre-aggregated Dataset (one row per pair with
@@ -659,18 +660,18 @@ Top to bottom:
 
 1. **Header:** id, purpose, Dataset, the data-trust chip (**Data details**), the Working Set counts and the degree
    reached; its `⋯` menu has **Settings…** (⚙ Settings ▸ Investigation settings), **Close** and **Delete**.
-2. The **seed queue**, when it holds anything.
-3. **Expand…** and **Expand next degree** (one hop further, up to degree 4, hubs left out of the frontier and
+2. The **queued start entities**, when there are any.
+3. **Expand…** and **Expand next degree** (one degree further, up to degree 4, busy entities held and
    counted), with the four-eyes waiting line when there is one.
-4. **Selected entity:** Seed, Keep, Hide, Exclude, Annotate, Expand one hop, **Choose neighbours…** (tick some, or
-   **Add the 10 strongest**: one expand to only those), its neighbours; **Expand the whole Working Set**.
-5. **Held** (high-connectivity entities, each with its sealed count — *High connectivity — 650 contacts (threshold
-   500), not expanded* — and **Expand anyway**).
-6. **Scope list:** entity ids to **Include (go through)** or **Leave out**.
+4. **Selected entity:** Start, Keep, Hide, Exclude, Annotate, Expand one hop, **Pick neighbours…** (tick some, or
+   **Add the 10 strongest**: one expand to only those), its neighbours; **Expand all**.
+5. **Busy entities** (each with its sealed count, *Busy: 650 linked entities (limit 500), not expanded*, and
+   **Expand anyway**).
+6. **Scope list:** entity ids to **Include** or **Leave out**.
 7. **More steps ▾:** Time window, Threshold, Snapshot marker, Compare, Connect seeds (each opens in place).
-8. **Last steps** (the last five) and **Open the Op log**.
+8. **Last steps** (the last five, each named by its kind: Start, Expand, Exclude by list…) and **Open the step log**.
 
-The full record is in the dock: **Op log** (with **Re-order steps**, which creates a fork), **Working Set rows**,
+The full record is in the dock: **Step log** (with **Re-order steps…**, which creates a fork), **Working Set rows**,
 **Coverage**, **Annotations** (entity and link) and **Excluded entities**. Clicking a node while an Investigation is
 open **selects** it for the next step.
 
@@ -733,7 +734,7 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 
 ### 11.9 Evidence: snapshot, Dossier, sealed bundle
 
-1. **File ▸ Save this analysis** freezes the screen as a **snapshot** with a SHA-256 fingerprint. A *saved view*
+1. **File ▸ Save snapshot…** freezes the screen as a **snapshot** with a SHA-256 fingerprint. A *saved view*
    re-reads live data; a *snapshot* does not change.
 2. **Build dossier** (⚙ ▸ Investigation settings ▸ Dossier): summary and topology, a ledger of every step with who
    and why, exclusions, score tables and a **SHA-256 manifest**. Download the *steps* and *method* statements or the
@@ -779,7 +780,7 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 the hub in the top decile. **Pattern match ▸ Structuring (smurfing)** finds `MULE-HUB-01`: 96 in-band legs from 12
 payers. **Value Measures ▸ Pass-through** flags 13 accounts (the two relays at ≈ 0.985, the hub at 0.979, `SHELL-A`
 above 1); **Velocity** shows them forwarding within hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub).
-**Start an Investigation from the top results**, state your purpose, expand one degree; **File ▸ Save this analysis**
+**Start an Investigation from the top results**, state your purpose, expand one degree; **File ▸ Save snapshot…**
 ▸ *create a new Case from graph nodes*, tick the hub and relays; **Build dossier**, **Verify this manifest**, and send
 the sealed bundle to the reviewer.
 
@@ -3367,7 +3368,7 @@ The page-title row in the footer renders the explain control through the `LA_AI_
 ## Getting started (LA-ONBOARD-1, as built 2026-10-22)
 
 The beginner's path, step by step, is in the [Part I §2 and §3](#2-quick-start-from-a-blank-install-to-a-first-finding); the reference is
-[Part I §5.1](#51-start-from). In short:
+[Part I §5.1](#51-start-a-graph). In short:
 
 - **Getting started page.** Until the current Space holds a Dataset (or while there is no Space), the la-app front page
   is **Getting started**: **Try the sample** (the `la-sample` Space Template: invented transfers with a planted mule

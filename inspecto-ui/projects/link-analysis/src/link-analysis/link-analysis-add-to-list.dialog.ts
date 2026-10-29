@@ -79,8 +79,7 @@ const NOT_BLANK = /\S/;
                 ></inspecto-option-picker>
                 @if (!listOptions().length) {
                     <p class="text-secondary m-0 text-xs" data-testid="la-add-list-none">
-                        No list can take these yet, and their Entity Type is not known here, so a new list cannot be made
-                        from this dialog. Create one on the Entity Lists page, then add them.
+                        No list fits these. Create one in Settings ▸ Entity Lists, then add them.
                     </p>
                 }
                 @if (listMissing()) {
@@ -88,13 +87,13 @@ const NOT_BLANK = /\S/;
                 }
                 @if (form.controls.listId.value === NEW_LIST) {
                     <inspecto-pen-field
-                        label="New list name"
+                        label="Name"
                         formControlName="newTitle"
                         [maxlength]="200"
                         [error]="titleError()"
                     ></inspecto-pen-field>
                     <inspecto-option-picker
-                        label="What the list is for"
+                        label="Purpose"
                         [options]="purposeOptions"
                         formControlName="purpose"
                     ></inspecto-option-picker>
@@ -143,7 +142,7 @@ export class LinkAnalysisAddToListDialog {
             label: l.title,
             hint: `${purposeWords(l.purpose)} · ${l.size.toLocaleString('en')} ${l.size === 1 ? 'member' : 'members'}`,
         })),
-        ...(this.data.entityType ? [{ value: NEW_LIST, label: 'Create a new list…', hint: 'A list you keep' }] : []),
+        ...(this.data.entityType ? [{ value: NEW_LIST, label: 'New list…', hint: 'A list you keep' }] : []),
     ]);
 
     readonly form = new FormGroup({
@@ -170,7 +169,7 @@ export class LinkAnalysisAddToListDialog {
     );
     readonly reasonError = computed(() =>
         this.submitted() && !NOT_BLANK.test(this.value().reason ?? '')
-            ? 'A reason is required - every change to a list is accounted for.'
+            ? 'A reason is required.'
             : '',
     );
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);

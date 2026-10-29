@@ -183,7 +183,8 @@ describe('OptionPickerDialog', () => {
         expect(fixture.nativeElement.querySelector('[role="listbox"]')).toBeNull();
         // a name on a role-less div is itself an axe violation (aria-prohibited-attr)
         expect(fixture.nativeElement.querySelector('mat-dialog-content [aria-label]')).toBeNull();
-        expect(fixture.nativeElement.textContent).toContain('No choice matches');
+        // no options at all says so, never "No choice matches “”" (T-089, cross-lane from T2)
+        expect(fixture.nativeElement.querySelector('[data-testid="picker-empty"]')?.textContent?.trim()).toBe('No options');
     });
 
     it('a non-empty choice list keeps the listbox role', () => {

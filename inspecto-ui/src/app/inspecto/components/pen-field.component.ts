@@ -51,6 +51,7 @@ import { MatIconModule } from '@angular/material/icon';
                         style="background: transparent; color: inherit"
                         [attr.maxlength]="maxlength()"
                         [attr.aria-label]="ariaLabel() || label()"
+                        aria-description="Enter to save, Escape to cancel"
                         [placeholder]="placeholder()"
                         [value]="draft()"
                         (input)="draft.set($any($event.target).value)"
@@ -67,6 +68,7 @@ import { MatIconModule } from '@angular/material/icon';
                         [attr.max]="max()"
                         [attr.maxlength]="maxlength()"
                         [attr.aria-label]="ariaLabel() || label()"
+                        aria-description="Enter to save, Escape to cancel"
                         [placeholder]="placeholder()"
                         [value]="draft()"
                         (input)="draft.set($any($event.target).value)"
@@ -86,7 +88,7 @@ import { MatIconModule } from '@angular/material/icon';
                     [class.whitespace-pre-line]="multiline()"
                     [class.line-clamp-3]="multiline()"
                     [disabled]="disabled()"
-                    [attr.aria-label]="'Edit ' + (ariaLabel() || label())"
+                    [attr.aria-label]="valueAriaLabel()"
                     (click)="startEditing()"
                     (keydown)="typeToEdit($event)"
                 >
@@ -102,6 +104,8 @@ import { MatIconModule } from '@angular/material/icon';
                     <button
                         type="button"
                         class="pen-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                        tabindex="-1"
+                        aria-hidden="true"
                         [attr.aria-label]="'Edit ' + (ariaLabel() || label())"
                         (click)="startEditing()"
                         (keydown)="typeToEdit($event)"
@@ -144,6 +148,17 @@ export class PenFieldComponent implements ControlValueAccessor {
     protected readonly text = computed(() => (this.value() ?? '') + '');
     protected readonly hasDefault = computed(() => this.default() !== null && this.default() !== '');
     protected readonly defaultText = computed(() => (this.default() ?? '') + '');
+    /**
+     * The value button's one accessible name: "<label>: <value>, edit" (LA-UI-TEXT-PASS-1 X3). The pencil beside it is
+     * a mouse affordance only (hidden from assistive tech, out of the tab order), so a screen reader never hears two
+     * controls both called "Edit <label>".
+     */
+    protected readonly valueAriaLabel = computed(() => {
+        const name = this.ariaLabel() || this.label();
+        const shown = this.text() !== '' ? this.text() : this.hasDefault() ? `default ${this.defaultText()}` : 'empty';
+        const editable = !this.readOnly() && !this.disabled();
+        return `${name ? name + ': ' : ''}${shown}${editable ? ', edit' : ''}`;
+    });
 
     private onChange: (v: string | number | null) => void = () => undefined;
     private onTouched: () => void = () => undefined;

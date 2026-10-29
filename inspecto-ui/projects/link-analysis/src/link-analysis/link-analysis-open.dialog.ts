@@ -134,7 +134,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
 
             <div class="flex flex-wrap items-end gap-2">
                 <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic">
-                    <mat-label>{{ tab() === 'views' ? 'Search name or description' : 'Search title or id' }}</mat-label>
+                    <mat-label>Search name or id</mat-label>
                     <input matInput [formControl]="search" data-testid="la-open-search" />
                 </mat-form-field>
                 @if (tab() === 'views') {
@@ -153,12 +153,12 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                         </mat-select>
                     </mat-form-field>
                     <mat-form-field class="w-44" subscriptSizing="dynamic">
-                        <mat-label>Status</mat-label>
+                        <mat-label>Show</mat-label>
                         <mat-select [formControl]="status">
-                            <mat-option value="">Any</mat-option>
-                            <mat-option value="recent">Recent (this screen)</mat-option>
+                            <mat-option value="">All</mat-option>
+                            <mat-option value="recent">Recent</mat-option>
                             <mat-option value="owner">Mine</mat-option>
-                            <mat-option value="case">Shared through a Case</mat-option>
+                            <mat-option value="case">Via a Case</mat-option>
                         </mat-select>
                     </mat-form-field>
                 }
@@ -213,7 +213,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                             </li>
                         } @empty {
                             <li class="text-secondary px-2 text-sm">
-                                {{ loading() ? 'Loading…' : allViews().length ? 'No saved view matches.' : 'Nothing saved yet: draw a graph, then File ▸ Save view.' }}
+                                {{ loading() ? 'Loading…' : allViews().length ? 'No saved view matches.' : 'No saved views yet. Draw a graph, then use File ▸ Save view.' }}
                             </li>
                         }
                     } @else {
@@ -239,18 +239,18 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                             </li>
                         } @empty {
                             <li class="text-secondary px-2 text-sm">
-                                {{ loading() ? 'Loading…' : 'No Investigation you may read matches.' }}
+                                {{ loading() ? 'Loading…' : 'No Investigation matches.' }}
                             </li>
                         }
                         @if (idCandidate(); as id) {
                             <li class="px-2 text-sm">
                                 <button mat-button (click)="openInvestigation({ id, title: null })" data-testid="la-open-by-id">
-                                    Open Investigation by id “{{ id }}”
+                                    Open by id “{{ id }}”
                                 </button>
                             </li>
                         }
                         @if (truncated()) {
-                            <li class="text-secondary px-2 text-xs">More Investigations exist than are listed: search narrows the listing.</li>
+                            <li class="text-secondary px-2 text-xs">Showing the first matches. Search to narrow.</li>
                         }
                     }
                 </ul>
@@ -276,14 +276,14 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                             <p class="m-0">{{ r.view.description || 'No description.' }}</p>
                             <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
                                 <dt class="text-secondary">Dataset</dt><dd class="m-0">{{ datasetOf(r.view) || '—' }}</dd>
-                                <dt class="text-secondary">Counts</dt><dd class="m-0">Counted when opened (the view re-projects live data)</dd>
+                                <dt class="text-secondary">Counts</dt><dd class="m-0">Counted when opened</dd>
                                 <dt class="text-secondary">Owner</dt><dd class="m-0">Not recorded for a saved view</dd>
                                 <dt class="text-secondary">Last changed</dt><dd class="m-0">{{ when(r.modified) }}</dd>
                                 <dt class="text-secondary">Investigations</dt><dd class="m-0">{{ r.view.investigations?.length ?? 0 }}</dd>
                                 <dt class="text-secondary">Pack</dt><dd class="m-0">{{ r.view.profile || 'generic' }}</dd>
                             </dl>
                             <p class="text-secondary m-0 text-xs leading-snug" data-testid="la-open-not-evidence">
-                                <span class="text-warn font-semibold">Not evidence</span> — {{ notEvidence }}
+                                <span class="text-warn font-semibold">Not evidence:</span> {{ notEvidence }}
                             </p>
                             <div class="flex flex-wrap gap-1">
                                 <button mat-flat-button color="primary" (click)="openView(r.view)" data-testid="la-open-open">Open</button>
@@ -302,7 +302,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                     <button mat-button (click)="data.tags(r.view)">Tags</button>
                                 }
                                 @if (data.shareable(r.view)) {
-                                    <button mat-button (click)="data.offer(r.view)">Offer for sharing</button>
+                                    <button mat-button (click)="data.offer(r.view)">Share…</button>
                                 }
                             </div>
                         } @else {
@@ -316,7 +316,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                 <dt class="text-secondary">Dataset</dt><dd class="m-0">{{ r.dataset || '—' }}</dd>
                                 <dt class="text-secondary">Steps</dt><dd class="m-0">{{ r.steps ?? '—' }}</dd>
                                 <dt class="text-secondary">Owner</dt><dd class="m-0">{{ r.owner || '—' }}</dd>
-                                <dt class="text-secondary">Created</dt><dd class="m-0">{{ when(r.changed) }}</dd>
+                                <dt class="text-secondary">Last changed</dt><dd class="m-0">{{ when(r.changed) }}</dd>
                                 <dt class="text-secondary">Linked Case</dt><dd class="m-0">{{ r.caseRef || '—' }}{{ r.readOnly ? ' (read-only)' : '' }}</dd>
                                 <dt class="text-secondary">Pack</dt><dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
                             </dl>
@@ -499,7 +499,7 @@ export class LinkAnalysisOpenDialog {
         this.investigationPack.set('…');
         this.inv.investigationLog(id, 1).subscribe({
             next: (log) => {
-                if (this.selectedInvestigationId() === id) this.investigationPack.set(log.header.pack || "none (the Space's pack)");
+                if (this.selectedInvestigationId() === id) this.investigationPack.set(log.header.pack || 'Space default');
             },
             error: () => {
                 if (this.selectedInvestigationId() === id) this.investigationPack.set('—');

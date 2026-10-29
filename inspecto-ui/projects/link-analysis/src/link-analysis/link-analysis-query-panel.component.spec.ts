@@ -46,7 +46,7 @@ describe('LinkAnalysisQueryPanelComponent', () => {
     it('entity-projection: needs a dataset + source/target columns, then builds a projection', () => {
         const { c } = make('entity-projection');
         expect(c.buildQuery()).toEqual({
-            error: expect.stringMatching(/source and target/),
+            error: expect.stringMatching(/From and To columns/),
         });
 
         c.queryForm.patchValue({
@@ -253,7 +253,7 @@ describe('LinkAnalysisQueryPanelComponent', () => {
 
     it('entity-projection-multi: builds node + edge mappings in the /inv/projection/multi body shape', () => {
         const { c } = make('entity-projection-multi');
-        expect(c.buildQuery()).toEqual({ error: expect.stringMatching(/at least one node or edge mapping/) });
+        expect(c.buildQuery()).toEqual({ error: expect.stringMatching(/Add a node or link mapping/) });
 
         c.addNodeMapping().patchValue({
             datasetId: 'people',
@@ -273,7 +273,7 @@ describe('LinkAnalysisQueryPanelComponent', () => {
     it('entity-projection-multi: refuses a half-filled mapping instead of silently dropping it', () => {
         const { c } = make('entity-projection-multi');
         c.addEdgeMapping().patchValue({ datasetId: 'calls', sourceColumn: 'A' });
-        expect(c.buildQuery()).toEqual({ error: expect.stringMatching(/source and target/) });
+        expect(c.buildQuery()).toEqual({ error: expect.stringMatching(/From and To columns/) });
     });
 
     it('entity-projection-multi: a saved view round-trips through the form', () => {
@@ -299,7 +299,7 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         const button = (text: string) =>
             Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes(text))!;
         button('Add node mapping').click();
-        button('Add edge mapping').click();
+        button('Add link mapping').click();
         fixture.detectChanges();
         expect(el.querySelector('[aria-label="Node mapping 1"]')).not.toBeNull();
         expect(el.querySelector('[aria-label="Edge mapping 1"]')).not.toBeNull();
@@ -334,10 +334,10 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         const { fixture } = make('entity-projection-multi');
         const el: HTMLElement = fixture.nativeElement;
         Array.from(el.querySelectorAll('button'))
-            .find((b) => b.textContent?.includes('Add edge mapping'))!
+            .find((b) => b.textContent?.includes('Add link mapping'))!
             .click();
         fixture.detectChanges();
-        expect(el.querySelector('[aria-label="Filter for edge mapping 1"]')).not.toBeNull();
+        expect(el.querySelector('[aria-label="Filter for link mapping 1"]')).not.toBeNull();
         await expectNoA11yViolations(el);
     });
 });
@@ -448,7 +448,7 @@ describe('LinkAnalysisQueryPanelComponent - starting guidance (operator 2026-10-
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelectorAll('button[data-outlined]')).toHaveLength(0);
         const help = el.querySelector('[data-testid="derive-mapping-help"]') as HTMLElement;
-        expect(help.textContent).toContain('needs permission to author configuration');
+        expect(help.textContent).toContain('Needs Workbench author.');
         expect(help.textContent).toContain('use the columns filled in above');
     });
 
@@ -523,7 +523,7 @@ describe('LinkAnalysisQueryPanelComponent - starting guidance (operator 2026-10-
         fixture.componentRef.setInput('queryOpen', false);
         fixture.detectChanges();
         const badge = fixture.debugElement.query(By.css('[data-testid=masking-badge]'));
-        expect(badge.nativeElement.textContent).toContain('Masking: typed (ids shown as aliases)');
+        expect(badge.nativeElement.textContent).toContain('Masking on: ids shown as aliases');
         expect(c.queryOpen()).toBe(false);
     });
 

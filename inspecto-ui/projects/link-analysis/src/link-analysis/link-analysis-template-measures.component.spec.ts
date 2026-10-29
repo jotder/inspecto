@@ -102,7 +102,7 @@ describe('LinkAnalysisTemplateMeasuresComponent (LA-23)', () => {
             throwError(() => new HttpErrorResponse({ status: 503, error: { error: 'no write root' } })),
         );
         expect(c.unavailable()).toBe(true);
-        expect(el.textContent).toContain('not available here');
+        expect(el.textContent).toContain('Investigations are not available');
         await expectNoA11yViolations(el);
     });
 });

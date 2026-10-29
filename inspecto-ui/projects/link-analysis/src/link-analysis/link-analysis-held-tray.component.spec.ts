@@ -48,11 +48,12 @@ describe('LinkAnalysisHeldTrayComponent (LA-GROW-EXCLUDE-1 §3.2)', () => {
     it('lists each held busy item with its contacts and why, teaches once, and is axe-clean', async () => {
         const { fixture, el } = create();
         const tray = el.querySelector('[data-testid="la-held-tray"]') as HTMLElement;
-        expect(tray.textContent).toContain('Held — busy wallets (2)');
-        expect(tray.textContent).toContain('9,120 contacts');
+        expect(tray.textContent).toContain('Held: busy wallets (2)');
+        expect(tray.textContent).toContain('9,120 linked');
         expect(tray.textContent).toContain('held'); // no count served: the badge still says held
-        expect(tray.textContent).toContain('more than 500 contacts');
-        expect(el.querySelector('[data-testid="la-held-hint"]')?.textContent).toContain('Call centres');
+        expect(tray.textContent).toContain('more than 500 linked entities');
+        expect(el.querySelector('[data-testid="la-held-hint"]')?.textContent).toContain('Expand holds them');
+        expect(tray.textContent).not.toMatch(/\bGrow\b|contacts|super node/); // T-044, G3, G5
         expect(el.querySelector('[data-testid="la-held-hint"] [data-testid="la-hint-guide"]')?.textContent).toContain(
             'Expand and clean up the graph',
         );
@@ -71,12 +72,12 @@ describe('LinkAnalysisHeldTrayComponent (LA-GROW-EXCLUDE-1 §3.2)', () => {
         expect(host.removed).toBe(1);
         expect(host.anyway).toEqual(['shop']);
         expect(host.focused).toEqual(['cc-1']);
-        expect(el.querySelector('[data-testid="la-held-remove"]')?.textContent).toContain('Remove held (2)');
+        expect(el.querySelector('[data-testid="la-held-remove"]')?.textContent).toContain('Exclude held (2)');
     });
 
     it('says why the actions cannot run instead of a silent grey, and the clicks do nothing', () => {
         const { fixture, el, host } = create();
-        host.whyNot.set('This changes the Investigation log and needs the Incident management capability.');
+        host.whyNot.set('Needs Incident management to change the step log.');
         fixture.detectChanges();
         const remove = el.querySelector('[data-testid="la-held-remove"]') as HTMLButtonElement;
         expect(remove.getAttribute('aria-disabled')).toBe('true');

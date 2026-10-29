@@ -1,4 +1,3 @@
-import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import {
     ChangeDetectionStrategy,
     Component,
@@ -50,10 +49,18 @@ export interface StartNotice {
 
 const KINDS: PickerOption[] = [
     { value: 'entity', label: 'One entity', hint: 'An Entity Type, then one of its values' },
-    { value: 'list', label: 'A list', hint: 'The members of an Entity List' },
-    { value: 'paste', label: 'A paste', hint: 'Values you paste, one per line' },
-    { value: 'dataset', label: 'The whole Dataset', hint: 'Every link of the Dataset' },
+    { value: 'list', label: 'Entity List', hint: 'The members of an Entity List' },
+    { value: 'paste', label: 'Pasted values', hint: 'Values you paste, one per line' },
+    { value: 'dataset', label: 'Whole Dataset', hint: 'Every link of the Dataset' },
 ];
+
+/** An Entity List option's sub-line, as Settings shows it: "Party · 2 members · Watch". */
+function listHint(l: EntityListSummary, types: readonly { id: string; label: string }[]): string {
+    const type = types.find((t) => t.id === l.entityType)?.label || l.entityType;
+    const purpose = l.purpose ? l.purpose[0].toUpperCase() + l.purpose.slice(1) : '';
+    const members = `${l.size.toLocaleString('en-GB')} ${l.size === 1 ? 'member' : 'members'}`;
+    return [type, members, purpose].filter(Boolean).join(' · ');
+}
 
 /** Expand on start: how many degrees, capped at the profile's maximum. */
 const DEGREE_CHOICES = [0, 1, 2, 3];
@@ -62,7 +69,7 @@ const DEGREE_CHOICES = [0, 1, 2, 3];
  * Why the New Investigation form is locked. The gate is literally `canManageIncidents` (`POST /inv/investigations`,
  * `InvestigationRoutes`), whose plain name is Incident management.
  */
-export const START_LOCKED_REASON = "Your role can't start Investigations (needs Incident management).";
+export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs Incident management.';
 
 /**
  * **Start from...** (LA-ONBOARD-1 phase 6, OB-9; UC-09), in two modes.
@@ -73,7 +80,7 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
  *   above the node cap). The page draws the chosen entities plus one ring, busy ones held. On the Investigations level
  *   *New Investigation…* below opens the form that starts one.
  * - `investigation` (LA-PANELS-REDESIGN-1, the Investigation tab's **New Investigation** form): the same Start from
- *   choice and inputs, then a **Name** and a **Reason** pre-filled from the input (re-defaulted until edited), the time
+ *   choice and inputs, then a **Name** and a **Purpose** pre-filled from the input (re-defaulted until edited), the time
  *   column under *More*, and an optional *Expand on start*. One press creates the Investigation, seeds it and expands.
  *
  * Open…, Explore dataset… and the examples live in the File menu.
@@ -94,30 +101,29 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
         InspectoOptionPickerComponent,
         LaFoldComponent,
         PenFieldComponent,
-        TermHelpComponent,
     ],
     host: { class: 'block w-full max-w-3xl', '[class.p-4]': "mode() === 'draw'" },
     template: `
         @if (mode() === 'draw') {
-            <h2 class="m-0 text-lg font-semibold" [id]="titleId()">Start from...</h2>
+            <h2 class="m-0 text-lg font-semibold" [id]="titleId()">Start a graph</h2>
             <p class="text-secondary mb-3 mt-1 text-sm">
-                Draw a few entities and who they are linked to, then Expand one degree at a time - not the whole hairball.
-                Pick a <inspecto-term term="dataset"></inspecto-term>, then an
-                <inspecto-term term="entity-type"></inspecto-term> and one of its values.
+                Draw a few entities and their links, then Expand one degree at a time.
             </p>
         } @else {
             <h3 class="m-0 text-base font-semibold" [id]="titleId()">New Investigation</h3>
             @if (locked()) {
                 <!-- the lock comes first: the inputs below are disabled, so say why before anyone tries them -->
                 <inspecto-alert class="mt-2 block" variant="info" title="Read-only" data-testid="new-locked">
-                    {{ lockedReason }} You can open and read existing ones with File ▸ Open….
+                    {{ lockedReason }} Open existing ones with File ▸ Open…
                 </inspecto-alert>
             }
             <p class="text-secondary mb-2 mt-1 text-sm">
-                Records each step you take from this start, with who, when and why, so it can be replayed and handed over.
+                Records every step, with who, when and why, so it can be replayed.
             </p>
         }
-        @if (catalogue().datasets.length) {
+        @if (locked()) {
+            <!-- a read-only role sees the reason only: a form of disabled inputs says nothing more (T-203) -->
+        } @else if (catalogue().datasets.length) {
             <form
                 class="flex flex-col gap-3"
                 [class.start-box]="mode() === 'draw'"
@@ -139,7 +145,6 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                         label="Dataset"
                         [outlined]="true"
                         [options]="datasetOptions()"
-                        [help]="datasetHelp()"
                         formControlName="dataset"
                     ></inspecto-option-picker>
                 }
@@ -155,7 +160,7 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                             formControlName="entityType"
                         ></inspecto-option-picker>
                         <mat-form-field class="w-full" subscriptSizing="dynamic">
-                            <mat-label>{{ typeLabel() }}</mat-label>
+                            <mat-label>{{ typeLabel() || 'Value' }}</mat-label>
                             <input
                                 matInput
                                 data-testid="start-value"
@@ -164,7 +169,7 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                                 [matAutocomplete]="suggestions"
                             />
                             @if (form.controls.value.hasError('required')) {
-                                <mat-error>Type the {{ typeLabel() }} to start from.</mat-error>
+                                <mat-error>Enter a value to start from.</mat-error>
                             }
                             @if (suggestNote(); as note) {
                                 <mat-hint data-testid="start-suggest-note">{{ note }}</mat-hint>
@@ -178,7 +183,7 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                                     data-testid="start-reveal"
                                     (click)="revealSuggestions.set(true)"
                                 >
-                                    Show its values (you may reveal them; recorded)
+                                    Show values (this is logged)
                                 </button>
                             </div>
                         }
@@ -201,12 +206,11 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                                 formControlName="listId"
                             ></inspecto-option-picker>
                             @if (tried() && !form.controls.listId.value) {
-                                <p class="text-warn m-0 text-xs" role="alert">Pick the Entity List to start from.</p>
+                                <p class="text-warn m-0 text-xs" role="alert">Choose an Entity List.</p>
                             }
                         } @else {
                             <p class="text-secondary m-0 text-sm" data-testid="start-no-lists">
-                                No Entity List in this Space yet - make one on the Entity Lists page, or paste the
-                                values.
+                                No Entity List yet. Create one in Settings ▸ Entity Lists, or paste values.
                             </p>
                         }
                     }
@@ -238,8 +242,8 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                     }
                     @case ('graph') {
                         <p class="text-secondary m-0 text-sm" data-testid="start-graph-note">
-                            Starts over the graph on screen ({{ graphOnScreen()?.name }}) and its one mapping. The
-                            query's filter is not carried over: the Investigation reads the whole Dataset.
+                            Uses the graph on screen ({{ graphOnScreen()?.name }}). Its filter is not kept: the whole
+                            Dataset is read.
                         </p>
                     }
                     @case ('dataset') {
@@ -247,8 +251,11 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                             <inspecto-alert variant="warning" data-testid="start-whole-warning">{{ w }}</inspecto-alert>
                         } @else {
                             <p class="text-secondary m-0 text-sm" data-testid="start-whole-note">
-                                Draws every link in {{ datasetName() }}. Above
-                                {{ nodeCap().toLocaleString('en') }} nodes the graph is cut to the busiest.
+                                Draws the whole of {{ datasetName() }} (busiest
+                                {{ nodeCap().toLocaleString('en-GB') }} nodes).
+                                @if (mode() === 'investigation') {
+                                    The Investigation starts empty: pick start entities from the graph.
+                                }
                             </p>
                         }
                     }
@@ -259,20 +266,21 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                         label="Name"
                         formControlName="name"
                         [maxlength]="200"
-                        [error]="form.controls.name.hasError('maxlength') ? 'At most 200 characters.' : ''"
+                        [required]="true"
+                        [error]="nameError()"
                     />
                     <div>
                         <inspecto-pen-field
-                            data-testid="new-reason"
-                            label="Reason"
+                            data-testid="new-purpose"
+                            label="Purpose"
                             [required]="true"
                             [multiline]="true"
-                            formControlName="reason"
+                            formControlName="purpose"
                             [maxlength]="1000"
-                            [error]="reasonError()"
+                            [error]="purposeError()"
                         />
                         <p class="text-secondary m-0 text-xs">
-                            The purpose or legal basis, recorded with the Investigation and shown in its Dossier.
+                            Why you are investigating (stated reason or legal basis). Shown in the Dossier.
                         </p>
                     </div>
                     <la-fold title="More" data-testid="new-more">
@@ -285,16 +293,16 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                                     [placeholder]="picked()?.timeCol ?? ''"
                                 />
                                 <p class="text-secondary m-0 text-xs">
-                                    The event time windows and the coverage check read{{
-                                        picked()?.timeCol ? ' - blank uses ' + picked()!.timeCol : ''
-                                    }}.
+                                    Used for time windows and the coverage check.{{
+                                        picked()?.timeCol ? ' Blank uses ' + picked()!.timeCol + '.' : ''
+                                    }}
                                 </p>
                             </div>
                             <inspecto-option-picker
                                 label="Time column zone"
                                 formControlName="timeColZone"
                                 [options]="timeZones"
-                                help="The zone a plain TIMESTAMP time column is read in. A column that already carries a zone refuses one."
+                                help="Time zone for a column that has none."
                             />
                         </div>
                     </la-fold>
@@ -303,13 +311,12 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                             <div class="flex flex-col gap-2 p-2">
                                 <inspecto-option-picker
                                     data-testid="new-degrees"
-                                    label="Expand"
+                                    label="Degrees"
                                     formControlName="degrees"
                                     [options]="degreeOptions()"
                                 />
                                 <p class="text-secondary m-0 text-xs">
-                                    Each degree is a recorded expand step with the profile's read settings; busy entities
-                                    are held. Expand… on the canvas goes further later.
+                                    Each degree is one recorded step. Busy entities are held.
                                 </p>
                             </div>
                         </la-fold>
@@ -325,7 +332,7 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
                             type="submit"
                             data-testid="start-submit"
                             [disabled]="busy() || locked()"
-                            [attr.aria-label]="locked() ? submitLabel() + ' - ' + lockedReason : null"
+                            [attr.aria-label]="locked() ? submitLabel() + ': ' + lockedReason : null"
                         >
                             {{ submitLabel() }}
                         </button>
@@ -335,7 +342,7 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
         } @else {
             <p class="m-0 text-sm" data-testid="start-no-dataset">
                 No Dataset in this Space has a link yet, so there is nothing to start from. Bring in a file of events with
-                <em>Add data</em>, or choose a Dataset's from and to columns yourself with File ▸ Explore dataset….
+                <em>Add data</em>, or choose a Dataset's From and To columns yourself with File ▸ Explore Dataset.
             </p>
         }
         @if (notice(); as n) {
@@ -346,14 +353,24 @@ export const START_LOCKED_REASON = "Your role can't start Investigations (needs 
 
         @if (mode() === 'draw') {
             <p class="text-secondary m-0 mt-4 text-sm" data-testid="start-file-hint">
-                Open…, Explore dataset… and the examples are in the File menu.
+                Open, Explore Dataset and Examples are in the File menu.
             </p>
             @if (investigations()) {
                 <div class="mt-2">
-                    <button mat-stroked-button type="button" data-testid="start-new-investigation" (click)="newInvestigation.emit()">
-                        <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon>
-                        New Investigation…
-                    </button>
+                    <!-- disabled-with-reason: the tooltip sits on a wrapper (a disabled button fires no hover) -->
+                    <span class="inline-flex" [matTooltip]="canWrite() ? '' : lockedReason">
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-testid="start-new-investigation"
+                            [disabled]="!canWrite()"
+                            [attr.aria-label]="canWrite() ? null : 'New Investigation: ' + lockedReason"
+                            (click)="newInvestigation.emit()"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon>
+                            New Investigation
+                        </button>
+                    </span>
                 </div>
             }
             @if (addData()) {
@@ -449,10 +466,11 @@ export class LinkAnalysisStartBoxComponent {
     readonly kindOptions = computed<PickerOption[]>(() => {
         const g = this.mode() === 'investigation' ? this.graphOnScreen() : null;
         return g
-            ? [...KINDS, { value: 'graph', label: 'The graph on screen', hint: `${g.name}: its mapping, no seed yet` }]
+            ? [...KINDS, { value: 'graph', label: 'Graph on screen', hint: `${g.name}, no start entities yet` }]
             : KINDS;
     });
-    readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
+    // "UTC (default)" is the blank choice: a second plain "UTC" would offer the same zone twice (T-036).
+    readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)').filter((o) => o.value !== 'UTC');
     readonly titleId = computed(() => (this.mode() === 'draw' ? 'la-start-title' : 'la-new-investigation-title'));
     readonly form = new FormGroup({
         dataset: new FormControl('', { nonNullable: true }),
@@ -462,8 +480,11 @@ export class LinkAnalysisStartBoxComponent {
         listId: new FormControl('', { nonNullable: true }),
         paste: new FormControl('', { nonNullable: true }),
         // ── the New Investigation form only ──
-        name: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
-        reason: new FormControl('', {
+        name: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(200)],
+        }),
+        purpose: new FormControl('', {
             nonNullable: true,
             validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(1000)],
         }),
@@ -483,16 +504,8 @@ export class LinkAnalysisStartBoxComponent {
     readonly picked = computed(() => this.catalogue().datasets.find((d) => d.id === this.datasetId()) ?? null);
     readonly datasetName = computed(() => this.picked()?.name ?? 'the Dataset');
     readonly datasetOptions = computed<PickerOption[]>(() =>
-        this.catalogue().datasets.map((d) => ({
-            value: d.id,
-            label: d.name,
-            hint: `${d.mapping.sourceCol} to ${d.mapping.targetCol}`,
-        })),
+        this.catalogue().datasets.map((d) => ({ value: d.id, label: d.name })),
     );
-    readonly datasetHelp = computed(() => {
-        const d = this.picked();
-        return d ? `Links ${d.mapping.sourceCol} to ${d.mapping.targetCol} (${d.from}).` : '';
-    });
     /** The picked Dataset's types first (its primary leading), then every other type that can start a graph. */
     readonly typeOptions = computed<PickerOption[]>(() => {
         const cat = this.catalogue();
@@ -505,7 +518,8 @@ export class LinkAnalysisStartBoxComponent {
         }));
     });
     readonly typeLabel = computed(
-        () => this.catalogue().types.find((t) => t.id === this.entityType())?.label ?? this.entityType() ?? 'value',
+        // `||`, not `??`: an unpicked type is '' and must fall through (X7)
+        () => this.catalogue().types.find((t) => t.id === this.entityType())?.label || this.entityType() || '',
     );
     readonly listOptions = computed<PickerOption[]>(() =>
         this.lists()
@@ -513,13 +527,13 @@ export class LinkAnalysisStartBoxComponent {
             .map((l) => ({
                 value: l.id,
                 label: l.title,
-                hint: `${l.size.toLocaleString('en')} ${l.entityType} - ${l.purpose}`,
+                hint: listHint(l, this.catalogue().types),
             })),
     );
 
-    // ── the New Investigation form: default Name and Reason, Expand on start ──
+    // ── the New Investigation form: default Name and Purpose, Expand on start ──
 
-    /** The default Name and Reason for the current input (LA-PANELS-REDESIGN-1). */
+    /** The default Name and Purpose for the current input (LA-PANELS-REDESIGN-1). */
     readonly defaults = computed(() =>
         newInvestigationDefaults({
             kind: this.kind(),
@@ -538,11 +552,17 @@ export class LinkAnalysisStartBoxComponent {
             label: d === 0 ? "Don't expand" : `${d} ${d === 1 ? 'degree' : 'degrees'}`,
         })),
     );
-    readonly reasonError = computed(() => {
+    readonly nameError = computed(() => {
         this.tried();
-        const c = this.form.controls.reason;
+        const c = this.form.controls.name;
+        if (c.hasError('maxlength')) return 'At most 200 characters.';
+        return this.tried() && c.invalid ? 'A name is required.' : '';
+    });
+    readonly purposeError = computed(() => {
+        this.tried();
+        const c = this.form.controls.purpose;
         if (c.hasError('maxlength')) return 'At most 1000 characters.';
-        return this.tried() && c.invalid ? 'A reason is required to start an Investigation.' : '';
+        return this.tried() && c.invalid ? 'A purpose is required.' : '';
     });
 
     constructor() {
@@ -555,13 +575,13 @@ export class LinkAnalysisStartBoxComponent {
         effect(() => {
             if (!this.graphOnScreen() && this.form.controls.kind.value === 'graph') this.form.controls.kind.setValue('entity');
         });
-        // The Name and Reason follow the input until the analyst edits them; an edit is kept from then on.
+        // The Name and Purpose follow the input until the analyst edits them; an edit is kept from then on.
         effect(() => {
             const d = this.defaults();
             if (this.mode() !== 'investigation') return;
-            const { name, reason } = this.form.controls;
+            const { name, purpose } = this.form.controls;
             if (name.pristine && name.value !== d.name) name.setValue(d.name);
-            if (reason.pristine && reason.value !== d.reason) reason.setValue(d.reason);
+            if (purpose.pristine && purpose.value !== d.purpose) purpose.setValue(d.purpose);
         });
         // The Dataset: the page's preselect (`?dataset=`) when it can start a graph, else keep a valid pick, else the first.
         effect(() => {
@@ -624,7 +644,7 @@ export class LinkAnalysisStartBoxComponent {
         if (!s) return '';
         if (s.masked && s.revealed)
             return 'This Entity Type is masked: its values are shown because you may reveal them, and each look-up is recorded.';
-        if (s.masked) return 'This Entity Type is masked: type the whole value - nothing is suggested.';
+        if (s.masked) return 'This Entity Type is masked: type the whole value. Nothing is suggested.';
         if (s.assessed && !s.items.length) return `No ${this.typeLabel()} in ${this.datasetName()} starts like this.`;
         return '';
     });
@@ -672,7 +692,7 @@ export class LinkAnalysisStartBoxComponent {
             case 'dataset':
                 return 'Draw the whole Dataset';
             default:
-                return 'Start';
+                return 'Draw';
         }
     });
 
@@ -680,23 +700,21 @@ export class LinkAnalysisStartBoxComponent {
     readonly whatHappens = computed(() => {
         const kind = this.kind();
         if (this.mode() === 'investigation') {
-            if (kind === 'graph') return 'Creates an Investigation over the graph on screen, with no seed yet.';
+            if (kind === 'graph') return 'Creates an Investigation over the graph on screen, with no start entities yet.';
             if (kind === 'dataset')
-                return 'Draws every link of the Dataset and creates an Investigation over it, with no seed yet.';
-            return 'Creates the Investigation, records the start as its seed step, then expands as set under Expand on start.';
+                return 'Draws the whole Dataset and creates an Investigation over it, with no start entities yet.';
+            return 'Creates the Investigation and records the start as step 1.';
         }
-        if (kind === 'dataset') return 'Draws every link of the Dataset at once.';
-        const ring =
-            kind === 'entity'
-                ? 'Draws it and everything linked to it - one ring - with busy ones held; Expand… continues from there.'
-                : 'Draws them and everything linked to them - one ring - with busy ones held; Expand… continues from there.';
-        return ring;
+        if (kind === 'dataset') return 'Draws the whole Dataset at once.';
+        return kind === 'entity'
+            ? 'Draws it and its links. Busy entities are held; Expand… goes further.'
+            : 'Draws them and their links. Busy entities are held; Expand… goes further.';
     });
 
     /**
      * Each File ▸ New / *New Investigation…* starts fresh (UI test 2026-10-29: after Close then New the Name kept the last
      * typed one). The form stays mounted while an Investigation is open (the page projects it), so a new one resets it:
-     * the start inputs are cleared, the Name and Reason are re-derived from the defaults, and every "edited" flag
+     * the start inputs are cleared, the Name and Purpose are re-derived from the defaults, and every "edited" flag
      * (pristine / touched, the submit attempt) is reset so the defaults follow the input again.
      */
     resetNew(): void {
@@ -710,7 +728,7 @@ export class LinkAnalysisStartBoxComponent {
         c.degrees.setValue('0');
         const d = this.defaults();
         c.name.setValue(d.name);
-        c.reason.setValue(d.reason);
+        c.purpose.setValue(d.purpose);
         this.form.markAsPristine();
         this.form.markAsUntouched();
         this.tried.set(false);
@@ -728,15 +746,16 @@ export class LinkAnalysisStartBoxComponent {
             if (req.kind !== 'graph') this.start.emit(req);
             return;
         }
-        const { name, reason } = this.form.controls;
-        if (name.invalid || reason.invalid) {
-            reason.markAsTouched();
+        const { name, purpose } = this.form.controls;
+        if (name.invalid || purpose.invalid) {
+            name.markAsTouched();
+            purpose.markAsTouched();
             return;
         }
         this.create.emit({
             start: req,
             title: v.name.trim(),
-            purpose: v.reason.trim(),
+            purpose: v.purpose.trim(),
             timeCol: v.timeCol.trim(),
             timeColZone: v.timeColZone,
             degrees: req.kind === 'dataset' || req.kind === 'graph' ? 0 : Number(v.degrees) || 0,

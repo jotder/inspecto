@@ -281,7 +281,7 @@ describe('WatchMeasureDialog (LA-23)', () => {
 
         bindInvestigationAlertRule.mockImplementation(http(403, 'missing canAuthorAlertRules'));
         await f.componentInstance.bind();
-        expect(f.componentInstance.error()).toContain('not allowed to author Alert Rules');
+        expect(f.componentInstance.error()).toBe('Needs Alert Rule authoring.');
         expect(f.componentInstance.unavailable()).toBe(false);
     });
 });

@@ -33,13 +33,13 @@ describe('hubRow (telecom S3)', () => {
 
     it('words an entities row flag as the badge, blanks an unflagged one, and passes other relations through', () => {
         expect(hubRow({ entityId: 'h', highConnectivity: true })['highConnectivity']).toBe(
-            'High connectivity — not expanded',
+            'Busy: not expanded',
         );
         expect(hubRow({ entityId: 'h', highConnectivity: true, contacts: 650 })['highConnectivity']).toBe(
-            'High connectivity — 650 contacts, not expanded',
+            'Busy: 650 linked entities, not expanded',
         );
         expect(hubRow({ entityId: 'h', highConnectivity: true, contacts: null })['highConnectivity']).toBe(
-            'High connectivity — not expanded',
+            'Busy: not expanded',
         );
         expect(hubRow({ entityId: 'a', highConnectivity: false })['highConnectivity']).toBe('');
         const link = { source: 'a', target: 'b' };

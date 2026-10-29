@@ -18,7 +18,7 @@ import {
     InvestigationTemplate,
     InvestigationTemplateSummary,
 } from '@inspecto/link-analysis/api/inv.service';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { needsPermission } from '@inspecto/core/api';
 import { AttributeSpec } from '@inspecto/core/component-model';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoDialogResizeDirective } from '@inspecto/core/components/dialog-resize.directive';
@@ -478,7 +478,7 @@ export class InstantiateTemplateDialog {
             const status = (err as { status?: number })?.status;
             this.error.set(
                 notFound && status === 404
-                    ? `${notFound} Server: ${apiErrorMessage(err, fallback)}`
+                    ? notFound
                     : investigationErrorMessage(err, fallback),
             );
         } finally {
@@ -512,15 +512,11 @@ export function alertRuleErrorMessage(err: unknown): string {
     const limit = limitRefusalMessage(err);
     if (limit) return limit;
     const status = (err as { status?: number })?.status;
-    const server = apiErrorMessage(err, 'Could not create the Alert Rule.');
     if (status === 403)
-        return 'You are not allowed to author Alert Rules (it needs that capability). Server: ' + server;
+        return needsPermission('canAuthorAlertRules');
     if (status === 503)
-        return (
-            'Alert Rules cannot be armed here — the alert engine (or a write root) is not running in this deployment. Server: ' +
-            server
-        );
-    if (status === 409) return 'An Alert Rule with this name already exists — pick another name. Server: ' + server;
+        return 'Alert Rules cannot be armed here: the alert engine is not running.';
+    if (status === 409) return 'An Alert Rule with this name already exists. Pick another name.';
     return investigationErrorMessage(err, 'Could not create the Alert Rule.');
 }
 

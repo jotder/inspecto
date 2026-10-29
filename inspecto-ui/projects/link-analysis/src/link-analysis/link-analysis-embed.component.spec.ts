@@ -120,7 +120,7 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
 
     it('shows the feature-dark state with the flag hint and disables the controls', async () => {
         const { el } = await create({ embeds: of(list([], false)) });
-        expect(el.textContent).toContain('-Dla.embed.enabled=true');
+        expect(el.textContent).toContain('Embed links are turned off. Ask an administrator.');
         expect(button(el, 'Create link')!.disabled).toBe(true);
         await expectNoA11yViolations(el);
     });
@@ -133,8 +133,8 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
 
     it('is read-only, naming the capability and the lead role, without canShareInvestigation', async () => {
         const { el } = await create({ can: false });
-        expect(el.textContent).toContain('canShareInvestigation');
-        expect(el.textContent).toContain('lead of this Investigation');
+        expect(el.textContent).toContain('Only a lead with Investigation sharing can create embed links.');
+        expect(el.textContent).not.toContain('canShareInvestigation');
         expect(button(el, 'Create link')).toBeUndefined();
         expect(button(el, 'Revoke')).toBeUndefined();
         await expectNoA11yViolations(el);
@@ -142,7 +142,7 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
 
     it('is read-only for a member who is not a lead', async () => {
         const { el } = await create({ you: 'analyst' });
-        expect(el.textContent).toContain('only a lead of this Investigation');
+        expect(el.textContent).toContain('Only a lead of this Investigation can create or revoke embed links.');
         expect(button(el, 'Create link')).toBeUndefined();
         expect(button(el, 'Revoke')).toBeUndefined();
     });
@@ -239,8 +239,8 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
         button(d, 'Create link')!.click();
         await new Promise((r) => setTimeout(r));
         await settle(c.f);
-        expect(d.textContent).toContain('switched off');
-        expect(d.textContent).toContain('-Dla.embed.enabled=true');
+        expect(d.textContent).toContain('Embed links are turned off.');
+        expect(d.textContent).toContain('Embed links are turned off. Ask an administrator.');
         expect(d.querySelector('#embed-link-field')).toBeNull();
     });
 

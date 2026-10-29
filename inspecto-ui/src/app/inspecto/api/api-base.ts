@@ -35,28 +35,48 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
     return fallback;
 }
 
-/** The plain name of a Capability the server refuses on, for the people reading the refusal (GLOSSARY "Capability"). */
-const CAPABILITY_NAMES: Readonly<Record<string, string>> = {
+/**
+ * The plain name of a Capability the server refuses on, for the people reading the refusal (GLOSSARY "Capability").
+ * Said as the permission alone ("Needs Workbench author."), never with the id or the word "capability"
+ * (LA-UI-TEXT-PASS-1 G14 / X4).
+ */
+export const CAPABILITY_NAMES: Readonly<Record<string, string>> = {
     canAuthorWorkbench: 'Workbench author',
     canManageIncidents: 'Incident management',
+    canWorkIncidents: 'Incident work',
     canOperateRuns: 'Run operations',
     canAdminister: 'Administration',
     canConfigureAccess: 'Access configuration',
+    canShareInvestigation: 'Investigation sharing',
+    canRunLinkGraphAnalysis: 'Run link graph analysis',
+    canBuildLinkIndex: 'Build link index',
+    canRevealLinkEntities: 'Reveal link entities',
+    canApproveLinkExpansions: 'Approve link expansions',
+    canUploadData: 'Upload data',
+    canAuthorAlertRules: 'Alert Rule authoring',
 };
+
+/** "Needs Workbench author." for a known capability id; a plain sentence for an unknown one (the id goes to the console). */
+export function needsPermission(capabilityId: string): string {
+    const name = CAPABILITY_NAMES[capabilityId];
+    if (name) return `Needs ${name}.`;
+    console.info(`Refused for a missing capability: ${capabilityId}`);
+    return 'Your role does not have the permission this needs.';
+}
 
 /**
  * `ApiContext.withCapability`'s 403 reads `missing capability 'canAuthorWorkbench'` — an identifier, not a sentence.
- * Say it in words, keeping the id in brackets for whoever grants the role (UI test 2026-10-29). Any other message is
- * returned as is.
+ * Say it as "Needs <permission>." (G14); the id never reaches the screen (X4), it goes to the console for whoever
+ * grants the role. A trailing scope ("in the owning space") is kept. Any other message is returned as is.
  */
 export function plainCapabilityRefusal(message: string): string {
     const m = /^missing capability '([A-Za-z]+)'(.*)$/.exec(message.trim());
     if (!m) return message;
-    const name = CAPABILITY_NAMES[m[1]];
-    const where = m[2].trim() ? ` ${m[2].trim()}` : '';
-    return name
-        ? `Your role does not have the ${name} permission (${m[1]})${where}.`
-        : `Your role does not have the permission this needs (${m[1]})${where}.`;
+    const where = m[2].trim().replace(/\.$/, '').replace(/ space$/, ' Space');
+    const base = needsPermission(m[1]);
+    if (!where) return base;
+    console.info(`Refused for a missing capability: ${m[1]} ${where}`);
+    return `${base.replace(/\.$/, '')} ${where}.`;
 }
 
 /**

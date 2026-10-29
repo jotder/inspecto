@@ -226,4 +226,36 @@ describe('PenFieldComponent', () => {
             }
         });
     });
+
+    describe('one accessible name per field (LA-UI-TEXT-PASS-1 X3)', () => {
+        function names(): { fixture: ReturnType<typeof TestBed.createComponent<TypingHostComponent>>; hosts: HTMLElement[] } {
+            const fixture = TestBed.createComponent(TypingHostComponent);
+            fixture.detectChanges();
+            return { fixture, hosts: Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('inspecto-pen-field')) };
+        }
+
+        it('names the value button "<label>: <value>, edit" and hides the pencil from assistive tech', () => {
+            const { hosts } = names();
+            const value = hosts[0].querySelector('button:not(.pen-pencil)')!;
+            const pencil = hosts[0].querySelector('button.pen-pencil')!;
+            expect(value.getAttribute('aria-label')).toBe('Name: old, edit');
+            expect(pencil.getAttribute('aria-hidden')).toBe('true');
+            expect(pencil.getAttribute('tabindex')).toBe('-1');
+        });
+
+        it('says "empty" for a blank value and drops ", edit" where the row cannot be edited', () => {
+            const { hosts } = names();
+            const label = (h: HTMLElement) => h.querySelector('button:not(.pen-pencil)')!.getAttribute('aria-label');
+            expect(label(hosts[2])).toBe('From: empty, edit');
+            expect(label(hosts[3])).toBe('Fixed: kept');
+            expect(label(hosts[4])).toBe('Off: off');
+        });
+
+        it('tells the editor how to save and cancel', () => {
+            const { fixture, hosts } = names();
+            (hosts[0].querySelector('button:not(.pen-pencil)') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            expect(hosts[0].querySelector('input')!.getAttribute('aria-description')).toBe('Enter to save, Escape to cancel');
+        });
+    });
 });

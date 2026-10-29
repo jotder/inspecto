@@ -7,6 +7,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
+import { needsPermission } from '@inspecto/core/api';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 import type { ExclusionListSummary } from '@inspecto/link-analysis/api/inv.service';
@@ -136,7 +137,7 @@ export class LinkAnalysisExcludeDialog {
     /** Why "Add to a list…" is not possible here; empty = it is. */
     readonly listWhyNot = signal(
         !this.data.canManageLists
-            ? 'Adding to a list needs the Incident management capability.'
+            ? needsPermission('canManageIncidents')
             : this.data.lists === null
               ? 'Exclusion lists cannot be read on this server.'
               : !this.data.entityType && !this.targets.length

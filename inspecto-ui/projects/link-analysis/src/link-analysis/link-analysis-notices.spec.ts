@@ -67,7 +67,7 @@ describe('LinkAnalysisWorkingSetComponent — split-identity notice (D-S4)', () 
         fixture.componentRef.setInput('splitIdentityCount', 2);
         fixture.detectChanges();
 
-        expect(text()).toContain('split ids');
+        expect(text()).toContain('split identities');
     });
 
     it('shows truncation and split identities together, not one instead of the other', () => {
@@ -76,7 +76,7 @@ describe('LinkAnalysisWorkingSetComponent — split-identity notice (D-S4)', () 
         fixture.componentRef.setInput('splitIdentityCount', 2);
         fixture.detectChanges();
 
-        expect(text()).toContain('truncated');
-        expect(text()).toContain('split ids');
+        expect(text()).toContain('cut short');
+        expect(text()).toContain('split identities');
     });
 });

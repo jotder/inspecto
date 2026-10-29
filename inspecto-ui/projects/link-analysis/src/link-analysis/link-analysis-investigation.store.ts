@@ -19,6 +19,7 @@ import {
     effectiveOpSteps,
     entityListErrorMessage,
     investigationErrorMessage,
+    stepName,
     truncatedSteps,
     workingSetToGraph,
 } from './investigation-state';
@@ -746,7 +747,7 @@ export class InvestigationSessionStore {
                 ? (err: unknown, fallback: string) => entityListErrorMessage(err, fallback, true)
                 : investigationErrorMessage;
         return this.run(
-            `The ${op.op} step failed.`,
+            `That ${stepName(op.op)} step failed.`,
             async () => {
                 const draft = this.activeDraftId();
                 const step = await firstValueFrom(

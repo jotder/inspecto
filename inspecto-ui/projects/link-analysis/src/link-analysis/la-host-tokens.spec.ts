@@ -156,7 +156,7 @@ describe('Link Analysis host-service tokens', () => {
         });
         const fixture = TestBed.createComponent(LinkAnalysisComponent);
         fixture.detectChanges();
-        expect(fixture.nativeElement.textContent).toContain('Start from...');
+        expect(fixture.nativeElement.textContent).toContain('Start a graph');
         // the Datasets the studio offers came through the token, not a host service
         expect(fixture.componentInstance.datasets()).toEqual([DS]);
     });
@@ -213,7 +213,7 @@ describe('Link Analysis host-service tokens', () => {
             .map((d) => d.componentInstance as FakeAiComponent);
         expect(explain.map((e) => e.screen())).toContain('Link Analysis');
         // one About button, at the right end of the header beside ⚙ Settings (operator 2026-10-29)
-        expect(explain.map((e) => e.label())).toEqual(['About']);
+        expect(explain.map((e) => e.label())).toEqual(['About Link Analysis']);
         // every term the About lists arrives with its own definition (UI test 2026-10-29)
         for (const e of explain) for (const t of e.terms()) expect(e.definitions()?.[t], t).toBeTruthy();
         // Tags go through the token, not a host dialog

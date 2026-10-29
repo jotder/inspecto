@@ -618,7 +618,7 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
         await fixture.componentInstance.save();
 
         expect(close).not.toHaveBeenCalled();
-        expect(fixture.componentInstance.saveError()).toContain('canManageIncidents');
+        expect(fixture.componentInstance.saveError()).toContain('Needs Incident management.');
         expect(fixture.componentInstance.saveError()).not.toBe('The analysis could not be saved.');
     });
 

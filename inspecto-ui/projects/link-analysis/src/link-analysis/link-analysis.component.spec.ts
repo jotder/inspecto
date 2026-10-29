@@ -243,9 +243,9 @@ describe('LinkAnalysisComponent', () => {
     it('renders the empty state, is a11y-clean, and validates the mapping before querying', async () => {
         const { fixture, queried } = create();
         fixture.detectChanges();
-        expect(fixture.nativeElement.textContent).toContain('Start from...');
+        expect(fixture.nativeElement.textContent).toContain('Start a graph');
         await fixture.componentInstance.run(); // no mapping picked yet
-        expect(fixture.componentInstance.loadError()).toMatch(/source and target/);
+        expect(fixture.componentInstance.loadError()).toMatch(/From and To columns/);
         expect(queried).toHaveLength(0);
         await expectNoA11yViolations(fixture.nativeElement);
     }, 45_000); // the axe pass under `test:coverage` (v8 instrumentation, what ui.yml runs) took over 15 s (2026-10-15)
@@ -470,10 +470,20 @@ describe('LinkAnalysisComponent', () => {
             return document.querySelector<HTMLButtonElement>('[data-testid="la-close"]')!;
         };
         expect(close().disabled).toBe(true);
+        // T-003: a disabled Close / Delete says why, visibly and in its name
+        expect(close().getAttribute('aria-label')).toBe('Close: Open an Investigation or saved view first.');
+        expect(document.querySelector('[data-testid="la-file-delete"]')?.getAttribute('aria-label')).toBe(
+            'Delete: Open an Investigation or saved view first.',
+        );
+        expect(document.querySelector('[data-testid="la-file-delete-locked"]')?.textContent?.trim()).toBe(
+            'Open an Investigation or saved view first.',
+        );
+        expect(document.querySelector('[data-testid="la-save-view"]')?.getAttribute('aria-label')).toBe('Save view: Draw a graph first.');
 
         await runQuery(fixture);
         fixture.detectChanges();
-        expect(close().textContent?.trim()).toContain('Close the analysis');
+        expect(close().textContent?.trim()).toMatch(/^Close\s*the analysis$/);
+        expect(close().getAttribute('aria-label')).toBe('Close the analysis');
         await expectNoA11yViolations(el.querySelector('[data-testid="la-header"]')!);
 
         close().click();
@@ -482,7 +492,7 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         expect(c.graph()).toBeNull();
         expect(c.lastRun()).toBeNull();
-        expect(el.textContent).toContain('Start from...');
+        expect(el.textContent).toContain('Start a graph');
         expect(c.openWorkLabel()).toBe('');
     }, 45_000);
 
@@ -1004,25 +1014,25 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const el: HTMLElement = fixture.nativeElement;
         expect(el.querySelector('[data-toolbox-view]')).toBeNull();
-        expect(c.toolboxTabs.map((t) => t.label)).toEqual(['Browser', 'Server', 'Investigation']);
+        expect(c.toolboxTabs.map((t) => t.label)).toEqual(['On screen', 'Whole Dataset', 'Investigation']);
         c.toolboxDockOpen.set(false);
         fixture.detectChanges();
         expect(el.querySelector('[aria-label="Open the view tools"]')).toBeNull();
         // the collapsed rail opens each of the three tabs
-        (el.querySelector('button[aria-label="Open the Server tools"]') as HTMLElement).click();
+        (el.querySelector('button[aria-label="Open the Whole Dataset tools"]') as HTMLElement).click();
         expect(c.toolboxTab()).toBe('server');
         expect(c.toolboxDockOpen()).toBe(true);
         c.toolboxDockOpen.set(false);
         fixture.detectChanges();
-        (el.querySelector('button[aria-label="Open the Browser tools"]') as HTMLElement).click();
+        (el.querySelector('button[aria-label="Open the On screen tools"]') as HTMLElement).click();
         expect(c.toolboxTab()).toBe('browser');
 
         // Its Overlays moved into the Display options menu, each once beside the labels already there.
-        (el.querySelector('[aria-label^="Display options ("]') as HTMLButtonElement).click();
+        (el.querySelector('[aria-label="Display options"][aria-haspopup]') as HTMLButtonElement).click();
         fixture.detectChanges();
-        const menu = document.querySelector('[aria-label="Display options"]') as HTMLElement;
+        const menu = document.querySelector('.mat-mdc-menu-panel [aria-label="Display options"]') as HTMLElement;
         const boxes = Array.from(menu.querySelectorAll('mat-checkbox')).map((b) => b.textContent!.trim().split(/\s+\(/)[0].trim());
-        for (const label of ['Legend', 'Working set', 'Node labels', 'Link labels', 'All link labels', 'Level of detail',
+        for (const label of ['Legend', 'Graph counts', 'Node labels', 'Link labels', 'All link labels', 'Level of detail',
             'Minimap', 'Grid', 'Community hulls', 'Group lone counterparties', 'Bubble sets', 'Link bundling']) {
             expect(boxes.filter((b) => b === label)).toHaveLength(1);
         }
@@ -1037,7 +1047,7 @@ describe('LinkAnalysisComponent', () => {
         (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="la-file"]')!.click();
         const btn = (): HTMLButtonElement =>
             [...document.querySelectorAll('.cdk-overlay-container button')].find((b) =>
-                (b.getAttribute('aria-label') ?? '').startsWith('Save this analysis'),
+                (b.getAttribute('aria-label') ?? '').startsWith('Save snapshot'),
             ) as HTMLButtonElement;
         fixture.detectChanges();
         expect(btn().disabled).toBe(false); // honor-system mode grants everything
@@ -1046,7 +1056,7 @@ describe('LinkAnalysisComponent', () => {
         session.capabilities.set([]);
         fixture.detectChanges();
         expect(btn().disabled).toBe(true);
-        expect(btn().getAttribute('aria-label')).toContain('needs the Incident management capability');
+        expect(btn().getAttribute('aria-label')).toBe('Save snapshot: Needs Incident management.');
         session.capabilities.set(['canManageIncidents']);
         fixture.detectChanges();
         expect(btn().disabled).toBe(false);
@@ -1100,7 +1110,7 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         fixture.detectChanges(); // graph stays null on failure, so the G6 host never mounts
         expect(fixture.componentInstance.loadError()).toBe('bad mapping');
-        expect(fixture.nativeElement.textContent).toContain('Query failed');
+        expect(fixture.nativeElement.textContent).toContain('Could not draw the graph');
     });
 
     it('collapse/expand branches hide and restore a node’s downstream subtree', async () => {
@@ -1925,7 +1935,7 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
         await c.expandNode('c', 'C', ['C']);
-        const alert = () => (fixture.nativeElement as HTMLElement).textContent?.includes('projection hit the node cap');
+        const alert = () => (fixture.nativeElement as HTMLElement).textContent?.includes('Some nodes are not shown. Narrow the Dataset or add a filter.');
         fixture.detectChanges();
         expect(alert()).toBe(true);
 
@@ -2096,15 +2106,15 @@ describe('LinkAnalysisComponent', () => {
         const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
         const items = Array.from(panel.querySelectorAll('[role="menuitem"]')).map((i) => i.textContent?.trim());
         for (const name of [
-            'New',
+            'New Investigation',
             'Open…',
-            'Explore dataset…',
+            'Explore Dataset…',
             'Examples',
             'Save view',
-            'Save view as…',
-            'Save this analysis (Snapshot)',
+            'Save view as',
+            'Save snapshot…',
             'Close',
-            'Delete',
+            'Delete…',
         ])
             expect(items, name).toContain(name);
         const open = vi.spyOn(c, 'openOpenDialog').mockImplementation(() => undefined);
@@ -2152,7 +2162,7 @@ describe('LinkAnalysisComponent', () => {
             const { el, tabs } = open();
             const list = el.querySelector('[role="tablist"]') as HTMLElement;
             expect(list.getAttribute('aria-label')).toBe('Toolbox tab');
-            expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Browser', 'Server', 'Investigation']);
+            expect(tabs().map((t) => t.textContent?.trim())).toEqual(['On screen', 'Whole Dataset', 'Investigation']);
             expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
             expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
             expect(list.parentElement!.querySelector('[role="radio"], [role="radiogroup"]')).toBeNull(); // the old switch
@@ -2248,7 +2258,7 @@ describe('LinkAnalysisComponent', () => {
         it('has a table icon that shows and hides the data table below the canvas completely', async () => {
             const { fixture, el, rail } = await ready();
             expect(el.querySelector('#bottom-panel-body')).toBeNull();
-            const toggle = rail.querySelector('button[aria-label="Show the rows"]') as HTMLButtonElement;
+            const toggle = rail.querySelector('button[aria-label="Show the table"]') as HTMLButtonElement;
             // aria-controls must name an element that exists (axe aria-valid-attr-value): only while it is open
             expect(toggle.hasAttribute('aria-controls')).toBe(false);
             toggle.click();
@@ -2270,13 +2280,13 @@ describe('LinkAnalysisComponent', () => {
             for (const name of [
                 'Search nodes',
                 'Filter node types',
-                'Graph layout',
+                'Layout',
                 'Attach to Case',
-                'Undo the last display/filter change',
-                'Redo the last undone display/filter change',
-                'Fit the graph to the screen',
+                'Undo display change (Ctrl+Z)',
+                'Redo display change (Ctrl+Y)',
+                'Fit to screen',
                 'Show as list',
-                'Export the graph',
+                'Export',
             ]) {
                 expect(
                     names.some((n) => n.startsWith(name)),
@@ -2289,7 +2299,7 @@ describe('LinkAnalysisComponent', () => {
         it('groups the four exports behind one Export menu whose items keep their names', async () => {
             const { fixture, rail } = await ready();
             expect(rail.querySelector('[aria-label="Export as PNG"]')).toBeNull(); // not loose in the rail
-            (rail.querySelector('button[aria-label="Export the graph"]') as HTMLElement).click();
+            (rail.querySelector('button[aria-label="Export"]') as HTMLElement).click();
             fixture.detectChanges();
             const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
             for (const f of ['PNG', 'JSON', 'SVG', 'GraphML']) {
@@ -2302,8 +2312,8 @@ describe('LinkAnalysisComponent', () => {
             const header = el.querySelector('[data-testid="la-header"]') as HTMLElement;
             const end = header.querySelector('[data-testid="la-fullscreen"]')!.parentElement!;
             expect(Array.from(end.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))).toEqual([
-                'View the graph in full screen',
-                'About',
+                'Full screen',
+                'About Link Analysis',
                 'Settings',
             ]);
             expect(header.querySelectorAll('inspecto-la-host-slot').length).toBe(1); // one About only
@@ -2318,7 +2328,7 @@ describe('LinkAnalysisComponent', () => {
             const c = fixture.componentInstance;
             c.toolboxDockOpen.set(false);
             fixture.detectChanges();
-            (el.querySelector('button[aria-label="Open the Browser tools"]') as HTMLElement).click();
+            (el.querySelector('button[aria-label="Open the On screen tools"]') as HTMLElement).click();
             expect(c.toolboxDockOpen()).toBe(true);
             expect(c.toolboxTab()).toBe('browser');
         });
@@ -2419,11 +2429,11 @@ describe('LinkAnalysisComponent', () => {
             openWorkingSet(c, ['ws-a', 'ws-b']);
             fixture.detectChanges();
             for (const label of [
-                'Display options (labels, colors, shapes and line styles)',
-                'Fit the graph to the screen',
+                'Display options',
+                'Fit to screen',
             ])
                 expect(el.querySelector(`button[aria-label="${label}"]`)).not.toBeNull();
-            expect(el.querySelector('button[aria-label="View the graph in full screen"]')).not.toBeNull();
+            expect(el.querySelector('button[aria-label="Full screen"]')).not.toBeNull();
             const toggle = el.querySelector('[data-testid="graph-list-toggle"]') as HTMLButtonElement;
             toggle.click();
             fixture.detectChanges();
@@ -2528,7 +2538,7 @@ describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance;
         const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]')).map((t) => t.textContent?.trim());
-        expect(tabs).toEqual(['Browser', 'Server', 'Investigation']);
+        expect(tabs).toEqual(['On screen', 'Whole Dataset', 'Investigation']);
         c.openInvestigation(); // what the rail's "Open the Investigation" button calls - no longer a no-op on this level
         fixture.detectChanges();
         expect(c.toolboxTab()).toBe('investigation');
@@ -2549,7 +2559,7 @@ describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not
         const tabs = Array.from(
             (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
         ).map((t) => t.textContent?.trim());
-        expect(tabs).toEqual(['Browser', 'Server', 'Investigation']);
+        expect(tabs).toEqual(['On screen', 'Whole Dataset', 'Investigation']);
     });
 });
 
@@ -2582,7 +2592,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         const { fixture } = create();
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.textContent).toContain('Start from...');
+        expect(el.textContent).toContain('Start a graph');
         expect(card(el, 'start-file-hint')?.textContent).toContain('in the File menu');
         // LA-PANELS-REDESIGN-1: no starter cards in the start box
         for (const id of ['starter-explore', 'starter-follow', 'starter-views']) expect(card(el, id), id).toBeNull();
@@ -2735,7 +2745,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             }));
         };
         const toolboxRail = (el: HTMLElement): HTMLElement | null =>
-            el.querySelector('aside[aria-label="Toolbox"] button[aria-label="Open the Browser tools"]');
+            el.querySelector('aside[aria-label="Toolbox"] button[aria-label="Open the On screen tools"]');
 
         afterEach(() => {
             vi.unstubAllGlobals();
@@ -3524,7 +3534,7 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
             'Excluded entities',
             'Results',
         ]);
-        expect(el.querySelector('#bottom-panel-body section[aria-label="Investigation op log"]')).not.toBeNull();
+        expect(el.querySelector('#bottom-panel-body section[aria-label="Investigation step log"]')).not.toBeNull();
         expect(JSON.parse(localStorage.getItem('inspecto.la.dock')!)).toEqual({ open: true, tab: 'oplog' });
 
         // closed again: the remembered Investigation tab falls back to Rows
@@ -3592,7 +3602,7 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         session.authMode.set('oidc');
         session.capabilities.set([]);
         fixture.detectChanges();
-        expect(c.mergeUnavailable()).toContain('needs the Incident management capability');
+        expect(c.mergeUnavailable()).toBe('Needs Incident management.');
         expect(merge()!.getAttribute('aria-disabled')).toBe('true');
         session.capabilities.set(['canManageIncidents']);
         fixture.detectChanges();
@@ -3745,7 +3755,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(grow.querySelector('mat-icon')?.getAttribute('svgIcon')).toBe('mat_outline:open_with');
         expect(grow.getAttribute('aria-keyshortcuts')).toBe('G');
         expect(el.querySelector('[data-testid="la-exclusions-button"]')?.getAttribute('aria-label')).toBe(
-            'Hidden by lists: 0 hidden',
+            'Hidden by lists (0). X hides the selection',
         );
         press(el, { key: 'g' });
         await settle(fixture);
@@ -3855,7 +3865,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1', 'x2']);
         expect(c.graph()!.nodes.map((n) => n.id)).toEqual(expect.arrayContaining(['x1', 'x2', 'x3']));
         expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain(
-            'Expanded 3 degrees: 3 nodes and 3 links added (not recorded).',
+            'Expanded 3 degrees: added 3 nodes and 3 links (not recorded).',
         );
         press(el, { key: 'z', ctrlKey: true });
         expect(c.graph()!.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
@@ -3921,7 +3931,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const ids = () => c.graph()!.nodes.map((n) => n.id).sort();
         expect(ids()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']); // the incoming g was not kept
         expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain(
-            'Expanded one degree: 1 node and 1 link added (not recorded).',
+            'Expanded one degree: added 1 node and 1 link (not recorded).',
         );
         press(el, { key: 'z', ctrlKey: true });
         fixture.detectChanges();
@@ -3942,7 +3952,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         fixture.detectChanges();
         expect(c.growExclude.undoable()).toBe(false);
         expect(el.querySelector('[data-testid="la-change-undo"]')).toBeNull();
-        expect(el.querySelector('[data-testid="la-change-stale"]')?.textContent).toContain('a later change came after it');
+        expect(el.querySelector('[data-testid="la-change-stale"]')?.textContent).toContain('Undo unavailable: a later change followed.');
         press(el, { key: 'z', ctrlKey: true });
         expect(c.graph()!.nodes.map((n) => n.id)).toContain('b2'); // the later expand survives
     });
@@ -4049,7 +4059,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         // Hold off goes through hubs: a sealed override, so it asks first; No sends nothing
         const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
         await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 } });
-        expect(ask).toHaveBeenCalledWith(expect.stringContaining('1 held high-connectivity entity'), expect.anything());
+        expect(ask).toHaveBeenCalledWith(expect.stringContaining('1 held busy entity'), expect.anything());
         expect(ops).toHaveLength(1);
         await c.removeHeld();
         expect(ops[1]).toEqual({ op: 'exclude', ids: ['ws-hub'], reason: 'busy node above 500 contacts' });
@@ -4070,7 +4080,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         session.authMode.set('oidc');
         session.capabilities.set([]);
         expect(c.growContext().blocked).toBe(
-            'This changes the Investigation log and needs the Incident management capability.',
+            'Needs Incident management to change the step log.',
         );
         expect(c.growWriteWhyNot()).toContain('Incident management');
     });
@@ -4257,7 +4267,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(ctx.blocked).toBeNull();
         expect([...ctx.frontier].sort()).toEqual(['MULE-HUB-01-R1', 'MULE-HUB-01-R2']);
         expect(ctx.heldFrontier).toEqual(['HUB']);
-        expect(c.startNotice()?.text).toContain('Drew 1 start and 3 linked');
+        expect(c.startNotice()?.text).toContain('Drew 1 entity and 3 linked');
         expect(c.startNotice()?.text).toContain('1 busy');
         expect(navigate).toHaveBeenCalledWith(
             [],
@@ -4307,7 +4317,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
                 entityType: 'account',
             },
         });
-        expect(fixture.componentInstance.startNotice()?.text).toContain('Drew 1 start');
+        expect(fixture.componentInstance.startNotice()?.text).toContain('Drew 1 entity');
     });
 
     it('F-8: a profile Dataset that does not link the type falls back to one that does', async () => {
@@ -4351,7 +4361,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'NOPE-9', 'A-2'] });
         expect(expand).toHaveBeenCalledTimes(3);
         expect([...c.expandedNodeIds()].sort()).toEqual(['A-1', 'A-2']);
-        expect(c.startNotice()).toEqual({ variant: 'warning', text: expect.stringContaining('Not in Transfers: NOPE-9.') });
+        expect(c.startNotice()).toEqual({ variant: 'warning', text: expect.stringContaining('NOPE-9 is not in Transfers.') });
         fixture.detectChanges();
         expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="start-outcome"]')?.textContent).toContain(
             'NOPE-9',
@@ -4365,7 +4375,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const c = fixture.componentInstance;
         await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['NOPE-1', 'NOPE-2'] });
         expect(c.graph()).toBeNull();
-        expect(c.startNotice()?.text).toContain('Not in Transfers: NOPE-1, NOPE-2. Nothing was drawn');
+        expect(c.startNotice()?.text).toBe('None of these are in Transfers: NOPE-1, NOPE-2. Check the spelling or pick another Dataset.');
     });
 
     it('a list draws its members with one ring', async () => {
@@ -4858,7 +4868,7 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
             what: 'A-1-R1, the busiest account',
         });
         expect(expand).toHaveBeenCalledWith('A-1-R1', 'A-1-R1', expect.anything());
-        expect(c.startNotice()?.text).toMatch(/^Started from A-1-R1, the busiest account\. Drew 1 start/);
+        expect(c.startNotice()?.text).toMatch(/^Started from A-1-R1, the busiest account\. Drew 1 entity/);
     });
 
     it('Analysis leads with Find something interesting; Save view as states not-evidence, the lists, the locked Investigation', async () => {
@@ -5365,7 +5375,7 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
         fixture.detectChanges();
         await fixture.whenStable();
         const row = document.querySelector('[data-testid="la-file-transfer"]') as HTMLElement;
-        expect(row?.textContent).toContain('Import / export views');
+        expect(row?.textContent).toContain('Import or export');
         // The label opens the transfer menu, as its icon button does.
         const iconButton = row.querySelector('button') as HTMLButtonElement;
         const opened = vi.fn();
@@ -5412,13 +5422,14 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         session.authMode.set('oidc');
         session.capabilities.set(['canManageIncidents']); // fm.analyst: Investigations yes, Workbench authoring no
         fixture.detectChanges();
-        expect(c.viewSaveBlocked()).toBe('Saving views needs the Workbench author permission.');
+        expect(c.viewSaveBlocked()).toBe('Needs Workbench author.');
         openFileMenu(fixture);
         expect(fileItem('la-save-view')!.disabled).toBe(true);
         expect(fileItem('la-save-view-as')!.disabled).toBe(true);
-        expect(document.querySelector('[data-testid="la-save-view-locked"]')?.textContent).toContain(
-            'Workbench author permission',
-        );
+        expect(document.querySelector('[data-testid="la-save-view-locked"]')?.textContent?.trim()).toBe('Needs Workbench author.');
+        // T-004: the reason is in the name of each disabled item, not only in a tooltip a disabled item never shows
+        expect(fileItem('la-save-view')!.getAttribute('aria-label')).toBe('Save view: Needs Workbench author.');
+        expect(fileItem('la-save-view-as')!.getAttribute('aria-label')).toBe('Save view as: Needs Workbench author.');
         await c.saveOpenView();
         await c.saveView();
         expect(save).not.toHaveBeenCalled(); // never a request the server answers with a raw 403
@@ -5443,12 +5454,10 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         session.capabilities.set([]); // bi.analyst: read-only
         fixture.detectChanges();
         expect(c.deleteLabel()).toBe('view mfs_money_trail');
-        expect(c.deleteBlocked()).toBe('Deleting saved views needs the Workbench author permission.');
+        expect(c.deleteBlocked()).toBe('Needs Workbench author.');
         openFileMenu(fixture);
         expect(fileItem('la-file-delete')!.disabled).toBe(true);
-        expect(document.querySelector('[data-testid="la-file-delete-locked"]')?.textContent).toContain(
-            'Workbench author permission',
-        );
+        expect(document.querySelector('[data-testid="la-file-delete-locked"]')?.textContent?.trim()).toBe('Needs Workbench author.');
 
         session.capabilities.set(['canAuthorWorkbench']);
         session.actor.set('fm.analyst');

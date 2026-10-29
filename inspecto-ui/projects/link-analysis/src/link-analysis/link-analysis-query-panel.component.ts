@@ -173,9 +173,9 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         this.extraMappingColumns().map((cols) => cols.map((c) => ({ value: c, label: c }))),
     );
     readonly directionOptions: PickerOption[] = [
-        { value: 'both', label: 'Both' },
-        { value: 'out', label: 'Downstream' },
-        { value: 'in', label: 'Upstream' },
+        { value: 'both', label: 'Both ways', hint: 'Links in either direction' },
+        { value: 'out', label: 'Outgoing', hint: 'Only links that start at the chosen items' },
+        { value: 'in', label: 'Incoming', hint: 'Only links that end at the chosen items' },
     ];
 
     constructor() {
@@ -358,7 +358,7 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         switch (this.sourceId()) {
             case 'entity-projection': {
                 if (!f.datasetId || !f.sourceCol || !f.targetCol) {
-                    return { error: 'Pick a dataset plus its source and target columns.' };
+                    return { error: 'Pick a Dataset and its From and To columns.' };
                 }
                 const primary: EntityProjection = {
                     datasetId: f.datasetId,
@@ -380,12 +380,12 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
             case 'entity-projection-multi': {
                 const nodeRows = this.nodeMappings.controls.map((g) => g.getRawValue());
                 const edgeRows = this.edgeMappings.controls.map((g) => g.getRawValue());
-                if (!nodeRows.length && !edgeRows.length) return { error: 'Add at least one node or edge mapping.' };
+                if (!nodeRows.length && !edgeRows.length) return { error: 'Add a node or link mapping.' };
                 // A half-filled row is refused, never silently dropped — a dropped row reads as "no rows there".
                 if (nodeRows.some((m) => !m.datasetId || !m.idColumn))
                     return { error: 'Every node mapping needs a Dataset and an id column.' };
                 if (edgeRows.some((m) => !m.datasetId || !m.sourceColumn || !m.targetColumn))
-                    return { error: 'Every edge mapping needs a Dataset plus its source and target columns.' };
+                    return { error: 'Every link mapping needs a Dataset and its From and To columns.' };
                 if (nodeRows.length + edgeRows.length > MAX_MULTI_MAPPINGS)
                     return { error: `At most ${MAX_MULTI_MAPPINGS} mappings per query.` };
                 return {
@@ -412,7 +412,7 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
                 };
             }
             case 'provenance': {
-                if (!f.pipeline) return { error: 'Pick a pipeline.' };
+                if (!f.pipeline) return { error: 'Pick a Pipeline.' };
                 const pipelineRoots = [f.pipeline, ...f.extraPipelines.filter((p) => p && p !== f.pipeline)];
                 return pipelineRoots.length > 1
                     ? { roots: pipelineRoots, counts: f.counts }

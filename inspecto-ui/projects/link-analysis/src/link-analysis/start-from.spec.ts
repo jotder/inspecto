@@ -13,6 +13,7 @@ import {
     seedNodeOf,
     startCatalogue,
     startMapping,
+    notInDatasetMessage,
     startOutcome,
     suggestionLine,
     wholeDatasetWarning,
@@ -195,8 +196,17 @@ describe('start-from (LA-ONBOARD-1 OB-9)', () => {
                 terms: { node: 'account', nodes: 'accounts' },
             }),
         ).toBe(
-            'Drew 2 starts and 10 linked accounts from Transfers. 1 busy account held - Grow does not go through them. ' +
-                'Not in Transfers: NOPE. Expand… (G) continues one degree at a time.',
+            'Drew 2 entities and 10 linked accounts. NOPE is not in Transfers. ' +
+                '1 busy account is held; Expand… (G) goes one degree further.',
+        );
+        // T-041: one entity, the toast in canonical words (never Grow)
+        expect(
+            startOutcome({ drawn: 1, nodes: 4, held: 3, unknown: [], notDrawn: 0, dataset: 'T', terms: { node: 'wallet', nodes: 'wallets' } }),
+        ).toBe('Drew 1 entity and 3 linked wallets. 3 busy wallets are held; Expand… (G) goes one degree further.');
+        // T-016: what a start that found nothing says
+        expect(notInDatasetMessage(['NOPE'], 'Transfers')).toBe('NOPE is not in Transfers. Check the spelling or pick another Dataset.');
+        expect(notInDatasetMessage(['A', 'B'], 'Transfers')).toBe(
+            'None of these are in Transfers: A, B. Check the spelling or pick another Dataset.',
         );
         expect(wholeDatasetWarning(312, 1000, 'Transfers', 'Account')).toBeNull();
         expect(wholeDatasetWarning(null, 10, 'Transfers', 'Account')).toBeNull();

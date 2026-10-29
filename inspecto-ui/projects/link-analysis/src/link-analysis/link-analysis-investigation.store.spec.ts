@@ -397,7 +397,7 @@ describe('InvestigationSessionStore (LA-10)', () => {
             throwError(() => new HttpErrorResponse({ status: 409, error: { error: { message: 'nothing to undo' } } })),
         );
         expect(await store.undo()).toBe(false);
-        expect(store.error()).toBe('Refused — nothing to undo');
+        expect(store.error()).toBe('Refused: nothing to undo');
         expect(inv.undoInvestigation).toHaveBeenLastCalledWith('inv-gone', undefined);
 
         store.forget('inv-gone');
@@ -561,7 +561,7 @@ describe('InvestigationSessionStore (LA-10)', () => {
         });
         expect(ok).toBe(false);
         expect(inv.appendInvestigationOp).toHaveBeenCalledTimes(1);
-        expect(store.error()).toBe('The server refused this step: bad seed');
+        expect(store.error()).toBe('That step was refused: bad seed');
         expect(store.active()).toBe(true); // the Investigation was created — it stays open
     });
 
@@ -948,7 +948,7 @@ describe('InvestigationSessionStore - walk-through 6', () => {
         };
         await store.open('inv-8');
         expect(store.hubBadge('h', null, 999)).toBe(
-            'High connectivity — 628 contacts (threshold 500), expanded through override',
+            'Busy: 628 linked entities (limit 500), expanded through override',
         );
     });
 });

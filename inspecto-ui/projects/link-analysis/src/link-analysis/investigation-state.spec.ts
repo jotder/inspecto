@@ -4,6 +4,7 @@ import { InvestigationLogEntry, WorkingSet } from '@inspecto/link-analysis/api/i
 import { EntityProjection } from '@inspecto/core/graph';
 import { entityId } from '@inspecto/core/graph';
 import {
+    stepName,
     effectiveOpSteps,
     idsInWorkingSet,
     investigationErrorMessage,
@@ -232,16 +233,17 @@ describe('LA-10 investigation-state', () => {
         expect(moveStep([1, 2, 3], 0, 1)).toEqual([2, 1, 3]);
     });
 
-    it('maps 404/403/409/422 to readable messages carrying the server reason', () => {
+    it('maps 404/403/409/422 to readable messages; 409/422 carry the server reason, 404/403 never print it (X5)', () => {
         const err = (status: number, message: string) =>
             new HttpErrorResponse({ status, error: { error: { message } } });
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).toContain('not yours');
-        expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).toContain("no investigation 'x'");
-        expect(investigationErrorMessage(err(403, 'missing canManageIncidents'), 'f')).toContain('not allowed');
+        expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).not.toContain("no investigation 'x'");
+        expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).not.toContain('Server:');
+        expect(investigationErrorMessage(err(403, 'missing canManageIncidents'), 'f')).toBe('Needs Incident management.');
         const heldRead = investigationErrorMessage(err(403, 'a neighbours read of one entity (degree 60) is a sensitive read [fan-out 60 > 1] - four-eyes applies'), 'f');
         expect(heldRead).toContain('four-eyes applies');
         expect(heldRead).not.toContain('capability');
-        expect(investigationErrorMessage(err(409, 'nothing to undo'), 'f')).toBe('Refused — nothing to undo');
+        expect(investigationErrorMessage(err(409, 'nothing to undo'), 'f')).toBe('Refused: nothing to undo');
         expect(investigationErrorMessage(err(422, "'exclude' requires a 'reason'"), 'f')).toContain(
             "'exclude' requires a 'reason'",
         );
@@ -266,5 +268,21 @@ describe('idsInWorkingSet through an exploration alias (DR-D2)', () => {
     it('is not in the Working Set when no pairing names it (positive twin: the same node WITH the pairing is)', () => {
         const ws: WorkingSet = { entities: [entity('masked:bbbb')], links: [], excluded: [], hash: '' };
         expect(idsInWorkingSet(node, ws)).toEqual([]);
+    });
+});
+
+describe('stepName: plain step names, never an op id (LA-UI-TEXT-PASS-1 X9)', () => {
+    it.each([
+        ['seed', 'Start'],
+        ['seedBy', 'Start from list'],
+        ['expand', 'Expand'],
+        ['excludeBy', 'Exclude by list'],
+        ['hide', 'Hide'],
+        ['keep', 'Keep'],
+        ['undo', 'Undo'],
+        ['someNewOp', 'Some new op'],
+        [undefined, 'Step'],
+    ])('%s reads as %s', (op, name) => {
+        expect(stepName(op)).toBe(name);
     });
 });

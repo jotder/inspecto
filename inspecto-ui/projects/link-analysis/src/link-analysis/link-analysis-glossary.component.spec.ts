@@ -72,10 +72,10 @@ describe('LinkAnalysisGlossaryComponent', () => {
             const fixture = TestBed.createComponent(HostComponent);
             fixture.detectChanges();
             const trigger = fixture.nativeElement.querySelector('[data-testid="la-glossary"]') as HTMLButtonElement;
-            expect(trigger.getAttribute('aria-label')).toContain('Glossary');
+            expect(trigger.getAttribute('aria-label')).toBe('Industry pack glossary');
             trigger.click();
             fixture.detectChanges();
-            const panel = document.querySelector('[role="dialog"][aria-label^="Glossary"]') as HTMLElement;
+            const panel = document.querySelector('[role="dialog"][aria-label="Industry pack glossary"]') as HTMLElement;
             expect(panel).not.toBeNull();
             const terms = Array.from(panel.querySelectorAll('dt')).map((t) => t.textContent?.replace(/\s+/g, ' ').trim());
             expect(terms).toEqual(['IRSF (IRS)', 'SIM box']);

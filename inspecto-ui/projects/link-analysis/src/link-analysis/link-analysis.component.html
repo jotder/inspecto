@@ -5,28 +5,28 @@
         <mat-menu #fileMenu="matMenu">
             <button mat-menu-item (click)="newWork()" [disabled]="investigation.busy()" data-testid="la-file-new">
                 <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon>
-                <span>New</span>
+                <span>{{ investigationsEnabled() ? 'New Investigation' : 'New' }}</span>
             </button>
             <button mat-menu-item (click)="openOpenDialog()" data-testid="la-file-open">
                 <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
                 <span>Open…</span>
             </button>
-            <!-- LA-PANELS-REDESIGN-1: Explore dataset… and the examples moved here from the start box -->
+            <!-- LA-PANELS-REDESIGN-1: Explore Dataset… and the examples moved here from the start box -->
             <button mat-menu-item (click)="exploreDataset()" data-testid="la-file-explore">
                 <mat-icon svgIcon="heroicons_outline:circle-stack"></mat-icon>
-                <span>Explore dataset…</span>
+                <span>Explore Dataset…</span>
             </button>
             <button mat-menu-item [matMenuTriggerFor]="examplesMenu" data-testid="la-file-examples">
                 <mat-icon svgIcon="heroicons_outline:light-bulb"></mat-icon>
                 <span>Examples</span>
             </button>
-            <!-- Saving and deleting a view are /components writes (canAuthorWorkbench): locked here with the reason, never a raw 403 -->
+            <!-- Every disabled File item says why: a disabled menu item shows no tooltip, so the reason is a visible line
+                 under it and part of its aria-label (T-003 / T-004). Saving a view is a /components write (canAuthorWorkbench). -->
             <button
                 mat-menu-item
                 (click)="saveOpenView()"
-                [disabled]="!graph() || saving() || !!viewOverwriteBlocked()"
-                [matTooltip]="viewOverwriteBlocked()"
-                [attr.aria-label]="viewOverwriteBlocked() ? 'Save view — ' + viewOverwriteBlocked() : null"
+                [disabled]="!!saveViewWhyNot() || saving()"
+                [attr.aria-label]="saveViewWhyNot() ? 'Save view: ' + saveViewWhyNot() : null"
                 data-testid="la-save-view"
             >
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
@@ -37,27 +37,30 @@
                 [matMenuTriggerFor]="saveMenu"
                 laFormMenu
                 #saveTrigger="matMenuTrigger"
-                [disabled]="!graph() || !!viewSaveBlocked()"
-                [matTooltip]="viewSaveBlocked()"
-                [attr.aria-label]="viewSaveBlocked() ? 'Save view as — ' + viewSaveBlocked() : 'Save view as'"
+                [disabled]="!!saveViewAsWhyNot()"
+                [attr.aria-label]="saveViewAsWhyNot() ? 'Save view as: ' + saveViewAsWhyNot() : 'Save view as'"
                 data-testid="la-save-view-as"
             >
                 <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
-                <span>Save view as…</span>
+                <span>Save view as</span>
             </button>
-            @if (viewOverwriteBlocked(); as why) {
+            @if (saveViewWhyNot() || saveViewAsWhyNot(); as why) {
                 <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-save-view-locked">{{ why }}</p>
             }
             <button
                 mat-menu-item
                 (click)="openSnapshot()"
                 [disabled]="snapshotUnavailable() !== ''"
-                [matTooltip]="snapshotUnavailable() || 'Save this analysis (optionally attaching it to a Case)'"
-                [attr.aria-label]="snapshotUnavailable() ? 'Save this analysis — ' + snapshotUnavailable() : 'Save this analysis'"
+                [matTooltip]="snapshotUnavailable() || 'Save a frozen copy, optionally on a Case'"
+                [attr.aria-label]="snapshotUnavailable() ? 'Save snapshot: ' + snapshotUnavailable() : 'Save snapshot…'"
             >
                 <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
-                <span>Save this analysis (Snapshot)</span>
+                <span>Save snapshot…</span>
             </button>
+            @if (snapshotUnavailable(); as why) {
+                <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-snapshot-locked">{{ why }}</p>
+            }
+            <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs">A view re-reads live data; a snapshot is frozen.</p>
             <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- stops the click closing File before the transfer menu opens -->
             <div class="flex items-center gap-1 px-2" (click)="onTransferRowClick($event)" data-testid="la-file-transfer">
                 <inspecto-la-host-slot
@@ -66,34 +69,40 @@
                         items: transferItems(),
                         allowedKinds: ['link-analysis-view'],
                         importDraft: true,
-                        label: 'Import / export views',
+                        label: 'Import or export',
                     }"
                     [outputs]="transferMenuOutputs"
                 />
                 <!-- the icon button carries the name for assistive tech; the label is its larger mouse target -->
-                <span class="cursor-pointer" aria-hidden="true">Import / export views</span>
+                <span class="cursor-pointer" aria-hidden="true">Import or export</span>
             </div>
             <button
                 mat-menu-item
                 (click)="closeOpenWork()"
-                [disabled]="!openWorkLabel() || investigation.busy()"
+                [disabled]="!!closeWhyNot() || investigation.busy()"
+                [attr.aria-label]="closeWhyNot() ? 'Close: ' + closeWhyNot() : 'Close ' + openWorkLabel()"
                 data-testid="la-close"
             >
                 <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                <span>Close{{ openWorkLabel() ? ' ' + openWorkLabel() : '' }}</span>
+                <span>Close</span>
+                @if (openWorkLabel(); as what) {
+                    <span class="text-secondary ml-2 text-xs" data-testid="la-close-what">{{ what }}</span>
+                }
             </button>
             <button
                 mat-menu-item
                 (click)="deleteOpenWork()"
-                [disabled]="!deleteLabel() || !!deleteBlocked() || investigation.busy()"
-                [matTooltip]="deleteBlocked()"
-                [attr.aria-label]="deleteBlocked() ? 'Delete ' + deleteLabel() + ' — ' + deleteBlocked() : null"
+                [disabled]="!!deleteWhyNot() || investigation.busy()"
+                [attr.aria-label]="deleteWhyNot() ? 'Delete: ' + deleteWhyNot() : 'Delete ' + deleteLabel() + '…'"
                 data-testid="la-file-delete"
             >
                 <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
-                <span>Delete{{ deleteLabel() ? ' ' + deleteLabel() : '' }}</span>
+                <span>Delete…</span>
+                @if (deleteLabel(); as what) {
+                    <span class="text-secondary ml-2 text-xs" data-testid="la-delete-what">{{ what }}</span>
+                }
             </button>
-            @if (deleteBlocked(); as why) {
+            @if (closeWhyNot() || deleteWhyNot(); as why) {
                 <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-file-delete-locked">{{ why }}</p>
             }
         </mat-menu>
@@ -102,7 +111,8 @@
                 mat-menu-item
                 (click)="loadFollowTheMoney()"
                 [disabled]="!followView()"
-                [matTooltip]="followView() ? 'Opens the saved view ' + followView()!.name + ' and draws it now' : 'No follow-the-money view in this Space'"
+                [matTooltip]="followView() ? 'Opens “' + followView()!.name + '”' : 'No money-flow view in this Space'"
+                [attr.aria-label]="followView() ? 'Follow the money: opens “' + followView()!.name + '”' : 'Follow the money: no money-flow view in this Space'"
                 data-testid="la-example-follow"
             >
                 <mat-icon svgIcon="heroicons_outline:banknotes"></mat-icon>
@@ -161,7 +171,7 @@
                         [disabled]="workingSetCanvas()"
                         [attr.aria-label]="
                             workingSetCanvas()
-                                ? 'Filter node types — ' + queryGraphOnlyReason
+                                ? 'Filter node types: ' + queryGraphOnlyReason
                                 : 'Filter node types' + (kindFilter().length ? ' (filter active)' : '')
                         "
                     >
@@ -190,7 +200,7 @@
                     [matMenuTriggerFor]="layoutMenu"
                     [color]="layoutId() !== 'dagre' ? 'primary' : undefined"
                     matTooltip="Layout"
-                    aria-label="Graph layout"
+                    aria-label="Layout"
                 >
                     <mat-icon svgIcon="heroicons_outline:squares-2x2"></mat-icon>
                 </button>
@@ -225,7 +235,7 @@
 
                 <!-- timeline: filter edges by a temporal `attrs` column cut off at a point in time -->
                 @if (attrColumns().length) {
-                    <span class="inline-flex" [matTooltip]="workingSetCanvas() ? queryGraphOnlyReason : 'Timeline'">
+                    <span class="inline-flex" [matTooltip]="workingSetCanvas() ? queryGraphOnlyReason : 'Filter links by time'">
                         <button
                             mat-icon-button
                             [matMenuTriggerFor]="timelineMenu" laFormMenu
@@ -233,8 +243,8 @@
                             [disabled]="workingSetCanvas()"
                             [attr.aria-label]="
                                 workingSetCanvas()
-                                    ? 'Filter edges by time — ' + queryGraphOnlyReason
-                                    : 'Filter edges by time' + (timeColumn() ? ' (filter active)' : '')
+                                    ? 'Filter links by time: ' + queryGraphOnlyReason
+                                    : 'Filter links by time' + (timeColumn() ? ' (filter active)' : '')
                             "
                         >
                             <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
@@ -281,7 +291,7 @@
                     <button
                         mat-icon-button
                         (click)="clearFilters()"
-                        matTooltip="Clear search & filters"
+                        matTooltip="Clear search and filters"
                         aria-label="Clear search and filters"
                     >
                         <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
@@ -319,7 +329,7 @@
                     </mat-form-field>
                     <p class="text-secondary m-0 mb-1 text-xs" data-testid="la-case-lists">{{ caseListsLine() }}</p>
                     <p class="text-secondary m-0 mb-2 text-xs leading-snug" data-testid="la-case-not-evidence">
-                        <span class="text-warn font-semibold">Not evidence</span> — {{ savedViewNotice }}
+                        <span class="text-warn font-semibold">Not evidence:</span> {{ savedViewNotice }}
                     </p>
                     <button mat-stroked-button type="submit" [disabled]="saving() || !graph()">
                         <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
@@ -344,7 +354,7 @@
                     [matMenuTriggerFor]="displayMenu" laFormMenu
                     [color]="displayCustomized() ? 'primary' : undefined"
                     matTooltip="Display options"
-                    aria-label="Display options (labels, colors, shapes and line styles)"
+                    aria-label="Display options"
                 >
                     <mat-icon svgIcon="heroicons_outline:paint-brush"></mat-icon>
                 </button>
@@ -394,7 +404,7 @@
                             [checked]="workingSetOpen()"
                             (change)="setOverlayOpen('workingSet', $event.checked)"
                         >
-                            Working set
+                            Graph counts
                         </mat-checkbox>
                         <mat-checkbox [checked]="levelOfDetail()" (change)="levelOfDetail.set($event.checked)">
                             Level of detail
@@ -634,8 +644,8 @@
                     mat-icon-button
                     (click)="undoPresentation()"
                     [disabled]="!canUndo()"
-                    matTooltip="Undo (Ctrl+Z)"
-                    aria-label="Undo the last display/filter change"
+                    matTooltip="Undo display change (Ctrl+Z)"
+                    aria-label="Undo display change (Ctrl+Z)"
                 >
                     <mat-icon svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
                 </button>
@@ -643,8 +653,8 @@
                     mat-icon-button
                     (click)="redoPresentation()"
                     [disabled]="!canRedo()"
-                    matTooltip="Redo (Ctrl+Y)"
-                    aria-label="Redo the last undone display/filter change"
+                    matTooltip="Redo display change (Ctrl+Y)"
+                    aria-label="Redo display change (Ctrl+Y)"
                 >
                     <mat-icon svgIcon="heroicons_outline:arrow-uturn-right"></mat-icon>
                 </button>
@@ -652,7 +662,7 @@
                     mat-icon-button
                     (click)="fitToScreen()"
                     matTooltip="Fit to screen"
-                    aria-label="Fit the graph to the screen"
+                    aria-label="Fit to screen"
                 >
                     <mat-icon svgIcon="heroicons_outline:viewfinder-circle"></mat-icon>
                 </button>
@@ -673,7 +683,7 @@
                     mat-icon-button
                     [matMenuTriggerFor]="exportMenu"
                     matTooltip="Export"
-                    aria-label="Export the graph"
+                    aria-label="Export"
                 >
                     <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
                 </button>
@@ -704,8 +714,8 @@
                     [color]="bottomOpen() ? 'primary' : undefined"
                     [attr.aria-pressed]="bottomOpen()"
                     [attr.aria-controls]="bottomOpen() ? 'bottom-panel-body' : null"
-                    [matTooltip]="bottomOpen() ? 'Hide the data table' : 'Show the data table'"
-                    [attr.aria-label]="bottomOpen() ? 'Hide the rows' : 'Show the rows'"
+                    [matTooltip]="bottomOpen() ? 'Hide the table' : 'Show the table'"
+                    [attr.aria-label]="bottomOpen() ? 'Hide the table' : 'Show the table'"
                 >
                     <mat-icon svgIcon="heroicons_outline:table-cells"></mat-icon>
                 </button>
@@ -787,8 +797,8 @@
                             [attr.aria-expanded]="growExclude.growOpen()"
                             [matTooltip]="
                                 growMode() === 'investigation'
-                                    ? 'Expand: add the next ring of linked items - one recorded expand step (G)'
-                                    : 'Expand: add the next ring of linked items to this graph - not recorded (G)'
+                                    ? 'Expand (G): recorded as one step'
+                                    : 'Expand (G): not recorded'
                             "
                             aria-label="Expand"
                             aria-keyshortcuts="G"
@@ -841,8 +851,8 @@
                                 (click)="excludeSelected()"
                                 [disabled]="!selectedOnCanvas().length"
                                 [disabledInteractive]="true"
-                                [matTooltip]="selectedOnCanvas().length ? 'Exclude the selected nodes from the Working Set (asks for a reason) (X)' : 'Select nodes to exclude'"
-                                aria-label="Exclude the selected nodes"
+                                [matTooltip]="selectedOnCanvas().length ? 'Exclude selection… (X)' : 'Select entities first.'"
+                                [attr.aria-label]="selectedOnCanvas().length ? 'Exclude selection… (X)' : 'Exclude selection: Select entities first.'"
                                 aria-keyshortcuts="X"
                                 data-testid="la-selection-exclude"
                             >
@@ -855,8 +865,8 @@
                                 (click)="mergeSelected()"
                                 [disabled]="!!mergeUnavailable()"
                                 [disabledInteractive]="true"
-                                [matTooltip]="mergeUnavailable() || 'Merge with... assert that the two selected nodes are one entity'"
-                                aria-label="Merge the two selected nodes into one identity"
+                                [matTooltip]="mergeUnavailable() || 'Merge identities…'"
+                                [attr.aria-label]="mergeUnavailable() ? 'Merge identities: ' + mergeUnavailable() : 'Merge identities…'"
                                 data-testid="la-selection-merge"
                             >
                                 <mat-icon svgIcon="heroicons_outline:arrows-pointing-in" aria-hidden="true"></mat-icon>
@@ -903,8 +913,8 @@
                             (click)="focusHeldTray()"
                             [disabled]="!heldItems().length"
                             [disabledInteractive]="true"
-                            [matTooltip]="'Held (' + heldItems().length + '): high-connectivity items Expand held back (opens the held tray)'"
-                            [attr.aria-label]="'Held: ' + heldItems().length"
+                            [matTooltip]="'Held (' + heldItems().length + '): busy entities Expand skips'"
+                            [attr.aria-label]="'Held (' + heldItems().length + '): busy entities Expand skips'"
                             data-testid="la-held-button"
                         >
                             <mat-icon svgIcon="heroicons_outline:hand-raised" aria-hidden="true"></mat-icon>
@@ -916,8 +926,8 @@
                             (click)="openExclusions()"
                             [color]="growExclude.exclusionsOpen() ? 'primary' : undefined"
                             [attr.aria-expanded]="growExclude.exclusionsOpen()"
-                            [matTooltip]="'Hidden (' + hiddenCount().toLocaleString('en') + ') by lists: exclusion lists in force and what they removed (X excludes the selection)'"
-                            [attr.aria-label]="'Hidden by lists: ' + hiddenCount() + ' hidden'"
+                            [matTooltip]="'Hidden by lists (' + hiddenCount().toLocaleString('en-GB') + '). X hides the selection'"
+                            [attr.aria-label]="'Hidden by lists (' + hiddenCount().toLocaleString('en-GB') + '). X hides the selection'"
                             data-testid="la-exclusions-button"
                         >
                             <mat-icon svgIcon="heroicons_outline:archive-box-x-mark" aria-hidden="true"></mat-icon>
@@ -997,10 +1007,10 @@
                     mat-icon-button
                     (click)="toggleFullscreen('graph')"
                     [matTooltip]="
-                        fullscreen() === 'graph' ? 'Exit full screen' : 'Full screen (browser-level, canvas only)'
+                        fullscreen() === 'graph' ? 'Exit full screen' : 'Full screen'
                     "
                     [attr.aria-label]="
-                        fullscreen() === 'graph' ? 'Exit graph full screen' : 'View the graph in full screen'
+                        fullscreen() === 'graph' ? 'Exit full screen' : 'Full screen'
                     "
                     data-testid="la-fullscreen"
                 >
@@ -1018,7 +1028,7 @@
                 [component]="aiExplain"
                 [inputs]="{
                     screen: 'Link Analysis',
-                    label: 'About',
+                    label: 'About Link Analysis',
                     terms: aboutTerms,
                     definitions: aboutDefinitions,
                 }"
@@ -1027,7 +1037,7 @@
             <button
                 mat-icon-button
                 (click)="openSettings()"
-                matTooltip="Settings: graph model, Entity Types, display rules, data"
+                matTooltip="Settings"
                 aria-label="Settings"
                 data-testid="la-settings-open"
             >
@@ -1038,7 +1048,7 @@
 
     <div class="mt-1 flex min-h-0 flex-auto flex-col gap-2">
         @if (loadError()) {
-            <inspecto-alert variant="error" title="Query failed">{{ loadError() }}</inspecto-alert>
+            <inspecto-alert variant="error" title="Could not draw the graph">{{ loadError() }}</inspecto-alert>
         }
         @if (importDraft(); as draft) {
             <div class="flex flex-col gap-2">
@@ -1061,15 +1071,15 @@
             </inspecto-alert>
         }
         @if (truncated() && !workingSetCanvas()) {
-            <inspecto-alert variant="warning" title="Truncated">
-                The projection hit the node cap — narrow the dataset or filter to see everything.
+            <inspecto-alert variant="warning" title="Result cut short">
+                Some nodes are not shown. Narrow the Dataset or add a filter.
             </inspecto-alert>
         }
         @if (startNotice(); as n) {
             @if (graph()) {
                 <div class="flex items-start gap-1" data-testid="start-outcome">
                     <inspecto-alert class="flex-auto" [variant]="n.variant">{{ n.text }}</inspecto-alert>
-                    <button mat-icon-button type="button" aria-label="Dismiss" (click)="startNotice.set(null)">
+                    <button mat-icon-button type="button" aria-label="Dismiss notice" (click)="startNotice.set(null)">
                         <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                     </button>
                 </div>
@@ -1139,7 +1149,7 @@
                                 class="absolute inset-x-0 top-1/4 z-10 mx-auto block w-full max-w-md p-4"
                                 icon="heroicons_outline:magnifying-glass-plus"
                                 title="The Working Set is empty"
-                                message="Nothing is seeded yet. Show the query graph to pick the entities to start from."
+                                message="No start entities yet. Show the full graph to pick some."
                                 actionLabel="Show the query graph"
                                 (action)="investigation.showWorkingSet.set(false)"
                                 data-testid="la-empty-working-set"
@@ -1254,13 +1264,13 @@
                                     </button>
                                 } @else if (change.undo) {
                                     <span class="text-secondary" data-testid="la-change-stale"
-                                        >Undo is no longer offered here: a later change came after it.</span
+                                        >Undo unavailable: a later change followed.</span
                                     >
                                 }
                                 <button
                                     mat-icon-button
                                     type="button"
-                                    aria-label="Dismiss"
+                                    aria-label="Dismiss change note"
                                     (click)="growExclude.lastChange.set(null)"
                                 >
                                     <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
@@ -1346,7 +1356,7 @@
                         @if (newFormInDock()) {
                             <!-- the Investigation tab's New form is on screen: one form for one job, so only a pointer here -->
                             <p class="text-secondary m-0 max-w-md p-4 text-center text-sm" data-testid="la-start-pointer">
-                                Start a new Investigation with the form in the Investigation tab.
+                                Use New Investigation in the Investigation tab.
                             </p>
                         } @else {
                             <inspecto-link-analysis-start-box
@@ -1354,6 +1364,7 @@
                                 [lists]="entityLists()"
                                 [dataset]="startDataset()"
                                 [investigations]="investigationsEnabled()"
+                                [canWrite]="canStartInvestigation()"
                                 [nodeCap]="nodeCap()"
                                 [notice]="startNotice()"
                                 [busy]="starting()"
@@ -1379,7 +1390,7 @@
                 [class.hidden]="!toolboxDockOpen()"
                 aria-label="Resize the toolbox (arrow keys or drag)"
             ></div>
-            <!-- right dock — Browser | Server | Investigation toolbox (LA-PANELS-REDESIGN-1); collapses to an icon rail -->
+            <!-- right dock — On screen | Whole Dataset | Investigation toolbox (LA-PANELS-REDESIGN-1); collapses to an icon rail -->
             <aside
                 class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l max-md:!w-full max-md:border-l-0 max-md:border-t"
                 [class.w-10]="!toolboxDockOpen()"
@@ -1570,24 +1581,24 @@
                     <button
                         mat-icon-button
                         (click)="openAnalysis('browser')"
-                        matTooltip="Browser"
-                        aria-label="Open the Browser tools"
+                        matTooltip="Open the On screen tools"
+                        aria-label="Open the On screen tools"
                     >
                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                     </button>
                     <button
                         mat-icon-button
                         (click)="openAnalysis('server')"
-                        matTooltip="Server"
-                        aria-label="Open the Server tools"
+                        matTooltip="Open the Whole Dataset tools"
+                        aria-label="Open the Whole Dataset tools"
                     >
                         <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
                     </button>
                     <button
                         mat-icon-button
                         (click)="openInvestigation()"
-                        matTooltip="Investigation"
-                        aria-label="Open the Investigation"
+                        matTooltip="Open the Investigation tab"
+                        aria-label="Open the Investigation tab"
                     >
                         <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
                     </button>
@@ -1677,7 +1688,7 @@
                                 <mat-icon class="icon-size-4" svgIcon="heroicons_outline:funnel"></mat-icon>
                                 Filter
                             </button>
-                            <button mat-icon-button (click)="bottomOpen.set(false)" matTooltip="Hide the rows" aria-label="Hide the rows">
+                            <button mat-icon-button (click)="bottomOpen.set(false)" matTooltip="Hide the table" aria-label="Hide the table">
                                 <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                             </button>
                         </div>

@@ -12,7 +12,7 @@ import {
     isHeldListChange,
     unmatchedCount,
 } from '@inspecto/link-analysis/api/inv.service';
-import { LensService } from '@inspecto/core/api';
+import { LensService, needsPermission } from '@inspecto/core/api';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -413,7 +413,7 @@ export class LinkAnalysisEntityListsComponent {
                 const res = await firstValueFrom(this.inv.registerEntityListDataset(list.id));
                 this.notice.set(`“${list.title}” registered as the Dataset ${res.datasetId}.`);
             },
-            'You are not allowed to register a Dataset (it needs the Workbench-authoring capability).',
+            needsPermission('canAuthorWorkbench'),
         );
     }
 

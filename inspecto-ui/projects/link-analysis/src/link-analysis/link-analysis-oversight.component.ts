@@ -13,16 +13,13 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return 'Refused by the server: ' + server;
+            return 'Refused: ' + server;
         case 404:
-            return (
-                'Not available — the Investigation or request does not exist or is not visible to you. Server: ' +
-                server
-            );
+            return 'Not available: the Investigation or request does not exist or is not visible to you.';
         case 409:
-            return 'Already decided or no longer applicable — ' + server;
+            return 'Already decided or no longer applicable.';
         case 422:
-            return 'The server refused the request: ' + server;
+            return 'Refused: ' + server;
         default:
             return server;
     }

@@ -117,7 +117,7 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         const { f, c, el } = create({ approve: true, reveal: false, approveError: err });
         await c.decide(PENDING, true);
         f.detectChanges();
-        expect(el.querySelector('[role="alert"], inspecto-alert')?.textContent).toContain('Refused by the server');
+        expect(el.querySelector('[role="alert"], inspecto-alert')?.textContent).toContain('Refused: four-eyes');
         expect(f.componentInstance.decided).toBe(0);
     });
 

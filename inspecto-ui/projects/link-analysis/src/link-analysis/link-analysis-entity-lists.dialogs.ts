@@ -32,7 +32,7 @@ import { isUnavailable } from './link-analysis-template.dialogs';
  */
 export const ENTITY_LIST_PURPOSES: readonly { value: EntityListPurpose; label: string; hint: string }[] = [
     { value: 'watch', label: 'Watch these', hint: 'Entities to keep an eye on' },
-    { value: 'exclusion', label: 'Never follow these (exclusion)', hint: 'Entities to leave out of an analysis' },
+    { value: 'exclusion', label: 'Exclusion: leave out of analyses', hint: 'Entities to leave out of an analysis' },
     { value: 'allow', label: 'Known good', hint: 'Entities known to be legitimate' },
     { value: 'block', label: 'Block', hint: 'Entities to block' },
 ];
@@ -73,13 +73,11 @@ export interface CreateEntityListData {
         <h2 mat-dialog-title>New Entity List</h2>
         <mat-dialog-content class="flex flex-col gap-3 text-sm">
             <p class="m-0 text-xs">
-                A named set of Entity keys in this Space. Every change is recorded with who, when and why, and the
-                history is kept.
+                A named set of entities. Every change is logged with who, when and why.
             </p>
             @if (!typeOptions.length) {
                 <inspecto-alert variant="warning" title="No Entity Types">
-                    No Entity Types are in force in this Space, so a list cannot be typed. Check the Link Analysis
-                    settings.
+                    No Entity Types are set up. Add one in Settings ▸ Entity Types.
                 </inspecto-alert>
             }
             <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="save()">
@@ -113,7 +111,7 @@ export interface CreateEntityListData {
                     <input matInput formControlName="reason" />
                     <mat-hint>Recorded with the change.</mat-hint>
                     @if (form.controls.reason.hasError('required') || form.controls.reason.hasError('pattern')) {
-                        <mat-error>A reason is required — every change to a list is accounted for.</mat-error>
+                        <mat-error>A reason is required.</mat-error>
                     } @else if (form.controls.reason.hasError('maxlength')) {
                         <mat-error>At most 1000 characters.</mat-error>
                     }
@@ -228,7 +226,7 @@ export interface EntityListReasonData {
                     <mat-label>Reason</mat-label>
                     <input matInput formControlName="reason" />
                     @if (form.controls.reason.hasError('required') || form.controls.reason.hasError('pattern')) {
-                        <mat-error>A reason is required — without one the change cannot be challenged.</mat-error>
+                        <mat-error>A reason is required.</mat-error>
                     } @else if (form.controls.reason.hasError('maxlength')) {
                         <mat-error>At most {{ data.maxLength }} characters.</mat-error>
                     }
@@ -335,8 +333,7 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
                     <mat-label>Entries, one per line</mat-label>
                     <textarea matInput rows="6" formControlName="entries"></textarea>
                     <mat-hint>
-                        A key · a prefix like +4478* · a range like 447800..447899 (same length) · a CIDR block like
-                        10.1.0.0/16. Keys and bounds are normalised as {{ data.typeLabel }}.
+                        One per line: a value, a prefix, a range or a CIDR block. Read as {{ data.typeLabel }}.
                     </mat-hint>
                     @if (form.controls.entries.hasError('required') || form.controls.entries.hasError('pattern')) {
                         <mat-error>Enter at least one entry.</mat-error>
@@ -363,7 +360,7 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
                     <mat-label>Reason</mat-label>
                     <input matInput formControlName="reason" />
                     @if (form.controls.reason.hasError('required') || form.controls.reason.hasError('pattern')) {
-                        <mat-error>A reason is required — every change to a list is accounted for.</mat-error>
+                        <mat-error>A reason is required.</mat-error>
                     } @else if (form.controls.reason.hasError('maxlength')) {
                         <mat-error>At most 1000 characters.</mat-error>
                     }

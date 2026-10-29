@@ -8,10 +8,10 @@ import type { LinkAnalysisView } from './link-analysis.service';
  * update (Save view over it, Rename) of a shared view needs edit access (`ComponentAccess.requireEdit`): the owner, an
  * access admin, or a share granting `edit`.
  */
-export const VIEW_AUTHOR_REASON = 'Saving views needs the Workbench author permission.';
-export const VIEW_DELETE_AUTHOR_REASON = 'Deleting saved views needs the Workbench author permission.';
+export const VIEW_AUTHOR_REASON = 'Needs Workbench author.';
+export const VIEW_DELETE_AUTHOR_REASON = 'Needs Workbench author.';
 export const VIEW_DELETE_OWNER_REASON = 'Only its owner can delete a shared saved view.';
-export const VIEW_EDIT_SHARE_REASON = 'This saved view is shared with you to view only: use Save view as… to keep a copy.';
+export const VIEW_EDIT_SHARE_REASON = 'This saved view is shared with you to view only: use Save view as to keep a copy.';
 
 export interface ViewAccessContext {
     /** `LensService.canAuthorWorkbench()`. */

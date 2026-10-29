@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HttpErrorResponse } from '@angular/common/http';
-import { STALE_WRITE_MESSAGE, apiErrorMessage, apiUrl, isStaleVersionError, plainCapabilityRefusal, toParams } from './api-base';
+import { STALE_WRITE_MESSAGE, apiErrorMessage, apiUrl, isStaleVersionError, needsPermission, plainCapabilityRefusal, toParams } from './api-base';
 import { environment } from '../../../environments/environment';
 
 describe('apiUrl', () => {
@@ -71,21 +71,35 @@ describe('isStaleVersionError', () => {
     });
 });
 
-describe('apiErrorMessage — a capability refusal in plain words (UI test 2026-10-29)', () => {
-    it("maps the server's `missing capability '…'` 403 to a sentence, keeping the id", () => {
+describe('apiErrorMessage — a capability refusal in plain words (LA-UI-TEXT-PASS-1 G14 / X4)', () => {
+    it("says the server's `missing capability '…'` 403 as \"Needs <permission>.\", never the id", () => {
         const err = new HttpErrorResponse({
             status: 403,
             error: { error: { errorCode: 'PERMISSION_DENIED', message: "missing capability 'canAuthorWorkbench'" } },
         });
-        expect(apiErrorMessage(err, 'Saving the view failed.')).toBe(
-            'Your role does not have the Workbench author permission (canAuthorWorkbench).',
-        );
+        expect(apiErrorMessage(err, 'Saving the view failed.')).toBe('Needs Workbench author.');
     });
 
-    it('keeps the owning-space suffix and names an unknown capability by its id', () => {
+    it('names every Link Analysis capability without its id or the word capability', () => {
+        for (const id of ['canShareInvestigation', 'canRunLinkGraphAnalysis', 'canManageIncidents', 'canBuildLinkIndex']) {
+            const text = plainCapabilityRefusal(`missing capability '${id}'`);
+            expect(text).toMatch(/^Needs [A-Z][a-z ]+[a-z]\.$/);
+            expect(text).not.toContain(id);
+            expect(text).not.toMatch(/capability/i);
+        }
+        expect(needsPermission('canManageIncidents')).toBe('Needs Incident management.');
+    });
+
+    it('keeps the owning-Space suffix and never shows an unknown id', () => {
+        const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
         expect(plainCapabilityRefusal("missing capability 'canFoo' in the owning space")).toBe(
-            'Your role does not have the permission this needs (canFoo) in the owning space.',
+            'Your role does not have the permission this needs in the owning Space.',
         );
+        expect(plainCapabilityRefusal("missing capability 'canAuthorWorkbench' in the owning space")).toBe(
+            'Needs Workbench author in the owning Space.',
+        );
+        expect(info).toHaveBeenCalled();
+        info.mockRestore();
     });
 
     it('leaves every other message as the server wrote it', () => {

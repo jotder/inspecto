@@ -41,15 +41,15 @@ export function embedErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 503:
-            return 'Embed links are switched off on this host. ' + server;
+            return 'Embed links are turned off. Ask an administrator.';
         case 403:
-            return 'Only a lead of this Investigation who holds canShareInvestigation can do that. Server: ' + server;
+            return 'Only a lead with Investigation sharing can do that.';
         case 404:
-            return 'Not available - the Investigation or the link is gone or not visible to you. Server: ' + server;
+            return 'Not available: the Investigation or the link is gone or not visible to you.';
         case 409:
-            return 'Refused as it stands now - ' + server;
+            return 'Refused: ' + server;
         case 422:
-            return 'The server refused the request: ' + server;
+            return 'Refused: ' + server;
         default:
             return server;
     }

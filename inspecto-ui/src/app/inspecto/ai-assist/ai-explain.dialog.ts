@@ -63,6 +63,75 @@ export function isUserFacingDoc(file: string): boolean {
     return !/(^|\/)archived-documents\//i.test(path) && USER_FACING_DOC.test(path);
 }
 
+/** A cited doc's readable name: "Glossary", "User guide", "User guide: link analysis". */
+export function guideTitle(file: string): string {
+    const base = file.replace(/\\/g, '/').split('/').pop()!.replace(/\.md$/i, '');
+    const named: Record<string, string> = { GLOSSARY: 'Glossary', USER_GUIDE: 'User guide', ADVANCED_GUIDE: 'Advanced guide' };
+    if (named[base.toUpperCase()]) return named[base.toUpperCase()];
+    const m = /^(user|admin)-guide-?(.*)$/i.exec(base);
+    const words = (s: string) => s.replace(/[-_]+/g, ' ').trim();
+    if (m) return `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} guide${m[2] ? `: ${words(m[2])}` : ''}`;
+    const plain = words(base);
+    return plain ? plain[0].toUpperCase() + plain.slice(1) : file;
+}
+
+/** Where an engineer's note starts in a GLOSSARY row: everything from here on is not for the analyst. */
+const ENGINEER_MARKERS = ['⛔', '✅', '⚠', '🔴', '(internal document', 'Named by operator decision', 'Named by decision'];
+/** Abbreviations whose full stop does not end a sentence. */
+const NOT_A_SENTENCE_END = /(?:\be\.g|\bi\.e|\bvs|\betc|\bcf|\bapprox)\.$/i;
+/** About this long, a definition still reads as one short paragraph. */
+const DEFINITION_MAX = 220;
+
+/**
+ * Turns a raw `docs/GLOSSARY.md` row into one clean, complete paragraph an analyst can read (LA-UI-TEXT-PASS-1 X2).
+ *
+ * A GLOSSARY row is binding vocabulary written for engineers: it carries ticket ids (`D-E1`, `LA-10`), routes
+ * (`/inv/*`), class names in backticks, ⛔ / ✅ / ⚠ notes, "(internal document - not shipped)" links, escaped table
+ * pipes (`\|`) and "Named by operator decision…" tails. This keeps the first sentence of the plain text before the
+ * first such marker, drops every code span that is not a plain lower-case word, and ends on a full stop. A sentence
+ * longer than about 220 characters is cut at a word and ends with "…". Returns '' when nothing readable is left.
+ */
+export function cleanGlossaryDefinition(raw: string): string {
+    let s = raw.replace(/\\\|/g, '|').replace(/\r?\n/g, ' ');
+    // A leading annotation the loader left in: "*(Link Analysis)* — ".
+    s = s.replace(/^\s*\*?\([^)]*\)\*?\s*[—–-]*\s*/, '');
+    const cut = Math.min(...ENGINEER_MARKERS.map((m) => s.indexOf(m)).filter((i) => i >= 0), s.length);
+    s = s.slice(0, cut);
+    s = s.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'); // [text](target) -> text
+    s = s.replace(/`([^`]*)`/g, (_m, code: string) => (/^[a-z][a-z ]*$/.test(code) ? code : ' '));
+    s = s.replace(/\*\*|\*|(?<=^|\s)_|_(?=\s|[.,;:)]|$)/g, '');
+    s = s.replace(/(^|[\s(])\/[\w/*{}.:-]+/g, '$1'); // routes
+    s = s.replace(/\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b/g, (id) => (/\d/.test(id) && !/^(SHA|UTF|ISO)-/.test(id) ? ' ' : id));
+    s = s.replace(/[|]/g, ' ');
+    for (let i = 0; i < 3; i++) {
+        s = s
+            .replace(/\(\s*(?:[,;:/—–-]|\band\b|\bor\b|\s)*\)/g, ' ') // a bracket left empty
+            .replace(/\(\s*[,;:]\s*/g, '(')
+            .replace(/\s*[,;:]\s*\)/g, ')')
+            .replace(/\s+([,.;:)])/g, '$1')
+            .replace(/([,;:])(?:\s*[,;:])+/g, '$1')
+            .replace(/\s{2,}/g, ' ');
+    }
+    s = s.trim().replace(/^[—–\-:,;\s]+/, '');
+    // The first sentence only.
+    const ends = /[.!?](?=\s+[A-Z(“"]|\s*$)/g;
+    let m: RegExpExecArray | null;
+    while ((m = ends.exec(s))) {
+        if (NOT_A_SENTENCE_END.test(s.slice(0, m.index + 1))) continue;
+        s = s.slice(0, m.index + 1);
+        break;
+    }
+    s = s.replace(/[\s,;:—–-]+$/, '').trim();
+    if (!/[A-Za-z]/.test(s)) return '';
+    if (s.length > DEFINITION_MAX) {
+        const room = s.slice(0, DEFINITION_MAX);
+        s = room.slice(0, room.lastIndexOf(' ')).replace(/[\s,;:(—–-]+$/, '') + '…';
+    } else if (!/[.!?…]$/.test(s)) {
+        s += '.';
+    }
+    return s[0].toUpperCase() + s.slice(1);
+}
+
 /**
  * "What am I looking at" — the read-only half of the inline AI surface (AGT-6a A4).
  *
@@ -96,9 +165,8 @@ export function isUserFacingDoc(file: string): boolean {
                     <span class="text-secondary text-sm">Looking up this screen's vocabulary…</span>
                 </div>
             } @else if (unavailable() && !hasOwnDefinitions()) {
-                <inspecto-alert variant="info" title="AI assistance unavailable">
-                    The intelligence module is not installed on this backend, so definitions cannot be looked up.
-                    Everything else on this screen works as usual.
+                <inspecto-alert variant="info" title="Definitions unavailable">
+                    Definitions are unavailable here. Everything else works.
                 </inspecto-alert>
             } @else {
                 <p class="text-secondary mb-4 text-sm" data-testid="explain-source">{{ sourceNote() }}</p>
@@ -109,22 +177,19 @@ export function isUserFacingDoc(file: string): boolean {
                             @if (entry.definition) {
                                 <dd class="mt-0.5 text-sm">{{ entry.definition }}</dd>
                             } @else if (entry.citations?.length) {
-                                <!-- No canonical definition, but the docs mention it — cite, never invent. -->
+                                <!-- No definition, but a guide mentions it: cite, never invent. -->
                                 <dd class="mt-0.5 text-sm">
-                                    <span class="text-secondary">
-                                        No canonical definition; found in the documentation:
-                                    </span>
+                                    <span class="text-secondary">No definition. Mentioned in the guides:</span>
                                     <ul class="mt-1 flex flex-col gap-1">
                                         @for (hit of entry.citations; track hit.file + hit.line) {
-                                            <li>
-                                                <code class="text-xs">{{ hit.file }}:{{ hit.line }}</code>
-                                                — {{ hit.snippet }}
+                                            <li [title]="hit.file + ':' + hit.line">
+                                                <span class="font-medium">{{ guideTitle(hit.file) }}</span>: {{ hit.snippet }}
                                             </li>
                                         }
                                     </ul>
                                 </dd>
                             } @else {
-                                <dd class="text-secondary mt-0.5 text-sm">No canonical definition found.</dd>
+                                <dd class="text-secondary mt-0.5 text-sm">No definition found.</dd>
                             }
                         </div>
                     }
@@ -144,18 +209,17 @@ export class AiExplainDialog {
     readonly entries = signal<ExplainEntry[]>([]);
     /** Latched when the intelligence module is absent (503) — the whole dialog then explains itself. */
     readonly unavailable = signal(false);
-    /** Terms answered from the glossary vs. from the pane's own definitions, for an honest source line. */
-    private readonly fromGlossary = signal(0);
-    private readonly fromPane = signal(0);
     /** The pane supplied its own definitions: shown even when the module is absent (they need no lookup). */
     hasOwnDefinitions(): boolean {
         return Object.keys(this.data.definitions ?? {}).length > 0;
     }
-    /** Where the definitions shown came from, said truthfully. */
+    /** The line above the terms: one plain sentence, whichever source answered. */
     sourceNote(): string {
-        if (this.fromPane() && this.fromGlossary()) return 'The terms this screen is built on: from the project glossary, else as this screen defines them.';
-        if (this.fromPane()) return 'The terms this screen is built on, as this screen defines them.';
-        return 'The canonical terms this screen is built on, from the project glossary.';
+        return 'Terms used on this screen.';
+    }
+    /** A cited doc's readable name ("User guide: link analysis"); the path stays in the row's tooltip. */
+    guideTitle(file: string): string {
+        return guideTitle(file);
     }
 
     constructor() {
@@ -168,21 +232,18 @@ export class AiExplainDialog {
     }
 
     private explain(term: string): Observable<ExplainEntry> {
+        // The pane's own hand-written definition wins (LA-UI-TEXT-PASS-1 X2): a GLOSSARY row is written for
+        // engineers and carries ticket ids, routes and warnings no analyst should read.
         const own = this.data.definitions?.[term];
+        if (own) return of({ term, definition: own });
         return this.agent.runTool<GlossaryResult>('glossary_lookup', { term }).pipe(
             map((result) => {
-                this.fromGlossary.update((n) => n + 1);
-                return { term, definition: result.definition };
+                const definition = cleanGlossaryDefinition(result.definition ?? '');
+                return definition ? { term, definition } : { term };
             }),
             // 422 = no canonical definition for this term. That is an answerable question, not a
             // failure, so fall back to the docs corpus rather than showing the operator nothing.
-            // The pane's own definition answers first — also on a 503, as it needs no lookup.
-            catchError((err: unknown) => {
-                if (!own) return this.searchDocs(term, err);
-                this.isUnavailable(err);
-                this.fromPane.update((n) => n + 1);
-                return of({ term, definition: own });
-            }),
+            catchError((err: unknown) => this.searchDocs(term, err)),
         );
     }
 
@@ -191,7 +252,11 @@ export class AiExplainDialog {
         return this.agent.runTool<DocsSearchResult>('docs_search', { query: term }).pipe(
             map((result) => ({
                 term,
-                citations: (result.hits ?? []).filter((h) => isUserFacingDoc(h.file)).slice(0, CITATION_LIMIT),
+                citations: (result.hits ?? [])
+                    .filter((h) => isUserFacingDoc(h.file))
+                    .map((h) => ({ ...h, snippet: cleanGlossaryDefinition(h.snippet ?? '') }))
+                    .filter((h) => h.snippet)
+                    .slice(0, CITATION_LIMIT),
             })),
             catchError((err: unknown) => {
                 this.isUnavailable(err);

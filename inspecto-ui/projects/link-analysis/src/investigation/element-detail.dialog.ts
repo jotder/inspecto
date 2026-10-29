@@ -102,7 +102,7 @@ const PIVOT_ICON: Record<PivotView, string> = { graph: 'heroicons_outline:share'
             @if (data.expandable) {
                 <button mat-button (click)="close('expand-neighbors')">
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
-                    Fetch neighbors
+                    Expand from here
                 </button>
             }
             <button mat-button (click)="close('focus')">

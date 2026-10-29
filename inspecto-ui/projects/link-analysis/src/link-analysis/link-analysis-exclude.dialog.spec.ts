@@ -107,7 +107,7 @@ describe('LinkAnalysisExcludeDialog (LA-GROW-EXCLUDE-1 §3.3)', () => {
     it('says why "Add to a list…" is not possible: no capability, or no list route on this server', () => {
         const { el } = create({ canManageLists: false });
         expect(el.querySelector('[data-testid="la-exclude-list-hint"]')?.textContent).toContain(
-            'Adding to a list needs the Incident management capability.',
+            'Needs Incident management.',
         );
         expect((el.querySelector('[data-testid="la-exclude-list"] input') as HTMLInputElement).disabled).toBe(true);
     });

@@ -25,7 +25,6 @@ export function limitRefusalMessage(err: unknown): string | null {
     }
     return (
         'Too many requests. Link Analysis allows each user a burst of 20 requests, then one every 3 seconds. ' +
-        'Wait a few seconds and try again.' +
-        (server ? ' Server: ' + server : '')
+        'Wait a few seconds and try again.'
     );
 }

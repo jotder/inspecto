@@ -11,7 +11,13 @@ import { penByLabel, penEdit, penError, penText, pickerSet } from '@inspecto/cor
 import { EntityProfileService, EntitySuggestions } from '@inspecto/link-analysis/api/entity-profile.service';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
-import { NewInvestigationRequest, StartCatalogue, StartRequest, newInvestigationDefaults } from './start-from';
+import {
+    NewInvestigationInput,
+    NewInvestigationRequest,
+    StartCatalogue,
+    StartRequest,
+    newInvestigationDefaults,
+} from './start-from';
 
 const CATALOGUE: StartCatalogue = {
     datasets: [
@@ -138,7 +144,7 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         const { box, el } = create();
         expect(box.form.controls.dataset.value).toBe('transfers');
         expect(box.form.controls.entityType.value).toBe('account');
-        expect(el.textContent).toContain('Start from...');
+        expect(el.textContent).toContain('Start a graph');
         expect(el.querySelector('mat-error')).toBeNull();
         await settle();
         await expectNoA11yViolations(el);
@@ -169,7 +175,7 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         submit(fixture);
         expect(fixture.componentInstance.starts).toEqual([]);
         expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain(
-            'Type the Account to start from.',
+            'Enter a value to start from.',
         );
         const input = q(el, 'start-value') as HTMLInputElement;
         input.value = ' ACC-0042 ';
@@ -261,7 +267,7 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         kind(fixture, 'list');
         submit(fixture);
         expect(fixture.componentInstance.starts).toEqual([]);
-        expect(el.querySelector('[role="alert"]')?.textContent).toContain('Pick the Entity List');
+        expect(el.querySelector('[role="alert"]')?.textContent).toContain('Choose an Entity List.');
         pickerSet(fixture, '[data-testid="start-list"]', 'suspects');
         submit(fixture);
         expect(fixture.componentInstance.starts).toEqual([
@@ -274,7 +280,7 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         const { fixture, el } = create();
         fixture.componentInstance.lists.set([]);
         kind(fixture, 'list');
-        expect(q(el, 'start-no-lists')?.textContent).toContain('No Entity List in this Space yet');
+        expect(q(el, 'start-no-lists')?.textContent).toContain('No Entity List yet. Create one in Settings ▸ Entity Lists');
     });
 
     it('a paste: values split on lines, commas and semicolons, repeats dropped', async () => {
@@ -304,7 +310,7 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         fixture.detectChanges();
         expect(suggest).toHaveBeenCalledWith('account', { dataset: 'transfers', limit: 1 });
         expect(q(el, 'start-whole-warning')?.textContent).toContain(
-            'Transfers holds about 312 Account entities, more than the 200-node cap',
+            'Transfers holds about 312 Account entities: only the busiest 200 are drawn.',
         );
         expect(q(el, 'start-submit')?.textContent).toContain('Draw the whole Dataset');
         submit(fixture);
@@ -318,33 +324,46 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         await settle();
         fixture.detectChanges();
         expect(q(el, 'start-whole-warning')).toBeNull();
-        expect(q(el, 'start-whole-note')?.textContent).toContain('Draws every link in Transfers');
+        expect(q(el, 'start-whole-note')?.textContent).toContain('Draws the whole of Transfers');
     });
 
-    it('draws on every level: a ring; on Investigations it offers New Investigation… (no seed step of its own)', () => {
+    it('draws on every level: its links; on Investigations it offers New Investigation (no step of its own)', () => {
         const { fixture, el } = create();
-        expect(q(el, 'start-what')?.textContent).toContain('one ring');
-        expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Start');
+        expect(q(el, 'start-what')?.textContent).toContain('Draws it and its links');
+        expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Draw');
         expect(q(el, 'start-new-investigation')).toBeNull();
         expect(q(el, 'start-file-hint')?.textContent).toContain('File menu');
         fixture.componentInstance.investigations.set(true);
         fixture.detectChanges();
-        expect(q(el, 'start-what')?.textContent).toContain('one ring');
-        expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Start');
+        expect(q(el, 'start-what')?.textContent).toContain('Draws it and its links');
+        expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Draw');
+        expect(q(el, 'start-new-investigation')?.textContent?.trim()).toBe('New Investigation');
         (q(el, 'start-new-investigation') as HTMLButtonElement).click();
         expect(fixture.componentInstance.newClicks).toBe(1);
-        // the draw box never asks for a name or a reason
+        // the draw box never asks for a name or a purpose
         expect(q(el, 'new-name')).toBeNull();
-        expect(q(el, 'new-reason')).toBeNull();
+        expect(q(el, 'new-purpose')).toBeNull();
     });
 
-    it('with no Dataset that has a link: says so, points to File ▸ Explore dataset… and offers Add data', async () => {
+    it('New Investigation is disabled with the reason for a role that cannot start one (T-033)', () => {
+        const { fixture, el } = create();
+        fixture.componentInstance.investigations.set(true);
+        fixture.componentInstance.canWrite.set(false);
+        fixture.detectChanges();
+        const button = q(el, 'start-new-investigation') as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        expect(button.getAttribute('aria-label')).toBe(
+            'New Investigation: Read-only: starting an Investigation needs Incident management.',
+        );
+    });
+
+    it('with no Dataset that has a link: says so, points to File ▸ Explore Dataset and offers Add data', async () => {
         const { fixture, el } = create();
         fixture.componentInstance.catalogue.set({ datasets: [], types: [] });
         fixture.detectChanges();
         expect(q(el, 'start-box')).toBeNull();
         expect(q(el, 'start-no-dataset')?.textContent).toContain('No Dataset in this Space has a link yet');
-        expect(q(el, 'start-no-dataset')?.textContent).toContain('File ▸ Explore dataset…');
+        expect(q(el, 'start-no-dataset')?.textContent).toContain('File ▸ Explore Dataset.');
         expect(q(el, 'starter-explore')).toBeNull();
         (q(el, 'starter-add-data') as HTMLButtonElement).click();
         expect(fixture.componentInstance.addDataClicks).toBe(1);
@@ -371,9 +390,9 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         return made;
     }
     const name = (el: HTMLElement) => penText(q(el, 'new-name')!);
-    const reason = (el: HTMLElement) => penText(q(el, 'new-reason')!);
+    const purpose = (el: HTMLElement) => penText(q(el, 'new-purpose')!);
 
-    it('starts with a Start from picker and only that choice’s inputs, then Name and Reason; passes axe', async () => {
+    it('starts with a Start from picker and only that choice’s inputs, then Name and Purpose; passes axe', async () => {
         const { fixture, el } = createNew();
         expect(q(el, 'start-kind')?.tagName.toLowerCase()).toBe('inspecto-option-picker');
         expect(q(el, 'start-type')).not.toBeNull();
@@ -386,38 +405,42 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         expect(q(el, 'start-paste')).toBeNull();
         expect(q(el, 'new-expand')).toBeNull(); // nothing to expand from the whole Dataset
         expect(q(el, 'new-name')).not.toBeNull();
-        expect(q(el, 'new-reason')).not.toBeNull();
+        expect(q(el, 'new-purpose')).not.toBeNull();
+        expect(penByLabel(el, 'Purpose')).toBeTruthy();
+        expect(penByLabel(el, 'Reason')).toBeFalsy(); // G1: the New form says Purpose
         expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Start Investigation');
         expect(q(el, 'start-new-investigation')).toBeNull();
         await expectNoA11yViolations(el);
     });
 
-    it('defaults the Name and Reason from the input, and re-defaults them when the input changes', async () => {
+    it('defaults the Name and Purpose from the input, and re-defaults them when the input changes', async () => {
         const { fixture, box, el } = createNew();
         box.form.controls.value.setValue('MULE-HUB-01');
         await settle();
         fixture.detectChanges();
-        expect(name(el)).toBe('Investigation — Account MULE-HUB-01');
-        expect(reason(el)).toBe('Review of Account MULE-HUB-01 and its links');
+        expect(name(el)).toBe('Account MULE-HUB-01');
+        expect(purpose(el)).toBe('Review of an Account and its links');
         kind(fixture, 'list');
         pickerSet(fixture, '[data-testid="start-list"]', 'suspects');
-        expect(name(el)).toBe('Investigation — list Suspects');
+        expect(name(el)).toBe('Members of “Suspects”');
+        expect(purpose(el)).toBe('Review of the members of “Suspects” and their links');
         kind(fixture, 'paste');
         box.form.controls.paste.setValue('a\nb\nc');
         fixture.detectChanges();
-        expect(name(el)).toBe('Investigation — 3 pasted values');
+        expect(name(el)).toBe('3 pasted Account values');
+        expect(purpose(el)).toBe('Review of 3 pasted values and their links');
         kind(fixture, 'dataset');
-        expect(name(el)).toBe('Investigation — whole Transfers');
-        expect(reason(el)).toBe('Review of the links in Transfers');
+        expect(name(el)).toBe('Transfers');
+        expect(purpose(el)).toBe('Review of the links in Transfers');
     });
 
-    it('keeps the analyst’s own Name and Reason when the input changes', () => {
+    it('keeps the analyst’s own Name and Purpose when the input changes', () => {
         const { fixture, el } = createNew();
         penEdit(fixture, q(el, 'new-name')!, 'Operation Larch');
-        penEdit(fixture, penByLabel(el, 'Reason')!, 'Warrant 7');
+        penEdit(fixture, penByLabel(el, 'Purpose')!, 'Warrant 7');
         kind(fixture, 'dataset');
         expect(name(el)).toBe('Operation Larch');
-        expect(reason(el)).toBe('Warrant 7');
+        expect(purpose(el)).toBe('Warrant 7');
     });
 
     it('a masked Space keeps the value out of the default Name (a title is stored and shown like a value)', async () => {
@@ -425,11 +448,11 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         box.form.controls.value.setValue('MULE-HUB-01');
         await settle();
         fixture.detectChanges();
-        expect(name(el)).toBe('Investigation — Account');
-        expect(reason(el)).toBe('Review of the Account and its links');
+        expect(name(el)).toBe('Account');
+        expect(purpose(el)).toBe('Review of an Account and its links');
     });
 
-    it('Start Investigation hands over the start, the name, the reason and Expand on start in ONE request', async () => {
+    it('Start Investigation hands over the start, the name, the purpose and Expand on start in ONE request', async () => {
         const { fixture, box } = createNew();
         box.form.controls.value.setValue('MULE-HUB-01');
         await settle();
@@ -440,8 +463,8 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         expect(fixture.componentInstance.creates).toEqual([
             {
                 start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
-                title: 'Investigation — Account MULE-HUB-01',
-                purpose: 'Review of Account MULE-HUB-01 and its links',
+                title: 'Account MULE-HUB-01',
+                purpose: 'Review of an Account and its links',
                 timeCol: '',
                 timeColZone: '',
                 degrees: 2,
@@ -451,23 +474,23 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         expect(box.degreeOptions().map((o) => o.value)).toEqual(['0', '1', '2']);
     });
 
-    it('with a graph drawn, Start from offers "The graph on screen": a seedless start over its mapping', () => {
+    it('with a graph drawn, Start from offers "Graph on screen": a start over its mapping with no start entities', () => {
         const { fixture, box, el } = createNew();
         expect(box.kindOptions().map((o) => o.value)).toEqual(['entity', 'list', 'paste', 'dataset']);
         fixture.componentInstance.graphOnScreen.set({ name: 'mule_layering_ring' });
         fixture.detectChanges();
-        expect(box.kindOptions().map((o) => o.label)).toContain('The graph on screen');
+        expect(box.kindOptions().map((o) => o.label)).toEqual(['One entity', 'Entity List', 'Pasted values', 'Whole Dataset', 'Graph on screen']);
         kind(fixture, 'graph');
         expect(q(el, 'start-dataset')).toBeNull(); // the drawn graph names its own Dataset
         expect(q(el, 'new-expand')).toBeNull(); // no seed to expand from
         expect(q(el, 'start-graph-note')?.textContent).toContain('mule_layering_ring');
-        expect(name(el)).toBe('Investigation — mule_layering_ring');
-        expect(reason(el)).toBe('Review of the graph on screen');
+        expect(name(el)).toBe('mule_layering_ring');
+        expect(purpose(el)).toBe('Review of the graph on screen');
         submit(fixture);
         expect(fixture.componentInstance.creates).toEqual([
             {
                 start: { kind: 'graph' },
-                title: 'Investigation — mule_layering_ring',
+                title: 'mule_layering_ring',
                 purpose: 'Review of the graph on screen',
                 timeCol: '',
                 timeColZone: '',
@@ -485,7 +508,7 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         fixture.componentInstance.graphOnScreen.set({ name: 'mule_layering_ring' });
         fixture.detectChanges();
         kind(fixture, 'graph');
-        expect(name(el)).toBe('Investigation — graph on screen');
+        expect(name(el)).toBe('Graph on screen');
     });
 
     it('the draw box never offers the graph on screen', () => {
@@ -495,28 +518,35 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         expect(box.kindOptions().map((o) => o.value)).not.toContain('graph');
     });
 
-    it('a cleared Reason refuses the start and says why on the field', () => {
+    it('a cleared Purpose refuses the start and says why on the field', () => {
         const { fixture, el } = createNew();
         kind(fixture, 'dataset');
-        penEdit(fixture, penByLabel(el, 'Reason')!, '   ');
+        penEdit(fixture, penByLabel(el, 'Purpose')!, '   ');
         submit(fixture);
         expect(fixture.componentInstance.creates).toEqual([]);
-        expect(penError(q(el, 'new-reason')!)).toBe('A reason is required to start an Investigation.');
+        expect(penError(q(el, 'new-purpose')!)).toBe('A purpose is required.');
     });
 
-    it('without the capability the lock note leads, every input is disabled and the button says why (UI test 2026-10-29)', async () => {
+    it('a cleared Name refuses the start too: the same rule as Settings ▸ General (T-034)', () => {
+        const { fixture, el } = createNew();
+        kind(fixture, 'dataset');
+        penEdit(fixture, q(el, 'new-name')!, '   ');
+        submit(fixture);
+        expect(fixture.componentInstance.creates).toEqual([]);
+        expect(penError(q(el, 'new-name')!)).toBe('A name is required.');
+    });
+
+    it('without the capability one read-only line replaces the form (T-203)', async () => {
         const { fixture, box, el } = createNew();
         fixture.componentInstance.canWrite.set(false);
         fixture.detectChanges();
         const note = q(el, 'new-locked');
-        expect(note?.textContent).toContain("Your role can't start Investigations (needs Incident management).");
-        // the note comes before the form, not under the button
-        expect(note!.compareDocumentPosition(q(el, 'start-box')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(note?.textContent).toContain('Read-only: starting an Investigation needs Incident management.');
+        expect(note?.textContent).toContain('Open existing ones with File ▸ Open…');
+        expect(q(el, 'start-box')).toBeNull();
+        expect(q(el, 'start-submit')).toBeNull();
         expect(box.form.disabled).toBe(true);
-        const button = q(el, 'start-submit') as HTMLButtonElement;
-        expect(button.disabled).toBe(true);
-        expect(button.getAttribute('aria-label')).toContain('needs Incident management');
-        submit(fixture);
+        box.submit();
         expect(fixture.componentInstance.creates).toEqual([]);
         await expectNoA11yViolations(el);
 
@@ -526,37 +556,65 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         expect(box.form.enabled).toBe(true);
     });
 
-    it('resetNew starts fresh: the start inputs clear, Name and Reason re-default and follow the input again', async () => {
+    it('resetNew starts fresh: the start inputs clear, Name and Purpose re-default and follow the input again', async () => {
         const { fixture, box, el } = createNew();
         penEdit(fixture, q(el, 'new-name')!, 'Operation Larch');
-        penEdit(fixture, penByLabel(el, 'Reason')!, 'Warrant 7');
+        penEdit(fixture, penByLabel(el, 'Purpose')!, 'Warrant 7');
         kind(fixture, 'paste');
         box.form.controls.paste.setValue('a\nb');
         box.resetNew();
         fixture.detectChanges();
         expect(box.form.controls.kind.value).toBe('entity');
         expect(box.form.controls.paste.value).toBe('');
-        expect(name(el)).toBe('Investigation — Account');
+        expect(box.form.controls.name.value).toBe(''); // nothing picked yet: no Name
+        expect(purpose(el)).toBe('Review of an Account and its links');
         expect(box.form.controls.name.pristine).toBe(true);
         expect(box.tried()).toBe(false);
         // the "edited" flags are reset, so the defaults follow the input again
         box.form.controls.value.setValue('MULE-HUB-01');
         await settle();
         fixture.detectChanges();
-        expect(name(el)).toBe('Investigation — Account MULE-HUB-01');
+        expect(name(el)).toBe('Account MULE-HUB-01');
     });
 });
 
-describe('newInvestigationDefaults', () => {
-    const base = { typeLabel: 'Phone number', value: '966501', listTitle: '', pasted: 0, datasetName: 'Calls' };
-    it('names each kind of start', () => {
-        expect(newInvestigationDefaults({ ...base, kind: 'entity', maskingMode: 'none' }).name).toBe(
-            'Investigation — Phone number 966501',
-        );
-        expect(newInvestigationDefaults({ ...base, kind: 'entity', maskingMode: null }).name).toBe(
-            'Investigation — Phone number',
-        );
-        expect(newInvestigationDefaults({ ...base, kind: 'paste', pasted: 1 }).name).toBe('Investigation — 1 pasted value');
-        expect(newInvestigationDefaults({ ...base, kind: 'list' }).name).toBe('Investigation — list an Entity List');
+describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () => {
+    const base = { typeLabel: 'Account', value: '', listTitle: '', pasted: 0, datasetName: 'Calls', maskingMode: 'none' };
+    const d = (over: Partial<NewInvestigationInput>) => newInvestigationDefaults({ ...base, kind: 'entity', ...over });
+    const NO_GAPS = /\s{2}|^\s|\s$|Investigation —|whole the|list an Entity List|\bundefined\b|\bnull\b/;
+
+    it.each<[string, Partial<NewInvestigationInput>, string, string]>([
+        // one entity
+        ['entity, no value yet', { value: '' }, '', 'Review of an Account and its links'],
+        ['entity, a value, Space unmasked', { value: 'AC-1' }, 'Account AC-1', 'Review of an Account and its links'],
+        ['entity, a value, Space masked', { value: 'AC-1', maskingMode: 'partial' }, 'Account', 'Review of an Account and its links'],
+        ['entity, a value, masking unknown', { value: 'AC-1', maskingMode: null }, 'Account', 'Review of an Account and its links'],
+        ['entity, type not picked', { typeLabel: '', value: 'AC-1' }, 'AC-1', 'Review of an entity and its links'],
+        ['entity, type not picked and masked', { typeLabel: '', value: 'AC-1', maskingMode: 'full' }, 'Entity', 'Review of an entity and its links'],
+        ['entity, consonant type', { typeLabel: 'Party', value: 'P-1' }, 'Party P-1', 'Review of a Party and its links'],
+        ['entity, blank value', { value: '   ' }, '', 'Review of an Account and its links'],
+        // Entity List
+        ['list, none picked', { kind: 'list' }, '', 'Review of the members of an Entity List and their links'],
+        ['list, picked', { kind: 'list', listTitle: ' Watch ' }, 'Members of “Watch”', 'Review of the members of “Watch” and their links'],
+        // pasted values
+        ['paste, none', { kind: 'paste', pasted: 0 }, '', ''],
+        ['paste, one', { kind: 'paste', pasted: 1 }, '1 pasted Account value', 'Review of 1 pasted value and its links'],
+        ['paste, many', { kind: 'paste', pasted: 1234 }, '1,234 pasted Account values', 'Review of 1,234 pasted values and their links'],
+        ['paste, type not picked', { kind: 'paste', pasted: 2, typeLabel: '' }, '2 pasted values', 'Review of 2 pasted values and their links'],
+        // whole Dataset
+        ['dataset, named', { kind: 'dataset' }, 'Calls', 'Review of the links in Calls'],
+        ['dataset, unnamed', { kind: 'dataset', datasetName: '' }, 'Whole Dataset', 'Review of the links in the Dataset'],
+        // graph on screen
+        ['graph, unmasked', { kind: 'graph', graphName: 'ring' }, 'ring', 'Review of the graph on screen'],
+        ['graph, masked', { kind: 'graph', graphName: 'ring', maskingMode: 'partial' }, 'Graph on screen', 'Review of the graph on screen'],
+        ['graph, no name', { kind: 'graph', graphName: '' }, 'Graph on screen', 'Review of the graph on screen'],
+    ])('%s', (_case, over, name, purpose) => {
+        const out = d(over);
+        expect(out).toEqual({ name, purpose });
+        for (const text of [out.name, out.purpose]) if (text) expect(text).not.toMatch(NO_GAPS);
+    });
+
+    it('never puts a raw identifier in the Purpose', () => {
+        expect(d({ value: 'AC-1' }).purpose).not.toContain('AC-1');
     });
 });
