@@ -153,6 +153,7 @@ import {
     activeDomainProfileId,
     domainProfile,
     profileForEntityType,
+    termLabel,
     workingSetOptionsFor,
 } from '@inspecto/link-analysis/graph/domain-profile';
 import { DomainProfileService } from '@inspecto/link-analysis/api/domain-profile.service';
@@ -285,6 +286,7 @@ import { autoStyle } from './auto-style';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
 import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
+import type { ColDef } from 'ag-grid-community';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
@@ -401,6 +403,15 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     }
     const max = Math.max(0, ...deg.values());
     return g.nodes.length >= 8 && max >= g.nodes.length / 2 ? 'force' : 'dagre';
+}
+
+/**
+ * The node card's ID (T-061): the minted id without its `<type>:` prefix, which the card's subtitle already says. Only a
+ * known type prefix is stripped, so a key that itself holds a colon (IPv6, a URN) is shown whole.
+ */
+export function nodeDisplayId(id: string, types: readonly (string | null | undefined)[]): string {
+    const t = types.find((x) => !!x && id.startsWith(`${x}:`));
+    return t ? id.slice(t.length + 1) : id;
 }
 
 /** The bottom dock's tabs (§5.9); `inv` = an Investigation tab. */
@@ -1051,11 +1062,16 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     // ── timeline filter (BACKLOG V2 §3: a time slider filtering edges by a temporal `attrs` column) ──
     /** The `attrs` column to filter on; '' = timeline off. */
     readonly timeColumn = signal('');
-    /** The timeline picker's choices — a blank-valued 'Off' is the named no-column choice, not unset. */
-    readonly timeColumnOptions = computed<PickerOption[]>(() => [
-        { value: '', label: 'Off' },
-        ...this.attrColumns().map((c) => ({ value: c, label: c })),
-    ]);
+    /**
+     * The timeline picker's choices — a blank-valued 'Off' is the named no-column choice, not unset. Only date/time
+     * columns are offered (T-074), plus the column already picked so a restored view keeps its choice.
+     */
+    readonly timeColumnOptions = computed<PickerOption[]>(() => {
+        const g = this.graph();
+        const picked = this.timeColumn();
+        const cols = this.attrColumns().filter((c) => c === picked || (!!g && isTemporalColumn(g, c)));
+        return [{ value: '', label: 'Off' }, ...cols.map((c) => ({ value: c, label: c }))];
+    });
     /**
      * The default event time of a new Investigation: the timeline's column when one is on, else the profile's
      * time hint, else the first edge-attribute column whose every value parses as a date (what the working-set
@@ -1434,10 +1450,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const n = this.canvasData()?.nodes.length ?? 0;
         return GRAPH_LAYOUTS.some((l) => layoutOverCapReason(l.id, n) !== null);
     });
-    /** Why Community hulls are off on this graph: Louvain over its browser cap draws none. */
-    readonly hullsDisabledReason = computed(() =>
-        overCapReason(browserAlgorithmCapValue('louvainCommunities'), this.displayed()?.nodes.length ?? 0),
-    );
+    /** Why Community outlines are off on this graph: Louvain over its browser cap draws none. A sentence, shown as is. */
+    readonly hullsDisabledReason = computed(() => {
+        const why = overCapReason(browserAlgorithmCapValue('louvainCommunities'), this.displayed()?.nodes.length ?? 0);
+        return why ? `${why.charAt(0).toUpperCase()}${why.slice(1)}.` : null;
+    });
     /**
      * "Reduce first" (§5.7): cut the graph under a cap with Clean up, the Filter editor (the dock's Rows tab, whichever
      * tab was showing) or Collapse of the selection.
@@ -1546,6 +1563,30 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             // no registry in this host: the legend keeps the pack's term, else the id
         }
     });
+    /** The Entity Type a generic `entity` node stands for: the last run's one mapped type, else null (T-061). */
+    private readonly genericEntityType = computed<string | null>(() => {
+        const types = new Set(
+            this.brushEntityTypes().flatMap((m) => (m ? [m.entityType, m.sourceType, m.targetType] : [])).filter((t): t is string => !!t),
+        );
+        return types.size === 1 ? [...types][0] : null;
+    });
+    /** Node kind → the name shown for it (legend, filters, display options, node card): the registry label, else the pack's term. */
+    readonly kindLabels = computed<Record<string, string>>(() => {
+        const labels = this.entityTypeLabels();
+        const t = this.genericEntityType();
+        return t ? { ...labels, entity: labels[t] || this.kindLabelOf(t, labels) } : labels;
+    });
+    private kindLabelOf(kind: string, labels: Record<string, string>): string {
+        return labels[kind] || termLabel(domainProfile(activeDomainProfileId()), `entity_type.${kind}`, kind);
+    }
+    /** What a node kind is called on screen: the same text as the legend. */
+    kindLabel(kind: string): string {
+        return this.kindLabelOf(kind, this.kindLabels());
+    }
+    /** What a link kind is called on screen (the pack's `link_kind.<kind>` term, else the kind): the same text as the legend (T-060). */
+    linkKindLabel(kind: string): string {
+        return termLabel(domainProfile(activeDomainProfileId()), `link_kind.${kind}`, kind || 'unlabelled');
+    }
     /** Drawn Working Set entities flagged high connectivity — the legend's ringed-node row. */
     readonly hubsDrawn = computed(
         () => this.investigation.canvas()?.nodes.filter((n) => n.data.highConnectivity).length ?? 0,
@@ -1598,8 +1639,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const shown = groups.slice(0, 3).map((g) => g.spellings.join(' / '));
         const rest = groups.length - shown.length;
         return (
-            'These spellings differ only by case, spacing or trailing punctuation, so they are counted as ONE ' +
-            'entity in degree, communities and every ranking — check they really are the same: ' +
+            'These spellings differ only by case, spacing or punctuation and count as one entity. ' +
+            'Check they are the same: ' +
             shown.join('; ') +
             (rest > 0 ? `; and ${rest} more` : '')
         );
@@ -1616,7 +1657,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 .filter((n) => !match || match.has(n.id))
                 .map((n) => ({
                     label: n.data.label,
-                    kind: n.data.kind,
+                    kind: this.kindLabel(n.data.kind),
                     links: g.edges.filter((e) => e.source === n.id || e.target === n.id).length,
                     id: n.id,
                 }));
@@ -1626,12 +1667,25 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             .filter((e) => !match || match.has(e.source) || match.has(e.target))
             .map((e) => ({
                 source: label(e.source),
-                relationship: baseEdgeKind(e.data.kind),
+                relationship: this.linkKindLabel(baseEdgeKind(e.data.kind)),
                 target: label(e.target),
                 rows: (e.data as { count?: number }).count ?? 1,
                 id: e.id,
             }));
     });
+    /** The links table's columns in plain words (T-070); the row keeps its `id` for the row click, never shown. */
+    readonly linkTableColumns: ColDef[] = [
+        { field: 'source', headerName: 'From' },
+        { field: 'relationship', headerName: 'Link kind' },
+        { field: 'target', headerName: 'To' },
+        { field: 'rows', headerName: 'Count', type: 'rightAligned' },
+    ];
+    /** The nodes table's columns, likewise without the internal id. */
+    readonly nodeTableColumns: ColDef[] = [
+        { field: 'label', headerName: 'Name' },
+        { field: 'kind', headerName: 'Entity Type' },
+        { field: 'links', headerName: 'Links', type: 'rightAligned' },
+    ];
     readonly nodeOptions = computed(() => {
         // What the canvas draws: over an Investigation that is its Working Set, whose ids the server run maps (serverIds).
         const g = this.canvasData();
@@ -2696,7 +2750,7 @@ Its prior copies stay in its version history.`,
             // The nav entry is hidden on the same flag; this is the belt for a bookmarked/deep-linked URL.
             this.loadError.set(
                 (err as { status?: number } | null)?.status === 503
-                    ? 'Link analysis is not available in this edition — its backend module is not installed in this bundle.'
+                    ? 'Link Analysis is not part of this edition.'
                     : err instanceof Error
                       ? err.message
                       : invErrorMessage(err, 'The graph query failed.'),
@@ -2950,7 +3004,7 @@ Its prior copies stay in its version history.`,
         if (this.attachUnavailable()) return;
         const data = this.snapshotData();
         if (!data) {
-            this.toastr.info('There is nothing on the canvas to attach yet — run a query or open an Investigation.');
+            this.toastr.info('Nothing to attach: draw a graph or open an Investigation.');
             return;
         }
         this.dialog
@@ -2982,7 +3036,7 @@ Its prior copies stay in its version history.`,
         const p = this.lastRun()?.query.projection;
         const dataset = p && this.datasets().find((d) => d.id === p.datasetId);
         if (!p || !dataset) {
-            this.toastr.info('Advanced search needs a single-Dataset projection to be loaded first.');
+            this.toastr.info('Advanced search needs a graph drawn from one Dataset.');
             return;
         }
         const data: LinkAnalysisAdvancedSearchData = { dataset, projection: p };
@@ -3223,7 +3277,7 @@ Its prior copies stay in its version history.`,
 
     private fullscreenBlocked(): void {
         this.toastr.warning(
-            'Full screen was blocked by the browser (an embedded page may not be allowed to go full screen).',
+            'The browser blocked full screen.',
             'Full screen',
         );
     }
@@ -3650,9 +3704,12 @@ Its prior copies stay in its version history.`,
                 width: '36rem',
                 data: {
                     title: node.data.label,
-                    subtitle: node.data.kind,
+                    subtitle: this.kindLabel(node.data.kind),
                     rows: [
-                        { label: 'ID', value: id },
+                        {
+                            label: 'ID',
+                            value: nodeDisplayId(id, [node.data.kind, node.data.entityType, this.genericEntityType()]),
+                        },
                         {
                             label: 'Links',
                             value: `${outgoing.length + incoming.length} (${outgoing.length} out · ${incoming.length} in)`,
@@ -3937,11 +3994,11 @@ Its prior copies stay in its version history.`,
                 width: '28rem',
                 data: {
                     title: `${this.labelOf(edge.source)} → ${this.labelOf(edge.target)}`,
-                    subtitle: baseEdgeKind(edge.data.kind),
+                    subtitle: this.linkKindLabel(baseEdgeKind(edge.data.kind)),
                     rows: [
                         { label: 'From', value: this.labelOf(edge.source) },
                         { label: 'To', value: this.labelOf(edge.target) },
-                        { label: 'Relationship', value: baseEdgeKind(edge.data.kind) },
+                        { label: 'Link kind', value: this.linkKindLabel(baseEdgeKind(edge.data.kind)) },
                         ...(count ? [{ label: 'Folded rows', value: String(count) }] : []),
                         { label: 'ID', value: id },
                     ],

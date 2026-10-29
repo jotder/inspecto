@@ -6,7 +6,7 @@ import { LensService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { NewEntityTypeComponent } from '@inspecto/link-analysis/entities/new-entity-type.component';
-import { settingsBodyWithTypes } from '@inspecto/link-analysis/entities/entity-columns';
+import { NORMALISER_OPTIONS, settingsBodyWithTypes } from '@inspecto/link-analysis/entities/entity-columns';
 import { LinkAnalysisLimits, LinkAnalysisSettingsService } from './link-analysis-settings.service';
 
 /**
@@ -27,7 +27,7 @@ import { LinkAnalysisLimits, LinkAnalysisSettingsService } from './link-analysis
                     <li class="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm" style="border-color: var(--gamma-border)">
                         <span class="font-medium">{{ t.label || t.id }}</span>
                         <code class="text-secondary text-xs">{{ t.id }}</code>
-                        <span class="text-secondary text-xs">· {{ t.normaliser }}{{ t.masked ? ' · masked' : '' }}</span>
+                        <span class="text-secondary text-xs">· {{ normaliserLabel(t.normaliser) }}{{ t.masked ? ' · masked' : '' }}</span>
                         @if (canEdit()) {
                             <button
                                 mat-button
@@ -66,6 +66,10 @@ import { LinkAnalysisLimits, LinkAnalysisSettingsService } from './link-analysis
     `,
 })
 export class LinkAnalysisEntityTypesComponent {
+    /** How values are compared, in the same plain words as the New Entity Type form (T-190); never the normaliser id. */
+    normaliserLabel(id: string | undefined): string {
+        return NORMALISER_OPTIONS.find((o) => o.value === (id || 'default'))?.label ?? id ?? '';
+    }
     private readonly settings = inject(LinkAnalysisSettingsService);
     private readonly confirm = inject(InspectoConfirmService);
     private readonly lens = inject(LensService);

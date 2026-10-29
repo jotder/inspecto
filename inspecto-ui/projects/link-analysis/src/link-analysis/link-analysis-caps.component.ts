@@ -15,7 +15,7 @@ import { MatButtonModule } from '@angular/material/button';
     imports: [MatButtonModule],
     template: `
         <button mat-button data-testid="caps-toggle" (click)="open.set(!open())" [attr.aria-expanded]="open()">
-            Caps
+            Limits
         </button>
         @if (open()) {
             <!-- Opens upward over the canvas: an opaque card above the footer, or the graph labels bleed through. -->
@@ -24,13 +24,13 @@ import { MatButtonModule } from '@angular/material/button';
                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                 data-testid="caps-list"
                 role="group"
-                aria-label="Node caps in force"
+                aria-label="Node limits in force"
             >
                 <ul class="m-0 flex list-none flex-col gap-1 p-0">
-                    <li>Projection: {{ projection() }} nodes (server)</li>
-                    <li>Analysis: {{ analysis() }} nodes (browser)</li>
+                    <li>Graph drawn: up to {{ projection().toLocaleString('en') }} nodes</li>
+                    <li>On screen tools: up to {{ analysis().toLocaleString('en') }} nodes</li>
                     @if (graphRun(); as ceiling) {
-                        <li>Graph run: {{ ceiling }} nodes (server)</li>
+                        <li>Whole Dataset tools: up to {{ ceiling.toLocaleString('en') }} nodes</li>
                     }
                 </ul>
             </div>

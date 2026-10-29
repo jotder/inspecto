@@ -375,7 +375,7 @@ describe('LinkViewWidgetComponent — the Space limits', () => {
         const display = stub.display() as GraphDisplayOptions;
         expect(display.layoutCaps).toEqual({ radial: 100, mds: 300, 'force-cluster': 200 });
         expect(fixture.nativeElement.querySelector('[data-testid="la-layout-cap-notice"]')?.textContent).toContain(
-            'Radial layout needs at most 100 nodes — this graph has 101, so the default layout is shown.',
+            'Radial layout needs at most 100 nodes (this graph has 101), so the default layout is shown.',
         );
         expect(stub.layout()).toBeNull(); // the graph view's default layout, never the over-cap Radial
     });

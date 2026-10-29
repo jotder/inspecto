@@ -71,6 +71,12 @@ describe('LinkAnalysisEntityTypesComponent (⚙ Settings → Entity Types, sweep
         expect(refused.el.querySelector('inspecto-alert')).not.toBeNull();
     });
 
+    it('says how values are compared in plain words, never the normaliser id (T-190)', () => {
+        const { el } = make();
+        expect(el.textContent).toContain('Upper case, spaces trimmed');
+        expect(el.textContent).not.toContain('upper-trim');
+    });
+
     it('without the right to change settings there is no New or Retire', () => {
         const { el } = make({ canEdit: false });
         expect(el.querySelector('[data-testid="la-entity-type-new"]')).toBeNull();

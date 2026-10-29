@@ -385,7 +385,20 @@ describe('LinkAnalysisQueryPanelComponent - starting guidance (operator 2026-10-
         expect(options.map((o) => o.value)).toEqual(['mule_transfers_dataset', 'maintenance_backups']);
         expect(options[0].hint).toContain('PAYER_ACCOUNT and PAYEE_ACCOUNT look like the two ends of a link');
         expect(options[0].hint).toContain('Columns: TXN_ID, PAYER_ACCOUNT, PAYEE_ACCOUNT, AMOUNT');
-        expect(options[1].hint).toContain('No obvious from/to column pair');
+        expect(options[1].hint).not.toContain('from/to');
+        expect(options.map((o) => o.group)).toEqual([undefined, 'Not link-shaped']); // T-171: one heading, not a line per row
+    });
+
+    it('a Dataset whose columns are not read yet is "Not checked yet", never filed as not link-shaped (T-171)', () => {
+        const m = make('entity-projection');
+        m.fixture.componentRef.setInput('datasets', [...DATASETS, { id: 'unread', name: 'unread', sourceName: 'u' }]);
+        m.fixture.detectChanges();
+        const options = m.c.datasetOptions();
+        expect(options.map((o) => [o.value, o.group])).toEqual([
+            ['mule_transfers_dataset', undefined],
+            ['maintenance_backups', 'Not link-shaped'],
+            ['unread', 'Not checked yet'],
+        ]);
     });
 
     it('picking a Dataset pre-fills Source and Target (editable), so the query is ready to run', async () => {

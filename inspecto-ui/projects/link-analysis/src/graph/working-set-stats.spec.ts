@@ -36,9 +36,16 @@ describe('workingSetStats', () => {
             ['Nodes', '2 / 3'],
             ['Links', '1 / 2'],
             ['Folded rows', '3'],
-            ['Σ amount', '1.5K'],
-            ['booked_at', '2026-01-04 → 2026-01-04'],
+            ['Total amount', '1.5K'],
+            ['Time span', '2026-01-04 → 2026-01-04'],
         ]);
+    });
+
+    it('leaves folded rows out when each link is one row: it would repeat the links count under a second name', () => {
+        const one = { ...FULL, edges: FULL.edges.map((e) => ({ ...e, data: { ...e.data, count: 1 } })) } as G6GraphData;
+        const labels = workingSetStats(one, one, { labels: { links: 'Transfers', rows: 'Wallet transactions' } }).map((s) => s.label);
+        expect(labels).toContain('Transfers');
+        expect(labels).not.toContain('Wallet transactions');
     });
 
     it('collapses the ratio when everything is shown, and honours profile labels and columns', () => {
@@ -49,8 +56,8 @@ describe('workingSetStats', () => {
         });
         expect(stats[0]).toMatchObject({ label: 'Accounts', value: '3' });
         expect(stats[1]).toMatchObject({ label: 'Transfers', value: '2' });
-        expect(stats.find((s) => s.label === 'Σ amount')?.value).toBe('2K');
-        expect(stats.find((s) => s.label === 'booked_at')?.value).toBe('2026-01-04 → 2026-03-31');
+        expect(stats.find((s) => s.label === 'Total amount')?.value).toBe('2K');
+        expect(stats.find((s) => s.label === 'Time span')?.value).toBe('2026-01-04 → 2026-03-31');
     });
 
     it('never sums identifiers: long digit strings (IMEI, MSISDN) or leading-zero codes are not measures', () => {
@@ -74,7 +81,7 @@ describe('workingSetStats', () => {
         expect(isNumericColumn(ids, 'via')).toBe(false);
         expect(isNumericColumn(ids, 'code')).toBe(false);
         expect(isNumericColumn(ids, 'events')).toBe(true);
-        expect(workingSetStats(ids, ids).map((s) => s.label)).toEqual(['Nodes', 'Links', 'Σ events']);
+        expect(workingSetStats(ids, ids).map((s) => s.label)).toEqual(['Nodes', 'Links', 'Total events']);
     });
 
     it('is empty without a loaded graph', () => {

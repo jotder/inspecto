@@ -1,6 +1,10 @@
 # Link Analysis UI text pass (LA-UI-TEXT-PASS-1)
 
-**Status:** ACTIVE 2026-10-29. The first fix pass has shipped in three lanes: T1 `5b4f7c339` + `750713ff7`, T2 `466a15c7b` + `1a6b7eac2`, T3 `25e59534b` + `f3b8fa108`. Each lane passed an independent review.
+**Status:** SHIPPED 2026-10-29, archived. Two passes, each lane independently reviewed:
+- Pass 1: T1 `5b4f7c339` + `750713ff7`, T2 `466a15c7b` + `1a6b7eac2`, T3 `25e59534b` + `f3b8fa108` + `a230939cb`.
+- Pass 2: P1 `919535143` + `5e6b9da1f`, P2 `81622e263`.
+
+The few items still open moved to `docs/BACKLOG.md` row `LA-UI-TEXT-RESIDUALS-1`. The as-built vocabulary is in the la-core user guide.
 
 **Operator decisions (2026-10-29):**
 - All G decisions are accepted.
@@ -13,9 +17,13 @@
 - About shows hand-written definitions. A cut-off glossary line shows "No definition found." and is never passed off as a full sentence.
 - 403s map to true reasons (`refusal403`).
 
-**Left (fix next):**
-- **M/L rows not yet reached:** T-028, T-045, T-056–061, T-064, T-065, T-067, T-070, T-074, T-075, T-077, T-079, T-080, T-082, T-083, T-152–155, T-170, T-171 (per-row line), T-178, T-179, T-185–187, T-190, T-193, T-196–198, T-209.
+**Left (moved to `LA-UI-TEXT-RESIDUALS-1`):**
+- **M/L rows still open** (pass 2 fixed or confirmed the rest, including T-001/002, T-118 and T-129):
+  - T-028: no repro in code. A Dataset's own primary or link-end type is already the default; other types are marked. Needs a live repro on the Dataset that showed it.
+  - T-083 (part): module ids are now a tooltip only. A plain name such as "Link Analysis storage" is the server's module `title`.
+  - T-186 (part): the Investigation list carries the owner's login id, not a display name. Needs a server field.
 - **Residuals:**
+  - The four-eyes refusal ("Narrow the read" on the server; "This read needs a second person's approval" in the UI) also guards non-reads: analyst upload, identity import and graph runs. It should say "step", not "read".
   - The glossary row for Graph Run cleans badly; nothing asks for it today.
   - The root cause is backend: `GlossaryLoader` parses the first line only. That is `INTELLIGENCE-GLOSSARY-ANNOTATED-1`; Data browser and Catalog now show "No definition found." for Dataset and Table until it is fixed.
 

@@ -187,6 +187,25 @@ describe('OptionPickerDialog', () => {
         expect(fixture.nativeElement.querySelector('[data-testid="picker-empty"]')?.textContent?.trim()).toBe('No options');
     });
 
+    it('puts a run of grouped options in one named role="group", so assistive tech announces the group (T-171)', async () => {
+        const { fixture } = createDialog([
+            { value: 'a', label: 'A' },
+            { value: 'b', label: 'B', group: 'Not link-shaped' },
+            { value: 'c', label: 'C', group: 'Not link-shaped' },
+        ]);
+        const el = fixture.nativeElement as HTMLElement;
+        const groups = el.querySelectorAll('[role="listbox"] [role="group"]');
+        expect(groups.length).toBe(1);
+        // in the accessibility tree: a named group, not hidden, holding exactly its own options
+        expect(groups[0].getAttribute('aria-label')).toBe('Not link-shaped');
+        expect(groups[0].closest('[aria-hidden="true"]')).toBeNull();
+        expect(Array.from(groups[0].querySelectorAll('[role="option"]')).map((o) => o.textContent!.trim())).toEqual(['B', 'C']);
+        expect(el.querySelector('[role="listbox"] > div:not([role]) [role="option"]')?.textContent?.trim()).toBe('A');
+        // the drawn heading is shown once and not read twice
+        expect(groups[0].querySelector('[aria-hidden="true"]')?.textContent?.trim()).toBe('Not link-shaped');
+        await expectNoA11yViolations(el);
+    });
+
     it('a non-empty choice list keeps the listbox role', () => {
         const { fixture } = createDialog(OPTIONS);
         expect(fixture.nativeElement.querySelector('[role="listbox"] button[role="option"]')).toBeTruthy();

@@ -229,7 +229,7 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
 * **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus,
   with an Investigation open, **Step log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
   entities**. Drag its edge to resize; it remembers its tab and height in this browser.
-* **Status bar:** **Caps**, the graph-model chips (Dataset, Mapping, Link type, Attributes — click one, or the pencil,
+* **Status bar:** **Limits**, the graph-model chips (Dataset, Mapping, Link type, Attributes — click one, or the pencil,
   to open ⚙ Settings ▸ Graph model), **Refresh** (runs the same graph model again), the counts and **Installed
   modules** (each Link Analysis module and whether it is active, inert with the reason, switched off, or not
   installed).
@@ -245,7 +245,7 @@ last section in this browser. Running the graph model closes it; closing it over
 | Group | Sections |
 |---|---|
 | **This graph** | **Graph model** (Dataset, the two entity columns, link type, mappings, attribute columns, root, depth and direction; **Run query** and **Refresh** at the foot; the Space's Industry pack is shown read-only at the top) · **Entity Types** (the types the graph is drawn as, **New Entity Type**, **Retire**) · **Display rules** (node colour rules by attribute) |
-| **Data** | **Entity Lists** · **Identities** (identity resolution) · **Add / Upload data** (upload a CSV to an upload-enabled Collector) |
+| **Data** | **Entity Lists** · **Identities** (identity resolution) · **Add data** (upload a CSV to a Collector that accepts uploads) |
 | **This Investigation** (only while one is open) | **Investigation settings**: Case, Members, Share and embed, Drafts, Replay and drift, Pin to a Widget, Oversight and approvals, Measures and templates, Dossier, References |
 
 **Industry pack, not a profile picker.** The words and suggested tools follow the Space's Industry pack (Telecom:
@@ -321,8 +321,8 @@ Conditions are a tree of AND/OR groups; a single bare condition is refused — w
 ### 5.4 Size limits — told honestly
 
 * By default the server returns at most **4 000 links** (ceiling 40 000), the canvas admits **1 000 nodes**, and
-  analysis in the browser runs up to **2 500 nodes** (heavier scores stop sooner and say so). **Caps** in the status
-  bar shows the caps in force. Every number is a setting ([§15](#15-limits-and-honest-behaviour)).
+  analysis in the browser runs up to **2 500 nodes** (heavier scores stop sooner and say so). **Limits** in the status
+  bar shows the node limits in force: *Graph drawn*, *On screen tools* and *Whole Dataset tools*. Every number is a setting ([§15](#15-limits-and-honest-behaviour)).
 * When a cap cuts data you see **Truncated** — never a silent "no results". Narrow the query or use the Server side
   of the catalogue.
 * Each server read says where it was answered: *Answered from the link index v3* (with a stale note when rows were
@@ -339,22 +339,24 @@ Conditions are a tree of AND/OR groups; a single bare condition is refused — w
 | A particular node | **Search nodes**; **Clear search and filters** resets |
 | Only some kinds of node | **Filter node types**, or the legend's chips |
 | A better layout | **Graph layout** |
-| Links in a time range | **Filter edges by time** (Timeline filter / Timeline cutoff); needs a time column among the Attribute columns |
+| Links in a time range | **Filter links by time**: pick a time column (only date/time columns are listed), then drag the cutoff; times are UTC. Needs a time column among the Attribute columns |
 | The rows behind the picture | **Show as list**, or the dock's **Rows** tab (**Show the rows**) |
 | The same entities on a map | Geo Map: selecting an area there highlights the matching entities here, and back |
 
 **Layouts.** *Layered, Grid, Force, Clustering force, Radial, Degree ordered, Circular, Information density,
-Fruchterman*, and tree layouts (*Mind map, Organization chart…*) enabled only when the data is tree-shaped.
-**Layered is disabled, with the reason, on a wide shallow graph** (more than 60 nodes would share one rank — say 300
+Force (spread)*, and tree layouts (*Mind map, Organisation chart…*) enabled only when the data is tree-shaped.
+**Layered is disabled, with the reason, on a wide shallow graph** (*too wide*: more than 60 nodes would share one row — say 300
 claims under 20 providers — which it would stack into one column too tall to fit); use *Force*. A saved view that
 picked Layered opens in the default layout then.
 
-**Display options** (the brush) switch node and link labels, colours, shapes, node size and spacing, **Snap lines** and
-**Hover activate**, and the overlays: **Legend**, **Working set**, **Level of detail**, **Minimap**, **Grid**,
-**Community hulls**, **Group lone counterparties**, **Bubble sets** and **Link bundling**. Colour rules by attribute
+**Display options** (the brush) switch node and link labels, colours, shapes, node size and spacing, **Align while
+dragging** and **Highlight on hover**, and the overlays: **Legend**, **Graph counts**, **Level of detail**, **Minimap**,
+**Grid**, **Community outlines**, **Group single-link neighbours**, **Community shading** and **Link bundling**. Every
+link kind and Entity Type is named as the legend names it, here, in the node-type filter, the links table and the node
+card. Colour rules by attribute
 are in **⚙ Settings ▸ Display rules**. On a canvas narrower than 1,000 px the legend and Working set start as small
-pills. A layout or overlay the graph is too big for is greyed out and says why (*needs at most 300 nodes — this graph
-has 921*); reduce the graph first with Clean up, a filter or Collapse. The legend's link-kind chips change the
+pills. A layout or overlay the graph is too big for is greyed out and says why (*needs at most 300 nodes (this graph
+has 921)*); reduce the graph first with Clean up, a filter or Collapse. The legend's link-kind chips change the
 drawing only — a hidden kind is still followed by the next expand; to leave it out, set link kinds in **Expand…** ▸
 **Advanced** (that is recorded).
 
@@ -435,7 +437,7 @@ inside an Investigation: nothing is recorded and the Working Set does not change
 
 ### 7.4 Clean up
 
-**Clean up** (the broom) offers **Keep paths between seeds** (keep the seeds and every node on a path of at most *L*
+**Clean up** (the broom) offers **Keep paths between start entities** (keep them and every node on a path of at most *L*
 links between two of them), **Highlight shortest paths** (glow, nothing removed; **Esc** clears), **Trim dangling
 leaves**, **Keep only selected** and **Remove selected**. Each first says what it would do (*hides 16 of 112
 entities*) with **Apply** / **Cancel**. While exploring it hides with Undo; in an Investigation it is recorded as a
@@ -746,11 +748,11 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 
 1. **File ▸ Save snapshot…** freezes the screen as a **snapshot** with a SHA-256 fingerprint. A *saved view*
    re-reads live data; a *snapshot* does not change.
-2. **Build dossier** (⚙ ▸ Investigation settings ▸ Dossier): summary and topology, a ledger of every step with who
+2. **Build Dossier** (⚙ ▸ Investigation settings ▸ Dossier): summary and topology, a ledger of every step with who
    and why, exclusions, score tables and a **SHA-256 manifest**. Download the *steps* and *method* statements or the
    JSON. Masked ids stay masked, even inside free-text reasons.
-3. **Verify this manifest** reports anything **changed, missing or added** since.
-4. **Download sealed bundle** — one file for someone outside the system (Dossier + references + a seal); *Verify a
+3. **Verify this Dossier** reports anything **changed, missing or added** since.
+4. **Download Dossier (sealed)** — one file for someone outside the system (Dossier + references + a seal); *Verify a
    bundle…* fails an edited file (*edited after export*).
 5. **Compare and seal** (More steps ▾ ▸ Compare) compares two windows and seals the difference as a step.
 6. **References** — pointers to records in other systems (system, type, id, optional URL); shown as text, never
@@ -760,7 +762,8 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 
 * **Case:** an Investigation is yours by default. **Link to Case** lets the owner or assignee of that open Case
   *read* it until the Case closes. *Shared through Case … (read-only)* marks such a row in File ▸ Open….
-* **Pin to a Widget** puts a Working Set on a Dashboard: **Frozen** (as of a pinned step, the default) or **Live**.
+* **Pin to a Widget** puts a Working Set on a Dashboard: **Show** picks which of its rows; **Frozen** (as of a pinned
+  step, the default) or **Live**.
   Only readers of the Investigation see data; others see *Not available to you*.
 * **Share and embed** gives someone without an account a **read-only, sealed view** through a link (served at
   `/embed/inv/<token>` by the console and by Inspecto LA). Off unless the host enables embedding; minting needs the
@@ -791,8 +794,8 @@ the hub in the top decile. **Pattern match ▸ Structuring (smurfing)** finds `M
 payers. **Value Measures ▸ Pass-through** flags 13 accounts (the two relays at ≈ 0.985, the hub at 0.979, `SHELL-A`
 above 1); **Velocity** shows them forwarding within hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub).
 **Start an Investigation from the top results**, state your purpose, expand one degree; **File ▸ Save snapshot…**
-▸ *create a new Case from graph nodes*, tick the hub and relays; **Build dossier**, **Verify this manifest**, and send
-the sealed bundle to the reviewer.
+▸ *create a new Case from graph nodes*, tick the hub and relays; **Build Dossier**, **Verify this Dossier**, and send
+the sealed Dossier to the reviewer.
 
 **Find the cash-out point.** **Value Measures ▸ Cash-out concentration** with cash-out kind `cash_out`: `TILL-06` holds
 97 % of cash-out value from 8 payers (reproduced by `ControlApiLaShowcaseFiguresTest`). **Benefit transfer** isolates

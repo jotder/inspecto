@@ -174,6 +174,14 @@ export class DataTableComponent {
     /** Extra classes per row (e.g. a band tint) — the caller owns the meaning and its non-colour cue. */
     readonly rowClass = input<((row: unknown) => string | undefined) | undefined>(undefined);
     readonly rowClassFn = (p: { data?: unknown }): string | undefined => this.rowClass()?.(p.data);
+    /** The pager's words in sentence case (R4): AG Grid's defaults are "First Page", "Page Size:". */
+    readonly localeText: Record<string, string> = {
+        firstPage: 'First page',
+        previousPage: 'Previous page',
+        nextPage: 'Next page',
+        lastPage: 'Last page',
+        pageSizeSelectorLabel: 'Page size',
+    };
     /**
      * A FIXED grid height (e.g. `'15rem'`) — only for hosts whose layout needs a stable box (a docked
      * bottom panel under a map/graph). Omitted ⇒ the grid sizes to its rows (`domLayout: 'autoHeight'`):

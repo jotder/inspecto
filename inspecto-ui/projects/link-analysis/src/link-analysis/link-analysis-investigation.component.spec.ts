@@ -454,7 +454,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await openInv(store);
         fixture.detectChanges();
         const section = el.querySelector('[aria-label="Pin to a Widget"]') as HTMLElement;
-        expect(section.textContent).toContain('a Live Widget cannot leave this Space');
+        expect(section.textContent).toMatch(/follows the Investigation and stays\s+in this Space/);
         await expectNoA11yViolations(el);
 
         button('Save Widget').click(); // no name yet

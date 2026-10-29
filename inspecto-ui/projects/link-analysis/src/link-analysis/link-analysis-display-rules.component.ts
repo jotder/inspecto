@@ -17,7 +17,7 @@ import { NODE_RULE_OPS, NodeRule, NodeRuleOp, describeNodeRule } from '@inspecto
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule],
     template: `
-        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Conditional formatting</span>
+        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Display rules</span>
         @for (r of rules(); track $index) {
             <div class="flex items-center gap-1.5">
                 <span class="h-4 w-4 shrink-0 rounded-full border" [style.background]="r.color"></span>
@@ -27,15 +27,14 @@ import { NODE_RULE_OPS, NodeRule, NodeRuleOp, describeNodeRule } from '@inspecto
                     type="button"
                     class="!h-6 !w-6"
                     (click)="remove($index)"
-                    [attr.aria-label]="'Remove the rule ' + describe(r)"
+                    [attr.aria-label]="'Remove the display rule ' + describe(r)"
                 >
                     <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
                 </button>
             </div>
         } @empty {
             <span class="text-secondary text-xs">
-                No rules. Colour the nodes whose attribute meets a condition; the first matching rule wins and
-                outranks the per-type colour.
+                No display rules yet. Add one to colour nodes by an attribute.
             </span>
         }
         @if (attributes().length === 0) {

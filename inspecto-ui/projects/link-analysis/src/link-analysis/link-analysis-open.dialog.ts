@@ -13,6 +13,7 @@ import { ComponentsService, TagsService, apiErrorMessage } from '@inspecto/core/
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InvService, InvestigationListItem } from '@inspecto/link-analysis/api/inv.service';
+import { needsPermission } from './disabled-reasons';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
 
@@ -280,7 +281,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                 <dt class="text-secondary">Owner</dt><dd class="m-0">Not recorded for a saved view</dd>
                                 <dt class="text-secondary">Last changed</dt><dd class="m-0">{{ when(r.modified) }}</dd>
                                 <dt class="text-secondary">Investigations</dt><dd class="m-0">{{ r.view.investigations?.length ?? 0 }}</dd>
-                                <dt class="text-secondary">Pack</dt><dd class="m-0">{{ r.view.profile || 'generic' }}</dd>
+                                <dt class="text-secondary">Industry pack</dt><dd class="m-0">{{ r.view.profile || 'Generic' }}</dd>
                             </dl>
                             <p class="text-secondary m-0 text-xs leading-snug" data-testid="la-open-not-evidence">
                                 <span class="text-warn font-semibold">Not evidence:</span> {{ notEvidence }}
@@ -318,12 +319,23 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                 <dt class="text-secondary">Owner</dt><dd class="m-0">{{ r.owner || '—' }}</dd>
                                 <dt class="text-secondary">Created</dt><dd class="m-0">{{ when(r.changed) }}</dd>
                                 <dt class="text-secondary">Linked Case</dt><dd class="m-0">{{ r.caseRef || '—' }}{{ r.readOnly ? ' (read-only)' : '' }}</dd>
-                                <dt class="text-secondary">Pack</dt><dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
+                                <dt class="text-secondary">Industry pack</dt><dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
                             </dl>
                             <div class="flex flex-wrap gap-1">
                                 <button mat-flat-button color="primary" (click)="openInvestigation(r)" data-testid="la-open-open">Open</button>
-                                @if (data.canDeleteInvestigations && !r.readOnly && r.listed) {
-                                    <button mat-button (click)="deleteInvestigation(r)" [disabled]="busy()">Delete</button>
+                                @if (r.listed) {
+                                    <!-- T-170: shown when it cannot act, disabled with the reason (the wrapper carries the tooltip) -->
+                                    <span class="inline-flex" [matTooltip]="investigationDeleteBlock(r)">
+                                        <button
+                                            mat-button
+                                            (click)="deleteInvestigation(r)"
+                                            [disabled]="busy() || !!investigationDeleteBlock(r)"
+                                            [attr.aria-label]="investigationDeleteBlock(r) ? 'Delete: ' + investigationDeleteBlock(r) : null"
+                                            data-testid="la-open-inv-delete"
+                                        >
+                                            Delete
+                                        </button>
+                                    </span>
                                 }
                             </div>
                         } @else {
@@ -386,8 +398,11 @@ export class LinkAnalysisOpenDialog {
     readonly selectedInvestigationId = signal<string | null>(null);
 
     readonly datasetOf = viewDataset;
+    /** One format and one zone, labelled, as in the step log (T-186). */
     when(iso: string | null): string {
-        return iso ? iso.slice(0, 16).replace('T', ' ') : '—';
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return isNaN(d.getTime()) ? iso : `${d.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
     }
 
     readonly viewRows = computed(() => {
@@ -565,6 +580,12 @@ export class LinkAnalysisOpenDialog {
     /** Why this view cannot be renamed in place here; '' = it can. */
     editBlock(view: LinkAnalysisView): string {
         return this.data.viewSaveBlock || (this.data.viewEditBlock?.(view) ?? '');
+    }
+
+    /** Why this Investigation cannot be deleted here; '' = it can. */
+    investigationDeleteBlock(r: OpenInvestigationRow): string {
+        if (!this.data.canDeleteInvestigations) return needsPermission('Incident management');
+        return r.readOnly ? 'Only the owner can delete.' : '';
     }
 
     /** Why this view cannot be deleted here; '' = it can. */

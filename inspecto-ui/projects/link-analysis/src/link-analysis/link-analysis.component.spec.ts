@@ -31,7 +31,7 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
+import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, nodeDisplayId, snapshotTitle } from './link-analysis.component';
 import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
 import { GRAPH_CACHE_TTL_MS, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { SpacesService } from '@inspecto/core/api';
@@ -239,6 +239,15 @@ installDomainProfiles(
 // ...and hands the registry back empty, so a later spec in the same worker does not inherit these packs.
 afterAll(() => installDomainProfiles([], null));
 
+describe('nodeDisplayId (T-061 node card ID)', () => {
+    it('strips only a known type prefix, so a key that holds a colon survives whole', () => {
+        expect(nodeDisplayId('party:p-17', ['entity', 'party'])).toBe('p-17');
+        expect(nodeDisplayId('entity:2001:db8::1', ['entity'])).toBe('2001:db8::1');
+        expect(nodeDisplayId('urn:isbn:0451450523', ['entity', 'party'])).toBe('urn:isbn:0451450523');
+        expect(nodeDisplayId('plain', ['entity', null, undefined])).toBe('plain');
+    });
+});
+
 describe('LinkAnalysisComponent', () => {
     it('renders the empty state, is a11y-clean, and validates the mapping before querying', async () => {
         const { fixture, queried } = create();
@@ -309,6 +318,33 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture); // a fresh query resets the timeline like the other presentation filters
         expect(c.timeColumn()).toBe('');
         expect(c.timeCutoff()).toBeNull();
+    });
+
+    it('the rows table names its columns in plain words and never shows the internal id (T-070)', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        expect(c.linkTableColumns.map((col) => col.headerName)).toEqual(['From', 'Link kind', 'To', 'Count']);
+        expect(c.nodeTableColumns.map((col) => col.headerName)).toEqual(['Name', 'Entity Type', 'Links']);
+        expect([...c.linkTableColumns, ...c.nodeTableColumns].some((col) => col.field === 'id')).toBe(false);
+        // a kind the Industry pack does not relabel shows as the legend shows it: as sent
+        expect(c.linkKindLabel('p2p')).toBe('p2p');
+        expect(c.linkKindLabel('')).toBe('unlabelled');
+    });
+
+    it('timeline: the picker offers only date/time columns (T-074)', async () => {
+        const mixed: G6GraphData = {
+            nodes: GRAPH.nodes,
+            edges: [
+                { id: 'a->b', source: 'a', target: 'b', data: { kind: 'link', attrs: { when: '2026-01-01T00:00:00Z', channel: 'wire' } } },
+                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'link', attrs: { when: '2026-06-01T00:00:00Z', channel: 'cash' } } },
+            ],
+        };
+        const { fixture } = create({ graph: mixed });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.attrColumns()).toEqual(['channel', 'when']);
+        expect(c.timeColumnOptions().map((o) => o.value)).toEqual(['', 'when']);
     });
 
     it('offers a pivot to the map for a node carrying an objectRef (ui-design-review R8)', async () => {
@@ -1033,7 +1069,8 @@ describe('LinkAnalysisComponent', () => {
         const menu = document.querySelector('.mat-mdc-menu-panel [aria-label="Display options"]') as HTMLElement;
         const boxes = Array.from(menu.querySelectorAll('mat-checkbox')).map((b) => b.textContent!.trim().split(/\s+\(/)[0].trim());
         for (const label of ['Legend', 'Graph counts', 'Node labels', 'Link labels', 'All link labels', 'Level of detail',
-            'Minimap', 'Grid', 'Community hulls', 'Group lone counterparties', 'Bubble sets', 'Link bundling']) {
+            'Minimap', 'Grid', 'Community outlines', 'Group single-link neighbours', 'Community shading', 'Link bundling',
+            'Align while dragging', 'Highlight on hover']) {
             expect(boxes.filter((b) => b === label)).toHaveLength(1);
         }
         fixture.destroy();
@@ -2004,12 +2041,12 @@ describe('LinkAnalysisComponent', () => {
         c.investigation.workingSet.set(ws(5003) as never);
         fixture.detectChanges();
         const footer = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Render status"]')!;
-        expect(footer.textContent).toContain('Showing 5,000 of 5,003 links (render limit)');
+        expect(footer.textContent).toContain('Showing 5,000 of 5,003 links: the canvas draws the heaviest');
         expect(c.workingSetCanvas()).toBe(true);
 
         c.investigation.workingSet.set(ws(40) as never);
         fixture.detectChanges();
-        expect(footer.textContent).not.toContain('render limit');
+        expect(footer.textContent).not.toContain('the canvas draws the heaviest');
         // the node and link counts live in the footer status bar now, not on the canvas strip
         expect(footer.textContent).not.toContain('links drawn');
         fixture.destroy();
@@ -2979,7 +3016,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             const r = stage(radialCap() + 821);
             r.fixture.detectChanges();
             const radial = r.c.layouts.find((l) => l.id === 'radial')!;
-            expect(r.c.layoutDisabledReason(radial)).toBe('needs at most 100 nodes — this graph has 921');
+            expect(r.c.layoutDisabledReason(radial)).toBe('needs at most 100 nodes (this graph has 921)');
             expect(r.c.layoutDisabledReason(r.c.layouts.find((l) => l.id === 'force')!)).toBeNull();
             expect(r.c.anyLayoutOverCap()).toBe(true);
             r.c.openReduce('filter');
@@ -2999,7 +3036,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             const c = fixture.componentInstance;
             configureLaLimits({ 'browser_algorithms.louvainCommunities': 4 });
             try {
-                expect(c.hullsDisabledReason()).toBe('needs at most 4 nodes — this graph has 5');
+                expect(c.hullsDisabledReason()).toBe('Needs at most 4 nodes (this graph has 5).');
                 configureLaLimits({ 'browser_algorithms.louvainCommunities': 5 });
                 expect(c.hullsDisabledReason()).toBeNull();
             } finally {
@@ -5585,7 +5622,7 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         const warn = vi.spyOn(TestBed.inject(ToastrService), 'warning');
         c.toggleFullscreen('graph');
         await new Promise((r) => setTimeout(r));
-        expect(warn).toHaveBeenCalledWith(expect.stringContaining('Full screen was blocked by the browser'), 'Full screen');
+        expect(warn).toHaveBeenCalledWith('The browser blocked full screen.', 'Full screen');
         fixture.destroy();
     });
 

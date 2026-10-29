@@ -96,10 +96,11 @@ describe('la-starter - dataset ranking', () => {
         expect(mule.hint).toContain('PAYER_ACCOUNT and PAYEE_ACCOUNT look like the two ends of a link');
         expect(mule.hint).toContain('Transfers.');
         expect(mule.hint).toContain('Columns: PAYER_ACCOUNT, PAYEE_ACCOUNT.');
-        expect(backups.hint).toContain('No obvious from/to column pair');
+        expect(backups.hint).not.toContain('from/to'); // T-171: the picker groups it instead of a line per row
         expect(undeclared.hint).toContain('read when you pick it');
         expect(mule.shape).toMatchObject({ source: 'PAYER_ACCOUNT', target: 'PAYEE_ACCOUNT' });
         expect(backups.shape).toBeNull();
+        expect([backups.checked, undeclared.checked]).toEqual([true, false]); // unread columns: not yet known either way
     });
 
     it('uses probed columns for a Dataset that declares none', () => {

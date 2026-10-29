@@ -239,6 +239,9 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         const blocked = create({ ctx: { blocked: 'This changes the Investigation log and needs the Incident management capability.' } });
         await settle(blocked.fixture);
         expect(q(blocked.el, 'la-expand-blocked')?.textContent).toContain('Incident management');
+        // T-193: shown once; the button points at the alert instead of repeating it in a second line
+        expect(blocked.el.querySelector('#la-expand-why')).toBeNull();
+        expect(blocked.el.querySelector('[data-testid="la-expand-go"]')!.getAttribute('aria-describedby')).toContain('la-expand-blocked-why');
         blocked.el.querySelector<HTMLButtonElement>('[data-testid="la-expand-go"]')!.click();
         expect(blocked.host.runs).toHaveLength(0);
     });

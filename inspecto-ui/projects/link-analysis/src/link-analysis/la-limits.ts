@@ -120,10 +120,10 @@ export function laLayoutCaps(): NonNullable<GraphDisplayOptions['layoutCaps']> {
     };
 }
 
-/** Why a control is off on this graph (UIR-D11): "needs at most 300 nodes — this graph has 921"; null when within its limit. */
+/** Why a control is off on this graph (UIR-D11): "needs at most 300 nodes (this graph has 921)"; null when within its limit. */
 export function overCapReason(cap: number | undefined, nodeCount: number): string | null {
     return cap !== undefined && nodeCount > cap
-        ? `needs at most ${cap.toLocaleString()} nodes — this graph has ${nodeCount.toLocaleString()}`
+        ? `needs at most ${cap.toLocaleString('en')} nodes (this graph has ${nodeCount.toLocaleString('en')})`
         : null;
 }
 
@@ -218,6 +218,6 @@ export function layeredWidestRank(g: { nodes: { id: string }[]; edges: { source:
 export function layeredShapeReason(g: Parameters<typeof layeredWidestRank>[0] | null): string | null {
     const w = g ? layeredWidestRank(g) : 0;
     return w > LAYERED_MAX_RANK_WIDTH
-        ? `draws an unreadable sliver — ${w.toLocaleString()} nodes in one rank (at most ${LAYERED_MAX_RANK_WIDTH})`
+        ? `too wide (${w.toLocaleString('en')} nodes in one row, max ${LAYERED_MAX_RANK_WIDTH})`
         : null;
 }

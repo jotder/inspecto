@@ -78,7 +78,9 @@ describe('LinkAnalysisTemplateMeasuresComponent (LA-23)', () => {
     it('renders the Measures strip with values, an em dash for an absent value, and the head step', async () => {
         const { el } = await create();
         const strip = el.querySelector('[aria-label="Measures strip"]')!.textContent!;
-        expect(strip).toContain('entities');
+        expect(strip).toContain('Entities');
+        expect(strip).toContain('Furthest degree'); // T-153: plain words, never the key
+        expect(strip).not.toContain('maxHop');
         expect(strip).toContain('12');
         expect(strip).toContain('—');
         expect(el.textContent).toContain('At step 3');
