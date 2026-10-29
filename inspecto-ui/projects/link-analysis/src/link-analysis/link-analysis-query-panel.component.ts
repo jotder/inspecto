@@ -156,8 +156,9 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
             value: d.id,
             label: d.name,
             hint: d.hint,
-            // ranked link-shaped first, so the rest form one run under one heading (T-171)
-            ...(d.shape ? {} : { group: 'Not link-shaped' }),
+            // ranked link-shaped first, so the rest form runs under a heading (T-171); a Dataset whose columns are not
+            // read yet is not known to be anything, so it is never filed as not link-shaped
+            ...(d.shape ? {} : { group: d.checked ? 'Not link-shaped' : 'Not checked yet' }),
         })),
     );
     /** The Source/Target pair filled in for the picked Dataset, while the form still holds it (editable). */

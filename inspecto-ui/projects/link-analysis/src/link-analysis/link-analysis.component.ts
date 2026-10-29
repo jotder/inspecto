@@ -406,6 +406,15 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
 }
 
 /** The bottom dock's tabs (§5.9); `inv` = an Investigation tab. */
+/**
+ * The node card's ID (T-061): the minted id without its `<type>:` prefix, which the card's subtitle already says. Only a
+ * known type prefix is stripped, so a key that itself holds a colon (IPv6, a URN) is shown whole.
+ */
+export function nodeDisplayId(id: string, types: readonly (string | null | undefined)[]): string {
+    const t = types.find((x) => !!x && id.startsWith(`${x}:`));
+    return t ? id.slice(t.length + 1) : id;
+}
+
 export type DockTab = 'rows' | InvestigationSection | 'results';
 /** The right dock's tabs (LA-PANELS-REDESIGN-1). */
 export type ToolboxTab = 'browser' | 'server' | 'investigation';
@@ -3697,8 +3706,10 @@ Its prior copies stay in its version history.`,
                     title: node.data.label,
                     subtitle: this.kindLabel(node.data.kind),
                     rows: [
-                        // The `<type>:` prefix of a minted id is the subtitle already (T-061).
-                        { label: 'ID', value: id.includes(':') ? id.slice(id.indexOf(':') + 1) : id },
+                        {
+                            label: 'ID',
+                            value: nodeDisplayId(id, [node.data.kind, node.data.entityType, this.genericEntityType()]),
+                        },
                         {
                             label: 'Links',
                             value: `${outgoing.length + incoming.length} (${outgoing.length} out · ${incoming.length} in)`,

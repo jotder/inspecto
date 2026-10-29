@@ -100,6 +100,7 @@ describe('la-starter - dataset ranking', () => {
         expect(undeclared.hint).toContain('read when you pick it');
         expect(mule.shape).toMatchObject({ source: 'PAYER_ACCOUNT', target: 'PAYEE_ACCOUNT' });
         expect(backups.shape).toBeNull();
+        expect([backups.checked, undeclared.checked]).toEqual([true, false]); // unread columns: not yet known either way
     });
 
     it('uses probed columns for a Dataset that declares none', () => {

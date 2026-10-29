@@ -118,6 +118,8 @@ export interface DatasetSuggestion {
     shape: LinkShape | null;
     /** The one-line explanation shown under the name in the picker. */
     hint: string;
+    /** Its columns are known (declared or probed): false means `shape` null says nothing yet. */
+    checked: boolean;
 }
 
 function hintFor(ds: DatasetLike, shape: LinkShape | null): string {
@@ -144,11 +146,19 @@ export function rankDatasets(
         .map((ds) => {
             const withColumns = ds.columns?.length ? ds : { ...ds, columns: probed.get(ds.id) ?? [] };
             const shape = suggestLinkColumns(withColumns.columns ?? []);
-            return { id: ds.id, name: ds.name, shape, hint: hintFor(withColumns, shape) };
+            return {
+                id: ds.id,
+                name: ds.name,
+                shape,
+                hint: hintFor(withColumns, shape),
+                checked: (withColumns.columns?.length ?? 0) > 0,
+            };
         })
         .sort((a, b) => {
             if (!!a.shape !== !!b.shape) return a.shape ? -1 : 1;
             if (a.shape && b.shape && a.shape.score !== b.shape.score) return b.shape.score - a.shape.score;
+            // checked before not-yet-checked, so each picker group is one run
+            if (!a.shape && !b.shape && a.checked !== b.checked) return a.checked ? -1 : 1;
             return a.name.localeCompare(b.name);
         });
 }

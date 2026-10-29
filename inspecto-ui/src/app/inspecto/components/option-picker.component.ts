@@ -65,39 +65,47 @@ const SEARCH_THRESHOLD = 8;
                 [attr.aria-label]="shown().length ? data.title : null"
                 (keydown)="onKeydown($event)"
             >
-                @for (opt of shown(); track opt.value) {
-                    @if (opt.group && opt.group !== shown()[$index - 1]?.group) {
-                        <!-- a visual heading only: a listbox holds options, so assistive tech is not given it -->
-                        <div
-                            aria-hidden="true"
-                            class="text-secondary px-2 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide"
-                            data-testid="picker-group"
-                        >
-                            {{ opt.group }}
-                        </div>
-                    }
-                    <button
-                        type="button"
-                        role="option"
-                        class="hover:bg-hover flex w-full items-start gap-2 rounded px-2 py-2 text-left"
-                        [attr.aria-selected]="opt.value === data.current"
-                        [attr.cdkFocusInitial]="
-                            data.options.length < threshold && opt.value === data.current ? '' : null
-                        "
-                        (click)="data.readOnly ? ref.close() : ref.close(opt.value)"
+                @for (run of runs(); track $index) {
+                    <!-- a grouped run is a role="group" named by its heading, so assistive tech announces it -->
+                    <div
+                        [attr.role]="run.group ? 'group' : null"
+                        [attr.aria-label]="run.group || null"
+                        [attr.data-testid]="run.group ? 'picker-group' : null"
                     >
-                        <mat-icon
-                            class="icon-size-5 shrink-0"
-                            [class.opacity-0]="opt.value !== data.current"
-                            svgIcon="heroicons_outline:check"
-                        ></mat-icon>
-                        <span class="min-w-0">
-                            <span class="block text-sm">{{ opt.label }}</span>
-                            @if (opt.hint) {
-                                <span class="text-secondary block text-xs">{{ opt.hint }}</span>
-                            }
-                        </span>
-                    </button>
+                        @if (run.group) {
+                            <!-- the group's name is its aria-label; this is the same text drawn once -->
+                            <div
+                                aria-hidden="true"
+                                class="text-secondary px-2 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide"
+                            >
+                                {{ run.group }}
+                            </div>
+                        }
+                        @for (opt of run.options; track opt.value) {
+                            <button
+                                type="button"
+                                role="option"
+                                class="hover:bg-hover flex w-full items-start gap-2 rounded px-2 py-2 text-left"
+                                [attr.aria-selected]="opt.value === data.current"
+                                [attr.cdkFocusInitial]="
+                                    data.options.length < threshold && opt.value === data.current ? '' : null
+                                "
+                                (click)="data.readOnly ? ref.close() : ref.close(opt.value)"
+                            >
+                                <mat-icon
+                                    class="icon-size-5 shrink-0"
+                                    [class.opacity-0]="opt.value !== data.current"
+                                    svgIcon="heroicons_outline:check"
+                                ></mat-icon>
+                                <span class="min-w-0">
+                                    <span class="block text-sm">{{ opt.label }}</span>
+                                    @if (opt.hint) {
+                                        <span class="text-secondary block text-xs">{{ opt.hint }}</span>
+                                    }
+                                </span>
+                            </button>
+                        }
+                    </div>
                 }
             </div>
             @if (!shown().length) {
@@ -125,6 +133,17 @@ export class OptionPickerDialog {
         const q = this.filter().trim().toLowerCase();
         if (!q) return this.data.options;
         return this.data.options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+    });
+
+    /** The shown options as runs: consecutive options that share a `group` form one run; ungrouped ones a run without one. */
+    readonly runs = computed(() => {
+        const out: { group?: string; options: PickerOption[] }[] = [];
+        for (const o of this.shown()) {
+            const last = out[out.length - 1];
+            if (last && last.group === o.group) last.options.push(o);
+            else out.push({ group: o.group, options: [o] });
+        }
+        return out;
     });
 
     /**

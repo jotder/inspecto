@@ -31,7 +31,7 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, snapshotTitle } from './link-analysis.component';
+import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, nodeDisplayId, snapshotTitle } from './link-analysis.component';
 import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
 import { GRAPH_CACHE_TTL_MS, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { SpacesService } from '@inspecto/core/api';
@@ -238,6 +238,15 @@ installDomainProfiles(
 );
 // ...and hands the registry back empty, so a later spec in the same worker does not inherit these packs.
 afterAll(() => installDomainProfiles([], null));
+
+describe('nodeDisplayId (T-061 node card ID)', () => {
+    it('strips only a known type prefix, so a key that holds a colon survives whole', () => {
+        expect(nodeDisplayId('party:p-17', ['entity', 'party'])).toBe('p-17');
+        expect(nodeDisplayId('entity:2001:db8::1', ['entity'])).toBe('2001:db8::1');
+        expect(nodeDisplayId('urn:isbn:0451450523', ['entity', 'party'])).toBe('urn:isbn:0451450523');
+        expect(nodeDisplayId('plain', ['entity', null, undefined])).toBe('plain');
+    });
+});
 
 describe('LinkAnalysisComponent', () => {
     it('renders the empty state, is a11y-clean, and validates the mapping before querying', async () => {
