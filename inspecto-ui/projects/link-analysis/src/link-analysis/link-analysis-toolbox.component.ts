@@ -1343,7 +1343,7 @@ export class LinkAnalysisToolboxComponent {
             this.patternMatches.set([]);
             this.emphasisChange.emit(null);
             this.analysisError.set(
-                'This pattern requires the hops to be in time order — add the time column under Attribute columns in the Query panel and run it again, then pick it as the Time column under Filter edges by time first.',
+                'This pattern requires the hops to be in time order — add the time column under Attribute columns in Settings ▸ Graph model and run it again, then pick it as the Time column under the Filter edges by time (clock) button in the toolbar.',
             );
             return;
         }

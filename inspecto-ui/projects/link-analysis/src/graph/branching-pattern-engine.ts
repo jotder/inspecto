@@ -158,7 +158,7 @@ export function matchBranchingPattern(
         return refuse(`Branching patterns are capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }
     if (branchingNeedsTime(stages) && !timeAttr) {
-        return refuse('This pattern has a time window or ordering — add the time column under Attribute columns in the Query panel and run it again, then pick it as the Time column under Filter edges by time first.');
+        return refuse('This pattern has a time window or ordering — add the time column under Attribute columns in Settings ▸ Graph model and run it again, then pick it as the Time column under the Filter edges by time (clock) button in the toolbar.');
     }
 
     const last = stages.length - 1;
@@ -185,7 +185,7 @@ export function matchBranchingPattern(
             const valued = legs.filter((e) => numericAttr(e, th.attr) !== undefined);
             if (!valued.length) {
                 return refuse(
-                    `No link carries a numeric ${th.attr}, so the threshold ${thresholdLabel(th)} cannot be evaluated — add ${th.attr} as a link attribute in the Query panel.`,
+                    `No link carries a numeric ${th.attr}, so the threshold ${thresholdLabel(th)} cannot be evaluated — add ${th.attr} under Attribute columns in Settings ▸ Graph model.`,
                 );
             }
             legs = valued.filter((e) => passes(th, numericAttr(e, th.attr)!));

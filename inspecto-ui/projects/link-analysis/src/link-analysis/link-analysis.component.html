@@ -20,7 +20,15 @@
                 <mat-icon svgIcon="heroicons_outline:light-bulb"></mat-icon>
                 <span>Examples</span>
             </button>
-            <button mat-menu-item (click)="saveOpenView()" [disabled]="!graph() || saving()" data-testid="la-save-view">
+            <!-- Saving and deleting a view are /components writes (canAuthorWorkbench): locked here with the reason, never a raw 403 -->
+            <button
+                mat-menu-item
+                (click)="saveOpenView()"
+                [disabled]="!graph() || saving() || !!viewOverwriteBlocked()"
+                [matTooltip]="viewOverwriteBlocked()"
+                [attr.aria-label]="viewOverwriteBlocked() ? 'Save view — ' + viewOverwriteBlocked() : null"
+                data-testid="la-save-view"
+            >
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
                 <span>Save view</span>
             </button>
@@ -29,13 +37,17 @@
                 [matMenuTriggerFor]="saveMenu"
                 laFormMenu
                 #saveTrigger="matMenuTrigger"
-                [disabled]="!graph()"
-                aria-label="Save view as"
+                [disabled]="!graph() || !!viewSaveBlocked()"
+                [matTooltip]="viewSaveBlocked()"
+                [attr.aria-label]="viewSaveBlocked() ? 'Save view as — ' + viewSaveBlocked() : 'Save view as'"
                 data-testid="la-save-view-as"
             >
                 <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
                 <span>Save view as…</span>
             </button>
+            @if (viewOverwriteBlocked(); as why) {
+                <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-save-view-locked">{{ why }}</p>
+            }
             <button
                 mat-menu-item
                 (click)="openSnapshot()"
@@ -73,12 +85,17 @@
             <button
                 mat-menu-item
                 (click)="deleteOpenWork()"
-                [disabled]="!deleteLabel() || investigation.busy()"
+                [disabled]="!deleteLabel() || !!deleteBlocked() || investigation.busy()"
+                [matTooltip]="deleteBlocked()"
+                [attr.aria-label]="deleteBlocked() ? 'Delete ' + deleteLabel() + ' — ' + deleteBlocked() : null"
                 data-testid="la-file-delete"
             >
                 <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                 <span>Delete{{ deleteLabel() ? ' ' + deleteLabel() : '' }}</span>
             </button>
+            @if (deleteBlocked(); as why) {
+                <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-file-delete-locked">{{ why }}</p>
+            }
         </mat-menu>
         <mat-menu #examplesMenu="matMenu">
             <button
@@ -1002,7 +1019,8 @@
                 [inputs]="{
                     screen: 'Link Analysis',
                     label: 'About',
-                    terms: ['Entity', 'Link', 'Entity Projection', 'Link-Analysis View', 'Dataset', 'Widget'],
+                    terms: aboutTerms,
+                    definitions: aboutDefinitions,
                 }"
             />
             <!-- ⚙ Settings (§5.10): the right end of the top bar -->
@@ -1083,7 +1101,7 @@
 
         <!-- ══ row: [tool rail] │ workspace — the rail is a labelled nav docked on the LEFT edge (canvas height);
              under the md breakpoint it wraps back into a row above the stacked workspace ══ -->
-        <div class="flex min-h-0 flex-auto gap-2 max-md:flex-col" [class]="bottomOpen() ? 'h-[28rem] flex-none' : ''">
+        <div class="flex min-h-0 flex-auto gap-2 max-md:flex-col" [class]="dockShown() && bottomOpen() ? 'h-[28rem] flex-none' : ''" data-testid="la-workspace-row">
 
         <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
@@ -1115,6 +1133,18 @@
                         (keydown)="onGraphKeydown($event)"
                     >
                         <p class="sr-only" role="status" data-testid="la-draw-announcement">{{ drawAnnouncement() }}</p>
+                        @if (emptyWorkingSet()) {
+                            <!-- a seedless Investigation draws nothing yet: say so on the canvas, with the one-click way back -->
+                            <inspecto-empty-state
+                                class="absolute inset-x-0 top-1/4 z-10 mx-auto block w-full max-w-md p-4"
+                                icon="heroicons_outline:magnifying-glass-plus"
+                                title="The Working Set is empty"
+                                message="Nothing is seeded yet. Show the query graph to pick the entities to start from."
+                                actionLabel="Show the query graph"
+                                (action)="investigation.showWorkingSet.set(false)"
+                                data-testid="la-empty-working-set"
+                            ></inspecto-empty-state>
+                        }
                         <p class="sr-only" role="status" data-testid="la-selection-announcement">{{ selectionAnnouncement() }}</p>
                         <inspecto-graph-view
                             [fill]="true"
@@ -1313,20 +1343,27 @@
                                 data-testid="investigate-issue"
                             ></inspecto-empty-state>
                         }
-                        <inspecto-link-analysis-start-box
-                            [catalogue]="startCatalogue()"
-                            [lists]="entityLists()"
-                            [dataset]="startDataset()"
-                            [investigations]="investigationsEnabled()"
-                            [nodeCap]="nodeCap()"
-                            [notice]="startNotice()"
-                            [busy]="starting()"
-                            [addData]="addDataOffered"
-                            (start)="startFrom($event)"
-                            (listsWanted)="refreshEntityLists()"
-                            (newInvestigation)="openNewInvestigation()"
-                            (openAddData)="openAddData()"
-                        ></inspecto-link-analysis-start-box>
+                        @if (newFormInDock()) {
+                            <!-- the Investigation tab's New form is on screen: one form for one job, so only a pointer here -->
+                            <p class="text-secondary m-0 max-w-md p-4 text-center text-sm" data-testid="la-start-pointer">
+                                Start a new Investigation with the form in the Investigation tab.
+                            </p>
+                        } @else {
+                            <inspecto-link-analysis-start-box
+                                [catalogue]="startCatalogue()"
+                                [lists]="entityLists()"
+                                [dataset]="startDataset()"
+                                [investigations]="investigationsEnabled()"
+                                [nodeCap]="nodeCap()"
+                                [notice]="startNotice()"
+                                [busy]="starting()"
+                                [addData]="addDataOffered"
+                                (start)="startFrom($event)"
+                                (listsWanted)="refreshEntityLists()"
+                                (newInvestigation)="openNewInvestigation()"
+                                (openAddData)="openAddData()"
+                            ></inspecto-link-analysis-start-box>
+                        }
                     </div>
                 }
             </div>
@@ -1388,7 +1425,7 @@
                             <mat-icon svgIcon="heroicons_outline:chevron-double-right"></mat-icon>
                         </button>
                     </div>
-                    <div #toolboxScroll data-testid="toolbox-scroll" class="min-h-0 flex-auto overflow-y-auto p-3">
+                    <div #toolboxScroll data-testid="toolbox-scroll" class="min-h-0 min-w-0 flex-auto overflow-y-auto overflow-x-hidden p-3">
                         <!-- LA-ONBOARD-1 phase 7 (UC-12): three plain questions first; the full toolbox below. -->
                         <inspecto-link-analysis-discover
                             class="mb-3"
@@ -1483,6 +1520,7 @@
                                 >
                                     <!-- LA-PANELS-REDESIGN-1: ONE New Investigation form (File ▸ New lands here) -->
                                     <inspecto-link-analysis-start-box
+                                        #newInvForm
                                         laNewInvestigation
                                         mode="investigation"
                                         [catalogue]="startCatalogue()"
@@ -1561,7 +1599,7 @@
 
         <!-- ══ Dock (LA-STUDIO-UI-REORG-1 §5.9): Rows, the open Investigation's tabs, Results. Resizable; collapses to its
              tab strip; open state and tab remembered per browser (inspecto.la.dock) ══ -->
-        @if (graph() || workingSetCanvas() || investigation.active()) {
+        @if (dockShown()) {
         <div class="flex shrink-0 flex-col rounded-lg border" role="region" aria-label="Dock" data-testid="la-dock">
             <!-- kept mounted while collapsed so #dockSplit stays resolvable for the body's height -->
             <div

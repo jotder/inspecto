@@ -13,6 +13,12 @@ export interface AiExplainData {
     screen: string;
     /** The canonical terms this screen is built on, in the order the operator should meet them. */
     terms: string[];
+    /**
+     * The pane's own definition per term, used when the glossary lookup has none for it (UI test 2026-10-29: the
+     * Link Analysis About showed unrelated docs lines for four of its terms). A term with a definition here never
+     * falls back to the docs search.
+     */
+    definitions?: Readonly<Record<string, string>>;
 }
 
 /** One docs/ line the fallback search matched, kept with its citation so the operator can go read it. */
@@ -41,6 +47,21 @@ interface DocsSearchResult {
 }
 
 const CITATION_LIMIT = 3;
+
+/**
+ * The docs the fallback may cite: user-facing guides and the glossary only. ⛔ Never a deployment, operations or
+ * internal README — `docs_search` walks the whole docs folder the backend was started with, and a deployment's own
+ * README (identity-provider and gateway set-up) answered "Link" with lines about Keycloak and WSO2 (UI test
+ * 2026-10-29). Nothing under `archived-documents/` either: history, never current guidance, even when a file there is
+ * named like a guide. The path is matched with either separator (a Windows backend answers back-slashed paths).
+ */
+const USER_FACING_DOC = /(^|\/)(GLOSSARY|USER_GUIDE|ADVANCED_GUIDE)\.md$|(^|\/)(user-guide|admin-guide)[^/]*\.md$/i;
+
+/** True when a docs hit is from a user-facing doc and may be shown to the operator. */
+export function isUserFacingDoc(file: string): boolean {
+    const path = file.replace(/\\/g, '/');
+    return !/(^|\/)archived-documents\//i.test(path) && USER_FACING_DOC.test(path);
+}
 
 /**
  * "What am I looking at" — the read-only half of the inline AI surface (AGT-6a A4).
@@ -74,15 +95,13 @@ const CITATION_LIMIT = 3;
                     <mat-progress-spinner diameter="20" mode="indeterminate" />
                     <span class="text-secondary text-sm">Looking up this screen's vocabulary…</span>
                 </div>
-            } @else if (unavailable()) {
+            } @else if (unavailable() && !hasOwnDefinitions()) {
                 <inspecto-alert variant="info" title="AI assistance unavailable">
                     The intelligence module is not installed on this backend, so definitions cannot be looked up.
                     Everything else on this screen works as usual.
                 </inspecto-alert>
             } @else {
-                <p class="text-secondary mb-4 text-sm">
-                    The canonical terms this screen is built on, from the project glossary.
-                </p>
+                <p class="text-secondary mb-4 text-sm" data-testid="explain-source">{{ sourceNote() }}</p>
                 <dl class="flex flex-col gap-4">
                     @for (entry of entries(); track entry.term) {
                         <div>
@@ -125,6 +144,19 @@ export class AiExplainDialog {
     readonly entries = signal<ExplainEntry[]>([]);
     /** Latched when the intelligence module is absent (503) — the whole dialog then explains itself. */
     readonly unavailable = signal(false);
+    /** Terms answered from the glossary vs. from the pane's own definitions, for an honest source line. */
+    private readonly fromGlossary = signal(0);
+    private readonly fromPane = signal(0);
+    /** The pane supplied its own definitions: shown even when the module is absent (they need no lookup). */
+    hasOwnDefinitions(): boolean {
+        return Object.keys(this.data.definitions ?? {}).length > 0;
+    }
+    /** Where the definitions shown came from, said truthfully. */
+    sourceNote(): string {
+        if (this.fromPane() && this.fromGlossary()) return 'The terms this screen is built on: from the project glossary, else as this screen defines them.';
+        if (this.fromPane()) return 'The terms this screen is built on, as this screen defines them.';
+        return 'The canonical terms this screen is built on, from the project glossary.';
+    }
 
     constructor() {
         // One request per term, in parallel, each independently degrading: a term that cannot be
@@ -136,11 +168,21 @@ export class AiExplainDialog {
     }
 
     private explain(term: string): Observable<ExplainEntry> {
+        const own = this.data.definitions?.[term];
         return this.agent.runTool<GlossaryResult>('glossary_lookup', { term }).pipe(
-            map((result) => ({ term, definition: result.definition })),
+            map((result) => {
+                this.fromGlossary.update((n) => n + 1);
+                return { term, definition: result.definition };
+            }),
             // 422 = no canonical definition for this term. That is an answerable question, not a
             // failure, so fall back to the docs corpus rather than showing the operator nothing.
-            catchError((err: unknown) => this.searchDocs(term, err)),
+            // The pane's own definition answers first — also on a 503, as it needs no lookup.
+            catchError((err: unknown) => {
+                if (!own) return this.searchDocs(term, err);
+                this.isUnavailable(err);
+                this.fromPane.update((n) => n + 1);
+                return of({ term, definition: own });
+            }),
         );
     }
 
@@ -149,7 +191,7 @@ export class AiExplainDialog {
         return this.agent.runTool<DocsSearchResult>('docs_search', { query: term }).pipe(
             map((result) => ({
                 term,
-                citations: (result.hits ?? []).slice(0, CITATION_LIMIT),
+                citations: (result.hits ?? []).filter((h) => isUserFacingDoc(h.file)).slice(0, CITATION_LIMIT),
             })),
             catchError((err: unknown) => {
                 this.isUnavailable(err);

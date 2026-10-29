@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `INTELLIGENCE-GLOSSARY-ANNOTATED-1` | P3 | defect | GlossaryLoader skips annotated GLOSSARY entries, and docs_search reads internal docs | — |
 | `AGENTIC-INVESTIGATION-1` | P2 | feature | an agent that works an Incident: explains why it fired, gathers evidence, quantifies value at risk and proposes the next action for a hum… | — |

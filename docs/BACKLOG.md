@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **75<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 60<!--count:backlog-p3--> × P3** —
+> **76<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 61<!--count:backlog-p3--> × P3** —
+> ⬆ **75 → 76 (P3 60 → 61) on 2026-10-29**: filed P3 defect `INTELLIGENCE-GLOSSARY-ANNOTATED-1` (LA UI test: the glossary loader skips annotated entries; `docs_search` reads internal docs; the UI side shipped with the LA UI test fixes).
 > ⬇ **76 → 75 (P2 16 → 15) on 2026-10-29**: closed P2 feature `LA-PANELS-REDESIGN-1` — shipped `fa3017df2` + `f90d66a6f` (review fixes: New Investigation… switches tab, Explorer Server tab, "The graph on screen" start, whole-Dataset guard); plan archived.
 > ⬆ **75 → 76 (P2 15 → 16) on 2026-10-29**: filed P2 feature `LA-PANELS-REDESIGN-1` (operator ask: Browser · Server · Investigation tabs, one New form, File menu holds Open / Explore / Examples).
 > ⬇ **76 → 75 (P3 61 → 60) on 2026-10-28**: closed P3 defect `LA-SPACE-SWITCH-TOAST-1` — cause: a `?investigation=` deep link sets the store's active id before the open is tried, and the id stays set after the 404, so the page remembered "Investigation <id>" as open in the Space it failed in, and the next Space switch said it "stays in" that Space. The remembered record now counts an Investigation only once its log has loaded (`rememberOpen` in `link-analysis.component.ts`); spec in `link-analysis.component.spec.ts` (the 404 deep-link case leaves no record).
@@ -363,10 +364,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 60<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 61<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 60<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 75<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 61<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 76<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -617,6 +618,12 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.9 Cases, Incidents & Assistant
 
+- **P3** · `INTELLIGENCE-GLOSSARY-ANNOTATED-1` — **`GlossaryLoader` skips annotated GLOSSARY entries, and `docs_search` reads internal docs** [items: module.intelligence · kind: defect]
+  - **Found** by the 2026-10-29 LA UI test.
+  - **Glossary miss:** the loader's entry pattern misses lines like `**Entity / Link** *(…)* —`, so the explain/About lookup answers "No canonical definition" for canonical terms. *Link-Analysis View* has no GLOSSARY entry at all.
+  - **Internal docs:** `InspectoTools.search` (`docs_search`) scans the whole `docs/` tree, deployment READMEs and `archived-documents/` included.
+  - **Already shipped (UI only):** the console now filters citations to user-facing docs, and the LA About supplies its own definitions.
+  - **Fix:** parse annotated entries, and restrict the search corpus server-side.
 
 
 

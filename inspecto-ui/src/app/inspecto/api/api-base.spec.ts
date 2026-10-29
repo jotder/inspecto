@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HttpErrorResponse } from '@angular/common/http';
-import { STALE_WRITE_MESSAGE, apiUrl, isStaleVersionError, toParams } from './api-base';
+import { STALE_WRITE_MESSAGE, apiErrorMessage, apiUrl, isStaleVersionError, plainCapabilityRefusal, toParams } from './api-base';
 import { environment } from '../../../environments/environment';
 
 describe('apiUrl', () => {
@@ -68,5 +68,27 @@ describe('isStaleVersionError', () => {
     it('has a message that tells the author what to DO, not just that it failed', () => {
         expect(STALE_WRITE_MESSAGE).toMatch(/changed underneath you/i);
         expect(STALE_WRITE_MESSAGE).toMatch(/reload/i);
+    });
+});
+
+describe('apiErrorMessage — a capability refusal in plain words (UI test 2026-10-29)', () => {
+    it("maps the server's `missing capability '…'` 403 to a sentence, keeping the id", () => {
+        const err = new HttpErrorResponse({
+            status: 403,
+            error: { error: { errorCode: 'PERMISSION_DENIED', message: "missing capability 'canAuthorWorkbench'" } },
+        });
+        expect(apiErrorMessage(err, 'Saving the view failed.')).toBe(
+            'Your role does not have the Workbench author permission (canAuthorWorkbench).',
+        );
+    });
+
+    it('keeps the owning-space suffix and names an unknown capability by its id', () => {
+        expect(plainCapabilityRefusal("missing capability 'canFoo' in the owning space")).toBe(
+            'Your role does not have the permission this needs (canFoo) in the owning space.',
+        );
+    });
+
+    it('leaves every other message as the server wrote it', () => {
+        expect(plainCapabilityRefusal('view-only share')).toBe('view-only share');
     });
 });

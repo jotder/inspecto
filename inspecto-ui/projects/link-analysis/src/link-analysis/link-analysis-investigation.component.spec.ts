@@ -276,7 +276,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
-            'needs the Incident management capability',
+            "Your role can't change Investigations (needs Incident management)",
         );
         // Mark this position sits behind More steps ▾ (§5.8 block 7)
         (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).moreStep.set('snapshot');
@@ -293,7 +293,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         penEdit(ro.fixture, penByLabel(ro.el, 'Purpose / legal basis')!, 'warrant 7');
         expect(ro.button('Start Investigation').disabled).toBe(true);
         expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
-            'Starting an Investigation needs the Incident management capability',
+            "Your role can't start Investigations (needs Incident management)",
         );
         // Enter in a field commits it and asks to start: with no capability that must write nothing
         penEdit(ro.fixture, penByLabel(ro.el, 'Title')!, 'a title');
@@ -1053,6 +1053,15 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         (el.querySelector('[data-testid="expand-dialog-open"]') as HTMLButtonElement).click();
         expect(asked).toHaveBeenCalledTimes(1);
         expect(el.textContent).not.toContain('Advanced expand settings');
+    });
+
+    it('nothing seeded: "Expand…" is locked with "Expand next degree", and the reason shows (UI test 2026-10-29)', async () => {
+        const { fixture, store, el } = create({ ws: { ...WS, entities: [], links: [] } });
+        await openInv(store);
+        fixture.detectChanges();
+        expect((el.querySelector('[data-testid="expand-dialog-open"]') as HTMLButtonElement).disabled).toBe(true);
+        expect((el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement).disabled).toBe(true);
+        expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Seed an entity first.');
     });
 });
 

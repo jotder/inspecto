@@ -28,7 +28,7 @@
         <section class="rounded-lg border" [attr.data-server-algorithm]="a.id">
             <button
                 type="button"
-                class="flex w-full items-center gap-2 p-3 text-left"
+                class="flex w-full flex-wrap items-center gap-2 p-3 text-left"
                 (click)="toggleServerTool(a.id)"
                 [attr.aria-expanded]="serverTab() === a.id"
                 [attr.aria-controls]="'srv-' + a.id"
@@ -65,7 +65,7 @@
         <section class="rounded-lg border">
             <button
                 type="button"
-                class="flex w-full items-center gap-2 p-3 text-left"
+                class="flex w-full flex-wrap items-center gap-2 p-3 text-left"
                 (click)="toggleTool(t.id)"
                 [attr.aria-expanded]="tab() === t.id"
                 [attr.aria-controls]="'tool-' + t.id"

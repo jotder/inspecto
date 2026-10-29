@@ -230,7 +230,10 @@ describe('pattern pack columns (telecom packs on a projection without link_kind 
     it('with no profile column to fall back on, refuses with a plain reason', () => {
         const plan = resolvePatternColumns({ kind: true, time: true }, {}, 'finance');
         expect(plan.kindCol).toBeUndefined();
-        expect(plan.blocked).toContain('This pattern needs a time column — set Time in the Query panel.');
+        expect(plan.blocked).toContain(
+            'This pattern needs a time column — pick the Time column under the Filter edges by time (clock) button in the toolbar.',
+        );
+        expect(plan.blocked).not.toMatch(/query panel/i); // no such panel in the Studio (UI test 2026-10-29)
         expect(plan.blocked).toContain('This pattern needs a link kind column');
         expect(resolvePatternColumns({ kind: false, time: false }, {}, null)).toEqual({});
     });
