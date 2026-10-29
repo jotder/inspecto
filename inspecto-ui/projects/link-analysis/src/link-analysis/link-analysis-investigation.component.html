@@ -538,8 +538,12 @@
                             <button mat-button type="button" (click)="pendingDone.emit()">Cancel</button>
                         </div>
                     </form>
+                } @else if (!store.queuedSeeds().length) {
+                    <!-- LA-PANELS-REDESIGN-1: the New Investigation form (the page projects it; File ▸ New lands here) -->
+                    <ng-content select="[laNewInvestigation]" />
                 } @else if (projection(); as p) {
-                    <p class="text-secondary m-0 text-sm">
+                    <!-- Top results queued from the Browser / Server tools: they become the first seed step -->
+                    <p class="text-secondary m-0 text-sm" data-testid="investigation-queued-start">
                         An Investigation is an ordered, append-only log of steps over <strong>{{ p.datasetId }}</strong> ({{
                             p.sourceCol
                         }}
@@ -594,10 +598,6 @@
                     File ▸ Open… lists the ones you may read (Recent: the ones this screen opened);
                     saving the view keeps them with it.
                 </p>
-                <!-- LA-STUDIO-UI-REORG-1 §5.11: listing, Open by id and Recent live in File ▸ Open… (its Investigations tab) -->
-                <div>
-                    <button mat-stroked-button (click)="openRequested.emit()" data-testid="investigation-open">Open…</button>
-                </div>
             } @else {
                 @if (store.header(); as h) {
                     <!-- 1. Header: title, purpose, Working Set counts, degree reached; ⋯ holds Settings…, Close and Delete -->

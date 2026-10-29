@@ -141,6 +141,7 @@ function makeToolbox(runs = runsMock()) {
         ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisToolboxComponent);
+    fixture.componentRef.setInput('side', 'server'); // the index reads and the Edge index are server controls
     fixture.componentRef.setInput('graph', CANVAS);
     fixture.componentRef.setInput(
         'nodeOptions',
@@ -219,7 +220,7 @@ describe('Toolbox Explain tab - egoNetwork and seeds-only degreeCentrality on th
 
     it('the Edge index tool opens and hosts the build control', () => {
         const { fixture, c, el } = makeToolbox();
-        c.whereChoice.set('server'); // the Edge index is a server tool: listed under Server (§5.8)
+        fixture.componentRef.setInput('side', 'server'); // the Edge index is a server tool: the Server tab (§5.8)
         c.toggleTool('index-build');
         fixture.detectChanges();
         expect(el.querySelector('inspecto-link-analysis-index-build')).not.toBeNull();

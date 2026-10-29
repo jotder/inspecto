@@ -16,6 +16,8 @@ import { LA_FEATURES, investigationsLockedReason } from '@inspecto/link-analysis
 import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { FormsModule } from '@angular/forms';
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { Subscription } from 'rxjs';
 import {
     GraphBudgetView,
@@ -51,7 +53,16 @@ import { fmtScore } from './graph-run-summary';
     selector: 'inspecto-link-analysis-server-run',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, MatButtonModule, MatIconModule, InspectoAlertComponent, ChipComponent, LockedActionComponent],
+    imports: [
+        DecimalPipe,
+        FormsModule,
+        MatButtonModule,
+        MatIconModule,
+        InspectoAlertComponent,
+        InspectoOptionPickerComponent,
+        ChipComponent,
+        LockedActionComponent,
+    ],
     template: `
         @if (investigationsEnabled()) {
             @if (note()) {
@@ -72,20 +83,14 @@ import { fmtScore } from './graph-run-summary';
                     }
                     @if (index(); as ix) {
                         @if (indexChoices().length > 1) {
-                            <label class="text-secondary text-sm">
-                                Index
-                                <select
-                                    class="ml-1 rounded border px-1"
-                                    data-testid="index-pick"
-                                    (change)="pickIndex($any($event.target).value)"
-                                >
-                                    @for (c of indexChoices(); track c.dataset) {
-                                        <option [value]="c.dataset" [selected]="c.dataset === ix.dataset">
-                                            {{ c.dataset }}
-                                        </option>
-                                    }
-                                </select>
-                            </label>
+                            <inspecto-option-picker
+                                class="w-48"
+                                label="Index"
+                                data-testid="index-pick"
+                                [options]="indexOptions()"
+                                [ngModel]="ix.dataset"
+                                (ngModelChange)="pickIndex('' + $event)"
+                            />
                         }
                         <button
                             mat-stroked-button
@@ -294,6 +299,9 @@ export class LinkAnalysisServerRunComponent {
         const l = this.runs.indexes();
         return this.supportsIndex() && l?.enabled ? l.indexes : [];
     });
+    readonly indexOptions = computed<PickerOption[]>(() =>
+        this.indexChoices().map((c) => ({ value: c.dataset, label: c.dataset })),
+    );
     readonly index = computed<LinkIndexSummary | null>(() => {
         const all = this.indexChoices();
         return all.find((i) => i.dataset === this.pickedDataset()) ?? all[0] ?? null;

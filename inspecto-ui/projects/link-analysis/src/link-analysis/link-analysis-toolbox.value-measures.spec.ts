@@ -25,6 +25,7 @@ function make(withMapping = true) {
         ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisToolboxComponent);
+    fixture.componentRef.setInput('side', 'server'); // Value Measures runs on the server: the Server tab
     if (withMapping)
         fixture.componentRef.setInput('indexMappings', [
             { dataset: 'transfers', sourceCol: 'payer', targetCol: 'payee', kindCol: 'kind', label: 'transfers' },

@@ -44,7 +44,8 @@ export const CATALOGUE_TOOLS: Readonly<Record<string, CatalogueTool>> = {
     'server-paths': tool('connected', [], 'any', 'server'),
     flow: tool('connected', ['maxFlow', 'maximumSpanningForest']), // vocab-allow: the max-flow graph algorithm id
     similarity: tool('connected', ['jaccardSimilarity', 'linkPrediction']),
-    explain: tool('important'),
+    // Its neighbourhood and degree reads from the edge index are server runs (LA-PANELS-REDESIGN-1).
+    explain: tool('important', [], 'browser', 'both'),
     centrality: tool('important', [
         'degreeCentrality',
         'pageRank',
@@ -87,13 +88,16 @@ export function serverQuestionOf(algorithm: string): CatalogueQuestionId {
 }
 
 /**
- * Is toolbox group `id` listed under `where`? A `both` group is listed under Server too while it hands its run over
- * (`handingOver`: the graph is above its browser cap, so its own control IS the server run).
+ * Is toolbox group `id` listed in the `side` tab (LA-PANELS-REDESIGN-1: Browser · Server · Investigation)? Browser lists
+ * what runs in the browser (`browser`, `both`); Server lists what runs on the server (`server`), a `both` group with no
+ * server-algorithm twin (its server controls live in the group), and a `both` group with twins only while it hands its
+ * run over (graph above its browser cap) — otherwise its twins are the Server tab's algorithm rows.
  */
-export function listedUnder(id: string, where: CatalogueWhere, handingOver = false): boolean {
+export function listedOnSide(id: string, side: CatalogueWhere, handingOver = false): boolean {
     const t = CATALOGUE_TOOLS[id];
-    if (!t) return where === 'browser';
-    return t.listed === 'any' || t.listed === where || (where === 'server' && t.runsOn === 'both' && handingOver);
+    if (!t) return side === 'browser';
+    if (side === 'browser') return t.runsOn !== 'server';
+    return t.runsOn === 'server' || (t.runsOn === 'both' && (!t.server.length || handingOver));
 }
 
 /** One server algorithm row under Server. */
@@ -125,7 +129,7 @@ export function catalogueSections<T extends { id: string }>(
 ): CatalogueSection<T>[] {
     return CATALOGUE_QUESTIONS.map((q) => ({
         ...q,
-        tools: tools.filter((t) => listedUnder(t.id, where, handingOver(t.id)) && (CATALOGUE_TOOLS[t.id]?.question ?? 'unusual') === q.id),
+        tools: tools.filter((t) => listedOnSide(t.id, where, handingOver(t.id)) && (CATALOGUE_TOOLS[t.id]?.question ?? 'unusual') === q.id),
         server:
             where === 'server'
                 ? algorithms

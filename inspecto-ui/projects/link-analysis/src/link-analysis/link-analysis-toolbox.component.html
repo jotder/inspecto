@@ -14,22 +14,12 @@
     </div>
 }
 <div class="flex flex-col gap-2">
-    <!-- The catalogue (§5.8, UIR-D10): where it runs, then one list grouped by question. -->
-    @if (investigationsEnabled()) {
-        <mat-button-toggle-group
-            class="self-start"
-            data-testid="catalogue-where"
-            aria-label="Where the analysis runs"
-            [value]="where()"
-            (change)="whereChoice.set($event.value)"
-        >
-            <mat-button-toggle value="browser">Browser</mat-button-toggle>
-            <mat-button-toggle value="server">Server</mat-button-toggle>
-        </mat-button-toggle-group>
-        @if (where() === 'server' && !whereChoice() && serverPreselectReason(); as why) {
-            <p class="text-secondary m-0 text-xs" data-testid="catalogue-preselect" role="status">{{ why }}</p>
+    <!-- The catalogue (§5.8, UIR-D10) for the host's Browser or Server tab (LA-PANELS-REDESIGN-1), grouped by question. -->
+    @if (side() === 'browser') {
+        @if (overCapNote(); as why) {
+            <p class="text-secondary m-0 text-xs" data-testid="catalogue-over-cap" role="status">{{ why }}</p>
         }
-    } @else {
+    } @else if (!investigationsEnabled()) {
         <div data-testid="catalogue-server-locked">
             <inspecto-locked-action label="Run on the server" [reason]="lockedReason()" />
         </div>
@@ -149,7 +139,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (serverSpecs().path; as srv) {
+                            @if (side() === 'server' && serverSpecs().path; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -200,7 +190,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (serverSpecs().allPaths; as srv) {
+                            @if (side() === 'server' && serverSpecs().allPaths; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -330,25 +320,26 @@
                                     [ngModel]="explainFor()"
                                     (ngModelChange)="explainFor.set($any($event))"
                                 />
-                                <mat-form-field subscriptSizing="dynamic" class="w-28">
-                                    <mat-label>Hops</mat-label>
-                                    <input
-                                        matInput
-                                        type="number"
-                                        min="1"
-                                        max="5"
-                                        [value]="explainHops()"
-                                        (input)="explainHops.set(+$any($event.target).value || 1)"
-                                    />
-                                </mat-form-field>
-                                <button mat-stroked-button (click)="runExplain()" [disabled]="!explainFor()">
-                                    <mat-icon svgIcon="heroicons_outline:light-bulb"></mat-icon>
-                                    Explain neighborhood
-                                </button>
+                                <inspecto-pen-field
+                                    class="w-28"
+                                    label="Hops"
+                                    type="number"
+                                    [min]="1"
+                                    [max]="5"
+                                    [ngModel]="explainHops()"
+                                    (ngModelChange)="explainHops.set(+$event || 1)"
+                                ></inspecto-pen-field>
+                                @if (side() === 'browser') {
+                                    <button mat-stroked-button (click)="runExplain()" [disabled]="!explainFor()">
+                                        <mat-icon svgIcon="heroicons_outline:light-bulb"></mat-icon>
+                                        Explain neighborhood
+                                    </button>
+                                }
                             </div>
-                            @if (explainText()) {
+                            @if (side() === 'browser' && explainText()) {
                                 <p class="mt-1 text-sm" role="status">{{ explainText() }}</p>
                             }
+                            @if (side() === 'server') {
                             <inspecto-link-analysis-server-run
                                 algorithm="neighborhood"
                                 [indexOnly]="true"
@@ -415,6 +406,7 @@
                                 [investigationOpen]="investigationOpen()"
                                 [allowed]="canRunOnServer()"
                             />
+                            }
                         }
                         @case ('temporal') {
                             <ng-content select="[laTemporal]" />
@@ -452,7 +444,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (serverSpecs().centrality; as srv) {
+                            @if (side() === 'server' && serverSpecs().centrality; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -520,7 +512,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (serverSpecs().communities; as srv) {
+                            @if (side() === 'server' && serverSpecs().communities; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -581,7 +573,7 @@
                                     >Directed loops — circular flow, forwarding loops.</span
                                 >
                             </div>
-                            @if (serverSpecs().cycles; as srv) {
+                            @if (side() === 'server' && serverSpecs().cycles; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -622,7 +614,7 @@
                                     >Nodes / links whose removal splits the graph.</span
                                 >
                             </div>
-                            @if (serverSpecs().cutNodes; as srv) {
+                            @if (side() === 'server' && serverSpecs().cutNodes; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -634,7 +626,7 @@
                                     (completed)="applyServerResult($event)"
                                 />
                             }
-                            @if (serverSpecs().cutEdges; as srv) {
+                            @if (side() === 'server' && serverSpecs().cutEdges; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -679,7 +671,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (serverSpecs().cliques; as srv) {
+                            @if (side() === 'server' && serverSpecs().cliques; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -759,7 +751,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (serverSpecs().prediction; as srv) {
+                            @if (side() === 'server' && serverSpecs().prediction; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -855,7 +847,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (serverSpecs().flow; as srv) {
+                            @if (side() === 'server' && serverSpecs().flow; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -867,7 +859,7 @@
                                     (completed)="applyServerResult($event)"
                                 />
                             }
-                            @if (serverSpecs().forest; as srv) {
+                            @if (side() === 'server' && serverSpecs().forest; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -904,7 +896,7 @@
                                     >Composite risk from degree, betweenness, PageRank, k-core, triangles.</span
                                 >
                             </div>
-                            @if (serverSpecs().scoring; as srv) {
+                            @if (side() === 'server' && serverSpecs().scoring; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -916,14 +908,12 @@
                                     (completed)="applyServerResult($event)"
                                 />
                             }
-                            <mat-form-field class="w-64" subscriptSizing="dynamic">
-                                <mat-label>Risk Score model</mat-label>
-                                <input
-                                    matInput
-                                    [value]="riskModel()"
-                                    (change)="riskModel.set($any($event.target).value.trim()); riskEntity.set(null)"
-                                />
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                class="w-64"
+                                label="Risk Score model"
+                                [ngModel]="riskModel()"
+                                (ngModelChange)="riskModel.set(('' + $event).trim()); riskEntity.set(null)"
+                            ></inspecto-pen-field>
                             @if (riskModel() && riskEntity()) {
                                 <inspecto-risk-score-panel
                                     class="mt-2 block max-w-md"
@@ -1054,7 +1044,7 @@
                                         <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
                                         Find matches
                                     </button>
-                                    @if (graphTruncated() && traversalMappings().length && !investigationPatternColumns()) {
+                                    @if (side() === 'server' && graphTruncated() && traversalMappings().length && !investigationPatternColumns()) {
                                         <button
                                             mat-stroked-button
                                             (click)="runBranchingOnServer()"
@@ -1102,7 +1092,7 @@
                                         {{ note }}
                                     </p>
                                 }
-                                @if (graphTruncated() && traversalMappings().length) {
+                                @if (side() === 'server' && graphTruncated() && traversalMappings().length) {
                                     @if (serverPatternColumns().blocked; as why) {
                                         <p
                                             class="m-0 text-sm"
@@ -1214,35 +1204,21 @@
                                                         >↔</mat-button-toggle
                                                     >
                                                 </mat-button-toggle-group>
-                                                <mat-form-field subscriptSizing="dynamic" class="w-40">
-                                                    <mat-label>Link kind</mat-label>
-                                                    <mat-select
-                                                        [value]="step.edgeKind ?? ''"
-                                                        (valueChange)="
-                                                            updatePatternStep(i, { edgeKind: $event || undefined })
-                                                        "
-                                                    >
-                                                        <mat-option [value]="''">Any</mat-option>
-                                                        @for (k of edgeKinds(); track k) {
-                                                            <mat-option [value]="k">{{ k }}</mat-option>
-                                                        }
-                                                    </mat-select>
-                                                </mat-form-field>
+                                                <inspecto-option-picker
+                                                    class="w-40"
+                                                    label="Link kind"
+                                                    [options]="edgeKindOptions()"
+                                                    [ngModel]="step.edgeKind ?? ''"
+                                                    (ngModelChange)="updatePatternStep(i, { edgeKind: $event || undefined })"
+                                                />
                                             }
-                                            <mat-form-field subscriptSizing="dynamic" class="w-40">
-                                                <mat-label>Node kind</mat-label>
-                                                <mat-select
-                                                    [value]="step.nodeKind ?? ''"
-                                                    (valueChange)="
-                                                        updatePatternStep(i, { nodeKind: $event || undefined })
-                                                    "
-                                                >
-                                                    <mat-option [value]="''">Any</mat-option>
-                                                    @for (k of nodeKinds(); track k) {
-                                                        <mat-option [value]="k">{{ k }}</mat-option>
-                                                    }
-                                                </mat-select>
-                                            </mat-form-field>
+                                            <inspecto-option-picker
+                                                class="w-40"
+                                                label="Node kind"
+                                                [options]="nodeKindOptions()"
+                                                [ngModel]="step.nodeKind ?? ''"
+                                                (ngModelChange)="updatePatternStep(i, { nodeKind: $event || undefined })"
+                                            />
                                             @if (i > 0) {
                                                 <button
                                                     mat-icon-button

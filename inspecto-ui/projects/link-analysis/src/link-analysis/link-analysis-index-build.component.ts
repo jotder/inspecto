@@ -12,7 +12,9 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api/api-base';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -117,9 +119,11 @@ export function indexBuildErrorMessage(err: unknown): string {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         DecimalPipe,
+        FormsModule,
         MatButtonModule,
         MatIconModule,
         RouterLink,
+        InspectoOptionPickerComponent,
         InspectoAlertComponent,
         ChipComponent,
         InspectoSchemaFormComponent,
@@ -148,20 +152,14 @@ export function indexBuildErrorMessage(err: unknown): string {
             @if (index(); as ix) {
                 <div class="flex flex-wrap items-center gap-2">
                     @if (choices().length > 1) {
-                        <label class="text-secondary text-sm">
-                            Index
-                            <select
-                                class="ml-1 rounded border px-1"
-                                data-testid="build-index-pick"
-                                (change)="pick($any($event.target).value)"
-                            >
-                                @for (c of choices(); track c.dataset) {
-                                    <option [value]="c.dataset" [selected]="c.dataset === ix.dataset">
-                                        {{ c.dataset }}
-                                    </option>
-                                }
-                            </select>
-                        </label>
+                        <inspecto-option-picker
+                            class="w-48"
+                            label="Index"
+                            data-testid="build-index-pick"
+                            [options]="choiceOptions()"
+                            [ngModel]="ix.dataset"
+                            (ngModelChange)="pick('' + $event)"
+                        />
                     }
                     <span class="text-sm" data-testid="build-index-version">
                         {{ ix.dataset }}: version {{ ix.version }}{{ ix.deltas ? ', ' + ix.deltas + ' appended' : '' }}
@@ -358,6 +356,9 @@ export class LinkAnalysisIndexBuildComponent {
     readonly choices = computed<LinkIndexSummary[]>(() => {
         return this.runs.indexes()?.indexes ?? [];
     });
+    readonly choiceOptions = computed<PickerOption[]>(() =>
+        this.choices().map((c) => ({ value: c.dataset, label: c.dataset })),
+    );
     readonly index = computed<LinkIndexSummary | null>(() => {
         const all = this.choices();
         return all.find((i) => i.dataset === this.pickedDataset()) ?? all[0] ?? null;

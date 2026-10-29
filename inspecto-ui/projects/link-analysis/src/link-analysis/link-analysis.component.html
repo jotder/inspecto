@@ -3,13 +3,22 @@
     <header #laHeader class="la-compact-bar flex min-w-0 flex-nowrap items-center gap-1" data-testid="la-header">
         <!-- LA-STUDIO-UI-REORG-1 §5.1 / §5.11: File ▾ - New, Open…, Save view, Save view as…, Snapshot, Import / export, Close, Delete -->
         <mat-menu #fileMenu="matMenu">
-            <button mat-menu-item (click)="closeOpenWork()" [disabled]="investigation.busy()" data-testid="la-file-new">
+            <button mat-menu-item (click)="newWork()" [disabled]="investigation.busy()" data-testid="la-file-new">
                 <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon>
                 <span>New</span>
             </button>
             <button mat-menu-item (click)="openOpenDialog()" data-testid="la-file-open">
                 <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
                 <span>Open…</span>
+            </button>
+            <!-- LA-PANELS-REDESIGN-1: Explore dataset… and the examples moved here from the start box -->
+            <button mat-menu-item (click)="exploreDataset()" data-testid="la-file-explore">
+                <mat-icon svgIcon="heroicons_outline:circle-stack"></mat-icon>
+                <span>Explore dataset…</span>
+            </button>
+            <button mat-menu-item [matMenuTriggerFor]="examplesMenu" data-testid="la-file-examples">
+                <mat-icon svgIcon="heroicons_outline:light-bulb"></mat-icon>
+                <span>Examples</span>
             </button>
             <button mat-menu-item (click)="saveOpenView()" [disabled]="!graph() || saving()" data-testid="la-save-view">
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
@@ -69,6 +78,18 @@
             >
                 <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                 <span>Delete{{ deleteLabel() ? ' ' + deleteLabel() : '' }}</span>
+            </button>
+        </mat-menu>
+        <mat-menu #examplesMenu="matMenu">
+            <button
+                mat-menu-item
+                (click)="loadFollowTheMoney()"
+                [disabled]="!followView()"
+                [matTooltip]="followView() ? 'Opens the saved view ' + followView()!.name + ' and draws it now' : 'No follow-the-money view in this Space'"
+                data-testid="la-example-follow"
+            >
+                <mat-icon svgIcon="heroicons_outline:banknotes"></mat-icon>
+                <span>Follow the money</span>
             </button>
         </mat-menu>
         <!-- the page title and its info (back up from the footer, operator 2026-10-28): the page's one h1 -->
@@ -1300,14 +1321,10 @@
                             [nodeCap]="nodeCap()"
                             [notice]="startNotice()"
                             [busy]="starting()"
-                            [followView]="followView()"
-                            [savedViewCount]="views().length"
                             [addData]="addDataOffered"
                             (start)="startFrom($event)"
                             (listsWanted)="refreshEntityLists()"
-                            (followMoney)="loadFollowTheMoney()"
-                            (exploreDataset)="exploreDataset()"
-                            (openSavedViews)="openSavedViews()"
+                            (newInvestigation)="newWork()"
                             (openAddData)="openAddData()"
                         ></inspecto-link-analysis-start-box>
                     </div>
@@ -1325,7 +1342,7 @@
                 [class.hidden]="!toolboxDockOpen()"
                 aria-label="Resize the toolbox (arrow keys or drag)"
             ></div>
-            <!-- right dock — Analysis | Investigation toolbox; collapses to an icon rail -->
+            <!-- right dock — Browser | Server | Investigation toolbox (LA-PANELS-REDESIGN-1); collapses to an icon rail -->
             <aside
                 class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l max-md:!w-full max-md:border-l-0 max-md:border-t"
                 [class.w-10]="!toolboxDockOpen()"
@@ -1352,11 +1369,7 @@
                                         toolboxTab() === t.id ? 'inset 0 -2px 0 var(--gamma-primary)' : null
                                     "
                                     [attr.aria-selected]="toolboxTab() === t.id"
-                                    [attr.aria-controls]="
-                                        t.id === 'investigation' && toolboxTab() !== 'investigation'
-                                            ? null
-                                            : 'la-toolbox-panel-' + t.id
-                                    "
+                                    [attr.aria-controls]="toolboxTab() === t.id ? 'la-toolbox-panel-' + t.id : null"
                                     [attr.tabindex]="toolboxTab() === t.id ? 0 : -1"
                                     (click)="toolboxTab.set(t.id)"
                                     (keydown)="onToolboxTabKey($event)"
@@ -1379,7 +1392,7 @@
                         <!-- LA-ONBOARD-1 phase 7 (UC-12): three plain questions first; the full toolbox below. -->
                         <inspecto-link-analysis-discover
                             class="mb-3"
-                            [class.hidden]="toolboxTab() !== 'analysis'"
+                            [class.hidden]="toolboxTab() !== 'browser'"
                             [graph]="canvasData()"
                             [terms]="growTerms()"
                             [timeAttr]="timeColumn()"
@@ -1390,13 +1403,14 @@
                             (startFrom)="startFromFound($event)"
                             (addToList)="addFoundToList($event)"
                         ></inspecto-link-analysis-discover>
-                        <!-- Analysis (the graph-algorithms toolbox). Kept mounted via `[hidden]` so its results
-                             survive tab switches; emits emphasis for the canvas. -->
+                        <!-- Browser and Server (the graph-algorithms toolbox): ONE instance, told its side. Kept mounted via
+                             `[hidden]` so its results survive tab switches; emits emphasis for the canvas. -->
                         <inspecto-link-analysis-toolbox
-                            [hidden]="toolboxTab() !== 'analysis'"
+                            [hidden]="toolboxTab() === 'investigation'"
                             role="tabpanel"
-                            id="la-toolbox-panel-analysis"
-                            aria-labelledby="la-toolbox-tab-analysis"
+                            [id]="'la-toolbox-panel-' + toolboxSide()"
+                            [attr.aria-labelledby]="'la-toolbox-tab-' + toolboxSide()"
+                            [side]="toolboxSide()"
                             [graph]="canvasData()"
                             [nodeOptions]="nodeOptions()"
                             [nodeKinds]="nodeKinds()"
@@ -1463,11 +1477,28 @@
                                     [degreePresets]="degreePresets()"
                                     [maxDegree]="maxDegree()"
                                     (pendingDone)="pendingInvestigation.set(null)"
-                                    (openRequested)="openOpenDialog('investigations')"
                                     (expandRequested)="openExpand()"
                                     (settingsRequested)="openSettings('investigation')"
                                     (dockRequested)="openDock($event)"
-                                ></inspecto-link-analysis-investigation>
+                                >
+                                    <!-- LA-PANELS-REDESIGN-1: ONE New Investigation form (File ▸ New lands here) -->
+                                    <inspecto-link-analysis-start-box
+                                        laNewInvestigation
+                                        mode="investigation"
+                                        [catalogue]="startCatalogue()"
+                                        [lists]="entityLists()"
+                                        [dataset]="startDataset()"
+                                        [investigations]="true"
+                                        [nodeCap]="nodeCap()"
+                                        [notice]="startNotice()"
+                                        [busy]="starting() || investigation.busy() || investigation.chainRunning()"
+                                        [maskingMode]="maskingMode()"
+                                        [maxDegree]="maxDegree()"
+                                        [canWrite]="canStartInvestigation()"
+                                        (create)="createInvestigation($event)"
+                                        (listsWanted)="refreshEntityLists()"
+                                    ></inspecto-link-analysis-start-box>
+                                </inspecto-link-analysis-investigation>
                             } @else {
                                 <div
                                     class="flex flex-col gap-2"
@@ -1499,11 +1530,19 @@
                     </button>
                     <button
                         mat-icon-button
-                        (click)="openAnalysis()"
-                        matTooltip="Analysis"
-                        aria-label="Open the analysis tools"
+                        (click)="openAnalysis('browser')"
+                        matTooltip="Browser"
+                        aria-label="Open the Browser tools"
                     >
                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
+                    </button>
+                    <button
+                        mat-icon-button
+                        (click)="openAnalysis('server')"
+                        matTooltip="Server"
+                        aria-label="Open the Server tools"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
                     </button>
                     <button
                         mat-icon-button

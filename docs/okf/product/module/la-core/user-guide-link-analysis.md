@@ -215,9 +215,15 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   graph edits (**Expand…**, **Collapse**, **Hide**, **Exclude** and **Merge** on an Investigation's canvas, **Attach to
   Case**), **Clean up** (the broom), and **Held** and **Hidden by lists**.
 * **Canvas:** the graph, with the legend, the Working set tiles and the minimap.
-* **Right panel**, collapsed to a thin rail (**Show the toolbox**, **Analysis**, **Investigation**) or open with two
-  tabs (**«** collapses it again): **Analysis** (*Find something interesting* and the one analysis catalogue,
-  [§8](#8-the-analysis-catalogue)) and **Investigation** (the Act panel, [§11](#11-investigations)).
+* **Right panel**, collapsed to a thin rail (**Show the toolbox**, **Browser**, **Server**, **Investigation**) or open
+  with three tabs (**«** collapses it again; LA-PANELS-REDESIGN-1, 2026-10-29):
+  * **Browser**: *Find something interesting* and the tools that run on the graph on screen.
+  * **Server**: the server algorithms and the tools that read the whole Dataset.
+  * **Investigation**: the New Investigation form, or the open one's Act panel ([§11](#11-investigations)).
+
+  The analysis catalogue is [§8](#8-the-analysis-catalogue). Settings in the three tabs are edited the same way
+  everywhere: **label · value · ✎** (click the pencil or the value, Enter keeps it, Escape drops it), and a choice
+  opens as a list in a popup.
 * **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus,
   with an Investigation open, **Op log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
   entities**. Drag its edge to resize; it remembers its tab and height in this browser.
@@ -270,17 +276,19 @@ The first screen is one **Start from...** box. Pick the **Dataset** first (alrea
 ([§7.2](#72-held-busy-entities)), so **Expand…** continues from there. A line above the graph says what was drawn and
 lists any value not in the Dataset. A list or a paste draws at most 25 values in one start.
 
-With Investigations (Standard and above, with the add-on), **One entity** seeds an Investigation instead: state the
-**Purpose / legal basis** and press **Investigate**; it creates the Investigation, seeds the entity and expands one
-degree. A list or a paste is drawn and queued as the first seeds. **Investigate** on an Entity's page, and
-**Investigate … in Link Analysis** on an Incident or Case page, take the same path.
+**Start from** is a choice that opens as a popup, like the Entity Type. The box always draws; it records nothing.
 
-Under the box: **Follow the money (example)** opens a ready-made view (when your Space has one), **Open a saved view**
-opens **File ▸ Open…**, **Explore a Dataset** opens Graph model, and **Add data** brings a file in.
+With Investigations (Standard and above, with the add-on), the box also offers **New Investigation…**. It opens the
+New Investigation form ([§11.1](#111-start-one)), which asks the same Start from question and starts the Investigation
+in one press. **Investigate** on an Entity's page, and **Investigate … in Link Analysis** on an Incident or Case page,
+open a short *Investigate {number}* form in the Investigation tab that asks only for the purpose.
+
+**Open…**, **Explore dataset…** and **Examples ▸ Follow the money** are in the **File** menu
+([§10](#10-saving-exporting-and-the-file-menu)). Under the box, **Add data** brings a file in.
 
 ### 5.2 Graph model: draw a Dataset yourself
 
-**Explore a Dataset**, a status-bar chip or the pencil opens **⚙ Settings ▸ Graph model**:
+**File ▸ Explore dataset…**, a status-bar chip or the pencil opens **⚙ Settings ▸ Graph model**:
 
 1. **Dataset.** The ones that look like links are listed first, each with the reason. **Entity/Link (several
    Datasets)** puts up to 16 mappings in one graph; the same entity in more than one Dataset becomes **one node** that
@@ -451,9 +459,9 @@ not in a text field, grid, menu or dialog.
 
 ## 8. The analysis catalogue
 
-The right panel's **Analysis** tab.
+The right panel's **Browser** and **Server** tabs.
 
-**Find something interesting** — three plain questions about the graph on screen:
+**Find something interesting** (Browser tab): three plain questions about the graph on screen.
 
 * **Who is busiest** — the five entities with the most links, each in one sentence (*MERCHANT-BIG takes part in 270
   transfers, the most on this graph.*). When the busiest has at least 5 links and twice the next, it asks: *Add it to
@@ -467,13 +475,24 @@ Every result row offers **Show on graph**, **Start from these** (a new graph fro
 **Add to a list** (purpose in plain words: *Watch these*, *Never follow these*, *Known good*, *Block*; a reason is
 recorded).
 
-**One catalogue, one entry per algorithm**, ordered by the question each answers. The **Browser | Server** switch
-sets where it runs: *Browser* works on the graph on screen; *Server* lists the server algorithms (29 on a standard
-install) and runs them over the whole Dataset or the open Investigation's Working Set, whatever its size, with the
-answer summarised in words and *Highlight on canvas*. Each row shows a badge (*both*, *server*) and its limit (*≤ 2500
-nodes in the browser*); over the browser limit Server is chosen for you and says why. The Server side is hidden on the
-Explorer level and on Basic, with one line saying what has it. Click a ranking row to select and centre that node; a
-long result has **Open in the dock** (the dock's **Results** tab).
+**One catalogue, one entry per algorithm**, ordered by the question each answers. It is split by where a tool runs:
+
+* **The Browser tab** works on the graph on screen. It holds every tool that runs in the browser, including those that
+  can also run on the server (*both*).
+* **The Server tab** lists the server algorithms (29 on a standard install). It runs them over the whole Dataset or
+  the open Investigation's Working Set, whatever its size, with the answer summarised in words and *Highlight on
+  canvas*. It also holds the tools that only read the server: *Find paths (server)*, *Value Measures*, *Burst and
+  periodicity* and *Edge index*.
+* **A *both* tool** shows only that side's controls in each tab. *Explain node* runs its neighbourhood in the browser;
+  its edge-index reads are in the Server tab. *Pattern match* finds matches in the Browser tab, and its **Run on
+  server** is in the Server tab.
+
+Each row shows a badge (*both*, *server*) and its limit (*≤ 2500 nodes in the browser*). Over the browser limit, the
+Browser tab says so. That tool's **Run on server** is then in the Server tab, listed with the same settings.
+
+The tools keep their results when you switch tabs. On the Explorer level and on Basic, the Server tab shows one locked
+line saying what has it. Click a ranking row to select and centre that node. A long result has **Open in the dock**
+(the dock's **Results** tab).
 
 | Group | Answers |
 |---|---|
@@ -545,8 +564,10 @@ Server side repeats the search across the whole Dataset.
 
 | Item | What it does |
 |---|---|
-| **New** | Back to *Start from...* |
+| **New** | Closes what is open. With Investigations it opens the **New Investigation** form in the Investigation tab ([§11.1](#111-start-one)); without them, back to *Start from...* |
 | **Open…** | One dialog, two tabs. **Saved views**: search, filter by Tag, Dataset and last change; **Open**, **Rename**, **Duplicate**, **Delete** (asks first), **Version history**, **Comments**, **Tags**, **Offer for sharing**. **Investigations**: the ones you may read plus **Recent**; filter by owner, Dataset, date and status (Recent, Mine, Shared through a Case); type an id to open one directly. |
+| **Explore dataset…** | Opens ⚙ Settings ▸ Graph model with its guided Dataset picker: choose a Dataset and its from and to columns yourself ([§5.2](#52-graph-model-draw-a-dataset-yourself)) |
+| **Examples ▸ Follow the money** | Opens the Space's ready-made money-mule view and draws it now. Greyed out when the Space has none |
 | **Save view** | Saves over the open view (with none open it asks a name) |
 | **Save view as…** | A **Name** and optional description; names the lists the graph uses (the list it started from, the exclusion lists you added to) and says once that a saved view re-reads live data and is not evidence |
 | **Save this analysis (Snapshot)** | Freezes what is on screen (the Working Set while an Investigation is open) with a SHA-256 fingerprint; can attach it to a Case or **create a new Case from graph nodes** |
@@ -560,7 +581,7 @@ locked, with one line naming what has it.
 A **saved view** keeps the graph's start, mapping, layout, display options, filters and the Entity Lists it uses.
 Opening it draws its start again over the data as it is then — the list's members as they are now, the entities you
 started from and expanded, each with one ring — and hides again whatever its exclusion lists hold now. A view saved
-from **Explore a Dataset** reruns that query. A view names a *Case* only by attaching: a Case is the Incident-management
+from **Explore dataset…** reruns that query. A view names a *Case* only by attaching: a Case is the Incident-management
 record you attach evidence to.
 
 | Other ways out | Notes |
@@ -578,12 +599,41 @@ prune deliberately. Every step is sealed with what it read, so it replays identi
 
 ### 11.1 Start one
 
-From **Start from... ▸ One entity** with **Investigate** ([§5.1](#51-start-from)); from a ranking, **Start an
-Investigation from the top results**; or on the **Investigation** tab give a **Purpose / legal basis** and press
-**Start Investigation** (it binds the drawn graph's one Dataset mapping; the query's filter is not carried over and the
-panel says so). Reopen one with **File ▸ Open…** ▸ *Investigations*. Over a pre-aggregated Dataset (one row per pair
-with an event count, like `telecom_links`) the count column is bound so an expand counts events, not rows; the Telecom
-pack binds `events` for you.
+**File ▸ New**, or the Investigation tab with nothing open, shows the **New Investigation** form (LA-PANELS-REDESIGN-1,
+2026-10-29). Fill it in top to bottom:
+
+1. **Start from** (a popup, like the Entity Type): **One entity**, **A list**, **A paste** or **The whole Dataset**.
+2. The **Dataset**.
+3. The input for that choice, and only that one:
+   * one entity: the Entity Type and the value, with the same matches as [§5.1](#51-start-from);
+   * a list: the Entity List;
+   * a paste: the values;
+   * the whole Dataset: nothing more. A warning shows when it is above the node cap.
+4. **Name** and **Reason**, both pre-filled from the input. The Reason is the purpose or legal basis, recorded and
+   shown in the Dossier. Examples:
+   * *Investigation — Account MULE-HUB-01* / *Review of Account MULE-HUB-01 and its links*;
+   * *Investigation — list Suspects*;
+   * *Investigation — 3 pasted values*;
+   * *Investigation — whole Transfers*.
+
+   They follow the input until you edit them; from then on your own text is kept. In a Space that masks values, the
+   default leaves the value out (*Investigation — Phone number*), because a name is stored and shown like a value.
+5. **More** (folded): the **Time column** (blank uses the Dataset's) and its **zone**.
+6. **Expand on start** (folded): *Don't expand* (the default), or 1, 2 or 3 degrees, up to the profile's last degree.
+
+**Start Investigation** does it all in one press. It creates the Investigation and records the start as its seed step,
+then expands the degrees you asked for, each a recorded step with busy entities held. A list or a paste is drawn first,
+and only the values found in the Dataset are seeded. The whole Dataset is drawn, and the Investigation is created over
+it with no seed yet. **Expand…** on the canvas goes further later.
+
+From a ranking, **Start an Investigation from the top results** queues the entities. The Investigation tab then shows
+*Start Investigation with N queued seeds*: give a **Purpose / legal basis** and the queued entities become the first
+seed step. It binds the drawn graph's one Dataset mapping; the query's filter is not carried over, and the panel says
+so.
+
+Reopen an Investigation with **File ▸ Open…** ▸ *Investigations*. Over a pre-aggregated Dataset (one row per pair with
+an event count, like `telecom_links`), the count column is bound so an expand counts events, not rows. The Telecom pack
+binds `events` for you.
 
 ### 11.2 The Investigation tab (Act panel)
 
@@ -706,8 +756,8 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 
 ## 13. Worked examples
 
-**Find a money-mule ring.** Press **Follow the money (example)**, or open `mule_layering_ring` (on the `la-showcase`
-Space Template: 112 accounts over three days). Analysis ▸ **Suspicion score** ▸ **Score nodes** puts the relays and
+**Find a money-mule ring.** Choose **File ▸ Examples ▸ Follow the money**, or open `mule_layering_ring` (on the
+`la-showcase` Space Template: 112 accounts over three days). Browser ▸ **Suspicion score** ▸ **Score nodes** puts the relays and
 the hub in the top decile. **Pattern match ▸ Structuring (smurfing)** finds `MULE-HUB-01`: 96 in-band legs from 12
 payers. **Value Measures ▸ Pass-through** flags 13 accounts (the two relays at ≈ 0.985, the hub at 0.979, `SHELL-A`
 above 1); **Velocity** shows them forwarding within hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub).
@@ -852,7 +902,9 @@ The Studio was reorganized on 2026-10-27 (`LA-STUDIO-UI-REORG-1`). Nothing was r
 | Save as a case (saved view) | **File ▸ Save view** / **Save view as…** |
 | Open saved views | **File ▸ Open…** ▸ *Saved views* |
 | Toolbox → View tab | The tool rail (layout, filters, Display options) and **Canvas mode** |
-| Toolbox → Analysis tab, *All algorithms (server)* | Right panel ▸ **Analysis**: one catalogue with **Browser \| Server** |
+| Toolbox → Analysis tab, *All algorithms (server)* | Right panel ▸ **Browser** and **Server** tabs (2026-10-29: the Analysis tab's Browser \| Server switch became two tabs) |
+| Start box's *Follow the money*, *Open a saved view*, *Explore a Dataset* cards | **File ▸ Examples ▸ Follow the money**, **File ▸ Open…**, **File ▸ Explore dataset…** |
+| Start box ▸ One entity ▸ *Investigate*, then the purpose form, then Expand… | One **New Investigation** form (File ▸ New): Start from, Name, Reason, optional Expand on start |
 | Selection bar, box select | Canvas toolbar selection group; **Shift+drag** lasso in Pan, or Lasso mode |
 | Investigation tab's Case, Members, Drafts, Oversight, Dossier cards | ⚙ Settings ▸ **Investigation settings** |
 
@@ -2758,7 +2810,7 @@ counts, never edge timestamps, so only the Dataset routes (which read the `timeC
   `wasNull` turned every NULL time into 1970 on the index path until the equivalence test caught it. The SPA panel
   gained a "Series per: Each link / Each entity" selector (`series` on the wire); an entity finding highlights its NODE
   and is listed by name. ✅ Sealing a finding set as a `temporal` op shipped 2026-10-05 (below, *The `temporal` op*).
-* **SPA overlay (2026-10-05).** `link-analysis-temporal-findings.component.ts` is a panel under the Analysis tab of the
+* **SPA overlay (2026-10-05).** `link-analysis-temporal-findings.component.ts` is a panel under the Server tab (until 2026-10-29 the Analysis tab) of the
   Analysis panel (a sibling of the catalogue, shown/hidden with `[class.hidden]`). It needs a **time column** and an **edge mapping**
   (the host's `traversalTargets`, the same ones server paths and the server pattern use), calls
   `InvService.temporalPattern` and hands the answer to the pure `temporal-findings.ts` (`temporalResultToState`).
@@ -3338,7 +3390,7 @@ On the la-app front page, after the Space guide, **My work** lists:
   rows loaded and rows set aside, read from the ingest audit ledger (`GET /runs/{pipeline}/batches`). After *Add a
   file* it also says replaced or appended and the net change in rows, from the Dataset's `lastImport`.
 
-**Find something interesting** (top of the Analysis tab) asks *Who is busiest*, *Which groups stick together* and *How
+**Find something interesting** (top of the Browser tab) asks *Who is busiest*, *Which groups stick together* and *How
 does A reach B*, each answered in one sentence with **Show on graph**, **Start from these** and **Add to a list**.
 Code: `la-app` `my-work.ts`, `discover.ts`; detail: [architecture §3.4](architecture.md).
 

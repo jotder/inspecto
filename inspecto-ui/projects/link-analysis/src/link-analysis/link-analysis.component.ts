@@ -69,6 +69,7 @@ import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-star
 import {
     START_MAX_SEEDS,
     StartDataset,
+    NewInvestigationRequest,
     StartRequest,
     datasetForType,
     genericBinding,
@@ -398,6 +399,8 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
 
 /** The bottom dock's tabs (§5.9); `inv` = an Investigation tab. */
 export type DockTab = 'rows' | InvestigationSection | 'results';
+/** The right dock's tabs (LA-PANELS-REDESIGN-1). */
+export type ToolboxTab = 'browser' | 'server' | 'investigation';
 const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean }[] = [
     { id: 'rows', label: 'Rows' },
     { id: 'oplog', label: 'Op log', inv: true },
@@ -603,7 +606,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             /* storage blocked - the choice just is not remembered */
         }
     });
-    readonly toolboxTab = signal<'analysis' | 'investigation'>('analysis');
+    readonly toolboxTab = signal<ToolboxTab>('browser');
     @ViewChild('toolboxScroll') private toolboxScroll?: ElementRef<HTMLElement>;
     /** The tabs share one scroll container; a new tab must open at its top, not where the last one was scrolled to. */
     private readonly resetToolboxScroll = effect(() => {
@@ -622,14 +625,18 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly investigationsEnabled = this.laFeatures.investigations;
     /** Why an Investigation action is locked on the Explorer level (`/bootstrap` `featureReasons.investigations`). */
     readonly investigationsLockedReason = computed(() => investigationsLockedReason(this.laFeatures));
-    private readonly allToolboxTabs: readonly { id: 'analysis' | 'investigation'; label: string }[] = [
-        { id: 'analysis', label: 'Analysis' },
+    /** LA-PANELS-REDESIGN-1: what runs in the browser, what runs on the server, and the Investigation. */
+    private readonly allToolboxTabs: readonly { id: ToolboxTab; label: string }[] = [
+        { id: 'browser', label: 'Browser' },
+        { id: 'server', label: 'Server' },
         { id: 'investigation', label: 'Investigation' },
     ];
     /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels) - the same on every level. */
-    get toolboxTabs(): readonly { id: 'analysis' | 'investigation'; label: string }[] {
+    get toolboxTabs(): readonly { id: ToolboxTab; label: string }[] {
         return this.allToolboxTabs;
     }
+    /** The side the one toolbox instance draws: Server on the Server tab, else Browser (it stays mounted, hidden). */
+    readonly toolboxSide = computed<'browser' | 'server'>(() => (this.toolboxTab() === 'server' ? 'server' : 'browser'));
     /** The graph canvas's text alternative: the displayed graph as a keyboard-navigable node / link list. */
     readonly listMode = signal(false);
     /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
@@ -1876,32 +1883,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             return;
         }
         if (req.kind === 'entity') {
-            await this.startFromEntity({ seed: req.value, entityType: req.entityType, dataset: ds.id });
+            // LA-PANELS-REDESIGN-1: the start box draws on every level; an Investigation starts from the New form
+            await this.startFromEntity({ seed: req.value, entityType: req.entityType, dataset: ds.id }, true);
             return;
         }
-        let values: string[];
-        // the Entity Type the start names (LA-ONBOARD-DEFECTS-1): the paste's pick, the list's own type, or - for a result
-        // found on the graph - the type the graph was drawn as; never silently the Dataset's primary type
-        let entityType: string | undefined =
-            req.kind === 'paste' ? req.entityType : req.kind === 'found' ? this.lastRun()?.query?.projection?.entityType : undefined;
-        if (req.kind === 'list') {
-            try {
-                const list = await firstValueFrom(this.inv.getEntityList(req.listId));
-                entityType = list.entityType || undefined;
-                if (!list.members) {
-                    this.startNotice.set({ variant: 'warning', text: `The members of ${list.title} are not shown to you, so it cannot start a graph.` });
-                    return;
-                }
-                if (!list.members.length) {
-                    this.startNotice.set({ variant: 'warning', text: `${list.title} has no members yet.` });
-                    return;
-                }
-                values = list.members;
-            } catch (err) {
-                this.startNotice.set({ variant: 'warning', text: apiErrorMessage(err, 'The Entity List could not be read.') });
-                return;
-            }
-        } else values = req.values;
+        const start = await this.startValues(req);
+        if (!start) return;
+        const { values, entityType } = start;
         const found = await this.drawStart(ds, values, entityType);
         if (found.length) {
             // a case remembers its start (A-1b): reopening draws it again over the data as it is then
@@ -1915,36 +1903,133 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             if (req.kind === 'found')
                 this.startNotice.update((n) => (n ? { ...n, text: `Started from ${req.what}. ${n.text}` } : n));
         }
-        if (!found.length || !this.investigationsEnabled()) return;
-        if (req.kind === 'list') {
-            // A list starts an Investigation as one entity does (S2): its members are seeded and expanded one degree, hubs held.
-            const title = this.entityLists().find((l) => l.id === req.listId)?.title ?? req.listId;
-            // the projection the explorer draw used: the list's own type, else the Dataset's mapping as it is
-            const binding = {
-                ...genericBinding(title, entityType ?? '', ds, activeDomainProfileId()),
-                ...(entityType ? {} : { projection: ds.mapping }),
-                seeds: found,
-            };
-            this.investigateIssue.set('');
+        // A result found on the graph is queued as the first seeds of an Investigation (as "top results" are); the start
+        // box's own kinds only draw - the New Investigation form starts one (LA-PANELS-REDESIGN-1).
+        if (!found.length || !this.investigationsEnabled() || req.kind !== 'found') return;
+        this.queueSeedsAndOpen(found.map((v) => ({ id: v, label: v, ids: [v] })));
+    }
+
+    /**
+     * The values a list / paste / found start names, and the Entity Type it names (LA-ONBOARD-DEFECTS-1): the paste's
+     * pick, the list's own type, or - for a result found on the graph - the type the graph was drawn as; never silently
+     * the Dataset's primary type. Null (with the notice set) when an Entity List cannot start one.
+     */
+    private async startValues(
+        req: Extract<StartRequest, { kind: 'list' | 'paste' | 'found' }>,
+    ): Promise<{ values: string[]; entityType?: string } | null> {
+        if (req.kind === 'paste') return { values: req.values, entityType: req.entityType };
+        if (req.kind === 'found') return { values: req.values, entityType: this.lastRun()?.query?.projection?.entityType };
+        try {
+            const list = await firstValueFrom(this.inv.getEntityList(req.listId));
+            if (!list.members) {
+                this.startNotice.set({ variant: 'warning', text: `The members of ${list.title} are not shown to you, so it cannot start a graph.` });
+                return null;
+            }
+            if (!list.members.length) {
+                this.startNotice.set({ variant: 'warning', text: `${list.title} has no members yet.` });
+                return null;
+            }
+            return { values: list.members, entityType: list.entityType || undefined };
+        } catch (err) {
+            this.startNotice.set({ variant: 'warning', text: apiErrorMessage(err, 'The Entity List could not be read.') });
+            return null;
+        }
+    }
+
+    /** The Space's masking mode for the New form's default Name: the last read's note, else the Space's mode in force. */
+    readonly maskingMode = computed(() => this.inv.masking()?.mode ?? this.limits.limits().maskingModeInForce ?? null);
+    /** Starting an Investigation needs the Incident management capability (as the Investigation tab's other writes). */
+    readonly canStartInvestigation = computed(() => this.lens.canManageIncidents());
+
+    /**
+     * File ▸ New (LA-PANELS-REDESIGN-1): close what is open, then - on the Investigations level - show the ONE New
+     * Investigation form in the Investigation tab. The Explorer level lands on the start box.
+     */
+    async newWork(): Promise<void> {
+        await this.closeOpenWork();
+        if (this.openWorkLabel() || !this.investigationsEnabled()) return; // Close was declined, or there is no Investigation
+        this.openInvestigation();
+    }
+
+    /**
+     * The New Investigation form's answer: create the Investigation, record the start as its seed step and expand
+     * `degrees` degrees with the profile's presets - one press, no second form (LA-PANELS-REDESIGN-1). One entity binds as
+     * a deep link does (a Domain Profile's mapping, else the Dataset's); a list or a paste is drawn first and its found
+     * values are seeded; the whole Dataset is drawn and an Investigation is created over its mapping, with no seed.
+     */
+    async createInvestigation(req: NewInvestigationRequest): Promise<void> {
+        if (!this.investigationsEnabled() || this.starting() || this.investigation.chainRunning()) return;
+        const ds = this.startCatalogue().datasets.find((d) => d.id === req.start.datasetId);
+        if (!ds) return;
+        this.forgetOpenView();
+        this.startNotice.set(null);
+        this.investigateIssue.set('');
+        if (req.start.kind === 'dataset') {
+            await this.startFrom(req.start);
             this.investigation.close();
-            this.boundProfile.set(binding.profileId);
-            const laDs = (await this.datasetsLoaded).find((d) => d.id === ds.id);
-            const windowEnd = laDs ? await this.latestEventTime(laDs, binding.timeCol) : null;
-            this.pendingInvestigation.set(windowEnd ? { ...binding, windowEnd } : binding);
-            this.openInvestigation();
+            await this.investigation.start(
+                ds.mapping,
+                req.purpose,
+                req.title,
+                req.timeCol || ds.timeCol,
+                req.timeColZone,
+                undefined,
+                ds.mapping.entityType,
+                activeDomainProfileId(),
+            );
             return;
         }
-        // Investigations level: the drawn start is also queued as the first seeds of the Investigation (as "top results" are).
-        this.queueSeedsAndOpen(found.map((v) => ({ id: v, label: v, ids: [v] })));
+        let binding: PendingInvestigation;
+        if (req.start.kind === 'entity') {
+            const bound = await this.bindInvestigation({ seed: req.start.value, entityType: req.start.entityType, dataset: ds.id });
+            if ('reason' in bound) {
+                this.startNotice.set({ variant: 'warning', text: bound.reason });
+                return;
+            }
+            binding = bound.binding;
+        } else {
+            const start = await this.startValues(req.start);
+            if (!start) return;
+            const found = await this.drawStart(ds, start.values, start.entityType);
+            if (!found.length) return;
+            const name =
+                req.start.kind === 'list'
+                    ? (this.entityLists().find((l) => l.id === (req.start as { listId: string }).listId)?.title ?? 'list')
+                    : `${found.length} pasted values`;
+            const generic = genericBinding(name, start.entityType ?? '', ds, activeDomainProfileId());
+            // the projection the draw used: the start's own type, else the Dataset's mapping as it is
+            binding = { ...generic, ...(start.entityType ? {} : { projection: ds.mapping }), seeds: found };
+            const laDs = (await this.datasetsLoaded).find((d) => d.id === ds.id);
+            const windowEnd = laDs ? await this.latestEventTime(laDs, binding.timeCol) : null;
+            if (windowEnd) binding = { ...binding, windowEnd };
+        }
+        this.investigation.close();
+        this.boundProfile.set(binding.profileId);
+        const ok = await this.investigation.investigateNumber({
+            projection: binding.projection,
+            purpose: req.purpose,
+            title: req.title,
+            timeCol: req.timeCol || binding.timeCol,
+            timeColZone: req.timeColZone,
+            eventsCol: binding.eventsCol,
+            seed: binding.seed,
+            seeds: binding.seeds,
+            presets: binding.presets,
+            maxDegree: binding.maxDegree,
+            degrees: req.degrees,
+            windowEnd: binding.windowEnd,
+            profileId: binding.profileId,
+        });
+        if (ok || this.investigation.active()) this.openInvestigation();
     }
 
     /**
      * ONE entity (the Start box, the `?seed=` deep link, an Entity profile's Investigate): on the Explorer level draw it and one
      * ring over a Dataset that links its type (F-8: it drew the whole Dataset); on the Investigations level seed an Investigation.
      */
-    async startFromEntity(req: InvestigateRequest): Promise<void> {
+    async startFromEntity(req: InvestigateRequest, draw = false): Promise<void> {
         this.forgetOpenView(); // what is drawn next is not the saved view
-        if (this.investigationsEnabled()) {
+        if (this.investigationsEnabled() && !draw) {
             await this.prepareInvestigation(req);
             return;
         }
@@ -2060,13 +2145,38 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     async prepareInvestigation(req: InvestigateRequest): Promise<void> {
         if (!this.investigationsEnabled()) return; // the Explorer level has no Investigation: startFromEntity draws instead
-        const badSeed = seedError(req);
-        if (badSeed) {
-            // The same rule as the starter card: a malformed number is refused, never queued.
-            this.pendingInvestigation.set(null);
-            this.investigateIssue.set(`${req.seed} cannot be investigated: ${badSeed}`);
+        const bound = await this.bindInvestigation(req);
+        if ('binding' in bound) {
+            this.investigateIssue.set('');
+            this.investigation.close(); // the pending form shows only while no Investigation is open (it stays remembered)
+            this.boundProfile.set(bound.binding.profileId);
+            this.pendingInvestigation.set(bound.binding);
+            this.openInvestigation();
             return;
         }
+        this.pendingInvestigation.set(null);
+        if (!bound.queue) {
+            // The same rule as the starter card: a malformed number is refused, never queued.
+            this.investigateIssue.set(bound.reason);
+            return;
+        }
+        this.investigateIssue.set(
+            `${bound.reason} Choose the Dataset holding ${bound.seed}'s links and run it; ${bound.seed} is queued as the first ` +
+                'seed of the Investigation you start from it.',
+        );
+        this.investigation.queueSeeds([{ id: bound.seed, label: bound.seed, ids: [bound.seed] }]);
+    }
+
+    /**
+     * Bind one entity to an Investigation: its profile's default Dataset (a Domain Profile that investigates the type),
+     * else a Dataset whose link holds the type; with the Dataset's latest event time as the window end. Nothing is
+     * created. A refusal says why, and whether the seed may be queued (a malformed number may not).
+     */
+    private async bindInvestigation(
+        req: InvestigateRequest,
+    ): Promise<{ binding: PendingInvestigation } | { reason: string; seed: string; queue: boolean }> {
+        const badSeed = seedError(req);
+        if (badSeed) return { reason: `${req.seed} cannot be investigated: ${badSeed}`, seed: req.seed, queue: false };
         // The packs arrive with the Space's Domain Profile: a deep link that lands first waits for them.
         if (!profileForEntityType(req.entityType) && !this.domainProfiles.state()) await this.domainProfiles.ready();
         const seed = req.entityType.toLowerCase() === 'msisdn' ? normaliseMsisdn(req.seed) : req.seed;
@@ -2092,20 +2202,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 reason = `The Dataset ${wanted} has no column ${missing.join(', ')}, which the ${binding.profileId} profile binds.`;
         }
         if (binding && ds && !reason) {
-            this.investigateIssue.set('');
-            this.investigation.close(); // the pending form shows only while no Investigation is open (it stays remembered)
-            this.boundProfile.set(binding.profileId);
             const windowEnd = await this.latestEventTime(ds, binding.timeCol);
-            this.pendingInvestigation.set(windowEnd ? { ...binding, windowEnd } : binding);
-            this.openInvestigation();
-            return;
+            return { binding: windowEnd ? { ...binding, windowEnd } : binding };
         }
-        this.pendingInvestigation.set(null);
-        this.investigateIssue.set(
-            `${reason} Choose the Dataset holding ${seed}'s links and run it; ${seed} is queued as the first seed of ` +
-                'the Investigation you start from it.',
-        );
-        this.investigation.queueSeeds([{ id: seed, label: seed, ids: [seed] }]);
+        return { reason, seed, queue: true };
     }
 
     /**
@@ -2137,14 +2237,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** The ready-made "follow the money" saved view of this Space, or null - the starter card is then hidden. */
     readonly followView = computed(() => pickFollowTheMoney(this.views(), this.datasets()));
 
-    /** Starter card "Follow the money": load the ready-made view, which draws its graph. */
+    /** File ▸ Examples ▸ Follow the money: load the ready-made view, which draws its graph. */
     loadFollowTheMoney(): void {
         const v = this.followView();
         if (v) void this.loadView(v);
     }
 
     /**
-     * Starter card "Explore a Dataset": show the Query panel and open its guided Dataset picker. With `datasetId` (Add
+     * File ▸ Explore dataset…: show the Query panel and open its guided Dataset picker. With `datasetId` (Add
      * data's `?dataset=<id>`) that Dataset is picked instead, and its graph is drawn when its link columns are suggested.
      */
     exploreDataset(datasetId?: string): void {
@@ -2154,10 +2254,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.queryPanel?.startExplore(datasetId);
     }
 
-    /** Starter card "Open a saved view": File ▸ Open… on its Saved views tab. */
-    openSavedViews(): void {
-        this.openOpenDialog();
-    }
 
     /** File ▸ Open… (§5.11): one dialog over saved views and Investigations; the list is re-read after, since it renames, copies and deletes. */
     openOpenDialog(tab?: 'views' | 'investigations'): void {
@@ -2793,10 +2889,10 @@ Its prior copies stay in its version history.`,
         this.settingsOpen.set(true);
     }
 
-    /** Open the graph-algorithms toolbox (the right dock's Analysis tab). */
-    openAnalysis(): void {
+    /** Open the graph-algorithms toolbox on its Browser tab, or on `side`. */
+    openAnalysis(side: 'browser' | 'server' = 'browser'): void {
         this.toolboxDockOpen.set(true);
-        this.toolboxTab.set('analysis');
+        this.toolboxTab.set(side);
     }
 
     /** LA-10: open the Investigation tab (start one, or work the open one's op log). */

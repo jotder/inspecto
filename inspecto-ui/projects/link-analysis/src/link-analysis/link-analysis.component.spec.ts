@@ -5,7 +5,7 @@ import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import type { LaFeatures, LaImportDraft } from '@inspecto/link-analysis/la-host';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { ApplicationRef, Component, EventEmitter, Input, Output, getDebugNode, signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -995,7 +995,7 @@ describe('LinkAnalysisComponent', () => {
         expect(c.settingsSection()).toBe('graph-model');
     });
 
-    it('UIR-D13: there is no View tab and no View rail button; the right panel keeps Analysis and Investigation', async () => {
+    it('UIR-D13 + LA-PANELS-REDESIGN-1: no View tab; the right panel is Browser, Server and Investigation', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         c.toolboxDockOpen.set(true);
@@ -1003,10 +1003,18 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const el: HTMLElement = fixture.nativeElement;
         expect(el.querySelector('[data-toolbox-view]')).toBeNull();
-        expect(c.toolboxTabs.map((t) => t.label)).toEqual(['Analysis', 'Investigation']);
+        expect(c.toolboxTabs.map((t) => t.label)).toEqual(['Browser', 'Server', 'Investigation']);
         c.toolboxDockOpen.set(false);
         fixture.detectChanges();
         expect(el.querySelector('[aria-label="Open the view tools"]')).toBeNull();
+        // the collapsed rail opens each of the three tabs
+        (el.querySelector('button[aria-label="Open the Server tools"]') as HTMLElement).click();
+        expect(c.toolboxTab()).toBe('server');
+        expect(c.toolboxDockOpen()).toBe(true);
+        c.toolboxDockOpen.set(false);
+        fixture.detectChanges();
+        (el.querySelector('button[aria-label="Open the Browser tools"]') as HTMLElement).click();
+        expect(c.toolboxTab()).toBe('browser');
 
         // Its Overlays moved into the Display options menu, each once beside the labels already there.
         (el.querySelector('[aria-label^="Display options ("]') as HTMLButtonElement).click();
@@ -1048,7 +1056,7 @@ describe('LinkAnalysisComponent', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         c.toolboxDockOpen.set(true);
-        c.toolboxTab.set('analysis');
+        c.toolboxTab.set('browser');
         fixture.detectChanges();
         const box = fixture.nativeElement.querySelector('[data-testid=toolbox-scroll]') as HTMLElement;
         expect(box).not.toBeNull();
@@ -1068,9 +1076,9 @@ describe('LinkAnalysisComponent', () => {
 
         c.toolboxDockOpen.set(false);
         c.toolboxTab.set('investigation');
-        c.openAnalysis(); // the toolbar algorithms icon opens the right dock on its Analysis tab
+        c.openAnalysis(); // the toolbar algorithms icon opens the right dock on its Browser tab
         expect(c.toolboxDockOpen()).toBe(true);
-        expect(c.toolboxTab()).toBe('analysis');
+        expect(c.toolboxTab()).toBe('browser');
 
         // The dock collapses to its rail and the rail's own button restores it; there is no left panel (§5.10).
         c.toolboxDockOpen.set(false);
@@ -2086,7 +2094,17 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
         const items = Array.from(panel.querySelectorAll('[role="menuitem"]')).map((i) => i.textContent?.trim());
-        for (const name of ['New', 'Open…', 'Save view', 'Save view as…', 'Save this analysis (Snapshot)', 'Close', 'Delete'])
+        for (const name of [
+            'New',
+            'Open…',
+            'Explore dataset…',
+            'Examples',
+            'Save view',
+            'Save view as…',
+            'Save this analysis (Snapshot)',
+            'Close',
+            'Delete',
+        ])
             expect(items, name).toContain(name);
         const open = vi.spyOn(c, 'openOpenDialog').mockImplementation(() => undefined);
         (panel.querySelector('[data-testid="la-file-open"]') as HTMLElement).click();
@@ -2133,36 +2151,56 @@ describe('LinkAnalysisComponent', () => {
             const { el, tabs } = open();
             const list = el.querySelector('[role="tablist"]') as HTMLElement;
             expect(list.getAttribute('aria-label')).toBe('Toolbox tab');
-            expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Analysis', 'Investigation']);
-            expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
-            expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1]);
+            expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Browser', 'Server', 'Investigation']);
+            expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
+            expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
             expect(list.parentElement!.querySelector('[role="radio"], [role="radiogroup"]')).toBeNull(); // the old switch
-            const panel = el.querySelector('#la-toolbox-panel-analysis') as HTMLElement;
+            const panel = el.querySelector('#la-toolbox-panel-browser') as HTMLElement;
             expect(panel.getAttribute('role')).toBe('tabpanel');
-            expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-analysis');
-            expect(tabs()[0].getAttribute('aria-controls')).toBe('la-toolbox-panel-analysis');
-            // the Investigation pane is only mounted while it is the tab: no dangling aria-controls
+            expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-browser');
+            expect(tabs()[0].getAttribute('aria-controls')).toBe('la-toolbox-panel-browser');
+            // only the selected tab names a panel: no dangling aria-controls
             expect(el.querySelector('#la-toolbox-panel-investigation')).toBeNull();
             expect(tabs()[1].hasAttribute('aria-controls')).toBe(false);
+            expect(tabs()[2].hasAttribute('aria-controls')).toBe(false);
+        });
+
+        it('Browser and Server are ONE kept-mounted toolbox told its side, so a result survives a tab switch', () => {
+            const { fixture, c, el, tabs } = open();
+            const box = () => el.querySelector('inspecto-link-analysis-toolbox') as HTMLElement;
+            const first = box();
+            tabs()[1].click();
+            fixture.detectChanges();
+            expect(c.toolboxTab()).toBe('server');
+            expect(box()).toBe(first); // the same element: not re-created
+            expect(box().id).toBe('la-toolbox-panel-server');
+            expect(box().hidden).toBe(false);
+            expect(c.toolboxSide()).toBe('server');
+            tabs()[2].click();
+            fixture.detectChanges();
+            expect(box()).toBe(first);
+            expect(box().hidden).toBe(true);
         });
 
         it('click and arrow keys select (automatic activation), wrap, and Home / End jump; the tab stop roves', () => {
             const { fixture, c, tabs, press } = open();
             const state = () => [c.toolboxTab(), tabs().findIndex((t) => t.tabIndex === 0)];
-            tabs()[1].click();
+            tabs()[2].click();
             fixture.detectChanges();
-            expect(state()).toEqual(['investigation', 1]);
+            expect(state()).toEqual(['investigation', 2]);
             press('ArrowRight'); // wraps
-            expect(state()).toEqual(['analysis', 0]);
+            expect(state()).toEqual(['browser', 0]);
             expect(document.activeElement).toBe(tabs()[0]);
             press('ArrowLeft'); // wraps back
-            expect(state()).toEqual(['investigation', 1]);
+            expect(state()).toEqual(['investigation', 2]);
             press('Home');
-            expect(state()).toEqual(['analysis', 0]);
+            expect(state()).toEqual(['browser', 0]);
+            press('ArrowRight');
+            expect(state()).toEqual(['server', 1]);
             press('End');
-            expect(state()).toEqual(['investigation', 1]);
+            expect(state()).toEqual(['investigation', 2]);
             press('a'); // any other key is left alone
-            expect(state()).toEqual(['investigation', 1]);
+            expect(state()).toEqual(['investigation', 2]);
         });
 
         it('the Investigation pane mounts as a labelled tabpanel on its tab, and selecting a tab does not move focus into a panel', () => {
@@ -2172,8 +2210,8 @@ describe('LinkAnalysisComponent', () => {
             const panel = el.querySelector('#la-toolbox-panel-investigation') as HTMLElement;
             expect(panel.getAttribute('role')).toBe('tabpanel');
             expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-investigation');
-            expect(tabs()[1].getAttribute('aria-controls')).toBe('la-toolbox-panel-investigation');
-            expect(document.activeElement).toBe(tabs()[1]);
+            expect(tabs()[2].getAttribute('aria-controls')).toBe('la-toolbox-panel-investigation');
+            expect(document.activeElement).toBe(tabs()[2]);
             expect(panel.contains(document.activeElement)).toBe(false);
             expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
         });
@@ -2274,14 +2312,14 @@ describe('LinkAnalysisComponent', () => {
             expect(header.querySelector('[data-testid="la-title"]')!.classList).toContain('text-lg');
         });
 
-        it('the toolbox panel still opens Analysis and Investigation from its own rail', async () => {
+        it('the toolbox panel still opens Browser and Investigation from its own rail', async () => {
             const { fixture, el } = await ready();
             const c = fixture.componentInstance;
             c.toolboxDockOpen.set(false);
             fixture.detectChanges();
-            (el.querySelector('button[aria-label="Open the analysis tools"]') as HTMLElement).click();
+            (el.querySelector('button[aria-label="Open the Browser tools"]') as HTMLElement).click();
             expect(c.toolboxDockOpen()).toBe(true);
-            expect(c.toolboxTab()).toBe('analysis');
+            expect(c.toolboxTab()).toBe('browser');
         });
 
         it('the workspace fills the remaining height instead of a fixed calc()', async () => {
@@ -2489,7 +2527,7 @@ describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance;
         const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]')).map((t) => t.textContent?.trim());
-        expect(tabs).toEqual(['Analysis', 'Investigation']);
+        expect(tabs).toEqual(['Browser', 'Server', 'Investigation']);
         c.openInvestigation(); // what the rail's "Open the Investigation" button calls - no longer a no-op on this level
         fixture.detectChanges();
         expect(c.toolboxTab()).toBe('investigation');
@@ -2504,13 +2542,13 @@ describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not
         await expectNoA11yViolations(panel);
     });
 
-    it('Standard (the flag on) keeps the two tabs', () => {
+    it('Standard (the flag on) keeps the three tabs', () => {
         const { fixture } = create();
         fixture.detectChanges();
         const tabs = Array.from(
             (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
         ).map((t) => t.textContent?.trim());
-        expect(tabs).toEqual(['Analysis', 'Investigation']);
+        expect(tabs).toEqual(['Browser', 'Server', 'Investigation']);
     });
 });
 
@@ -2531,45 +2569,46 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
     };
     const card = (el: HTMLElement, id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement | null;
 
-    it('replaces the empty canvas with the Start box; the Explore card is always there', () => {
+    /** Open File ▾ and return its panel (a CDK overlay on document.body). */
+    const fileMenu = (fixture: ComponentFixture<LinkAnalysisComponent>): HTMLElement => {
+        (fixture.nativeElement.querySelector('[data-testid="la-file"]') as HTMLElement).click();
+        fixture.detectChanges();
+        const panels = Array.from(document.querySelectorAll<HTMLElement>('.mat-mdc-menu-panel'));
+        return panels[panels.length - 1];
+    };
+
+    it('replaces the empty canvas with the Start box; Open, Explore and the examples moved to the File menu', () => {
         const { fixture } = create();
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.textContent).toContain('Start from...');
-        expect(card(el, 'starter-explore')).toBeTruthy();
-        // nothing saved in this Space: the cards that need a saved view are hidden, not dead
-        expect(card(el, 'starter-follow')).toBeNull();
-        expect(card(el, 'starter-views')).toBeNull();
+        expect(card(el, 'start-file-hint')?.textContent).toContain('in the File menu');
+        // LA-PANELS-REDESIGN-1: no starter cards in the start box
+        for (const id of ['starter-explore', 'starter-follow', 'starter-views']) expect(card(el, id), id).toBeNull();
     });
 
-    it('Follow the money loads the ready-made saved view and puts its graph on screen in one click', async () => {
+    it('File ▸ Examples ▸ Follow the money loads the ready-made saved view and puts its graph on screen', async () => {
         const { fixture, queried } = create({ views: [OTHER, MONEY] });
         fixture.detectChanges();
-        const el = fixture.nativeElement as HTMLElement;
-        expect(card(el, 'starter-follow')?.textContent).toContain('mule_layering_ring');
-        card(el, 'starter-follow')!.click();
+        expect(fixture.componentInstance.followView()?.name).toBe('mule_layering_ring');
+        const file = fileMenu(fixture);
+        (file.querySelector('[data-testid="la-file-examples"]') as HTMLElement).click();
+        fixture.detectChanges();
+        const follow = document.querySelector('[data-testid="la-example-follow"]') as HTMLButtonElement;
+        expect(follow.disabled).toBe(false);
+        follow.click();
         await fixture.whenStable();
         expect(queried).toEqual([MONEY.query]);
         expect(fixture.componentInstance.graph()).not.toBeNull();
     });
 
-    it('the follow-the-money card is hidden when the saved views are not money-themed', () => {
+    it('the follow-the-money example has nothing to open when the saved views are not money-themed', () => {
         const { fixture } = create({ views: [OTHER] });
         fixture.detectChanges();
-        const el = fixture.nativeElement as HTMLElement;
-        expect(card(el, 'starter-follow')).toBeNull();
-        expect(card(el, 'starter-views')?.textContent).toContain('1 saved view');
+        expect(fixture.componentInstance.followView()).toBeNull();
     });
 
-    it('Open a saved view opens File ▸ Open… (§5.11)', () => {
-        const { fixture } = create({ views: [OTHER] });
-        fixture.detectChanges();
-        const open = vi.spyOn(fixture.componentInstance, 'openOpenDialog').mockImplementation(() => undefined);
-        card(fixture.nativeElement, 'starter-views')!.click();
-        expect(open).toHaveBeenCalledTimes(1);
-    });
-
-    it('Explore a Dataset shows the Query panel and hands over to its guided picker', () => {
+    it('File ▸ Explore dataset… shows the Query panel and hands over to its guided picker', () => {
         const { fixture } = create();
         fixture.detectChanges();
         const c = fixture.componentInstance;
@@ -2579,7 +2618,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             .spyOn(LinkAnalysisQueryPanelComponent.prototype, 'startExplore')
             .mockImplementation(() => undefined);
         fixture.detectChanges();
-        card(fixture.nativeElement, 'starter-explore')!.click();
+        (fileMenu(fixture).querySelector('[data-testid="la-file-explore"]') as HTMLElement).click();
         expect(c.settingsOpen()).toBe(true);
         expect(c.settingsSection()).toBe('graph-model');
         expect(explore).toHaveBeenCalledTimes(1);
@@ -2600,7 +2639,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
     it('"Start an Investigation from the top results" queues the seeds and opens the Investigation tab - creating nothing', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
-        c.toolboxTab.set('analysis');
+        c.toolboxTab.set('browser');
         c.queueSeedsAndOpen([{ id: 'a', label: 'A', ids: ['a'] }]);
         expect(c.investigation.queuedSeeds()).toEqual([{ id: 'a', label: 'A', ids: ['a'] }]);
         expect(c.toolboxTab()).toBe('investigation');
@@ -2695,7 +2734,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             }));
         };
         const toolboxRail = (el: HTMLElement): HTMLElement | null =>
-            el.querySelector('aside[aria-label="Toolbox"] button[aria-label="Open the analysis tools"]');
+            el.querySelector('aside[aria-label="Toolbox"] button[aria-label="Open the Browser tools"]');
 
         afterEach(() => {
             vi.unstubAllGlobals();
@@ -2963,12 +3002,12 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        c.toolboxTab.set('analysis');
+        c.toolboxTab.set('browser');
         c.toolboxDockOpen.set(false);
         c.investigation.activeId.set('inv-1');
         c.onNodeClick('a');
         expect(c.investigation.selected()?.id).toBe('a');
-        expect(c.toolboxTab()).toBe('analysis');
+        expect(c.toolboxTab()).toBe('browser');
         expect(c.toolboxDockOpen()).toBe(false);
     });
 
@@ -3024,7 +3063,7 @@ describe('LinkAnalysisComponent - focus after the first draw (LA-A11Y-AUDIT-1 a,
         query: { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } },
     };
     const region = (el: HTMLElement) => el.querySelector('[data-testid="la-graph-region"]') as HTMLElement | null;
-    const follow = (el: HTMLElement) => el.querySelector('[data-testid="starter-follow"]') as HTMLButtonElement;
+
 
     /** A real focus target needs the fixture in the document; jsdom ignores focus() on a detached node. */
     function mount() {
@@ -3034,12 +3073,10 @@ describe('LinkAnalysisComponent - focus after the first draw (LA-A11Y-AUDIT-1 a,
         return made;
     }
 
-    it('moves focus from the removed landing card to the named graph region, and announces the draw', async () => {
+    it('moves focus to the named graph region on the first draw from the landing, and announces the draw', async () => {
         const { fixture } = mount();
         const el = fixture.nativeElement as HTMLElement;
-        follow(el).focus();
-        expect(document.activeElement).toBe(follow(el));
-        follow(el).click();
+        fixture.componentInstance.loadFollowTheMoney(); // File ▸ Examples ▸ Follow the money
         await fixture.whenStable();
         fixture.detectChanges();
         const r = region(el)!;
@@ -3055,10 +3092,9 @@ describe('LinkAnalysisComponent - focus after the first draw (LA-A11Y-AUDIT-1 a,
 
     it('does not move focus when the user has already put it somewhere else during the draw', async () => {
         const { fixture } = mount();
-        const el = fixture.nativeElement as HTMLElement;
         const elsewhere = document.createElement('button');
         document.body.appendChild(elsewhere);
-        follow(el).click();
+        fixture.componentInstance.loadFollowTheMoney(); // File ▸ Examples ▸ Follow the money
         elsewhere.focus(); // the user tabbed away while the query was in flight
         await fixture.whenStable();
         fixture.detectChanges();
@@ -3069,8 +3105,7 @@ describe('LinkAnalysisComponent - focus after the first draw (LA-A11Y-AUDIT-1 a,
 
     it('does not steal focus on a later run over a graph that is already on screen', async () => {
         const { fixture } = mount();
-        const el = fixture.nativeElement as HTMLElement;
-        follow(el).click();
+        fixture.componentInstance.loadFollowTheMoney(); // File ▸ Examples ▸ Follow the money
         await fixture.whenStable();
         fixture.detectChanges();
         const elsewhere = document.createElement('button');
@@ -3584,7 +3619,7 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
     it('opens the Investigation tab holding the prefilled merge', async () => {
         const { fixture, c, select, merge } = await inInvestigation(['msisdn:+447700900123', 'imsi:234150000000001']);
         select(2);
-        c.toolboxTab.set('analysis');
+        c.toolboxTab.set('browser');
         fixture.detectChanges();
         expect(c.mergeUnavailable()).toBe('');
         expect(merge()).not.toBeNull();
@@ -4348,7 +4383,42 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect([...c.expandedNodeIds()].sort()).toEqual(['S-1', 'S-2']);
     });
 
-    it('LA-START-LIST-1 (S2): on the Investigations level a list starts an Investigation as one entity does - seeded and grown one degree', async () => {
+    it('LA-PANELS-REDESIGN-1: the New form starts a list Investigation in ONE press - drawn, every member seeded, expanded as asked', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), getEntityList } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        const chain = vi.spyOn(c.investigation, 'investigateNumber').mockResolvedValue(true);
+        await c.createInvestigation({
+            start: { kind: 'list', datasetId: 'transfers', listId: 'suspects' },
+            title: 'Investigation — list Suspects',
+            purpose: 'Review of the members of list Suspects and their links',
+            timeCol: '',
+            timeColZone: 'Europe/London',
+            degrees: 1,
+        });
+        expect(chain).toHaveBeenCalledWith(
+            expect.objectContaining({
+                seeds: ['S-1', 'S-2'],
+                projection: expect.objectContaining({ entityType: 'account' }),
+                title: 'Investigation — list Suspects',
+                purpose: 'Review of the members of list Suspects and their links',
+                timeColZone: 'Europe/London',
+                degrees: 1,
+            }),
+        );
+        // no second form: nothing pending, nothing queued
+        expect(c.pendingInvestigation()).toBeNull();
+        expect(c.investigation.queuedSeeds()).toEqual([]);
+        expect(c.graph()).not.toBeNull();
+    });
+
+    it('LA-PANELS-REDESIGN-1: the start box only draws a list on the Investigations level - no pending form, no queue', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
         const { fixture } = create({
@@ -4359,10 +4429,9 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startFrom({ kind: 'list', datasetId: 'transfers', listId: 'suspects' });
-        // not merely queued as bare seeds (they drew 2 entities and 0 links): the pending Investigation seeds every member
+        expect(c.graph()).not.toBeNull();
+        expect(c.pendingInvestigation()).toBeNull();
         expect(c.investigation.queuedSeeds()).toEqual([]);
-        expect(c.pendingInvestigation()).toMatchObject({ seeds: ['S-1', 'S-2'], projection: { entityType: 'account' } });
-        expect(c.toolboxTab()).toBe('investigation');
     });
 
     it('LA-START-LIST-1 (S1): choosing "A list" re-reads the Entity Lists, so a list made since the page loaded is offered', async () => {
@@ -4450,17 +4519,39 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    it('Investigations level, one entity: an account seeds an Investigation over its Dataset (generic binding, OB-9)', async () => {
+    it('Investigations level, one entity from the New form: an account seeds an Investigation over its Dataset (generic binding, OB-9)', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
-        await c.startFrom({ kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' });
-        expect(c.pendingInvestigation()).toMatchObject({ seed: 'MULE-HUB-01', projection: MAPPING, presets: {} });
+        const chain = vi.spyOn(c.investigation, 'investigateNumber').mockResolvedValue(true);
+        await c.createInvestigation({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            title: 'Investigation — Account MULE-HUB-01',
+            purpose: 'Review of Account MULE-HUB-01 and its links',
+            timeCol: '',
+            timeColZone: '',
+            degrees: 0,
+        });
+        expect(chain).toHaveBeenCalledWith(
+            expect.objectContaining({ seed: 'MULE-HUB-01', projection: MAPPING, presets: {}, degrees: 0 }),
+        );
+        expect(c.pendingInvestigation()).toBeNull(); // no second form
         expect(c.investigateIssue()).toBe('');
-        expect(c.toolboxTab()).toBe('investigation');
     });
 
-    it('Investigations level, a paste: drawn with one ring and queued as the first seeds', async () => {
+    it('Investigations level, the start box draws one entity with its ring - it seeds nothing', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startFrom({ kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' });
+        expect(expand).toHaveBeenCalled();
+        expect(c.graph()).not.toBeNull();
+        expect(c.pendingInvestigation()).toBeNull();
+        expect(c.investigation.queuedSeeds()).toEqual([]);
+    });
+
+    it('Investigations level, a paste in the start box is drawn with one ring and queued nowhere', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const { fixture } = create({
             datasets: [TRANSFERS],
@@ -4470,9 +4561,22 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'A-2'] });
-        expect(c.investigation.queuedSeeds().map((s) => s.id)).toEqual(['A-1', 'A-2']);
-        expect(c.toolboxTab()).toBe('investigation');
+        expect(c.investigation.queuedSeeds()).toEqual([]);
         expect(c.graph()).not.toBeNull();
+    });
+
+    it('File ▸ New on the Investigations level closes what is open and lands on the New Investigation form', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        c.toolboxDockOpen.set(true);
+        c.toolboxTab.set('browser');
+        await c.newWork();
+        fixture.detectChanges();
+        expect(c.toolboxTab()).toBe('investigation');
+        const form = (fixture.nativeElement as HTMLElement).querySelector('[laNewInvestigation]') as HTMLElement;
+        expect(form?.querySelector('[data-testid="start-kind"]')).not.toBeNull();
+        expect(form?.textContent).toContain('New Investigation');
     });
 });
 
@@ -5082,7 +5186,7 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
         const run = vi.spyOn(c, 'findPaths').mockResolvedValue();
         await c.findPathsFromCleanup(4);
         expect(c.toolboxDockOpen()).toBe(true);
-        expect(c.toolboxTab()).toBe('analysis');
+        expect(c.toolboxTab()).toBe('browser');
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('two seeds'), 'Find paths');
         expect(run).not.toHaveBeenCalled();
 

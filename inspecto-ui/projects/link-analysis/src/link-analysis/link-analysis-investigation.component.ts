@@ -174,8 +174,6 @@ export class LinkAnalysisInvestigationComponent {
     readonly pendingDone = output<void>();
     /** "Expand…": the screen opens its Expand dialog (§5.4), which holds the read settings. */
     readonly expandRequested = output<void>();
-    /** "Open…": the screen opens File ▸ Open… on its Investigations tab (§5.11). */
-    readonly openRequested = output<void>();
     /** Which part of the Investigation this instance draws (§5.8 / §5.9); every instance shares the one store. */
     readonly section = input<InvestigationSection>('act');
     /** "Settings…" in the header's ⋯ menu: the screen opens the Investigation's settings. */

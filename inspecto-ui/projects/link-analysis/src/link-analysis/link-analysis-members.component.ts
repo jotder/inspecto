@@ -1,5 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { Observable, firstValueFrom } from 'rxjs';
 import { InvService, InvestigationMembers, InvestigationRole } from '@inspecto/link-analysis/api/inv.service';
 import { LensService, apiErrorMessage } from '@inspecto/core/api';
@@ -46,7 +49,14 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
     selector: 'inspecto-link-analysis-members',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, InspectoAlertComponent, StatusBadgeComponent],
+    imports: [
+        FormsModule,
+        MatButtonModule,
+        InspectoAlertComponent,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
+        StatusBadgeComponent,
+    ],
     template: `
         <section
             class="flex flex-col gap-2 rounded-md border p-2 text-sm"
@@ -89,26 +99,22 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
                 </ul>
                 @if (canChange()) {
                     <div class="flex items-center gap-2 border-t pt-1" style="border-color: var(--gamma-border)">
-                        <input
-                            class="rounded border px-1"
-                            style="border-color: var(--gamma-border)"
-                            maxlength="200"
+                        <inspecto-pen-field
+                            class="w-40"
+                            label="Subject"
+                            ariaLabel="Member subject"
                             placeholder="Subject id"
-                            aria-label="Member subject"
-                            [value]="subject()"
-                            (input)="subject.set($any($event.target).value)"
+                            [maxlength]="200"
+                            [ngModel]="subject()"
+                            (ngModelChange)="subject.set('' + $event)"
+                        ></inspecto-pen-field>
+                        <inspecto-option-picker
+                            class="w-32"
+                            label="Role"
+                            [options]="roleOptions"
+                            [ngModel]="role()"
+                            (ngModelChange)="role.set($any($event))"
                         />
-                        <select
-                            class="rounded border px-1"
-                            style="border-color: var(--gamma-border)"
-                            aria-label="Member role"
-                            [value]="role()"
-                            (change)="role.set($any($event.target).value)"
-                        >
-                            @for (r of roles; track r) {
-                                <option [value]="r">{{ r }}</option>
-                            }
-                        </select>
                         <button mat-stroked-button [disabled]="busy() || !subject().trim()" (click)="grant()">
                             Grant
                         </button>
@@ -132,7 +138,7 @@ export class LinkAnalysisMembersComponent {
     private readonly inv = inject(InvService);
     private readonly lens = inject(LensService);
     private readonly confirm = inject(InspectoConfirmService);
-    readonly roles = ROLES;
+    readonly roleOptions: PickerOption[] = ROLES.map((r) => ({ value: r, label: r }));
     /** Grant and revoke are gated server-side on `canManageIncidents` as well as on being a lead. */
     readonly canManage = computed(() => this.lens.canManageIncidents());
 

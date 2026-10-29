@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import {
     GraphAlgorithm,
@@ -46,7 +47,7 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
     selector: 'inspecto-link-analysis-server-algorithms',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, MatButtonModule, InspectoOptionPickerComponent, LinkAnalysisServerRunComponent],
+    imports: [FormsModule, MatButtonModule, InspectoOptionPickerComponent, PenFieldComponent, LinkAnalysisServerRunComponent],
     template: `
         @if (!algorithms().length) {
             <p class="text-secondary text-sm" data-testid="algo-none">The server's algorithm list is not available.</p>
@@ -94,18 +95,16 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                     }
                     @for (p of structuredParams(); track p.name) {
                         @if (p.type === 'DOUBLE_LIST') {
-                            <label class="text-secondary text-sm">
-                                {{ p.name }}
-                                <input
-                                    type="text"
-                                    class="ml-1 w-40 rounded border px-1"
+                            <div>
+                                <inspecto-pen-field
+                                    class="w-48"
+                                    [label]="p.name"
                                     [attr.data-testid]="'param-' + p.name"
-                                    [attr.aria-describedby]="'hint-' + p.name"
-                                    [value]="listText(p)"
-                                    (change)="setList(p.name, $any($event.target).value)"
-                                />
-                                <span class="ml-1 text-xs" [id]="'hint-' + p.name">per hop, 0..1</span>
-                            </label>
+                                    [ngModel]="listText(p)"
+                                    (ngModelChange)="setList(p.name, '' + $event)"
+                                ></inspecto-pen-field>
+                                <p class="text-secondary m-0 text-xs" [id]="'hint-' + p.name">per hop, 0..1</p>
+                            </div>
                             @if (listErrors()[p.name]; as e) {
                                 <p class="text-warn text-xs" role="alert">{{ e }}</p>
                             }
@@ -151,34 +150,25 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                     }
                     @for (p of editableParams(); track p.name) {
                         @if (p.type === 'ENUM') {
-                            <label class="text-secondary text-sm">
-                                {{ p.name }}
-                                <select
-                                    class="ml-1 rounded border px-1"
-                                    [attr.data-testid]="'param-' + p.name"
-                                    (change)="setParam(p.name, $any($event.target).value)"
-                                >
-                                    @for (c of p.allowed ?? []; track c) {
-                                        <option [value]="c" [selected]="c === valueOf(p.name, p.default)">
-                                            {{ c }}
-                                        </option>
-                                    }
-                                </select>
-                            </label>
+                            <inspecto-option-picker
+                                class="w-48"
+                                [label]="p.name"
+                                [attr.data-testid]="'param-' + p.name"
+                                [options]="enumOptions(p.allowed)"
+                                [ngModel]="'' + valueOf(p.name, p.default)"
+                                (ngModelChange)="setParam(p.name, '' + $event)"
+                            />
                         } @else {
-                            <label class="text-secondary text-sm">
-                                {{ p.name }}
-                                <input
-                                    type="number"
-                                    class="ml-1 w-24 rounded border px-1"
-                                    [attr.data-testid]="'param-' + p.name"
-                                    [attr.min]="p.min"
-                                    [attr.max]="p.max"
-                                    [attr.step]="p.type === 'INT' ? 1 : 'any'"
-                                    [value]="valueOf(p.name, p.default)"
-                                    (change)="setParam(p.name, $any($event.target).value, true)"
-                                />
-                            </label>
+                            <inspecto-pen-field
+                                class="w-48"
+                                type="number"
+                                [label]="p.name"
+                                [attr.data-testid]="'param-' + p.name"
+                                [min]="p.min ?? null"
+                                [max]="p.max ?? null"
+                                [ngModel]="valueOf(p.name, p.default)"
+                                (ngModelChange)="setParam(p.name, '' + $event, true)"
+                            ></inspecto-pen-field>
                         }
                     }
                 </div>
@@ -451,6 +441,11 @@ export class LinkAnalysisServerAlgorithmsComponent {
 
     toggleFactors(id: string): void {
         this.expanded.update((x) => (x === id ? null : id));
+    }
+
+    /** An ENUM parameter's choices, for its popup picker. */
+    enumOptions(allowed: readonly string[] | null | undefined): PickerOption[] {
+        return (allowed ?? []).map((c) => ({ value: c, label: c }));
     }
 
     valueOf(name: string, dflt: unknown): unknown {

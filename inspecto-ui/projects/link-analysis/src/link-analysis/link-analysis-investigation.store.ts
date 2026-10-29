@@ -578,6 +578,8 @@ export class InvestigationSessionStore {
         purpose: string;
         title: string;
         timeCol?: string;
+        /** The IANA zone a naive TIMESTAMP time column is read in (the New form's *More*); absent = UTC. */
+        timeColZone?: string;
         eventsCol?: string;
         seed: string;
         /** Several seeds (an Entity List start); absent = `seed` alone. */
@@ -610,7 +612,7 @@ export class InvestigationSessionStore {
                 req.purpose,
                 req.title,
                 req.timeCol,
-                undefined,
+                req.timeColZone,
                 req.eventsCol,
                 req.projection.entityType,
                 req.profileId,

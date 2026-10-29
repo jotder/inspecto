@@ -40,7 +40,7 @@ import { penByLabel, penEdit, penError, penText, refresh } from '@inspecto/core/
         (pendingDone)="pending.set(null)"
         (settingsRequested)="settingsAsked = true"
         (dockRequested)="dockAsked = $event"
-    ></inspecto-link-analysis-investigation>
+    ><p laNewInvestigation data-testid="projected-new-form">New Investigation form</p></inspecto-link-analysis-investigation>
     <!-- §5.8/§5.9: the parts the Act panel handed to the dock and the settings sections, over the same store -->
     @for (s of sections; track s) {
         <inspecto-link-analysis-investigation [section]="s" [attr.data-section]="s"></inspecto-link-analysis-investigation>
@@ -123,6 +123,9 @@ const COVERAGE: InvestigationCoverage = {
         note: 'per-Collector coverage is not assessed: a Dataset row carries no Collector attribution',
     },
 };
+
+/** One queued seed: the projection start form shows only while seeds are queued (LA-PANELS-REDESIGN-1). */
+const QUEUED = [{ id: 'q', label: 'Q', ids: ['q'] }];
 
 const refused = (message: string) =>
     throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message } } }));
@@ -238,7 +241,8 @@ async function openInv(store: InvestigationSessionStore) {
 // over 20 s on a 12-thread dev box and timed out.
 describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () => {
     it('prefills the time column from the default (DR-D7) and starts with it', async () => {
-        const { fixture, el, inv, button } = create();
+        const { fixture, el, inv, button, store } = create();
+        store.queueSeeds(QUEUED); // LA-PANELS-REDESIGN-1: the projection start form serves queued seeds only
         const host = fixture.componentInstance as unknown as { timeCol: { set(v: string): void } };
         host.timeCol.set('booked_at');
         fixture.detectChanges();
@@ -267,6 +271,8 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
 
     it('without the capability Start Investigation is disabled with the reason, and Enter in a field fires no write', async () => {
         const ro = create({ canManage: false });
+        ro.store.queueSeeds(QUEUED);
+        ro.fixture.detectChanges();
         penEdit(ro.fixture, penByLabel(ro.el, 'Purpose / legal basis')!, 'warrant 7');
         expect(ro.button('Start Investigation').disabled).toBe(true);
         expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
@@ -311,8 +317,18 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(button('Seed').disabled).toBe(false);
     });
 
-    it('start state: explains the binding, starts from the projection, and passes axe', async () => {
-        const { fixture, el, inv, button } = create();
+    it('nothing open and nothing queued: the page-projected New Investigation form shows, and no Open… button (File menu)', () => {
+        const { el } = create();
+        expect(el.querySelector('[data-testid="projected-new-form"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="investigation-queued-start"]')).toBeNull();
+        expect(el.querySelector('[data-testid="investigation-open"]')).toBeNull();
+    });
+
+    it('start state with queued seeds: explains the binding, starts from the projection, and passes axe', async () => {
+        const { fixture, el, inv, button, store } = create();
+        store.queueSeeds(QUEUED);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="projected-new-form"]')).toBeNull();
         expect(el.textContent).toContain("the query's filter is not applied");
         expect(el.textContent).toContain('File ▸ Open… lists the ones you may read');
         await expectNoA11yViolations(el);
@@ -577,13 +593,6 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(el.querySelector('[aria-label="Link annotations"]')?.textContent).toContain('a → b (voice)');
     });
 
-    it('Open… asks the screen for File ▸ Open (the listing, Open by id and Recent moved there, §5.11)', () => {
-        const { fixture, el } = create();
-        const asked = vi.fn();
-        (fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent)).componentInstance as LinkAnalysisInvestigationComponent).openRequested.subscribe(asked);
-        (el.querySelector('[data-testid="investigation-open"]') as HTMLButtonElement).click();
-        expect(asked).toHaveBeenCalled();
-    });
 
     describe('delete (LA-INVESTIGATION-DELETE-1)', () => {
         it('without the Incident management capability there is no Delete on the open Investigation', async () => {

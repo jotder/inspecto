@@ -110,6 +110,8 @@ function make(
         serverCeilings?: Record<string, number> | null;
         graph?: typeof CANVAS | null;
         answer?: (r: GraphRunRequest) => Observable<GraphRunView>;
+        /** Which tab draws the toolbox (default: Server, where the hand-off lives). */
+        side?: 'browser' | 'server';
         /** The host's module flags (default: Standard and above). */
         features?: LaFeatures;
     } = {},
@@ -136,6 +138,7 @@ function make(
         ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisToolboxComponent);
+    fixture.componentRef.setInput('side', opts.side ?? 'server'); // the hand-off is a server control: the Server tab
     const c = fixture.componentInstance;
     fixture.componentRef.setInput('graph', opts.graph === undefined ? CANVAS : opts.graph);
     fixture.componentRef.setInput('workingSetNodes', opts.workingSetNodes ?? null);
@@ -174,8 +177,8 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
             ariaDisabled: l.querySelector('button')?.getAttribute('aria-disabled'),
         }));
 
-    it('the catalogue shows ONE locked Run on the server line, and lists no server-only tool (§5.8)', async () => {
-        const { fixture, c, el, run } = make({ features: EXPLORER });
+    it('the Browser tab lists no server-only tool; the Server tab shows ONE locked Run on the server line (§5.8)', async () => {
+        const { fixture, c, el, run } = make({ features: EXPLORER, side: 'browser' });
         fixture.detectChanges();
         const ids = c.tools.map((t) => t.id);
         expect(ids).toEqual(expect.arrayContaining(['index-build', 'path', 'value-measures', 'temporal']));
@@ -183,6 +186,10 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
         expect(el.querySelector('[data-testid="catalogue-where"]')).toBeNull();
         expect(el.querySelector('inspecto-link-analysis-server-algorithms')).toBeNull();
         expect(el.querySelector('[aria-controls="tool-index-build"]')).toBeNull();
+        expect(locked(el)).toEqual([]);
+        fixture.componentRef.setInput('side', 'server');
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-link-analysis-server-algorithms')).toBeNull();
         expect(locked(el)).toEqual([{ label: 'Run on the server', reason: REASON, ariaDisabled: 'true' }]);
         (el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement).click();
         expect(run).not.toHaveBeenCalled();
@@ -191,7 +198,7 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
 
     it('above the cap the browser control becomes a LOCKED Run on server, still saying why the browser did not run it', async () => {
         capAll(3);
-        const { fixture, c, el, run } = make({ features: EXPLORER });
+        const { fixture, c, el, run } = make({ features: EXPLORER }); // the hand-off is a server control: the Server tab
         c.tab.set('centrality');
         c.centralityMetric.set('betweenness');
         fixture.detectChanges();
@@ -214,9 +221,10 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
     });
 
     it('Standard lists the Edge index under Server (the server algorithms come from the catalogue)', () => {
-        const { c } = make();
+        const { fixture, c } = make({ side: 'browser' });
         expect(c.tools.map((t) => t.id)).toContain('index-build');
-        c.whereChoice.set('server');
+        expect(c.sections().flatMap((s) => s.tools.map((t) => t.id))).not.toContain('index-build');
+        fixture.componentRef.setInput('side', 'server');
         expect(c.sections().flatMap((s) => s.tools.map((t) => t.id))).toContain('index-build');
     });
 });
@@ -225,7 +233,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
     afterEach(() => resetLaLimits());
 
     it('at or under the cap the local run is unchanged and no server control exists', () => {
-        const { fixture, c, el, button, run } = make();
+        const { fixture, c, el, button, run } = make({ side: 'browser' });
         c.tab.set('centrality');
         c.centralityMetric.set('betweenness');
         fixture.detectChanges();
@@ -237,13 +245,16 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
         expect(run).not.toHaveBeenCalled();
     });
 
-    it('above the cap the browser control becomes Run on server - and no "capped at" refusal is shown', () => {
+    it('above the cap the browser control becomes Run on server in the Server tab - and no "capped at" refusal is shown', () => {
         capAll(3);
-        const { fixture, c, el, button } = make();
+        const { fixture, c, el, button } = make({ side: 'browser' });
         c.tab.set('centrality');
         c.centralityMetric.set('betweenness');
         fixture.detectChanges();
         expect(button(/Rank nodes/)).toBeUndefined();
+        expect(button(/Run on server/)).toBeUndefined(); // the Browser tab shows only the browser's own controls
+        fixture.componentRef.setInput('side', 'server');
+        fixture.detectChanges();
         expect(button(/Run on server/)).toBeDefined();
         expect(el.textContent).toContain('This graph has 5 nodes - above the 3-node limit');
         expect(el.textContent).not.toMatch(/capped at/);
@@ -252,9 +263,8 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
 
     it('an algorithm without a browser cap (degree) stays local even on a big graph', () => {
         capAll(3);
-        const { fixture, c, button } = make();
-        c.whereChoice.set('browser'); // over the cap Server is preselected (§5.8); degree stays a browser run
-        c.tab.set('centrality');
+        const { fixture, c, button } = make({ side: 'browser' });
+        c.tab.set('centrality'); // degree stays a browser run
         c.centralityMetric.set('degree');
         fixture.detectChanges();
         expect(c.serverSpecs().centrality).toBeNull();
@@ -820,6 +830,7 @@ describe('LinkAnalysisToolboxComponent - per-algorithm browser caps decide the h
         fixture.detectChanges();
         expect(c.serverSpecs().centrality?.algorithm).toBe('closenessCentrality');
         expect(el.textContent).toContain('above the 3-node limit');
+        fixture.componentRef.setInput('side', 'browser'); // hub stays a browser run: the Browser tab
         c.centralityMetric.set('hub');
         fixture.detectChanges();
         expect(c.serverSpecs().centrality).toBeNull();

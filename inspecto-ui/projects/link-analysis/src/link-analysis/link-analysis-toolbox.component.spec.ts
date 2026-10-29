@@ -477,6 +477,7 @@ describe('LinkAnalysisToolboxComponent', () => {
 
     it('structuring pack: offers "Run on server" ONLY on a truncated graph with an edge mapping, and emits the motif', () => {
         const { fixture, c } = make(structuringGraph());
+        fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         c.tab.set('pattern');
         c.loadPatternPack('structuring');
         fixture.detectChanges();
@@ -546,6 +547,7 @@ describe('LinkAnalysisToolboxComponent', () => {
 
     it('find paths (server): says what it needs until a projection offers an edge mapping', () => {
         const { fixture, c } = make();
+        fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         c.tab.set('server-paths');
         fixture.detectChanges();
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Load an Entity/Link projection first');
@@ -553,6 +555,7 @@ describe('LinkAnalysisToolboxComponent', () => {
 
     it('find paths (server): emits the walk request — To optional, depth clamped to the server fence', () => {
         const { fixture, c } = make();
+        fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         fixture.componentRef.setInput('traversalMappings', [
             { value: '0', label: 'calls: A → B' },
             { value: '1', label: 'wires: X → Y' },
@@ -569,6 +572,7 @@ describe('LinkAnalysisToolboxComponent', () => {
 
     it('find paths (server): states the fences honestly and lists the paths', async () => {
         const { fixture, c, last } = make();
+        fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'calls: A → B' }]);
         const path = { nodeIds: ['a', 'b', 'c'], edgeIds: ['a->b', 'b->c'] };
         fixture.componentRef.setInput('serverPaths', {
@@ -595,6 +599,7 @@ describe('LinkAnalysisToolboxComponent', () => {
 
     it('find paths (server): says where the answer came from (DR-U4)', () => {
         const { fixture, c } = make();
+        fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'calls: A → B' }]);
         const state = { paths: [], truncated: false, edgeYieldCapped: false, depthLimit: 6, deepest: 0 };
         fixture.componentRef.setInput('serverPaths', { ...state, source: { kind: 'index', version: 3, stale: false } });
@@ -882,6 +887,7 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
 
     it('pre-fills link_kind / first_seen from the telecom profile, says so, and sends them in the request', () => {
         const { fixture, c } = telecom();
+        fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         fixture.componentRef.setInput('profileId', 'telecom');
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
@@ -910,6 +916,7 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
 
     it('with no profile fallback, disables Run with a plain reason and sends nothing', async () => {
         const { fixture, c } = telecom();
+        fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(serverButton(el)!.disabled).toBe(true);
@@ -1090,7 +1097,7 @@ describe('LinkAnalysisToolboxComponent search around', () => {
         const rows = (el: HTMLElement): string[] =>
             Array.from(el.querySelectorAll('section > button > span.font-medium')).map((s) => s.textContent!.trim());
 
-        it('Browser lists every browser group once by question, badged with where it runs and its cap', async () => {
+        it('the Browser tab lists what runs in the browser once by question, badged with where it runs and its cap', async () => {
             const { fixture, c } = make(GRAPH, [], true);
             TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
             fixture.detectChanges();
@@ -1098,10 +1105,13 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             expect(c.where()).toBe('browser');
             const names = rows(el);
             expect(new Set(names).size).toBe(names.length); // each once
-            expect(names).toContain('Value Measures');
-            expect(names).toContain('Burst and periodicity');
-            expect(names).not.toContain('All algorithms (server)');
-            expect(names).not.toContain('Propagated risk'); // server-only: Server side alone
+            expect(names).toEqual(expect.arrayContaining(['Centrality', 'Explain node', 'Pattern match']));
+            // LA-PANELS-REDESIGN-1: what runs on the server is listed in the Server tab only
+            expect(names).not.toContain('Value Measures');
+            expect(names).not.toContain('Burst and periodicity');
+            expect(names).not.toContain('Find paths (server)');
+            expect(names).not.toContain('Propagated risk');
+            expect(el.querySelector('[data-testid=catalogue-where]')).toBeNull(); // no toggle: the host's tab is the side
             expect(Array.from(el.querySelectorAll('h3[data-question]')).map((h) => h.textContent!.trim())).toEqual([
                 'How are they connected?',
                 'Who matters most?',
@@ -1109,57 +1119,67 @@ describe('LinkAnalysisToolboxComponent search around', () => {
                 'What looks unusual?',
             ]);
             expect(c.runsOn('centrality')).toBe('both');
-            expect(c.runsOn('explain')).toBe('browser');
+            expect(c.runsOn('explain')).toBe('both'); // its edge-index reads run on the server
             expect(c.toolCap('centrality')).toBe('≤ 500 nodes in the browser'); // betweenness is the lowest
             await expectNoA11yViolations(el);
         });
 
-        it('Server lists the server algorithms by question; a row opens that algorithm in one click (two from Browser)', () => {
+        it('the Server tab lists the server algorithms and server tools by question; a row opens its algorithm in one click', () => {
             const { fixture, c } = make(GRAPH, [], true);
             TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
+            fixture.componentRef.setInput('side', 'server');
             fixture.detectChanges();
             const el: HTMLElement = fixture.nativeElement;
-            const server = Array.from(el.querySelectorAll('[data-testid=catalogue-where] button'))[1] as HTMLButtonElement;
-            server.click(); // click 1
-            fixture.detectChanges();
             expect(c.where()).toBe('server');
             const names = rows(el);
-            expect(names).toEqual(expect.arrayContaining(['Propagated risk', 'Ego network', 'PageRank', 'Find paths (server)']));
-            expect(names).not.toContain('Explain node'); // a browser-only group is not listed under Server
+            expect(names).toEqual(
+                expect.arrayContaining([
+                    'Propagated risk',
+                    'Ego network',
+                    'PageRank',
+                    'Find paths (server)',
+                    'Value Measures',
+                    'Burst and periodicity',
+                    'Explain node', // a both group with no server twin: its server controls live in the group
+                ]),
+            );
+            expect(names).not.toContain('Centrality'); // under its cap its server twins are the algorithm rows
             const risk = el.querySelector('[data-server-algorithm=propagatedRisk]')!;
             expect(risk.textContent).toContain('server');
             expect(el.querySelector('[data-server-algorithm=pageRank]')!.textContent).toContain('both');
-            (risk.querySelector('button') as HTMLButtonElement).click(); // click 2
+            (risk.querySelector('button') as HTMLButtonElement).click();
             fixture.detectChanges();
             const panel = risk.querySelector('inspecto-link-analysis-server-algorithms')!;
             expect(panel.querySelector('[data-testid=algo-form]')).not.toBeNull();
             expect(panel.querySelector('[data-testid=algo-count]')).toBeNull(); // no second picker
         });
 
-        it('over the browser cap, Server is preselected with the reason; the investigator can still pick Browser', () => {
+        it('over the browser cap the Browser tab says so and points to the Server tab, which lists the hand-off', () => {
             const { fixture, c } = make(GRAPH, [], true);
             fixture.componentRef.setInput('workingSetNodes', 3000);
             fixture.detectChanges();
             const el: HTMLElement = fixture.nativeElement;
-            expect(c.where()).toBe('server');
-            expect(el.querySelector('[data-testid=catalogue-preselect]')!.textContent).toContain(
-                'The Working Set has 3000 nodes - above the 2500-node browser limit, so Server is preselected.',
-            );
-            c.whereChoice.set('browser');
-            fixture.detectChanges();
             expect(c.where()).toBe('browser');
-            expect(el.querySelector('[data-testid=catalogue-preselect]')).toBeNull();
+            expect(el.querySelector('[data-testid=catalogue-over-cap]')!.textContent).toContain(
+                'The Working Set has 3000 nodes - above the 2500-node browser limit: a tool over its limit runs from the Server tab.',
+            );
+            fixture.componentRef.setInput('side', 'server');
+            fixture.detectChanges();
+            expect(c.where()).toBe('server');
+            expect(el.querySelector('[data-testid=catalogue-over-cap]')).toBeNull();
         });
 
-        it('on the Explorer level the toggle is hidden: one locked line, and Browser even over the cap', () => {
+        it('on the Explorer level the Server tab shows one locked line, the Browser tab none', () => {
             const { fixture, c } = make(GRAPH, [], false);
             fixture.componentRef.setInput('workingSetNodes', 3000);
             fixture.detectChanges();
             const el: HTMLElement = fixture.nativeElement;
-            expect(el.querySelector('[data-testid=catalogue-where]')).toBeNull();
-            expect(el.querySelectorAll('[data-testid=catalogue-server-locked]')).toHaveLength(1);
+            expect(el.querySelector('[data-testid=catalogue-server-locked]')).toBeNull();
             expect(c.where()).toBe('browser');
             expect(rows(el)).not.toContain('Edge index');
+            fixture.componentRef.setInput('side', 'server');
+            fixture.detectChanges();
+            expect(el.querySelectorAll('[data-testid=catalogue-server-locked]')).toHaveLength(1);
         });
     });
 });

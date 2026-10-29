@@ -11,29 +11,31 @@ import {
     signal,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatRadioModule } from '@angular/material/radio';
 import { catchError, combineLatest, debounceTime, distinctUntilChanged, map, of, startWith, switchMap } from 'rxjs';
 import { LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
+import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import {
     EntityProfileService,
     EntitySuggestion,
     EntitySuggestions,
 } from '@inspecto/link-analysis/api/entity-profile.service';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
-import { oneLine } from './la-starter';
-import { LinkAnalysisView } from './link-analysis.service';
+import { LaFoldComponent } from './la-fold.component';
 import {
+    NewInvestigationRequest,
     StartCatalogue,
     StartKind,
     StartRequest,
+    newInvestigationDefaults,
     parsePastedValues,
     suggestionLine,
     wholeDatasetWarning,
@@ -45,21 +47,29 @@ export interface StartNotice {
     text: string;
 }
 
-const KINDS: { value: StartKind; label: string }[] = [
-    { value: 'entity', label: 'One entity' },
-    { value: 'list', label: 'A list' },
-    { value: 'paste', label: 'A paste' },
-    { value: 'dataset', label: 'The whole Dataset' },
+const KINDS: PickerOption[] = [
+    { value: 'entity', label: 'One entity', hint: 'An Entity Type, then one of its values' },
+    { value: 'list', label: 'A list', hint: 'The members of an Entity List' },
+    { value: 'paste', label: 'A paste', hint: 'Values you paste, one per line' },
+    { value: 'dataset', label: 'The whole Dataset', hint: 'Every link of the Dataset' },
 ];
 
+/** Expand on start: how many degrees, capped at the profile's maximum. */
+const DEGREE_CHOICES = [0, 1, 2, 3];
+
 /**
- * **Start from...** (LA-ONBOARD-1 phase 6, OB-9; UC-09): the first screen of Link Analysis. One box replaces the old starter
- * cards: pick the Dataset, then start from **one entity** (the Entity Type FIRST, the Dataset's primary type preselected -
- * A-7b - then the value, with a type-ahead of matches and their link counts), **a list** (an Entity List), **a paste**
- * (values, unknown ones reported after) or **the whole Dataset** (allowed, warned above the node cap). The page carries it
- * out: on the Explorer level a start draws the chosen entities plus one ring, busy ones held; on the Investigations level
- * one entity seeds an Investigation. The saved-view starts, *Explore a Dataset* (choose the columns yourself) and *Add data*
- * stay below.
+ * **Start from...** (LA-ONBOARD-1 phase 6, OB-9; UC-09), in two modes.
+ *
+ * - `draw` (the Query zone's empty canvas): pick the Dataset, then start from **one entity** (the Entity Type FIRST, the
+ *   Dataset's primary type preselected - A-7b - then the value, with a type-ahead of matches and their link counts), **a
+ *   list** (an Entity List), **a paste** (values, unknown ones reported after) or **the whole Dataset** (allowed, warned
+ *   above the node cap). The page draws the chosen entities plus one ring, busy ones held. On the Investigations level
+ *   *New Investigation…* below opens the form that starts one.
+ * - `investigation` (LA-PANELS-REDESIGN-1, the Investigation tab's **New Investigation** form): the same Start from
+ *   choice and inputs, then a **Name** and a **Reason** pre-filled from the input (re-defaulted until edited), the time
+ *   column under *More*, and an optional *Expand on start*. One press creates the Investigation, seeds it and expands.
+ *
+ * Open…, Explore dataset… and the examples live in the File menu.
  */
 @Component({
     selector: 'inspecto-link-analysis-start-box',
@@ -71,28 +81,44 @@ const KINDS: { value: StartKind; label: string }[] = [
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatRadioModule,
         ReactiveFormsModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        LaFoldComponent,
+        PenFieldComponent,
         TermHelpComponent,
     ],
-    host: { class: 'block w-full max-w-3xl p-4' },
+    host: { class: 'block w-full max-w-3xl', '[class.p-4]': "mode() === 'draw'" },
     template: `
-        <h2 class="m-0 text-lg font-semibold" id="la-start-title">Start from...</h2>
-        <p class="text-secondary mb-3 mt-1 text-sm">
-            Draw a few entities and who they are linked to, then Expand one degree at a time - not the whole hairball. Pick
-            a <inspecto-term term="dataset"></inspecto-term>, then an
-            <inspecto-term term="entity-type"></inspecto-term> and one of its values.
-        </p>
+        @if (mode() === 'draw') {
+            <h2 class="m-0 text-lg font-semibold" [id]="titleId()">Start from...</h2>
+            <p class="text-secondary mb-3 mt-1 text-sm">
+                Draw a few entities and who they are linked to, then Expand one degree at a time - not the whole hairball.
+                Pick a <inspecto-term term="dataset"></inspecto-term>, then an
+                <inspecto-term term="entity-type"></inspecto-term> and one of its values.
+            </p>
+        } @else {
+            <h3 class="m-0 text-base font-semibold" [id]="titleId()">New Investigation</h3>
+            <p class="text-secondary mb-2 mt-1 text-sm">
+                Records each step you take from this start, with who, when and why, so it can be replayed and handed over.
+            </p>
+        }
         @if (catalogue().datasets.length) {
             <form
-                class="start-box flex flex-col gap-3"
+                class="flex flex-col gap-3"
+                [class.start-box]="mode() === 'draw'"
                 data-testid="start-box"
-                aria-labelledby="la-start-title"
+                [attr.aria-labelledby]="titleId()"
                 [formGroup]="form"
                 (ngSubmit)="submit()"
             >
+                <inspecto-option-picker
+                    data-testid="start-kind"
+                    label="Start from"
+                    [outlined]="true"
+                    [options]="kinds"
+                    formControlName="kind"
+                ></inspecto-option-picker>
                 <inspecto-option-picker
                     data-testid="start-dataset"
                     label="Dataset"
@@ -101,16 +127,6 @@ const KINDS: { value: StartKind; label: string }[] = [
                     [help]="datasetHelp()"
                     formControlName="dataset"
                 ></inspecto-option-picker>
-                <mat-radio-group
-                    class="flex flex-wrap gap-x-4"
-                    aria-label="Start from"
-                    data-testid="start-kind"
-                    formControlName="kind"
-                >
-                    @for (k of kinds; track k.value) {
-                        <mat-radio-button [value]="k.value" [attr.data-kind]="k.value">{{ k.label }}</mat-radio-button>
-                    }
-                </mat-radio-group>
 
                 @switch (kind()) {
                     @case ('entity') {
@@ -215,6 +231,68 @@ const KINDS: { value: StartKind; label: string }[] = [
                         }
                     }
                 }
+                @if (mode() === 'investigation') {
+                    <inspecto-pen-field
+                        data-testid="new-name"
+                        label="Name"
+                        formControlName="name"
+                        [maxlength]="200"
+                        [error]="form.controls.name.hasError('maxlength') ? 'At most 200 characters.' : ''"
+                    />
+                    <div>
+                        <inspecto-pen-field
+                            data-testid="new-reason"
+                            label="Reason"
+                            [required]="true"
+                            [multiline]="true"
+                            formControlName="reason"
+                            [maxlength]="1000"
+                            [error]="reasonError()"
+                        />
+                        <p class="text-secondary m-0 text-xs">
+                            The purpose or legal basis, recorded with the Investigation and shown in its Dossier.
+                        </p>
+                    </div>
+                    <la-fold title="More" data-testid="new-more">
+                        <div class="flex flex-col gap-2 p-2">
+                            <div>
+                                <inspecto-pen-field
+                                    label="Time column"
+                                    formControlName="timeCol"
+                                    [maxlength]="200"
+                                    [placeholder]="picked()?.timeCol ?? ''"
+                                />
+                                <p class="text-secondary m-0 text-xs">
+                                    The event time windows and the coverage check read{{
+                                        picked()?.timeCol ? ' - blank uses ' + picked()!.timeCol : ''
+                                    }}.
+                                </p>
+                            </div>
+                            <inspecto-option-picker
+                                label="Time column zone"
+                                formControlName="timeColZone"
+                                [options]="timeZones"
+                                help="The zone a plain TIMESTAMP time column is read in. A column that already carries a zone refuses one."
+                            />
+                        </div>
+                    </la-fold>
+                    @if (kind() !== 'dataset') {
+                        <la-fold title="Expand on start" data-testid="new-expand">
+                            <div class="flex flex-col gap-2 p-2">
+                                <inspecto-option-picker
+                                    data-testid="new-degrees"
+                                    label="Expand"
+                                    formControlName="degrees"
+                                    [options]="degreeOptions()"
+                                />
+                                <p class="text-secondary m-0 text-xs">
+                                    Each degree is a recorded expand step with the profile's read settings; busy entities
+                                    are held. Expand… on the canvas goes further later.
+                                </p>
+                            </div>
+                        </la-fold>
+                    }
+                }
                 <p class="text-secondary m-0 text-xs" data-testid="start-what">{{ whatHappens() }}</p>
                 <div>
                     <button
@@ -222,7 +300,7 @@ const KINDS: { value: StartKind; label: string }[] = [
                         color="primary"
                         type="submit"
                         data-testid="start-submit"
-                        [disabled]="busy()"
+                        [disabled]="busy() || (mode() === 'investigation' && !canWrite())"
                     >
                         {{ submitLabel() }}
                     </button>
@@ -230,9 +308,8 @@ const KINDS: { value: StartKind; label: string }[] = [
             </form>
         } @else {
             <p class="m-0 text-sm" data-testid="start-no-dataset">
-                No Dataset in this Space has a link yet, so there is nothing to start from. Choose
-                <em>Add data</em> below to bring in a file of events, or <em>Explore a Dataset</em> to choose its from
-                and to columns yourself.
+                No Dataset in this Space has a link yet, so there is nothing to start from. Bring in a file of events with
+                <em>Add data</em>, or choose a Dataset's from and to columns yourself with File ▸ Explore dataset….
             </p>
         }
         @if (notice(); as n) {
@@ -241,74 +318,37 @@ const KINDS: { value: StartKind; label: string }[] = [
             }}</inspecto-alert>
         }
 
-        <h3 class="mb-2 mt-5 text-sm font-semibold">Or</h3>
-        <ul class="m-0 grid list-none gap-3 p-0 grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
-            @if (followView(); as v) {
-                <li>
-                    <button
-                        type="button"
-                        class="starter-card"
-                        data-testid="starter-follow"
-                        (click)="followMoney.emit()"
-                    >
-                        <mat-icon class="icon-size-6" svgIcon="heroicons_outline:banknotes"></mat-icon>
-                        <span class="block text-sm font-semibold">Follow the money (example)</span>
-                        <span class="text-secondary block text-xs">
-                            Opens the saved view {{ v.name }} and draws it now.
-                            {{ followAbout() }}
-                        </span>
+        @if (mode() === 'draw') {
+            <p class="text-secondary m-0 mt-4 text-sm" data-testid="start-file-hint">
+                Open…, Explore dataset… and the examples are in the File menu.
+            </p>
+            @if (investigations()) {
+                <div class="mt-2">
+                    <button mat-stroked-button type="button" data-testid="start-new-investigation" (click)="newInvestigation.emit()">
+                        <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon>
+                        New Investigation…
                     </button>
-                </li>
+                </div>
             }
-            @if (savedViewCount() > 0) {
-                <li>
-                    <button
-                        type="button"
-                        class="starter-card"
-                        data-testid="starter-views"
-                        (click)="openSavedViews.emit()"
-                    >
-                        <mat-icon class="icon-size-6" svgIcon="heroicons_outline:folder-open"></mat-icon>
-                        <span class="block text-sm font-semibold">Open a saved view</span>
-                        <span class="text-secondary block text-xs">
-                            {{ savedViewCount() }} saved {{ savedViewCount() === 1 ? 'view' : 'views' }} in this Space.
-                            A saved view re-reads live data; it is not evidence.
-                        </span>
-                    </button>
-                </li>
-            }
-            <li>
-                <button
-                    type="button"
-                    class="starter-card"
-                    data-testid="starter-explore"
-                    (click)="exploreDataset.emit()"
-                >
-                    <mat-icon class="icon-size-6" svgIcon="heroicons_outline:circle-stack"></mat-icon>
-                    <span class="block text-sm font-semibold">Explore a Dataset</span>
-                    <span class="text-secondary block text-xs">
-                        Choose a Dataset and its from and to columns yourself - the ones that look like links are listed
-                        first.
-                    </span>
-                </button>
-            </li>
             @if (addData()) {
-                <li>
-                    <button
-                        type="button"
-                        class="starter-card"
-                        data-testid="starter-add-data"
-                        (click)="openAddData.emit()"
-                    >
-                        <mat-icon class="icon-size-6" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
-                        <span class="block text-sm font-semibold">Add data</span>
-                        <span class="text-secondary block text-xs">
-                            Bring a file of events (transfers, calls, messages) into this Space.
-                        </span>
-                    </button>
-                </li>
+                <ul class="m-0 mt-3 grid list-none gap-3 p-0 grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
+                    <li>
+                        <button
+                            type="button"
+                            class="starter-card"
+                            data-testid="starter-add-data"
+                            (click)="openAddData.emit()"
+                        >
+                            <mat-icon class="icon-size-6" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                            <span class="block text-sm font-semibold">Add data</span>
+                            <span class="text-secondary block text-xs">
+                                Bring a file of events (transfers, calls, messages) into this Space.
+                            </span>
+                        </button>
+                    </li>
+                </ul>
             }
-        </ul>
+        }
     `,
     styles: `
         .starter-card {
@@ -349,26 +389,34 @@ export class LinkAnalysisStartBoxComponent {
     readonly lists = input<EntityListSummary[]>([]);
     /** The Dataset to preselect (`?dataset=<id>`, Add data's *Explore in Link Analysis*); null = the first. */
     readonly dataset = input<string | null>(null);
-    /** The Investigations level: one entity seeds an Investigation instead of drawing a ring. */
+    /** The Investigations level: *New Investigation…* is offered under the draw. */
     readonly investigations = input(false);
     readonly nodeCap = input(1000);
     readonly notice = input<StartNotice | null>(null);
     readonly busy = input(false);
-    /** The ready-made "follow the money" saved view, or null (the card is then not shown). */
-    readonly followView = input<LinkAnalysisView | null>(null);
-    readonly savedViewCount = input(0);
     /** The host has an Add data screen (`/add-data`): the card is offered. */
     readonly addData = input(false);
+    /** `draw` = the Query zone's start; `investigation` = the Investigation tab's New Investigation form. */
+    readonly mode = input<'draw' | 'investigation'>('draw');
+    /** The Space's masking mode (`InvService.masking`): an entity value enters the default Name only when it is `none`. */
+    readonly maskingMode = input<string | null>(null);
+    /** The profile's last degree: Expand on start offers no more. */
+    readonly maxDegree = input(3);
+    /** Starting an Investigation needs the Incident management capability. */
+    readonly canWrite = input(true);
 
     readonly start = output<StartRequest>();
-    readonly followMoney = output<void>();
-    readonly exploreDataset = output<void>();
-    readonly openSavedViews = output<void>();
+    /** The New Investigation form's answer (`investigation` mode). */
+    readonly create = output<NewInvestigationRequest>();
+    /** *New Investigation…* under the draw box (Investigations level): the page opens the form in the Investigation tab. */
+    readonly newInvestigation = output<void>();
     readonly openAddData = output<void>();
     /** "A list" was chosen: the host re-reads the Space's Entity Lists, so a list made elsewhere since is offered. */
     readonly listsWanted = output<void>();
 
     readonly kinds = KINDS;
+    readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
+    readonly titleId = computed(() => (this.mode() === 'draw' ? 'la-start-title' : 'la-new-investigation-title'));
     readonly form = new FormGroup({
         dataset: new FormControl('', { nonNullable: true }),
         kind: new FormControl<StartKind>('entity', { nonNullable: true }),
@@ -376,10 +424,22 @@ export class LinkAnalysisStartBoxComponent {
         value: new FormControl('', { nonNullable: true }),
         listId: new FormControl('', { nonNullable: true }),
         paste: new FormControl('', { nonNullable: true }),
+        // ── the New Investigation form only ──
+        name: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+        reason: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(1000)],
+        }),
+        timeCol: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+        timeColZone: new FormControl('', { nonNullable: true }),
+        degrees: new FormControl('0', { nonNullable: true }),
     });
     private readonly datasetId = toSignal(this.form.controls.dataset.valueChanges, { initialValue: '' });
     readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: 'entity' as StartKind });
     private readonly entityType = toSignal(this.form.controls.entityType.valueChanges, { initialValue: '' });
+    private readonly valueText = toSignal(this.form.controls.value.valueChanges, { initialValue: '' });
+    private readonly listId = toSignal(this.form.controls.listId.valueChanges, { initialValue: '' });
+    private readonly pasteText = toSignal(this.form.controls.paste.valueChanges, { initialValue: '' });
     /** Submit was pressed: a missing list choice says so. */
     readonly tried = signal(false);
 
@@ -420,7 +480,42 @@ export class LinkAnalysisStartBoxComponent {
             })),
     );
 
+    // ── the New Investigation form: default Name and Reason, Expand on start ──
+
+    /** The default Name and Reason for the current input (LA-PANELS-REDESIGN-1). */
+    readonly defaults = computed(() =>
+        newInvestigationDefaults({
+            kind: this.kind(),
+            typeLabel: this.typeLabel(),
+            value: this.valueText(),
+            listTitle: this.lists().find((l) => l.id === this.listId())?.title ?? '',
+            pasted: parsePastedValues(this.pasteText()).length,
+            datasetName: this.datasetName(),
+            maskingMode: this.maskingMode(),
+        }),
+    );
+    readonly degreeOptions = computed<PickerOption[]>(() =>
+        DEGREE_CHOICES.filter((d) => d <= this.maxDegree()).map((d) => ({
+            value: String(d),
+            label: d === 0 ? "Don't expand" : `${d} ${d === 1 ? 'degree' : 'degrees'}`,
+        })),
+    );
+    readonly reasonError = computed(() => {
+        this.tried();
+        const c = this.form.controls.reason;
+        if (c.hasError('maxlength')) return 'At most 1000 characters.';
+        return this.tried() && c.invalid ? 'A reason is required to start an Investigation.' : '';
+    });
+
     constructor() {
+        // The Name and Reason follow the input until the analyst edits them; an edit is kept from then on.
+        effect(() => {
+            const d = this.defaults();
+            if (this.mode() !== 'investigation') return;
+            const { name, reason } = this.form.controls;
+            if (name.pristine && name.value !== d.name) name.setValue(d.name);
+            if (reason.pristine && reason.value !== d.reason) reason.setValue(d.reason);
+        });
         // The Dataset: the page's preselect (`?dataset=`) when it can start a graph, else keep a valid pick, else the first.
         effect(() => {
             const ids = this.catalogue().datasets.map((d) => d.id);
@@ -521,6 +616,7 @@ export class LinkAnalysisStartBoxComponent {
     });
 
     readonly submitLabel = computed(() => {
+        if (this.mode() === 'investigation') return 'Start Investigation';
         switch (this.kind()) {
             case 'list':
                 return 'Start from this list';
@@ -529,55 +625,76 @@ export class LinkAnalysisStartBoxComponent {
             case 'dataset':
                 return 'Draw the whole Dataset';
             default:
-                return this.investigations() ? 'Investigate' : 'Start';
+                return 'Start';
         }
     });
 
     /** What pressing the button will do on this level, in one line. */
     readonly whatHappens = computed(() => {
         const kind = this.kind();
+        if (this.mode() === 'investigation') {
+            if (kind === 'dataset')
+                return 'Draws every link of the Dataset and creates an Investigation over it, with no seed yet.';
+            return 'Creates the Investigation, records the start as its seed step, then expands as set under Expand on start.';
+        }
         if (kind === 'dataset') return 'Draws every link of the Dataset at once.';
-        if (kind === 'entity' && this.investigations())
-            return 'Seeds an Investigation from it: you give a purpose, and it expands one degree of who it is linked to.';
         const ring =
             kind === 'entity'
                 ? 'Draws it and everything linked to it - one ring - with busy ones held; Expand… continues from there.'
                 : 'Draws them and everything linked to them - one ring - with busy ones held; Expand… continues from there.';
-        return this.investigations() ? `${ring} They are queued as the first seeds of an Investigation.` : ring;
+        return ring;
     });
-
-    readonly followAbout = computed(() => oneLine(this.followView()?.description, 110));
 
     submit(): void {
         this.tried.set(true);
         const v = this.form.getRawValue();
         if (!v.dataset) return;
+        const req = this.request(v);
+        if (!req) return;
+        if (this.mode() === 'draw') {
+            this.start.emit(req);
+            return;
+        }
+        const { name, reason } = this.form.controls;
+        if (name.invalid || reason.invalid) {
+            reason.markAsTouched();
+            return;
+        }
+        this.create.emit({
+            start: req,
+            title: v.name.trim(),
+            purpose: v.reason.trim(),
+            timeCol: v.timeCol.trim(),
+            timeColZone: v.timeColZone,
+            degrees: req.kind === 'dataset' ? 0 : Number(v.degrees) || 0,
+        });
+    }
+
+    /** The start the form names, or null (with the missing input marked). */
+    private request(v: ReturnType<LinkAnalysisStartBoxComponent['form']['getRawValue']>): Exclude<StartRequest, { kind: 'found' }> | null {
         switch (v.kind) {
             case 'entity': {
                 const value = v.value.trim();
                 if (!value) {
                     this.form.controls.value.setErrors({ required: true });
                     this.form.controls.value.markAsTouched();
-                    return;
+                    return null;
                 }
-                this.start.emit({ kind: 'entity', datasetId: v.dataset, entityType: v.entityType, value });
-                return;
+                return { kind: 'entity', datasetId: v.dataset, entityType: v.entityType, value };
             }
             case 'list':
-                if (v.listId) this.start.emit({ kind: 'list', datasetId: v.dataset, listId: v.listId });
-                return;
+                return v.listId ? { kind: 'list', datasetId: v.dataset, listId: v.listId } : null;
             case 'paste': {
                 const values = parsePastedValues(v.paste);
                 if (!values.length) {
                     this.form.controls.paste.setErrors({ required: true });
                     this.form.controls.paste.markAsTouched();
-                    return;
+                    return null;
                 }
-                this.start.emit({ kind: 'paste', datasetId: v.dataset, entityType: v.entityType, values });
-                return;
+                return { kind: 'paste', datasetId: v.dataset, entityType: v.entityType, values };
             }
             default:
-                this.start.emit({ kind: 'dataset', datasetId: v.dataset });
+                return { kind: 'dataset', datasetId: v.dataset };
         }
     }
 }

@@ -6,6 +6,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { penEdit, penText } from '@inspecto/core/testing/pen-field';
 import {
     GraphAlgorithm,
     GraphAlgorithmCatalogue,
@@ -180,15 +181,14 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         expect(c.algorithmOptions().find((o) => o.value === 'propagatedRisk')!.label).toBe('Propagated risk');
         c.pick('propagatedRisk');
         fixture.detectChanges();
-        const weights = el.querySelector<HTMLInputElement>('[data-testid=param-weights]')!;
-        expect(weights.value).toBe('1, 0.5'); // the Space's graph_run.propagated_risk_weights
-        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain('Fill nodeScores first');
-        weights.value = '1, 2';
-        weights.dispatchEvent(new Event('change'));
+        await fixture.whenStable(); // ngModel writes the pen field's value a tick later
         fixture.detectChanges();
+        const weights = el.querySelector<HTMLElement>('[data-testid=param-weights]')!;
+        expect(penText(weights)).toBe('1, 0.5'); // the Space's graph_run.propagated_risk_weights
+        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain('Fill nodeScores first');
+        penEdit(fixture, weights, '1, 2');
         expect(el.querySelector('[role=alert]')!.textContent).toContain('from 0 to 1');
-        weights.value = '1, 0.4, 0.2';
-        weights.dispatchEvent(new Event('change'));
+        penEdit(fixture, weights, '1, 0.4, 0.2');
         c.addId('seeds', 'c-a');
         el.querySelector<HTMLButtonElement>('[data-testid=fill-nodeScores]')!.click();
         await fixture.whenStable();
@@ -248,15 +248,15 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         expect(emitted).toEqual([{ nodeIds: ['c-b'], edgeIds: [] }]);
     });
 
-    it('builds the parameter form from the descriptors and sends what was edited', () => {
+    it('builds the parameter form from the descriptors and sends what was edited', async () => {
         const { fixture, c, el, run } = make();
         c.pick('pageRank');
         fixture.detectChanges();
-        const damping = el.querySelector<HTMLInputElement>('[data-testid=param-damping]')!;
-        expect(damping.value).toBe('0.85');
-        damping.value = '0.5';
-        damping.dispatchEvent(new Event('change'));
+        await fixture.whenStable(); // ngModel writes the pen field's value a tick later
         fixture.detectChanges();
+        const damping = el.querySelector<HTMLElement>('[data-testid=param-damping]')!;
+        expect(penText(damping)).toBe('0.85');
+        penEdit(fixture, damping, '0.5');
         el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!.click();
         expect(run).toHaveBeenCalledWith({ investigationId: 'inv', algorithm: 'pageRank', params: { damping: 0.5 } });
     });

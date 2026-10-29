@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import {
     describeSearchAround,
     SearchAroundCondition,
@@ -21,21 +21,16 @@ import {
 @Component({
     selector: 'inspecto-la-search-around',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, MatButtonToggleModule, MatFormFieldModule, MatIconModule, MatSelectModule],
+    imports: [FormsModule, MatButtonModule, MatButtonToggleModule, MatIconModule, InspectoOptionPickerComponent],
     template: `
         <div class="flex flex-col gap-2" data-testid="search-around">
-            <mat-form-field subscriptSizing="dynamic" class="w-48">
-                <mat-label>Start entity type</mat-label>
-                <mat-select
-                    [value]="spec().startType ?? ''"
-                    (valueChange)="specChange.emit({ ...spec(), startType: $event || undefined })"
-                >
-                    <mat-option [value]="''">Any</mat-option>
-                    @for (k of nodeKinds(); track k) {
-                        <mat-option [value]="k">{{ k }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker
+                class="w-48"
+                label="Start entity type"
+                [options]="nodeKindOptions()"
+                [ngModel]="spec().startType ?? ''"
+                (ngModelChange)="specChange.emit({ ...spec(), startType: $event || undefined })"
+            />
             @for (c of spec().conditions; track $index; let i = $index) {
                 <div class="flex flex-wrap items-center gap-2">
                     <mat-button-toggle-group
@@ -48,27 +43,20 @@ import {
                         <mat-button-toggle value="in" aria-label="incoming">←</mat-button-toggle>
                         <mat-button-toggle value="both" aria-label="either direction">↔</mat-button-toggle>
                     </mat-button-toggle-group>
-                    <mat-form-field subscriptSizing="dynamic" class="w-40">
-                        <mat-label>Link kind</mat-label>
-                        <mat-select [value]="c.linkKind ?? ''" (valueChange)="edit(i, { linkKind: $event || undefined })">
-                            <mat-option [value]="''">Any</mat-option>
-                            @for (k of edgeKinds(); track k) {
-                                <mat-option [value]="k">{{ k }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-40">
-                        <mat-label>Neighbour type</mat-label>
-                        <mat-select
-                            [value]="c.neighbourType ?? ''"
-                            (valueChange)="edit(i, { neighbourType: $event || undefined })"
-                        >
-                            <mat-option [value]="''">Any</mat-option>
-                            @for (k of nodeKinds(); track k) {
-                                <mat-option [value]="k">{{ k }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
+                    <inspecto-option-picker
+                        class="w-40"
+                        label="Link kind"
+                        [options]="edgeKindOptions()"
+                        [ngModel]="c.linkKind ?? ''"
+                        (ngModelChange)="edit(i, { linkKind: $event || undefined })"
+                    />
+                    <inspecto-option-picker
+                        class="w-40"
+                        label="Neighbour type"
+                        [options]="nodeKindOptions()"
+                        [ngModel]="c.neighbourType ?? ''"
+                        (ngModelChange)="edit(i, { neighbourType: $event || undefined })"
+                    />
                     <button mat-icon-button type="button" (click)="remove(i)" [attr.aria-label]="'Remove condition ' + (i + 1)">
                         <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                     </button>
@@ -103,6 +91,15 @@ export class LinkAnalysisSearchAroundComponent {
     readonly spec = input.required<SearchAroundSpec>();
     readonly nodeKinds = input<string[]>([]);
     readonly edgeKinds = input<string[]>([]);
+    /** *Any* (blank, a named choice) then each kind on the graph. */
+    protected readonly nodeKindOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Any' },
+        ...this.nodeKinds().map((k) => ({ value: k, label: k })),
+    ]);
+    protected readonly edgeKindOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Any' },
+        ...this.edgeKinds().map((k) => ({ value: k, label: k })),
+    ]);
     readonly specChange = output<SearchAroundSpec>();
     readonly run = output<void>();
 

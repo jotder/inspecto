@@ -28,10 +28,7 @@ import { LockedActionComponent } from '@inspecto/core/components/locked-action.c
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { ComponentsService } from '@inspecto/core/api';
 import {
     GraphRunResult,
@@ -239,10 +236,7 @@ type CentralityMetric =
         DecimalPipe,
         MatButtonModule,
         MatButtonToggleModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
-        MatSelectModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         LinkAnalysisResultNextComponent,
@@ -347,6 +341,15 @@ export class LinkAnalysisToolboxComponent {
     }
     readonly nodeKinds = input<string[]>([]);
     readonly edgeKinds = input<string[]>([]);
+    /** A pattern step's kind choices: *Any* (blank, a named choice) then each kind on the graph. */
+    readonly nodeKindOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Any' },
+        ...this.nodeKinds().map((k) => ({ value: k, label: k })),
+    ]);
+    readonly edgeKindOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Any' },
+        ...this.edgeKinds().map((k) => ({ value: k, label: k })),
+    ]);
     /** Tool-group ids the host's domain profile foregrounds — badged "suggested" on the header. */
     readonly suggested = input<string[]>([]);
     /** Node-id → label lookup, supplied by the host (its full-graph labels). */
@@ -470,28 +473,28 @@ export class LinkAnalysisToolboxComponent {
         { id: 'index-build', label: 'Edge index', icon: 'heroicons_outline:server-stack' },
     ];
 
-    // ── The catalogue (§5.8, UIR-D10): one list grouped by question, with a Browser | Server toggle ──
+    // ── The catalogue (§5.8, UIR-D10): one list grouped by question, for the host's Browser or Server tab ──
 
     private readonly runs = inject(GraphRunsService);
     /** The server's algorithm list (`GET /inv/graph/algorithms`); empty until it loads, or on the Explorer level. */
     readonly serverAlgorithms = computed(() => this.runs.catalogue()?.algorithms ?? []);
-    /** The investigator's own pick; null = the default (Server over the browser cap, else Browser). */
-    readonly whereChoice = signal<CatalogueWhere | null>(null);
+    /**
+     * Which tab this toolbox draws (LA-PANELS-REDESIGN-1): the host's Browser or Server tab. One instance serves both and
+     * stays mounted, so a tool's result survives a tab switch.
+     */
+    readonly side = input<CatalogueWhere>('browser');
     /** The nodes the tools run over: the Working Set when the canvas draws one, else the drawn graph. */
     private readonly analysedNodes = computed(() => this.workingSetNodes() ?? this.graph()?.nodes.length ?? 0);
-    /** Why Server is preselected: the graph is above the browser's shared cap. '' = under it, or no Server here. */
-    readonly serverPreselectReason = computed(() => {
+    /** Why the Server tab is the place to run: the graph is above the browser's shared cap. '' = under it, or no Server here. */
+    readonly overCapNote = computed(() => {
         const n = this.analysedNodes();
         const cap = selectionNodeCapValue();
         if (!this.investigationsEnabled() || n <= cap) return '';
         const subject = this.workingSetNodes() !== null ? 'The Working Set' : 'This graph';
-        return `${subject} has ${n} nodes - above the ${cap}-node browser limit, so Server is preselected.`;
+        return `${subject} has ${n} nodes - above the ${cap}-node browser limit: a tool over its limit runs from the Server tab.`;
     });
-    /** Where the catalogue runs. Always Browser on the Explorer level, which has no server runs. */
-    readonly where = computed<CatalogueWhere>(() => {
-        if (!this.investigationsEnabled()) return 'browser';
-        return this.whereChoice() ?? (this.serverPreselectReason() ? 'server' : 'browser');
-    });
+    /** Where the catalogue runs: the tab's side. The Explorer level has no server runs (its Server tab is locked). */
+    readonly where = computed<CatalogueWhere>(() => this.side());
     readonly sections = computed(() => {
         const specs = this.serverSpecs();
         return catalogueSections(this.allTools, this.serverAlgorithms(), this.where(), (id) =>

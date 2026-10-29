@@ -24,6 +24,74 @@ export type StartRequest =
     /** Phase 7 (UC-09 "the busiest / a community"): a *Find something interesting* result's entities; `what` names it. */
     | { kind: 'found'; datasetId: string; values: string[]; what: string };
 
+/**
+ * The New Investigation form's answer (LA-PANELS-REDESIGN-1): what to start from, the name and reason, the time column
+ * read settings, and how many degrees to expand on start (0 = none - the standalone Expand… stays for later).
+ */
+export interface NewInvestigationRequest {
+    start: Exclude<StartRequest, { kind: 'found' }>;
+    title: string;
+    purpose: string;
+    /** '' = the Dataset's own time column. */
+    timeCol: string;
+    timeColZone: string;
+    degrees: number;
+}
+
+/** What the default Name and Reason are made from: the Start from choice and its current input. */
+export interface NewInvestigationInput {
+    kind: StartKind;
+    /** The Entity Type's label (one entity, a paste). */
+    typeLabel: string;
+    /** The one entity's value. */
+    value: string;
+    /** The Entity List's title. */
+    listTitle: string;
+    /** How many values the paste holds. */
+    pasted: number;
+    datasetName: string;
+    /** The Space's masking mode: a title is stored and shown like a value, so a value enters it only when this is `none`. */
+    maskingMode?: string | null;
+}
+
+/**
+ * The New form's default Name and Reason for an input (LA-PANELS-REDESIGN-1). The analyst may change both; the form
+ * re-defaults them only until they are edited. An entity value enters the defaults only where the Space is known not to
+ * mask (the same rule as `suspectTitle`) - otherwise the default names the Entity Type alone.
+ */
+export function newInvestigationDefaults(i: NewInvestigationInput): { name: string; reason: string } {
+    switch (i.kind) {
+        case 'list': {
+            const list = i.listTitle.trim() || 'an Entity List';
+            return {
+                name: `Investigation — list ${list}`,
+                reason: `Review of the members of list ${list} and their links`,
+            };
+        }
+        case 'paste': {
+            const n = i.pasted;
+            const what = `${n} pasted ${n === 1 ? 'value' : 'values'}`;
+            return {
+                name: `Investigation — ${what}`,
+                reason: `Review of ${n} pasted ${i.typeLabel} ${n === 1 ? 'value' : 'values'} and their links`,
+            };
+        }
+        case 'dataset':
+            return {
+                name: `Investigation — whole ${i.datasetName}`,
+                reason: `Review of the links in ${i.datasetName}`,
+            };
+        default: {
+            const value = i.maskingMode === 'none' ? i.value.trim() : '';
+            const subject = value ? `${i.typeLabel} ${value}` : i.typeLabel;
+            return {
+                name: `Investigation — ${subject}`,
+                reason: `Review of ${value ? subject : `the ${i.typeLabel}`} and its links`,
+            };
+        }
+    }
+}
+
 /** One Dataset a start can draw: the mapping every start over it uses, and the Entity Types its link ends hold. */
 export interface StartDataset {
     id: string;
