@@ -27,6 +27,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/projection/neighbors"},
             {"POST", "/inv/projection/neighbors/preview"},          // LA-GROW-EXCLUDE-1: the explorer's Grow preview reads like the step
             {"POST", "/inv/investigations/([^/]+)/expand/preview"}, // LA-GROW-EXCLUDE-1: the dry run reads exactly what the expand would
+            {"POST", "/inv/expand/preview"},                         // LA-UNSAVED-INVESTIGATION-1: reads every unsaved expand again, as the neighbours reads
             {"POST", "/geo/projection"},
             {"POST", "/inv/pattern/temporal"},
             {"POST", "/inv/pattern/branching"},

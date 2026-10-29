@@ -13,7 +13,7 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-100 row(s).
+101 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -73,6 +73,7 @@ tags: [feature-db, module]
 | "POST /inv/entity-identities" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/entity-identities"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/entity-identities/([^/]+)/retract" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/entity-identities/([^/]+)/retract"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/entity-identities/import" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/entity-identities/import"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /inv/expand/preview" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/expand/preview"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/graph/runs" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/graph/runs"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/graph/runs/([^/]+)/cancel" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/graph/runs/([^/]+)/cancel"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/inbound/investigations" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/inbound/investigations"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

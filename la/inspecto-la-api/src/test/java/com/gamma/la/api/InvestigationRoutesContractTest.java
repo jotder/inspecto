@@ -14,6 +14,7 @@ class InvestigationRoutesContractTest extends RouteModuleContract {
     @Override
     protected java.util.Map<String, String> exemptMutatingRoutes() {
         return java.util.Map.of(
-                "POST /inv/investigations/([^/]+)/replay", "read-shaped: re-evaluates a sealed Investigation log (LA-10); persists nothing");
+                "POST /inv/investigations/([^/]+)/replay", "read-shaped: re-evaluates a sealed Investigation log (LA-10); persists nothing",
+                "POST /inv/expand/preview", "read-shaped: evaluates an unsaved Investigation's seed / expand steps (LA-UNSAVED-INVESTIGATION-1); persists nothing");
     }
 }

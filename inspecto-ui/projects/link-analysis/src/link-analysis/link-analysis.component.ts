@@ -121,7 +121,8 @@ import {
     SaveInvestigationDialogData,
     SaveInvestigationDialogResult,
 } from './link-analysis-save-investigation.dialog';
-import { UNSAVED_FOUR_EYES, UNSAVED_FOUR_EYES_START, UnsavedStep } from './unsaved-investigation';
+import { UNSAVED_FOUR_EYES, UNSAVED_FOUR_EYES_START, UnsavedBinding, UnsavedStep } from './unsaved-investigation';
+import type { WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
 import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.component';
 import { ExcludeDialogData, ExcludeDialogResult, LinkAnalysisExcludeDialog } from './link-analysis-exclude.dialog';
@@ -295,7 +296,7 @@ import { foldBranches, foldableOf } from '@inspecto/link-analysis/graph/graph-cl
 import { autoStyle } from './auto-style';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
-import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
+import { idsInWorkingSet, mergePairOf, rawIdsOf, workingSetToGraph } from './investigation-state';
 import type { ColDef } from 'ag-grid-community';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
@@ -2185,36 +2186,32 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
             return;
         }
-        const found = await this.drawStart(ds, values, entityType);
+        const found = await this.drawStart(ds, values, entityType);   // finds the values the Dataset holds
         if (!found.length) return;
-        this.boundProfile.set(binding.profileId);
-        this.investigation.beginUnsaved(
-            {
-                projection: binding.projection,
-                timeCol: req.timeCol || binding.timeCol,
-                timeColZone: zone,
-                eventsCol: binding.eventsCol,
-                presets: binding.presets,
-                maxDegree: binding.maxDegree,
-                windowEnd: binding.windowEnd,
-                profileId: binding.profileId,
-            },
-            req.defaults,
-            [
-                { kind: 'seed', ids: found, ...(binding.projection.entityType ? { entityType: binding.projection.entityType } : {}) },
-                { kind: 'expand', from: 'ids', ids: found, req: this.startRing(), walked: [found] },
-            ],
-        );
-        if (req.degrees > 1) {
-            const ctx = this.growContext();
-            const outer = ctx.sources?.find((x) => x.value === 'outer');
-            if (outer && !outer.blocked)
-                await this.expandUnsaved(
-                    { ...ctx, frontier: outer.frontier, heldFrontier: outer.heldFrontier },
-                    this.startRing(req.degrees - 1),
-                    'outer',
-                );
+        const unsaved: UnsavedBinding = {
+            projection: binding.projection,
+            timeCol: req.timeCol || binding.timeCol,
+            timeColZone: zone,
+            eventsCol: binding.eventsCol,
+            presets: binding.presets,
+            maxDegree: binding.maxDegree,
+            windowEnd: binding.windowEnd,
+            profileId: binding.profileId,
+        };
+        const type = binding.projection.entityType;
+        const seed: UnsavedStep = { kind: 'seed', ids: found, ...(type ? { entityType: type } : {}) };
+        // the ring and the further degrees, read by the server with the presets: the screen is what Save records
+        const walk = await this.walkUnsaved(unsaved, [seed], found, this.startRing(Math.max(1, req.degrees)));
+        if (!walk) {
+            this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
+            return;
         }
+        this.boundProfile.set(binding.profileId);
+        this.investigation.beginUnsaved(unsaved, req.defaults, [
+            seed,
+            { kind: 'expand', from: 'ids', ids: found, req: this.startRing(walk.walked.length), walked: walk.walked },
+        ]);
+        this.drawUnsaved(walk.ws, unsaved);
         this.openInvestigation();
     }
 
@@ -2231,23 +2228,84 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             return false;
         }
         const nodes = this.graph()?.nodes ?? [];
-        const named = growIds(ctx, req).map((id) => nodes.find((n) => n.id === id)?.data.label ?? id);
-        const walked = await this.growBasic(ctx, req);
-        // the exact values each degree expanded from, capped as the screen capped them: Save records what was drawn
-        const step: UnsavedStep = { kind: 'expand', from: from === 'outer' ? 'outer' : 'ids', ids: from === 'outer' ? [] : named, req, walked };
-        this.investigation.recordUnsaved(step);
-        const change = this.growExclude.lastChange();
-        if (change?.undo) {
-            const undo = change.undo;
-            this.growExclude.lastChange.set({
-                ...change,
-                undo: () => {
-                    undo();
-                    this.investigation.popUnsaved();
-                },
-            });
+        const named = [...new Set(growIds(ctx, req).flatMap((id) => {
+            const n = nodes.find((x) => x.id === id);
+            return n ? rawIdsOf(n) : [id];
+        }))];
+        const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld() };
+        const walk = await this.walkUnsaved(u.binding, u.steps, named, req);
+        if (!walk) {
+            this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+            this.toastr.info(UNSAVED_FOUR_EYES);
+            return false;
         }
+        if (!walk.walked.length) {
+            this.growExclude.lastChange.set({ text: 'There is nothing to expand from yet.' });
+            return false;
+        }
+        // each degree's frontier, as the server read it: Save sends exactly these lists
+        const step: UnsavedStep = { kind: 'expand', from: from === 'outer' ? 'outer' : 'ids', ids: from === 'outer' ? [] : named, req, walked: walk.walked };
+        this.investigation.recordUnsaved(step);
+        const added = walk.ws.entities.length - (before.graph?.nodes.length ?? 0);
+        this.drawUnsaved(walk.ws, u.binding);
+        const after = this.graph();
+        const t = ctx.terms;
+        const text = `Expanded ${walk.walked.length === 1 ? 'one degree' : walk.walked.length + ' degrees'}: added ${Math.max(0, added).toLocaleString('en-GB')} ${added === 1 ? t.node : t.nodes} (not saved yet).`;
+        this.growExclude.lastChange.set({
+            text,
+            valid: () => this.graph() === after,
+            undo: () => {
+                this.graph.set(before.graph);
+                this.expandedNodeIds.set(before.expanded);
+                this.growExclude.basicHeld.set(before.held);
+                this.investigation.popUnsaved();
+                this.growExclude.lastChange.set({ text: 'Undone.' });
+            },
+        });
+        this.drawAnnouncement.set(text);
         return true;
+    }
+
+    /**
+     * Walk an unsaved Expand degree by degree through the server's preview (\`POST /inv/expand/preview\`, the step route's own
+     * code, with the presets and the fold filters of \`req\`): each degree expands from what the previous one admitted, less
+     * the busy entities held. Null when a degree would be held for four-eyes approval (it cannot run unsaved).
+     */
+    private async walkUnsaved(
+        b: UnsavedBinding,
+        base: readonly UnsavedStep[],
+        from: string[],
+        req: GrowRequest,
+    ): Promise<{ walked: string[][]; ws: WorkingSet } | null> {
+        const walked: string[][] = [];
+        const cap = laLimit('investigation.max_frontier');
+        let frontier = from.slice(0, cap);
+        let ws: WorkingSet = { entities: [], links: [], excluded: [], hash: '' };
+        for (let d = 1; d <= Math.max(1, req.degrees) && frontier.length; d++) {
+            const next = [...walked, frontier];
+            const res = await this.investigation.previewUnsaved(
+                [...base, { kind: 'expand', from: 'ids', ids: next[0], req, walked: next }],
+                b,
+            );
+            const last = res.steps.at(-1);
+            if (last?.needsApproval) return null;
+            walked.push(frontier);
+            ws = res.workingSet;
+            const busy = new Set(ws.entities.filter((e) => e.highConnectivity).map((e) => e.id));
+            frontier = (last?.admitted ?? []).filter((id) => !req.hold || !busy.has(id)).slice(0, cap);
+        }
+        return { walked, ws };
+    }
+
+    /** Draw the unsaved Working Set the server previewed: the canvas is exactly what Save records. */
+    private drawUnsaved(ws: WorkingSet, b: UnsavedBinding): void {
+        const g = workingSetToGraph(ws, b.projection);
+        const maxHop = Math.max(0, ...ws.entities.map((e) => e.hop));
+        const inner = new Set(ws.entities.filter((e) => e.hop < maxHop).map((e) => e.id));
+        this.graph.set(g);
+        this.lastRun.set(this.runOf('entity-projection', { projection: b.projection }, g));
+        this.expandedNodeIds.set(g.nodes.filter((n) => rawIdsOf(n).some((id) => inner.has(id))).map((n) => n.id));
+        this.growExclude.basicHeld.set(new Map(ws.entities.filter((e) => e.highConnectivity).map((e) => [e.id, e.contacts ?? null])));
     }
 
     /** How many entities are selected on the canvas (Start from selected names them). */
@@ -2270,14 +2328,22 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         }
         // every spelling the node stands for, as the tab's Start seeds them (never only the label)
         const values = [...new Set(picked.flatMap((n) => rawIdsOf(n)))];
-        const before = this.graph();
-        for (const n of picked) await this.expandNode(n.id, n.data.label, n.data.spellings);
-        if (this.graph() === before) return; // the draw failed (its error is shown): nothing is recorded
         const type = u.binding.projection.entityType;
-        this.investigation.recordUnsaved(
-            { kind: 'seed', ids: values, ...(type ? { entityType: type } : {}) },
-            { kind: 'expand', from: 'ids', ids: values, req: this.startRing(), walked: [values] },
-        );
+        const seed: UnsavedStep = { kind: 'seed', ids: values, ...(type ? { entityType: type } : {}) };
+        let walk: Awaited<ReturnType<LinkAnalysisComponent['walkUnsaved']>>;
+        try {
+            walk = await this.walkUnsaved(u.binding, [...u.steps, seed], values, this.startRing());
+        } catch (err) {
+            this.toastr.error(invErrorMessage(err, 'The start could not be drawn.'));
+            return; // nothing is recorded
+        }
+        if (!walk) {
+            this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+            this.toastr.info(UNSAVED_FOUR_EYES);
+            return;
+        }
+        this.investigation.recordUnsaved(seed, { kind: 'expand', from: 'ids', ids: values, req: this.startRing(walk.walked.length), walked: walk.walked });
+        this.drawUnsaved(walk.ws, u.binding);
     }
 
     /**

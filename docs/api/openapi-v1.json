@@ -12749,6 +12749,47 @@
         "x-optional-module" : true
       }
     },
+    "/inv/expand/preview" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Unsaved Investigation preview: the Working Set its seed / expand steps would build (stores nothing)",
+        "operationId" : "postInvExpandPreview",
+        "description" : "LA-UNSAVED-INVESTIGATION-1. Body = the binding a create takes (dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?, entityType? / sourceType? / targetType?) and steps[], the seed / expand bodies the step route would append, in order (1 to 100). Each step is validated, read and evaluated by the same code as an append (bindings, frontier, four-eyes, the expand read with its budget, fan-out, hub threshold, direction, window and link kinds), so the Working Set equals what those steps record once saved. An expand above the four-eyes thresholds is not read: the walk stops with needsApproval. Ids in and out are the Space's exploration aliases when it masks. Read-shaped and ungated like the explorer's neighbours reads; expensive rate class. Gates: write root 503, bad body or step 422, unknown or not-viewable Dataset 404, unknown column or bad zone 422. 503 on Basic.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "dataset", "sourceCol", "targetCol", "steps" ],
+                "properties" : {
+                  "dataset" : { "type" : "string" },
+                  "sourceCol" : { "type" : "string" },
+                  "targetCol" : { "type" : "string" },
+                  "linkKindCol" : { "type" : "string" },
+                  "timeCol" : { "type" : "string" },
+                  "timeColZone" : { "type" : "string" },
+                  "eventsCol" : { "type" : "string" },
+                  "entityType" : { "type" : "string" },
+                  "steps" : {
+                    "type" : "array",
+                    "items" : { "type" : "object", "description" : "A seed or expand op body, as POST /inv/investigations/{id}/ops takes it." }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope data: workingSet (entities, links, excluded, hash), steps[] ({step, op, needsApproval, admitted[]} or {step, needsApproval: true, exceeded[]}) and masked."
+          },
+          "404" : { "description" : "Unknown or not-viewable Dataset." },
+          "422" : { "description" : "A bad body, step, column or zone." },
+          "503" : { "description" : "No write root, or Basic (no Investigations)." }
+        }
+      }
+    },
     "/inv/inbound/investigations" : {
       "post" : {
         "tags" : [ "inv" ],

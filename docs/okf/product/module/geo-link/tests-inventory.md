@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-120 test class(es): 18 unit, 102 real-HTTP control-plane, 0 IT.
+121 test class(es): 18 unit, 103 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -119,6 +119,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiStandingDetectionLd5Test` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiStandingDetectionLd5Test.java` | LA-LIVE-DETECTION-1 slices LD-4 and LD-5 over real HTTP: the {@code la.detect} Job Type run through |
 | `ControlApiStandingDetectionTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiStandingDetectionTest.java` | LA-LIVE-DETECTION-1 slices LD-1..LD-3 over real HTTP — {@code POST /inv/investigations/{id}/standing-detection} |
 | `ControlApiTelecomPatternPacksTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiTelecomPatternPacksTest.java` | The {@code la-showcase} Space Template's three authored telecom pattern packs ({@code config/registry/pattern-packs/ |
+| `ControlApiUnsavedPreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiUnsavedPreviewTest.java` | LA-UNSAVED-INVESTIGATION-1 over real HTTP: {@code POST /inv/expand/preview}, the unsaved Investigation's dry run. Its |
 | `ControlApiValueMeasureTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiValueMeasureTest.java` | LA-18 over real HTTP — {@code GET /inv/value-measures} (a named value Measure over the WHOLE Dataset) and a |
 | `ControlApiWorkingSetEtagTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiWorkingSetEtagTest.java` | PERF-P4-3: the Working Set GET is conditional - an ETag built from the store's {@code logToken} (never a read of the |
 | `ControlApiWorkingSetGoldenTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiWorkingSetGoldenTest.java` | PERF-P4-3 golden: the Working Set body (field order included, as clients parse it) must stay byte-identical when the |

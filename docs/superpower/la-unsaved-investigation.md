@@ -48,9 +48,14 @@ through the existing step route `POST /inv/investigations/{id}/ops`, in order:
   ids (the Working Set's `exploreAliases`, so a masked Space's aliases are resolved) and kept to what the Working Set
   holds; a degree whose values the server never admitted expands from what the server's previous degree admitted
   (the first degree from the outer ring, `degreeState`). The server never gets an id it would refuse (422).
-- The explorer draw cannot apply the presets (window, minimum events, row budget, fan-out: the neighbours read takes
-  only direction, link kinds and the busy limit), so where they cut, the saved Working Set is smaller than the drawing.
-  Making the draw equal the server's admission needs a server preview without an Investigation; deferred (§6).
+- **The unsaved screen is the server's evaluation** (operator, 2026-10-29): every unsaved degree (the start's ring, each
+  Expand, Start from selected's ring) is drawn from `POST /inv/expand/preview`, which takes the create's binding and the
+  unsaved `seed` / `expand` bodies and evaluates them with the step route's own code (`params`, `requireBindings`,
+  `expandFrontier`, `sensitivity`, the shared `expandRead`, the evaluator): presets (window, minimum events, row budget,
+  fan-out, busy limit) and the fold filters apply, so the drawing equals what Save records. Read-shaped and ungated like
+  the explorer's neighbours reads, expensive rate class, aliases in and out as exploration; a four-eyes-sensitive degree
+  answers `needsApproval` and cannot run unsaved. Parity is pinned by `ControlApiUnsavedPreviewTest`. The Save fallback
+  above stays as a safety net (data that changed between the preview and Save).
 
 The server evaluates every replayed step, so the saved Working Set is the server's (window presets, row budgets, busy
 limit, exclusion lists in force). It can differ from the unsaved explorer drawing where those presets cut: that is the
@@ -99,6 +104,5 @@ Time: Time window, Snapshot marker · Compare: Threshold, Compare) · Scope list
 
 - Unsaved work survives a reload only if it is kept in the browser; not built (D2 says in memory; the leave prompt warns).
 - Keep / Hide / Exclude / Annotate and the other steps while unsaved.
-- An unsaved draw that applies the profile presets exactly (a server preview of an expand without an Investigation).
 - On a saved Investigation, **Add start entities…** opens the start form in add mode and records one `seed` step
   (replaces what the removed checkbox offered: start entities outside the Working Set).

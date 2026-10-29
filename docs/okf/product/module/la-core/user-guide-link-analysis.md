@@ -673,11 +673,10 @@ approval from a second person, so it cannot run unsaved. Save first, then Expand
 in the Dossier), both pre-filled from the start: *Account MULE-HUB-01* / *Review of an Account and its links*,
 *Members of “Suspects”* / *Review of the members of “Suspects” and their links*, *Transfers* / *Review of the links in
 Transfers*. In a Space that masks values the default Name leaves the value out (*Phone number*). Your edits are kept if
-you cancel. Save then creates the Investigation and records the steps in order, each with your name: every Expand
-degree names the entities it expanded from on screen. The server reads each step again with the Industry pack's
-settings (time window, minimum events, row limit, neighbours per entity), which the unsaved drawing does not apply. So
-the saved Working Set can be smaller than the drawing; a degree whose entities the server did not admit expands from
-what it did admit, so Save still completes. If a step is
+you cancel. Save then creates the Investigation and records the steps in order, each with your name. While unsaved,
+every degree is already read by the server with the Industry pack's settings (time window, minimum events, row limit,
+neighbours per entity, busy limit) and your Links, Time and Limits choices, so what you see is what Save records. If the
+data changed in between and a degree's entities are no longer admitted, Save expands from what is, and still completes. If a step is
 refused partway, the Investigation is saved with the steps before it and a message names the steps that were not
 recorded. If a step needs a second person's approval, Save stops there and the step waits for approval.
 

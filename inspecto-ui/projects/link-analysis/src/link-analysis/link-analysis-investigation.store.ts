@@ -12,6 +12,7 @@ import {
     InvestigationOpRequest,
     InvestigationReplayResult,
     InvestigationStepResult,
+    UnsavedPreviewResult,
     WorkingSet,
 } from '@inspecto/link-analysis/api/inv.service';
 import {
@@ -166,6 +167,35 @@ export class InvestigationSessionStore {
     /** Append the steps just run on the canvas; nothing happens without unsaved work. */
     recordUnsaved(...steps: UnsavedStep[]): void {
         this.unsaved.update((u) => (u ? { ...u, steps: [...u.steps, ...steps] } : u));
+    }
+
+    /** The step route bodies these unsaved steps are: a seed, and one \`expand\` per walked degree with the presets laid under. */
+    unsavedOps(steps: readonly UnsavedStep[], b: UnsavedBinding): InvestigationOpRequest[] {
+        return steps.flatMap((s): InvestigationOpRequest[] =>
+            s.kind === 'seed'
+                ? [{ op: 'seed', ids: s.ids, ...(s.entityType ? { entityType: s.entityType } : {}) }]
+                : (s.walked ?? [s.ids]).map((ids) => growExpandBody(ids, s.req, this.withPresets(b.presets, {}))),
+        );
+    }
+
+    /**
+     * The Working Set these unsaved steps build, as the server evaluates them (\`POST /inv/expand/preview\`, the step
+     * route's own code): the screen draws exactly what Save will record.
+     */
+    previewUnsaved(steps: readonly UnsavedStep[], b: UnsavedBinding): Promise<UnsavedPreviewResult> {
+        const p = b.projection;
+        return firstValueFrom(
+            this.inv.previewUnsaved({
+                dataset: p.datasetId,
+                sourceCol: p.sourceCol,
+                targetCol: p.targetCol,
+                ...(p.linkKindCol ? { linkKindCol: p.linkKindCol } : {}),
+                ...(b.timeCol ? { timeCol: b.timeCol, ...(b.timeColZone ? { timeColZone: b.timeColZone } : {}) } : {}),
+                ...(b.eventsCol ? { eventsCol: b.eventsCol } : {}),
+                ...(p.entityType ? { entityType: p.entityType } : {}),
+                steps: this.unsavedOps(steps, b),
+            }),
+        );
     }
 
     /** Drop the newest unsaved step (the canvas Undo reversed it). */

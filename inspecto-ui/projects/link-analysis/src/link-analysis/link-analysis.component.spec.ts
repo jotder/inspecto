@@ -14,7 +14,7 @@ import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Subject, delay, of, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, delay, firstValueFrom, of, throwError } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
@@ -238,6 +238,42 @@ installDomainProfiles(
 );
 // ...and hands the registry back empty, so a later spec in the same worker does not inherit these packs.
 afterAll(() => installDomainProfiles([], null));
+
+/**
+ * LA-UNSAVED-INVESTIGATION-1: a fake \`POST /inv/expand/preview\` - a seed adds its ids at hop 0, an expand admits
+ * \`admit(id)\` per id at the next hop (by default \`<id>.n\`). Synthetic values only.
+ */
+function fakeUnsaved(admit: (id: string) => string[] = (id) => [`${id}.n`]) {
+    return vi.fn((req: { steps: { op: string; ids?: string[] }[] }) => {
+        const entities = new Map<string, number>();
+        const links: { source: string; target: string; kind: string; count: number; admittedBy: number }[] = [];
+        const steps: { step: number; op: string; needsApproval: boolean; admitted: string[] }[] = [];
+        req.steps.forEach((st, i) => {
+            const before = new Set(entities.keys());
+            if (st.op === 'seed') {
+                for (const id of st.ids ?? []) if (!entities.has(id)) entities.set(id, 0);
+            } else {
+                const hop = Math.max(0, ...entities.values()) + 1;
+                for (const id of st.ids ?? [])
+                    for (const n of admit(id)) {
+                        if (!entities.has(n)) entities.set(n, hop);
+                        links.push({ source: id, target: n, kind: 'link', count: 1, admittedBy: i + 1 });
+                    }
+            }
+            steps.push({ step: i + 1, op: st.op, needsApproval: false, admitted: [...entities.keys()].filter((x) => !before.has(x)) });
+        });
+        return of({
+            workingSet: {
+                entities: [...entities].map(([id, hop]) => ({ id, type: null, hop, seed: id, admittedBy: 1, hidden: false, kept: false })),
+                links,
+                excluded: [],
+                hash: 'h',
+            },
+            steps,
+            masked: false,
+        });
+    });
+}
 
 describe('nodeDisplayId (T-061 node card ID)', () => {
     it('strips only a known type prefix, so a key that holds a colon survives whole', () => {
@@ -4732,7 +4768,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const { fixture } = create({
             datasets: [TRANSFERS],
             expand,
-            inv: { previewNeighbors: preview(), getEntityList } as unknown as Partial<InvService>,
+            inv: { previewNeighbors: preview(), getEntityList, previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
         });
         await settle(fixture);
         const c = fixture.componentInstance;
@@ -4862,7 +4898,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('LA-UNSAVED-INVESTIGATION-1: one entity starts unsaved over its binding; Degrees 2 walks one more degree, recorded', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -4874,16 +4910,17 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         const u = c.investigation.unsaved()!;
         expect(u.binding.projection).toEqual(MAPPING);
-        expect(u.steps.map((x) => x.kind)).toEqual(['seed', 'expand', 'expand']);
+        expect(u.steps.map((x) => x.kind)).toEqual(['seed', 'expand']);
         expect(u.steps[0]).toEqual({ kind: 'seed', ids: ['MULE-HUB-01'], entityType: MAPPING.entityType });
-        expect(u.steps[2]).toEqual(expect.objectContaining({ from: 'outer', req: expect.objectContaining({ degrees: 1 }) }));
+        // the ring and one degree more, each from what the server admitted
+        expect(u.steps[1]).toEqual(expect.objectContaining({ walked: [['MULE-HUB-01'], ['MULE-HUB-01.n']], req: expect.objectContaining({ degrees: 2 }) }));
         expect(c.investigateIssue()).toBe('');
         expect(c.toolboxTab()).toBe('investigation');
     });
 
     it('LA-UNSAVED-INVESTIGATION-1: an unsaved Expand the Space would hold for four-eyes is refused before it runs', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -4903,7 +4940,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('LA-UNSAVED-INVESTIGATION-1: an unsaved Expand is recorded, and its Undo drops the step', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -4952,7 +4989,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
     });
     it('Investigations level, the start box draws one entity with its ring - it seeds nothing', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startFrom({ kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' });
@@ -4967,7 +5004,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const { fixture } = create({
             datasets: [TRANSFERS],
             expand,
-            inv: { previewNeighbors: preview() } as Partial<InvService>,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
         });
         await settle(fixture);
         const c = fixture.componentInstance;
@@ -5072,14 +5109,16 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(c.workingSetCanvas()).toBe(false); // the canvas draws the explorer graph
     });
 
-    const ring2 = (label: string) => ({
-        nodes: [{ id: label, data: { label, kind: 'entity' } }, ...Array.from({ length: 30 }, (_, i) => ({ id: `${label}.${i}`, data: { label: `${label}.${i}`, kind: 'entity' } }))],
-        edges: Array.from({ length: 30 }, (_, i) => ({ id: `${label}-${i}`, source: label, target: `${label}.${i}`, data: { kind: 'link' } })),
-    });
 
-    it('a multi-degree Expand that stopped early on screen records exactly the capped values each degree expanded from', async () => {
-        const expand = vi.fn(async (_id: string, label: string) => ring2(label) as never);
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+    it('every unsaved degree is read by the server preview with the presets: the canvas IS the Working Set Save records', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        // the server admits fewer than an explorer read would (its presets cut): one neighbour per entity
+        const previewUnsaved = fakeUnsaved((id) => [`${id}.n`]);
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5089,20 +5128,22 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             timeColZone: '',
             degrees: 1,
         });
-        const ctx = c.growContext();
-        await c.onExpand({ ctx, req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        // the start's ring is the server's, not the explorer's ring
+        expect(c.graph()!.nodes.map((n) => n.data.label).sort()).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n']);
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
         const step = c.investigation.unsaved()!.steps.at(-1)!;
-        const walked = step.kind === 'expand' ? step.walked! : [];
-        // the 30-node ring is capped at 25 on screen, and the walk stopped at the cap after degree 1
-        expect(walked).toHaveLength(1);
-        expect(walked[0]).toHaveLength(c.selectionExpandCap);
-        const drawn = expand.mock.calls.slice(-c.selectionExpandCap).map((a) => a[1]);
-        expect(walked[0]).toEqual(drawn);
+        expect(step.kind === 'expand' && step.walked).toEqual([['MULE-HUB-01.n'], ['MULE-HUB-01.n.n'], ['MULE-HUB-01.n.n.n']]);
+        // what is drawn is exactly the Working Set the last preview answered
+        const last = await firstValueFrom(previewUnsaved.mock.results.at(-1)!.value as Observable<{ workingSet: { entities: { id: string }[] } }>);
+        expect(c.graph()!.nodes.map((n) => n.data.label).sort()).toEqual(last.workingSet.entities.map((e) => e.id).sort());
+        // and each degree was sent as the step route body Save sends: the presets laid under, the fold filters on top
+        const sent = previewUnsaved.mock.calls.at(-1)![0].steps.at(-1) as Record<string, unknown>;
+        expect(sent).toEqual(expect.objectContaining({ op: 'expand', ids: ['MULE-HUB-01.n.n.n'], direction: 'either', hubThreshold: 500 }));
     });
 
     it('a start whose ring the Space would hold for four-eyes is refused up front, and draws nothing', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
@@ -5120,13 +5161,13 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('Start from selected: refused up front for four-eyes, and records nothing when its draw fails', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({ start: { kind: 'dataset', datasetId: 'transfers' }, defaults: { name: 'A', purpose: 'B' }, timeCol: '', timeColZone: '', degrees: 0 });
         c.onSelectionChange([c.graph()!.nodes[0].id]);
-        // the draw fails: nothing is recorded
-        expand.mockRejectedValueOnce(new Error('down'));
+        // the draw (the server preview) fails: nothing is recorded
+        vi.spyOn(c.investigation, 'previewUnsaved').mockRejectedValueOnce(new Error('down'));
         await c.startFromSelected();
         expect(c.investigation.unsaved()!.steps).toEqual([]);
         // four-eyes: refused before any read
@@ -5140,7 +5181,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('an unsaved Expand through busy entities asks first, as the saved path does; No records nothing', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5160,7 +5201,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('Start from selected seeds every spelling of a merged node, as the tab\'s Start does', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({ start: { kind: 'dataset', datasetId: 'transfers' }, defaults: { name: 'A', purpose: 'B' }, timeCol: '', timeColZone: '', degrees: 0 });
