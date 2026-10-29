@@ -167,6 +167,11 @@ const DOC_ALLOW = {
     // and moved to docs/archived-documents/plans-archive/ (a permanently unscanned tier). The
     // stale-allowlist rule named both the moment the file left this scope — the self-retirement working as
     // designed, rather than two exemptions quietly outliving the debt they described.
+    // The two la-ui-text-pass entries retire themselves when the plan is archived (the stale-allowlist rule).
+    'docs/superpower/la-ui-text-pass.md::source-acquisition-entity':
+        'Subject is the banned term itself: the UI text review quotes current Studio strings ("Source", "Graph source") in order to remove them.',
+    'docs/superpower/la-ui-text-pass.md::bare-flow':
+        'Subject is the banned term itself: the review quotes the Studio\'s current "Flow and backbone" tool label in order to rename it.',
     'docs/okf/product/module/la-core/user-guide-link-analysis.md::source-acquisition-entity':
         'Different concept: link-analysis "Sources" are `GraphSource` renderer feeds, not acquisition entities.',
     // A `grammar-config.md::source-acquisition-entity` entry lived here for one commit (2026-08-26). It is
