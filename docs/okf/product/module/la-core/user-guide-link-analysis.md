@@ -2699,8 +2699,8 @@ range scrubber / reset — and highlights the links whose `attrs[col]` date fall
 last slice includes the max) through the shared canvas `emphasis`. It writes NOTHING to the graph, the timeline
 filter or its cutoff, and a link with no parseable date is active in no slice. The status line (`role=status`)
 names the slice and its link count (`aria-live` off while playing, so it does not read every tick). **Reduced
-motion:** under `prefers-reduced-motion: reduce` nothing advances by itself — Play is disabled and says why; step and
-scrub remain. Calls made: the range is the TIMELINE column's, not the Investigation's `window` — a Working Set has
+motion:** Play is offered under `prefers-reduced-motion: reduce` too — it only starts on the user's press and pauses
+on the next one (WCAG 2.2.2), so no note is shown (operator, 2026-10-29). Calls made: the range is the TIMELINE column's, not the Investigation's `window` — a Working Set has
 no per-link timestamps (it is sealed), so playback exists on the query-graph canvas only, like the timeline filter
 beside it; a link carries ONE date, so an aggregated link plays at the date it carries; fixed 20 slices, no
 slice-size knob; no jump to a burst. Clearing the time column clears the highlight.
