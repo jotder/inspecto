@@ -405,7 +405,6 @@ export function defaultLayoutFor(g: G6GraphData | null, onInvestigation: boolean
     return g.nodes.length >= 8 && max >= g.nodes.length / 2 ? 'force' : 'dagre';
 }
 
-/** The bottom dock's tabs (§5.9); `inv` = an Investigation tab. */
 /**
  * The node card's ID (T-061): the minted id without its `<type>:` prefix, which the card's subtitle already says. Only a
  * known type prefix is stripped, so a key that itself holds a colon (IPv6, a URN) is shown whole.
@@ -415,6 +414,7 @@ export function nodeDisplayId(id: string, types: readonly (string | null | undef
     return t ? id.slice(t.length + 1) : id;
 }
 
+/** The bottom dock's tabs (§5.9); `inv` = an Investigation tab. */
 export type DockTab = 'rows' | InvestigationSection | 'results';
 /** The right dock's tabs (LA-PANELS-REDESIGN-1). */
 export type ToolboxTab = 'browser' | 'server' | 'investigation';
