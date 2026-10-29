@@ -11,8 +11,8 @@ import { DomainProfile, GENERIC_PROFILE, termLabel } from '@inspecto/link-analys
  * sent as nothing and the server fills its own default, which the answer's `measure` block then states.
  */
 export const VALUE_MEASURES: { value: ValueMeasureName; label: string; alertable: boolean }[] = [
-    { value: 'passThrough', label: 'Pass-through (retention = 1 − ratio)', alertable: true },
-    { value: 'velocity', label: 'Velocity (hours from inbound to next outbound)', alertable: true },
+    { value: 'passThrough', label: 'Pass-through', alertable: true },
+    { value: 'velocity', label: 'Velocity', alertable: true },
     { value: 'timeToCashOut', label: 'Time to withdrawal', alertable: true },
     { value: 'cashOutConcentration', label: 'Withdrawal concentration', alertable: true },
     { value: 'structuring', label: 'Structuring (legs just under a limit)', alertable: true },
@@ -44,7 +44,7 @@ const THRESHOLD_LABELS: Record<string, string> = {
     maxHours: 'Maximum hours',
     minShare: 'Minimum share (0–1)',
     minPayers: 'Minimum payers',
-    min: 'Leg value from (inclusive)',
+    min: 'Leg value from',
     max: 'Leg value below',
     minLegs: 'Minimum legs',
     minRecipients: 'Minimum recipients',
@@ -71,9 +71,9 @@ export function valueMeasureAttributes(profile: DomainProfile = GENERIC_PROFILE)
     });
     return [
         { key: 'dataset', label: 'Dataset', type: 'autocomplete', tier: 'required' },
-        col('sourceCol', 'Source column (sender)'),
-        col('targetCol', 'Target column (receiver)'),
-        col('linkKindCol', 'Link kind column', false, 'Needed by the withdrawal and benefit Measures.'),
+        col('sourceCol', 'From column (sender)'),
+        col('targetCol', 'To column (receiver)'),
+        col('linkKindCol', 'Link kind column (optional)', false, 'Needed by the withdrawal and benefit Measures.'),
         {
             key: 'name',
             label: 'Measure',
@@ -95,7 +95,7 @@ export function valueMeasureAttributes(profile: DomainProfile = GENERIC_PROFILE)
             required: false,
             pattern: LAST,
             placeholder: '24h or 7d',
-            help: 'Hours or days back from now, in UTC, re-read at every evaluation — never together with From/To. At most 31 days (744h).',
+            help: 'Hours or days back from now (UTC), e.g. 24h or 7d. Not with From/To.',
         },
         ...Object.keys(THRESHOLD_LABELS).map(
             (key): AttributeSpec => ({
@@ -105,7 +105,7 @@ export function valueMeasureAttributes(profile: DomainProfile = GENERIC_PROFILE)
                 tier: 'required',
                 required: false,
                 min: 0,
-                placeholder: 'server default',
+                placeholder: 'Default',
                 dependsOn: { key: 'name', in: using(key) },
             }),
         ),
@@ -202,12 +202,20 @@ export function valueMeasureQuery(v: Record<string, unknown>): ValueMeasureQuery
     return out as unknown as ValueMeasureQuery;
 }
 
-/** Result columns in the server's order; `retention` is labelled as what it is — derived, 1 − ratio. */
+/** A result field as a column header: `maxHours` → "Max hours"; `retention` says it is derived (1 − ratio). */
+export function valueMeasureHeader(field: string): string {
+    if (field === 'retention') return 'Retention (1 − ratio)';
+    const words = field
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .trim();
+    return words ? words[0].toUpperCase() + words.slice(1) : field;
+}
+
+/** Result columns in the server's order, with plain headers (T-123). */
 export function valueMeasureColumns(rows: Record<string, unknown>[]): ColDef[] {
     const first = rows[0];
     if (!first) return [];
-    return Object.keys(first).map((field) => ({
-        field,
-        headerName: field === 'retention' ? 'Retention (derived: 1 − ratio)' : field,
-    }));
+    return Object.keys(first).map((field) => ({ field, headerName: valueMeasureHeader(field) }));
 }

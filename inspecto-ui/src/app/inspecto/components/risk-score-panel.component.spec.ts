@@ -83,7 +83,9 @@ describe('RiskScorePanelComponent', () => {
         quiet.componentRef.setInput('explainAbsence', true);
         quiet.detectChanges();
         const el = quiet.nativeElement as HTMLElement;
-        expect(el.querySelector('[role="status"]')?.textContent).toContain('No stored score for this entity yet');
+        expect(el.querySelector('[role="status"]')?.textContent).toContain(
+            'No Risk Score yet for this entity. Run the scoring job',
+        );
         expect(el.querySelector('inspecto-alert')).toBeNull();
         await expectNoA11yViolations(el);
     });
@@ -94,6 +96,6 @@ describe('RiskScorePanelComponent', () => {
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('inspecto-alert')?.textContent).toContain('Could not load the latest score.');
-        expect(el.textContent).not.toContain('No stored score');
+        expect(el.textContent).not.toContain('No Risk Score yet');
     });
 });

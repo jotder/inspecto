@@ -98,10 +98,12 @@ function make(opts: { allowed?: boolean; investigationId?: string | null; ceilin
 
 /** D-4 step 7 - the "Run on server" control and the states a run ends in. */
 describe('LinkAnalysisServerRunComponent', () => {
-    it('without the capability the button is disabled with a stated reason, and nothing starts', () => {
+    it('without the permission the button is disabled with a stated reason, and nothing starts', () => {
         const { q, runs, fixture } = make({ allowed: false });
         expect((q('run-on-server') as HTMLButtonElement).disabled).toBe(true);
-        expect(q('blocked-reason')!.textContent).toMatch(/capability/);
+        expect(q('blocked-reason')!.textContent!.trim()).toBe(
+            'Your role cannot run server tools. Needs Run link graph analysis.',
+        );
         fixture.componentInstance.start();
         expect(runs.run).not.toHaveBeenCalled();
     });
@@ -109,7 +111,9 @@ describe('LinkAnalysisServerRunComponent', () => {
     it('without an open Investigation it says what to do instead of failing', () => {
         const { q } = make({ investigationId: null });
         expect((q('run-on-server') as HTMLButtonElement).disabled).toBe(true);
-        expect(q('blocked-reason')!.textContent).toMatch(/Investigation/);
+        expect(q('blocked-reason')!.textContent!.trim()).toBe(
+            'Server tools run on an open Investigation. Open or start one first.',
+        );
     });
 
     it('DR-D3: with an Investigation open but the query graph drawn, it names the checkbox, not "open one"', () => {
@@ -118,7 +122,8 @@ describe('LinkAnalysisServerRunComponent', () => {
         fixture.detectChanges();
         const text = q('blocked-reason')!.textContent!;
         expect(text).toMatch(/Show the query graph/);
-        expect(text).not.toMatch(/open or start an Investigation/);
+        expect(text).not.toMatch(/Open or start one/);
+        expect(text).not.toMatch(/ - /);
     });
 
     it('starts the run with the Investigation and the parameters - no log step, so the server reads the head', () => {
@@ -219,9 +224,10 @@ describe('LinkAnalysisServerRunComponent', () => {
             'the Working Set has 800 nodes; the budget allows 500 (budget.maxNodes).',
         ); // the facts, without the server's own list of three remedies
         const numbers = q('budget-numbers')!.textContent!.replace(/\s+/g, ' ');
-        expect(numbers).toContain('NODES');
-        expect(numbers).toContain('Budget: 500 nodes, 5000 links, 10000 ms');
-        expect(numbers).toContain('Measured: 800 nodes, 1200 links, 3 ms');
+        expect(numbers).toContain('Limit reached: nodes');
+        expect(numbers).toContain('Allowed: 500 nodes, 5,000 links, 10 seconds');
+        expect(numbers).toContain('Used: 800 nodes, 1,200 links, 3 ms');
+        expect(q('budget-numbers')!.closest('inspecto-alert')!.textContent).toContain('Over the limit: no result');
         expect(q('raise-budget')!.textContent).toMatch(/800 nodes/);
         expect(q('narrow-advice')).toBeNull(); // exactly one next action
         expect(el.querySelector('[data-testid="run-done"]')).toBeNull();
@@ -262,7 +268,7 @@ describe('LinkAnalysisServerRunComponent', () => {
     });
 
     it.each([
-        [403, '', /capability/],
+        [403, '', /Needs Run link graph analysis/],
         [404, '', /not found/],
         [422, 'CONFIG_VALIDATION_FAILED', /refused/],
         [503, 'STORE_BUSY', /busy/],
@@ -300,7 +306,7 @@ describe('LinkAnalysisServerRunComponent', () => {
         const { click, q, push, el } = make();
         click('run-on-server');
         expect((q('cancel-run') as HTMLButtonElement).disabled).toBe(true);
-        expect(q('cancel-wait-reason')!.textContent).toMatch(/once the server has queued the run/);
+        expect(q('cancel-wait-reason')!.textContent!.trim()).toBe('Cancel is available once the run is queued.');
         await expectNoA11yViolations(el);
         push(view('RUNNING'));
         expect((q('cancel-run') as HTMLButtonElement).disabled).toBe(false);

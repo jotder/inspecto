@@ -21,6 +21,7 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { Subscription } from 'rxjs';
 import {
     GraphBudgetView,
+    GraphExceededReason,
     GraphRunRequest,
     GraphRunResult,
     GraphRunView,
@@ -34,6 +35,14 @@ import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
 import { fmtScore } from './graph-run-summary';
+
+/** A BUDGET_EXCEEDED reason in words (T-132). */
+const LIMIT_NAMES: Record<GraphExceededReason, string> = {
+    NODES: 'nodes',
+    EDGES: 'links',
+    TIMEOUT: 'time',
+    WORK: 'work',
+};
 
 /**
  * **Run on server** (LA separation D-4 step 7): the control the toolbox shows INSTEAD of a local run when the
@@ -85,7 +94,7 @@ import { fmtScore } from './graph-run-summary';
                         @if (indexChoices().length > 1) {
                             <inspecto-option-picker
                                 class="w-48"
-                                label="Index"
+                                label="Link index"
                                 data-testid="index-pick"
                                 [options]="indexOptions()"
                                 [ngModel]="ix.dataset"
@@ -99,7 +108,7 @@ import { fmtScore } from './graph-run-summary';
                             (click)="start(undefined, 'index')"
                         >
                             <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
-                            Run on index
+                            Run on link index
                         </button>
                         @if (ix.stale) {
                             <inspecto-chip
@@ -108,7 +117,7 @@ import { fmtScore } from './graph-run-summary';
                                 data-testid="index-stale-chip"
                                 [title]="ix.reason ?? ''"
                             >
-                                Index stale
+                                Link index out of date
                             </inspecto-chip>
                         }
                     }
@@ -120,19 +129,19 @@ import { fmtScore } from './graph-run-summary';
                         (click)="cancel()"
                     >
                         <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                        {{ cancelling() ? 'Cancelling...' : 'Cancel' }}
+                        {{ cancelling() ? 'Cancelling…' : 'Cancel' }}
                     </button>
                 }
             </div>
             @if (active() && !view()) {
                 <p class="text-secondary mt-1 text-sm" role="status" data-testid="cancel-wait-reason">
-                    Cancel is available once the server has queued the run; a small run is answered before that.
+                    Cancel is available once the run is queued.
                 </p>
             }
             @if (blockedReason(); as why) {
                 <p class="text-secondary mt-1 text-sm" role="status" data-testid="blocked-reason">{{ why }}</p>
             }
-            @if (index() && indexBlockedReason(); as why) {
+            @if (index() && indexBlockedReason() !== blockedReason() && indexBlockedReason(); as why) {
                 <p class="text-secondary mt-1 text-sm" role="status" data-testid="index-blocked-reason">{{ why }}</p>
             }
             @if (error()) {
@@ -141,30 +150,29 @@ import { fmtScore } from './graph-run-summary';
             @if (view(); as v) {
                 @if (active()) {
                     <p class="mt-1 text-sm" role="status" data-testid="run-progress">
-                        {{ v.status === 'QUEUED' ? 'Queued on the server' : 'Running on the server' }}
+                        {{ v.status === 'QUEUED' ? 'Queued on the server' : 'Running on the server' }}:
                         @if (v.status === 'RUNNING' && v.progress.fraction > 0) {
-                            - {{ v.progress.fraction * 100 | number: '1.0-0' }}%
+                            {{ v.progress.fraction * 100 | number: '1.0-0' }}%,
                         } @else if (v.status === 'RUNNING' && v.progress.work > 0) {
-                            - {{ v.progress.work | number: '1.0-0' }} steps done
+                            {{ v.progress.work | number: '1.0-0' }} steps done,
                         }
-                        - {{ elapsedMs() | number: '1.0-0' }} ms elapsed ({{ v.consumed.nodes }} nodes,
-                        {{ v.consumed.edges }} links)
+                        {{ elapsedMs() | number: '1.0-0' }} ms elapsed
                     </p>
                 } @else {
                     @switch (v.status) {
                         @case ('COMPLETED') {
                             <p class="mt-1 text-sm" role="status" data-testid="run-done">
-                                Ran on the server in {{ v.consumed.elapsedMs | number: '1.0-0' }} ms over
-                                {{ v.consumed.nodes }} nodes and {{ v.consumed.edges }} links{{
-                                    v.cached ? ' (cached answer)' : ''
-                                }}.
+                                Ran on the server in {{ v.consumed.elapsedMs | number: '1.0-0' }} ms ({{
+                                    v.consumed.nodes | number: '1.0-0'
+                                }}
+                                nodes, {{ v.consumed.edges | number: '1.0-0' }} links).
                             </p>
                             @if (v.source; as src) {
                                 <p class="mt-1 flex flex-wrap items-center gap-2 text-sm" data-testid="index-source">
-                                    Answered from the edge index, version {{ src.version }}.
+                                    Answered from the link index, version {{ src.version }}.
                                     @if (src.stale) {
                                         <inspecto-chip variant="soft" tone="warning" data-testid="source-stale-chip">
-                                            Index stale
+                                            Link index out of date
                                         </inspecto-chip>
                                         <span class="text-secondary">
                                             {{ src.staleReason ?? 'Rows were added to the Dataset after the build.' }}
@@ -176,7 +184,12 @@ import { fmtScore } from './graph-run-summary';
                                     @if (sum.lines.length) {
                                         <ol class="mt-1 list-inside list-decimal text-sm" data-testid="index-lines">
                                             @for (l of sum.lines; track $index) {
-                                                <li [attr.title]="sum.fullLines[$index] || null" [attr.aria-label]="sum.fullLines[$index] || null">{{ l }}</li>
+                                                <li
+                                                    [attr.title]="sum.fullLines[$index] || null"
+                                                    [attr.aria-label]="sum.fullLines[$index] || null"
+                                                >
+                                                    {{ l }}
+                                                </li>
                                             }
                                         </ol>
                                     }
@@ -184,19 +197,21 @@ import { fmtScore } from './graph-run-summary';
                             }
                         }
                         @case ('BUDGET_EXCEEDED') {
-                            <inspecto-alert variant="warning" title="Over budget - no result">
+                            <inspecto-alert variant="warning" title="Over the limit: no result">
                                 <p data-testid="budget-reason">{{ reasonFacts() }}</p>
                                 <ul class="mt-1 list-disc pl-5" data-testid="budget-numbers">
                                     <li>
-                                        Limit hit: <strong>{{ v.exceeded }}</strong>
+                                        Limit reached: <strong>{{ limitName(v.exceeded) }}</strong>
                                     </li>
                                     <li>
-                                        Budget: {{ v.budget.maxNodes }} nodes, {{ v.budget.maxEdges }} links,
-                                        {{ v.budget.timeoutMs }} ms
+                                        Allowed: {{ v.budget.maxNodes | number: '1.0-0' }} nodes,
+                                        {{ v.budget.maxEdges | number: '1.0-0' }} links,
+                                        {{ duration(v.budget.timeoutMs) }}
                                     </li>
                                     <li>
-                                        Measured: {{ v.consumed.nodes }} nodes, {{ v.consumed.edges }} links,
-                                        {{ v.consumed.elapsedMs }} ms
+                                        Used: {{ v.consumed.nodes | number: '1.0-0' }} nodes,
+                                        {{ v.consumed.edges | number: '1.0-0' }} links,
+                                        {{ duration(v.consumed.elapsedMs) }}
                                     </li>
                                 </ul>
                                 @if (nextAction(); as next) {
@@ -222,8 +237,8 @@ import { fmtScore } from './graph-run-summary';
                         }
                         @case ('FAILED') {
                             <inspecto-alert variant="error" title="Run failed">
-                                The server run failed{{ v.failure ? ' (' + v.failure + ')' : '' }}. Nothing was changed on
-                                the canvas.
+                                The server run failed{{ v.failure ? ' (' + v.failure + ')' : '' }}. Nothing was changed
+                                on the canvas.
                             </inspecto-alert>
                         }
                     }
@@ -235,7 +250,7 @@ import { fmtScore } from './graph-run-summary';
             }
             <inspecto-locked-action
                 class="mt-1"
-                [label]="indexOnly() ? 'Run on index' : 'Run on server'"
+                [label]="indexOnly() ? 'Run on link index' : 'Run on server'"
                 [reason]="lockedReason()"
             />
         }
@@ -264,7 +279,11 @@ export class LinkAnalysisServerRunComponent {
     /** DR-D3: an Investigation IS open but the canvas draws the query graph, so no id is passed - say that, not "open one". */
     readonly investigationOpen = input(false);
     private readonly notDrawn =
-        "the canvas is showing the query graph - untick 'Show the query graph (to pick seeds)' in the Investigation tab so it draws the Working Set.";
+        'Server tools run on the Working Set, but the canvas shows the query graph. Untick “Show the query graph (to pick seeds)” in the Investigation tab.';
+    /** No role permission (G14, T-207): one line for both buttons. */
+    private readonly notAllowed = 'Your role cannot run server tools. Needs Run link graph analysis.';
+    /** No Investigation open (T-137): one line for both buttons. */
+    private readonly noInvestigation = 'Server tools run on an open Investigation. Open or start one first.';
     /** A reason the run cannot start yet that the toolbox knows (e.g. no source and sink picked); '' = none. */
     readonly hold = input('');
     /** May the Subject start a run (`canRunLinkGraphAnalysis`)? */
@@ -308,20 +327,16 @@ export class LinkAnalysisServerRunComponent {
     });
     /** Why Run on index cannot be pressed, stated - or ''. */
     readonly indexBlockedReason = computed(() => {
-        if (!this.allowed())
-            return 'Running on the index needs the Run link graph analysis capability, which your role does not hold.';
-        if (!this.investigationId())
-            return this.investigationOpen()
-                ? `Running on the index starts from the Working Set, but ${this.notDrawn}`
-                : 'Running on the index starts from an Investigation - open or start an Investigation first.';
+        if (!this.allowed()) return this.notAllowed;
+        if (!this.investigationId()) return this.investigationOpen() ? this.notDrawn : this.noInvestigation;
         const hops = this.params()['hops'];
         if (this.algorithm() === 'neighborhood' && typeof hops === 'number' && hops > 2)
-            return 'The index answers at most 2 hops. Lower the hops, or run it on the Working Set.';
+            return 'The link index answers at most 2 hops. Lower the hops, or run it on the Working Set.';
         if (this.algorithm() === 'degreeCentrality') {
             if (!this.seeds().length)
-                return 'Pick 1 to 20 nodes to score: from the index, degree centrality scores only the nodes you pick.';
+                return 'Pick 1 to 20 nodes to score: from the link index, degree centrality scores only the nodes you pick.';
             if (this.seeds().length > 20)
-                return `${this.seeds().length} nodes are picked; the index scores at most 20 at a time.`;
+                return `${this.seeds().length} nodes are picked; the link index scores at most 20 at a time.`;
         }
         return this.hold();
     });
@@ -343,7 +358,7 @@ export class LinkAnalysisServerRunComponent {
         const nodes = r.nodes ?? [];
         const links = r.edges ?? [];
         return {
-            headline: `${nodes.length} node${nodes.length === 1 ? '' : 's'} and ${links.length} link${links.length === 1 ? '' : 's'} reached${r.truncated ? ' (the server cut the list)' : ''}.`,
+            headline: `${nodes.length} node${nodes.length === 1 ? '' : 's'} and ${links.length} link${links.length === 1 ? '' : 's'} reached${r.truncated ? ' (cut at the limit)' : ''}.`,
             lines: nodes.slice(0, 10).map((n) => n.label),
             fullLines: [],
         };
@@ -368,12 +383,8 @@ export class LinkAnalysisServerRunComponent {
     });
     /** Why Run cannot be pressed, stated - or ''. */
     readonly blockedReason = computed(() => {
-        if (!this.allowed())
-            return 'Running on the server needs the Run link graph analysis capability, which your role does not hold.';
-        if (!this.investigationId())
-            return this.investigationOpen()
-                ? `Running on the server works on the Working Set, but ${this.notDrawn}`
-                : "Running on the server works on an Investigation's Working Set - open or start an Investigation first.";
+        if (!this.allowed()) return this.notAllowed;
+        if (!this.investigationId()) return this.investigationOpen() ? this.notDrawn : this.noInvestigation;
         return this.hold();
     });
     /**
@@ -387,6 +398,18 @@ export class LinkAnalysisServerRunComponent {
             ? budgetNextAction(v, this.runs.catalogue()?.ceilings ?? null)
             : null;
     });
+
+    /** A budget time in words: milliseconds under a second, else seconds ("30 seconds"). */
+    duration(ms: number): string {
+        if (ms < 1000) return `${ms.toLocaleString('en-GB')} ms`;
+        const s = ms / 1000;
+        return `${s.toLocaleString('en-GB', { maximumFractionDigits: 1 })} second${s === 1 ? '' : 's'}`;
+    }
+
+    /** The limit a BUDGET_EXCEEDED run names, in words. */
+    limitName(exceeded: GraphExceededReason | null | undefined): string {
+        return exceeded ? LIMIT_NAMES[exceeded] : '';
+    }
 
     constructor() {
         inject(DestroyRef).onDestroy(() => this.sub?.unsubscribe());

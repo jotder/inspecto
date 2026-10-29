@@ -208,7 +208,7 @@ describe('LinkAnalysisServerRunComponent - input index', () => {
 
     it('shows a stale chip beside the button when the listed index is stale', () => {
         const { q } = make({ list: idx({ enabled: true, indexes: [index({ stale: true, reason: 'files added' })] }) });
-        expect(q('index-stale-chip')!.textContent).toMatch(/stale/i);
+        expect(q('index-stale-chip')!.textContent).toContain('Link index out of date');
     });
 
     it('a COMPLETED index run states the version, summarises the answer and does not touch the canvas', () => {
@@ -250,7 +250,7 @@ describe('LinkAnalysisServerRunComponent - input index', () => {
         const { q, runs, el, fixture } = make({ run: () => throwError(() => refusal) });
         q('run-on-index')!.click();
         fixture.detectChanges();
-        expect(el.textContent).toMatch(/No edge index has been built/);
+        expect(el.textContent).toMatch(/No link index has been built/);
         expect(el.textContent).toMatch(/no_index/);
         expect(runs.run).toHaveBeenCalledTimes(1);
         expect(runs.run.mock.calls[0][0]).toMatchObject({ input: 'index' });

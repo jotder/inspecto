@@ -27,10 +27,10 @@ import { StatusBadgeComponent } from './status-badge.component';
                     <span class="text-lg font-semibold tabular-nums">{{ s.score | number: '1.0-1' }}</span>
                     <inspecto-status-badge
                         [value]="s.high ? 'error' : 'success'"
-                        [label]="s.high ? 'High' : 'Below threshold'"
+                        [label]="s.high ? 'High' : 'Not high'"
                     />
                     <span class="text-secondary text-xs">
-                        {{ s.model }} · high at {{ s.highThreshold }} ·
+                        {{ s.model }}. High from {{ s.highThreshold }}. Scored
                         <span [attr.title]="s.scoredAt">{{ stamp(s.scoredAt) }}</span>
                     </span>
                 </div>
@@ -67,8 +67,7 @@ import { StatusBadgeComponent } from './status-badge.component';
                 <inspecto-alert variant="error">{{ e }}</inspecto-alert>
             } @else if (absent()) {
                 <p class="text-secondary text-sm" role="status">
-                    No stored score for this entity yet — the risk.score Job has not scored it. Use Preview to score it
-                    now.
+                    No Risk Score yet for this entity. Run the scoring job, or use Preview to score it now.
                 </p>
             }
         }

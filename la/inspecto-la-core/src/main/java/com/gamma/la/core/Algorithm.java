@@ -34,8 +34,8 @@ public enum Algorithm {
     SHORTEST_PATH("shortestPath", "Shortest path", Cost.SYNC, 100_000, ResultKind.SELECTION, false, true, true, false,
             Param.DIRECTION),
     /** 4 / 35 / 828 ms (3 hops). */
-    NEIGHBORHOOD("neighborhood", "Neighborhood", Cost.SYNC, 100_000, ResultKind.GRAPH, false, false, false, true,
-            Param.integer("hops", 1, 0, 100), Param.DIRECTION),
+    NEIGHBORHOOD("neighborhood", "Neighbourhood", Cost.SYNC, 100_000, ResultKind.GRAPH, false, false, false, true,
+            Param.integer("hops", "Hops", "How many links out from the node", 1, 0, 100), Param.DIRECTION),
     /** Not benched: {@code neighborhood} at one hop. */
     EGO_NETWORK("egoNetwork", "Ego network", Cost.SYNC, 100_000, ResultKind.GRAPH, false, false, false, true, Param.DIRECTION),
     /** 2 / 8 / 189 ms. */
@@ -48,26 +48,27 @@ public enum Algorithm {
     /** 14 / 143 / 4 418 ms. */
     TRIANGLE_COUNT("triangleCount", "Triangle count", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false),
     /** 10 / 38 / 866 ms. */
-    ARTICULATION_POINTS("articulationPoints", "Articulation points", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false,
+    ARTICULATION_POINTS("articulationPoints", "Cut points", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false,
             false),
     /** 3 / 35 / 878 ms. */
     BRIDGES("bridges", "Bridges", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, false),
     /** 2 / 16 / 254 ms. */
-    IS_FOREST("isForest", "Is forest", Cost.SYNC, 100_000, ResultKind.FLAG, false, false, false, false),
+    IS_FOREST("isForest", "Is it a tree?", Cost.SYNC, 100_000, ResultKind.FLAG, false, false, false, false),
     /** 2 / 12 / 224 ms. */
     DESCENDANTS("descendants", "Descendants", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, true),
     /** 10 / 100 / 931 ms after LA-GRAPH-QUADRATIC-1 (binary heap; was 46 / 1 740 / t). 10⁵ is 0.9-2.8 s with the machine busy: 10⁴. */
-    WEIGHTED_SHORTEST_PATH("weightedShortestPath", "Weighted shortest path", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
+    WEIGHTED_SHORTEST_PATH("weightedShortestPath", "Strongest path", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
             true, true, false, Param.DIRECTION),
     /** 8 / 73 / 1 066 ms. */
-    MAXIMUM_SPANNING_FOREST("maximumSpanningForest", "Maximum spanning forest", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
+    MAXIMUM_SPANNING_FOREST("maximumSpanningForest", "Strongest backbone", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
             false, false, false),
     /** 13 / 385 / 36 898 ms (the biggest hub at 10⁵: input-dependent). */
     JACCARD_SIMILARITY("jaccardSimilarity", "Jaccard similarity", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false,
             true),
     /** 61 / 356 / 11 610 ms. */
     PAGE_RANK("pageRank", "PageRank", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false,
-            Param.decimal("damping", 0.85, 0, 1), Param.integer("iterations", 60, 0, 10_000)),
+            Param.decimal("damping", "Damping", "Chance of following a link rather than jumping", 0.85, 0, 1),
+            Param.integer("iterations", "Iterations", Param.ITERATIONS_HINT, 60, 0, 10_000)),
 
     // ── JOB hints (super-linear or unbounded) ──────────────────────────────────────────────────────────────────────
     /** 1 335 / t / - ms — quadratic; ceiling by extrapolation (see the class comment). */
@@ -78,45 +79,55 @@ public enum Algorithm {
             false, false),
     /** 1 366 / t / - ms — composes betweenness; ceiling by extrapolation. */
     SUSPICION_SCORE("suspicionScore", "Suspicion score", Cost.JOB, 500, ResultKind.SUSPICION, false, false, false, false,
-            Param.decimal("degree", 1, 0, 1_000), Param.decimal("betweenness", 1, 0, 1_000),
-            Param.decimal("pageRank", 1, 0, 1_000), Param.decimal("core", 1, 0, 1_000),
-            Param.decimal("triangles", 1, 0, 1_000)),
+            Param.decimal("degree", "Links weight", "Weight of how many links a node has", 1, 0, 1_000),
+            Param.decimal("betweenness", "Bridging weight", "Weight of how often a node sits between others", 1, 0, 1_000),
+            Param.decimal("pageRank", "Influence weight", "Weight of how well linked its neighbours are", 1, 0, 1_000),
+            Param.decimal("core", "Core weight", "Weight of how deep it sits in a dense core", 1, 0, 1_000),
+            Param.decimal("triangles", "Triangles weight", "Weight of how many closed triangles it is in", 1, 0, 1_000)),
     /** 39 / 616 / 4 642 ms. */
-    LOUVAIN_COMMUNITIES("louvainCommunities", "Louvain communities", Cost.JOB, 10_000, ResultKind.COMMUNITIES, false, false,
+    LOUVAIN_COMMUNITIES("louvainCommunities", "Louvain", Cost.JOB, 10_000, ResultKind.COMMUNITIES, false, false,
             false, false),
     /** 14 / 239 / 8 831 ms. */
-    DETECT_COMMUNITIES("detectCommunities", "Label-propagation communities", Cost.JOB, 10_000, ResultKind.COMMUNITIES, false,
-            false, false, false, Param.integer("maxIterations", 20, 0, 10_000)),
+    DETECT_COMMUNITIES("detectCommunities", "Label spread", Cost.JOB, 10_000, ResultKind.COMMUNITIES, false,
+            false, false, false, Param.integer("maxIterations", "Iterations", "Most rounds of label spreading", 20, 0, 10_000)),
     /** 38 / 2 376 / t ms — worst case exponential in clique count. */
     CLIQUES("cliques", "Cliques", Cost.JOB, 1_000, ResultKind.GROUPS, false, false, false, false,
-            Param.integer("minSize", 3, 0, 1_000)),
+            Param.integer("minSize", "Smallest group", "Fewest nodes in a reported clique", 3, 0, 1_000)),
     /** 0 / 21 / 292 ms (limit 50, 8 hops) — input-dependent. */
-    FIND_CYCLES("findCycles", "Find cycles", Cost.JOB, 100_000, ResultKind.SELECTIONS, false, false, false, false,
-            Param.integer("limit", 50, 0, 10_000), Param.integer("maxLen", 8, 1, 64)),
+    FIND_CYCLES("findCycles", "Cycles", Cost.JOB, 100_000, ResultKind.SELECTIONS, false, false, false, false,
+            Param.integer("limit", "Most results", "Stop after this many cycles", 50, 0, 10_000),
+            Param.integer("maxLen", "Longest cycle", "Most links in one cycle", 8, 1, 64)),
     /** 3 / 44 / 16 839 ms (limit 10, 8 hops; 2.9 GB allocated at 10⁵) — input-dependent. */
     ALL_PATHS("allPaths", "All paths", Cost.JOB, 10_000, ResultKind.SELECTIONS, false, true, true, false,
-            Param.integer("limit", 10, 0, 10_000), Param.integer("maxHops", 8, 1, 64), Param.DIRECTION),
+            Param.integer("limit", "Most results", "Stop after this many paths", 10, 0, 10_000),
+            Param.integer("maxHops", "Longest path", "Most hops in one path", 8, 1, 64), Param.DIRECTION),
     /** 76 / 7 308 / t ms. */
     MAX_FLOW("maxFlow", "Maximum flow", Cost.JOB, 1_000, ResultKind.FLOW, true, true, true, false),
     /** 140 / 2 327 / t ms after LA-GRAPH-QUADRATIC-1 (2-hop candidates; was 129 / 13 728 / t). Output-bound: pairs sharing a hub neighbour. */
-    LINK_PREDICTION("linkPrediction", "Link prediction", Cost.JOB, 1_000, ResultKind.LINKS, false, false, false, false,
-            Param.choice("method", "adamic-adar", "common-neighbors", "adamic-adar"), Param.integer("limit", 20, 0, 10_000)),
+    LINK_PREDICTION("linkPrediction", "Predict links", Cost.JOB, 1_000, ResultKind.LINKS, false, false, false, false,
+            Param.choice("method", "Method", "How shared neighbours are counted", "adamic-adar",
+                    List.of("common-neighbors", "adamic-adar"), List.of("Shared neighbours", "Adamic-Adar (rare ones count more)")),
+            Param.integer("limit", "Most results", "Stop after this many predicted links", 20, 0, 10_000)),
     /** 60 / 1 725 / 52 999 ms. */
     EIGENVECTOR_CENTRALITY("eigenvectorCentrality", "Eigenvector centrality", Cost.JOB, 1_000, ResultKind.SCORES, false,
-            false, false, false, Param.integer("iterations", 100, 0, 10_000)),
+            false, false, false, Param.integer("iterations", "Iterations", Param.ITERATIONS_HINT, 100, 0, 10_000)),
     /** 78 / 1 623 / 48 699 ms. */
     KATZ_CENTRALITY("katzCentrality", "Katz centrality", Cost.JOB, 1_000, ResultKind.SCORES, false, false, false, false,
-            Param.decimal("alpha", 0.1, 0, 1), Param.decimal("beta", 1, 0, 1_000), Param.integer("iterations", 100, 0, 10_000)),
+            Param.decimal("alpha", "Alpha", "How much each further hop counts", 0.1, 0, 1),
+            Param.decimal("beta", "Beta", "Base score every node starts with", 1, 0, 1_000),
+            Param.integer("iterations", "Iterations", Param.ITERATIONS_HINT, 100, 0, 10_000)),
     /** 91 / 1 823 / 49 213 ms. */
     HITS("hits", "HITS hubs and authorities", Cost.JOB, 1_000, ResultKind.HITS, false, false, false, false,
-            Param.integer("iterations", 100, 0, 10_000)),
+            Param.integer("iterations", "Iterations", Param.ITERATIONS_HINT, 100, 0, 10_000)),
     /**
      * Not benched; server-side only (no TypeScript twin). One BFS per origin, at most {@code weights.size()} (≤ 6) hops deep:
      * never more than {@code closenessCentrality}'s unbounded BFS per node, so it takes closeness's ceiling.
      */
     PROPAGATED_RISK("propagatedRisk", "Propagated risk", Cost.JOB, 1_000, ResultKind.PROPAGATED_RISK, false, false, false,
-            false, Param.scoreMap("nodeScores", 0, 100, Param.MAX_ENTRIES), Param.idList("seeds", Param.MAX_ENTRIES),
-            Param.decimalList("weights", List.of(1.0, 0.6, 0.35, 0.15), 0, 1, 6), Param.DIRECTION);
+            false, Param.scoreMap("nodeScores", "Risk scores", "Each node's own risk, 0 to 100", 0, 100, Param.MAX_ENTRIES),
+            Param.idList("seeds", "Risk origins", "Only these nodes pass on risk; empty uses every scored node", Param.MAX_ENTRIES),
+            Param.decimalList("weights", "Weight per hop", "Share of risk passed on at each hop, 0 to 1",
+                    List.of(1.0, 0.6, 0.35, 0.15), 0, 1, 6), Param.DIRECTION);
 
     /** The design's complexity estimate — a HINT; see {@link Algorithm#inlineNodeCeiling()} for the decision input. */
     public enum Cost { SYNC, JOB }
@@ -240,49 +251,61 @@ public enum Algorithm {
     }
 
     /**
-     * One tunable parameter of an algorithm: its name, type, default and range (or allowed choices). For the collection types
-     * {@code min}/{@code max} bound each NUMBER in it and {@code maxSize} the entry count (null for the scalar types).
+     * One tunable parameter of an algorithm: its wire {@code name}, the {@code label} and one-line {@code description} a UI
+     * shows for it, its type, default and range (or allowed choices, with {@code allowedLabels} naming each one for people).
+     * For the collection types {@code min}/{@code max} bound each NUMBER in it and {@code maxSize} the entry count (null for
+     * the scalar types).
      * <ul>
      *   <li>{@code DOUBLE_LIST} - a non-empty JSON array of numbers; resolved to a {@code List<Double>} in the given order.</li>
      *   <li>{@code ID_LIST} - a JSON array of non-blank node-id strings; resolved sorted and de-duplicated (one cache key).</li>
      *   <li>{@code SCORE_MAP} - a JSON object node id → number; resolved to a {@code Map<String, Double>} sorted by id.</li>
      * </ul>
      */
-    public record Param(String name, Type type, Object defaultValue, Double min, Double max, List<String> allowed, Integer maxSize) {
+    public record Param(String name, String label, String description, Type type, Object defaultValue, Double min, Double max,
+                        List<String> allowed, List<String> allowedLabels, Integer maxSize) {
 
         public enum Type { INT, DOUBLE, ENUM, DOUBLE_LIST, ID_LIST, SCORE_MAP }
 
         /** The most entries a list or map parameter may take: the server's node ceiling ({@link GraphRunService.Limits#standard()}). */
         public static final int MAX_ENTRIES = 500_000;
 
-        /** The shared edge-direction parameter. */
-        public static final Param DIRECTION = choice("direction", "both", "out", "in", "both");
+        /** The one-line hint every {@code iterations} parameter shares. */
+        static final String ITERATIONS_HINT = "Rounds of refinement: more is slower but steadier";
 
-        public static Param integer(String name, int dflt, int min, int max) {
-            return new Param(name, Type.INT, dflt, (double) min, (double) max, List.of(), null);
+        /** The shared link-direction parameter. */
+        public static final Param DIRECTION = choice("direction", "Direction", "Which way links are followed", "both",
+                List.of("out", "in", "both"), List.of("Outgoing", "Incoming", "Both ways"));
+
+        public static Param integer(String name, String label, String description, int dflt, int min, int max) {
+            return new Param(name, label, description, Type.INT, dflt, (double) min, (double) max, List.of(), List.of(), null);
         }
 
-        public static Param decimal(String name, double dflt, double min, double max) {
-            return new Param(name, Type.DOUBLE, dflt, min, max, List.of(), null);
+        public static Param decimal(String name, String label, String description, double dflt, double min, double max) {
+            return new Param(name, label, description, Type.DOUBLE, dflt, min, max, List.of(), List.of(), null);
         }
 
-        public static Param choice(String name, String dflt, String... allowed) {
-            return new Param(name, Type.ENUM, dflt, null, null, List.of(allowed), null);
+        /** A choice of {@code allowed}; {@code allowedLabels} names each one, in the same order. */
+        public static Param choice(String name, String label, String description, String dflt, List<String> allowed,
+                                   List<String> allowedLabels) {
+            if (allowed.size() != allowedLabels.size()) throw new IllegalArgumentException(name + ": one label per choice");
+            return new Param(name, label, description, Type.ENUM, dflt, null, null, List.copyOf(allowed),
+                    List.copyOf(allowedLabels), null);
         }
 
         /** A non-empty list of numbers, each within {@code [min, max]}, at most {@code maxSize} long. */
-        public static Param decimalList(String name, List<Double> dflt, double min, double max, int maxSize) {
-            return new Param(name, Type.DOUBLE_LIST, List.copyOf(dflt), min, max, List.of(), maxSize);
+        public static Param decimalList(String name, String label, String description, List<Double> dflt, double min,
+                                        double max, int maxSize) {
+            return new Param(name, label, description, Type.DOUBLE_LIST, List.copyOf(dflt), min, max, List.of(), List.of(), maxSize);
         }
 
         /** A list of node ids, at most {@code maxSize}; the default is empty. */
-        public static Param idList(String name, int maxSize) {
-            return new Param(name, Type.ID_LIST, List.of(), null, null, List.of(), maxSize);
+        public static Param idList(String name, String label, String description, int maxSize) {
+            return new Param(name, label, description, Type.ID_LIST, List.of(), null, null, List.of(), List.of(), maxSize);
         }
 
         /** A node id → number map, each number within {@code [min, max]}, at most {@code maxSize} entries; the default is empty. */
-        public static Param scoreMap(String name, double min, double max, int maxSize) {
-            return new Param(name, Type.SCORE_MAP, Map.of(), min, max, List.of(), maxSize);
+        public static Param scoreMap(String name, String label, String description, double min, double max, int maxSize) {
+            return new Param(name, label, description, Type.SCORE_MAP, Map.of(), min, max, List.of(), List.of(), maxSize);
         }
 
         Object resolve(String algorithm, Object v) {
