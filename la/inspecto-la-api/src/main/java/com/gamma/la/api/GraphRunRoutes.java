@@ -194,11 +194,14 @@ public final class GraphRunRoutes implements RouteModule {
             for (Algorithm.Param p : a.params()) {
                 Map<String, Object> pm = new LinkedHashMap<>();
                 pm.put("name", p.name());
+                pm.put("label", p.label());
+                pm.put("description", p.description());
                 pm.put("type", p.type().name());
                 pm.put("default", p.defaultValue());
                 if (p.min() != null) pm.put("min", p.min());
                 if (p.max() != null) pm.put("max", p.max());
                 if (!p.allowed().isEmpty()) pm.put("allowed", p.allowed());
+                if (!p.allowedLabels().isEmpty()) pm.put("allowedLabels", p.allowedLabels());
                 if (p.maxSize() != null) pm.put("maxSize", p.maxSize());
                 params.add(pm);
             }

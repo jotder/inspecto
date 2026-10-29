@@ -49,8 +49,9 @@ const SPARK_H = 24;
                     }
                 </div>
                 <p class="text-secondary mt-1 text-xs">
-                    {{ s.model }} · elevated at {{ s.elevatedThreshold }}, high at {{ s.highThreshold }} · period
-                    <span [attr.title]="s.periodStart">{{ stamp(s.periodStart, true) }}</span> · scored
+                    {{ s.model }}. Elevated from {{ s.elevatedThreshold }}, high from {{ s.highThreshold }}. Period
+                    <span [attr.title]="s.periodStart">{{ stamp(s.periodStart, true) }}</span
+                    >. Scored
                     <span [attr.title]="s.scoredAt">{{ stamp(s.scoredAt) }}</span>
                 </p>
                 <p class="mt-1 text-xs">
@@ -81,10 +82,8 @@ const SPARK_H = 24;
                                 <span class="tabular-nums">{{ f.share | number: '1.0-0' }} %</span>
                             </div>
                             <div class="text-secondary text-xs tabular-nums">
-                                observed {{ f.observed ?? '—' }} · baseline {{ f.baseline?.median ?? '—' }}
-                                @if (f.peerBaseline?.median != null) {
-                                    · peers {{ f.peerBaseline!.median }}
-                                }
+                                Seen {{ f.observed ?? '—' }}, usual {{ f.baseline?.median ?? '—'
+                                }}{{ f.peerBaseline?.median != null ? ', peers ' + f.peerBaseline!.median : '' }}
                             </div>
                             @if (f.reason) {
                                 <p class="text-xs">{{ f.reason }}</p>

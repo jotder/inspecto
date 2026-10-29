@@ -11,7 +11,7 @@ import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/gri
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { penOpen, refresh } from '@inspecto/core/testing/pen-field';
 import { LinkAnalysisValueMeasuresComponent, valueMeasureErrorMessage } from './link-analysis-value-measures.component';
-import { valueMeasureQuery, valueMeasureWindowIssue } from './value-measures';
+import { valueMeasureHeader, valueMeasureQuery, valueMeasureWindowIssue } from './value-measures';
 import { configureLaLimits, resetLaLimits } from './la-limits';
 
 const HEADER: InvestigationHeader = {
@@ -168,10 +168,11 @@ describe('LinkAnalysisValueMeasuresComponent', () => {
         expect(c.form().form.get('minRatio')?.value).toBe(0.9);
         expect(c.form().form.get('minInbound')?.value).toBe(10000);
         const counts = el.querySelector('[data-test="counts"]')?.textContent ?? '';
-        expect(counts).toContain('1200 rows in the window');
-        expect(counts).toContain('3 rows without a numeric value');
+        expect(counts.trim()).toBe('1 entity breaches. 1,200 rows read, 3 skipped (no numeric value).');
+        expect(counts).not.toContain('·');
         expect(el.textContent).toContain('More entities breach than are listed');
-        expect(c.columns().find((col) => col.field === 'retention')?.headerName).toBe('Retention (derived: 1 − ratio)');
+        expect(el.textContent).toContain('Result cut short');
+        expect(c.columns().find((col) => col.field === 'retention')?.headerName).toBe('Retention (1 − ratio)');
     });
 
     it("shows a 422 in the server's own words, and a 503 as an explained info notice", async () => {
@@ -190,7 +191,7 @@ describe('LinkAnalysisValueMeasuresComponent', () => {
             throwError(() => new HttpErrorResponse({ status: 503, error: { error: { message: 'no write root' } } })),
         );
         await run();
-        expect(el.querySelector('inspecto-alert')?.textContent).toContain('need the link-analysis module');
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain('Value Measures are not available here');
         expect(c.unavailable()).toBe(true);
     });
 
@@ -198,7 +199,9 @@ describe('LinkAnalysisValueMeasuresComponent', () => {
         const { el, fixture, inv, fill, run } = setup();
         fill(WINDOW);
         await run();
-        expect(el.querySelector('[data-test="fires-on"]')?.textContent).toContain('ONE Alert');
+        expect(el.querySelector('[data-test="fires-on"]')?.textContent?.trim()).toBe(
+            'Raises one Alert when any entity breaches. Now: 1.',
+        );
         el.querySelector<HTMLButtonElement>(
             'form[aria-label="Watch this value Measure"] button[type="submit"]',
         )!.click();
@@ -285,9 +288,15 @@ describe('Value Measures form (DR-D4)', () => {
         }
     });
 
+    it('T-123: result columns get plain headers, never the raw field name', () => {
+        expect(valueMeasureHeader('maxHours')).toBe('Max hours');
+        expect(valueMeasureHeader('entity_id')).toBe('Entity id');
+        expect(valueMeasureHeader('ratio')).toBe('Ratio');
+    });
+
     it('states the 31-day cap before anything is run', () => {
         const { el } = setup();
-        expect(el.querySelector('[data-test="vm-intro"]')!.textContent).toContain('at most 31 days');
+        expect(el.querySelector('[data-test="vm-intro"]')!.textContent).toContain('up to 31 days');
     });
 
     it('disables Run Measure while the window is missing or over 31 days, and enables it once valid', async () => {
@@ -359,7 +368,7 @@ describe('Watch (DR-D6)', () => {
         c.watchForm.controls.name.markAsDirty();
         refresh(fixture);
         expect(el.querySelector('inspecto-pen-field p[role="alert"]')?.textContent).toContain(
-            'Letters, digits, dot, dash and underscore',
+            'Use letters, digits, . - _',
         );
     });
 });

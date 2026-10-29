@@ -180,8 +180,8 @@ describe('GraphRunsService', () => {
 describe('indexRefusalMessage', () => {
     it.each([
         ['the edge index cannot serve this run (index_disabled)', /switched off/],
-        ['the edge index cannot serve this run (no_index)', /No edge index/],
-        ['the edge index cannot serve this run (index_stale_refused: removed)', /stale/],
+        ['the edge index cannot serve this run (no_index)', /No link index/],
+        ['the edge index cannot serve this run (index_stale_refused: removed)', /out of date/],
         ['the edge index cannot serve this run (stale_unknown: older)', /older than this Space allows/],
         ['hops 3 is over the index cap of 2 hops', /at most 2 hops/],
         ["'seeds' lists 21 nodes; the index cap is 20 keys per level", /at most 20/],
@@ -192,8 +192,19 @@ describe('indexRefusalMessage', () => {
         expect(msg).toMatch(words);
         expect(msg).toContain(server);
     });
+    it('T-116: names the link index and never a config key', () => {
+        const off = indexRefusalMessage('the edge index cannot serve this run (index_disabled)');
+        expect(off).toMatch(
+            /^Link index serving is switched off for this Space\. An administrator can turn it on in Settings ▸ Link Analysis\./,
+        );
+        const old = indexRefusalMessage('the edge index cannot serve this run (stale_unknown: older)');
+        expect(old).toMatch(/^The link index is older than this Space allows\. Rebuild it\./);
+        for (const m of [off, old]) {
+            expect(m).not.toMatch(/index\.enabled|max_age_hours|is false/);
+        }
+    });
     it('an unknown cause still shows the server sentence', () => {
-        expect(indexRefusalMessage('something new')).toBe('The index run was refused: something new');
+        expect(indexRefusalMessage('something new')).toBe('The link index run was refused: something new');
     });
 });
 
@@ -201,8 +212,10 @@ describe('graphRunErrorMessage', () => {
     const fail = (status: number, errorCode = '', message = '') =>
         new HttpErrorResponse({ status, error: { error: { errorCode, message } } });
 
-    it('403 names the capability', () => {
-        expect(graphRunErrorMessage(fail(403), 'x')).toMatch(/Run link graph analysis capability/);
+    it('403 names the permission (G14), never the word capability', () => {
+        const m = graphRunErrorMessage(fail(403), 'x');
+        expect(m).toContain('Needs Run link graph analysis.');
+        expect(m).not.toMatch(/capability/i);
     });
     it('404 says the Investigation or run is not visible to the caller', () => {
         expect(graphRunErrorMessage(fail(404), 'x')).toMatch(/not found/);
@@ -222,7 +235,9 @@ describe('graphRunErrorMessage', () => {
     });
     it('503 tells a full waiting line from an unavailable module', () => {
         expect(graphRunErrorMessage(fail(503, 'STORE_BUSY'), 'x')).toMatch(/waiting line/);
-        expect(graphRunErrorMessage(fail(503, 'CAPABILITY_UNAVAILABLE'), 'x')).toMatch(/not available here/);
+        expect(graphRunErrorMessage(fail(503, 'CAPABILITY_UNAVAILABLE'), 'x')).toBe(
+            'Server runs are not available here. Try again later or ask an administrator.',
+        );
     });
     it('anything else falls back', () => {
         expect(graphRunErrorMessage(fail(500), 'fallback')).toBe('fallback');

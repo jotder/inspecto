@@ -26,6 +26,7 @@ import {
     IndexMappingTarget,
     LinkAnalysisIndexBuildComponent,
     indexBuildCancelMessage,
+    fileChangesText,
     indexBuildErrorMessage,
 } from './link-analysis-index-build.component';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
@@ -279,7 +280,9 @@ describe('LinkAnalysisIndexBuildComponent - the build mode control', () => {
         const { q, el } = makeBuild();
         expect(q('build-index-version')!.textContent).toContain('version 3, 1 appended');
         expect(q('build-plan-recommended')!.textContent).toBe('append');
-        expect(q('build-plan')!.textContent).toContain('2 file(s) added');
+        expect(q('build-plan')!.textContent).toContain('Suggested:');
+        expect(q('build-plan')!.textContent).toContain('2 files added, 0 removed, 0 changed');
+        expect(q('build-plan')!.textContent).not.toContain('(s)');
         expect(el.textContent).toContain('2 files were added');
         expect(el.textContent).toContain('f1.parquet, f2.parquet');
         expect((q('mode-append') as HTMLInputElement).checked).toBe(true);
@@ -352,14 +355,16 @@ describe('LinkAnalysisIndexBuildComponent - the build mode control', () => {
     it('disables the build and says why without the capability', () => {
         const { q, runs } = makeBuild({ allowed: false });
         expect((q('start-build') as HTMLButtonElement).disabled).toBe(true);
-        expect(q('build-blocked')!.textContent).toContain('Build link index capability');
+        expect(q('build-blocked')!.textContent!.trim()).toBe(
+            'Your role cannot build a link index. Needs Build link index.',
+        );
         q('start-build')!.click();
         expect(runs.startBuild).not.toHaveBeenCalled();
     });
 
     it('maps each status to its own sentence', () => {
         const e = (status: number) => indexBuildErrorMessage(new HttpErrorResponse({ status }));
-        expect(e(403)).toContain('Build link index capability');
+        expect(e(403)).toBe('Your role cannot build a link index. Needs Build link index.');
         expect(e(404)).toContain('not found');
         expect(e(422)).toContain('refused the build');
         expect(e(503)).toContain('not available');
@@ -481,11 +486,13 @@ describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-S
         const { q, el, fixture } = makeBuild({ runs, mappings });
         expect(q('no-index')).toBeNull();
         expect(q('index-serving')!.textContent).toContain('Link index serving is off');
+        expect(q('index-serving')!.textContent).toContain('Settings ▸ Link Analysis');
         expect(q('index-serving')!.textContent).toContain('administrator');
         expect(q('index-settings-link')!.getAttribute('href')).toBe('/settings/link-analysis');
-        expect(q('index-vs-flat')!.textContent).toContain('Flat');
+        expect(q('index-vs-flat')!.textContent).toContain('Dataset only');
+        expect(q('index-vs-flat')!.textContent).not.toMatch(/flat/i);
         expect(q('index-vs-flat')!.textContent).toContain('no link index has been built for it');
-        expect(q('start-build')!.textContent).toContain('Build first index (Full)');
+        expect(q('start-build')!.textContent!.trim()).toBe('Build first index');
         expect(el.querySelector('inspecto-schema-form')).not.toBeNull();
         // the form is prefilled from the loaded query's mapping
         const form = fixture.debugElement.query((d) => d.name === 'inspecto-schema-form').componentInstance as {
@@ -502,7 +509,9 @@ describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-S
         const list = { enabled: false, indexes: [] } as unknown as LinkIndexList;
         const { q } = makeBuild({ list, allowed: false });
         expect((q('start-build') as HTMLButtonElement).disabled).toBe(true);
-        expect(q('build-blocked')!.textContent).toContain('Build link index capability');
+        expect(q('build-blocked')!.textContent!.trim()).toBe(
+            'Your role cannot build a link index. Needs Build link index.',
+        );
     });
 
     it('DR-U5: labels each loaded mapping Index or Flat, with the reason', () => {
@@ -518,7 +527,7 @@ describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-S
                 e.textContent!.replace(/\s+/g, ' ').trim(),
             );
         const on = texts({ enabled: true, indexes: [index()] } as unknown as LinkIndexList);
-        expect(on[0]).toContain('Index');
+        expect(on[0]).toContain('Link index');
         expect(on[0]).toContain('reads are served from link index v3');
         expect(on[1]).toContain('built over different columns');
         expect(on[2]).toContain('no link index has been built for it');
@@ -527,17 +536,27 @@ describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-S
         expect(off[0]).toContain('built, but serving is off');
         TestBed.resetTestingModule();
         const stale = texts({ enabled: true, indexes: [index({ stale: true })] } as unknown as LinkIndexList);
-        expect(stale[0]).toContain('is stale');
+        expect(stale[0]).toContain('is out of date');
     });
 
-    it('shows the Index stale chip for a stale listed index', () => {
+    it('T-121: says the file counts with real plurals, and one sentence when nothing changed', () => {
+        expect(fileChangesText({ added: 0, removed: 0, changed: 0 })).toBe('No files changed since this version.');
+        expect(fileChangesText({ added: 1, removed: 0, changed: 2 })).toBe(
+            '1 file added, 0 removed, 2 changed since this version.',
+        );
+        expect(fileChangesText({ added: 1200, removed: 0, changed: 0 })).toBe(
+            '1,200 files added, 0 removed, 0 changed since this version.',
+        );
+    });
+
+    it('shows the link index out-of-date chip for a stale listed index', () => {
         const { q, el } = makeBuild({
             list: {
                 enabled: true,
                 indexes: [index({ stale: true, reason: 'files added' })],
             } as unknown as LinkIndexList,
         });
-        expect(el.textContent).toContain('Index stale');
+        expect(el.textContent).toContain('Link index out of date');
         expect(q('index-serving')!.textContent).toContain('Link index serving is on');
     });
 

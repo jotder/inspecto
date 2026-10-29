@@ -364,7 +364,9 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
         c.tab.set('scoring');
         fixture.detectChanges();
         expect((button(/Run on server/) as HTMLButtonElement).disabled).toBe(true);
-        expect(el.querySelector('[data-testid="blocked-reason"]')!.textContent).toMatch(/capability/);
+        expect(el.querySelector('[data-testid="blocked-reason"]')!.textContent).toMatch(
+            /Needs Run link graph analysis/,
+        );
         button(/Run on server/)!.click();
         expect(run).not.toHaveBeenCalled();
     });

@@ -58,10 +58,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
         case 422:
             return 'The server refused this: ' + server;
         case 503:
-            return (
-                'Value Measures need the link-analysis module, a write root and (to watch) the alert engine. Server: ' +
-                server
-            );
+            return 'Value Measures are not available here: the Link Analysis module, or the alert engine for watching, is not installed.';
         default:
             return server;
     }
@@ -96,8 +93,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                 Value Measures
             </h3>
             <p class="text-secondary m-0" data-test="vm-intro">
-                Reads the whole Dataset in the window — never the filtered view on screen. A window is at most
-                {{ maxDays() }} days: From and To, or a rolling last (up to {{ maxDays() * 24 }}h).
+                Reads the whole Dataset for the window (up to {{ maxDays() }} days), not the graph on screen.
             </p>
             <inspecto-schema-form
                 [specs]="specs"
@@ -106,11 +102,9 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                 (submitted)="run()"
             ></inspecto-schema-form>
             <fieldset class="m-0 flex flex-wrap gap-2 border-0 p-0" data-test="vm-window">
-                <legend class="text-secondary p-0 text-sm font-semibold">
-                    Fixed window (or use the rolling one above)
-                </legend>
-                <inspecto-pen-field label="From (inclusive)" [formControl]="fromDate" type="date" data-test="vm-from" />
-                <inspecto-pen-field label="To (exclusive)" [formControl]="toDate" type="date" data-test="vm-to" />
+                <legend class="text-secondary p-0 text-sm font-semibold">Fixed window</legend>
+                <inspecto-pen-field label="From" [formControl]="fromDate" type="date" data-test="vm-from" />
+                <inspecto-pen-field label="To (not included)" [formControl]="toDate" type="date" data-test="vm-to" />
             </fieldset>
             @if (issue(); as why) {
                 <p class="text-secondary m-0" data-test="vm-issue">{{ why }}</p>
@@ -129,7 +123,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
 
             @if (result(); as r) {
                 <p class="m-0" data-test="threshold">
-                    <span class="font-semibold">Threshold in force:</span> {{ r.measure.name }} — {{ r.threshold }}
+                    <span class="font-semibold">Thresholds in use:</span> {{ r.measure.name }} — {{ r.threshold }}
                 </p>
                 @if (r.window) {
                     <p class="text-secondary m-0" data-test="window">
@@ -139,12 +133,11 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                     </p>
                 }
                 <p class="text-secondary m-0" data-test="counts">
-                    {{ r.count }} entities breach · {{ r.rowsInWindow }} rows in the window · {{ r.unvalued }}
-                    rows without a numeric value (skipped)
+                    {{ countsLine(r) }}
                 </p>
                 @if (r.truncated) {
-                    <inspecto-alert variant="warning" title="Result cut">
-                        More entities breach than are listed — only the first {{ r.fences?.maxEntities ?? r.count }}
+                    <inspecto-alert variant="warning" title="Result cut short">
+                        More entities breach than are listed: only the first {{ r.fences?.maxEntities ?? r.count }}
                         are shown. Narrow the window or raise a threshold.
                     </inspecto-alert>
                 }
@@ -161,8 +154,9 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                     <p class="text-secondary m-0">Open an Investigation over this Dataset to watch this Measure.</p>
                 } @else if (!matchesInvestigation()) {
                     <p class="text-secondary m-0">
-                        Watching binds over the open Investigation's Dataset and roles ({{ investigation()!.dataset }});
-                        run the Measure over those to watch it.
+                        To watch this Measure, run it on the open Investigation's Dataset ({{
+                            investigation()!.dataset
+                        }}).
                     </p>
                 } @else if (!canAuthor()) {
                     <p class="text-secondary m-0" data-test="watch-no-cap">
@@ -177,8 +171,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                         (ngSubmit)="watch()"
                     >
                         <p class="m-0" data-test="fires-on">
-                            Fires ONE Alert when at least 1 entity breaches — on the count of breaching entities, not
-                            per entity. Now: {{ r.count }}.
+                            Raises one Alert when any entity breaches. Now: {{ r.count }}.
                         </p>
                         <inspecto-pen-field
                             label="Alert Rule name"
@@ -187,7 +180,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                                 watchForm.controls.name.hasError('required')
                                     ? 'A name is required.'
                                     : watchForm.controls.name.hasError('pattern')
-                                      ? 'Letters, digits, dot, dash and underscore only.'
+                                      ? 'Use letters, digits, . - _'
                                       : ''
                             "
                         />
@@ -199,7 +192,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                         ></inspecto-option-picker>
                         <div>
                             <button mat-flat-button color="primary" type="submit" [disabled]="binding() || !!bound()">
-                                Watch
+                                Watch this Measure
                             </button>
                         </div>
                     </form>
@@ -315,6 +308,14 @@ export class LinkAnalysisValueMeasuresComponent {
         linkKindCol: '',
     });
     readonly columns = computed(() => valueMeasureColumns(this.result()?.entities ?? []));
+
+    /** The result counts in one plain line (T-124): "5 entities breach. 120 rows read, 3 skipped (no numeric value)." */
+    countsLine(r: Pick<ValueMeasureResult, 'count' | 'rowsInWindow' | 'unvalued'>): string {
+        const n = (x: number) => x.toLocaleString('en-GB');
+        const breach = r.count === 1 ? '1 entity breaches.' : `${n(r.count)} entities breach.`;
+        const read = `${n(r.rowsInWindow)} row${r.rowsInWindow === 1 ? '' : 's'} read`;
+        return r.unvalued ? `${breach} ${read}, ${n(r.unvalued)} skipped (no numeric value).` : `${breach} ${read}.`;
+    }
     readonly alertable = computed(
         () => VALUE_MEASURES.find((m) => m.value === this.result()?.measure.name)?.alertable ?? false,
     );

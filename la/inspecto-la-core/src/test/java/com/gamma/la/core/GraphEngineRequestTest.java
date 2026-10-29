@@ -77,6 +77,21 @@ class GraphEngineRequestTest {
                 EnumSet.copyOf(java.util.Arrays.stream(Algorithm.values()).filter(Algorithm::needsWeights).toList()));
     }
 
+    /** LA-UI-TEXT-PASS-1 X1: every parameter carries the words a UI shows, never only its wire name. */
+    @Test
+    void everyParameterHasALabelAndAOneLineDescription() {
+        for (Algorithm a : Algorithm.values())
+            for (Algorithm.Param p : a.params()) {
+                String at = a.id() + "." + p.name();
+                assertTrue(p.label() != null && !p.label().isBlank() && !p.label().equals(p.name()), at + " label");
+                assertTrue(p.description() != null && !p.description().isBlank(), at + " description");
+                assertTrue(!p.description().contains("\n") && !p.description().endsWith("."), at + " one line, no full stop");
+                assertEquals(p.type() == Algorithm.Param.Type.ENUM ? p.allowed().size() : 0, p.allowedLabels().size(),
+                        at + " one label per choice");
+            }
+        assertEquals(List.of("Outgoing", "Incoming", "Both ways"), Algorithm.Param.DIRECTION.allowedLabels());
+    }
+
     /** No silent gap: every catalogued algorithm resolves to a dispatch and answers with the shape it declares. */
     @Test
     void everyCatalogueEntryDispatchesAndAnswersItsDeclaredKind() {

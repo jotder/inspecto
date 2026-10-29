@@ -182,12 +182,19 @@ export interface GraphRunRequest {
 export type GraphParamType = 'INT' | 'DOUBLE' | 'ENUM' | 'DOUBLE_LIST' | 'ID_LIST' | 'SCORE_MAP';
 
 export interface GraphAlgorithmParam {
+    /** The wire key the request carries. */
     name: string;
+    /** What a person reads for it; an older server may not send it (fall back to `name`). */
+    label?: string;
+    /** A one-line hint under the field. */
+    description?: string;
     type: GraphParamType;
     default: unknown;
     min?: number;
     max?: number;
     allowed?: string[];
+    /** A label per `allowed` choice, same order. */
+    allowedLabels?: string[];
     maxSize?: number;
 }
 
@@ -311,40 +318,40 @@ function errorCodeOf(err: HttpErrorResponse): string {
 export function indexRefusalMessage(serverMessage: string): string {
     const m = serverMessage;
     const rules: [RegExp, string][] = [
-        [/index_disabled/, 'The edge index is switched off for this Space (index.enabled is false).'],
-        [/no_index/, 'No edge index has been built for this Dataset yet.'],
+        [
+            /index_disabled/,
+            'Link index serving is switched off for this Space. An administrator can turn it on in Settings ▸ Link Analysis.',
+        ],
+        [/no_index/, 'No link index has been built for this Dataset yet.'],
         [
             /index_stale_refused/,
-            'The index is stale and rows it still holds may have been removed from the Dataset, so it was refused. Rebuild the index.',
+            'The link index is out of date: rows it holds may have been removed from the Dataset. Rebuild it.',
         ],
-        [
-            /stale_unknown/,
-            'The index is older than this Space allows (index.max_age_hours) and the input files of this Dataset cannot be checked for changes. Rebuild the index.',
-        ],
+        [/stale_unknown/, 'The link index is older than this Space allows. Rebuild it.'],
         [
             /mapping_not_indexed|column_not_indexed/,
-            'The index was built over different columns than this run asked for.',
+            'The link index was built over different columns than this run asks for.',
         ],
         [
             /depth_over_index_cap|hops \d+ is over/,
-            'The index answers at most 2 hops. Run it on the Working Set for a deeper walk.',
+            'The link index answers at most 2 hops. Run it on the Working Set to go deeper.',
         ],
         [
             /frontier_over_index_cap|index cap is 20|lists \d+ nodes/,
-            'The index looks up at most 20 nodes per step. Pick fewer nodes, or run it on the Working Set.',
+            'The link index looks up at most 20 nodes per step. Pick fewer nodes, or run it on the Working Set.',
         ],
         [
             /'at' cannot be combined/,
-            'The index holds the Dataset as built, so a past step of the Investigation cannot be read from it.',
+            'The link index holds the Dataset as built, so it cannot read a past step of the Investigation.',
         ],
         [
             /hides entities/,
-            'This Investigation hides entities, which the index cannot honour. Run it on the Working Set.',
+            'This Investigation hides entities, which the link index cannot honour. Run it on the Working Set.',
         ],
-        [/cannot run from the index/, 'This algorithm cannot run from the index. Run it on the Working Set.'],
+        [/cannot run from the index/, 'This algorithm cannot run from the link index. Run it on the Working Set.'],
     ];
     const hit = rules.find(([re]) => re.test(m));
-    return hit ? `${hit[1]} (Server: ${m})` : `The index run was refused: ${m}`;
+    return hit ? `${hit[1]} (Server: ${m})` : `The link index run was refused: ${m}`;
 }
 
 /**
@@ -361,9 +368,9 @@ export function graphRunErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, '');
     switch (err.status) {
         case 403:
-            return 'You are not allowed to run graph analysis on the server (it needs the Run link graph analysis capability).';
+            return 'Your role cannot run server tools. Needs Run link graph analysis.';
         case 404:
-            return 'The Investigation or run was not found - it may be closed, or it is not yours to read.';
+            return 'The Investigation or run was not found. It may be closed, or not shared with you.';
         case 409:
             return 'That run has already finished.';
         case 422:
@@ -371,7 +378,7 @@ export function graphRunErrorMessage(err: unknown, fallback: string): string {
         case 503:
             return errorCodeOf(err) === 'STORE_BUSY'
                 ? 'The server is busy: its waiting line for graph runs is full. Try again in a moment.'
-                : 'Server-side graph runs are not available here (the server has no writable Space, is shutting down, or lacks the Link Analysis module).';
+                : 'Server runs are not available here. Try again later or ask an administrator.';
         default:
             return server || fallback;
     }

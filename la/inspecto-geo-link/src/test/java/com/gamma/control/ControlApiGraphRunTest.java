@@ -208,6 +208,11 @@ class ControlApiGraphRunTest {
             for (JsonNode a : d.get("algorithms")) if ("pageRank".equals(a.get("id").asText())) pr = a;
             assertEquals(Algorithm.PAGE_RANK.inlineNodeCeiling(), pr.get("inlineNodeCeiling").asInt());
             assertEquals("damping", pr.get("params").get(0).get("name").asText());
+            assertEquals("Damping", pr.get("params").get(0).get("label").asText(), "X1: the label a UI shows");
+            assertFalse(pr.get("params").get(0).get("description").asText().isBlank(), "X1: a one-line hint");
+            JsonNode sp = null;
+            for (JsonNode a : d.get("algorithms")) if ("shortestPath".equals(a.get("id").asText())) sp = a;
+            assertEquals(List.of("Outgoing", "Incoming", "Both ways"), texts(sp.get("params").get(0).get("allowedLabels")));
             assertEquals("SCORES", pr.get("resultKind").asText());
             assertEquals(500_000, d.get("ceilings").get("maxNodes").asInt());
             assertEquals(77, d.get("defaults").get("maxNodes").asInt(), "the Space's stated default");

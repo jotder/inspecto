@@ -26,6 +26,7 @@ const SCORE: AnomalyScore = {
             label: 'Data MB',
             observed: 4812,
             baseline: { median: 310 },
+            peerBaseline: { median: 290 },
             contribution: 0.8,
             reason: 'data MB 4 812 vs a usual 310 (Tuesdays, 4 weeks) — 14.5 MADs above',
         },
@@ -69,10 +70,10 @@ describe('AnomalyPanelComponent', () => {
         expect(items.length).toBe(3);
         expect(items[0]).toContain('Data MB');
         expect(items[0]).toContain('14.5 MADs above');
-        expect(items[0]).toContain('observed 4812');
+        expect(items[0]).toContain('Seen 4812, usual 310, peers 290');
         expect(el.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toContain('last 3 periods');
-        expect(el.textContent).toContain('period 9 Oct 2026');
-        expect(el.textContent).toContain('scored 10 Oct 2026, 01:00:00');
+        expect(el.textContent).toContain('Period 9 Oct 2026');
+        expect(el.textContent).toContain('Scored 10 Oct 2026, 01:00:00');
         expect(el.querySelector('[title="2026-10-10 01:00:00"]')).not.toBeNull();
         await expectNoA11yViolations(el);
     });

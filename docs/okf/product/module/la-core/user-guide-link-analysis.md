@@ -500,8 +500,9 @@ On the Explorer level and on Basic, the Whole Dataset tab still runs the Dataset
 *Find paths (server)*, *Value Measures*, *Burst and periodicity* and the pattern's **Run on server**. One locked line
 after them, *Run a server algorithm*, says what has the server algorithms.
 
-Click a ranking row to select and centre that node. A long result has **Open in the dock** (the dock's **Results**
-tab).
+Click a ranking row to select and centre that node. A long result has **Open in dock** (the dock's **Results**
+tab). Each server algorithm field shows a plain name with a one-line hint under it (*Weight per hop*, *Risk origins*,
+*Longest path*, *Direction*: *Both ways / Outgoing / Incoming*).
 
 | Group | Answers |
 |---|---|
@@ -517,7 +518,7 @@ tab).
 | **Pattern match** | Find a shape ([§9](#9-pattern-matching)) |
 | **Value Measures** | Who stands out by money flow: pass-through, velocity, cash-out concentration, structuring, benefit transfer |
 | **Burst and periodicity** | When activity spikes, and what repeats on a schedule |
-| **Propagated risk** (Server) | Risk spread from scored nodes over the links: *weights* per hop, *seeds*, *nodeScores* (**Fill from indicators**); a ranked table whose *Factors* expand to the contributing origins |
+| **Propagated risk** (Server) | Risk spread from scored nodes over the links: *Weight per hop*, *Risk origins*, *Risk scores* (**Use risk scores**); a ranked table (*Score*, *Uncapped*, *Own risk*, *Contributors*) whose *Factors* expand to the contributing origins |
 
 **From a ranking to an Investigation.** Under a ranking, **Start an Investigation from the top results** queues the
 top five nodes on the **Investigation** tab; nothing is created until you give the purpose and press **Start

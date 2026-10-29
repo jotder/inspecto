@@ -32,7 +32,7 @@ import {
 } from '@inspecto/link-analysis/api/graph-runs.service';
 
 const MODES: { id: LinkIndexBuildMode; label: string; help: string }[] = [
-    { id: 'full', label: 'Full', help: 'Rebuild the index from the whole Dataset.' },
+    { id: 'full', label: 'Full', help: 'Rebuild the link index from the whole Dataset.' },
     { id: 'append', label: 'Append', help: 'Index only the files added since the live version.' },
     { id: 'compact', label: 'Compact', help: 'Merge the appended deltas into one sorted main.' },
 ];
@@ -69,42 +69,52 @@ export function indexVsFlat(
             const why = other
                 ? 'the link index of this Dataset was built over different columns'
                 : 'no link index has been built for it';
-            return { label: m.label, index: false, text: `${m.label}: reads the Dataset (flat) - ${why}.` };
+            return { label: m.label, index: false, text: `${m.label}: reads the Dataset directly, as ${why}.` };
         }
         if (!list.enabled)
             return {
                 label: m.label,
                 index: false,
-                text: `${m.label}: link index v${hit.version} is built, but serving is off, so reads use the Dataset (flat).`,
+                text: `${m.label}: link index v${hit.version} is built, but serving is off, so reads use the Dataset directly.`,
             };
         if (hit.stale)
             return {
                 label: m.label,
                 index: false,
-                text: `${m.label}: link index v${hit.version} is stale; a read may use the Dataset (flat) until it is rebuilt.`,
+                text: `${m.label}: link index v${hit.version} is out of date; a read may use the Dataset directly until it is rebuilt.`,
             };
         return { label: m.label, index: true, text: `${m.label}: reads are served from link index v${hit.version}.` };
     });
 }
 
+/** No role permission to build (G14): one sentence for the hint and the 403. */
+const NOT_ALLOWED = 'Your role cannot build a link index. Needs Build link index.';
+
 /** The sentence a refused build start reads as; each status means something specific on `POST /inv/index/builds`. */
 export function indexBuildErrorMessage(err: unknown): string {
-    if (!(err instanceof HttpErrorResponse)) return 'The index build could not be started.';
+    if (!(err instanceof HttpErrorResponse)) return 'The link index build could not be started.';
     const server = apiErrorMessage(err, '');
     switch (err.status) {
         case 403:
-            return 'You are not allowed to build an index (it needs the Build link index capability).';
+            return NOT_ALLOWED;
         case 404:
-            return 'The Dataset was not found, or it is not yours to read.';
+            return 'The Dataset was not found, or it is not shared with you.';
         case 409:
             return `That build cannot run now: ${server || 'one is already running for this index, or the mode does not apply.'}`;
         case 422:
             return `The server refused the build: ${server || 'check the mapping and the mode.'}`;
         case 503:
-            return 'Index builds are not available here (no writable Space) or the build queue is full. Try again in a moment.';
+            return 'Link index builds are not available here, or the build queue is full. Try again in a moment.';
         default:
-            return server || 'The index build could not be started.';
+            return server || 'The link index build could not be started.';
     }
+}
+
+/** The plan's file counts in words: real plurals, and one sentence when nothing changed (T-121). */
+export function fileChangesText(plan: { added: number; removed: number; changed: number }): string {
+    if (!plan.added && !plan.removed && !plan.changed) return 'No files changed since this version.';
+    const files = plan.added === 1 ? 'file' : 'files';
+    return `${plan.added.toLocaleString('en-GB')} ${files} added, ${plan.removed.toLocaleString('en-GB')} removed, ${plan.changed.toLocaleString('en-GB')} changed since this version.`;
 }
 
 /**
@@ -132,19 +142,19 @@ export function indexBuildErrorMessage(err: unknown): string {
         @if (known()) {
             <p class="text-sm" role="status" data-testid="index-serving">
                 @if (enabled()) {
-                    <strong>Link index serving is on</strong> for this Space: a read is answered from a fresh link index,
-                    and from the Dataset otherwise.
+                    <strong>Link index serving is on</strong> for this Space: a read is answered from a fresh link
+                    index, and from the Dataset otherwise.
                 } @else {
-                    <strong>Link index serving is off</strong> for this Space: every read uses the Dataset (flat). An
+                    <strong>Link index serving is off</strong> for this Space. Reads use the Dataset directly. A link
                     index built here is kept, and used once serving is on.
                 }
                 Only an administrator changes this, in
-                <a routerLink="/settings/link-analysis" data-testid="index-settings-link">Settings &gt; Link Analysis</a>.
+                <a routerLink="/settings/link-analysis" data-testid="index-settings-link">Settings ▸ Link Analysis</a>.
             </p>
             @for (m of mappingStates(); track m.label) {
                 <p class="flex flex-wrap items-center gap-2 text-sm" data-testid="index-vs-flat">
                     <inspecto-chip variant="soft" [tone]="m.index ? 'primary' : 'neutral'">{{
-                        m.index ? 'Index' : 'Flat'
+                        m.index ? 'Link index' : 'Dataset only'
                     }}</inspecto-chip>
                     <span>{{ m.text }}</span>
                 </p>
@@ -154,7 +164,7 @@ export function indexBuildErrorMessage(err: unknown): string {
                     @if (choices().length > 1) {
                         <inspecto-option-picker
                             class="w-48"
-                            label="Index"
+                            label="Link index"
                             data-testid="build-index-pick"
                             [options]="choiceOptions()"
                             [ngModel]="ix.dataset"
@@ -166,19 +176,18 @@ export function indexBuildErrorMessage(err: unknown): string {
                     </span>
                     @if (ix.stale) {
                         <inspecto-chip variant="soft" tone="warning" [title]="ix.reason ?? ''"
-                            >Index stale</inspecto-chip
+                            >Link index out of date</inspecto-chip
                         >
                     }
                 </div>
                 @if (ix.plan; as plan) {
                     <div class="mt-1 text-sm" data-testid="build-plan">
                         <p>
-                            Advice:
+                            Suggested:
                             <strong data-testid="build-plan-recommended">{{
                                 plan.recommended === 'none' ? 'nothing to do' : plan.recommended
                             }}</strong
-                            >. {{ plan.added }} file(s) added, {{ plan.removed }} removed, {{ plan.changed }} changed
-                            since this version.
+                            >. {{ fileChanges(plan) }}
                         </p>
                         @if (plan.reasons.length) {
                             <ul class="list-inside list-disc" aria-label="Why this advice">
@@ -202,7 +211,7 @@ export function indexBuildErrorMessage(err: unknown): string {
                         [disabled]="busy()"
                         (change)="newMapping.set($any($event.target).checked)"
                     />
-                    Index a different mapping instead
+                    Index a different mapping
                 </label>
             }
             @if (choosingMapping()) {
@@ -212,7 +221,7 @@ export function indexBuildErrorMessage(err: unknown): string {
                     } @else {
                         This Space has no link index yet: choose the Dataset and the columns to index.
                     }
-                    A new mapping is always built in full; append and compact only apply to a listed index.
+                    A new mapping is always built in full.
                 </p>
                 <inspecto-schema-form
                     [specs]="mappingSpecs"
@@ -246,7 +255,7 @@ export function indexBuildErrorMessage(err: unknown): string {
                     (click)="start()"
                 >
                     <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
-                    {{ index() && !newMapping() ? 'Build index' : 'Build first index (Full)' }}
+                    {{ index() && !newMapping() ? 'Build link index' : 'Build first index' }}
                 </button>
                 @if (cancellable()) {
                     <button mat-stroked-button data-testid="cancel-build" [disabled]="cancelling()" (click)="cancel()">
@@ -259,7 +268,7 @@ export function indexBuildErrorMessage(err: unknown): string {
                 <p class="text-secondary mt-1 text-sm" role="status" data-testid="build-blocked">{{ why }}</p>
             }
             @if (error()) {
-                <inspecto-alert variant="error" title="Index build">{{ error() }}</inspecto-alert>
+                <inspecto-alert variant="error" title="Link index build">{{ error() }}</inspecto-alert>
             }
             @if (build(); as b) {
                 @switch (b.status) {
@@ -272,7 +281,7 @@ export function indexBuildErrorMessage(err: unknown): string {
                         <p class="mt-1 text-sm" role="status" data-testid="build-progress">
                             Building{{
                                 b.progress
-                                    ? ' - ' + b.progress.phase + ' (' + b.progress.step + '/' + b.progress.steps + ')'
+                                    ? ': ' + b.progress.phase + ' (' + b.progress.step + '/' + b.progress.steps + ')'
                                     : ''
                             }}.{{ cancelling() ? ' Cancelling…' : '' }}
                         </p>
@@ -297,12 +306,13 @@ export function indexBuildErrorMessage(err: unknown): string {
             }
         } @else {
             <p class="text-secondary text-sm" data-testid="no-index">
-                The server did not say which link indexes this Space has, so none can be built from here.
+                The link index list could not be loaded, so none can be built here. Try again later.
             </p>
         }
     `,
 })
 export class LinkAnalysisIndexBuildComponent {
+    readonly fileChanges = fileChangesText;
     private readonly runs = inject(GraphRunsService);
     private sub: Subscription | null = null;
 
@@ -373,9 +383,7 @@ export class LinkAnalysisIndexBuildComponent {
         const s = this.build()?.status;
         return this.starting() || s === 'QUEUED' || s === 'RUNNING';
     });
-    readonly blockedReason = computed(() =>
-        this.allowed() ? '' : 'Building an index needs the Build link index capability, which your role does not hold.',
-    );
+    readonly blockedReason = computed(() => (this.allowed() ? '' : NOT_ALLOWED));
     readonly sampleGroups = computed(() => {
         const s = this.index()?.plan?.samples;
         return s
@@ -472,7 +480,7 @@ export function indexBuildCancelMessage(err: unknown): string {
         case 403:
             return "Only the build's starter or an administrator can cancel it.";
         case 404:
-            return 'That build was not found - it is not yours to cancel, or it was never started.';
+            return 'That build was not found. It is not yours to cancel, or it was never started.';
         case 409:
             return 'The build had already finished, so there was nothing to cancel.';
         default:

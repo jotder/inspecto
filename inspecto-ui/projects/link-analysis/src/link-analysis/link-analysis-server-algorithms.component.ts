@@ -36,6 +36,29 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
     return a.params.filter((p) => !isEditableParam(p) && !STRUCTURED.has(p.type)).map((p) => p.name);
 }
 
+/** What a person reads for a parameter: the catalogue's `label`, else (an older server) its wire `name` (X1). */
+export function paramLabel(p: GraphAlgorithmParam): string {
+    return p.label?.trim() || p.name;
+}
+
+/** An ENUM parameter's choices, each named by the catalogue's `allowedLabels` when it sends them. */
+export function enumOptionsOf(p: GraphAlgorithmParam): PickerOption[] {
+    return (p.allowed ?? []).map((c, i) => ({ value: c, label: p.allowedLabels?.[i]?.trim() || c }));
+}
+
+/** The canvas node pickers still empty, as one "Pick ... first." sentence (X6), or ''. */
+export function missingNodesReason(from: boolean, to: boolean, node: boolean): string {
+    if (from && to) return 'Pick a From and a To node first.';
+    if (from) return 'Pick a From node first.';
+    if (to) return 'Pick a To node first.';
+    return node ? 'Pick a node first.' : '';
+}
+
+/** A label inside a sentence: lower-cased first letter, unless it is a name such as "PageRank". */
+export function inSentence(label: string): string {
+    return /^[A-Z][a-z]+(\s|$)/.test(label) ? label[0].toLowerCase() + label.slice(1) : label;
+}
+
 /**
  * **All algorithms (server)** (DR-U11): every algorithm the server catalogue lists, runnable whatever the Working Set's
  * size. The form is DRIVEN BY THE CATALOGUE (`GET /inv/graph/algorithms`): each parameter descriptor becomes a number
@@ -47,14 +70,22 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
     selector: 'inspecto-link-analysis-server-algorithms',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, MatButtonModule, InspectoOptionPickerComponent, PenFieldComponent, LinkAnalysisServerRunComponent],
+    imports: [
+        FormsModule,
+        MatButtonModule,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
+        LinkAnalysisServerRunComponent,
+    ],
     template: `
         @if (!algorithms().length) {
-            <p class="text-secondary text-sm" data-testid="algo-none">The server's algorithm list is not available.</p>
+            <p class="text-secondary text-sm" data-testid="algo-none">
+                The algorithm list could not be loaded. Try again later.
+            </p>
         } @else {
             @if (!algorithmId()) {
                 <p class="text-secondary text-sm" data-testid="algo-count">
-                    {{ algorithms().length }} algorithms on the server.
+                    {{ algorithms().length }} algorithms available.
                 </p>
                 <inspecto-option-picker
                     class="w-72"
@@ -98,12 +129,16 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                             <div>
                                 <inspecto-pen-field
                                     class="w-48"
-                                    [label]="p.name"
+                                    [label]="paramLabel(p)"
                                     [attr.data-testid]="'param-' + p.name"
                                     [ngModel]="listText(p)"
                                     (ngModelChange)="setList(p.name, '' + $event)"
                                 ></inspecto-pen-field>
-                                <p class="text-secondary m-0 text-xs" [id]="'hint-' + p.name">per hop, 0..1</p>
+                                @if (p.description) {
+                                    <p class="text-secondary m-0 text-xs" [id]="'hint-' + p.name">
+                                        {{ p.description }}
+                                    </p>
+                                }
                             </div>
                             @if (listErrors()[p.name]; as e) {
                                 <p class="text-warn text-xs" role="alert">{{ e }}</p>
@@ -112,7 +147,7 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                             <div class="flex flex-wrap items-center gap-1" [attr.data-testid]="'param-' + p.name">
                                 <inspecto-option-picker
                                     class="w-56"
-                                    [label]="'Add to ' + p.name"
+                                    [label]="paramLabel(p)"
                                     [options]="nodeChoices()"
                                     [ngModel]="''"
                                     (ngModelChange)="addId(p.name, $any($event))"
@@ -121,13 +156,18 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                                     <button
                                         mat-stroked-button
                                         type="button"
-                                        [attr.aria-label]="'Remove ' + labelOfCanvas(id) + ' from ' + p.name"
+                                        [attr.aria-label]="
+                                            'Remove ' + labelOfCanvas(id) + ' from ' + inSentence(paramLabel(p))
+                                        "
                                         (click)="removeId(p.name, id)"
                                     >
                                         {{ labelOfCanvas(id) }} ✕
                                     </button>
                                 }
                             </div>
+                            @if (p.description) {
+                                <p class="text-secondary m-0 text-xs">{{ p.description }}</p>
+                            }
                         } @else {
                             <div class="flex flex-wrap items-center gap-2" [attr.data-testid]="'param-' + p.name">
                                 <button
@@ -137,24 +177,25 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                                     [disabled]="!riskMapping() || filling()"
                                     (click)="fillScores(p)"
                                 >
-                                    Fill {{ p.name }} from indicators
+                                    Use {{ inSentence(paramLabel(p)) }}
                                 </button>
                                 <span class="text-secondary text-xs" role="status">{{
-                                    scoreNote()[p.name] ??
-                                        (riskMapping()
-                                            ? ''
-                                            : 'No indicators Dataset is mapped for this domain profile.')
+                                    scoreNote()[p.name] ?? (riskMapping() ? '' : 'No risk data for this Industry pack.')
                                 }}</span>
                             </div>
+                            @if (p.description) {
+                                <p class="text-secondary m-0 text-xs">{{ p.description }}</p>
+                            }
                         }
                     }
                     @for (p of editableParams(); track p.name) {
                         @if (p.type === 'ENUM') {
                             <inspecto-option-picker
                                 class="w-48"
-                                [label]="p.name"
+                                [label]="paramLabel(p)"
                                 [attr.data-testid]="'param-' + p.name"
-                                [options]="enumOptions(p.allowed)"
+                                [attr.title]="p.description || null"
+                                [options]="enumOptions(p)"
                                 [ngModel]="'' + valueOf(p.name, p.default)"
                                 (ngModelChange)="setParam(p.name, '' + $event)"
                             />
@@ -162,8 +203,9 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                             <inspecto-pen-field
                                 class="w-48"
                                 type="number"
-                                [label]="p.name"
+                                [label]="paramLabel(p)"
                                 [attr.data-testid]="'param-' + p.name"
+                                [attr.title]="p.description || null"
                                 [min]="p.min ?? null"
                                 [max]="p.max ?? null"
                                 [ngModel]="valueOf(p.name, p.default)"
@@ -184,7 +226,7 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                 />
                 @if (summary(); as s) {
                     <div class="mt-1 text-sm" data-testid="algo-result">
-                        <p>{{ s.headline }}</p>
+                        <p [attr.title]="riskRows().length ? RISK_HINT : null">{{ s.headline }}</p>
                         @if (riskRows().length) {
                             <table class="mt-1 w-full text-left text-sm" data-testid="risk-table">
                                 <caption class="sr-only">
@@ -195,8 +237,8 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                                         <th scope="col">#</th>
                                         <th scope="col">Node</th>
                                         <th scope="col" class="text-right">Score</th>
-                                        <th scope="col" class="text-right">Raw</th>
-                                        <th scope="col" class="text-right">Own</th>
+                                        <th scope="col" class="text-right">Uncapped</th>
+                                        <th scope="col" class="text-right">Own risk</th>
                                         <th scope="col" class="text-right">Contributors</th>
                                         <th scope="col"><span class="sr-only">Factors</span></th>
                                     </tr>
@@ -206,9 +248,27 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                                         <tr>
                                             <td>{{ i + 1 }}</td>
                                             <td>{{ r.label }}</td>
-                                            <td class="text-right font-semibold" [attr.title]="r.full.score" [attr.aria-label]="r.full.score">{{ r.score }}</td>
-                                            <td class="text-right" [attr.title]="r.full.raw" [attr.aria-label]="r.full.raw">{{ r.raw }}</td>
-                                            <td class="text-right" [attr.title]="r.full.own" [attr.aria-label]="r.full.own">{{ r.own }}</td>
+                                            <td
+                                                class="text-right font-semibold"
+                                                [attr.title]="r.full.score"
+                                                [attr.aria-label]="r.full.score"
+                                            >
+                                                {{ r.score }}
+                                            </td>
+                                            <td
+                                                class="text-right"
+                                                [attr.title]="r.full.raw"
+                                                [attr.aria-label]="r.full.raw"
+                                            >
+                                                {{ r.raw }}
+                                            </td>
+                                            <td
+                                                class="text-right"
+                                                [attr.title]="r.full.own"
+                                                [attr.aria-label]="r.full.own"
+                                            >
+                                                {{ r.own }}
+                                            </td>
                                             <td class="text-right">{{ r.contributors }}</td>
                                             <td>
                                                 @if (r.factors.length) {
@@ -242,7 +302,12 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                         } @else if (s.lines.length) {
                             <ol class="mt-1 list-inside list-decimal">
                                 @for (l of s.lines; track $index) {
-                                    <li [attr.title]="s.fullLines[$index] || null" [attr.aria-label]="s.fullLines[$index] || null">{{ l }}</li>
+                                    <li
+                                        [attr.title]="s.fullLines[$index] || null"
+                                        [attr.aria-label]="s.fullLines[$index] || null"
+                                    >
+                                        {{ l }}
+                                    </li>
                                 }
                             </ol>
                         }
@@ -252,8 +317,13 @@ export function apiOnlyParams(a: GraphAlgorithm): string[] {
                             </button>
                         }
                         @if (dockAvailable() && lastResult() && (riskRows().length || s.lines.length) > LONG_RESULT) {
-                            <button mat-stroked-button class="mt-1" data-testid="algo-open-dock" (click)="openInDock.emit(lastResult()!)">
-                                Open in the dock
+                            <button
+                                mat-stroked-button
+                                class="mt-1"
+                                data-testid="algo-open-dock"
+                                (click)="openInDock.emit(lastResult()!)"
+                            >
+                                Open in dock
                             </button>
                         }
                     </div>
@@ -285,13 +355,15 @@ export class LinkAnalysisServerAlgorithmsComponent {
     readonly openInDock = output<GraphRunResult>();
     /** More rows than this is a long table: it gets *Open in the dock*. */
     readonly LONG_RESULT = 10;
+    /** The propagated-risk headline's tooltip (T-140). */
+    readonly RISK_HINT = 'Risk passed from risky nodes to the nodes linked to them';
     readonly lastResult = signal<GraphRunResult | null>(null);
 
     readonly algorithms = computed<GraphAlgorithm[]>(() => this.runs.catalogue()?.algorithms ?? []);
     readonly algorithmOptions = computed<PickerOption[]>(() =>
         this.algorithms().map((a) => ({
             value: a.id,
-            label: apiOnlyParams(a).length ? `${a.label} (API only)` : a.label,
+            label: apiOnlyParams(a).length ? `${a.label} (not available here)` : a.label,
         })),
     );
     readonly picked = signal('');
@@ -338,20 +410,21 @@ export class LinkAnalysisServerAlgorithmsComponent {
     readonly hold = computed(() => {
         const a = this.current();
         if (!a) return '';
-        const apiOnly = apiOnlyParams(a);
-        if (apiOnly.length)
-            return `API only: this panel cannot edit ${apiOnly.join(', ')} yet - run it through POST /inv/graph/runs.`;
-        const missing = [a.needsSource && 'from', a.needsTarget && 'to', a.needsNode && 'node'].filter(
-            (k): k is string => !!k && !(k in this.params()),
+        if (apiOnlyParams(a).length) return 'This algorithm cannot be run from this panel yet.';
+        const given = this.params();
+        const missing = missingNodesReason(
+            a.needsSource && !('from' in given),
+            a.needsTarget && !('to' in given),
+            a.needsNode && !('node' in given),
         );
-        if (missing.length) return `Pick ${missing.join(' and ')} first.`;
-        const badList = Object.keys(this.listErrors())[0];
-        if (badList) return `Correct ${badList} first.`;
+        if (missing) return missing;
+        const badList = a.params.find((p) => p.name in this.listErrors());
+        if (badList) return `Correct the ${inSentence(paramLabel(badList))} first.`;
         // an empty score map scores every node 0: an answer that says nothing
         const emptyMap = a.params.find(
-            (p) => p.type === 'SCORE_MAP' && !Object.keys((this.params()[p.name] as object) ?? {}).length,
+            (p) => p.type === 'SCORE_MAP' && !Object.keys((given[p.name] as object) ?? {}).length,
         );
-        return emptyMap ? `Fill ${emptyMap.name} first.` : '';
+        return emptyMap ? `Fill the ${inSentence(paramLabel(emptyMap))} first.` : '';
     });
 
     constructor() {
@@ -417,7 +490,7 @@ export class LinkAnalysisServerAlgorithmsComponent {
             // only the drawn nodes' rows, masked by the server like every Link Analysis read (POST /inv/reference-rows)
             const table = await this.risk.lookup(m.indicators, serverIds, this.investigationId());
             if (table.error) {
-                this.scoreNote.update((n) => ({ ...n, [p.name]: `The indicators could not be read: ${table.error}` }));
+                this.scoreNote.update((n) => ({ ...n, [p.name]: `The risk scores could not be read: ${table.error}` }));
                 return;
             }
             const r = nodeScoresFor(serverIds, table.byKey, m.indicators.scoreCol, p.maxSize);
@@ -426,8 +499,8 @@ export class LinkAnalysisServerAlgorithmsComponent {
                 ...n,
                 [p.name]:
                     `${r.matched} of ${serverIds.length} nodes have a score in ${m.indicators.dataset}` +
-                    (r.dropped ? ` (${r.dropped} left out at the ${p.maxSize}-entry cap).` : '.') +
-                    (table.truncated ? ' More rows matched than one read returns: some scores may be missing.' : '') +
+                    (r.dropped ? ` (${r.dropped} left out at the ${p.maxSize?.toLocaleString('en-GB')} limit).` : '.') +
+                    (table.truncated ? ' Some scores may be missing: too many rows matched.' : '') +
                     (table.unresolved ? ` ${table.unresolved} node ids could not be resolved by the server.` : ''),
             }));
         } finally {
@@ -444,9 +517,12 @@ export class LinkAnalysisServerAlgorithmsComponent {
     }
 
     /** An ENUM parameter's choices, for its popup picker. */
-    enumOptions(allowed: readonly string[] | null | undefined): PickerOption[] {
-        return (allowed ?? []).map((c) => ({ value: c, label: c }));
+    enumOptions(p: GraphAlgorithmParam): PickerOption[] {
+        return enumOptionsOf(p);
     }
+
+    readonly paramLabel = paramLabel;
+    readonly inSentence = inSentence;
 
     valueOf(name: string, dflt: unknown): unknown {
         return name in this.edited() ? this.edited()[name] : dflt;

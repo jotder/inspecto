@@ -16,7 +16,12 @@ import {
 } from '@inspecto/link-analysis/api/graph-runs.service';
 import { ServerIdMap } from './graph-run-apply';
 import { propagatedRiskRows, summarizeGraphRun } from './graph-run-summary';
-import { LinkAnalysisServerAlgorithmsComponent } from './link-analysis-server-algorithms.component';
+import {
+    LinkAnalysisServerAlgorithmsComponent,
+    enumOptionsOf,
+    missingNodesReason,
+    paramLabel,
+} from './link-analysis-server-algorithms.component';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { NodeRiskService } from './node-risk.service';
 
@@ -65,6 +70,8 @@ const CATALOGUE = {
                 { name: 'iterations', type: 'INT', default: 60, min: 0, max: 10000 },
             ],
         }),
+        // a parameter type this panel has no control for: the algorithm is not runnable here (T-114)
+        alg('futureAlgo', { label: 'Future', params: [{ name: 'shape', type: 'GEOMETRY' as never, default: null }] }),
         alg('neighborhood', {
             resultKind: 'GRAPH',
             needsNode: true,
@@ -76,10 +83,44 @@ const CATALOGUE = {
             cost: 'JOB',
             resultKind: 'PROPAGATED_RISK',
             params: [
-                { name: 'nodeScores', type: 'SCORE_MAP', default: {}, min: 0, max: 100, maxSize: 500000 },
-                { name: 'seeds', type: 'ID_LIST', default: [], maxSize: 500000 },
-                { name: 'weights', type: 'DOUBLE_LIST', default: [1, 0.6, 0.35, 0.15], min: 0, max: 1, maxSize: 6 },
-                { name: 'direction', type: 'ENUM', default: 'both', allowed: ['out', 'in', 'both'] },
+                // the server's X1 words (label, description, allowedLabels), as Algorithm.java declares them
+                {
+                    name: 'nodeScores',
+                    label: 'Risk scores',
+                    description: "Each node's own risk, 0 to 100",
+                    type: 'SCORE_MAP',
+                    default: {},
+                    min: 0,
+                    max: 100,
+                    maxSize: 500000,
+                },
+                {
+                    name: 'seeds',
+                    label: 'Risk origins',
+                    description: 'Only these nodes pass on risk; empty uses every scored node',
+                    type: 'ID_LIST',
+                    default: [],
+                    maxSize: 500000,
+                },
+                {
+                    name: 'weights',
+                    label: 'Weight per hop',
+                    description: 'Share of risk passed on at each hop, 0 to 1',
+                    type: 'DOUBLE_LIST',
+                    default: [1, 0.6, 0.35, 0.15],
+                    min: 0,
+                    max: 1,
+                    maxSize: 6,
+                },
+                {
+                    name: 'direction',
+                    label: 'Direction',
+                    description: 'Which way links are followed',
+                    type: 'ENUM',
+                    default: 'both',
+                    allowed: ['out', 'in', 'both'],
+                    allowedLabels: ['Outgoing', 'Incoming', 'Both ways'],
+                },
             ],
         }),
     ],
@@ -173,7 +214,7 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
             'pageRank',
         ])
             expect(c.algorithmOptions().some((o) => o.value === id)).toBe(true);
-        expect(el.querySelector('[data-testid=algo-count]')!.textContent).toContain('9 algorithms');
+        expect(el.querySelector('[data-testid=algo-count]')!.textContent).toContain('10 algorithms available.');
     });
 
     it('gives propagatedRisk real inputs: weights prefilled from the Space default, seeds from the canvas, nodeScores from indicators', async () => {
@@ -185,7 +226,7 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         fixture.detectChanges();
         const weights = el.querySelector<HTMLElement>('[data-testid=param-weights]')!;
         expect(penText(weights)).toBe('1, 0.5'); // the Space's graph_run.propagated_risk_weights
-        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain('Fill nodeScores first');
+        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain('Fill the risk scores first.');
         penEdit(fixture, weights, '1, 2');
         expect(el.querySelector('[role=alert]')!.textContent).toContain('from 0 to 1');
         penEdit(fixture, weights, '1, 0.4, 0.2');
@@ -248,6 +289,56 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         expect(emitted).toEqual([{ nodeIds: ['c-b'], edgeIds: [] }]);
     });
 
+    it('X1: shows each parameter by its label with the description as a hint, never the wire name', async () => {
+        const { fixture, c, el } = make();
+        c.pick('propagatedRisk');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const text = el.querySelector('[data-testid=algo-form]')!.textContent!;
+        for (const words of ['Use risk scores', "Each node's own risk", 'Risk origins', 'Weight per hop', 'Direction'])
+            expect(text).toContain(words);
+        expect(text).toContain('Share of risk passed on at each hop, 0 to 1');
+        expect(text).not.toMatch(/nodeScores|seeds|weights|per hop, 0\.\.1/);
+        expect(text).not.toContain('No indicators Dataset');
+        expect(el.querySelector('[data-testid=param-direction]')!.getAttribute('title')).toBe(
+            'Which way links are followed',
+        );
+        const dir = c.current()!.params.find((p) => p.name === 'direction')!;
+        expect(c.enumOptions(dir).map((o) => o.label)).toEqual(['Outgoing', 'Incoming', 'Both ways']);
+        c.addId('seeds', 'c-a');
+        fixture.detectChanges();
+        const remove = el.querySelector('[data-testid=param-seeds] button[aria-label]')!;
+        expect(remove.getAttribute('aria-label')).toBe('Remove A from risk origins');
+    });
+
+    it('X1: falls back to the wire name when an older server sends no label', () => {
+        expect(paramLabel({ name: 'damping', type: 'DOUBLE', default: 0.85 })).toBe('damping');
+        expect(paramLabel({ name: 'damping', label: ' ', type: 'DOUBLE', default: 0.85 })).toBe('damping');
+        expect(enumOptionsOf({ name: 'd', type: 'ENUM', default: 'in', allowed: ['in'] })).toEqual([
+            { value: 'in', label: 'in' },
+        ]);
+    });
+
+    it('T-114: an algorithm the panel cannot edit says so in plain words, with no route or parameter names', () => {
+        const { fixture, c, el, run } = make();
+        expect(c.algorithmOptions().find((o) => o.value === 'futureAlgo')!.label).toBe('Future (not available here)');
+        c.pick('futureAlgo');
+        fixture.detectChanges();
+        const why = el.querySelector('[data-testid=blocked-reason]')!.textContent!.trim();
+        expect(why).toBe('This algorithm cannot be run from this panel yet.');
+        el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!.click();
+        expect(run).not.toHaveBeenCalled();
+    });
+
+    it('X6: names the missing node pickers in one fixed phrase', () => {
+        expect(missingNodesReason(true, true, false)).toBe('Pick a From and a To node first.');
+        expect(missingNodesReason(true, false, false)).toBe('Pick a From node first.');
+        expect(missingNodesReason(false, true, false)).toBe('Pick a To node first.');
+        expect(missingNodesReason(false, false, true)).toBe('Pick a node first.');
+        expect(missingNodesReason(false, false, false)).toBe('');
+    });
+
     it('builds the parameter form from the descriptors and sends what was edited', async () => {
         const { fixture, c, el, run } = make();
         c.pick('pageRank');
@@ -265,7 +356,7 @@ describe('LinkAnalysisServerAlgorithmsComponent (DR-U11)', () => {
         const { fixture, c, el, run } = make();
         c.pick('descendants');
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain('Pick node first');
+        expect(el.querySelector('[data-testid=blocked-reason]')!.textContent).toContain('Pick a node first.');
         el.querySelector<HTMLButtonElement>('[data-testid=run-on-server]')!.click();
         expect(run).not.toHaveBeenCalled();
         c.setNode('node', 'c-a');
