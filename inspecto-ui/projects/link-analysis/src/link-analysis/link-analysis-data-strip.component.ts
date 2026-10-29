@@ -19,9 +19,11 @@ import {
 import { GraphRunsService, LinkIndexSummary } from '@inspecto/link-analysis/api/graph-runs.service';
 import { KIND_TEXT, LinkAnalysisCorrectedDaysComponent } from './link-analysis-corrected-days.component';
 import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, formatInstant, outcomeTone } from './data-trust';
+import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
 const PAGE = 25;
 const NO_TIME_COLUMN = 'this Investigation has no time column, so no day can be judged missing.';
+const NO_WINDOW = 'this Investigation sets no time window, and its Files name no event day.';
 
 /**
  * LA-DATA-TRUST-1 S2 - what data does this graph stand on? A one-line strip (how fresh, how complete, which index) with an
@@ -289,6 +291,8 @@ export class LinkAnalysisDataStripComponent {
     private readonly db = inject(DbBrowserService);
     private readonly runs = inject(RunsService);
     private readonly graphRuns = inject(GraphRunsService);
+    /** The host's Investigation session, when the strip sits in one: its log tells whether the Investigation sets a window. */
+    private readonly session = inject(InvestigationSessionStore, { optional: true });
 
     /** The open Investigation (the coverage read is over its window). */
     readonly investigationId = input.required<string>();
@@ -411,12 +415,14 @@ export class LinkAnalysisDataStripComponent {
             (f) => current() && this.dataAsOf.set(f.dataAsOf),
             () => undefined,
         );
-        const coverage = this.hasTimeColumn()
-            ? firstValueFrom(this.inv.investigationCoverage(id)).then(
+        const coverage = !this.hasTimeColumn()
+            ? this.coverageError.set(NO_TIME_COLUMN)
+            : this.setsNoWindow(id)
+              ? this.coverageError.set(NO_WINDOW) // the bare read would be refused (422): go straight to the Files' span
+              : firstValueFrom(this.inv.investigationCoverage(id)).then(
                   (c) => current() && this.coverage.set(c),
                   (err) => current() && this.coverageError.set(apiErrorMessage(err, 'the coverage read failed.')),
-              )
-            : this.coverageError.set(NO_TIME_COLUMN);
+              );
         const files = firstValueFrom(this.inv.datasetFiles(ds, { limit: PAGE })).then(
             (f) => {
                 if (!current()) return;
@@ -428,6 +434,16 @@ export class LinkAnalysisDataStripComponent {
         );
         await Promise.all([freshness, coverage, files]);
         await this.coverageOverFilesSpan(id, current);
+    }
+
+    /**
+     * True only when this Investigation's whole log is in hand and holds no Window step: the server then has no window of
+     * its own to judge, and the bare coverage read is refused with 422. A log with any Window step (even one set to All
+     * time) is left to the server.
+     */
+    private setsNoWindow(id: string): boolean {
+        const log = this.session?.activeId() === id ? this.session.log() : null;
+        return !!log && !log.truncated && !log.entries.some((e) => e.op === 'window');
     }
 
     /** The coverage read refuses an Investigation with no window; retry over the span of the Files so the days are judged. */

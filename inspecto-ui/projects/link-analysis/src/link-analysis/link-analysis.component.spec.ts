@@ -1100,6 +1100,58 @@ describe('LinkAnalysisComponent', () => {
         fixture.destroy();
     });
 
+    it('Save snapshot… is disabled on an empty canvas, says why, and enables once a graph is drawn', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="la-file"]')!.click();
+        fixture.detectChanges();
+        const btn = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('[data-testid="la-save-snapshot"]')!;
+        expect(btn().disabled).toBe(true);
+        expect(btn().getAttribute('aria-label')).toBe('Save snapshot: Draw a graph first.');
+        expect(document.querySelector('[data-testid="la-snapshot-locked"]')?.textContent?.trim()).toBe('Draw a graph first.');
+        await runQuery(fixture);
+        fixture.detectChanges();
+        expect(btn().disabled).toBe(false);
+        expect(btn().getAttribute('aria-label')).toBe('Save snapshot…');
+        expect(document.querySelector('[data-testid="la-snapshot-locked"]')).toBeNull();
+        fixture.destroy();
+    });
+
+    it('one icon, one action: the reused icons each name a single control on the drawn Studio', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const names = new Map<string, Set<string>>();
+        for (const b of Array.from(el.querySelectorAll('button'))) {
+            const icon = b.querySelector('mat-icon')?.getAttribute('data-mat-icon-name');
+            if (!icon) continue;
+            const name = (b.getAttribute('aria-label') ?? b.textContent ?? '').replace(/\(.*$|:.*$/, '').trim();
+            names.set(icon, (names.get(icon) ?? new Set()).add(name));
+        }
+        for (const icon of ['hand-raised', 'queue-list', 'table-cells', 'pencil'])
+            expect(names.get(icon)?.size ?? 0, `${icon}: ${[...(names.get(icon) ?? [])].join(' | ')}`).toBeLessThanOrEqual(1);
+        expect([...(names.get('pause-circle') ?? [])]).toEqual(['Held']);
+        expect(names.get('table-cells')).toEqual(new Set(['Show the table']));
+        expect(names.get('circle-stack')).toContain('Change Dataset in the graph model');
+        fixture.destroy();
+    });
+
+    it('Search nodes puts the caret in its box when it opens', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="la-search-nodes"]')!.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const box = document.querySelector<HTMLInputElement>('.cdk-overlay-container input[aria-label="Search nodes"]');
+        expect(box).not.toBeNull();
+        expect(document.activeElement).toBe(box);
+        fixture.destroy();
+    });
+
     it('a toolbox tab opens at its top: the three tabs share one scroll container', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
@@ -1663,6 +1715,28 @@ describe('LinkAnalysisComponent', () => {
         expect(state().moreHidden).toBe(true);
     });
 
+    it('the overflow menu says why its selection items are off, visibly and in their names (axe clean)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.onSelectionChange([]);
+        c.fitCanvasToolsToWidth(1150);
+        fixture.detectChanges();
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="la-canvas-tools-more"]')!.click();
+        fixture.detectChanges();
+        const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
+        expect(panel.querySelector('[data-testid="la-more-select-first"]')?.textContent?.trim()).toBe('Select entities first.');
+        const disabled = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[mat-menu-item]')).filter((b) => b.disabled);
+        expect(disabled.length).toBeGreaterThan(0);
+        for (const b of disabled) expect(b.getAttribute('aria-label') ?? '', b.textContent ?? '').toMatch(/: \S/);
+        expect(panel.querySelector('[data-testid="la-more-collapse"]')?.getAttribute('aria-label')).toBe(
+            'Collapse / unfold the selected: Select entities first.',
+        );
+        await expectNoA11yViolations(panel);
+        fixture.destroy();
+    });
+
     it('below 1,300 px the overflow menu holds Collapse, the N collapsed chip and Clean up (LA-REORG-NARROW-CLEANUP-1)', async () => {
         const { fixture } = create();
         fixture.detectChanges();
@@ -1811,6 +1885,28 @@ describe('LinkAnalysisComponent', () => {
         await c.openSnapshot();
         expect(dataAt(2).graph).toBe(c.canvasData());
         expect(dataAt(2).graph.nodes).toHaveLength(5);
+    });
+    it('the status bar counts what the canvas draws: the Working Set while an Investigation is open, not the query graph', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const counts = (): string =>
+            (fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-status-counts"]')!.textContent!.replace(/\s+/g, ' ').trim();
+        expect(counts()).toBe(`${c.displayed()!.nodes.length} nodes · ${c.displayed()!.edges.length} links on screen`);
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'ws-a' }, { id: 'ws-b' }],
+            links: [{ source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        fixture.detectChanges();
+        expect(c.displayed()!.nodes.length).not.toBe(2); // the query graph is still loaded underneath
+        expect(counts()).toBe('2 nodes · 1 links on screen');
+        fixture.destroy();
     });
     it('LA-UNEXPANDED-MARKER-1 (b): Next unexpanded picks each unexpanded node in turn; Only unexpanded draws just the frontier', async () => {
         const { fixture } = create();
@@ -3867,6 +3963,47 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             drawn: ['B', 'C', 'D', 'E'],
             filter,
         });
+    });
+
+    it('one Expand of one node is ONE preview and ONE neighbours read: the closed panel re-reads nothing after the graph grows', async () => {
+        const previewNeighbors = vi.fn(() =>
+            of({ addsNodes: 1, addsLinks: 1, held: [], heldCount: 0, excludedByLists: [], truncated: false, readPath: 'flat', linksWithinGraph: 0 }),
+        );
+        const expand = vi.fn(async (id: string) => ({
+            nodes: [{ id, data: { label: id, kind: 'entity' } }, { id: 'n1', data: { label: 'n1', kind: 'entity' } }],
+            edges: [{ id: id + '->n1', source: id, target: 'n1', data: { kind: 'link' } }],
+        }));
+        const { fixture, c, el } = await drawn({ expand, inv: { ...OLD_SERVER, previewNeighbors }, features: BASIC_EDITION_FEATURES });
+        c.onSelectionChange(['a']);
+        press(el, { key: 'g' });
+        await settle(fixture);
+        await settle(fixture);
+        expect(previewNeighbors).toHaveBeenCalledTimes(1);
+        (el.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).click();
+        for (let i = 0; i < 4; i++) await settle(fixture);
+        expect(c.graph()!.nodes.map((n) => n.id)).toContain('n1');
+        expect(expand).toHaveBeenCalledTimes(1);
+        expect(previewNeighbors).toHaveBeenCalledTimes(1);
+    });
+
+    it("the last expand's source note names its Dataset, and steps aside while an Investigation's Working Set is drawn", async () => {
+        const expand = vi.fn(async (id: string) => ({
+            nodes: [{ id, data: { label: id, kind: 'entity' } }],
+            edges: [],
+            source: { kind: 'dataset' as const, reason: 'no_index' },
+        }));
+        const { fixture, c, el } = await drawn({ expand });
+        await c.expandNode('a', 'A');
+        fixture.detectChanges();
+        const note = () => el.querySelector('[data-testid="expand-source"]')?.textContent?.trim() ?? null;
+        expect(note()).toBe(
+            "Last neighbour expand on Links: Answered from the Dataset because this Dataset has no link index yet.", // the Dataset by its name
+        );
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'other-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.workingSet.set({ entities: [{ id: 'ws-a' }], links: [], excluded: [], hash: 'h' } as never);
+        fixture.detectChanges();
+        expect(note()).toBeNull(); // the Working Set's own read line speaks for this canvas
     });
 
     it('Basic preview: a 403 (restricted list) shows the server reason in the Grow panel, and Grow still runs', async () => {

@@ -53,6 +53,7 @@
                 [disabled]="snapshotUnavailable() !== ''"
                 [matTooltip]="snapshotUnavailable() || 'Save a frozen copy, optionally on a Case'"
                 [attr.aria-label]="snapshotUnavailable() ? 'Save snapshot: ' + snapshotUnavailable() : 'Save snapshot…'"
+                data-testid="la-save-snapshot"
             >
                 <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
                 <span>Save snapshot…</span>
@@ -139,9 +140,11 @@
                 <button
                     mat-icon-button
                     [matMenuTriggerFor]="searchMenu" laFormMenu
+                    (menuOpened)="focusSearchBox()"
                     [color]="search() ? 'primary' : undefined"
                     matTooltip="Search nodes"
                     aria-label="Search nodes"
+                    data-testid="la-search-nodes"
                 >
                     <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
                 </button>
@@ -151,6 +154,7 @@
                         <mat-form-field subscriptSizing="dynamic" class="w-64">
                             <mat-label>Search nodes</mat-label>
                             <input
+                                #searchBox
                                 matInput
                                 [value]="search()"
                                 (input)="onSearch($any($event.target).value)"
@@ -382,6 +386,8 @@
                         <mat-checkbox
                             [checked]="allEdgeLabels()"
                             [disabled]="!edgeLabels()"
+                            [matTooltip]="edgeLabels() ? '' : 'Turn on Link labels first.'"
+                            data-testid="la-all-link-labels"
                             (change)="allEdgeLabels.set($event.checked)"
                             >All link labels
                             <span class="text-secondary text-xs"
@@ -469,6 +475,8 @@
                         <mat-checkbox
                             [checked]="!!viewOptions().bubbleSets"
                             [disabled]="!viewOptions().hulls"
+                            [matTooltip]="viewOptions().hulls ? '' : 'Turn on Community outlines first.'"
+                            data-testid="la-community-shading"
                             (change)="toggleViewFlag('bubbleSets', $event.checked)"
                         >
                             Community shading
@@ -681,7 +689,7 @@
                     data-testid="graph-list-toggle"
                 >
                     <mat-icon
-                        [svgIcon]="listMode() ? 'heroicons_outline:share' : 'heroicons_outline:queue-list'"
+                        [svgIcon]="listMode() ? 'heroicons_outline:share' : 'heroicons_outline:list-bullet'"
                     ></mat-icon>
                 </button>
                 <!-- Export group: one rail icon, the four formats as menu items -->
@@ -923,7 +931,7 @@
                             [attr.aria-label]="'Held (' + heldItems().length + '): busy entities Expand skips'"
                             data-testid="la-held-button"
                         >
-                            <mat-icon svgIcon="heroicons_outline:hand-raised" aria-hidden="true"></mat-icon>
+                            <mat-icon svgIcon="heroicons_outline:pause-circle" aria-hidden="true"></mat-icon>
                             <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none" aria-hidden="true">{{ heldItems().length }}</span>
                         </button>
                         <button
@@ -956,10 +964,28 @@
                     <mat-menu #canvasToolsMore="matMenu">
                         <button mat-menu-item type="button" (click)="selectAll()">Select all</button>
                         <button mat-menu-item type="button" (click)="invertSelection()">Invert the selection</button>
-                        <button mat-menu-item type="button" (click)="addNeighboursToSelection()" [disabled]="!selectedOnCanvas().length">
+                        <!-- a disabled menu item shows no tooltip: the items that act on a selection say why in one visible line and in their names -->
+                        @if (!selectedOnCanvas().length) {
+                            <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-more-select-first">{{ selectFirst }}</p>
+                        }
+                        <button
+                            mat-menu-item
+                            type="button"
+                            (click)="addNeighboursToSelection()"
+                            [disabled]="!selectedOnCanvas().length"
+                            [attr.aria-label]="selectedOnCanvas().length ? null : 'Add the neighbours: ' + selectFirst"
+                        >
                             Add the neighbours
                         </button>
-                        <button mat-menu-item type="button" (click)="clearSelection()" [disabled]="!selectedOnCanvas().length">Clear the selection</button>
+                        <button
+                            mat-menu-item
+                            type="button"
+                            (click)="clearSelection()"
+                            [disabled]="!selectedOnCanvas().length"
+                            [attr.aria-label]="selectedOnCanvas().length ? null : 'Clear the selection: ' + selectFirst"
+                        >
+                            Clear the selection
+                        </button>
                         <mat-divider></mat-divider>
                         <button mat-menu-item type="button" (click)="openExpand()">Expand…</button>
                         <button
@@ -967,6 +993,7 @@
                             type="button"
                             (click)="toggleCollapse(selectedOnCanvas())"
                             [disabled]="!selectedOnCanvas().length"
+                            [attr.aria-label]="selectedOnCanvas().length ? null : 'Collapse / unfold the selected: ' + selectFirst"
                             data-testid="la-more-collapse"
                         >
                             Collapse / unfold the selected
@@ -976,14 +1003,51 @@
                                 Unfold {{ collapsedRoots().length }} collapsed
                             </button>
                         }
-                        <button mat-menu-item type="button" (click)="hideSelected()" [disabled]="!selectedOnCanvas().length">Hide the selected nodes</button>
+                        <button
+                            mat-menu-item
+                            type="button"
+                            (click)="hideSelected()"
+                            [disabled]="!selectedOnCanvas().length"
+                            [attr.aria-label]="selectedOnCanvas().length ? null : 'Hide the selected nodes: ' + selectFirst"
+                        >
+                            Hide the selected nodes
+                        </button>
                         @if (investigation.canvas()) {
-                            <button mat-menu-item type="button" (click)="excludeSelected()" [disabled]="!selectedOnCanvas().length">
+                            <button
+                                mat-menu-item
+                                type="button"
+                                (click)="excludeSelected()"
+                                [disabled]="!selectedOnCanvas().length"
+                                [attr.aria-label]="selectedOnCanvas().length ? null : 'Exclude selection: ' + selectFirst"
+                            >
                                 Exclude selection…
                             </button>
-                            <button mat-menu-item type="button" (click)="mergeSelected()" [disabled]="!!mergeUnavailable()">Merge…</button>
+                            <button
+                                mat-menu-item
+                                type="button"
+                                (click)="mergeSelected()"
+                                [disabled]="!!mergeUnavailable()"
+                                [attr.aria-label]="mergeUnavailable() ? 'Merge: ' + mergeUnavailable() : null"
+                                data-testid="la-more-merge"
+                            >
+                                Merge…
+                            </button>
+                            @if (mergeUnavailable() && selectedOnCanvas().length) {
+                                <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-more-merge-locked">{{ mergeUnavailable() }}</p>
+                            }
                         }
-                        <button mat-menu-item type="button" (click)="openAttachToCase()" [disabled]="!!attachUnavailable()">Attach to Case</button>
+                        <button
+                            mat-menu-item
+                            type="button"
+                            (click)="openAttachToCase()"
+                            [disabled]="!!attachUnavailable()"
+                            [attr.aria-label]="attachUnavailable() ? 'Attach to Case: ' + attachUnavailable() : null"
+                        >
+                            Attach to Case
+                        </button>
+                        @if (attachUnavailable(); as why) {
+                            <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-more-attach-locked">{{ why }}</p>
+                        }
                         <mat-divider></mat-divider>
                         @for (t of cleanup.tools; track t.id) {
                             <button
@@ -991,13 +1055,18 @@
                                 type="button"
                                 (click)="cleanup.pick(t.id)"
                                 [disabled]="(t.id === 'keep' || t.id === 'remove') && !selectedOnCanvas().length"
+                                [attr.aria-label]="
+                                    (t.id === 'keep' || t.id === 'remove') && !selectedOnCanvas().length
+                                        ? 'Clean up: ' + t.label + ': ' + selectFirst
+                                        : null
+                                "
                                 [attr.data-testid]="'la-more-cleanup-' + t.id"
                             >
                                 Clean up: {{ t.label }}
                             </button>
                         }
                         <mat-divider></mat-divider>
-                        <button mat-menu-item type="button" (click)="focusHeldTray()" [disabled]="!heldItems().length">
+                        <button mat-menu-item type="button" (click)="focusHeldTray()" [disabled]="!heldItems().length" [attr.aria-label]="'Held (' + heldItems().length + '): busy entities Expand skips'">
                             Held ({{ heldItems().length }})
                         </button>
                         <button mat-menu-item type="button" (click)="openExclusions()">Hidden ({{ hiddenCount().toLocaleString('en') }})</button>
@@ -1093,7 +1162,7 @@
         }
         @if (expandSourceNote(); as note) {
             <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-source">
-                Last neighbour expand: {{ note }}
+                {{ note }}
             </p>
         }
         @if (mappingSummary().length) {
@@ -1600,7 +1669,7 @@
                         matTooltip="Open the Investigation tab"
                         aria-label="Open the Investigation tab"
                     >
-                        <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
+                        <mat-icon svgIcon="heroicons_outline:document-magnifying-glass"></mat-icon>
                     </button>
                 }
             </aside>
@@ -1683,6 +1752,8 @@
                                 (click)="filterOpen.set(!filterOpen())"
                                 [attr.aria-expanded]="filterOpen()"
                                 [disabled]="!graph()"
+                                [attr.aria-label]="graph() ? null : 'Filter: ' + drawFirst"
+                                [matTooltip]="graph() ? '' : drawFirst"
                             >
                                 <mat-icon class="icon-size-4" svgIcon="heroicons_outline:funnel"></mat-icon>
                                 Filter
@@ -1804,8 +1875,9 @@
                 >
                     <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
-                <span class="text-secondary shrink-0 whitespace-nowrap text-xs">
-                    {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
+                <!-- what the canvas draws (the Working Set while an Investigation is open), so it matches the Working Set count -->
+                <span class="text-secondary shrink-0 whitespace-nowrap text-xs" data-testid="la-status-counts">
+                    {{ canvasData()?.nodes?.length ?? 0 }} nodes · {{ canvasData()?.edges?.length ?? 0 }} links on screen
                 </span>
             }
             <!-- Installed Link Analysis modules: the right-most item of the footer; its list opens upward over the canvas -->
@@ -1842,7 +1914,14 @@
             ></inspecto-link-analysis-query-panel>
             <div class="flex justify-end gap-2 border-t pt-3" style="border-color: var(--gamma-border)">
                 <!-- Run is the form's own submit (Run query) above; Refresh re-reads the last run from the server -->
-                <button mat-stroked-button [disabled]="loading() || !lastRun()" (click)="refreshFromServer()" data-testid="la-settings-refresh">
+                <button
+                    mat-stroked-button
+                    [disabled]="loading() || !lastRun()"
+                    [attr.aria-label]="lastRun() ? null : 'Refresh: ' + drawFirst"
+                    [matTooltip]="lastRun() ? '' : drawFirst"
+                    (click)="refreshFromServer()"
+                    data-testid="la-settings-refresh"
+                >
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                     Refresh
                 </button>

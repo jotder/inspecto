@@ -55,6 +55,7 @@ import {
 import { GraphRunResult, GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { graphRunRows, summarizeGraphRun } from './graph-run-summary';
 import { indexSourceNote } from './index-source';
+import { DISABLED_REASON } from './disabled-reasons';
 import { IndexMappingTarget } from './link-analysis-index-build.component';
 import {
     EntityListSummary,
@@ -628,6 +629,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
     @ViewChild('laHeader') private laHeader?: ElementRef<HTMLElement>;
+    @ViewChild('searchBox') private searchBox?: ElementRef<HTMLInputElement>;
     /** True while the header row is narrower than {@link CANVAS_TOOLS_FOLD_PX}; unmeasured (jsdom) counts as wide. */
     readonly canvasToolsFolded = signal(false);
     @ViewChild('graphRegion') private graphRegion?: ElementRef<HTMLElement>;
@@ -889,7 +891,20 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly serverPathsBusy = signal(false);
     /** DR-U4: where the last incremental expand read its neighbours from (the link index or the Dataset); null = none yet. */
     readonly expandSource = signal<IndexSource | null>(null);
-    readonly expandSourceNote = computed(() => indexSourceNote(this.expandSource()));
+    /** The Dataset that expand read, so the note names it: "this Dataset" read as the open Investigation's own. */
+    readonly expandSourceDataset = signal<string | null>(null);
+    /**
+     * The note for the query graph's last expand. Hidden while the canvas draws an Investigation's Working Set: that
+     * canvas has its own source line (the sealed read), and the two contradicted each other when they named
+     * different Datasets.
+     */
+    readonly expandSourceNote = computed(() => {
+        const note = indexSourceNote(this.expandSource());
+        if (!note || this.workingSetCanvas()) return null;
+        const ds = this.expandSourceDataset();
+        if (!ds) return `Last neighbour expand: ${note}`;
+        return `Last neighbour expand on ${this.datasets().find((d) => d.id === ds)?.name ?? ds}: ${note}`;
+    });
     /** LA-14b: the last whole-Dataset branching pattern search. */
     readonly serverPattern = signal<ServerPatternState | null>(null);
     readonly serverPatternBusy = signal(false);
@@ -975,7 +990,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                     return q.projections.map((p) => {
                         const ds = this.datasets().find((d) => d.id === p.datasetId);
                         return {
-                            icon: 'heroicons_outline:table-cells',
+                            icon: 'heroicons_outline:circle-stack',
                             label: p.entityType ?? 'Mapping',
                             value: `${ds?.name ?? p.datasetId}: ${p.sourceCol} → ${p.targetCol}`,
                         };
@@ -985,7 +1000,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 if (!p) return [];
                 const ds = this.datasets().find((d) => d.id === p.datasetId);
                 const items: QuerySummaryItem[] = [
-                    { icon: 'heroicons_outline:table-cells', label: 'Dataset', value: ds?.name ?? p.datasetId },
+                    { icon: 'heroicons_outline:circle-stack', label: 'Dataset', value: ds?.name ?? p.datasetId },
                     {
                         icon: 'heroicons_outline:arrow-long-right',
                         label: 'Mapping',
@@ -2964,10 +2979,14 @@ Its prior copies stay in its version history.`,
         }
     }
 
-    /** Why "Save this analysis" is unavailable to this user — empty when it is available. Sealing a snapshot needs `canManageIncidents`. */
-    readonly snapshotUnavailable = computed(() =>
-        this.lens.canManageIncidents() ? '' : needsPermission('canManageIncidents'),
-    );
+    /**
+     * Why File ▸ Save snapshot… is unavailable — empty when it is available. Sealing a snapshot needs
+     * `canManageIncidents`, and something on screen to freeze (an empty canvas used to leave it enabled and inert).
+     */
+    readonly snapshotUnavailable = computed(() => {
+        if (!this.lens.canManageIncidents()) return needsPermission('canManageIncidents');
+        return this.snapshotData() ? '' : DRAW_FIRST;
+    });
 
     /** Why "Attach to Case" is unavailable to this user — empty when it is available. Attaching needs `canManageIncidents`. */
     readonly attachUnavailable = computed(() =>
@@ -3971,6 +3990,7 @@ Its prior copies stay in its version history.`,
             // LA-GROW-EXCLUDE-1: a Basic Grow keeps only its direction and link kinds.
             const extra = keep ? filterExpansion(read, id, keep) : read;
             this.expandSource.set((extra as ProjectedGraph).source ?? null);
+            this.expandSourceDataset.set(run.query.projection?.datasetId ?? null);
             this.graph.update((g) => (g ? mergeGraphs([g, extra]) : extra));
             this.expandedNodeIds.update((ids) => (ids.includes(id) ? ids : [...ids, id]));
             // LA-02: an expand that hit the server's row limit, or the browser's node cap, leaves the
@@ -4026,6 +4046,15 @@ Its prior copies stay in its version history.`,
 
     // `search` deliberately isn't recorded per keystroke here (Phase G) — that would flood the undo
     // stack with one entry per character typed. `clearFilters` still records, since it's a single action.
+    /** The fixed reasons the template gives a disabled control (LA-UI-TEXT-PASS-1 X6). */
+    readonly selectFirst = DISABLED_REASON.selectEntities;
+    readonly drawFirst = DRAW_FIRST;
+
+    /** Opening Search nodes puts the caret in its box (the menu would otherwise focus its own panel). */
+    focusSearchBox(): void {
+        afterNextRender(() => this.searchBox?.nativeElement.focus(), { injector: this.injector });
+    }
+
     onSearch(text: string): void {
         this.search.set(text);
         const g = this.displayed();

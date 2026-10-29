@@ -172,6 +172,22 @@ describe('PenFieldComponent', () => {
             expect(host.nameCtl.value).toBe('New');
         });
 
+        it('Enter and Escape hand focus back to the value button, never to the page body', async () => {
+            const { fixture, hosts } = setupTyping();
+            for (const key of ['Enter', 'Escape']) {
+                press(valueButton(hosts[0]), 'N');
+                fixture.detectChanges();
+                await fixture.whenStable();
+                const box = hosts[0].querySelector('input') as HTMLInputElement;
+                expect(document.activeElement).toBe(box);
+                press(box, key);
+                fixture.detectChanges();
+                await fixture.whenStable();
+                expect(hosts[0].querySelector('input'), key).toBeNull();
+                expect(document.activeElement, key).toBe(valueButton(hosts[0]));
+            }
+        });
+
         it('the pencil takes a typed key too; Escape still drops the edit', () => {
             const { fixture, host, hosts } = setupTyping();
             press(hosts[0].querySelector('button.pen-pencil')!, 'x');

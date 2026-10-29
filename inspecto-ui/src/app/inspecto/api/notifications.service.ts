@@ -126,6 +126,27 @@ export class NotificationsService {
             .subscribe({ next: (r) => this.unreadCount.set(r.count) });
     }
 
+    /**
+     * One polling tick: ONE request, the unread count. The feed is re-read only when that count moved (a new or
+     * newly-read notification) or when `feedShown` (the open panel must stay current). A tick used to re-read
+     * both, two requests every interval for a feed nobody was looking at.
+     */
+    poll(feedShown = false): void {
+        this.http.get<{ count: number }>(apiUrl('/notifications/unread-count')).subscribe({
+            next: (r) => {
+                const moved = r.count !== this.unreadCount();
+                this.unreadCount.set(r.count);
+                if (moved || feedShown) this.refreshFeed();
+            },
+        });
+    }
+
+    private refreshFeed(): void {
+        this.http.get<NotificationRow[]>(apiUrl('/notifications'), { params: toParams({ limit: 50 }) }).subscribe({
+            next: (rows) => this.items.set(rows),
+        });
+    }
+
     /** Push a notification arriving over SSE to the front of the feed (no reload). */
     applyIncoming(n: NotificationRow): void {
         if (this.items().some((x) => x.id === n.id)) return;

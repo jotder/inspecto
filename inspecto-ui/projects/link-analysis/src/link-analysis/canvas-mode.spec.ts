@@ -10,6 +10,14 @@ describe('Canvas modes (LA-STUDIO-UI-REORG-1 UIR-D3)', () => {
         expect(CANVAS_MODES.map((m) => m.id)).toEqual(['pan', 'lasso', 'fisheye', 'linkFilter']);
     });
 
+    it('each mode has its own icon, none shared with another Studio action', () => {
+        const icons = CANVAS_MODES.map((m) => m.icon);
+        expect(new Set(icons).size).toBe(icons.length);
+        // pencil = an attribute edit (pen-field), funnel = Filter node types: a mode reusing them read as the same action
+        expect(CANVAS_MODES.find((m) => m.id === 'lasso')?.icon).not.toBe('heroicons_outline:pencil');
+        expect(CANVAS_MODES.find((m) => m.id === 'linkFilter')?.icon).not.toBe('heroicons_outline:funnel');
+    });
+
     it('Pan: a plain drag pans, Shift+drag lassos, no rectangle box', () => {
         const b = buildBehaviors(canvasInteractionFor('pan'), null, () => undefined);
         expect(types(b)).toContain('drag-canvas');

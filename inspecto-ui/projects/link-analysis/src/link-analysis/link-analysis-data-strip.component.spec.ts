@@ -11,6 +11,7 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { DatasetFilesPage, InvService, InvestigationCoverage } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.component';
+import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
 const FILES = {
     dataset: 'calls',
@@ -119,7 +120,15 @@ interface Spies {
 let spies: Spies;
 
 function setup(
-    over: { files?: unknown; coverage?: unknown; asOf?: string | null; corrections?: unknown[]; hasTimeColumn?: boolean } = {},
+    over: {
+        files?: unknown;
+        coverage?: unknown;
+        asOf?: string | null;
+        corrections?: unknown[];
+        hasTimeColumn?: boolean;
+        /** The host's Investigation session: its open id and log (absent = the strip sits outside one). */
+        session?: { activeId: string; log: { truncated: boolean; entries: { op?: string }[] } };
+    } = {},
 ): ComponentFixture<Host> {
     spies = {
         changes: vi.fn(() => of({ ...CHANGES, changes: over.corrections ?? [] })),
@@ -168,6 +177,14 @@ function setup(
                 useValue: { pending: () => of({ pipeline: 'p', inbox: '', pending: 2, running: false }) },
             },
             { provide: GraphRunsService, useValue: { indexes, loadIndexes: spies.loadIndexes } },
+            ...(over.session
+                ? [
+                      {
+                          provide: InvestigationSessionStore,
+                          useValue: { activeId: signal(over.session.activeId), log: signal(over.session.log) },
+                      },
+                  ]
+                : []),
         ],
     });
     const f = TestBed.createComponent(Host);
@@ -275,6 +292,39 @@ describe('LinkAnalysisDataStripComponent', () => {
         q(f, '[data-test="strip-toggle"]')!.click();
         await settle(f);
         expect(q(f, '[data-test="coverage-over-files"]')).not.toBeNull();
+    });
+
+    it('an Investigation whose log sets no window sends no bare coverage read (no 422): it goes straight to the Files span', async () => {
+        const f = setup({ session: { activeId: 'inv1', log: { truncated: false, entries: [{ op: 'seed' }, { op: 'expand' }] } } });
+        await settle(f);
+        expect(spies.coverage).toHaveBeenCalledTimes(1);
+        expect(spies.coverage.mock.calls[0][1]).toEqual({ from: '2026-09-01T00:00:00Z', to: '2026-09-04T00:00:00Z' });
+        expect(q(f, '[data-test="strip-days-reason"]')).toBeNull();
+    });
+
+    it('with no window and no Files day, the reason is plain words, never the API refusal', async () => {
+        const f = setup({
+            files: of({ ...FILES, days: [] }),
+            session: { activeId: 'inv1', log: { truncated: false, entries: [{ op: 'seed' }] } },
+        });
+        await settle(f);
+        expect(spies.coverage).not.toHaveBeenCalled();
+        const reason = q(f, '[data-test="strip-days-reason"]')!.textContent!;
+        expect(reason).toContain('this Investigation sets no time window');
+        expect(reason).not.toContain("'from'");
+    });
+
+    it('a log with a Window step (or one only partly read) is left to the server: the bare read is sent', async () => {
+        for (const log of [
+            { truncated: false, entries: [{ op: 'seed' }, { op: 'window' }] },
+            { truncated: true, entries: [{ op: 'seed' }] },
+        ]) {
+            TestBed.resetTestingModule();
+            const f = setup({ session: { activeId: 'inv1', log } });
+            await settle(f);
+            expect(spies.coverage).toHaveBeenCalledTimes(1);
+            expect(spies.coverage.mock.calls[0][1]).toBeUndefined();
+        }
     });
 
     it('an unknown data-as-of date says so', async () => {
