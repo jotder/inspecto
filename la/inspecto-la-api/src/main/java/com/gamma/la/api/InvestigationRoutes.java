@@ -216,7 +216,7 @@ public final class InvestigationRoutes implements RouteModule {
     /**
      * {@code PATCH /inv/investigations/{id}} (LA-INVESTIGATION-RENAME-1) — body {@code {title?, purpose?}}: rename the Investigation
      * and/or restate its purpose. The sealed header is never rewritten: the edit is a details record beside it
-     * ({@link InvestigationStore#writeDetails}), laid over the header by {@link #open}, so every answer shows it while the
+     * ({@link InvestigationStore#updateDetails}), laid over the header by {@link #open}, so every answer shows it while the
      * Dossier manifest (which hashes the raw header) still verifies. Gates, in order: {@code canManageIncidents} 403 → write
      * root 503 → a body naming neither field, a blank or longer-than-{@value #TITLE_MAX} title, or a blank or over-long
      * purpose 422 → {@link #open} lead-only (422 unsafe id · 404 absent or not readable · 403 a non-lead member) → write the
