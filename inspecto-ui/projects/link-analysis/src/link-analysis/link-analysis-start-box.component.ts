@@ -30,6 +30,7 @@ import {
 } from '@inspecto/link-analysis/api/entity-profile.service';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
 import { LaFoldComponent } from './la-fold.component';
+import { laLimit } from './la-limits';
 import {
     NewInvestigationRequest,
     StartCatalogue,
@@ -276,7 +277,7 @@ export const START_LOCKED_REASON = 'Read-only: starting an Investigation needs I
                             [required]="true"
                             [multiline]="true"
                             formControlName="purpose"
-                            [maxlength]="1000"
+                            [maxlength]="purposeMax()"
                             [error]="purposeError()"
                         />
                         <p class="text-secondary m-0 text-xs">
@@ -435,6 +436,8 @@ export class LinkAnalysisStartBoxComponent {
     /** The Investigations level: *New Investigation…* is offered under the draw. */
     readonly investigations = input(false);
     readonly nodeCap = input(1000);
+    /** The longest purpose the Space accepts (`input.purpose_length`), as the Investigation settings use it. */
+    readonly purposeMax = computed(() => laLimit('input.purpose_length'));
     readonly notice = input<StartNotice | null>(null);
     readonly busy = input(false);
     /** The host has an Add data screen (`/add-data`): the card is offered. */
@@ -486,7 +489,7 @@ export class LinkAnalysisStartBoxComponent {
         }),
         purpose: new FormControl('', {
             nonNullable: true,
-            validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(1000)],
+            validators: [Validators.required, Validators.pattern(/\S/), (c) => Validators.maxLength(laLimit('input.purpose_length'))(c)],
         }),
         timeCol: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
         timeColZone: new FormControl('', { nonNullable: true }),
@@ -561,7 +564,7 @@ export class LinkAnalysisStartBoxComponent {
     readonly purposeError = computed(() => {
         this.tried();
         const c = this.form.controls.purpose;
-        if (c.hasError('maxlength')) return 'At most 1000 characters.';
+        if (c.hasError('maxlength')) return `At most ${this.purposeMax()} characters.`;
         return this.tried() && c.invalid ? 'A purpose is required.' : '';
     });
 
