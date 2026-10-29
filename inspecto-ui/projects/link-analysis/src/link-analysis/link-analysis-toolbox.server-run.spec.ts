@@ -177,7 +177,7 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
             ariaDisabled: l.querySelector('button')?.getAttribute('aria-disabled'),
         }));
 
-    it('the Browser tab lists no server-only tool; the Server tab shows ONE locked Run on the server line (§5.8)', async () => {
+    it('Explorer: Browser lists no server-only tool; Server keeps the Dataset reads usable, hides the Edge index and locks only the algorithms', async () => {
         const { fixture, c, el, run } = make({ features: EXPLORER, side: 'browser' });
         fixture.detectChanges();
         const ids = c.tools.map((t) => t.id);
@@ -190,7 +190,16 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
         fixture.componentRef.setInput('side', 'server');
         fixture.detectChanges();
         expect(el.querySelector('inspecto-link-analysis-server-algorithms')).toBeNull();
-        expect(locked(el)).toEqual([{ label: 'Run on the server', reason: REASON, ariaDisabled: 'true' }]);
+        // the three Dataset reads run without an Investigation, as before the split; the Edge index is not offered
+        const listed = c.sections().flatMap((s) => s.tools.map((t) => t.id));
+        expect(listed.sort()).toEqual(['pattern', 'server-paths', 'temporal', 'value-measures']);
+        expect(el.querySelector('[aria-controls="tool-index-build"]')).toBeNull();
+        expect(el.querySelector('[aria-controls="tool-server-paths"]')).not.toBeNull();
+        // the one locked line names the server algorithms and comes after the tools that do run
+        expect(locked(el)).toEqual([{ label: 'Run a server algorithm', reason: REASON, ariaDisabled: 'true' }]);
+        const lock = el.querySelector('[data-testid="catalogue-server-locked"]')!;
+        const paths = el.querySelector('[aria-controls="tool-server-paths"]')!;
+        expect(paths.compareDocumentPosition(lock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         (el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement).click();
         expect(run).not.toHaveBeenCalled();
         await expectNoA11yViolations(el);
@@ -198,16 +207,14 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
 
     it('above the cap the browser control becomes a LOCKED Run on server, still saying why the browser did not run it', async () => {
         capAll(3);
-        const { fixture, c, el, run } = make({ features: EXPLORER }); // the hand-off is a server control: the Server tab
+        // the Explorer level has no server algorithms tab to hand over to: the LOCKED hand-off stays with the tool
+        const { fixture, c, el, run } = make({ features: EXPLORER, side: 'browser' });
         c.tab.set('centrality');
         c.centralityMetric.set('betweenness');
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="run-on-server"]')).toBeNull();
         expect(el.textContent).toContain('This graph has 5 nodes - above the 3-node limit');
-        expect(locked(el)).toEqual([
-            { label: 'Run on the server', reason: REASON, ariaDisabled: 'true' }, // the catalogue's one line
-            { label: 'Run on server', reason: REASON, ariaDisabled: 'true' },
-        ]);
+        expect(locked(el)).toEqual([{ label: 'Run on server', reason: REASON, ariaDisabled: 'true' }]);
         (el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement).click();
         expect(run).not.toHaveBeenCalled();
         await expectNoA11yViolations(el);

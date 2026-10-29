@@ -201,6 +201,9 @@ export interface ServerRunSpec {
     hold: string;
 }
 
+/** The Server tab's tools on the Explorer level: Dataset reads that run without an Investigation (the pattern's Run on server walks the edge Dataset too). */
+const EXPLORER_SERVER_TOOLS: readonly string[] = ['server-paths', 'value-measures', 'temporal', 'pattern'];
+
 /** The over-cap hand-offs ({@link ServerRunSpec}) behind each catalogue group. */
 const HAND_OFF: Partial<Record<string, ServerTool[]>> = {
     path: ['path'],
@@ -497,9 +500,16 @@ export class LinkAnalysisToolboxComponent {
     readonly where = computed<CatalogueWhere>(() => this.side());
     readonly sections = computed(() => {
         const specs = this.serverSpecs();
-        return catalogueSections(this.allTools, this.serverAlgorithms(), this.where(), (id) =>
+        const all = catalogueSections(this.allTools, this.serverAlgorithms(), this.where(), (id) =>
             (HAND_OFF[id] ?? []).some((k) => !!specs[k]),
         );
+        if (this.where() === 'browser' || this.investigationsEnabled()) return all;
+        // The Explorer level's Server tab: the Dataset reads that need no Investigation (server paths, Value Measures,
+        // burst and periodicity, the pattern's Run on server) stay usable, as before the split; the Edge index and the
+        // graph algorithms are not here.
+        return all
+            .map((s) => ({ ...s, tools: s.tools.filter((t) => EXPLORER_SERVER_TOOLS.includes(t.id)) }))
+            .filter((s) => s.tools.length || s.server.length);
     });
     /** The open server-algorithm row (its own accordion, beside {@link tab}). */
     readonly serverTab = signal<string | null>(null);

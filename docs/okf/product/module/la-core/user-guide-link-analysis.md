@@ -490,9 +490,14 @@ recorded).
 Each row shows a badge (*both*, *server*) and its limit (*≤ 2500 nodes in the browser*). Over the browser limit, the
 Browser tab says so. That tool's **Run on server** is then in the Server tab, listed with the same settings.
 
-The tools keep their results when you switch tabs. On the Explorer level and on Basic, the Server tab shows one locked
-line saying what has it. Click a ranking row to select and centre that node. A long result has **Open in the dock**
-(the dock's **Results** tab).
+The tools keep their results when you switch tabs.
+
+On the Explorer level and on Basic, the Server tab still runs the Dataset reads that need no Investigation:
+*Find paths (server)*, *Value Measures*, *Burst and periodicity* and the pattern's **Run on server**. One locked line
+after them, *Run a server algorithm*, says what has the server algorithms.
+
+Click a ranking row to select and centre that node. A long result has **Open in the dock** (the dock's **Results**
+tab).
 
 | Group | Answers |
 |---|---|
@@ -603,6 +608,11 @@ prune deliberately. Every step is sealed with what it read, so it replays identi
 2026-10-29). Fill it in top to bottom:
 
 1. **Start from** (a popup, like the Entity Type): **One entity**, **A list**, **A paste** or **The whole Dataset**.
+   While a graph is drawn (a saved view, or a graph drawn with Explore dataset…), it also offers **The graph on
+   screen**:
+   * It starts an Investigation over that graph's one mapping, with no seed yet.
+   * Its default Name is the view's or the Dataset's (*Investigation — mule_layering_ring*).
+   * Its default Reason is *Review of the graph on screen*.
 2. The **Dataset**.
 3. The input for that choice, and only that one:
    * one entity: the Entity Type and the value, with the same matches as [§5.1](#51-start-from);

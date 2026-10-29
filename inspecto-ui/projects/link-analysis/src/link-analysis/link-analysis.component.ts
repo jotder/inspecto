@@ -1945,6 +1945,26 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      * File ▸ New (LA-PANELS-REDESIGN-1): close what is open, then - on the Investigations level - show the ONE New
      * Investigation form in the Investigation tab. The Explorer level lands on the start box.
      */
+    /**
+     * The start box's *New Investigation…* (Investigations level). Nothing is drawn on the landing, so there is nothing to
+     * close: the tab switches at once, as File ▸ New lands. A pending deep-link form or queued seeds would hide the New
+     * form, so they are dropped - the analyst asked for a new one.
+     */
+    openNewInvestigation(): void {
+        if (!this.investigationsEnabled()) return;
+        this.pendingInvestigation.set(null);
+        this.investigation.clearQueuedSeeds();
+        this.openInvestigation();
+    }
+
+    /** The graph on screen, for the New form's *The graph on screen* (a seedless Investigation over its mapping). */
+    readonly graphOnScreen = computed<{ name: string } | null>(() => {
+        const p = this.graph() ? this.investigationProjection() : null;
+        if (!p) return null;
+        const view = this.views().find((v) => v.id === this.openViewId());
+        return { name: view?.name ?? this.datasets().find((d) => d.id === p.datasetId)?.name ?? p.datasetId };
+    });
+
     async newWork(): Promise<void> {
         await this.closeOpenWork();
         if (this.openWorkLabel() || !this.investigationsEnabled()) return; // Close was declined, or there is no Investigation
@@ -1959,14 +1979,33 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     async createInvestigation(req: NewInvestigationRequest): Promise<void> {
         if (!this.investigationsEnabled() || this.starting() || this.investigation.chainRunning()) return;
-        const ds = this.startCatalogue().datasets.find((d) => d.id === req.start.datasetId);
+        if (req.start.kind === 'graph') {
+            // A seedless Investigation over the graph on screen (a saved view, a custom Explore dataset… mapping), as the
+            // old projection start did: the drawn graph's one mapping, the query's filter not carried over.
+            const p = this.investigationProjection();
+            if (!p) return;
+            this.startNotice.set(null);
+            this.investigateIssue.set('');
+            await this.investigation.start(
+                p,
+                req.purpose,
+                req.title,
+                req.timeCol || this.investigationTimeDefault(),
+                req.timeColZone,
+            );
+            return;
+        }
+        const start = req.start;
+        const ds = this.startCatalogue().datasets.find((d) => d.id === start.datasetId);
         if (!ds) return;
         this.forgetOpenView();
         this.startNotice.set(null);
         this.investigateIssue.set('');
-        if (req.start.kind === 'dataset') {
-            await this.startFrom(req.start);
+        if (start.kind === 'dataset') {
+            await this.startFrom(start);
+            if (!this.graph()) return; // the draw failed (its error is on screen): nothing is created
             this.investigation.close();
+            this.boundProfile.set(activeDomainProfileId());
             await this.investigation.start(
                 ds.mapping,
                 req.purpose,
@@ -1980,25 +2019,25 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             return;
         }
         let binding: PendingInvestigation;
-        if (req.start.kind === 'entity') {
-            const bound = await this.bindInvestigation({ seed: req.start.value, entityType: req.start.entityType, dataset: ds.id });
+        if (start.kind === 'entity') {
+            const bound = await this.bindInvestigation({ seed: start.value, entityType: start.entityType, dataset: ds.id });
             if ('reason' in bound) {
                 this.startNotice.set({ variant: 'warning', text: bound.reason });
                 return;
             }
             binding = bound.binding;
         } else {
-            const start = await this.startValues(req.start);
-            if (!start) return;
-            const found = await this.drawStart(ds, start.values, start.entityType);
+            const values = await this.startValues(start);
+            if (!values) return;
+            const found = await this.drawStart(ds, values.values, values.entityType);
             if (!found.length) return;
             const name =
-                req.start.kind === 'list'
-                    ? (this.entityLists().find((l) => l.id === (req.start as { listId: string }).listId)?.title ?? 'list')
+                start.kind === 'list'
+                    ? (this.entityLists().find((l) => l.id === start.listId)?.title ?? 'list')
                     : `${found.length} pasted values`;
-            const generic = genericBinding(name, start.entityType ?? '', ds, activeDomainProfileId());
+            const generic = genericBinding(name, values.entityType ?? '', ds, activeDomainProfileId());
             // the projection the draw used: the start's own type, else the Dataset's mapping as it is
-            binding = { ...generic, ...(start.entityType ? {} : { projection: ds.mapping }), seeds: found };
+            binding = { ...generic, ...(values.entityType ? {} : { projection: ds.mapping }), seeds: found };
             const laDs = (await this.datasetsLoaded).find((d) => d.id === ds.id);
             const windowEnd = laDs ? await this.latestEventTime(laDs, binding.timeCol) : null;
             if (windowEnd) binding = { ...binding, windowEnd };
@@ -2254,11 +2293,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.queryPanel?.startExplore(datasetId);
     }
 
-
     /** File ▸ Open… (§5.11): one dialog over saved views and Investigations; the list is re-read after, since it renames, copies and deletes. */
-    openOpenDialog(tab?: 'views' | 'investigations'): void {
+    openOpenDialog(): void {
         const data: LaOpenDialogData = {
-            tab,
             opsEnabled: !!this.opsEnabled(),
             shareable: (v) => this.shareable(v),
             history: (v) => this.openHistory(v),

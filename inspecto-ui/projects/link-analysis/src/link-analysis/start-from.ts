@@ -29,7 +29,8 @@ export type StartRequest =
  * read settings, and how many degrees to expand on start (0 = none - the standalone Expand… stays for later).
  */
 export interface NewInvestigationRequest {
-    start: Exclude<StartRequest, { kind: 'found' }>;
+    /** `graph` = a seedless Investigation over the graph on screen (its one mapping). */
+    start: Exclude<StartRequest, { kind: 'found' }> | { kind: 'graph' };
     title: string;
     purpose: string;
     /** '' = the Dataset's own time column. */
@@ -40,7 +41,9 @@ export interface NewInvestigationRequest {
 
 /** What the default Name and Reason are made from: the Start from choice and its current input. */
 export interface NewInvestigationInput {
-    kind: StartKind;
+    kind: StartKind | 'graph';
+    /** The graph on screen's name: its saved view, else its Dataset. */
+    graphName?: string;
     /** The Entity Type's label (one entity, a paste). */
     typeLabel: string;
     /** The one entity's value. */
@@ -61,6 +64,12 @@ export interface NewInvestigationInput {
  */
 export function newInvestigationDefaults(i: NewInvestigationInput): { name: string; reason: string } {
     switch (i.kind) {
+        case 'graph':
+            return {
+                // the same rule as a value: a name enters only where the Space is known not to mask
+                name: i.maskingMode === 'none' && i.graphName ? `Investigation — ${i.graphName}` : 'Investigation — graph on screen',
+                reason: 'Review of the graph on screen',
+            };
         case 'list': {
             const list = i.listTitle.trim() || 'an Entity List';
             return {

@@ -4578,6 +4578,87 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(form?.querySelector('[data-testid="start-kind"]')).not.toBeNull();
         expect(form?.textContent).toContain('New Investigation');
     });
+
+    it('the start box’s New Investigation… switches the dock to the Investigation tab at once, as File ▸ New does', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.toolboxDockOpen.set(true);
+        c.toolboxTab.set('browser');
+        c.investigation.queueSeeds([{ id: 'q', label: 'q', ids: ['q'] }]); // e.g. a deep link that could not bind
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        (el.querySelector('[data-testid="start-new-investigation"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(c.toolboxTab()).toBe('investigation');
+        expect(el.querySelector('#la-toolbox-tab-investigation')!.getAttribute('aria-selected')).toBe('true');
+        expect(c.investigation.queuedSeeds()).toEqual([]); // nothing hides the New form
+        expect(el.querySelector('[laNewInvestigation] [data-testid="start-kind"]')).not.toBeNull();
+    });
+
+    it('the New form’s whole Dataset draws it, then creates the Investigation over its mapping with the profile bound', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
+        await c.createInvestigation({
+            start: { kind: 'dataset', datasetId: 'transfers' },
+            title: 'Investigation — whole Transfers',
+            purpose: 'Review of the links in Transfers',
+            timeCol: '',
+            timeColZone: '',
+            degrees: 0,
+        });
+        expect(c.graph()).not.toBeNull();
+        expect(start).toHaveBeenCalledWith(
+            MAPPING,
+            'Review of the links in Transfers',
+            'Investigation — whole Transfers',
+            undefined,
+            '',
+            undefined,
+            MAPPING.entityType,
+            expect.any(String),
+        );
+        expect(c.boundProfile()).not.toBeNull();
+    });
+
+    it('the New form’s whole Dataset creates NOTHING when the draw fails', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS], fail: true });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
+        await c.createInvestigation({
+            start: { kind: 'dataset', datasetId: 'transfers' },
+            title: 'x',
+            purpose: 'y',
+            timeCol: '',
+            timeColZone: '',
+            degrees: 0,
+        });
+        expect(c.graph()).toBeNull();
+        expect(start).not.toHaveBeenCalled();
+    });
+
+    it('the New form’s "The graph on screen" starts a seedless Investigation over the drawn mapping', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        Object.defineProperty(c, 'investigationProjection', { value: () => MAPPING });
+        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
+        const chain = vi.spyOn(c.investigation, 'investigateNumber');
+        await c.createInvestigation({
+            start: { kind: 'graph' },
+            title: 'Investigation — Transfers',
+            purpose: 'Review of the graph on screen',
+            timeCol: 'booked_at',
+            timeColZone: 'UTC',
+            degrees: 0,
+        });
+        expect(start).toHaveBeenCalledWith(MAPPING, 'Review of the graph on screen', 'Investigation — Transfers', 'booked_at', 'UTC');
+        expect(chain).not.toHaveBeenCalled(); // no seed step
+    });
 });
 
 describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONBOARD-1 phase 7)', () => {

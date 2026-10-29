@@ -1180,6 +1180,8 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             fixture.componentRef.setInput('side', 'server');
             fixture.detectChanges();
             expect(el.querySelectorAll('[data-testid=catalogue-server-locked]')).toHaveLength(1);
+            expect(rows(el)).toEqual(expect.arrayContaining(['Find paths (server)', 'Value Measures', 'Burst and periodicity']));
+            expect(rows(el)).not.toContain('Edge index');
         });
     });
 });

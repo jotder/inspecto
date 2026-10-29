@@ -29,8 +29,11 @@ Status: **ACTIVE 2026-10-29**, one lane (`C:\sandbox\la-panels`). Item: `module.
      *Explain* and the pattern's *Run on server* show on Server only. On Browser, a line says when the graph is above
      the browser limit and points to the Server tab.
    - Discover (the three plain questions) runs on the drawn graph, so it sits in the Browser tab.
-   - The Explorer level has no server runs. The Server tab stays and shows the locked action with its reason, the same
-     rule the Investigation tab follows.
+   - On the Explorer level, the Server tab keeps the Dataset reads that need no Investigation, as they were before the
+     split: Find paths (server), Value Measures, Burst and periodicity, and the pattern's Run on server. Edge index is
+     hidden there, and one locked line, *Run a server algorithm*, comes after them.
+     - The over-cap hand-off stays locked inside its own tool in the Browser tab, because on this level there is no
+       server algorithm to hand over to.
 2. **Pen fields and popup pickers everywhere in the three tabs.**
    - Free-text and number settings use `inspecto-pen-field`.
    - Single choices use `inspecto-option-picker`.
@@ -40,6 +43,10 @@ Status: **ACTIVE 2026-10-29**, one lane (`C:\sandbox\la-panels`). Item: `module.
    - The form reuses the start box component (`inspecto-link-analysis-start-box`, `mode="investigation"`), so the
      type-ahead, masking reveal and whole-Dataset warning are not duplicated. It is laid out top to bottom:
      1. **Start from** (option picker): One entity / A list / A paste / The whole Dataset.
+        - While a graph is drawn, it also offers **The graph on screen** (review fix 2026-10-29). This starts a seedless
+          Investigation over the drawn graph's one mapping, as the old projection start form did.
+        - Its defaults are *Investigation — {view or Dataset name}* / *Review of the graph on screen*. Under masking
+          the name is left out (*Investigation — graph on screen*).
      2. **Dataset**.
      3. The inputs for that choice.
      4. **Name** and **Reason** (pen fields).

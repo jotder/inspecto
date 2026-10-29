@@ -19,9 +19,9 @@ export const CATALOGUE_QUESTIONS: readonly { id: CatalogueQuestionId; label: str
 
 /**
  * One toolbox group in the catalogue: its question, the server algorithms that answer the same question (a non-empty
- * list makes it `both`), and `where` it is listed — `browser` (a browser run, with its server twin under Server),
- * `server` (server-only: listed under Server alone), `any` (a Dataset read that is not a graph algorithm: listed under
- * both, since it does not run on the drawn graph).
+ * list makes it `both`), and `runsOn`, which decides the tab it is listed in ({@link listedOnSide}). `listed` no longer
+ * places it: it only says what kind of group it is - `browser` (a graph algorithm run in the browser, whose browser cap
+ * the row states), `server` (a server-only tool) or `any` (a Dataset read that is not a graph algorithm).
  */
 export interface CatalogueTool {
     question: CatalogueQuestionId;

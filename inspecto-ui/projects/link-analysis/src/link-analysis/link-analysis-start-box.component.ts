@@ -116,17 +116,19 @@ const DEGREE_CHOICES = [0, 1, 2, 3];
                     data-testid="start-kind"
                     label="Start from"
                     [outlined]="true"
-                    [options]="kinds"
+                    [options]="kindOptions()"
                     formControlName="kind"
                 ></inspecto-option-picker>
-                <inspecto-option-picker
-                    data-testid="start-dataset"
-                    label="Dataset"
-                    [outlined]="true"
-                    [options]="datasetOptions()"
-                    [help]="datasetHelp()"
-                    formControlName="dataset"
-                ></inspecto-option-picker>
+                @if (kind() !== 'graph') {
+                    <inspecto-option-picker
+                        data-testid="start-dataset"
+                        label="Dataset"
+                        [outlined]="true"
+                        [options]="datasetOptions()"
+                        [help]="datasetHelp()"
+                        formControlName="dataset"
+                    ></inspecto-option-picker>
+                }
 
                 @switch (kind()) {
                     @case ('entity') {
@@ -220,6 +222,12 @@ const DEGREE_CHOICES = [0, 1, 2, 3];
                             >
                         </mat-form-field>
                     }
+                    @case ('graph') {
+                        <p class="text-secondary m-0 text-sm" data-testid="start-graph-note">
+                            Starts over the graph on screen ({{ graphOnScreen()?.name }}) and its one mapping. The
+                            query's filter is not carried over: the Investigation reads the whole Dataset.
+                        </p>
+                    }
                     @case ('dataset') {
                         @if (wholeWarning(); as w) {
                             <inspecto-alert variant="warning" data-testid="start-whole-warning">{{ w }}</inspecto-alert>
@@ -276,7 +284,7 @@ const DEGREE_CHOICES = [0, 1, 2, 3];
                             />
                         </div>
                     </la-fold>
-                    @if (kind() !== 'dataset') {
+                    @if (kind() !== 'dataset' && kind() !== 'graph') {
                         <la-fold title="Expand on start" data-testid="new-expand">
                             <div class="flex flex-col gap-2 p-2">
                                 <inspecto-option-picker
@@ -414,12 +422,20 @@ export class LinkAnalysisStartBoxComponent {
     /** "A list" was chosen: the host re-reads the Space's Entity Lists, so a list made elsewhere since is offered. */
     readonly listsWanted = output<void>();
 
-    readonly kinds = KINDS;
+    /** The graph on screen (New form only): offered as a fifth Start from, a seedless Investigation over its mapping. */
+    readonly graphOnScreen = input<{ name: string } | null>(null);
+    /** Start from's choices: the four starts, plus *The graph on screen* in the New form while a graph is drawn. */
+    readonly kindOptions = computed<PickerOption[]>(() => {
+        const g = this.mode() === 'investigation' ? this.graphOnScreen() : null;
+        return g
+            ? [...KINDS, { value: 'graph', label: 'The graph on screen', hint: `${g.name}: its mapping, no seed yet` }]
+            : KINDS;
+    });
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
     readonly titleId = computed(() => (this.mode() === 'draw' ? 'la-start-title' : 'la-new-investigation-title'));
     readonly form = new FormGroup({
         dataset: new FormControl('', { nonNullable: true }),
-        kind: new FormControl<StartKind>('entity', { nonNullable: true }),
+        kind: new FormControl<StartKind | 'graph'>('entity', { nonNullable: true }),
         entityType: new FormControl('', { nonNullable: true }),
         value: new FormControl('', { nonNullable: true }),
         listId: new FormControl('', { nonNullable: true }),
@@ -435,7 +451,7 @@ export class LinkAnalysisStartBoxComponent {
         degrees: new FormControl('0', { nonNullable: true }),
     });
     private readonly datasetId = toSignal(this.form.controls.dataset.valueChanges, { initialValue: '' });
-    readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: 'entity' as StartKind });
+    readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: 'entity' as StartKind | 'graph' });
     private readonly entityType = toSignal(this.form.controls.entityType.valueChanges, { initialValue: '' });
     private readonly valueText = toSignal(this.form.controls.value.valueChanges, { initialValue: '' });
     private readonly listId = toSignal(this.form.controls.listId.valueChanges, { initialValue: '' });
@@ -491,6 +507,7 @@ export class LinkAnalysisStartBoxComponent {
             listTitle: this.lists().find((l) => l.id === this.listId())?.title ?? '',
             pasted: parsePastedValues(this.pasteText()).length,
             datasetName: this.datasetName(),
+            graphName: this.graphOnScreen()?.name,
             maskingMode: this.maskingMode(),
         }),
     );
@@ -508,6 +525,10 @@ export class LinkAnalysisStartBoxComponent {
     });
 
     constructor() {
+        // The graph left the screen: *The graph on screen* is no longer a choice.
+        effect(() => {
+            if (!this.graphOnScreen() && this.form.controls.kind.value === 'graph') this.form.controls.kind.setValue('entity');
+        });
         // The Name and Reason follow the input until the analyst edits them; an edit is kept from then on.
         effect(() => {
             const d = this.defaults();
@@ -633,6 +654,7 @@ export class LinkAnalysisStartBoxComponent {
     readonly whatHappens = computed(() => {
         const kind = this.kind();
         if (this.mode() === 'investigation') {
+            if (kind === 'graph') return 'Creates an Investigation over the graph on screen, with no seed yet.';
             if (kind === 'dataset')
                 return 'Draws every link of the Dataset and creates an Investigation over it, with no seed yet.';
             return 'Creates the Investigation, records the start as its seed step, then expands as set under Expand on start.';
@@ -648,11 +670,12 @@ export class LinkAnalysisStartBoxComponent {
     submit(): void {
         this.tried.set(true);
         const v = this.form.getRawValue();
-        if (!v.dataset) return;
-        const req = this.request(v);
+        const graph = this.mode() === 'investigation' && v.kind === 'graph';
+        if (!v.dataset && !graph) return;
+        const req = graph ? ({ kind: 'graph' } as const) : this.request(v);
         if (!req) return;
         if (this.mode() === 'draw') {
-            this.start.emit(req);
+            if (req.kind !== 'graph') this.start.emit(req);
             return;
         }
         const { name, reason } = this.form.controls;
@@ -666,7 +689,7 @@ export class LinkAnalysisStartBoxComponent {
             purpose: v.reason.trim(),
             timeCol: v.timeCol.trim(),
             timeColZone: v.timeColZone,
-            degrees: req.kind === 'dataset' ? 0 : Number(v.degrees) || 0,
+            degrees: req.kind === 'dataset' || req.kind === 'graph' ? 0 : Number(v.degrees) || 0,
         });
     }
 

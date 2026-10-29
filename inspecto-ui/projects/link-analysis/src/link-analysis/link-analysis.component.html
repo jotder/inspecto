@@ -1324,7 +1324,7 @@
                             [addData]="addDataOffered"
                             (start)="startFrom($event)"
                             (listsWanted)="refreshEntityLists()"
-                            (newInvestigation)="newWork()"
+                            (newInvestigation)="openNewInvestigation()"
                             (openAddData)="openAddData()"
                         ></inspecto-link-analysis-start-box>
                     </div>
@@ -1495,6 +1495,7 @@
                                         [maskingMode]="maskingMode()"
                                         [maxDegree]="maxDegree()"
                                         [canWrite]="canStartInvestigation()"
+                                        [graphOnScreen]="graphOnScreen()"
                                         (create)="createInvestigation($event)"
                                         (listsWanted)="refreshEntityLists()"
                                     ></inspecto-link-analysis-start-box>

@@ -19,10 +19,6 @@
         @if (overCapNote(); as why) {
             <p class="text-secondary m-0 text-xs" data-testid="catalogue-over-cap" role="status">{{ why }}</p>
         }
-    } @else if (!investigationsEnabled()) {
-        <div data-testid="catalogue-server-locked">
-            <inspecto-locked-action label="Run on the server" [reason]="lockedReason()" />
-        </div>
     }
     @for (q of sections(); track q.id) {
     <h3 class="text-secondary m-0 mt-1 text-xs font-semibold uppercase tracking-wide" [attr.data-question]="q.id">
@@ -139,7 +135,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (side() === 'server' && serverSpecs().path; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().path; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -190,7 +186,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (side() === 'server' && serverSpecs().allPaths; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().allPaths; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -444,7 +440,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (side() === 'server' && serverSpecs().centrality; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().centrality; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -512,7 +508,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (side() === 'server' && serverSpecs().communities; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().communities; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -573,7 +569,7 @@
                                     >Directed loops — circular flow, forwarding loops.</span
                                 >
                             </div>
-                            @if (side() === 'server' && serverSpecs().cycles; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().cycles; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -614,7 +610,7 @@
                                     >Nodes / links whose removal splits the graph.</span
                                 >
                             </div>
-                            @if (side() === 'server' && serverSpecs().cutNodes; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().cutNodes; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -626,7 +622,7 @@
                                     (completed)="applyServerResult($event)"
                                 />
                             }
-                            @if (side() === 'server' && serverSpecs().cutEdges; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().cutEdges; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -671,7 +667,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (side() === 'server' && serverSpecs().cliques; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().cliques; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -751,7 +747,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (side() === 'server' && serverSpecs().prediction; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().prediction; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -847,7 +843,7 @@
                                     </button>
                                 }
                             </div>
-                            @if (side() === 'server' && serverSpecs().flow; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().flow; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -859,7 +855,7 @@
                                     (completed)="applyServerResult($event)"
                                 />
                             }
-                            @if (side() === 'server' && serverSpecs().forest; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().forest; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -896,7 +892,7 @@
                                     >Composite risk from degree, betweenness, PageRank, k-core, triangles.</span
                                 >
                             </div>
-                            @if (side() === 'server' && serverSpecs().scoring; as srv) {
+                            @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().scoring; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"
@@ -1277,5 +1273,11 @@
             }
         </section>
     }
+    }
+    @if (side() === 'server' && !investigationsEnabled()) {
+        <!-- the Explorer level: only the server ALGORITHMS are locked; the Dataset reads above run -->
+        <div data-testid="catalogue-server-locked">
+            <inspecto-locked-action label="Run a server algorithm" [reason]="lockedReason()" />
+        </div>
     }
 </div>

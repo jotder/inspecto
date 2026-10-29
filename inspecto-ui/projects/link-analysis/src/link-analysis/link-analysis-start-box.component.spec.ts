@@ -81,6 +81,7 @@ const answer = (over: Partial<EntitySuggestions> = {}): EntitySuggestions => ({
         [mode]="mode()"
         [maskingMode]="masking()"
         [maxDegree]="2"
+        [graphOnScreen]="graphOnScreen()"
         (start)="starts.push($event)"
         (create)="creates.push($event)"
         (newInvestigation)="newClicks = newClicks + 1"
@@ -96,6 +97,7 @@ class Host {
     readonly addData = signal(true);
     readonly mode = signal<'draw' | 'investigation'>('draw');
     readonly masking = signal<string | null>('none');
+    readonly graphOnScreen = signal<{ name: string } | null>(null);
     readonly starts: StartRequest[] = [];
     readonly creates: NewInvestigationRequest[] = [];
     addDataClicks = 0;
@@ -445,6 +447,50 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         ]);
         // Expand on start offers no more than the profile's last degree
         expect(box.degreeOptions().map((o) => o.value)).toEqual(['0', '1', '2']);
+    });
+
+    it('with a graph drawn, Start from offers "The graph on screen": a seedless start over its mapping', () => {
+        const { fixture, box, el } = createNew();
+        expect(box.kindOptions().map((o) => o.value)).toEqual(['entity', 'list', 'paste', 'dataset']);
+        fixture.componentInstance.graphOnScreen.set({ name: 'mule_layering_ring' });
+        fixture.detectChanges();
+        expect(box.kindOptions().map((o) => o.label)).toContain('The graph on screen');
+        kind(fixture, 'graph');
+        expect(q(el, 'start-dataset')).toBeNull(); // the drawn graph names its own Dataset
+        expect(q(el, 'new-expand')).toBeNull(); // no seed to expand from
+        expect(q(el, 'start-graph-note')?.textContent).toContain('mule_layering_ring');
+        expect(name(el)).toBe('Investigation — mule_layering_ring');
+        expect(reason(el)).toBe('Review of the graph on screen');
+        submit(fixture);
+        expect(fixture.componentInstance.creates).toEqual([
+            {
+                start: { kind: 'graph' },
+                title: 'Investigation — mule_layering_ring',
+                purpose: 'Review of the graph on screen',
+                timeCol: '',
+                timeColZone: '',
+                degrees: 0,
+            },
+        ]);
+        // the graph leaves the screen: the choice goes with it
+        fixture.componentInstance.graphOnScreen.set(null);
+        fixture.detectChanges();
+        expect(box.form.controls.kind.value).toBe('entity');
+    });
+
+    it('the graph on screen is not named in a masked Space', () => {
+        const { fixture, el } = createNew('masked');
+        fixture.componentInstance.graphOnScreen.set({ name: 'mule_layering_ring' });
+        fixture.detectChanges();
+        kind(fixture, 'graph');
+        expect(name(el)).toBe('Investigation — graph on screen');
+    });
+
+    it('the draw box never offers the graph on screen', () => {
+        const { fixture, box } = create();
+        fixture.componentInstance.graphOnScreen.set({ name: 'x' });
+        fixture.detectChanges();
+        expect(box.kindOptions().map((o) => o.value)).not.toContain('graph');
     });
 
     it('a cleared Reason refuses the start and says why on the field', () => {
