@@ -509,8 +509,18 @@ export class LinkAnalysisToolboxComponent {
             icon: 'heroicons_outline:squares-2x2',
             hint: 'Parts of the graph not linked to each other',
         },
-        { id: 'cycles', label: 'Cycles', icon: 'heroicons_outline:arrow-path' },
-        { id: 'cut-points', label: 'Cut points', icon: 'heroicons_outline:scissors' },
+        {
+            id: 'cycles',
+            label: 'Cycles',
+            icon: 'heroicons_outline:arrow-path',
+            hint: 'Loops that return to their start',
+        },
+        {
+            id: 'cut-points',
+            label: 'Cut points',
+            icon: 'heroicons_outline:scissors',
+            hint: 'Weak points that split the graph',
+        },
         {
             id: 'cohesion',
             label: 'Cohesive groups',
@@ -529,7 +539,12 @@ export class LinkAnalysisToolboxComponent {
             icon: 'heroicons_outline:beaker',
             hint: 'Maximum flow between two nodes, and the strongest links',
         },
-        { id: 'scoring', label: 'Suspicion score', icon: 'heroicons_outline:shield-exclamation' },
+        {
+            id: 'scoring',
+            label: 'Suspicion score',
+            icon: 'heroicons_outline:shield-exclamation',
+            hint: 'Nodes whose links look most unusual',
+        },
         {
             id: 'value-measures',
             label: 'Value Measures',

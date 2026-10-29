@@ -181,6 +181,22 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('X6: Highlight all with nothing on the canvas says why, and a click highlights nothing', async () => {
+        const { fixture, host, el } = setup();
+        // c → b is not drawn on GRAPH, so no finding is on the canvas
+        host.state.set(temporalResultToState({ ...RESULT, results: [RESULT.results[1]] }, GRAPH));
+        fixture.detectChanges();
+        const all = el.querySelector<HTMLButtonElement>('[data-test=temporal-all]')!;
+        expect(all.getAttribute('aria-disabled')).toBe('true');
+        expect(all.getAttribute('aria-describedby')).toContain('la-temporal-all-why');
+        expect(el.querySelector('[data-test=temporal-all-why]')!.textContent!.trim()).toBe(
+            'None of these findings are on the canvas.',
+        );
+        all.click(); // disabledInteractive lets the click through: the template guard must stop it
+        expect(host.focused).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
+    });
+
     it('says so when nothing matched, and surfaces an error', async () => {
         const { fixture, host, el } = setup();
         host.state.set(temporalResultToState({ ...RESULT, results: [], truncated: false }, GRAPH));

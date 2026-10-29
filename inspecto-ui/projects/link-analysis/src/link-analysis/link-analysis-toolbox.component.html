@@ -138,16 +138,16 @@
                                         mat-stroked-button
                                         (click)="!pathWhyNot() && runPath()"
                                         [disabled]="!!pathWhyNot()"
-                                    [disabledInteractive]="true"
-                                    [matTooltip]="pathWhyNot()"
-                                    [attr.aria-describedby]="pathWhyNot() ? 'why-path' : null"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="pathWhyNot()"
+                                        [attr.aria-describedby]="pathWhyNot() ? 'why-path' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
                                         Find shortest path
                                     </button>
-                                @if (pathWhyNot(); as why) {
-                                    <p class="text-secondary m-0 w-full text-xs" id="why-path" data-testid="why-path">{{ why }}</p>
-                                }
+                                    @if (pathWhyNot(); as why) {
+                                        <p class="text-secondary m-0 w-full text-xs" id="why-path" data-testid="why-path">{{ why }}</p>
+                                    }
                                 }
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().path; as srv) {
@@ -195,16 +195,16 @@
                                         mat-stroked-button
                                         (click)="!pathWhyNot() && runAllPaths()"
                                         [disabled]="!!pathWhyNot()"
-                                    [disabledInteractive]="true"
-                                    [matTooltip]="pathWhyNot()"
-                                    [attr.aria-describedby]="pathWhyNot() ? 'why-all-paths' : null"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="pathWhyNot()"
+                                        [attr.aria-describedby]="pathWhyNot() ? 'why-all-paths' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
                                         Find all paths
                                     </button>
-                                @if (pathWhyNot(); as why) {
-                                    <p class="text-secondary m-0 w-full text-xs" id="why-all-paths" data-testid="why-all-paths">{{ why }}</p>
-                                }
+                                    @if (pathWhyNot(); as why) {
+                                        <p class="text-secondary m-0 w-full text-xs" id="why-all-paths" data-testid="why-all-paths">{{ why }}</p>
+                                    }
                                 }
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().allPaths; as srv) {
@@ -281,19 +281,19 @@
                                         mat-stroked-button
                                         (click)="!serverPathsWhyNot() && runServerPaths()"
                                         [disabled]="!!serverPathsWhyNot()"
-                                    [disabledInteractive]="true"
-                                    [matTooltip]="serverPathsWhyNot()"
-                                    [attr.aria-describedby]="serverPathsWhyNot() ? 'why-server-paths' : null"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="serverPathsWhyNot()"
+                                        [attr.aria-describedby]="serverPathsWhyNot() ? 'why-server-paths' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
                                         Find paths
                                     </button>
-                                @if (serverPathsWhyNot(); as why) {
-                                    <p class="text-secondary m-0 w-full text-xs" id="why-server-paths" data-testid="why-server-paths">{{ why }}</p>
-                                }
+                                    @if (serverPathsWhyNot(); as why) {
+                                        <p class="text-secondary m-0 w-full text-xs" id="why-server-paths" data-testid="why-server-paths">{{ why }}</p>
+                                    }
                                 </div>
                                 @if (serverPaths(); as sp) {
-                                    <p class="m-0 text-sm tabular-nums" role="status" aria-label="Server path search">
+                                    <p class="m-0 text-sm tabular-nums" role="status" aria-label="Whole Dataset path search">
                                         @if (sp.paths.length) {
                                             {{ sp.paths.length }} {{ sp.paths.length === 1 ? 'path' : 'paths' }}, longest
                                             {{ sp.deepest }} hops (searched up to {{ sp.depthLimit }})
@@ -317,7 +317,7 @@
                                         </inspecto-alert>
                                     }
                                     @if (sp.paths.length) {
-                                        <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Server paths">
+                                        <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Paths from the whole Dataset">
                                             @for (p of sp.paths; track $index) {
                                                 <li>
                                                     <button
@@ -356,16 +356,16 @@
                                         mat-stroked-button
                                         (click)="!explainWhyNot() && runExplain()"
                                         [disabled]="!!explainWhyNot()"
-                                    [disabledInteractive]="true"
-                                    [matTooltip]="explainWhyNot()"
-                                    [attr.aria-describedby]="explainWhyNot() ? 'why-explain' : null"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="explainWhyNot()"
+                                        [attr.aria-describedby]="explainWhyNot() ? 'why-explain' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:light-bulb"></mat-icon>
                                         Explain node
                                     </button>
-                                @if (explainWhyNot(); as why) {
-                                    <p class="text-secondary m-0 w-full text-xs" id="why-explain" data-testid="why-explain">{{ why }}</p>
-                                }
+                                    @if (explainWhyNot(); as why) {
+                                        <p class="text-secondary m-0 w-full text-xs" id="why-explain" data-testid="why-explain">{{ why }}</p>
+                                    }
                                 }
                             </div>
                             @if (side() === 'browser' && explainText()) {
@@ -884,9 +884,9 @@
                                         mat-stroked-button
                                         (click)="!flowWhyNot() && runFlow()"
                                         [disabled]="!!flowWhyNot()"
-                                    [disabledInteractive]="true"
-                                    [matTooltip]="flowWhyNot()"
-                                    [attr.aria-describedby]="flowWhyNot() ? 'why-flow' : null"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="flowWhyNot()"
+                                        [attr.aria-describedby]="flowWhyNot() ? 'why-flow' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                                         Find maximum flow

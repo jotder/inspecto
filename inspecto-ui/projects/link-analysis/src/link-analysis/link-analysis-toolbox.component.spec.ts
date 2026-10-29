@@ -602,7 +602,7 @@ describe('LinkAnalysisToolboxComponent', () => {
         );
         expect(el.textContent).toContain('Search stopped early');
         expect(c.toolBadge('server-paths')).toBe('1 path, cut short');
-        const item = el.querySelector<HTMLButtonElement>('[aria-label="Server paths"] button')!;
+        const item = el.querySelector<HTMLButtonElement>('[aria-label="Paths from the whole Dataset"] button')!;
         expect(item.textContent).toContain('A → B → C');
         item.click();
         expect(last()).toEqual(path);
