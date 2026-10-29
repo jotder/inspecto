@@ -678,9 +678,9 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
     - malformed New-form defaults.
   - **Before fixing:** 8 vocabulary choices are operator calls.
   - **Plan:** [`superpower/la-ui-text-pass.md`](superpower/la-ui-text-pass.md).
-- **P2** · `LA-PRODUCT-NEXT-1` — **Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "What can this role do?", Investigation access review, time-cutoff playback, and a pattern from the selection** [items: module.la-core, module.access · kind: feature]
+- **P2** · `LA-PRODUCT-NEXT-1` — **Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "What can this role do?", Investigation access review, a timeline scrubber, pattern-by-example (from a selection, saved as a pack, then as standing detection), and an entity-resolution suggestions spike** [items: module.la-core, module.access · kind: feature]
   - **Phase 1 is a security gap** (verified 2026-10-29): `PUT /access/roles` and `PUT /access/policies` write straight to disk, while Access Catalog and Profile edits go through `PendingChanges.hold`. So an Approval Policy cannot hold the write that grants capabilities.
-  - **Decisions** NX-D1…NX-D4 were made by the assistant under operator delegation and are pending confirmation. The deferred ideas and their reasons are in the plan's §4.
+  - **Decisions** NX-D1…NX-D7 were made by the assistant under operator delegation and are pending confirmation. The operator endorsed the pattern-by-example, scrubber and entity-resolution picks. The deferred ideas and their reasons are in the plan's §4, and the Reach review is in §5.
   - **Plan:** [`superpower/la-product-next-plan.md`](superpower/la-product-next-plan.md).
 - **P3** · `LA-INVESTIGATION-EDIT-HARDENING-1` — **harden the Investigation rename route (`PATCH /inv/investigations/{id}`, shipped 2026-10-29)** [items: module.la-core · kind: defect]
   - **Found** by its independent review, none of it blocking.
