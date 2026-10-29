@@ -13,6 +13,12 @@ export interface AiExplainData {
     screen: string;
     /** The canonical terms this screen is built on, in the order the operator should meet them. */
     terms: string[];
+    /**
+     * The pane's own definition per term, used when the glossary lookup has none for it (UI test 2026-10-29: the
+     * Link Analysis About showed unrelated docs lines for four of its terms). A term with a definition here never
+     * falls back to the docs search.
+     */
+    definitions?: Readonly<Record<string, string>>;
 }
 
 /** One docs/ line the fallback search matched, kept with its citation so the operator can go read it. */
@@ -41,6 +47,19 @@ interface DocsSearchResult {
 }
 
 const CITATION_LIMIT = 3;
+
+/**
+ * The docs the fallback may cite: user-facing guides and the glossary only. ⛔ Never a deployment, operations or
+ * internal README — `docs_search` walks the whole docs folder the backend was started with, and a deployment's own
+ * README (identity-provider and gateway set-up) answered "Link" with lines about Keycloak and WSO2 (UI test
+ * 2026-10-29). The path is matched with either separator (a Windows backend answers back-slashed paths).
+ */
+const USER_FACING_DOC = /(^|\/)(GLOSSARY|USER_GUIDE|ADVANCED_GUIDE)\.md$|(^|\/)(user-guide|admin-guide)[^/]*\.md$/i;
+
+/** True when a docs hit is from a user-facing doc and may be shown to the operator. */
+export function isUserFacingDoc(file: string): boolean {
+    return USER_FACING_DOC.test(file.replace(/\\/g, '/'));
+}
 
 /**
  * "What am I looking at" — the read-only half of the inline AI surface (AGT-6a A4).
@@ -136,11 +155,14 @@ export class AiExplainDialog {
     }
 
     private explain(term: string): Observable<ExplainEntry> {
+        const own = this.data.definitions?.[term];
         return this.agent.runTool<GlossaryResult>('glossary_lookup', { term }).pipe(
             map((result) => ({ term, definition: result.definition })),
             // 422 = no canonical definition for this term. That is an answerable question, not a
             // failure, so fall back to the docs corpus rather than showing the operator nothing.
-            catchError((err: unknown) => this.searchDocs(term, err)),
+            catchError((err: unknown) =>
+                own && !this.isUnavailable(err) ? of({ term, definition: own }) : this.searchDocs(term, err),
+            ),
         );
     }
 
@@ -149,7 +171,7 @@ export class AiExplainDialog {
         return this.agent.runTool<DocsSearchResult>('docs_search', { query: term }).pipe(
             map((result) => ({
                 term,
-                citations: (result.hits ?? []).slice(0, CITATION_LIMIT),
+                citations: (result.hits ?? []).filter((h) => isUserFacingDoc(h.file)).slice(0, CITATION_LIMIT),
             })),
             catchError((err: unknown) => {
                 this.isUnavailable(err);

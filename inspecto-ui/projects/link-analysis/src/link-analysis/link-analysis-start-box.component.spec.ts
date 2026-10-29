@@ -82,6 +82,7 @@ const answer = (over: Partial<EntitySuggestions> = {}): EntitySuggestions => ({
         [maskingMode]="masking()"
         [maxDegree]="2"
         [graphOnScreen]="graphOnScreen()"
+        [canWrite]="canWrite()"
         (start)="starts.push($event)"
         (create)="creates.push($event)"
         (newInvestigation)="newClicks = newClicks + 1"
@@ -98,6 +99,7 @@ class Host {
     readonly mode = signal<'draw' | 'investigation'>('draw');
     readonly masking = signal<string | null>('none');
     readonly graphOnScreen = signal<{ name: string } | null>(null);
+    readonly canWrite = signal(true);
     readonly starts: StartRequest[] = [];
     readonly creates: NewInvestigationRequest[] = [];
     addDataClicks = 0;
@@ -500,6 +502,48 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         submit(fixture);
         expect(fixture.componentInstance.creates).toEqual([]);
         expect(penError(q(el, 'new-reason')!)).toBe('A reason is required to start an Investigation.');
+    });
+
+    it('without the capability the lock note leads, every input is disabled and the button says why (UI test 2026-10-29)', async () => {
+        const { fixture, box, el } = createNew();
+        fixture.componentInstance.canWrite.set(false);
+        fixture.detectChanges();
+        const note = q(el, 'new-locked');
+        expect(note?.textContent).toContain("Your role can't start Investigations (needs Incident management).");
+        // the note comes before the form, not under the button
+        expect(note!.compareDocumentPosition(q(el, 'start-box')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(box.form.disabled).toBe(true);
+        const button = q(el, 'start-submit') as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        expect(button.getAttribute('aria-label')).toContain('needs Incident management');
+        submit(fixture);
+        expect(fixture.componentInstance.creates).toEqual([]);
+        await expectNoA11yViolations(el);
+
+        fixture.componentInstance.canWrite.set(true);
+        fixture.detectChanges();
+        expect(q(el, 'new-locked')).toBeNull();
+        expect(box.form.enabled).toBe(true);
+    });
+
+    it('resetNew starts fresh: the start inputs clear, Name and Reason re-default and follow the input again', async () => {
+        const { fixture, box, el } = createNew();
+        penEdit(fixture, q(el, 'new-name')!, 'Operation Larch');
+        penEdit(fixture, penByLabel(el, 'Reason')!, 'Warrant 7');
+        kind(fixture, 'paste');
+        box.form.controls.paste.setValue('a\nb');
+        box.resetNew();
+        fixture.detectChanges();
+        expect(box.form.controls.kind.value).toBe('entity');
+        expect(box.form.controls.paste.value).toBe('');
+        expect(name(el)).toBe('Investigation — Account');
+        expect(box.form.controls.name.pristine).toBe(true);
+        expect(box.tried()).toBe(false);
+        // the "edited" flags are reset, so the defaults follow the input again
+        box.form.controls.value.setValue('MULE-HUB-01');
+        await settle();
+        fixture.detectChanges();
+        expect(name(el)).toBe('Investigation — Account MULE-HUB-01');
     });
 });
 

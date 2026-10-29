@@ -184,7 +184,8 @@ export interface LaAiDraft {
  * The host's AI components, rendered with `<la-host-slot>`.
  * - `assist` — inputs `tool`, `args`, `current`, `label`, `disabled`, `disabledReason`; output `applyDraft`
  *   ({@link LaAiDraft}).
- * - `explain` — inputs `screen`, `terms`.
+ * - `explain` — inputs `screen`, `terms`, `label`, `definitions` (the Studio's own definition per term, used when the
+ *   glossary has none).
  */
 export interface LaAiAssist {
     readonly assist: Type<unknown>;

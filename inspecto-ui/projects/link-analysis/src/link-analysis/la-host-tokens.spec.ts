@@ -77,6 +77,7 @@ class FakeAiComponent {
     readonly screen = input('');
     readonly terms = input<string[]>([]);
     readonly label = input('');
+    readonly definitions = input<Readonly<Record<string, string>>>();
 }
 
 @Component({ selector: 'fake-assist', standalone: true, changeDetection: ChangeDetectionStrategy.Eager, template: '' })
@@ -213,6 +214,8 @@ describe('Link Analysis host-service tokens', () => {
         expect(explain.map((e) => e.screen())).toContain('Link Analysis');
         // one About button, at the right end of the header beside ⚙ Settings (operator 2026-10-29)
         expect(explain.map((e) => e.label())).toEqual(['About']);
+        // every term the About lists arrives with its own definition (UI test 2026-10-29)
+        for (const e of explain) for (const t of e.terms()) expect(e.definitions()?.[t], t).toBeTruthy();
         // Tags go through the token, not a host dialog
         fixture.componentInstance.openTags({ id: 'v1', name: 'View one' } as never);
         expect(fakeTags.open).toHaveBeenCalledWith({

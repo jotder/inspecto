@@ -202,7 +202,10 @@ These changes need the right to edit Datasets when you sign in; without it they 
 Act on the canvas, read in the dock, configure in **⚙ Settings**.
 
 * **One header row.** The title **Link Analysis**, then the **tool rail** and the **canvas toolbar** side by side,
-  then **Full screen**, **About** (what this page is and its terms) and **⚙ Settings**. Every control is an icon: hover
+  then **Full screen**, **About** (what this page is and its terms) and **⚙ Settings**. **About** defines each term it
+  lists (Entity, Link, Dataset, Entity Projection, Saved view, Investigation, Working Set): from the glossary, else in
+  the Studio's own words; it never quotes deployment or internal notes. When the browser refuses **Full screen** (an
+  embedded page that is not allowed to go full screen, for one) a message says so. Every control is an icon: hover
   it for its name. Counts (Held, Hidden, collapsed, Attach) are a small number on the icon. When the header is too
   narrow, the canvas toolbar's groups after Canvas mode fold into **More canvas tools** (`⋯`), and a long selection
   row drops under the rail rather than being clipped.
@@ -280,7 +283,8 @@ lists any value not in the Dataset. A list or a paste draws at most 25 values in
 
 With Investigations (Standard and above, with the add-on), the box also offers **New Investigation…**. It opens the
 New Investigation form ([§11.1](#111-start-one)), which asks the same Start from question and starts the Investigation
-in one press. **Investigate** on an Entity's page, and **Investigate … in Link Analysis** on an Incident or Case page,
+in one press. While that form shows in the Investigation tab, the centre shows only a pointer to it, so two forms never
+do one job. **Investigate** on an Entity's page, and **Investigate … in Link Analysis** on an Incident or Case page,
 open a short *Investigate {number}* form in the Investigation tab that asks only for the purpose.
 
 **Open…**, **Explore dataset…** and **Examples ▸ Follow the money** are in the **File** menu
@@ -573,11 +577,11 @@ Server side repeats the search across the whole Dataset.
 | **Open…** | One dialog, two tabs. **Saved views**: search, filter by Tag, Dataset and last change; **Open**, **Rename**, **Duplicate**, **Delete** (asks first), **Version history**, **Comments**, **Tags**, **Offer for sharing**. **Investigations**: the ones you may read plus **Recent**; filter by owner, Dataset, date and status (Recent, Mine, Shared through a Case); type an id to open one directly. |
 | **Explore dataset…** | Opens ⚙ Settings ▸ Graph model with its guided Dataset picker: choose a Dataset and its from and to columns yourself ([§5.2](#52-graph-model-draw-a-dataset-yourself)) |
 | **Examples ▸ Follow the money** | Opens the Space's ready-made money-mule view and draws it now. Greyed out when the Space has none |
-| **Save view** | Saves over the open view (with none open it asks a name) |
+| **Save view** | Saves over the open view (with none open it asks a name). Saving, renaming, duplicating and deleting views needs the *Workbench author* permission (`canAuthorWorkbench`); without it these items are greyed out and the menu says why. A view shared with others may be deleted only by its owner |
 | **Save view as…** | A **Name** and optional description; names the lists the graph uses (the list it started from, the exclusion lists you added to) and says once that a saved view re-reads live data and is not evidence |
 | **Save this analysis (Snapshot)** | Freezes what is on screen (the Working Set while an Investigation is open) with a SHA-256 fingerprint; can attach it to a Case or **create a new Case from graph nodes** |
 | **Import / export views** | Moves views between Spaces as a file |
-| **Close** | Back to the start |
+| **Close** | Back to the start; the page keeps its full height |
 | **Delete** | Deletes the open view or Investigation; names it and asks first |
 
 Without Investigations (Basic, or no Investigations add-on) the menu shows **Start an Investigation from this**
@@ -605,7 +609,9 @@ prune deliberately. Every step is sealed with what it read, so it replays identi
 ### 11.1 Start one
 
 **File ▸ New**, or the Investigation tab with nothing open, shows the **New Investigation** form (LA-PANELS-REDESIGN-1,
-2026-10-29). Fill it in top to bottom:
+2026-10-29). Each **New** starts it fresh: the inputs are cleared and the Name and Reason are the defaults again. Without
+*Incident management* the form opens with a *Read-only* note at its top (*Your role can't start Investigations (needs
+Incident management)*), its fields are disabled and **Start Investigation** says why. Fill it in top to bottom:
 
 1. **Start from** (a popup, like the Entity Type): **One entity**, **A list**, **A paste** or **The whole Dataset**.
    While a graph is drawn (a saved view, or a graph drawn with Explore dataset…), it also offers **The graph on
@@ -634,7 +640,9 @@ prune deliberately. Every step is sealed with what it read, so it replays identi
 **Start Investigation** does it all in one press. It creates the Investigation and records the start as its seed step,
 then expands the degrees you asked for, each a recorded step with busy entities held. A list or a paste is drawn first,
 and only the values found in the Dataset are seeded. The whole Dataset is drawn, and the Investigation is created over
-it with no seed yet. **Expand…** on the canvas goes further later.
+it with no seed yet: the canvas keeps the drawn graph (*Show the query graph* is ticked) so you pick seeds from it, and
+**Expand…** stays locked with **Expand next degree** until something is seeded. If the canvas shows an empty Working
+Set, it says so with a one-click **Show the query graph**. **Expand…** on the canvas goes further later.
 
 From a ranking, **Start an Investigation from the top results** queues the entities. The Investigation tab then shows
 *Start Investigation with N queued seeds*: give a **Purpose / legal basis** and the queued entities become the first
@@ -806,10 +814,12 @@ If a control is greyed out, hover it: it names what is missing.
 | Mint an embed link | `canShareInvestigation` and lead of the Investigation |
 | Change Link Analysis settings, set what a column holds, add an Entity Type | `canAuthorWorkbench` |
 
-**Read-only roles.** Without *Incident management* the Investigation tab says *Changing an Investigation needs the
-Incident management capability - you can read it*: you can open, read, replay, re-read and build, download and verify
+**Read-only roles.** Without *Incident management* the Investigation tab says *Your role can't change Investigations
+(needs Incident management) - you can read this one*: you can open, read, replay, re-read and build, download and verify
 the Dossier; every write control is disabled with that sentence. Without `canAuthorWorkbench`, Settings → Link Analysis
-shows its values with no Save. A refusal shows the server's reason. *Not found* on an Investigation can mean it does
+shows its values with no Save, and File ▸ Save view, Save view as… and Delete view are greyed out with the reason. A
+refusal shows the server's reason; a missing permission is named in words (*Your role does not have the Workbench
+author permission*). *Not found* on an Investigation can mean it does
 not exist, is not yours, or its Dataset is no longer shared with you — the same answer on purpose. In the
 `la-showcase` demo, *Demo RA Analyst* and *Demo Manager* are read-only; *Demo FM Analyst* holds manage-incidents,
 graph-run, index-build and Alert Rule authoring; *Demo FM Manager* is the second approver; *Demo Admin* also holds

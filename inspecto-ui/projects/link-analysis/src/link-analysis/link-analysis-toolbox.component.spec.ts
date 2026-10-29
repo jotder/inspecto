@@ -70,6 +70,17 @@ function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = [], inv
 }
 
 describe('LinkAnalysisToolboxComponent', () => {
+    it('a tool header wraps its chips instead of pushing the tab sideways (UI test 2026-10-29: 408 px in a 331 px tab)', () => {
+        const { fixture } = make();
+        fixture.detectChanges();
+        const headers = Array.from(
+            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('section > button[aria-controls]'),
+        );
+        expect(headers.length).toBeGreaterThan(0);
+        // the label, the runs-on chip, the node cap, a badge and "suggested" sit in one row that must be allowed to wrap
+        for (const h of headers) expect(h.classList.contains('flex-wrap'), h.textContent ?? '').toBe(true);
+    });
+
     it('scrolls the Analysis alert into view when a tool refuses, so a button far down the panel is never silent', async () => {
         const { c, fixture } = make();
         fixture.detectChanges();
@@ -1011,9 +1022,9 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         const { fixture, c } = telecom('link_kind');
         fixture.componentRef.setInput('profileId', 'telecom');
         fixture.detectChanges();
-        expect(c.browserPatternColumns().blocked).toBe('This pattern needs a time column — set Time to first_seen.');
+        expect(c.browserPatternColumns().blocked).toBe('This pattern needs a time column — pick first_seen as the Time column under the Filter edges by time (clock) button in the toolbar.');
         c.runPattern();
-        expect(c.analysisError()).toBe('This pattern needs a time column — set Time to first_seen.');
+        expect(c.analysisError()).toBe('This pattern needs a time column — pick first_seen as the Time column under the Filter edges by time (clock) button in the toolbar.');
     });
 
     it('LA-DEMO-POLISH-1 (1): a hand-built ordered motif uses the Investigation bound time column when the links carry it', () => {

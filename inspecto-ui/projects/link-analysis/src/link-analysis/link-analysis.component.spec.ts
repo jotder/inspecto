@@ -41,6 +41,7 @@ import { provideLaHostServices } from 'app/modules/admin/studio/la-host.provider
 import { configureLaLimits, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { LinkAnalysisCleanupComponent } from './link-analysis-cleanup.component';
 import { SessionService } from 'app/inspecto/auth/session.service';
+import { LinkAnalysisStartBoxComponent } from './link-analysis-start-box.component';
 
 /** LA-EDITIONS-1: these specs drive the Investigation surface, which the host reports present on Standard and above. */
 const STANDARD_EDITION_FEATURES = {
@@ -4658,6 +4659,25 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         expect(start).toHaveBeenCalledWith(MAPPING, 'Review of the graph on screen', 'Investigation — Transfers', 'booked_at', 'UTC');
         expect(chain).not.toHaveBeenCalled(); // no seed step
+        expect(c.investigation.showWorkingSet()).toBe(false); // seedless: the drawn graph stays, seeds are picked there
+    });
+
+    it('a whole-Dataset Investigation keeps the drawn graph on the canvas, not its empty Working Set (UI test 2026-10-29)', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
+        await c.createInvestigation({
+            start: { kind: 'dataset', datasetId: 'transfers' },
+            title: 'Investigation — whole Transfers',
+            purpose: 'Review of the links in Transfers',
+            timeCol: '',
+            timeColZone: '',
+            degrees: 0,
+        });
+        expect(c.graph()?.nodes.length).toBeGreaterThan(0);
+        expect(c.investigation.showWorkingSet()).toBe(false);
+        expect(c.workingSetCanvas()).toBe(false); // the canvas draws the query graph
     });
 });
 
@@ -5373,5 +5393,165 @@ describe('LinkAnalysisComponent - the node dialog Entity page link follows /boot
             const tree = c.entityPageOf('msisdn', '123');
             expect(tree === null ? null : String(tree)).toBe(expected);
         }
+    });
+});
+
+describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
+    const fileItem = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement | null;
+    const openFileMenu = (fixture: ReturnType<typeof create>['fixture']) => {
+        (fixture.nativeElement.querySelector('[data-testid="la-file"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+    };
+
+    it('File ▸ Save view / Save view as… are locked without canAuthorWorkbench, with the reason in words', async () => {
+        const { fixture, save } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canManageIncidents']); // fm.analyst: Investigations yes, Workbench authoring no
+        fixture.detectChanges();
+        expect(c.viewSaveBlocked()).toBe('Saving views needs the Workbench author permission.');
+        openFileMenu(fixture);
+        expect(fileItem('la-save-view')!.disabled).toBe(true);
+        expect(fileItem('la-save-view-as')!.disabled).toBe(true);
+        expect(document.querySelector('[data-testid="la-save-view-locked"]')?.textContent).toContain(
+            'Workbench author permission',
+        );
+        await c.saveOpenView();
+        await c.saveView();
+        expect(save).not.toHaveBeenCalled(); // never a request the server answers with a raw 403
+        fixture.destroy();
+    });
+
+    it('File ▸ Delete of the open saved view follows the same gate and the shared-view owner rule', async () => {
+        const view: LinkAnalysisView = {
+            id: 'mfs_money_trail',
+            name: 'mfs_money_trail',
+            sourceId: 'entity-projection',
+            query: {},
+        };
+        const { fixture } = create({ views: [view] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.views.set([view]);
+        c.openViewId.set(view.id);
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set([]); // bi.analyst: read-only
+        fixture.detectChanges();
+        expect(c.deleteLabel()).toBe('view mfs_money_trail');
+        expect(c.deleteBlocked()).toBe('Deleting saved views needs the Workbench author permission.');
+        openFileMenu(fixture);
+        expect(fileItem('la-file-delete')!.disabled).toBe(true);
+        expect(document.querySelector('[data-testid="la-file-delete-locked"]')?.textContent).toContain(
+            'Workbench author permission',
+        );
+
+        session.capabilities.set(['canAuthorWorkbench']);
+        session.actor.set('fm.analyst');
+        c.views.set([{ ...view, shared: true, owner: 'someone.else' }]);
+        expect(c.deleteBlocked()).toBe('Only its owner can delete a shared saved view.');
+        c.views.set([{ ...view, shared: true, owner: 'fm.analyst' }]);
+        expect(c.deleteBlocked()).toBe('');
+        fixture.destroy();
+    });
+
+    it('after File ▸ Close the workspace row is not held at the open dock height (no dock is drawn)', async () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.bottomOpen.set(true); // remembered open from an earlier graph
+        fixture.detectChanges();
+        const row = () => fixture.nativeElement.querySelector('[data-testid="la-workspace-row"]') as HTMLElement;
+        expect(c.dockShown()).toBe(false);
+        expect(row().className).not.toContain('h-[28rem]');
+        await runQuery(fixture);
+        fixture.detectChanges();
+        expect(c.dockShown()).toBe(true);
+        expect(row().className).toContain('h-[28rem]');
+        fixture.destroy();
+    });
+
+    it('with the New form in the Investigation tab, the centre shows a pointer instead of a second form', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        c.toolboxDockOpen.set(true);
+        c.toolboxTab.set('investigation');
+        fixture.detectChanges();
+        expect(c.newFormInDock()).toBe(true);
+        expect(el.querySelector('[data-testid="la-start-pointer"]')?.textContent).toContain('Investigation tab');
+        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the New form only
+        c.toolboxTab.set('browser');
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="la-start-pointer"]')).toBeNull();
+        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the centre box is back
+        fixture.destroy();
+    });
+
+    it('File ▸ New resets the New form: the last typed Name does not survive Close then New', async () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.toolboxDockOpen.set(true);
+        c.toolboxTab.set('investigation');
+        fixture.detectChanges();
+        const form = fixture.debugElement
+            .queryAll(By.directive(LinkAnalysisStartBoxComponent))
+            .map((d) => d.componentInstance as LinkAnalysisStartBoxComponent)
+            .find((b) => b.mode() === 'investigation')!;
+        form.form.controls.name.setValue('Ring 7 typed by hand');
+        form.form.controls.name.markAsDirty();
+        await c.newWork();
+        fixture.detectChanges();
+        expect(form.form.controls.name.value).not.toBe('Ring 7 typed by hand');
+        expect(form.form.controls.name.value).toBe(form.defaults().name);
+        expect(form.form.controls.name.pristine).toBe(true);
+        fixture.destroy();
+    });
+
+    it('a refused full screen says so in a toast instead of doing nothing', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const zone = (c as unknown as { canvasZone: { nativeElement: HTMLElement } }).canvasZone.nativeElement;
+        Object.defineProperty(zone, 'requestFullscreen', {
+            value: () => Promise.reject(new TypeError('Permissions check failed')),
+        });
+        const warn = vi.spyOn(TestBed.inject(ToastrService), 'warning');
+        c.toggleFullscreen('graph');
+        await new Promise((r) => setTimeout(r));
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('Full screen was blocked by the browser'), 'Full screen');
+        fixture.destroy();
+    });
+
+    it('the toolbox tab body never scrolls sideways', () => {
+        const { fixture } = create();
+        fixture.componentInstance.toolboxDockOpen.set(true);
+        fixture.detectChanges();
+        const body = fixture.nativeElement.querySelector('[data-testid="toolbox-scroll"]') as HTMLElement;
+        expect(body.classList.contains('overflow-x-hidden')).toBe(true);
+        expect(body.classList.contains('min-w-0')).toBe(true);
+        fixture.destroy();
+    });
+
+    it('an empty Working Set on the canvas says so, with a one-click "Show the query graph"', async () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        // a real signal BEFORE the first read, so the page's computeds depend on it (as the layout-cap specs do)
+        const canvas = signal<G6GraphData | null>(null);
+        Object.defineProperty(c.investigation, 'canvas', { value: canvas });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        canvas.set({ nodes: [], edges: [] } as unknown as G6GraphData);
+        c.investigation.activeId.set('inv-1');
+        c.investigation.workingSet.set({ entities: [], links: [], excluded: [], hash: '' });
+        fixture.detectChanges();
+        const empty = fixture.nativeElement.querySelector('[data-testid="la-empty-working-set"]') as HTMLElement;
+        expect(empty?.textContent).toContain('The Working Set is empty');
+        (empty.querySelector('button') as HTMLButtonElement).click();
+        expect(c.investigation.showWorkingSet()).toBe(false);
+        fixture.destroy();
     });
 });

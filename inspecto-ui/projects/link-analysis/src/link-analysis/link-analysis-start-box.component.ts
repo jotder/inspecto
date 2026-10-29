@@ -17,6 +17,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { catchError, combineLatest, debounceTime, distinctUntilChanged, map, of, startWith, switchMap } from 'rxjs';
 import { LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -58,6 +59,12 @@ const KINDS: PickerOption[] = [
 const DEGREE_CHOICES = [0, 1, 2, 3];
 
 /**
+ * Why the New Investigation form is locked. The gate is literally `canManageIncidents` (`POST /inv/investigations`,
+ * `InvestigationRoutes`), whose plain name is Incident management.
+ */
+export const START_LOCKED_REASON = "Your role can't start Investigations (needs Incident management).";
+
+/**
  * **Start from...** (LA-ONBOARD-1 phase 6, OB-9; UC-09), in two modes.
  *
  * - `draw` (the Query zone's empty canvas): pick the Dataset, then start from **one entity** (the Entity Type FIRST, the
@@ -81,6 +88,7 @@ const DEGREE_CHOICES = [0, 1, 2, 3];
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
+        MatTooltipModule,
         ReactiveFormsModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
@@ -99,6 +107,12 @@ const DEGREE_CHOICES = [0, 1, 2, 3];
             </p>
         } @else {
             <h3 class="m-0 text-base font-semibold" [id]="titleId()">New Investigation</h3>
+            @if (locked()) {
+                <!-- the lock comes first: the inputs below are disabled, so say why before anyone tries them -->
+                <inspecto-alert class="mt-2 block" variant="info" title="Read-only" data-testid="new-locked">
+                    {{ lockedReason }} You can open and read existing ones with File ▸ Open….
+                </inspecto-alert>
+            }
             <p class="text-secondary mb-2 mt-1 text-sm">
                 Records each step you take from this start, with who, when and why, so it can be replayed and handed over.
             </p>
@@ -303,15 +317,19 @@ const DEGREE_CHOICES = [0, 1, 2, 3];
                 }
                 <p class="text-secondary m-0 text-xs" data-testid="start-what">{{ whatHappens() }}</p>
                 <div>
-                    <button
-                        mat-flat-button
-                        color="primary"
-                        type="submit"
-                        data-testid="start-submit"
-                        [disabled]="busy() || (mode() === 'investigation' && !canWrite())"
-                    >
-                        {{ submitLabel() }}
-                    </button>
+                    <!-- disabled-with-reason: the tooltip sits on a wrapper (a disabled button fires no hover) -->
+                    <span class="inline-flex" [matTooltip]="locked() ? lockedReason : ''">
+                        <button
+                            mat-flat-button
+                            color="primary"
+                            type="submit"
+                            data-testid="start-submit"
+                            [disabled]="busy() || locked()"
+                            [attr.aria-label]="locked() ? submitLabel() + ' - ' + lockedReason : null"
+                        >
+                            {{ submitLabel() }}
+                        </button>
+                    </span>
                 </div>
             </form>
         } @else {
@@ -412,6 +430,9 @@ export class LinkAnalysisStartBoxComponent {
     readonly maxDegree = input(3);
     /** Starting an Investigation needs the Incident management capability. */
     readonly canWrite = input(true);
+    /** The New form without the capability: the lock note leads, every input is disabled and the button says why. */
+    readonly locked = computed(() => this.mode() === 'investigation' && !this.canWrite());
+    readonly lockedReason = START_LOCKED_REASON;
 
     readonly start = output<StartRequest>();
     /** The New Investigation form's answer (`investigation` mode). */
@@ -525,6 +546,11 @@ export class LinkAnalysisStartBoxComponent {
     });
 
     constructor() {
+        // A locked New form is read-only: its inputs are disabled, not merely its button (UI test 2026-10-29).
+        effect(() => {
+            if (this.locked()) this.form.disable({ emitEvent: false });
+            else if (this.form.disabled) this.form.enable({ emitEvent: false });
+        });
         // The graph left the screen: *The graph on screen* is no longer a choice.
         effect(() => {
             if (!this.graphOnScreen() && this.form.controls.kind.value === 'graph') this.form.controls.kind.setValue('entity');
@@ -667,7 +693,31 @@ export class LinkAnalysisStartBoxComponent {
         return ring;
     });
 
+    /**
+     * Each File ▸ New / *New Investigation…* starts fresh (UI test 2026-10-29: after Close then New the Name kept the last
+     * typed one). The form stays mounted while an Investigation is open (the page projects it), so a new one resets it:
+     * the start inputs are cleared, the Name and Reason are re-derived from the defaults, and every "edited" flag
+     * (pristine / touched, the submit attempt) is reset so the defaults follow the input again.
+     */
+    resetNew(): void {
+        const c = this.form.controls;
+        c.kind.setValue('entity');
+        c.value.setValue('');
+        c.listId.setValue('');
+        c.paste.setValue('');
+        c.timeCol.setValue('');
+        c.timeColZone.setValue('');
+        c.degrees.setValue('0');
+        const d = this.defaults();
+        c.name.setValue(d.name);
+        c.reason.setValue(d.reason);
+        this.form.markAsPristine();
+        this.form.markAsUntouched();
+        this.tried.set(false);
+    }
+
     submit(): void {
+        if (this.locked()) return;
         this.tried.set(true);
         const v = this.form.getRawValue();
         const graph = this.mode() === 'investigation' && v.kind === 'graph';

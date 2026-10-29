@@ -38,6 +38,10 @@ export interface LaOpenDialogData {
     store: InvestigationSessionStore;
     /** May delete an Investigation (the host's write capability). */
     canDeleteInvestigations: boolean;
+    /** Why Rename / Duplicate cannot write a view here (`view-access.ts`); ''/absent = they can. */
+    viewSaveBlock?: string;
+    /** Why Delete cannot remove this view here (capability, shared-view owner rule); ''/absent = it can. */
+    viewDeleteBlock?(view: LinkAnalysisView): string;
 }
 
 export type LaOpenResult =
@@ -281,9 +285,15 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                             </p>
                             <div class="flex flex-wrap gap-1">
                                 <button mat-flat-button color="primary" (click)="openView(r.view)" data-testid="la-open-open">Open</button>
-                                <button mat-button (click)="beginRename(r.view)" [disabled]="busy()">Rename</button>
-                                <button mat-button (click)="duplicate(r.view)" [disabled]="busy()" data-testid="la-open-duplicate">Duplicate</button>
-                                <button mat-button (click)="deleteView(r.view)" [disabled]="busy()" data-testid="la-open-delete">Delete</button>
+                                <span class="inline-flex" [matTooltip]="data.viewSaveBlock || ''">
+                                    <button mat-button (click)="beginRename(r.view)" [disabled]="busy() || !!data.viewSaveBlock">Rename</button>
+                                </span>
+                                <span class="inline-flex" [matTooltip]="data.viewSaveBlock || ''">
+                                    <button mat-button (click)="duplicate(r.view)" [disabled]="busy() || !!data.viewSaveBlock" data-testid="la-open-duplicate">Duplicate</button>
+                                </span>
+                                <span class="inline-flex" [matTooltip]="deleteBlock(r.view)">
+                                    <button mat-button (click)="deleteView(r.view)" [disabled]="busy() || !!deleteBlock(r.view)" data-testid="la-open-delete">Delete</button>
+                                </span>
                                 <button mat-button (click)="data.history(r.view)">Version history</button>
                                 @if (data.opsEnabled) {
                                     <button mat-button (click)="data.comments(r.view)">Comments</button>
@@ -548,6 +558,11 @@ export class LinkAnalysisOpenDialog {
 
     openInvestigation(r: { id: string; title: string | null }): void {
         this.ref.close({ kind: 'investigation', id: r.id, title: r.title ?? undefined });
+    }
+
+    /** Why this view cannot be deleted here; '' = it can. */
+    deleteBlock(view: LinkAnalysisView): string {
+        return this.data.viewDeleteBlock?.(view) ?? '';
     }
 
     beginRename(view: LinkAnalysisView): void {

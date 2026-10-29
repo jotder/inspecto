@@ -53,6 +53,13 @@ export interface LinkAnalysisView {
      * entities; `listId` re-reads that list's members. Absent = the view reruns `query`.
      */
     start?: CaseStart;
+    /**
+     * Read-only access envelope the server keeps on the Component (`ComponentAccess`): who created it, and whether it is
+     * shared (`shares` present). A shared view may be deleted only by its owner or an access admin. Never written back:
+     * an update without them keeps the stored ones.
+     */
+    owner?: string;
+    shared?: boolean;
 }
 
 /** The Entity Lists a case uses (A-1b). */
@@ -153,6 +160,8 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         investigations?: InvestigationRef[];
         lists?: unknown;
         start?: unknown;
+        owner?: unknown;
+        shares?: unknown;
     };
     return {
         id,
@@ -167,6 +176,8 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         investigations: Array.isArray(c.investigations) ? c.investigations : undefined,
         lists: listsOf(c.lists),
         start: startOf(c.start),
+        ...(typeof c.owner === 'string' && c.owner ? { owner: c.owner } : {}),
+        ...(c.shares != null ? { shared: true } : {}),
     };
 }
 

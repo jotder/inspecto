@@ -115,7 +115,11 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         const { fixture, host, el } = setup();
         host.time.set('');
         fixture.detectChanges();
-        expect(el.querySelector('[data-test=temporal-no-time]')).not.toBeNull();
+        const note = el.querySelector('[data-test=temporal-no-time]')?.textContent ?? '';
+        // it points to where the Time column really is: no "Query panel" exists in the Studio (UI test 2026-10-29)
+        expect(note).toContain('Settings ▸ Graph model');
+        expect(note).toContain('Filter edges by time (clock) button');
+        expect(note).not.toMatch(/query panel/i);
         expect(el.querySelector('[data-test=temporal-run]')).toBeNull();
         await expectNoA11yViolations(el);
     });

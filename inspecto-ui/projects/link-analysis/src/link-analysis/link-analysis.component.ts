@@ -296,6 +296,8 @@ import { SessionService } from '@inspecto/core/api';
 import { DatePipe } from '@angular/common';
 import { GraphQueryCache, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { deepEqual } from '@inspecto/link-analysis/api/stable-json';
+import { ViewAccessContext, viewDeleteBlock, viewSaveBlock } from './view-access';
+import { LA_ABOUT_DEFINITIONS, LA_ABOUT_TERMS } from './about-terms';
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
@@ -513,6 +515,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** The host's Import/export menu + draft banner and AI explain, rendered through `<inspecto-la-host-slot>`. */
     readonly transfer = inject(LA_TRANSFER);
     readonly aiExplain = inject(LA_AI_ASSIST).explain;
+    /** The header About's terms, each with the Studio's own definition for when the glossary lookup has none. */
+    readonly aboutTerms = [...LA_ABOUT_TERMS];
+    readonly aboutDefinitions = LA_ABOUT_DEFINITIONS;
     readonly transferMenuOutputs = {
         draftImported: (d: LaImportDraft) => void this.onDraftImported(d),
         changed: () => this.reloadViews(),
@@ -550,6 +555,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     private readonly exchangeEnabled = inject(LA_FEATURES).exchange;
     readonly canShare = computed(() => this.exchangeEnabled() && this.lens.canOfferDatasets());
+    /** Who may write a saved view, as the server judges it (`view-access.ts`): the generic `/components` write gate. */
+    private readonly viewAccess = computed<ViewAccessContext>(() => ({
+        canAuthor: this.lens.canAuthorWorkbench(),
+        canConfigureAccess: this.lens.canConfigureAccess(),
+        actor: this.session.actor(),
+    }));
+    /** Why File ▸ Save view / Save view as… are locked; '' = they are not. */
+    readonly viewSaveBlocked = computed(() => viewSaveBlock(this.viewAccess()));
     private datasetsService = inject(LA_DATASETS);
     private readonly limits = inject(LinkAnalysisSettingsService);
     /** Installs the Space's Industry packs into the Domain Profile registry (LA-EDITIONS-1). */
@@ -575,6 +588,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     @ViewChild(LinkAnalysisDiscoverComponent) private discover?: LinkAnalysisDiscoverComponent;
     @ViewChild(LinkAnalysisQueryPanelComponent) private queryPanel?: LinkAnalysisQueryPanelComponent;
     @ViewChild(LinkAnalysisCleanupComponent) private cleanup?: LinkAnalysisCleanupComponent;
+    /** The Investigation tab's New Investigation form (page-projected, so it outlives an open Investigation). */
+    @ViewChild('newInvForm') private newInvForm?: LinkAnalysisStartBoxComponent;
     @ViewChild('studioRoot') private studioRoot?: ElementRef<HTMLElement>;
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
     @ViewChild('laHeader') private laHeader?: ElementRef<HTMLElement>;
@@ -1423,6 +1438,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly fullscreen = signal<'app' | 'graph' | null>(null);
     /** The bottom dock (§5.9): open = its body shows; closed = the tab strip only. Remembered per browser. */
     readonly bottomOpen = signal(readDock().open);
+    /**
+     * The dock is drawn only over something to show (a graph, a Working Set, an open Investigation). The workspace row's
+     * fixed height for an open dock follows THIS, not `bottomOpen` alone: after File ▸ Close the remembered open state
+     * left the row at 28rem with no dock under it, so the page used its top 40% (UI test 2026-10-29).
+     */
+    readonly dockShown = computed(() => !!this.graph() || this.workingSetCanvas() || !!this.investigation.active());
     /** The dock's chosen tab; an Investigation tab falls back to Rows while none is open (see `dockTabShown`). */
     readonly dockTab = signal<DockTab>(readDock().tab);
     /** The dock's tabs: Rows always; the Investigation's only while one is open, and never on the Explorer level. */
@@ -1955,7 +1976,22 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.pendingInvestigation.set(null);
         this.investigation.clearQueuedSeeds();
         this.openInvestigation();
+        this.newInvForm?.resetNew(); // a new one starts fresh, never with the last typed Name
     }
+
+    /**
+     * The Investigation tab's New Investigation form is on screen (Investigations level, the dock open on that tab, nothing
+     * open, no pending or queued start): the centre start box then gives way to a pointer, so two forms never do one job.
+     */
+    readonly newFormInDock = computed(
+        () =>
+            this.investigationsEnabled() &&
+            this.toolboxDockOpen() &&
+            this.toolboxTab() === 'investigation' &&
+            !this.investigation.active() &&
+            !this.pendingInvestigation() &&
+            !this.investigation.queuedSeeds().length,
+    );
 
     /** The graph on screen, for the New form's *The graph on screen* (a seedless Investigation over its mapping). */
     readonly graphOnScreen = computed<{ name: string } | null>(() => {
@@ -1969,6 +2005,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         await this.closeOpenWork();
         if (this.openWorkLabel() || !this.investigationsEnabled()) return; // Close was declined, or there is no Investigation
         this.openInvestigation();
+        this.newInvForm?.resetNew(); // a new one starts fresh, never with the last typed Name
     }
 
     /**
@@ -1986,13 +2023,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             if (!p) return;
             this.startNotice.set(null);
             this.investigateIssue.set('');
-            await this.investigation.start(
+            const started = await this.investigation.start(
                 p,
                 req.purpose,
                 req.title,
                 req.timeCol || this.investigationTimeDefault(),
                 req.timeColZone,
             );
+            if (started) this.showSeedlessStart();
             return;
         }
         const start = req.start;
@@ -2006,7 +2044,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             if (!this.graph()) return; // the draw failed (its error is on screen): nothing is created
             this.investigation.close();
             this.boundProfile.set(activeDomainProfileId());
-            await this.investigation.start(
+            const started = await this.investigation.start(
                 ds.mapping,
                 req.purpose,
                 req.title,
@@ -2016,6 +2054,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 ds.mapping.entityType,
                 activeDomainProfileId(),
             );
+            if (started) this.showSeedlessStart();
             return;
         }
         let binding: PendingInvestigation;
@@ -2061,6 +2100,18 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         });
         if (ok || this.investigation.active()) this.openInvestigation();
     }
+
+    /**
+     * A seedless Investigation (the whole Dataset, the graph on screen) has an empty Working Set, so drawing it would blank
+     * the canvas the start just drew (UI test 2026-10-29). Keep the drawn graph - the query graph, where seeds are picked -
+     * on the canvas; the first seed switches it to the Working Set.
+     */
+    private showSeedlessStart(): void {
+        if (!this.investigation.workingSet()?.entities?.length) this.investigation.showWorkingSet.set(false);
+    }
+
+    /** The canvas draws an Investigation's Working Set and it holds nothing yet: say so, with the way back to the graph. */
+    readonly emptyWorkingSet = computed(() => this.workingSetCanvas() && !this.investigation.workingSet()?.entities?.length);
 
     /**
      * ONE entity (the Start box, the `?seed=` deep link, an Entity profile's Investigate): on the Explorer level draw it and one
@@ -2304,6 +2355,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             offer: (v) => this.offer(v),
             store: this.investigation,
             canDeleteInvestigations: this.lens.canManageIncidents(),
+            viewSaveBlock: this.viewSaveBlocked(),
+            viewDeleteBlock: (v) => viewDeleteBlock(v, this.viewAccess()),
         };
         this.dialog
             .open<LinkAnalysisOpenDialog, LaOpenDialogData, LaOpenResult>(LinkAnalysisOpenDialog, {
@@ -2325,6 +2378,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     /** File ▸ Save view: over the open saved view; with none open it asks for a name (Save view as…). */
     async saveOpenView(): Promise<void> {
+        if (this.viewSaveBlocked()) return;
         const open = this.views().find((v) => v.id === this.openViewId());
         if (!open) {
             this.fileTrigger?.openMenu();
@@ -2351,11 +2405,17 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const v = this.views().find((x) => x.id === this.openViewId());
         return v ? `view ${v.name}` : '';
     });
+    /** Why File ▸ Delete cannot remove the open saved view (the server's capability and owner rule); '' = it can. */
+    readonly deleteBlocked = computed<string>(() => {
+        if (this.investigation.active()) return '';
+        const v = this.views().find((x) => x.id === this.openViewId());
+        return v ? viewDeleteBlock(v, this.viewAccess()) : '';
+    });
 
     /** File ▸ Delete, after a confirm: the Investigation (server-side, audited) or the saved view; then back to the empty state. */
     async deleteOpenWork(): Promise<void> {
         const label = this.deleteLabel();
-        if (!label) return;
+        if (!label || this.deleteBlocked()) return;
         const invId = this.investigation.active() ? this.investigation.activeId() : null;
         const ok = await this.confirm.confirmDestructive(
             invId
@@ -3112,12 +3172,31 @@ Its prior copies stay in its version history.`,
         this.graphView?.fitView();
     }
 
-    /** Toggle fullscreen for the whole studio (`app`) or just the canvas zone (`graph`). */
+    /**
+     * Toggle fullscreen for the whole studio (`app`) or just the canvas zone (`graph`). The browser may refuse - an
+     * embedded frame without `allowfullscreen`, a policy, a click it does not count as a gesture - and it does so by
+     * rejecting the promise. That rejection was dropped (`void`), so a refused click did nothing at all (UI test
+     * 2026-10-29); it is now said in a toast.
+     */
     toggleFullscreen(zone: 'app' | 'graph'): void {
         const el = (zone === 'app' ? this.studioRoot : this.canvasZone)?.nativeElement;
         if (!el?.requestFullscreen) return; // unsupported environment (e.g. jsdom)
-        if (document.fullscreenElement) void document.exitFullscreen();
-        else void el.requestFullscreen();
+        if (document.fullscreenElement) {
+            void Promise.resolve(document.exitFullscreen()).catch(() => undefined); // leaving cannot usefully fail: the page is already out
+            return;
+        }
+        if (document.fullscreenEnabled === false) {
+            this.fullscreenBlocked();
+            return;
+        }
+        Promise.resolve(el.requestFullscreen()).catch(() => this.fullscreenBlocked()); // an older engine returns no promise
+    }
+
+    private fullscreenBlocked(): void {
+        this.toastr.warning(
+            'Full screen was blocked by the browser (an embedded page may not be allowed to go full screen).',
+            'Full screen',
+        );
     }
 
     onFullscreenChange(): void {
@@ -3971,6 +4050,7 @@ Its prior copies stay in its version history.`,
     // ── saved views ──
 
     async saveView(): Promise<void> {
+        if (this.viewSaveBlocked()) return;
         this.saveForm.markAllAsTouched();
         if (this.saveForm.invalid) return;
         const { name, description } = this.saveForm.getRawValue();

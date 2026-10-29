@@ -40,7 +40,7 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
             </h3>
             @if (!timeColumn()) {
                 <p class="text-secondary m-0" data-test="temporal-no-time">
-                    Add a time column under Attribute columns in the query panel, then pick it under Filter edges by time, to look for bursts and regular intervals.
+                    Add a time column under Attribute columns in Settings ▸ Graph model, then pick it as the Time column under the Filter edges by time (clock) button in the toolbar, to look for bursts and regular intervals.
                 </p>
             } @else if (!mappings().length) {
                 <p class="text-secondary m-0" data-test="temporal-no-mapping">

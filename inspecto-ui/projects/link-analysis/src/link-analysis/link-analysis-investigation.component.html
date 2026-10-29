@@ -588,9 +588,10 @@
                 } @else {
                     <inspecto-alert variant="info" title="Nothing to investigate yet">{{ projectionIssue() }}</inspecto-alert>
                 }
-                @if (!canWrite()) {
+                <!-- the New form carries its own lock note at its top; this one serves the pending and queued starts -->
+                @if (!canWrite() && (pending() || store.queuedSeeds().length)) {
                     <inspecto-alert variant="info" title="Read-only" data-testid="investigation-read-only">
-                        Starting an Investigation needs the Incident management capability - you can open and read existing
+                        Your role can't start Investigations (needs Incident management) - you can open and read existing
                         ones.
                     </inspecto-alert>
                 }
@@ -672,7 +673,7 @@
                 }
                 @if (!canWrite()) {
                     <inspecto-alert variant="info" title="Read-only" data-testid="investigation-read-only">
-                        Changing an Investigation needs the Incident management capability - you can read it.
+                        Your role can't change Investigations (needs Incident management) - you can read this one.
                     </inspecto-alert>
                 }
                 @if (store.activeDraftId(); as draft) {
@@ -751,6 +752,7 @@
                     </ol>
                 </div>
                 <div class="flex flex-wrap gap-1">
+                    <!-- nothing seeded = nothing to expand from: Expand… is locked with Expand next degree (the reason shows below) -->
                     <button
                         mat-flat-button
                         color="primary"
@@ -758,7 +760,7 @@
                         data-testid="expand-dialog-open"
                         aria-keyshortcuts="G"
                         matTooltip="Expand 1 to {{ maxDegree() }} degrees with hubs held, read settings and a preview (G)"
-                        [disabled]="!canWrite() || store.busy() || store.chainRunning()"
+                        [disabled]="!canWrite() || store.busy() || store.chainRunning() || degree().current < 0"
                         (click)="expandRequested.emit()"
                     >
                         Expand…

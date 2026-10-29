@@ -27,12 +27,36 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
         // A status-0 / parse failure means we never got a real JSON body — use the fallback.
         if (err.status === 0) return fallback;
         const e = err.error?.error;
-        if (typeof e === 'string' && e.trim()) return e; // legacy: { error: 'msg' }
+        if (typeof e === 'string' && e.trim()) return plainCapabilityRefusal(e); // legacy: { error: 'msg' }
         const msg = e?.message; // v1: { error: { message, … } }
-        if (typeof msg === 'string' && msg.trim()) return msg;
+        if (typeof msg === 'string' && msg.trim()) return plainCapabilityRefusal(msg);
         return fallback;
     }
     return fallback;
+}
+
+/** The plain name of a Capability the server refuses on, for the people reading the refusal (GLOSSARY "Capability"). */
+const CAPABILITY_NAMES: Readonly<Record<string, string>> = {
+    canAuthorWorkbench: 'Workbench author',
+    canManageIncidents: 'Incident management',
+    canOperateRuns: 'Run operations',
+    canAdminister: 'Administration',
+    canConfigureAccess: 'Access configuration',
+};
+
+/**
+ * `ApiContext.withCapability`'s 403 reads `missing capability 'canAuthorWorkbench'` — an identifier, not a sentence.
+ * Say it in words, keeping the id in brackets for whoever grants the role (UI test 2026-10-29). Any other message is
+ * returned as is.
+ */
+export function plainCapabilityRefusal(message: string): string {
+    const m = /^missing capability '([A-Za-z]+)'(.*)$/.exec(message.trim());
+    if (!m) return message;
+    const name = CAPABILITY_NAMES[m[1]];
+    const where = m[2].trim() ? ` ${m[2].trim()}` : '';
+    return name
+        ? `Your role does not have the ${name} permission (${m[1]})${where}.`
+        : `Your role does not have the permission this needs (${m[1]})${where}.`;
 }
 
 /**

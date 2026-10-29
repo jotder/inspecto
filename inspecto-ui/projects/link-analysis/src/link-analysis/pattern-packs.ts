@@ -367,6 +367,6 @@ export function resolvePatternColumns(
 /** The plain refusal for a column the pattern needs and does not have, naming the profile's column when there is one. */
 export function patternColumnRefusal(what: 'time' | 'kind', suggested: string | undefined): string {
     return what === 'time'
-        ? `This pattern needs a time column — ${suggested ? `set Time to ${suggested}` : 'set Time in the Query panel'}.`
-        : `This pattern needs a link kind column — ${suggested ? `set Link type to ${suggested}` : 'set Link type in the Query panel'}.`;
+        ? `This pattern needs a time column — ${suggested ? `pick ${suggested} as the Time column under the Filter edges by time (clock) button in the toolbar` : 'pick the Time column under the Filter edges by time (clock) button in the toolbar'}.`
+        : `This pattern needs a link kind column — ${suggested ? `set Link type column to ${suggested} in Settings ▸ Graph model` : 'set Link type column in Settings ▸ Graph model'}.`;
 }
