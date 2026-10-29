@@ -137,6 +137,7 @@ function stripGlossaryMarkup(raw: string): string {
     const cut = Math.min(...ENGINEER_MARKERS.map((m) => s.indexOf(m)).filter((i) => i >= 0), s.length);
     s = s.slice(0, cut);
     s = s.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'); // [text](target) -> text
+    s = s.replace(/[;,]\s*wire values?\b[^;)]*/gi, ''); // "; wire values `CONFIRMED` … `ACCEPTED_RISK`" is for engineers
     // code spans: op ids, class names, keys - never analyst words; an upper-case value (a status) stays as a word
     s = s.replace(/(\b(?:with|via)\s+)?`([^`]*)`/g, (_all, lead: string | undefined, code: string) =>
         SHOWN_CODE.test(code) ? (lead ?? '') + code : ' ',

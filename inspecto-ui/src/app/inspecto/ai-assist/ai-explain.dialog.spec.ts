@@ -246,6 +246,14 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
         expect(cleanGlossaryDefinition('One of: A \\| B | C.')).toBe('One of: A, B, C.');
     });
 
+    it('drops a "wire values" aside, so Disposition shows the ladder words only', () => {
+        expect(
+            cleanGlossaryDefinition(
+                'The decided outcome an Incident or a Case resolves with (built-in ladder: confirmed · false-positive · recovered; wire values `CONFIRMED` … `ACCEPTED_RISK`). Required to resolve an Incident.',
+            ),
+        ).toBe('The decided outcome an Incident or a Case resolves with (built-in ladder: confirmed · false-positive · recovered).');
+    });
+
     it('ends a cut row at its last complete sentence, and drops an id together with the word that pointed at it', () => {
         expect(cleanGlossaryDefinition('A single collected file. It is then parsed and')).toBe('A single collected file.');
         expect(

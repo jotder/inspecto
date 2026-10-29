@@ -105,4 +105,78 @@ class GlossaryLoaderTest {
         assertTrue(GLOSSARY.get("Annotation Target").startsWith("What an Annotation is attached to"),
                 GLOSSARY.get("Annotation Target"));
     }
+
+    @Test
+    void annotationsThatWrapOrUsePlainBracketsAndTwoBoldHalvesAllParse() {
+        // **Load** *(added … as built: [..](..) ·  — wraps over four lines …)* —
+        assertTrue(GLOSSARY.get("Load").startsWith("The third definition stage/drawer in the unified pipeline editor"),
+                GLOSSARY.get("Load"));
+        // **Domain Profile** *(Link Analysis; … — wraps …)* —
+        assertTrue(GLOSSARY.get("Domain Profile").startsWith("The Industry pack a Space reads Link Analysis in:"),
+                GLOSSARY.get("Domain Profile"));
+        // **Submission** (of a Regulatory Report) —
+        assertTrue(GLOSSARY.get("Submission").startsWith("Writing an approved report's exact bytes to its template's file drop"),
+                GLOSSARY.get("Submission"));
+        // **Triage** / **Triage Run** *(renamed …)* —
+        String triage = GLOSSARY.get("Triage / Triage Run");
+        assertNotNull(triage);
+        assertTrue(triage.startsWith("A Triage is the Assistant's RCA playbook"), triage);
+        assertEquals(triage, GLOSSARY.get("Triage"));
+        assertEquals(triage, GLOSSARY.get("Triage Run"));
+    }
+
+    /**
+     * Guard: every paragraph that opens with a bold term and reaches an em dash before its first sentence ends is an
+     * entry, and must load. A new entry shape the parser does not know fails here instead of vanishing silently.
+     */
+    @Test
+    void everyParagraphThatOpensAnEntryLoads() throws java.io.IOException {
+        List<String> lines = java.nio.file.Files.readAllLines(GlossaryLoader.glossaryPath());
+        List<String> missing = new java.util.ArrayList<>();
+        int checked = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            String prev = i == 0 ? "" : lines.get(i - 1).trim();
+            String line = lines.get(i).trim();
+            boolean starts = prev.isEmpty() || prev.startsWith("#") || prev.startsWith("---");
+            if (!starts || !line.startsWith("**")) continue;
+            StringBuilder p = new StringBuilder(line);
+            for (int j = i + 1; j < lines.size() && !lines.get(j).isBlank(); j++) p.append(' ').append(lines.get(j).trim());
+            // The first em dash outside brackets ("**Migration underway** (… — …)" is prose), and the text before it
+            // outside brackets (an annotation may hold full stops of its own).
+            int dash = -1;
+            StringBuilder head = new StringBuilder();
+            for (int k = 0, depth = 0; k < p.length() && dash < 0; k++) {
+                char c = p.charAt(k);
+                if (c == '(') depth++;
+                else if (c == ')') depth = Math.max(0, depth - 1);
+                else if (c == '—' && depth == 0) dash = k;
+                else if (depth == 0) head.append(c);
+            }
+            if (dash < 0) continue;
+            if (head.indexOf(". ") >= 0) continue; // a sentence ended first: bold prose, not an entry
+            String term = line.substring(2, line.indexOf("**", 2)).trim();
+            checked++;
+            if (!GLOSSARY.containsKey(term)) missing.add(i + 1 + ": " + term);
+        }
+        assertTrue(checked > 200, "guard checked only " + checked + " entries");
+        assertEquals(List.of(), missing, "GLOSSARY entries the loader skipped (line: term)");
+    }
+
+    @Test
+    void aListUnderAnEntryIsNotFoldedIntoIt() {
+        assertTrue(GLOSSARY.get("Watermark").endsWith("neither may be called a Watermark unqualified:"), GLOSSARY.get("Watermark"));
+        assertFalse(GLOSSARY.get("Watermark").contains("Incremental read cursor"));
+        assertEquals("Mostly-content bundle of Space Templates that requires Add-ons. Two kinds, composed:",
+                GLOSSARY.get("Solution pack"));
+        Map<String, String> parsed = GlossaryLoader.parse(List.of(
+                "**Kind** — Two kinds:",
+                "- **One** — the first.",
+                "  wrapped item text.",
+                "1. numbered",
+                "",
+                "**Next** — After the list."));
+        assertEquals("Two kinds:", parsed.get("Kind"));
+        assertEquals("After the list.", parsed.get("Next"));
+        assertEquals(2, parsed.size());
+    }
 }
