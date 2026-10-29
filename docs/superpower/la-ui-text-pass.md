@@ -14,7 +14,10 @@
 - 403s map to true reasons (`refusal403`).
 
 **Left (fix next):**
-- **M/L rows not yet reached:** T-028, T-045, T-056–061, T-064, T-065, T-067, T-070, T-074, T-075, T-077, T-079, T-080, T-082, T-083, T-152–155, T-170, T-171 (per-row line), T-178, T-179, T-185–187, T-190, T-193, T-196–198, T-209.
+- **M/L rows still open** (pass 2 lane P1 fixed or confirmed the rest):
+  - T-028: no repro in code. A Dataset's own primary or link-end type is already the default; other types are marked. Needs a live repro on the Dataset that showed it.
+  - T-083 (part): module ids are now a tooltip only. A plain name such as "Link Analysis storage" is the server's module `title`.
+  - T-186 (part): the Investigation list carries the owner's login id, not a display name. Needs a server field.
 - **Other screens:**
   - T-001/002: sign-in, outside the Studio.
   - T-118: algorithm-level descriptions need a catalogue field.

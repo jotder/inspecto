@@ -33,7 +33,7 @@ export function isLinkAnalysisModule(id: string): boolean {
                 @if (error()) {
                     <p class="text-secondary text-sm" role="status" data-testid="modules-error">{{ error() }}</p>
                 } @else if (!modules()) {
-                    <p class="text-secondary text-sm" role="status">Loading...</p>
+                    <p class="text-secondary text-sm" role="status">Loading…</p>
                 } @else {
                     <ul
                         class="flex flex-col gap-1 text-sm"
@@ -42,8 +42,8 @@ export function isLinkAnalysisModule(id: string): boolean {
                     >
                         @for (m of modules(); track m.id) {
                             <li class="flex flex-wrap items-center gap-2">
-                                <span class="font-medium">{{ m.title || m.id }}</span>
-                                <span class="text-secondary">{{ m.id }}</span>
+                                <!-- the module id is for support only: a tooltip, never body text (T-083) -->
+                                <span class="font-medium" [title]="m.id" data-testid="module-name">{{ m.title || m.id }}</span>
                                 <inspecto-chip variant="soft" [tone]="tone(m)" [attr.data-testid]="'module-' + m.id">
                                     {{ label(m) }}
                                 </inspecto-chip>

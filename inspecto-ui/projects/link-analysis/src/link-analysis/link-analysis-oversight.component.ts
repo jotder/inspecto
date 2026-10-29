@@ -126,6 +126,9 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
                     </div>
                 }
             </section>
+        } @else {
+            <!-- T-152: the fold never opens blank -->
+            <p class="text-secondary m-0 text-sm" data-testid="oversight-empty">No approvals needed for this Investigation.</p>
         }
     `,
 })

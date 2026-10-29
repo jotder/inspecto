@@ -26,7 +26,7 @@ export interface CleanupApply {
 }
 
 const TOOLS: { id: CleanupTool; label: string; icon: string }[] = [
-    { id: 'paths', label: 'Keep paths between seeds', icon: 'heroicons_outline:arrows-right-left' },
+    { id: 'paths', label: 'Keep paths between start entities', icon: 'heroicons_outline:arrows-right-left' },
     { id: 'shortest', label: 'Highlight shortest paths', icon: 'heroicons_outline:light-bulb' },
     { id: 'trim', label: 'Trim dangling leaves', icon: 'heroicons_outline:scissors' },
     { id: 'keep', label: 'Keep only selected', icon: 'heroicons_outline:check-circle' },
@@ -154,8 +154,8 @@ export class LinkAnalysisCleanupComponent {
         if (!t || !g) return t ? 'Nothing is drawn.' : null;
         if (t === 'paths' || t === 'shortest') {
             if (g.nodes.length > this.nodeCap())
-                return `Path search in the browser needs at most ${this.nodeCap().toLocaleString('en')} nodes — this graph has ${g.nodes.length.toLocaleString('en')}.`;
-            if (new Set(this.seeds()).size < 2) return 'Needs at least two seeds on the canvas.';
+                return `Path search in the browser needs at most ${this.nodeCap().toLocaleString('en')} nodes (this graph has ${g.nodes.length.toLocaleString('en')}).`;
+            if (new Set(this.seeds()).size < 2) return 'Needs at least two start entities on the canvas.';
             if (t === 'paths' && !(this.len() >= 1 && this.len() <= 8)) return 'The longest path is 1 to 8 links.';
             if (t === 'paths' && this.hidden() === null) return 'Too many paths to list in the browser.';
         }
@@ -231,7 +231,7 @@ export class LinkAnalysisCleanupComponent {
     private reasonFor(t: CleanupTool): string {
         switch (t) {
             case 'paths':
-                return `Clean up: not on a path between seeds, L = ${this.len()}`;
+                return `Clean up: not on a path between start entities, L = ${this.len()}`;
             case 'trim':
                 return 'Clean up: dangling leaf';
             case 'keep':

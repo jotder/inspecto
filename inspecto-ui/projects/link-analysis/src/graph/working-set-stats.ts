@@ -68,11 +68,13 @@ export function workingSetStats(
         { label: labels.links, value: ratio(s.edges.length, full.edges.length), hint: 'shown / loaded' },
     ];
     const counts = s.edges.map((e) => (e.data as { count?: number }).count).filter((c): c is number => c != null);
-    if (counts.length) {
+    const rows = counts.reduce((a, b) => a + b, 0);
+    // One row per link says the links count again under a second name (T-064): show folded rows only when they differ.
+    if (counts.length && rows !== s.edges.length) {
         out.push({
             label: labels.rows,
-            value: plain.format(counts.reduce((a, b) => a + b, 0)),
-            hint: 'Σ count over the shown links',
+            value: plain.format(rows),
+            hint: 'Total count over the shown links',
         });
     }
     const cols = attrColumns(full);
@@ -82,7 +84,7 @@ export function workingSetStats(
             .map((v) => Number(v.replace(/,/g, '')))
             .filter((n) => Number.isFinite(n));
         if (!vs.length) continue;
-        out.push({ label: `Σ ${col}`, value: compact.format(vs.reduce((a, b) => a + b, 0)), hint: `sum of ${col}` });
+        out.push({ label: `Total ${col}`, value: compact.format(vs.reduce((a, b) => a + b, 0)), hint: `Sum of ${col}` });
     }
     const timeCol = opts.timeColumn ?? cols.find((c) => isTemporalColumn(full, c));
     if (timeCol) {
@@ -92,9 +94,9 @@ export function workingSetStats(
         if (ts.length) {
             const day = (t: number): string => new Date(t).toISOString().slice(0, 10);
             out.push({
-                label: timeCol,
+                label: 'Time span',
                 value: `${day(Math.min(...ts))} → ${day(Math.max(...ts))}`,
-                hint: 'earliest → latest',
+                hint: `${timeCol}: earliest → latest`,
             });
         }
     }

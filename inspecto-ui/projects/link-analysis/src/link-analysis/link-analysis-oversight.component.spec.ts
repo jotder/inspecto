@@ -91,6 +91,17 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         expect(f.componentInstance.decided).toBe(1);
     });
 
+    it('says no approvals are needed when nothing is held or masked (T-152)', () => {
+        const { f, el } = create({ approve: true, reveal: false });
+        expect(el.querySelector('[data-testid=oversight-empty]')).toBeNull();
+        f.componentInstance.log = null;
+        f.componentInstance.ws = null;
+        f.detectChanges();
+        expect(el.querySelector('[data-testid=oversight-empty]')?.textContent).toContain(
+            'No approvals needed for this Investigation.',
+        );
+    });
+
     it('names only the limits that are set and formats the request time, never "—" or a raw nanosecond instant', () => {
         const { c, el } = create({ approve: true, reveal: false });
         expect(c.limits(PENDING)).toBe('budget above 100');

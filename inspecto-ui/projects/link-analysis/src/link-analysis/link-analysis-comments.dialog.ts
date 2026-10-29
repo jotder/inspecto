@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -49,8 +50,14 @@ export interface LinkAnalysisCommentsData {
             <form class="mb-4 flex items-start gap-3" (ngSubmit)="addComment()">
                 <mat-form-field class="flex-auto" subscriptSizing="dynamic">
                     <mat-label>Add a comment</mat-label>
-                    <textarea matInput rows="2" [formControl]="commentControl" required></textarea>
-                    @if (commentControl.hasError('required') && commentControl.touched) {
+                    <textarea
+                        matInput
+                        rows="2"
+                        [formControl]="commentControl"
+                        [errorStateMatcher]="afterEmptyAdd"
+                        required
+                    ></textarea>
+                    @if (triedEmpty() && !commentControl.value.trim()) {
                         <mat-error>Enter a comment before adding.</mat-error>
                     }
                 </mat-form-field>
@@ -96,6 +103,11 @@ export class LinkAnalysisCommentsDialog {
     readonly posting = signal(false);
     readonly comments = signal<ObjectNote[]>([]);
     readonly commentControl = new FormControl('', { nonNullable: true, validators: [Validators.required] });
+    /** An Add was pressed with the box empty: only then does the field say so (T-187), never on a mere blur. */
+    readonly triedEmpty = signal(false);
+    readonly afterEmptyAdd: ErrorStateMatcher = {
+        isErrorState: (control) => this.triedEmpty() && !String(control?.value ?? '').trim(),
+    };
 
     constructor() {
         this.load();
@@ -116,12 +128,12 @@ export class LinkAnalysisCommentsDialog {
     }
 
     addComment(): void {
-        if (this.commentControl.invalid) {
+        const body = this.commentControl.value.trim();
+        this.triedEmpty.set(!body);
+        if (this.commentControl.invalid || !body) {
             this.commentControl.markAsTouched();
             return;
         }
-        const body = this.commentControl.value.trim();
-        if (!body) return;
         this.posting.set(true);
         this.notes.addComment(LinkAnalysisCommentsDialog.TARGET_KIND, this.data.id, body).subscribe({
             next: () => {

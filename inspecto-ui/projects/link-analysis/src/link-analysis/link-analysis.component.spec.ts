@@ -311,6 +311,33 @@ describe('LinkAnalysisComponent', () => {
         expect(c.timeCutoff()).toBeNull();
     });
 
+    it('the rows table names its columns in plain words and never shows the internal id (T-070)', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        expect(c.linkTableColumns.map((col) => col.headerName)).toEqual(['From', 'Link kind', 'To', 'Count']);
+        expect(c.nodeTableColumns.map((col) => col.headerName)).toEqual(['Name', 'Entity Type', 'Links']);
+        expect([...c.linkTableColumns, ...c.nodeTableColumns].some((col) => col.field === 'id')).toBe(false);
+        // a kind the Industry pack does not relabel shows as the legend shows it: as sent
+        expect(c.linkKindLabel('p2p')).toBe('p2p');
+        expect(c.linkKindLabel('')).toBe('unlabelled');
+    });
+
+    it('timeline: the picker offers only date/time columns (T-074)', async () => {
+        const mixed: G6GraphData = {
+            nodes: GRAPH.nodes,
+            edges: [
+                { id: 'a->b', source: 'a', target: 'b', data: { kind: 'link', attrs: { when: '2026-01-01T00:00:00Z', channel: 'wire' } } },
+                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'link', attrs: { when: '2026-06-01T00:00:00Z', channel: 'cash' } } },
+            ],
+        };
+        const { fixture } = create({ graph: mixed });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.attrColumns()).toEqual(['channel', 'when']);
+        expect(c.timeColumnOptions().map((o) => o.value)).toEqual(['', 'when']);
+    });
+
     it('offers a pivot to the map for a node carrying an objectRef (ui-design-review R8)', async () => {
         const graphWithRef: G6GraphData = {
             nodes: [
@@ -1033,7 +1060,8 @@ describe('LinkAnalysisComponent', () => {
         const menu = document.querySelector('.mat-mdc-menu-panel [aria-label="Display options"]') as HTMLElement;
         const boxes = Array.from(menu.querySelectorAll('mat-checkbox')).map((b) => b.textContent!.trim().split(/\s+\(/)[0].trim());
         for (const label of ['Legend', 'Graph counts', 'Node labels', 'Link labels', 'All link labels', 'Level of detail',
-            'Minimap', 'Grid', 'Community hulls', 'Group lone counterparties', 'Bubble sets', 'Link bundling']) {
+            'Minimap', 'Grid', 'Community outlines', 'Group single-link neighbours', 'Community shading', 'Link bundling',
+            'Align while dragging', 'Highlight on hover']) {
             expect(boxes.filter((b) => b === label)).toHaveLength(1);
         }
         fixture.destroy();
@@ -2004,12 +2032,12 @@ describe('LinkAnalysisComponent', () => {
         c.investigation.workingSet.set(ws(5003) as never);
         fixture.detectChanges();
         const footer = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Render status"]')!;
-        expect(footer.textContent).toContain('Showing 5,000 of 5,003 links (render limit)');
+        expect(footer.textContent).toContain('Showing 5,000 of 5,003 links: the canvas draws the heaviest');
         expect(c.workingSetCanvas()).toBe(true);
 
         c.investigation.workingSet.set(ws(40) as never);
         fixture.detectChanges();
-        expect(footer.textContent).not.toContain('render limit');
+        expect(footer.textContent).not.toContain('the canvas draws the heaviest');
         // the node and link counts live in the footer status bar now, not on the canvas strip
         expect(footer.textContent).not.toContain('links drawn');
         fixture.destroy();
@@ -2979,7 +3007,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             const r = stage(radialCap() + 821);
             r.fixture.detectChanges();
             const radial = r.c.layouts.find((l) => l.id === 'radial')!;
-            expect(r.c.layoutDisabledReason(radial)).toBe('needs at most 100 nodes — this graph has 921');
+            expect(r.c.layoutDisabledReason(radial)).toBe('needs at most 100 nodes (this graph has 921)');
             expect(r.c.layoutDisabledReason(r.c.layouts.find((l) => l.id === 'force')!)).toBeNull();
             expect(r.c.anyLayoutOverCap()).toBe(true);
             r.c.openReduce('filter');
@@ -2999,7 +3027,7 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             const c = fixture.componentInstance;
             configureLaLimits({ 'browser_algorithms.louvainCommunities': 4 });
             try {
-                expect(c.hullsDisabledReason()).toBe('needs at most 4 nodes — this graph has 5');
+                expect(c.hullsDisabledReason()).toBe('Needs at most 4 nodes (this graph has 5).');
                 configureLaLimits({ 'browser_algorithms.louvainCommunities': 5 });
                 expect(c.hullsDisabledReason()).toBeNull();
             } finally {
@@ -5585,7 +5613,7 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         const warn = vi.spyOn(TestBed.inject(ToastrService), 'warning');
         c.toggleFullscreen('graph');
         await new Promise((r) => setTimeout(r));
-        expect(warn).toHaveBeenCalledWith(expect.stringContaining('Full screen was blocked by the browser'), 'Full screen');
+        expect(warn).toHaveBeenCalledWith('The browser blocked full screen.', 'Full screen');
         fixture.destroy();
     });
 

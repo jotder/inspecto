@@ -10,6 +10,8 @@ export interface PickerOption {
     label: string;
     /** Optional one-line explanation, shown under the label in the popup only. */
     hint?: string;
+    /** Optional heading shown once above the first of a run of options that share it (the popup only). */
+    group?: string;
 }
 
 /** Plain string choices whose label is the value itself. */
@@ -64,6 +66,16 @@ const SEARCH_THRESHOLD = 8;
                 (keydown)="onKeydown($event)"
             >
                 @for (opt of shown(); track opt.value) {
+                    @if (opt.group && opt.group !== shown()[$index - 1]?.group) {
+                        <!-- a visual heading only: a listbox holds options, so assistive tech is not given it -->
+                        <div
+                            aria-hidden="true"
+                            class="text-secondary px-2 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide"
+                            data-testid="picker-group"
+                        >
+                            {{ opt.group }}
+                        </div>
+                    }
                     <button
                         type="button"
                         role="option"

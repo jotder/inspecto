@@ -122,10 +122,11 @@ export interface DatasetSuggestion {
 
 function hintFor(ds: DatasetLike, shape: LinkShape | null): string {
     const cols = columnPreview(ds.columns ?? []);
+    // A Dataset with columns but no from/to pair says nothing here: the picker groups it under "Not link-shaped" (T-171).
     const lead = shape
         ? `Suggested: ${shape.reason}.`
         : (ds.columns?.length ?? 0) > 0
-          ? 'No obvious from/to column pair.'
+          ? ''
           : 'Columns are read when you pick it.';
     const about = oneLine(ds.description);
     return [lead, about, cols ? `Columns: ${cols}.` : ''].filter(Boolean).join(' ');

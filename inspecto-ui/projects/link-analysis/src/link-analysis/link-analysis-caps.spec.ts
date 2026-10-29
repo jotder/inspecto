@@ -26,15 +26,16 @@ describe('LinkAnalysisCapsComponent', () => {
         expect(el.querySelector('[data-testid=caps-toggle]')!.getAttribute('aria-expanded')).toBe('false');
         toggle();
         const text = el.querySelector('[data-testid=caps-list]')!.textContent!;
-        expect(text).toContain('Projection: 1000 nodes (server)');
-        expect(text).toContain('Analysis: 2500 nodes (browser)');
-        expect(text).not.toContain('Graph run');
+        expect(el.querySelector('[data-testid=caps-toggle]')!.textContent!.trim()).toBe('Limits');
+        expect(text).toContain('Graph drawn: up to 1,000 nodes');
+        expect(text).toContain('On screen tools: up to 2,500 nodes');
+        expect(text).not.toContain('Whole Dataset tools');
     });
 
     it('adds the graph-run ceiling once the server has stated it', () => {
         const { el, toggle } = make(5000);
         toggle();
-        expect(el.querySelector('[data-testid=caps-list]')!.textContent).toContain('Graph run: 5000 nodes (server)');
+        expect(el.querySelector('[data-testid=caps-list]')!.textContent).toContain('Whole Dataset tools: up to 5,000 nodes');
     });
 
     it('opens as an opaque card above the canvas, anchored to the left edge', () => {

@@ -32,7 +32,7 @@ describe('LinkAnalysisDisplayRulesComponent', () => {
         const el: HTMLElement = fixture.nativeElement;
         const host = fixture.componentInstance;
 
-        expect(el.textContent).toContain('No rules');
+        expect(el.textContent).toContain('No display rules yet.');
         const add = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Add rule'))!;
         expect(add.disabled).toBe(true); // attribute, value and colour all required
 
@@ -54,7 +54,7 @@ describe('LinkAnalysisDisplayRulesComponent', () => {
         expect(el.textContent).toContain('risk is greater than 5');
         await expectNoA11yViolations(fixture.nativeElement);
 
-        el.querySelector<HTMLButtonElement>('button[aria-label^="Remove the rule"]')!.click();
+        el.querySelector<HTMLButtonElement>('button[aria-label^="Remove the display rule"]')!.click();
         fixture.detectChanges();
         expect(host.emitted).toEqual([]);
     });

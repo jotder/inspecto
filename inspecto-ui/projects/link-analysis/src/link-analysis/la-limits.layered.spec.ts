@@ -23,7 +23,7 @@ describe('Layered rank width', () => {
     });
 
     it('disables Layered with the reason only when a rank is over the limit', () => {
-        expect(layeredShapeReason(bipartite(20, 300))).toContain('300 nodes in one rank');
+        expect(layeredShapeReason(bipartite(20, 300))).toContain('too wide (300 nodes in one row, max ');
         expect(layeredShapeReason(bipartite(5, LAYERED_MAX_RANK_WIDTH))).toBeNull();
         expect(layeredShapeReason(null)).toBeNull();
     });

@@ -81,7 +81,7 @@ export interface TagAssignmentData {
                             matInput
                             [formControl]="newTag"
                             (keyup.enter)="createTag()"
-                            placeholder="e.g. billing"
+                            placeholder="Tag name"
                             aria-label="New tag name"
                             cdkFocusInitial
                         />

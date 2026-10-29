@@ -34,6 +34,17 @@ import { investigationErrorMessage, stepName } from './investigation-state';
 import { limitRefusalMessage } from './limit-refusal';
 import { SAFE_ID_PATTERN, templatePreview } from './investigation-template';
 
+/** The server's Measure keys in plain words (T-153); an unknown key shows as sent. */
+const MEASURE_LABELS: Record<string, string> = {
+    entities: 'Entities',
+    links: 'Links',
+    events: 'Events',
+    excluded: 'Excluded',
+    maxHop: 'Furthest degree',
+    identities: 'Identities',
+};
+export const investigationMeasureLabel = (name: string): string => MEASURE_LABELS[name] ?? name;
+
 const SAFE_ID_HINT = "Letters, digits, '.', '_' or '-', starting with a letter or digit (at most 128).";
 
 /** A 503 is an expected deployment state (module / write root / alert engine absent) — explained, not an error. */
@@ -539,7 +550,7 @@ export function alertRuleErrorMessage(err: unknown): string {
         InspectoOptionPickerComponent,
     ],
     template: `
-        <h2 mat-dialog-title>Watch “{{ data.measure.name }}”</h2>
+        <h2 mat-dialog-title>Watch “{{ measureLabel(data.measure.name) }}”</h2>
         <mat-dialog-content class="flex flex-col gap-3 text-sm">
             <p class="m-0 text-xs">
                 <code>{{ data.measure.measure }}</code> over {{ data.measure.relation }} — now
@@ -599,6 +610,7 @@ export function alertRuleErrorMessage(err: unknown): string {
     `,
 })
 export class WatchMeasureDialog {
+    protected readonly measureLabel = investigationMeasureLabel;
     readonly data = inject<WatchMeasureData>(MAT_DIALOG_DATA);
     readonly ref = inject(MatDialogRef<WatchMeasureDialog, InvestigationAlertRuleResult | undefined>);
     private inv = inject(InvService);

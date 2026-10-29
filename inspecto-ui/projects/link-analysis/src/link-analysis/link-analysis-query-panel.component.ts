@@ -152,7 +152,13 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     /** Every Dataset, those that look link-shaped first, each with a one-line reason (operator 2026-10-10). */
     readonly rankedDatasets = computed(() => rankDatasets(this.datasets(), this.probedColumns()));
     readonly datasetOptions = computed<PickerOption[]>(() =>
-        this.rankedDatasets().map((d) => ({ value: d.id, label: d.name, hint: d.hint })),
+        this.rankedDatasets().map((d) => ({
+            value: d.id,
+            label: d.name,
+            hint: d.hint,
+            // ranked link-shaped first, so the rest form one run under one heading (T-171)
+            ...(d.shape ? {} : { group: 'Not link-shaped' }),
+        })),
     );
     /** The Source/Target pair filled in for the picked Dataset, while the form still holds it (editable). */
     readonly prefilled = signal<LinkShape | null>(null);

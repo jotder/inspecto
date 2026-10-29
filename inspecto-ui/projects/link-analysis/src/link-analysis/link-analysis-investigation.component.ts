@@ -807,8 +807,9 @@ export class LinkAnalysisInvestigationComponent {
         return stepName(e.kind === 'undo' ? 'undo' : e.op);
     }
 
+    /** One format and one zone, labelled, as in File ▸ Open… (T-186). */
     time(at: string): string {
         const d = new Date(at);
-        return isNaN(d.getTime()) ? at : d.toLocaleString();
+        return isNaN(d.getTime()) ? at : `${d.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
     }
 }

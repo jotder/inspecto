@@ -169,10 +169,8 @@
                 >
                     <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Pin to a Widget</h3>
                     <p class="text-secondary m-0 text-sm">
-                        Save this Working Set as a dashboard Widget. <strong>Frozen</strong> shows it as it is now and never
-                        moves. <strong>Live</strong> follows this Investigation and shows what changed since now — a Live
-                        Widget cannot leave this Space. Either way only the Investigation's owner sees its rows; anyone else
-                        is told it is not available to them.
+                        <strong>Frozen</strong>: as it is now. <strong>Live</strong>: follows the Investigation and stays
+                        in this Space. Only the owner sees its rows.
                     </p>
                     <form class="flex flex-col gap-2" [formGroup]="pinForm" (ngSubmit)="pinToWidget()">
                         <inspecto-pen-field
@@ -187,7 +185,7 @@
                             "
                         />
                         <inspecto-option-picker
-                            label="Relation"
+                            label="Show"
                             formControlName="relation"
                             [options]="relationOptions"
                         ></inspecto-option-picker>

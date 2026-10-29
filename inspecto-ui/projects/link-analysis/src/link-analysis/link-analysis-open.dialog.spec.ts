@@ -184,6 +184,8 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         expect(el.querySelector('[data-testid="la-open-inv-pack"]')?.textContent?.trim()).toBe('Space default');
         // the list carries only createdAt (set once at create, fork or instantiate): the label says so (T-161 review)
         expect(Array.from(el.querySelectorAll('dt')).map((d) => d.textContent?.trim())).toContain('Created');
+        // T-186: one labelled zone and format, the same as the step log
+        expect(el.querySelector('[data-testid="la-open-preview"]')?.textContent).toContain('2026-10-01 09:00 UTC');
 
         c.setTab('views');
         await settle();
@@ -191,16 +193,19 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         await expectNoA11yViolations(el);
     });
 
-    it('a read-only (Case member) Investigation offers no Delete; an own one deletes after a confirm', async () => {
+    it('a read-only (Case member) Investigation shows Delete disabled with the reason; an own one deletes after a confirm', async () => {
         const { c, el, store, settle } = create({ tab: 'investigations' });
         await settle();
         c.selectedInvestigationId.set('inv-2');
         await settle();
-        const buttons = () => Array.from(el.querySelectorAll('[data-testid="la-open-preview"] button')).map((b) => b.textContent?.trim());
-        expect(buttons()).not.toContain('Delete');
+        const del = () => el.querySelector<HTMLButtonElement>('[data-testid="la-open-inv-delete"]')!;
+        expect(del().disabled).toBe(true);
+        expect(c.investigationDeleteBlock(c.selectedInvestigation()!)).toBe('Only the owner can delete.');
+        expect(del().getAttribute('aria-label')).toBe('Delete: Only the owner can delete.');
         c.selectedInvestigationId.set('inv-1');
         await settle();
-        expect(buttons()).toContain('Delete');
+        expect(del().disabled).toBe(false);
+        expect(c.investigationDeleteBlock(c.selectedInvestigation()!)).toBe('');
         await c.deleteInvestigation(c.selectedInvestigation()!);
         expect(store.deleteInvestigation).toHaveBeenCalledWith('inv-1');
         expect(c.investigationRows().map((r) => r.id)).not.toContain('inv-1');

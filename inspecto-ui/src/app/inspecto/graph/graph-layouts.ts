@@ -37,9 +37,9 @@ export const GRAPH_LAYOUTS: readonly {
     { id: 'concentric', label: 'Degree ordered', tree: false },
     { id: 'circular', label: 'Circular', tree: false },
     { id: 'mds', label: 'Information density', tree: false },
-    { id: 'fruchterman', label: 'Fruchterman', tree: false },
+    { id: 'fruchterman', label: 'Force (spread)', tree: false },
     { id: 'mindmap', label: 'Mind map', tree: true },
-    { id: 'org', label: 'Organization chart', tree: true },
+    { id: 'org', label: 'Organisation chart', tree: true },
     { id: 'radial-tree', label: 'Radial tree', tree: true },
     // Hierarchical like the three above, so they carry the same tree/forest gate: G6's tree layouts
     // read a root and a child order, and handed a cyclic graph they lay out only what they can reach.

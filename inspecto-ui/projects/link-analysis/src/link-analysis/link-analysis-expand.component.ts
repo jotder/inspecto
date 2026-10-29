@@ -312,7 +312,7 @@ export interface ExpandRun {
             }
 
             @if (active().blocked; as why) {
-                <inspecto-alert variant="info" data-testid="la-expand-blocked">{{ why }}</inspecto-alert>
+                <inspecto-alert id="la-expand-blocked-why" variant="info" data-testid="la-expand-blocked">{{ why }}</inspecto-alert>
             }
 
             <div class="flex items-center justify-end gap-2">
@@ -325,14 +325,17 @@ export interface ExpandRun {
                     [disabled]="!!goWhyNot()"
                     [disabledInteractive]="true"
                     [matTooltip]="goWhyNot() || ''"
-                    [attr.aria-describedby]="goWhyNot() ? 'la-expand-why' : null"
+                    [attr.aria-describedby]="goWhyNot() ? (active().blocked ? 'la-expand-blocked-why' : 'la-expand-why') : null"
                     (click)="submit()"
                 >
                     Expand{{ formValue().degrees > 1 ? ' ' + formValue().degrees + ' degrees' : '' }}
                 </button>
             </div>
+            <!-- T-193: a blocked start already says why in the alert above; the reason is never shown twice -->
             @if (goWhyNot(); as why) {
-                <p id="la-expand-why" class="text-secondary m-0 text-right text-xs">{{ why }}</p>
+                @if (!active().blocked) {
+                    <p id="la-expand-why" class="text-secondary m-0 text-right text-xs">{{ why }}</p>
+                }
             }
         </section>
     `,

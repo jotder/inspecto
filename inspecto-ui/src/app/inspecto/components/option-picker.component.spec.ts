@@ -187,6 +187,19 @@ describe('OptionPickerDialog', () => {
         expect(fixture.nativeElement.querySelector('[data-testid="picker-empty"]')?.textContent?.trim()).toBe('No options');
     });
 
+    it('shows a group heading once above its run of options, hidden from assistive tech', async () => {
+        const { fixture } = createDialog([
+            { value: 'a', label: 'A' },
+            { value: 'b', label: 'B', group: 'Not link-shaped' },
+            { value: 'c', label: 'C', group: 'Not link-shaped' },
+        ]);
+        const heads = fixture.nativeElement.querySelectorAll('[data-testid="picker-group"]');
+        expect(heads.length).toBe(1);
+        expect(heads[0].textContent.trim()).toBe('Not link-shaped');
+        expect(heads[0].getAttribute('aria-hidden')).toBe('true');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
     it('a non-empty choice list keeps the listbox role', () => {
         const { fixture } = createDialog(OPTIONS);
         expect(fixture.nativeElement.querySelector('[role="listbox"] button[role="option"]')).toBeTruthy();

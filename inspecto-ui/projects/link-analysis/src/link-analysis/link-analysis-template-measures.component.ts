@@ -16,6 +16,7 @@ import {
     InstantiateTemplateDialog,
     SaveTemplateDialog,
     WatchMeasureDialog,
+    investigationMeasureLabel,
     isUnavailable,
 } from './link-analysis-template.dialogs';
 
@@ -46,13 +47,13 @@ import {
                             class="flex items-center gap-1 rounded-md border px-2 py-0.5"
                             style="border-color: var(--gamma-border)"
                         >
-                            <span>{{ x.name }}</span>
+                            <span>{{ label(x.name) }}</span>
                             <strong class="tabular-nums">{{ x.value ?? '—' }}</strong>
                             <button
                                 mat-button
                                 class="!min-w-0 !px-1"
                                 (click)="watch(x)"
-                                [attr.aria-label]="'Watch the ' + x.name + ' Measure with an Alert Rule'"
+                                [attr.aria-label]="'Watch the ' + label(x.name) + ' Measure with an Alert Rule'"
                             >
                                 Watch
                             </button>
@@ -88,6 +89,7 @@ import {
     `,
 })
 export class LinkAnalysisTemplateMeasuresComponent {
+    protected readonly label = investigationMeasureLabel;
     private inv = inject(InvService);
     private dialog = inject(MatDialog);
     private readonly lens = inject(LensService);

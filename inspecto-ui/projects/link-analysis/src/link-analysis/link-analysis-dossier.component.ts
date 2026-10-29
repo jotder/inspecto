@@ -60,7 +60,7 @@ function saveBlob(blob: Blob, name: string): void {
             <div class="flex items-center gap-1">
                 <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Dossier</h3>
                 <button mat-stroked-button class="ml-auto" [disabled]="busy()" (click)="build()">
-                    {{ dossier() ? 'Rebuild' : 'Build dossier' }}
+                    {{ dossier() ? 'Rebuild' : 'Build Dossier' }}
                 </button>
             </div>
             <div class="flex flex-wrap items-start gap-2" role="group" aria-label="Dossier scope">
@@ -70,7 +70,7 @@ function saveBlob(blob: Blob, name: string): void {
                     type="number"
                     [error]="atControl.hasError('range') ? (atError()) : ''"
                 />
-                <p class="text-secondary m-0 text-sm">{{ steps() == null ? 'Blank = the head' : 'Blank = the head, 0–' + steps() }}</p>
+                <p class="text-secondary m-0 text-sm">{{ steps() == null ? 'Leave blank for the latest step.' : 'Leave blank for the latest step (0–' + steps() + ').' }}</p>
                 <div class="flex flex-col gap-1">
                     <button mat-button [disabled]="busy()" (click)="loadSnapshots()">
                         {{ snapshotList() ? 'Reload snapshots' : 'Include snapshots…' }}
@@ -201,7 +201,7 @@ function saveBlob(blob: Blob, name: string): void {
 
             <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Verify a manifest">
                 <button mat-stroked-button [disabled]="busy() || !dossier()" (click)="verifyIssued()">
-                    Verify this manifest
+                    Verify this Dossier
                 </button>
                 <button mat-button [disabled]="busy()" (click)="file.click()">Verify an uploaded manifest…</button>
                 <input
@@ -214,7 +214,7 @@ function saveBlob(blob: Blob, name: string): void {
                 />
             </div>
             <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Export bundle">
-                <button mat-stroked-button [disabled]="busy()" (click)="downloadBundle()">Download sealed bundle</button>
+                <button mat-stroked-button [disabled]="busy()" (click)="downloadBundle()">Download Dossier (sealed)</button>
                 <button mat-button [disabled]="busy()" (click)="bundleFile.click()">Verify a bundle…</button>
                 <input
                     #bundleFile

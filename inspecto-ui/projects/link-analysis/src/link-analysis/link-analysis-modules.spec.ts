@@ -57,6 +57,11 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
         expect(el.querySelector('[data-testid=module-la-graph]')!.textContent).toContain('Inert');
         expect(el.textContent).toContain('requires la-core');
         expect(el.querySelector('[data-testid=module-la-store-pg]')!.textContent).toContain('Not installed');
+        // T-083: the title is the text; the module id is a tooltip only
+        const name = el.querySelector<HTMLElement>('[data-testid=module-name]')!;
+        expect(name.textContent!.trim()).toBe('geo-link title');
+        expect(name.title).toBe('geo-link');
+        expect(el.querySelector('[data-testid=modules-list]')!.textContent).not.toMatch(/geo-link(?! title)/);
     });
 
     it('draws the list as an opaque card above the canvas, so graph labels do not bleed through it', () => {

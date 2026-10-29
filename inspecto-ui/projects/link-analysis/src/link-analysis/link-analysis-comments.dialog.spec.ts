@@ -73,6 +73,19 @@ describe('LinkAnalysisCommentsDialog', () => {
         expect(addComment).not.toHaveBeenCalled();
     });
 
+    it('says "Enter a comment" only after an empty Add, never on a blur before typing (T-187)', () => {
+        const { c, f } = create();
+        const el = f.nativeElement as HTMLElement;
+        const textarea = el.querySelector('textarea')!;
+        textarea.dispatchEvent(new Event('focus'));
+        textarea.dispatchEvent(new Event('blur'));
+        f.detectChanges();
+        expect(el.textContent).not.toContain('Enter a comment before adding.');
+        c.addComment();
+        f.detectChanges();
+        expect(el.textContent).toContain('Enter a comment before adding.');
+    });
+
     it('shows an empty state with no comments', () => {
         const { c, f } = create({ comments: [] });
         expect(c.comments().length).toBe(0);

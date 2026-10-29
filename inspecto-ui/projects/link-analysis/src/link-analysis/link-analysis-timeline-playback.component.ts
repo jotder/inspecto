@@ -139,15 +139,15 @@ export class LinkAnalysisTimelinePlaybackComponent {
 
     readonly valueText = computed(() => {
         const a = this.active();
-        return a ? `${label(a.slice.start)} to ${label(a.slice.end)}` : 'not started';
+        return a ? `${label(a.slice.start)} to ${label(a.slice.end)} UTC` : 'not started';
     });
 
     readonly status = computed(() => {
         const a = this.active();
         if (!a)
-            return `Not started. ${this.count()} slices from ${label(this.extent()[0])} to ${label(this.extent()[1])}.`;
+            return `Not started. ${this.count()} slices from ${label(this.extent()[0])} to ${label(this.extent()[1])} UTC.`;
         const n = a.selection.edgeIds.length;
-        return `Slice ${a.slice.index + 1} of ${a.slice.count}: ${label(a.slice.start)} to ${label(a.slice.end)} — ${n} ${n === 1 ? 'link' : 'links'} active.`;
+        return `Slice ${a.slice.index + 1} of ${a.slice.count}: ${label(a.slice.start)} to ${label(a.slice.end)} UTC. ${n} ${n === 1 ? 'link' : 'links'} active.`;
     });
 
     private timer: ReturnType<typeof setInterval> | null = null;
