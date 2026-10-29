@@ -140,6 +140,36 @@ function kind(fixture: ReturnType<typeof create>['fixture'], k: string): void {
 }
 
 describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
+    it('T-028: an Entity Types read that answers after the Dataset was picked still defaults the Entity Type', () => {
+        // the Datasets arrive first and the Entity Types later: the first default was taken from a catalogue without them
+        const partial: StartCatalogue = {
+            datasets: CATALOGUE.datasets.map((d) => ({ ...d, primaryEntityType: null, types: [] })),
+            types: [],
+        };
+        TestBed.configureTestingModule({
+            imports: [Host],
+            providers: [
+                provideNoopAnimations(),
+                { provide: EntityProfileService, useValue: { suggestEntities: vi.fn(() => of(answer())) } },
+                { provide: LensService, useValue: { canRevealLinkEntities: computed(() => false) } },
+            ],
+        });
+        const fixture = TestBed.createComponent(Host);
+        fixture.componentInstance.catalogue.set(partial);
+        fixture.detectChanges();
+        const box = fixture.debugElement.query(By.directive(LinkAnalysisStartBoxComponent)).componentInstance as LinkAnalysisStartBoxComponent;
+        expect(box.form.controls.dataset.value).toBe('transfers');
+        expect(box.form.controls.entityType.value).toBe('');
+        fixture.componentInstance.catalogue.set(CATALOGUE);
+        fixture.detectChanges();
+        expect(box.form.controls.entityType.value).toBe('account');
+        // a type the person chose, and the catalogue still offers, is kept when the catalogue moves again
+        box.form.controls.entityType.setValue('msisdn');
+        fixture.componentInstance.catalogue.set({ ...CATALOGUE });
+        fixture.detectChanges();
+        expect(box.form.controls.entityType.value).toBe('msisdn');
+    });
+
     it('preselects the ?dataset Dataset and its primary Entity Type (A-7b), with no error before a submit', async () => {
         const { box, el } = create();
         expect(box.form.controls.dataset.value).toBe('transfers');
@@ -480,6 +510,8 @@ describe('LinkAnalysisStartBoxComponent - the New Investigation form (LA-PANELS-
         fixture.componentInstance.graphOnScreen.set({ name: 'mule_layering_ring' });
         fixture.detectChanges();
         expect(box.kindOptions().map((o) => o.label)).toEqual(['One entity', 'Entity List', 'Pasted values', 'Whole Dataset', 'Graph on screen']);
+        // its hint names the drawn graph in Start entity words (it once read "no seed yet" beside a drawn graph)
+        expect(box.kindOptions().at(-1)?.hint).toBe('mule_layering_ring, no start entities yet');
         kind(fixture, 'graph');
         expect(q(el, 'start-dataset')).toBeNull(); // the drawn graph names its own Dataset
         expect(q(el, 'new-expand')).toBeNull(); // no seed to expand from

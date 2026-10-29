@@ -8,6 +8,7 @@ import {
     input,
     output,
     signal,
+    untracked,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -599,14 +600,31 @@ export class LinkAnalysisStartBoxComponent {
         });
         // A-7b: a new Dataset preselects its primary Entity Type (else its first link-end type).
         this.form.controls.dataset.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => {
-            const d = this.catalogue().datasets.find((x) => x.id === id);
-            const type = d?.primaryEntityType ?? d?.types[0] ?? this.catalogue().types[0]?.id ?? '';
-            this.form.controls.entityType.setValue(type);
+            this.form.controls.entityType.setValue(this.defaultType(id));
+        });
+        // T-028: the Entity Types read can answer AFTER the Dataset was picked, so the default above was taken from a
+        // partial catalogue (blank, or a type the Space does not keep). Re-default once the catalogue moves, unless the
+        // type in the box is one it still offers.
+        effect(() => {
+            const offered = this.catalogue().types.map((t) => t.id);
+            untracked(() => {
+                const ctl = this.form.controls.entityType;
+                if (ctl.value && offered.includes(ctl.value)) return;
+                const type = this.defaultType(this.form.controls.dataset.value);
+                if (type !== ctl.value) ctl.setValue(type);
+            });
         });
         // A reveal asked for one Entity Type is not carried to the next.
         this.form.controls.entityType.valueChanges
             .pipe(takeUntilDestroyed())
             .subscribe(() => this.revealSuggestions.set(false));
+    }
+
+    /** The Entity Type a Dataset starts with: its primary, else its first link-end type, else the first offered. */
+    private defaultType(datasetId: string): string {
+        const cat = this.catalogue();
+        const d = cat.datasets.find((x) => x.id === datasetId);
+        return d?.primaryEntityType ?? d?.types[0] ?? cat.types[0]?.id ?? '';
     }
 
     // ── one entity: the type-ahead ──

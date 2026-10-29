@@ -221,6 +221,27 @@ component *is* do not apply, so a mode flag would leave half of it dead on every
 and the dialog explains the module is absent instead of failing. There is **no model in the loop**: the
 operator reads the binding glossary, not a paraphrase of it.
 
+**What the two reads return** (`INTELLIGENCE-GLOSSARY-ANNOTATED-1`, 2026-10-29). `glossary_lookup` answers
+the **whole** GLOSSARY entry: a paragraph that opens with a bold term and an em dash, all of its lines up to
+a blank line, heading, table or list, joined with spaces, with bold markers, link targets and `\|` escapes
+dropped (until then it sent the first line only, so Dataset, Table and Connection stopped mid-sentence and the
+dialog showed "No definition found."). The entry shapes `GlossaryLoader` parses: `**Term** —`; an italic
+annotation `*(…)*` before the dash, also when it wraps over several lines; a plain-bracket annotation
+(`**Submission** (of a Regulatory Report) —`); and two bold halves (`**Triage** / **Triage Run**`). A list
+directly under an entry is a new block and is not folded into it. A slashed term answers for each half
+(`Entity`, `Link`) unless another entry owns that word. `GlossaryLoaderTest` guards the shapes: every
+paragraph of the real GLOSSARY that opens a bold term and reaches an em dash (outside brackets) before a
+sentence ends must load, so an entry written in a new shape fails the build rather than vanishing. The
+console's `cleanGlossaryDefinition` then keeps the first complete sentence before any ⛔ / ✅ / ⚠ note, reads
+`A | B` as a comma list, keeps an upper-case status code (`COMPLETED`) as a word, drops a "wire values …"
+aside, and drops every other code span. `docs_search` reads **user-facing docs only**, server-side:
+`GLOSSARY.md`, `USER_GUIDE.md`, `ADVANCED_GUIDE.md`, then the product hubs' `user-guide*` / `admin-guide*` /
+`api*` slots under `okf/product/`. It never reads `archived-documents/`, `superpower/`, `.claude/` or a
+deployment / operations README (`InspectoTools.isUserFacingDoc`).
+
+⚠ `InspectoPromptProfile.domainGlossary()` returns the same map, **uncapped**: with whole entries it has
+grown to about 24k tokens. No prompt is built from it today; whoever wires it into one must cap or select it.
+
 **Adopted on 12 panes** (13 routes — `object-mail` serves both `/incidents` and `/cases` and switches its
 term list on `isIncident`): Pipelines · Datasets · Catalog · Expectations · Alerts · Collectors · Query
 Library · Runs · Scheduler · Tags · Incidents/Case Manager · **Link Analysis** (2026-07-26, as

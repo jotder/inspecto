@@ -60,4 +60,26 @@ describe('NotificationsService read state', () => {
         svc.applyIncoming(row('c', false));
         expect(svc.unreadCount()).toBe(2);
     });
+
+    it('a polling tick is ONE request while the count holds; the feed is re-read only when it moved or is shown', () => {
+        const all = () => http.match(() => true);
+        svc.poll();
+        let sent = all();
+        expect(sent.map((r) => r.request.url)).toEqual([expect.stringMatching(/\/notifications\/unread-count$/)]);
+        sent[0].flush({ count: 1 }); // unchanged
+        expect(all()).toHaveLength(0);
+
+        svc.poll();
+        all()[0].flush({ count: 3 }); // moved: the feed follows, once
+        sent = all();
+        expect(sent).toHaveLength(1);
+        expect(sent[0].request.url).toMatch(/\/notifications$/);
+        sent[0].flush([row('c', false)]);
+        expect(svc.unreadCount()).toBe(3);
+        expect(svc.items().map((n) => n.id)).toEqual(['c']);
+
+        svc.poll(true); // the panel is open: keep it current even when the count holds
+        all()[0].flush({ count: 3 });
+        expect(all()).toHaveLength(1);
+    });
 });

@@ -50,10 +50,12 @@ const CITATION_LIMIT = 3;
 
 /**
  * The docs the fallback may cite: user-facing guides and the glossary only. ⛔ Never a deployment, operations or
- * internal README — `docs_search` walks the whole docs folder the backend was started with, and a deployment's own
- * README (identity-provider and gateway set-up) answered "Link" with lines about Keycloak and WSO2 (UI test
- * 2026-10-29). Nothing under `archived-documents/` either: history, never current guidance, even when a file there is
- * named like a guide. The path is matched with either separator (a Windows backend answers back-slashed paths).
+ * internal README — a deployment's own README (identity-provider and gateway set-up) once answered "Link" with lines
+ * about Keycloak and WSO2 (UI test 2026-10-29). Nothing under `archived-documents/` either: history, never current
+ * guidance, even when a file there is named like a guide. The server now searches user-facing docs only
+ * (INTELLIGENCE-GLOSSARY-ANNOTATED-1, `InspectoTools.isUserFacingDoc`); this stays as the console's own, stricter
+ * gate (it also leaves out the hubs' `api*` slots). The path is matched with either separator (a Windows backend
+ * answers back-slashed paths).
  */
 const USER_FACING_DOC = /(^|\/)(GLOSSARY|USER_GUIDE|ADVANCED_GUIDE)\.md$|(^|\/)(user-guide|admin-guide)[^/]*\.md$/i;
 
@@ -79,6 +81,8 @@ export function guideTitle(file: string): string {
 const ENGINEER_MARKERS = ['⛔', '✅', '⚠', '🔴', '(internal document', 'Named by operator decision', 'Named by decision'];
 /** Abbreviations whose full stop does not end a sentence. */
 const NOT_A_SENTENCE_END = /(?:\be\.g|\bi\.e|\bvs|\betc|\bcf|\bapprox)\.$/i;
+/** A code span an analyst may read: an upper-case value such as a status (`COMPLETED`, `BUDGET_EXCEEDED`, `PII`). */
+const SHOWN_CODE = /^[A-Z]{3,}(?:_[A-Z]+)*$/;
 /** About this long, a definition still reads as one short paragraph. */
 const DEFINITION_MAX = 220;
 
@@ -90,10 +94,14 @@ const DEFINITION_MAX = 220;
  * pipes (`\|`) and "Named by operator decision…" tails. This keeps the first COMPLETE sentence of the plain text before
  * the first such marker and drops every code span and id.
  *
- * ⚠ The glossary lookup sends only the FIRST LINE of a row, which often stops mid-sentence ("…a database, cloud"). A
- * fragment is never presented as complete: with no sentence end in the text, this returns '' and the dialog shows the
- * term with no definition (review 2026-10-29). A complete sentence longer than about 220 characters is cut at a word
- * and ends with "…", so the cut shows. Returns '' when nothing readable is left.
+ * The glossary lookup sends the WHOLE row, its continuation lines joined (INTELLIGENCE-GLOSSARY-ANNOTATED-1). A
+ * fragment is still never presented as complete: with no sentence end in the text, this returns '' and the dialog
+ * shows the term with no definition (review 2026-10-29). A complete sentence longer than about 220 characters is cut
+ * at a word and ends with "…", so the cut shows. Returns '' when nothing readable is left.
+ *
+ * Two kinds of code span survive as words: an upper-case value such as a status (`COMPLETED`, `PII`), which an analyst
+ * meets on screen. A span introduced by "with" or "via" goes together with that word ("started with `POST /x`, polled"
+ * reads "started, polled"). A list in table-escaped pipes ("Table \| Derived Table") reads as a comma list.
  */
 export function cleanGlossaryDefinition(raw: string): string {
     const s = stripGlossaryMarkup(raw);
@@ -129,7 +137,11 @@ function stripGlossaryMarkup(raw: string): string {
     const cut = Math.min(...ENGINEER_MARKERS.map((m) => s.indexOf(m)).filter((i) => i >= 0), s.length);
     s = s.slice(0, cut);
     s = s.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'); // [text](target) -> text
-    s = s.replace(/`[^`]*`/g, ' '); // code spans: op ids, class names, keys - never analyst words
+    s = s.replace(/[;,]\s*wire values?\b[^;)]*/gi, ''); // "; wire values `CONFIRMED` … `ACCEPTED_RISK`" is for engineers
+    // code spans: op ids, class names, keys - never analyst words; an upper-case value (a status) stays as a word
+    s = s.replace(/(\b(?:with|via)\s+)?`([^`]*)`/g, (_all, lead: string | undefined, code: string) =>
+        SHOWN_CODE.test(code) ? (lead ?? '') + code : ' ',
+    );
     s = s.replace(/\bops\b/g, 'steps').replace(/\bop\b/g, 'step');
     s = s.replace(/\*\*|\*|(?<=^|\s)_|_(?=\s|[.,;:)]|$)/g, '');
     s = s.replace(/(^|[\s(])\/[\w/*{}.:-]+/g, '$1'); // routes
@@ -137,7 +149,7 @@ function stripGlossaryMarkup(raw: string): string {
     s = s.replace(/(?:\b(?:since|per|under|see|in|by|from)\s+)?\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\b/g, (all, id: string) =>
         /\d/.test(id) && !/^(SHA|UTF|ISO)-/.test(id) ? ' ' : all,
     );
-    s = s.replace(/[|]/g, ' ');
+    s = s.replace(/\s*[|]\s*/g, ', '); // "Table | Derived Table" is a list
     for (let i = 0; i < 3; i++) {
         s = s
             .replace(/\(\s*(?:[,;:/—–-]|\band\b|\bor\b|\s)*\)/g, ' ') // a bracket left empty

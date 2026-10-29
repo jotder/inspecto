@@ -265,7 +265,7 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
         if (this.polling) return;
         this.polling = visibleInterval(DEFAULT_REFRESH_MS)
             .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe(() => this.svc.refresh());
+            .subscribe(() => this.svc.poll(this.open()));
     }
 
     /**

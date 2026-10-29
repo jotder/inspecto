@@ -81,6 +81,7 @@ import { MatIconModule } from '@angular/material/icon';
                 }
             } @else {
                 <button
+                    #valueButton
                     type="button"
                     class="hover:bg-hover min-w-0 flex-1 rounded px-1 py-0.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
                     [class.font-mono]="mono()"
@@ -143,6 +144,7 @@ export class PenFieldComponent implements ControlValueAccessor {
     protected readonly editing = signal(false);
     protected readonly draft = signal('');
     private readonly box = viewChild<ElementRef<HTMLInputElement | HTMLTextAreaElement>>('box');
+    private readonly valueButton = viewChild<ElementRef<HTMLButtonElement>>('valueButton');
     private readonly injector = inject(Injector);
 
     protected readonly text = computed(() => (this.value() ?? '') + '');
@@ -220,9 +222,11 @@ export class PenFieldComponent implements ControlValueAccessor {
             if (this.multiline() && e.shiftKey) return; // Shift+Enter breaks a line in a note
             e.preventDefault();
             this.commit();
+            this.refocusValue();
         } else if (e.key === 'Escape') {
             e.stopPropagation();
             this.editing.set(false);
+            this.refocusValue();
         } else if (e.key === 'ArrowRight' && this.hasDefault()) {
             const d = this.defaultText();
             // Number inputs expose no caret, so → there only fires on an empty box.
@@ -233,6 +237,14 @@ export class PenFieldComponent implements ControlValueAccessor {
                 el.value = d;
             }
         }
+    }
+
+    /**
+     * A keyboard close (Enter / Escape) hands focus back to the value button the editor replaced: removing the focused
+     * box otherwise drops focus to the page body. A blur commit leaves focus where the person moved it.
+     */
+    private refocusValue(): void {
+        afterNextRender(() => this.valueButton()?.nativeElement.focus(), { injector: this.injector });
     }
 
     protected commit(): void {

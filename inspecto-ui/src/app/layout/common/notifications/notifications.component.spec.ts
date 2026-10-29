@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { SessionService } from 'app/inspecto/api';
+import { DEFAULT_REFRESH_MS } from 'app/inspecto/api/auto-refresh';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { NotificationBellComponent } from './notifications.component';
 
@@ -85,6 +86,27 @@ describe('NotificationBellComponent', () => {
             req.flush(req.request.url.includes('unread-count') ? { count: 0 } : []);
         }
     }
+
+    it('each polling tick sends ONE request (the unread count), not a feed + count pair', () => {
+        vi.useFakeTimers();
+        try {
+            G['EventSource'] = FakeEventSource;
+            TestBed.inject(SessionService).authMode.set('oidc');
+            const fixture = TestBed.createComponent(NotificationBellComponent);
+            fixture.detectChanges();
+            flushInitialLoad(); // the first load reads both, once
+            const http = TestBed.inject(HttpTestingController);
+            for (let tick = 0; tick < 3; tick++) {
+                vi.advanceTimersByTime(DEFAULT_REFRESH_MS);
+                const sent = http.match(() => true);
+                expect(sent.map((r) => r.request.url.replace(/.*\/notifications/, '')), `tick ${tick}`).toEqual(['/unread-count']);
+                sent[0].flush({ count: 0 });
+            }
+            fixture.destroy();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 
     it('renders the bell with no accessibility violations', async () => {
         const fixture = TestBed.createComponent(NotificationBellComponent);
