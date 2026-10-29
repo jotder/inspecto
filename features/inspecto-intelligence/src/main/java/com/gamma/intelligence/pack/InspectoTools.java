@@ -151,7 +151,7 @@ final class InspectoTools {
 
     private static Tool docsSearch() {
         ToolSpec spec = new ToolSpec("docs_search",
-                "Search the docs/ corpus for lines matching a query, with file + line citations",
+                "Search the user-facing docs (glossary, user/admin guides, API guides) for lines matching a query, with file + line citations",
                 "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\"}},\"required\":[\"query\"]}",
                 false, Role.USER, Capability.READ_DOCS);
         return new FunctionTool(spec, call -> {
@@ -1661,13 +1661,56 @@ final class InspectoTools {
         }
     }
 
-    /** Case-insensitive substring search over every {@code .md} file under {@link #DOCS_ROOT}. */
+    /** The root canon an operator may read, searched first, in this order. */
+    private static final List<String> USER_FACING_ROOT_DOCS = List.of("GLOSSARY.md", "USER_GUIDE.md", "ADVANCED_GUIDE.md");
+    /** The product-hub slots written for users: {@code user-guide*}, {@code admin-guide*}, {@code api*}. */
+    private static final java.util.regex.Pattern USER_FACING_HUB_SLOT =
+            java.util.regex.Pattern.compile("(user-guide|admin-guide|api)(-[^/]*)?\\.md");
+
+    /**
+     * True when a docs file (path relative to the docs root) is user-facing and may be searched
+     * (INTELLIGENCE-GLOSSARY-ANNOTATED-1): the root GLOSSARY / USER_GUIDE / ADVANCED_GUIDE, or a product hub's
+     * {@code user-guide*} / {@code admin-guide*} / {@code api*} slot under {@code okf/product/}. ⛔ Never
+     * {@code archived-documents/} (history), {@code superpower/} (plans in flight), {@code .claude/}, or a
+     * deployment / operations README — a deployment's identity-provider set-up answered "Link" with lines about
+     * Keycloak (UI test 2026-10-29).
+     */
+    static boolean isUserFacingDoc(Path relative) {
+        String path = relative.toString().replace('\\', '/');
+        if (USER_FACING_ROOT_DOCS.contains(path)) return true;
+        if (!path.startsWith("okf/product/")) return false;
+        for (String segment : path.split("/")) {
+            if (segment.equals("archived-documents") || segment.equals("superpower") || segment.equals(".claude")) {
+                return false;
+            }
+        }
+        return USER_FACING_HUB_SLOT.matcher(path.substring(path.lastIndexOf('/') + 1)).matches();
+    }
+
     private static List<Map<String, Object>> search(String query) {
+        return search(DOCS_ROOT, query);
+    }
+
+    /**
+     * Case-insensitive substring search over the user-facing {@code .md} files under {@code docsRoot}
+     * ({@link #isUserFacingDoc}): the root canon first, then the hub slots in path order.
+     */
+    static List<Map<String, Object>> search(Path docsRoot, String query) {
         String needle = query.toLowerCase(Locale.ROOT);
         List<Map<String, Object>> hits = new ArrayList<>();
-        if (!Files.isDirectory(DOCS_ROOT)) return hits;
-        try (Stream<Path> paths = Files.walk(DOCS_ROOT)) {
-            for (Path file : paths.filter(p -> p.toString().endsWith(".md")).toList()) {
+        if (!Files.isDirectory(docsRoot)) return hits;
+        Comparator<Path> canonFirst = Comparator.comparingInt((Path p) -> {
+            int i = USER_FACING_ROOT_DOCS.indexOf(p.toString().replace('\\', '/'));
+            return i < 0 ? USER_FACING_ROOT_DOCS.size() : i;
+        }).thenComparing(p -> p.toString().replace('\\', '/'));
+        try (Stream<Path> paths = Files.walk(docsRoot)) {
+            List<Path> files = paths.filter(Files::isRegularFile)
+                    .map(docsRoot::relativize)
+                    .filter(InspectoTools::isUserFacingDoc)
+                    .sorted(canonFirst)
+                    .map(docsRoot::resolve)
+                    .toList();
+            for (Path file : files) {
                 if (hits.size() >= DOCS_SEARCH_MAX_HITS) break;
                 List<String> lines;
                 try {
@@ -1677,7 +1720,7 @@ final class InspectoTools {
                 }
                 for (int i = 0; i < lines.size() && hits.size() < DOCS_SEARCH_MAX_HITS; i++) {
                     if (lines.get(i).toLowerCase(Locale.ROOT).contains(needle)) {
-                        hits.add(Map.of("file", DOCS_ROOT.relativize(file).toString(),
+                        hits.add(Map.of("file", docsRoot.relativize(file).toString(),
                                 "line", i + 1, "snippet", lines.get(i).trim()));
                     }
                 }
