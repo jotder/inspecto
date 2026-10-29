@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.intelligence`](../../../../../product-map/module/intelligence.toon).
 
-35 test class(es): 35 unit, 0 real-HTTP control-plane, 0 IT.
+37 test class(es): 37 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -40,8 +40,10 @@ mvn -o test -pl features/inspecto-intelligence -Dtest=AgentApprovalsTest,Approva
 | `NativeEmbeddingLoadTest` | `com.gamma.intelligence.natives` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/natives/NativeEmbeddingLoadTest.java` | Exercises the platform's onnxruntime + DJL tokenizers natives for real (NATIVE-LICENCE-LINUX-MACOS-1): |
 | `AnomalyScanGoldenTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/AnomalyScanGoldenTest.java` | Golden figures of the Assistant's {@code anomaly_scan} tool (ANALYTICS-CORE-1 S7), pinned against the tool as it |
 | `ArgumentDeriverTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/ArgumentDeriverTest.java` | AGT-6a A5.1 — the derive hop's safety properties, pinned against a deterministic stub gateway. |
+| `DocsSearchTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/DocsSearchTest.java` | {@code docs_search} reads only user-facing docs (INTELLIGENCE-GLOSSARY-ANNOTATED-1): the root GLOSSARY / USER_GUIDE / |
 | `DraftArtifactsTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/DraftArtifactsTest.java` | AGT-ARTIFACT-1 slice one: a draft skill's ok result is remembered per run, consumed on read, transparent otherwise. |
 | `EgressMaskingTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/EgressMaskingTest.java` | AGENT-EGRESS-MASK-1: the row-reading scan tools and every other tool result are masked on the way out - on the |
+| `GlossaryLoaderTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/GlossaryLoaderTest.java` | {@link GlossaryLoader} against the real {@code docs/GLOSSARY.md} (INTELLIGENCE-GLOSSARY-ANNOTATED-1): every entry |
 | `InspectoPackTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/InspectoPackTest.java` | Shape checks for {@link InspectoPack} (AGT-5 P0) — mirrors eoiagent's own ReferenceApplicationPackTest. |
 | `InspectoPolicyProfileTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/InspectoPolicyProfileTest.java` | Unit coverage for the host-role → platform-Role/capability mapping (AGT-5 P0). |
 | `InspectoToolsTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/InspectoToolsTest.java` | Direct (no-LLM) tests of the S5 signal tools: they read the canonical ledger through |

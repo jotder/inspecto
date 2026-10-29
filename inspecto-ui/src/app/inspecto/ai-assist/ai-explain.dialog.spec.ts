@@ -180,15 +180,16 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
     it('renders a nasty row as one clean, complete sentence', () => {
         const clean = cleanGlossaryDefinition(NASTY);
         expect(clean).toBe(
-            'The Link Analysis enquiry object: an ordered, replayable log of analyst steps over a graph per Space, plus the Working Set it evaluates to.',
+            'The Link Analysis enquiry object: an ordered, replayable log of analyst steps over a graph, per Space, plus the Working Set it evaluates to.',
         );
         for (const junk of ['`', '*', '⛔', '✅', '\\|', '|', 'D-E1', 'LA-10', 'GLOSSARY-CASE-1', '/inv', 'internal document', 'Named by', 'InvestigationRoutes', '()', 'ops', 'seed'])
             expect(clean, junk).not.toContain(junk);
     });
 
     /**
-     * Real first lines of `docs/GLOSSARY.md` rows, exactly as the glossary lookup sends them (it reads one line per row,
-     * so most stop mid-sentence). A cut-off line must never read as a finished definition (review 2026-10-29).
+     * Real first lines of `docs/GLOSSARY.md` rows, as the glossary lookup sent them before INTELLIGENCE-GLOSSARY-ANNOTATED-1
+     * (one line per row, so most stopped mid-sentence). A cut-off line must never read as a finished definition (review
+     * 2026-10-29).
      */
     it.each([
         ['Dataset', 'The umbrella for any queryable relation the BI layer can bind to: **Table** \\| **Derived Table** \\|'],
@@ -198,6 +199,51 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
         ['Expectation', 'A **data-quality** rule that validates records against a Schema (non-null, range, regex,'],
     ])('a cut-off %s row gives no definition, never a fragment with a full stop', (_term, firstLine) => {
         expect(cleanGlossaryDefinition(firstLine)).toBe('');
+    });
+
+    /**
+     * Whole `docs/GLOSSARY.md` rows, exactly as the glossary lookup now sends them (INTELLIGENCE-GLOSSARY-ANNOTATED-1:
+     * continuation lines joined, bold markers and table-escaped pipes dropped). Each reads as one complete sentence.
+     */
+    it.each([
+        [
+            'Dataset',
+            'The umbrella for any queryable relation the BI layer can bind to: Table | Derived Table | Reference Dataset | View. ⛔ never "Data Store" (that means the physical backend).',
+            'The umbrella for any queryable relation the BI layer can bind to: Table, Derived Table, Reference Dataset, View.',
+        ],
+        [
+            'Connection',
+            'Named endpoint + credentials for reaching a remote system (SFTP/FTP/FTPS, a database, cloud storage). Defined once, reused by many Collectors. Holds *how to reach it*, never *what to collect*.',
+            'Named endpoint + credentials for reaching a remote system (SFTP/FTP/FTPS, a database, cloud storage).',
+        ],
+        [
+            'Table',
+            'A Hive-style root directory of Parquet files, partitioned by date / partition key and split by event type. Its structure is described by a Schema. (≈ Iceberg/Hive table.)',
+            'A Hive-style root directory of Parquet files, partitioned by date / partition key and split by event type.',
+        ],
+        [
+            'Widget',
+            "A Visualization Type + Config + a binding to a Dataset's resultset metadata — i.e. the configured, renderable instance. This is the Type→Instance pattern made concrete.",
+            "A Visualization Type + Config + a binding to a Dataset's resultset metadata — i.e. the configured, renderable instance.",
+        ],
+        [
+            'Expectation',
+            'A data-quality rule that validates records against a Schema (non-null, range, regex, referential). Borrowed from the Great Expectations model.',
+            'A data-quality rule that validates records against a Schema (non-null, range, regex, referential).',
+        ],
+        [
+            'Graph Run',
+            "One execution of one Link Analysis graph algorithm (of 29) on the server over an Investigation's Working Set, started with `POST /inv/graph/runs`, polled, cancellable, and ending in exactly one of `COMPLETED`, `CANCELLED`, `BUDGET_EXCEEDED` or `FAILED`. It carries a Graph Budget (`maxNodes`, `maxEdges`, `timeoutMs`).",
+            "One execution of one Link Analysis graph algorithm (of 29) on the server over an Investigation's Working Set, started, polled, cancellable, and ending in exactly one of COMPLETED, CANCELLED, BUDGET_EXCEEDED or FAILED.",
+        ],
+    ])('a whole %s row reads as one complete sentence', (_term, row, expected) => {
+        expect(cleanGlossaryDefinition(row)).toBe(expected);
+    });
+
+    it('drops a code span with the "with" that introduced it, keeps an upper-case status, and lists piped items', () => {
+        expect(cleanGlossaryDefinition('Started via `runJob()` and ends `DONE` or `FAILED_HARD`.')).toBe('Started and ends DONE or FAILED_HARD.');
+        expect(cleanGlossaryDefinition('A label such as `PII` or `INTERNAL` (`D16`, `x-key`).')).toBe('A label such as PII or INTERNAL.');
+        expect(cleanGlossaryDefinition('One of: A \\| B | C.')).toBe('One of: A, B, C.');
     });
 
     it('ends a cut row at its last complete sentence, and drops an id together with the word that pointed at it', () => {

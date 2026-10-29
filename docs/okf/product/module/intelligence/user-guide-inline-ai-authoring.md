@@ -221,6 +221,20 @@ component *is* do not apply, so a mode flag would leave half of it dead on every
 and the dialog explains the module is absent instead of failing. There is **no model in the loop**: the
 operator reads the binding glossary, not a paraphrase of it.
 
+**What the two reads return** (`INTELLIGENCE-GLOSSARY-ANNOTATED-1`, 2026-10-29). `glossary_lookup` answers
+the **whole** GLOSSARY entry: the line that opens a paragraph with `**Term** —` plus every continuation line
+to the blank line, joined with spaces, with bold markers, link targets and `\|` escapes dropped (until then
+it sent the first line only, so Dataset, Table and Connection stopped mid-sentence and the dialog showed
+"No definition found."). An annotated entry (`**Entity / Link** *(business graphs only)* —`) is parsed too,
+and a slashed term answers for each half (`Entity`, `Link`) unless another entry owns that word. The console's
+`cleanGlossaryDefinition` then keeps the first complete sentence before any ⛔ / ✅ / ⚠ note, reads `A | B`
+as a comma list, keeps an upper-case status code (`COMPLETED`) as a word and drops every other code span.
+`docs_search` reads **user-facing docs only**, server-side: `GLOSSARY.md`, `USER_GUIDE.md`,
+`ADVANCED_GUIDE.md`, then the product hubs' `user-guide*` / `admin-guide*` / `api*` slots under
+`okf/product/`. It never reads `archived-documents/`, `superpower/`, `.claude/` or a deployment / operations
+README (`InspectoTools.isUserFacingDoc`). ⚠ `InspectoPromptProfile.domainGlossary()` reads the same map, so
+the assistant's glossary is now the whole entries too.
+
 **Adopted on 12 panes** (13 routes — `object-mail` serves both `/incidents` and `/cases` and switches its
 term list on `isIncident`): Pipelines · Datasets · Catalog · Expectations · Alerts · Collectors · Query
 Library · Runs · Scheduler · Tags · Incidents/Case Manager · **Link Analysis** (2026-07-26, as

@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **79<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 63<!--count:backlog-p3--> × P3** —
+> **78<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 62<!--count:backlog-p3--> × P3** —
+> ⬇ **79 → 78 (P3 63 → 62) on 2026-10-29**: closed P3 defect `INTELLIGENCE-GLOSSARY-ANNOTATED-1` — `GlossaryLoader` returns whole entries (continuation lines joined, annotated entries parsed, `A / B` answers for each half) and `docs_search` reads user-facing docs only; as built in `okf/product/module/intelligence/user-guide-inline-ai-authoring.md`.
 > ↔ **79 (P2 17 → 16, P3 62 → 63) on 2026-10-29**: closed P2 chore `LA-UI-TEXT-PASS-1` (two passes shipped, plan archived) and filed its residuals as P3 chore `LA-UI-TEXT-RESIDUALS-1`.
 > ⬆ **78 → 79 (P2 16 → 17) on 2026-10-29**: filed P2 feature `LA-PRODUCT-NEXT-1` (the LA feature brainstorm's five phases; phase 1 brings role and access-policy edits under maker-checker; plan in `superpower/la-product-next-plan.md`).
 > ⬆ **77 → 78 (P2 15 → 16) on 2026-10-29**: filed P2 chore `LA-UI-TEXT-PASS-1` (the LA UI text review: 209 findings, plan since archived to `archived-documents/plans-archive/la-ui-text-pass.md`).
@@ -368,10 +369,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 62<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 79<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 62<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 78<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -622,15 +623,6 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.9 Cases, Incidents & Assistant
 
-- **P3** · `INTELLIGENCE-GLOSSARY-ANNOTATED-1` — **`GlossaryLoader` skips annotated GLOSSARY entries, and `docs_search` reads internal docs** [items: module.intelligence · kind: defect]
-  - **Found** by the 2026-10-29 LA UI test.
-  - **Glossary miss:** the loader's entry pattern misses lines like `**Entity / Link** *(…)* —`, so the explain/About lookup answers "No canonical definition" for canonical terms. *Link-Analysis View* has no GLOSSARY entry at all.
-  - **Internal docs:** `InspectoTools.search` (`docs_search`) scans the whole `docs/` tree, deployment READMEs and `archived-documents/` included.
-  - **Already shipped (UI only):** the console now filters citations to user-facing docs, and the LA About supplies its own definitions.
-  - **Fix:** parse annotated entries, and restrict the search corpus server-side.
-
-
-
 - **P3** · `D6-REAL-USER-SESSION-1` — **the D10 think-aloud with a REAL Case-desk lead is still unrun.** The D6 row closed 2026-09-29 as *accepted on proxy (operator 2026-09-29)*: an agent acting as a Case-desk lead drove the *Findings fields* dialog end to end on a `4dbe84d1a` demo build. A proxy cannot tell what a lead who has never seen the product finds confusing. Run the design's §8 protocol (T2, T6, T7, T5 unaided) with a real lead, and record pass or fail per task in `objects.md`. (The plan was archived on 2026-09-29 by operator decision, to `archived-documents/plans-archive/findings-spec-authoring-ui-design.md`.) → `okf/product/module/ops/user-guide-objects.md` (*Proxy acceptance session 2026-09-29*) **2026-10-12:** the facilitator script is ready (`okf/product/module/la-core/tests-think-aloud-script.md`: pre-session checklist, T2/T6/T7/T5, pass/fail signals); running it needs a real Case-desk lead. [items: module.case-management · kind: chore · hold: external]
 - **P2** · **AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL** (re-gated 2026-09-16). The upstream `DryRunProvider` type ships, but the seam does not: `javap` on the pinned `eoiagent-platform` jar shows `PlatformBuilder` with `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`**. **Upstream ask (to `jotder/inspect-agent`): expose `PlatformBuilder.dryRunProvider(DryRunProvider)` and thread it to the gate builder.** Until then `AgentApprovals` stays as the previewer. ⛔ Do not re-discharge on the presence of the type — check the builder. `incident_explain` waits separately on the eoiagent host seam. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2 [items: module.agent · kind: feature · hold: external]
 - **P3** · `AGT-SEGMENT-1` — **the assistant's commercial framing is an unvalidated product read.** The tier packaging (A Explain / B Author-with-approval / C Bounded autonomy), the "Tier A is the wedge" argument and the SHADOW-first on-ramp were never validated against a client segment. ⛔ Decided 2026-09-10: keep the caveat and reopen on the first customer conversation — needs product input, not engineering; the framing is quoted in a stakeholder-facing doc, so it carries its caveat until this closes. → `okf/product/layer/product/features-product-capabilities.md` §"How the ladder is packaged" · `archived-documents/plans-archive/agt-6-plan.md` §2 [items: module.agent, layer.product · kind: chore]
@@ -674,7 +666,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
   - **T-083 (part):** show the module's plain name. That needs the server's module `title`; ids are tooltips now.
   - **T-186 (part):** the Open… list shows the owner's login id. A display name needs a server field.
   - **Four-eyes wording:** the refusal says "read" ("Narrow the read" on the server, "This read needs…" in the UI). It also guards analyst upload, identity import and graph runs, so it should say "step".
-  - **Glossary text on other screens:** this waits on `INTELLIGENCE-GLOSSARY-ANNOTATED-1`, the first-line-only `GlossaryLoader`. Until then, Data browser and Catalog show "No definition found." for Dataset and Table, and the Graph Run row cleans badly.
 - **P2** · `LA-PRODUCT-NEXT-1` — **Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "What can this role do?", Investigation access review, a timeline scrubber, pattern-by-example (from a selection, saved as a pack, then as standing detection), and an entity-resolution suggestions spike** [items: module.la-core, module.access · kind: feature]
   - **Phase 1 is a security gap** (verified 2026-10-29): `PUT /access/roles` and `PUT /access/policies` write straight to disk, while Access Catalog and Profile edits go through `PendingChanges.hold`. So an Approval Policy cannot hold the write that grants capabilities.
   - **Decisions** NX-D1…NX-D7 were made by the assistant under operator delegation and are pending confirmation. The operator endorsed the pattern-by-example, scrubber and entity-resolution picks. The deferred ideas and their reasons are in the plan's §4, and the Reach review is in §5.
