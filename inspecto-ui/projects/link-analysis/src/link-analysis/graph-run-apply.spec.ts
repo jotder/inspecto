@@ -285,10 +285,10 @@ describe('countDropped / droppedNotice (LA-GRAPH-RUN-HIDDEN-NODES-1)', () => {
         );
         expect(droppedNotice(whole)).toBe('');
         expect(droppedNotice({ nodes: { dropped: 2, total: 9 }, edges: { dropped: 0, total: 4 } })).toBe(
-            '2 of 9 result nodes are not drawn on the canvas right now, so the result shown here leaves them out.',
+            '2 of 9 result nodes are not on the canvas, so this result leaves them out.',
         );
         expect(droppedNotice({ nodes: { dropped: 1, total: 3 }, edges: { dropped: 1, total: 2 } })).toBe(
-            '1 of 3 result nodes and 1 of 2 result links are not drawn on the canvas right now, so the result shown here leaves them out.',
+            '1 of 3 result nodes and 1 of 2 result links are not on the canvas, so this result leaves them out.',
         );
     });
 });
@@ -301,7 +301,7 @@ describe('truncationNotice (D1 - never a silent cap)', () => {
         elapsedMs: 1,
         ...more,
     });
-    const tail = '(the server cap is 2; raise graph_run.max_result_items in Settings).';
+    const tail = '(cut at the server limit of 2; an administrator can raise it in Settings).';
 
     it('is empty for a whole result', () => {
         const whole = { scores: { total: 3, returned: 3, limit: 10, truncated: false } };
@@ -312,7 +312,7 @@ describe('truncationNotice (D1 - never a silent cap)', () => {
     it('names the kept and total counts and the cap for a cut list', () => {
         const lists = { scores: { total: 25311, returned: 10000, limit: 10000, truncated: true } };
         expect(truncationNotice(r({ truncated: true, lists }))).toBe(
-            'Showing the first 10,000 of 25,311 scores (the server cap is 10,000; raise graph_run.max_result_items in Settings).',
+            'Showing the first 10,000 of 25,311 scores (cut at the server limit of 10,000; an administrator can raise it in Settings).',
         );
     });
 

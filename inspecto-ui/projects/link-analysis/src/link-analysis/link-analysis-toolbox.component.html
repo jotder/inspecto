@@ -1,21 +1,24 @@
 @if (serverDropped()) {
-    <inspecto-alert variant="info" title="Part of the server result is not on the canvas"
+    <inspecto-alert variant="info" title="Some results are not on the canvas"
         ><span data-testid="server-dropped">{{ serverDropped() }}</span></inspecto-alert
     >
 }
 @if (serverTruncated()) {
-    <inspecto-alert variant="warning" title="The server cut this result"
+    <inspecto-alert variant="warning" title="Result cut short"
         ><span data-testid="server-truncated">{{ serverTruncated() }}</span></inspecto-alert
     >
 }
 @if (analysisError()) {
     <div #analysisAlert data-testid="analysis-alert">
-        <inspecto-alert variant="warning" title="Analysis">{{ analysisError() }}</inspecto-alert>
+        <inspecto-alert variant="warning" title="Analysis problem">{{ analysisError() }}</inspecto-alert>
     </div>
 }
 <div class="flex flex-col gap-2">
     <!-- The catalogue (§5.8, UIR-D10) for the host's Browser or Server tab (LA-PANELS-REDESIGN-1), grouped by question. -->
     @if (side() === 'browser') {
+        @if (!graph()?.nodes?.length) {
+            <p class="text-secondary m-0 text-xs" data-testid="catalogue-no-graph" role="status">Draw a graph first.</p>
+        }
         @if (overCapNote(); as why) {
             <p class="text-secondary m-0 text-xs" data-testid="catalogue-over-cap" role="status">{{ why }}</p>
         }
@@ -35,8 +38,10 @@
             >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:server-stack"></mat-icon>
                 <span class="font-medium">{{ a.label }}</span>
-                <inspecto-chip class="whitespace-nowrap" variant="soft">{{ a.runsOn }}</inspecto-chip>
-                <span class="text-secondary hidden text-xs sm:inline">waits for ≤ {{ a.inlineNodeCeiling }} nodes</span>
+                @if (alsoOn(a.runsOn); as also) {
+                    <inspecto-chip class="whitespace-nowrap" variant="soft">{{ also }}</inspecto-chip>
+                }
+                <span class="text-secondary hidden text-xs sm:inline">{{ inlineCeiling(a.inlineNodeCeiling) }}</span>
                 <mat-icon
                     class="icon-size-4 ml-auto shrink-0"
                     [svgIcon]="serverTab() === a.id ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'"
@@ -75,7 +80,9 @@
                 @if (t.hint) {
                     <span class="text-secondary hidden text-xs sm:inline" [id]="'tool-hint-' + t.id">{{ t.hint }}</span>
                 }
-                <inspecto-chip class="whitespace-nowrap" variant="soft">{{ runsOn(t.id) }}</inspecto-chip>
+                @if (alsoOn(runsOn(t.id)); as also) {
+                    <inspecto-chip class="whitespace-nowrap" variant="soft">{{ also }}</inspecto-chip>
+                }
                 @if (toolCap(t.id); as cap) {
                     <span class="text-secondary hidden whitespace-nowrap text-xs sm:inline">{{ cap }}</span>
                 }
@@ -87,8 +94,8 @@
                         class="whitespace-nowrap"
                         variant="soft"
                         tone="primary"
-                        title="Foregrounded by the selected domain profile"
-                        >suggested</inspecto-chip
+                        matTooltip="Suggested for this Industry pack"
+                        >Suggested</inspecto-chip
                     >
                 }
                 <mat-icon
@@ -119,20 +126,28 @@
                                 <mat-button-toggle-group
                                     [value]="pathMetric()"
                                     (change)="pathMetric.set($event.value)"
-                                    aria-label="Path metric"
+                                    aria-label="Path type"
                                 >
                                     <mat-button-toggle value="hops">Fewest hops</mat-button-toggle>
-                                    <mat-button-toggle value="weighted">Strongest ties</mat-button-toggle>
+                                    <mat-button-toggle value="weighted" matTooltip="Prefers links with the highest weight"
+                                        >Strongest ties</mat-button-toggle
+                                    >
                                 </mat-button-toggle-group>
                                 @if (!serverFirst('path')) {
                                     <button
                                         mat-stroked-button
-                                        (click)="runPath()"
-                                        [disabled]="!pathFrom() || !pathTo()"
+                                        (click)="!pathWhyNot() && runPath()"
+                                        [disabled]="!!pathWhyNot()"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="pathWhyNot()"
+                                        [attr.aria-describedby]="pathWhyNot() ? 'why-path' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
                                         Find shortest path
                                     </button>
+                                    @if (pathWhyNot(); as why) {
+                                        <p class="text-secondary m-0 w-full text-xs" id="why-path" data-testid="why-path">{{ why }}</p>
+                                    }
                                 }
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().path; as srv) {
@@ -178,12 +193,18 @@
                                 @if (!serverFirst('allPaths')) {
                                     <button
                                         mat-stroked-button
-                                        (click)="runAllPaths()"
-                                        [disabled]="!pathFrom() || !pathTo()"
+                                        (click)="!pathWhyNot() && runAllPaths()"
+                                        [disabled]="!!pathWhyNot()"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="pathWhyNot()"
+                                        [attr.aria-describedby]="pathWhyNot() ? 'why-all-paths' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
                                         Find all paths
                                     </button>
+                                    @if (pathWhyNot(); as why) {
+                                        <p class="text-secondary m-0 w-full text-xs" id="why-all-paths" data-testid="why-all-paths">{{ why }}</p>
+                                    }
                                 }
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().allPaths; as srv) {
@@ -216,12 +237,12 @@
                         @case ('server-paths') {
                             @if (!traversalMappings().length) {
                                 <p class="text-secondary text-sm">
-                                    Load an Entity/Link projection first — the server walks its edge Dataset.
+                                    Draw a graph from an Entity/Link query first.
                                 </p>
                             } @else {
                                 <p class="text-secondary text-sm">
-                                    Walks the whole edge Dataset on the server, not just the loaded graph. Nodes it
-                                    reaches beyond the working set are added.
+                                    Searches the whole Dataset, not just the graph on screen. New nodes it reaches are
+                                    added.
                                 </p>
                                 <div class="flex flex-wrap items-center gap-2">
                                     <inspecto-option-picker
@@ -241,39 +262,44 @@
                                     @if (traversalMappings().length > 1) {
                                         <inspecto-option-picker
                                             class="w-56"
-                                            label="Edge Dataset"
+                                            label="Link Dataset"
                                             [options]="traversalMappings()"
                                             [ngModel]="serverMapping()"
                                             (ngModelChange)="serverMapping.set($any($event))"
                                         />
                                     }
-                                    <inspecto-pen-field class="w-full" label="Max hops" type="number" [min]="1" [max]="10" [ngModel]="serverDepth()" (ngModelChange)="serverDepth.set(+$event)"></inspecto-pen-field>
+                                    <inspecto-pen-field class="w-full" label="Longest path (hops)" type="number" [min]="1" [max]="10" [ngModel]="serverDepth()" (ngModelChange)="serverDepth.set(+$event)"></inspecto-pen-field>
                                     <mat-button-toggle-group
                                         [value]="serverDirection()"
                                         (change)="serverDirection.set($event.value)"
-                                        aria-label="Traversal direction"
+                                        aria-label="Direction"
                                     >
-                                        <mat-button-toggle value="DIRECTED">Follow direction</mat-button-toggle>
-                                        <mat-button-toggle value="UNDIRECTED">Either direction</mat-button-toggle>
+                                        <mat-button-toggle value="DIRECTED">Outgoing</mat-button-toggle>
+                                        <mat-button-toggle value="UNDIRECTED">Both ways</mat-button-toggle>
                                     </mat-button-toggle-group>
                                     <button
                                         mat-stroked-button
-                                        (click)="runServerPaths()"
-                                        [disabled]="!pathFrom() || serverPathsBusy()"
+                                        (click)="!serverPathsWhyNot() && runServerPaths()"
+                                        [disabled]="!!serverPathsWhyNot()"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="serverPathsWhyNot()"
+                                        [attr.aria-describedby]="serverPathsWhyNot() ? 'why-server-paths' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
                                         Find paths
                                     </button>
+                                    @if (serverPathsWhyNot(); as why) {
+                                        <p class="text-secondary m-0 w-full text-xs" id="why-server-paths" data-testid="why-server-paths">{{ why }}</p>
+                                    }
                                 </div>
                                 @if (serverPaths(); as sp) {
-                                    <p class="m-0 text-sm tabular-nums" role="status" aria-label="Server path search">
+                                    <p class="m-0 text-sm tabular-nums" role="status" aria-label="Whole Dataset path search">
                                         @if (sp.paths.length) {
-                                            {{ sp.paths.length }} {{ sp.paths.length === 1 ? 'path' : 'paths' }} ·
-                                            longest {{ sp.deepest }} hops
+                                            {{ sp.paths.length }} {{ sp.paths.length === 1 ? 'path' : 'paths' }}, longest
+                                            {{ sp.deepest }} hops (searched up to {{ sp.depthLimit }})
                                         } @else {
-                                            No path found
+                                            No path found (searched up to {{ sp.depthLimit }} hops)
                                         }
-                                        · searched up to {{ sp.depthLimit }} hops
                                     </p>
                                     @if (serverPathsSourceNote(); as note) {
                                         <p class="text-secondary m-0 text-xs" role="status" data-testid="paths-source">
@@ -281,17 +307,17 @@
                                         </p>
                                     }
                                     @if (sp.edgeYieldCapped) {
-                                        <inspecto-alert variant="warning" title="Edge-yield cap reached">
-                                            A hop level hit the server's edge-yield fence, so part of the graph was not
-                                            walked — longer or other paths may exist.
+                                        <inspecto-alert variant="warning" title="Search stopped early">
+                                            The server hit its link limit, so some paths may be missing. Narrow the
+                                            query and run it again.
                                         </inspecto-alert>
                                     } @else if (sp.truncated) {
-                                        <inspecto-alert variant="warning" title="Truncated">
-                                            The path limit cut the answer short — more paths exist than are shown.
+                                        <inspecto-alert variant="warning" title="Result cut short">
+                                            Cut at the path limit: more paths exist than are shown.
                                         </inspecto-alert>
                                     }
                                     @if (sp.paths.length) {
-                                        <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Server paths">
+                                        <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Paths from the whole Dataset">
                                             @for (p of sp.paths; track $index) {
                                                 <li>
                                                     <button
@@ -326,16 +352,27 @@
                                     (ngModelChange)="explainHops.set(+$event || 1)"
                                 ></inspecto-pen-field>
                                 @if (side() === 'browser') {
-                                    <button mat-stroked-button (click)="runExplain()" [disabled]="!explainFor()">
+                                    <button
+                                        mat-stroked-button
+                                        (click)="!explainWhyNot() && runExplain()"
+                                        [disabled]="!!explainWhyNot()"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="explainWhyNot()"
+                                        [attr.aria-describedby]="explainWhyNot() ? 'why-explain' : null"
+                                    >
                                         <mat-icon svgIcon="heroicons_outline:light-bulb"></mat-icon>
-                                        Explain neighborhood
+                                        Explain node
                                     </button>
+                                    @if (explainWhyNot(); as why) {
+                                        <p class="text-secondary m-0 w-full text-xs" id="why-explain" data-testid="why-explain">{{ why }}</p>
+                                    }
                                 }
                             </div>
                             @if (side() === 'browser' && explainText()) {
                                 <p class="mt-1 text-sm" role="status">{{ explainText() }}</p>
                             }
                             @if (side() === 'server') {
+                            <h4 class="mt-2 text-sm font-medium">Neighbourhood from the link index</h4>
                             <inspecto-link-analysis-server-run
                                 algorithm="neighborhood"
                                 [indexOnly]="true"
@@ -345,7 +382,7 @@
                                 [investigationOpen]="investigationOpen()"
                                 [allowed]="canRunOnServer()"
                             />
-                            <h4 class="mt-2 text-sm font-medium">Ego network from the index</h4>
+                            <h4 class="mt-2 text-sm font-medium">Ego network from the link index</h4>
                             <inspecto-link-analysis-server-run
                                 algorithm="egoNetwork"
                                 [indexOnly]="true"
@@ -355,7 +392,7 @@
                                 [investigationOpen]="investigationOpen()"
                                 [allowed]="canRunOnServer()"
                             />
-                            <h4 class="mt-2 text-sm font-medium">Degree of chosen nodes from the index</h4>
+                            <h4 class="mt-2 text-sm font-medium">Degree from the link index</h4>
                             <div class="flex flex-wrap items-center gap-2">
                                 <inspecto-option-picker
                                     class="w-56"
@@ -367,11 +404,17 @@
                                 <button
                                     mat-stroked-button
                                     data-testid="add-score-seed"
-                                    [disabled]="!scoreSeedPick()"
-                                    (click)="addScoreSeed()"
+                                    [disabled]="!!scoreSeedWhyNot()"
+                                    [disabledInteractive]="true"
+                                    [matTooltip]="scoreSeedWhyNot()"
+                                    [attr.aria-describedby]="scoreSeedWhyNot() ? 'why-add-node' : null"
+                                    (click)="!scoreSeedWhyNot() && addScoreSeed()"
                                 >
                                     Add node
                                 </button>
+                                @if (scoreSeedWhyNot(); as why) {
+                                    <p class="text-secondary m-0 w-full text-xs" id="why-add-node" data-testid="why-add-node">{{ why }}</p>
+                                }
                             </div>
                             @if (scoreSeeds().length) {
                                 <ul
@@ -421,14 +464,14 @@
                                     [mappings]="indexMappings()"
                                 />
                             } @else {
-                                <inspecto-locked-action label="Build index" [reason]="lockedReason()" />
+                                <inspecto-locked-action label="Build link index" [reason]="lockedReason()" />
                             }
                         }
                         @case ('centrality') {
                             <div class="flex flex-wrap items-center gap-2">
                                 <inspecto-option-picker
                                     class="w-56"
-                                    label="Metric"
+                                    label="Rank by"
                                     [options]="centralityOptions"
                                     [ngModel]="centralityMetric()"
                                     (ngModelChange)="centralityMetric.set($any($event))"
@@ -455,11 +498,7 @@
                             @if (ranking().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
                                     <caption class="sr-only">
-                                        Node ranking by
-                                        {{
-                                            centralityMetric()
-                                        }}
-                                        centrality
+                                        Node ranking by {{ centralityLabel() }}
                                     </caption>
                                     <thead>
                                         <tr class="text-left">
@@ -498,8 +537,12 @@
                                     (change)="communityMethod.set($event.value)"
                                     aria-label="Community detection method"
                                 >
-                                    <mat-button-toggle value="label-prop">LP automatic clustering</mat-button-toggle>
-                                    <mat-button-toggle value="louvain">Louvain</mat-button-toggle>
+                                    <mat-button-toggle value="label-prop" matTooltip="Fast: neighbours share a group label"
+                                        >Label spread (fast)</mat-button-toggle
+                                    >
+                                    <mat-button-toggle value="louvain" matTooltip="Slower: finds finer, tighter groups"
+                                        >Louvain (finer)</mat-button-toggle
+                                    >
                                 </mat-button-toggle-group>
                                 @if (!serverSpecs().communities) {
                                     <button mat-stroked-button (click)="runCommunities()">
@@ -528,7 +571,7 @@
                                                 class="min-h-6 px-1 text-left underline-offset-2 hover:underline"
                                                 (click)="focusCommunity(c.members)"
                                             >
-                                                Community {{ i + 1 }} — {{ c.members.length }} nodes
+                                                Community {{ i + 1 }}: {{ c.members.length }} nodes
                                             </button>
                                         </li>
                                     }
@@ -550,7 +593,7 @@
                                                 class="min-h-6 px-1 text-left underline-offset-2 hover:underline"
                                                 (click)="focusComponent(c)"
                                             >
-                                                Component {{ i + 1 }} — {{ c.length }} nodes
+                                                Component {{ i + 1 }}: {{ c.length }} nodes
                                             </button>
                                         </li>
                                     }
@@ -566,7 +609,7 @@
                                     </button>
                                 }
                                 <span class="text-sm text-secondary"
-                                    >Directed loops — circular flow, forwarding loops.</span
+                                    >Finds loops that return to their start.</span
                                 >
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().cycles; as srv) {
@@ -580,6 +623,9 @@
                                     [allowed]="canRunOnServer()"
                                     (completed)="applyServerResult($event)"
                                 />
+                            }
+                            @if (cyclesNote(); as note) {
+                                <p class="text-secondary m-0 text-sm" role="status" data-testid="cycles-note">{{ note }}</p>
                             }
                             @if (cycles().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Cycles">
@@ -607,7 +653,7 @@
                                     </button>
                                 }
                                 <span class="text-sm text-secondary"
-                                    >Nodes / links whose removal splits the graph.</span
+                                    >Finds nodes and links whose removal splits the graph.</span
                                 >
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().cutNodes; as srv) {
@@ -636,7 +682,7 @@
                             }
                             @if (cutNodes().length) {
                                 <div class="mt-1 text-sm">
-                                    <span class="font-medium">Articulation nodes:</span>
+                                    <span class="font-medium">Cut nodes:</span>
                                     @for (id of cutNodes(); track id) {
                                         <button class="ml-1 underline-offset-2 hover:underline" (click)="focusNode(id)">
                                             {{ label(id) }}
@@ -646,7 +692,7 @@
                             }
                             @if (cutEdges().length) {
                                 <p class="text-sm">
-                                    <span class="font-medium">Bridges:</span> {{ cutEdges().length }} link(s)
+                                    {{ cutEdges().length }} {{ cutEdges().length === 1 ? 'cut link' : 'cut links' }}
                                     highlighted.
                                 </p>
                             }
@@ -663,7 +709,7 @@
                                 @if (!serverSpecs().cliques) {
                                     <button mat-stroked-button (click)="runCohesion()">
                                         <mat-icon svgIcon="heroicons_outline:cube"></mat-icon>
-                                        Analyze
+                                        Find groups
                                     </button>
                                 }
                             </div>
@@ -682,10 +728,7 @@
                             @if (cohesionRanking().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
                                     <caption class="sr-only">
-                                        Nodes by
-                                        {{
-                                            cohesionMetric()
-                                        }}
+                                        Nodes by {{ cohesionLabel() }}
                                     </caption>
                                     <thead>
                                         <tr class="text-left">
@@ -720,7 +763,7 @@
                                                 class="min-h-6 px-1 text-left underline-offset-2 hover:underline"
                                                 (click)="focusClique(c)"
                                             >
-                                                Clique {{ i + 1 }} ({{ c.length }}) — {{ cliqueLabel(c) }}
+                                                Clique {{ i + 1 }} ({{ c.length }}): {{ cliqueLabel(c) }}
                                             </button>
                                         </li>
                                     }
@@ -736,15 +779,25 @@
                                     [ngModel]="similarityFor()"
                                     (ngModelChange)="similarityFor.set($any($event))"
                                 />
-                                <button mat-stroked-button (click)="runSimilarity()" [disabled]="!similarityFor()">
+                                <button
+                                    mat-stroked-button
+                                    (click)="!similarityWhyNot() && runSimilarity()"
+                                    [disabled]="!!similarityWhyNot()"
+                                    [disabledInteractive]="true"
+                                    [matTooltip]="similarityWhyNot()"
+                                    [attr.aria-describedby]="similarityWhyNot() ? 'why-similar' : null"
+                                >
                                     <mat-icon svgIcon="heroicons_outline:sparkles"></mat-icon>
-                                    Find similar
+                                    Find similar nodes
                                 </button>
                                 @if (!serverSpecs().prediction) {
                                     <button mat-stroked-button (click)="runPrediction()">
                                         <mat-icon svgIcon="heroicons_outline:link"></mat-icon>
                                         Predict links
                                     </button>
+                                }
+                                @if (similarityWhyNot(); as why) {
+                                    <p class="text-secondary m-0 w-full text-xs" id="why-similar" data-testid="why-similar">{{ why }}</p>
                                 }
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().prediction; as srv) {
@@ -814,14 +867,14 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <inspecto-option-picker
                                     class="w-48"
-                                    label="Source"
+                                    label="From"
                                     [options]="pathNodeOptions()"
                                     [ngModel]="flowFrom()"
                                     (ngModelChange)="flowFrom.set($any($event))"
                                 />
                                 <inspecto-option-picker
                                     class="w-48"
-                                    label="Sink"
+                                    label="To"
                                     [options]="pathNodeOptions()"
                                     [ngModel]="flowTo()"
                                     (ngModelChange)="flowTo.set($any($event))"
@@ -829,11 +882,14 @@
                                 @if (!serverSpecs().flow) {
                                     <button
                                         mat-stroked-button
-                                        (click)="runFlow()"
-                                        [disabled]="!flowFrom() || !flowTo()"
+                                        (click)="!flowWhyNot() && runFlow()"
+                                        [disabled]="!!flowWhyNot()"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="flowWhyNot()"
+                                        [attr.aria-describedby]="flowWhyNot() ? 'why-flow' : null"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
-                                        Max flow / min cut
+                                        Find maximum flow
                                     </button>
                                 }
                                 @if (!serverFirst('forest')) {
@@ -841,6 +897,9 @@
                                         <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
                                         Strongest backbone
                                     </button>
+                                }
+                                @if (!serverSpecs().flow && flowWhyNot(); as why) {
+                                    <p class="text-secondary m-0 w-full text-xs" id="why-flow" data-testid="why-flow">{{ why }}</p>
                                 }
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().flow; as srv) {
@@ -869,14 +928,15 @@
                             }
                             @if (flowResult(); as f) {
                                 <p class="mt-1 text-sm" role="status">
-                                    Max flow = {{ f.value | number: '1.0-2' }}; {{ f.minCut.edgeIds.length }} min-cut
-                                    link(s) highlighted.
+                                    Maximum flow: {{ f.value | number: '1.0-2' }}. {{ f.minCut.edgeIds.length }}
+                                    {{ f.minCut.edgeIds.length === 1 ? 'link' : 'links' }} in the minimum cut
+                                    {{ f.minCut.edgeIds.length === 1 ? 'is' : 'are' }} highlighted.
                                 </p>
                             }
                             @if (spanningForest(); as msf) {
                                 <p class="mt-1 text-sm" role="status">
-                                    Backbone: {{ msf.edgeIds.length }} strongest link(s) spanning
-                                    {{ msf.nodeIds.length }} node(s).
+                                    Backbone: {{ msf.edgeIds.length }} {{ msf.edgeIds.length === 1 ? 'link connects' : 'links connect' }}
+                                    {{ msf.nodeIds.length }} {{ msf.nodeIds.length === 1 ? 'node' : 'nodes' }}.
                                 </p>
                             }
                         }
@@ -885,11 +945,11 @@
                                 @if (!serverSpecs().scoring) {
                                     <button mat-stroked-button (click)="runScoring()">
                                         <mat-icon svgIcon="heroicons_outline:shield-exclamation"></mat-icon>
-                                        Score nodes
+                                        Find suspicious nodes
                                     </button>
                                 }
                                 <span class="text-sm text-secondary"
-                                    >Composite risk from degree, betweenness, PageRank, k-core, triangles.</span
+                                    >Combined score from how connected, central and clustered a node is.</span
                                 >
                             </div>
                             @if ((side() === 'server' || !investigationsEnabled()) && serverSpecs().scoring; as srv) {
@@ -906,7 +966,8 @@
                             }
                             <inspecto-pen-field
                                 class="w-64"
-                                label="Risk Score model"
+                                label="Risk model (optional)"
+                                placeholder="Name of a saved model"
                                 [ngModel]="riskModel()"
                                 (ngModelChange)="riskModel.set(('' + $event).trim()); riskEntity.set(null)"
                             ></inspecto-pen-field>
@@ -926,7 +987,7 @@
                                     <thead>
                                         <tr class="text-left">
                                             <th scope="col" class="py-1">Node</th>
-                                            <th scope="col" class="py-1 text-right">Score</th>
+                                            <th scope="col" class="py-1 text-right">Suspicion</th>
                                             @if (riskModel()) {
                                                 <th scope="col" class="py-1 text-right">Risk Score</th>
                                             }
@@ -950,7 +1011,7 @@
                                                     <td class="py-0.5 text-right">
                                                         <button
                                                             mat-button
-                                                            [attr.aria-label]="'Show the Risk Score of ' + r.label"
+                                                            [attr.aria-label]="'Show factors for ' + r.label"
                                                             (click)="riskEntity.set(r.label || r.id)"
                                                         >
                                                             Factors
@@ -969,12 +1030,12 @@
                         }
                         @case ('pattern') {
                             <p class="text-sm text-secondary">
-                                Match a path motif — a start node, then one hop per step.
+                                Find chains of links: a start, then one hop per step.
                             </p>
                             <div class="flex flex-wrap items-center gap-2">
                                 <inspecto-option-picker
                                     class="w-64"
-                                    label="Pattern pack"
+                                    label="Pattern"
                                     [options]="packOptions()"
                                     [ngModel]="loadedPack()?.id ?? ''"
                                     (ngModelChange)="loadPatternPack($event)"
@@ -982,14 +1043,14 @@
                             </div>
                             @if (!loadedPack()) {
                                 <p class="text-sm text-secondary" role="status">
-                                    Choose a pattern — a custom motif with no link kinds set matches every link.
+                                    Pick a pattern or build your own. A step with no link kind matches any link.
                                 </p>
                             }
                             @if (loadedPack(); as pack) {
                                 <p class="text-sm text-secondary" role="status">
                                     {{ packDescription(pack) }}
                                     @if (pack.tool) {
-                                        <span class="font-medium"> Better served by the {{ pack.tool }} tool.</span>
+                                        <span class="font-medium"> Better served by the {{ toolLabel(pack.tool) }} tool.</span>
                                     }
                                 </p>
                             }
@@ -999,29 +1060,29 @@
                                     @for (st of stages; track $index; let i = $index) {
                                         <li class="flex flex-wrap items-center gap-2 text-sm">
                                             <span class="w-40 font-medium">
-                                                {{ i + 1 }}. {{ st.shape === 'fan-in' ? 'Fan-in from' : 'Fan-out to' }}
+                                                {{ i + 1 }}. {{ st.shape === 'fan-in' ? 'Many send to one' : 'One sends to many' }}
                                             </span>
-                                            <inspecto-pen-field class="w-full" label="At least" type="number" [min]="1" [attr.aria-label]=" 'Stage ' + (i + 1) + ' minimum distinct counterparties' " [ngModel]="st.minBranches" (ngModelChange)=" updateBranchStage(i, { minBranches: +$event >= 1 ? +$event : 1, }) "></inspecto-pen-field>
-                                            <span class="text-secondary">distinct</span>
+                                            <inspecto-pen-field class="w-full" label="At least" type="number" [min]="1" [attr.aria-label]="'Stage ' + (i + 1) + ': at least'" [ngModel]="st.minBranches" (ngModelChange)=" updateBranchStage(i, { minBranches: +$event >= 1 ? +$event : 1, }) "></inspecto-pen-field>
+                                            <span class="text-secondary">different counterparties</span>
                                             @if (st.threshold; as th) {
-                                                <inspecto-pen-field class="w-full" label="Link attribute" [attr.aria-label]="'Stage ' + (i + 1) + ' threshold attribute'" [ngModel]="th.attr" (ngModelChange)=" updateBranchThreshold(i, { attr: $event.trim() }) "></inspecto-pen-field>
-                                                <inspecto-pen-field class="w-full" label="From (≥)" type="number" [attr.aria-label]=" 'Stage ' + (i + 1) + ' threshold lower bound' " [ngModel]="th.min ?? ''" (ngModelChange)=" updateBranchThreshold(i, { min: boundOf('' + $event) }) "></inspecto-pen-field>
-                                                <inspecto-pen-field class="w-full" label="Under (&lt;)" type="number" [attr.aria-label]=" 'Stage ' + (i + 1) + ' threshold upper bound' " [ngModel]="th.max ?? ''" (ngModelChange)=" updateBranchThreshold(i, { max: boundOf('' + $event) }) "></inspecto-pen-field>
+                                                <inspecto-pen-field class="w-full" label="Value column" [attr.aria-label]="'Stage ' + (i + 1) + ': value column'" [ngModel]="th.attr" (ngModelChange)=" updateBranchThreshold(i, { attr: $event.trim() }) "></inspecto-pen-field>
+                                                <inspecto-pen-field class="w-full" label="Value from" type="number" [attr.aria-label]="'Stage ' + (i + 1) + ': value from'" [ngModel]="th.min ?? ''" (ngModelChange)=" updateBranchThreshold(i, { min: boundOf('' + $event) }) "></inspecto-pen-field>
+                                                <inspecto-pen-field class="w-full" label="Value below" type="number" [attr.aria-label]="'Stage ' + (i + 1) + ': value below'" [ngModel]="th.max ?? ''" (ngModelChange)=" updateBranchThreshold(i, { max: boundOf('' + $event) }) "></inspecto-pen-field>
                                             }
                                             <span class="text-secondary" data-testid="stage-summary">
                                                 @if (st.threshold; as th) {
                                                     {{ thresholdLabel(th) }}
                                                 }
                                                 @if (st.windowHours) {
-                                                    · within {{ st.windowHours }} h
+                                                    · within {{ st.windowHours }} hours
                                                 }
                                                 @if (st.afterPrevious) {
                                                     · after the previous stage{{
-                                                        st.maxGapHours ? ', ≤ ' + st.maxGapHours + ' h' : ''
+                                                        st.maxGapHours ? ', within ' + st.maxGapHours + ' hours' : ''
                                                     }}
                                                 }
                                                 @if (st.closesToStart) {
-                                                    · back to the origin
+                                                    · ends at the starting account
                                                 }
                                             </span>
                                         </li>
@@ -1030,12 +1091,11 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     <button
                                         mat-stroked-button
-                                        (click)="runPattern()"
-                                        [disabled]="
-                                            investigationPatternColumns()
-                                                ? serverPatternBusy() || !!investigationPatternColumns()?.blocked
-                                                : !!browserPatternColumns().blocked
-                                        "
+                                        data-testid="pattern-run"
+                                        (click)="!patternWhyNot() && runPattern()"
+                                        [disabled]="!!patternWhyNot()"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="patternWhyNot()"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
                                         Find matches
@@ -1043,12 +1103,19 @@
                                     @if (side() === 'server' && graphTruncated() && traversalMappings().length && !investigationPatternColumns()) {
                                         <button
                                             mat-stroked-button
-                                            (click)="runBranchingOnServer()"
-                                            [disabled]="serverPatternBusy() || !!serverPatternColumns().blocked"
+                                            (click)="!serverPatternWhyNot() && runBranchingOnServer()"
+                                            [disabled]="!!serverPatternWhyNot()"
+                                            [disabledInteractive]="true"
+                                            [matTooltip]="serverPatternWhyNot()"
                                         >
                                             <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
-                                            Run on server
+                                            Search whole Dataset
                                         </button>
+                                    }
+                                    @if (serverPatternBusy()) {
+                                        <p class="text-secondary m-0 w-full text-xs" data-testid="why-pattern">
+                                            {{ disabledReason.searching }}
+                                        </p>
                                     }
                                 </div>
                                 <!-- A pack's kind / time column: pre-filled from the domain profile, or why it cannot run. -->
@@ -1071,9 +1138,8 @@
                                         </p>
                                     }
                                     <p class="text-secondary m-0 text-sm" data-testid="investigation-pattern-scope">
-                                        This pattern runs on the server over the Investigation's whole Dataset
-                                        ({{ investigationPatternTarget()?.dataset }}), not only the Working Set on the
-                                        canvas, so a match can include numbers you have not added yet.
+                                        Runs over the whole Dataset ({{ investigationPatternTarget()?.dataset }}), so
+                                        matches can include entities not in the Working Set.
                                     </p>
                                 } @else if (browserPatternColumns().blocked; as why) {
                                     <p class="m-0 text-sm" role="status" data-testid="pattern-columns-blocked">
@@ -1095,7 +1161,7 @@
                                             role="status"
                                             data-testid="server-pattern-columns-blocked"
                                         >
-                                            Run on server: {{ why }}
+                                            Whole Dataset search: {{ why }}
                                         </p>
                                     } @else if (serverPatternColumns().notice; as note) {
                                         <p
@@ -1103,12 +1169,12 @@
                                             role="status"
                                             data-testid="server-pattern-columns-notice"
                                         >
-                                            Run on server: {{ note }}
+                                            Whole Dataset search: {{ note }}
                                         </p>
                                     }
                                     <p class="text-secondary m-0 text-sm">
-                                        This graph is truncated, and the small legs this pattern looks for are the first
-                                        links a truncation cuts. Run on server searches the whole Dataset of
+                                        This graph was cut short, which may hide small links this pattern needs. Search
+                                        whole Dataset reads all of
                                         {{
                                             traversalMappings()[+serverMapping()]?.label ??
                                                 traversalMappings()[0].label
@@ -1119,31 +1185,31 @@
                                     <p
                                         class="m-0 text-sm tabular-nums"
                                         role="status"
-                                        aria-label="Server pattern search"
+                                        aria-label="Whole Dataset pattern search"
                                     >
                                         @if (sp.refusal) {
                                             {{ sp.refusal }}
                                         } @else if (sp.matches.length) {
-                                            Server: {{ sp.matches.length }}
-                                            {{ sp.matches.length === 1 ? 'match' : 'matches' }} over the whole Dataset
+                                            {{ sp.matches.length }}
+                                            {{ sp.matches.length === 1 ? 'match' : 'matches' }} in the whole Dataset
                                         } @else {
-                                            Server: no matches over the whole Dataset
+                                            No matches in the whole Dataset
                                         }
                                     </p>
                                     @if (sp.legCapped) {
-                                        <inspecto-alert variant="warning" title="Leg cap reached">
-                                            More links qualified than the server searches at once, so part of the
-                                            Dataset was not searched — filter the query to narrow it.
+                                        <inspecto-alert variant="warning" title="Search stopped early">
+                                            Too many links qualified, so part of the Dataset was not searched. Narrow
+                                            the query and run it again.
                                         </inspecto-alert>
                                     } @else if (sp.truncated) {
-                                        <inspecto-alert variant="warning" title="Truncated">
-                                            The match limit cut the answer short — more matches exist than are shown.
+                                        <inspecto-alert variant="warning" title="Result cut short">
+                                            Cut at the match limit: more matches exist than are shown.
                                         </inspecto-alert>
                                     }
                                     @if (sp.matches.length) {
                                         <ul
                                             class="mt-1 flex flex-col gap-1 text-sm"
-                                            aria-label="Server pattern matches"
+                                            aria-label="Whole Dataset pattern matches"
                                         >
                                             @for (m of sp.matches; track $index) {
                                                 <li>
@@ -1166,7 +1232,7 @@
                                         (change)="aroundView.set($event.value === 'around')"
                                     >
                                         <mat-button-toggle value="steps">Steps</mat-button-toggle>
-                                        <mat-button-toggle value="around">Search around</mat-button-toggle>
+                                        <mat-button-toggle value="around">Conditions</mat-button-toggle>
                                     </mat-button-toggle-group>
                                 }
                                 @if (aroundView() && aroundSpec(); as around) {
@@ -1182,7 +1248,7 @@
                                     @for (step of patternSteps(); track $index; let i = $index) {
                                         <div class="flex flex-wrap items-center gap-2">
                                             @if (i === 0) {
-                                                <span class="w-16 text-sm font-medium">Start</span>
+                                                <span class="w-24 text-sm font-medium">Start node</span>
                                             } @else {
                                                 <mat-button-toggle-group
                                                     class="shrink-0"
@@ -1190,13 +1256,13 @@
                                                     (change)="updatePatternStep(i, { direction: $event.value })"
                                                     [attr.aria-label]="'Step ' + (i + 1) + ' direction'"
                                                 >
-                                                    <mat-button-toggle value="out" aria-label="outgoing"
+                                                    <mat-button-toggle value="out" aria-label="Outgoing" matTooltip="Outgoing"
                                                         >→</mat-button-toggle
                                                     >
-                                                    <mat-button-toggle value="in" aria-label="incoming"
+                                                    <mat-button-toggle value="in" aria-label="Incoming" matTooltip="Incoming"
                                                         >←</mat-button-toggle
                                                     >
-                                                    <mat-button-toggle value="both" aria-label="either direction"
+                                                    <mat-button-toggle value="both" aria-label="Both ways" matTooltip="Both ways"
                                                         >↔</mat-button-toggle
                                                     >
                                                 </mat-button-toggle-group>
@@ -1210,7 +1276,7 @@
                                             }
                                             <inspecto-option-picker
                                                 class="w-40"
-                                                label="Node kind"
+                                                label="Entity Type"
                                                 [options]="nodeKindOptions()"
                                                 [ngModel]="step.nodeKind ?? ''"
                                                 (ngModelChange)="updatePatternStep(i, { nodeKind: $event || undefined })"
@@ -1234,8 +1300,10 @@
                                     </button>
                                     <button
                                         mat-stroked-button
-                                        (click)="runPattern()"
-                                        [disabled]="!!browserPatternColumns().blocked"
+                                        (click)="!patternWhyNot() && runPattern()"
+                                        [disabled]="!!patternWhyNot()"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="patternWhyNot()"
                                     >
                                         <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
                                         Find matches
@@ -1255,6 +1323,9 @@
                                     </p>
                                 }
                                 }
+                            }
+                            @if (patternNote(); as note) {
+                                <p class="text-secondary m-0 text-sm" role="status" data-testid="pattern-note">{{ note }}</p>
                             }
                             @if (patternMatches().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Pattern matches">
@@ -1277,7 +1348,7 @@
     @if (side() === 'server' && !investigationsEnabled()) {
         <!-- the Explorer level: only the server ALGORITHMS are locked; the Dataset reads above run -->
         <div data-testid="catalogue-server-locked">
-            <inspecto-locked-action label="Run a server algorithm" [reason]="lockedReason()" />
+            <inspecto-locked-action label="Run on the whole Dataset" [reason]="lockedReason()" />
         </div>
     }
 </div>

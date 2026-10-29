@@ -76,7 +76,7 @@ describe('Find something interesting - the readings (LA-ONBOARD-1 phase 7, UC-12
         const both = route(G, 'V2', 'V3', T);
         expect(both.rows[0].reading).toBe('V2 and V3 are linked through 2 transfers, not all in one direction: V2 – BIG – V3.');
         const none = route({ nodes: [node('A'), node('B')], edges: [] }, 'A', 'B', T);
-        expect(none.empty).toBe('A and B are not linked on this graph. Expand… (G) from one of them may connect them.');
+        expect(none.empty).toBe('A and B are not linked on this graph. Try Expand from one of them.');
         expect(route(G, 'V1', 'V1', T).empty).toBe('Choose two different accounts on the graph.');
     });
 });

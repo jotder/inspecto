@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import {
     describeSearchAround,
@@ -21,12 +22,19 @@ import {
 @Component({
     selector: 'inspecto-la-search-around',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, MatButtonModule, MatButtonToggleModule, MatIconModule, InspectoOptionPickerComponent],
+    imports: [
+        FormsModule,
+        MatButtonModule,
+        MatButtonToggleModule,
+        MatIconModule,
+        MatTooltipModule,
+        InspectoOptionPickerComponent,
+    ],
     template: `
         <div class="flex flex-col gap-2" data-testid="search-around">
             <inspecto-option-picker
                 class="w-48"
-                label="Start entity type"
+                label="Start Entity Type"
                 [options]="nodeKindOptions()"
                 [ngModel]="spec().startType ?? ''"
                 (ngModelChange)="specChange.emit({ ...spec(), startType: $event || undefined })"
@@ -39,9 +47,9 @@ import {
                         (change)="edit(i, { direction: $event.value })"
                         [attr.aria-label]="'Condition ' + (i + 1) + ' direction'"
                     >
-                        <mat-button-toggle value="out" aria-label="outgoing">→</mat-button-toggle>
-                        <mat-button-toggle value="in" aria-label="incoming">←</mat-button-toggle>
-                        <mat-button-toggle value="both" aria-label="either direction">↔</mat-button-toggle>
+                        <mat-button-toggle value="out" aria-label="Outgoing" matTooltip="Outgoing">→</mat-button-toggle>
+                        <mat-button-toggle value="in" aria-label="Incoming" matTooltip="Incoming">←</mat-button-toggle>
+                        <mat-button-toggle value="both" aria-label="Both ways" matTooltip="Both ways">↔</mat-button-toggle>
                     </mat-button-toggle-group>
                     <inspecto-option-picker
                         class="w-40"
@@ -52,7 +60,7 @@ import {
                     />
                     <inspecto-option-picker
                         class="w-40"
-                        label="Neighbour type"
+                        label="Entity Type"
                         [options]="nodeKindOptions()"
                         [ngModel]="c.neighbourType ?? ''"
                         (ngModelChange)="edit(i, { neighbourType: $event || undefined })"
@@ -72,17 +80,24 @@ import {
                     <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                     Add condition
                 </button>
-                <button mat-stroked-button type="button" (click)="run.emit()" [disabled]="issues().length > 0">
+                <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="!issues().length && run.emit()"
+                    [disabled]="issues().length > 0"
+                    [disabledInteractive]="true"
+                    [matTooltip]="issues()[0] ?? ''"
+                    [attr.aria-describedby]="issues().length ? 'search-around-why' : null"
+                >
                     <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
-                    Search around
+                    Find matches
                 </button>
             </div>
             @if (issues().length) {
-                <p class="m-0 text-sm" role="status" data-testid="search-around-issues">{{ issues()[0] }}</p>
+                <p class="m-0 text-sm" role="status" id="search-around-why" data-testid="search-around-issues">{{ issues()[0] }}</p>
             }
             <p class="text-secondary m-0 text-xs">
-                Searches the graph drawn here. Reaching entities that are not loaded yet is Expand, which follows link kinds and
-                direction only, never a neighbour type.
+                Searches the graph drawn here. To reach entities not loaded yet, use Expand.
             </p>
         </div>
     `,

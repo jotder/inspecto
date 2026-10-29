@@ -21,9 +21,8 @@ import { LA_FEATURES, investigationsLockedReason } from '@inspecto/link-analysis
     template: `
         @if (investigations()) {
             <p class="text-secondary m-0 text-xs" data-testid="result-next-hint">
-                What to do next: click a row to find that node on the canvas. If these look like leads, start an
-                Investigation to record what you do from here - the top {{ count() }} are queued as seed entities, and
-                you confirm the title and purpose before anything is created.
+                Click a row to find it. Start an Investigation from the top {{ count() }} results to record your
+                steps.
             </p>
             <button mat-stroked-button type="button" class="mt-1" (click)="start.emit()">
                 <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
@@ -31,7 +30,7 @@ import { LA_FEATURES, investigationsLockedReason } from '@inspecto/link-analysis
             </button>
         } @else {
             <p class="text-secondary m-0 text-xs" data-testid="result-next-hint">
-                What to do next: click a row to find that node on the canvas.
+                Click a row to find it.
             </p>
             <inspecto-locked-action
                 class="mt-1"

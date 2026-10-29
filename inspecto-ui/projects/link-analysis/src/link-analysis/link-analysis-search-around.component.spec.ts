@@ -36,7 +36,11 @@ describe('LinkAnalysisSearchAroundComponent', () => {
         const f = make();
         const el = f.nativeElement as HTMLElement;
         const find = (t: string) => buttons(el).find((b) => b.textContent?.includes(t))!;
-        expect(find('Search around').disabled).toBe(true);
+        // Disabled with its reason (X6): still focusable, described by the visible line, and a click does nothing.
+        expect(find('Find matches').getAttribute('aria-disabled')).toBe('true');
+        expect(find('Find matches').getAttribute('aria-describedby')).toContain('search-around-why');
+        find('Find matches').click();
+        expect(f.componentInstance.runs).toBe(0);
         expect(el.querySelector('[data-testid="search-around-issues"]')?.textContent).toContain('at least one');
         find('Add condition').click();
         f.detectChanges();
@@ -44,8 +48,8 @@ describe('LinkAnalysisSearchAroundComponent', () => {
         expect(el.querySelector('[data-testid="search-around-words"]')?.textContent).toContain(
             'Follow outgoing any links',
         );
-        expect(find('Search around').disabled).toBe(false);
-        find('Search around').click();
+        expect(find('Find matches').getAttribute('aria-disabled')).not.toBe('true');
+        find('Find matches').click();
         expect(f.componentInstance.runs).toBe(1);
     });
 

@@ -29,6 +29,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ComponentsService } from '@inspecto/core/api';
 import {
     GraphRunResult,
@@ -100,6 +101,7 @@ import {
     patternColumnRefusal,
     patternPackFromContent,
     resolvePatternColumns,
+    usingColumnsNotice,
 } from './pattern-packs';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { FormsModule } from '@angular/forms';
@@ -126,6 +128,13 @@ import {
     toSelection,
     toSuspicionScores,
 } from './graph-run-apply';
+import { DISABLED_REASON, NEEDS_TIME_COLUMN } from './disabled-reasons';
+
+/** A count with a thousands comma ("3,254"), as everywhere in the Studio. */
+const fmt = (n: number): string => n.toLocaleString('en');
+/** "1 path" / "3 paths": a real plural, never "path(s)". */
+const plural = (n: number, one: string, many: string): string => `${fmt(n)} ${n === 1 ? one : many}`;
+const NO_PATH = 'No path connects the two nodes. Try Expand or search the whole Dataset.';
 
 /**
  * LA-11: what the analyst asked the server to walk. `mapping` is the index into the host's
@@ -240,6 +249,7 @@ type CentralityMetric =
         MatButtonModule,
         MatButtonToggleModule,
         MatIconModule,
+        MatTooltipModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         LinkAnalysisResultNextComponent,
@@ -262,6 +272,9 @@ export class LinkAnalysisToolboxComponent {
 
     /** The Analysis alert sits above every tool; a refusal from a button far down the panel must not go unseen. */
     private readonly analysisAlert = viewChild<ElementRef<HTMLElement>>('analysisAlert');
+
+    /** The fixed disabled-reason phrases (X6), for the template. */
+    protected readonly disabledReason = DISABLED_REASON;
 
     constructor() {
         effect(() => {
@@ -321,17 +334,24 @@ export class LinkAnalysisToolboxComponent {
         { value: 'eigenvector', label: 'Eigenvector' },
         { value: 'katz', label: 'Katz' },
         { value: 'pagerank', label: 'PageRank' },
-        { value: 'hub', label: 'HITS — hub' },
-        { value: 'authority', label: 'HITS — authority' },
+        { value: 'hub', label: 'Hub score (HITS)' },
+        { value: 'authority', label: 'Authority score (HITS)' },
     ];
+    /** The picked centrality's own words, for the ranking's caption (never the raw value). */
+    readonly centralityLabel = computed(
+        () => this.centralityOptions.find((o) => o.value === this.centralityMetric())?.label ?? '',
+    );
     readonly cohesionOptions: PickerOption[] = [
-        { value: 'k-core', label: 'k-core' },
-        { value: 'triangles', label: 'Triangle count' },
+        { value: 'k-core', label: 'Dense core (k-core)' },
+        { value: 'triangles', label: 'Triangles' },
         { value: 'cliques', label: 'Cliques' },
     ];
-    /** "Custom motif" is a real, blank-valued choice (the skill's idiom), then every loaded pack. */
+    readonly cohesionLabel = computed(
+        () => this.cohesionOptions.find((o) => o.value === this.cohesionMetric())?.label ?? '',
+    );
+    /** "Custom pattern" is a real, blank-valued choice (the skill's idiom), then every loaded pack. */
     readonly packOptions = computed<PickerOption[]>(() => [
-        { value: '', label: 'Custom motif' },
+        { value: '', label: 'Custom pattern' },
         ...this.patternPacks().map((p) => ({ value: p.id, label: this.packLabel(p) })),
     ]);
     /** What the active Industry pack calls a pattern pack (`pattern.<id>`), else its own label. Display only: the id is kept. */
@@ -447,34 +467,114 @@ export class LinkAnalysisToolboxComponent {
         return this.allTools;
     }
     private readonly allTools: { id: AnalysisTab; label: string; icon: string; hint?: string }[] = [
-        { id: 'path', label: 'Shortest path', icon: 'heroicons_outline:arrows-right-left' },
-        { id: 'all-paths', label: 'All paths', icon: 'heroicons_outline:share' },
-        { id: 'server-paths', label: 'Find paths (server)', icon: 'heroicons_outline:server-stack' },
-        { id: 'explain', label: 'Explain node', icon: 'heroicons_outline:light-bulb' },
-        { id: 'centrality', label: 'Centrality', icon: 'heroicons_outline:star' },
-        { id: 'communities', label: 'Communities', icon: 'heroicons_outline:user-group' },
-        { id: 'components', label: 'Connected components', icon: 'heroicons_outline:squares-2x2' },
-        { id: 'cycles', label: 'Cycles', icon: 'heroicons_outline:arrow-path' },
-        { id: 'cut-points', label: 'Cut points', icon: 'heroicons_outline:scissors' },
-        { id: 'cohesion', label: 'Cohesive groups', icon: 'heroicons_outline:cube' },
-        { id: 'similarity', label: 'Similarity & prediction', icon: 'heroicons_outline:sparkles' },
-        { id: 'flow', label: 'Flow & backbone', icon: 'heroicons_outline:beaker' },
-        { id: 'scoring', label: 'Suspicion score', icon: 'heroicons_outline:shield-exclamation' },
+        {
+            id: 'path',
+            label: 'Shortest path',
+            icon: 'heroicons_outline:arrows-right-left',
+            hint: 'Fewest hops or strongest links between two nodes',
+        },
+        {
+            id: 'all-paths',
+            label: 'All paths',
+            icon: 'heroicons_outline:share',
+            hint: 'Every route between two nodes, up to 10',
+        },
+        {
+            id: 'server-paths',
+            label: 'Find paths',
+            icon: 'heroicons_outline:server-stack',
+            hint: 'Routes across the whole Dataset',
+        },
+        {
+            id: 'explain',
+            label: 'Explain node',
+            icon: 'heroicons_outline:light-bulb',
+            hint: 'What a node links to, in words',
+        },
+        {
+            id: 'centrality',
+            label: 'Centrality',
+            icon: 'heroicons_outline:star',
+            hint: 'Order nodes by how central they are',
+        },
+        {
+            id: 'communities',
+            label: 'Communities',
+            icon: 'heroicons_outline:user-group',
+            hint: 'Groups that link mostly among themselves',
+        },
+        {
+            id: 'components',
+            label: 'Connected components',
+            icon: 'heroicons_outline:squares-2x2',
+            hint: 'Parts of the graph not linked to each other',
+        },
+        {
+            id: 'cycles',
+            label: 'Cycles',
+            icon: 'heroicons_outline:arrow-path',
+            hint: 'Loops that return to their start',
+        },
+        {
+            id: 'cut-points',
+            label: 'Cut points',
+            icon: 'heroicons_outline:scissors',
+            hint: 'Weak points that split the graph',
+        },
+        {
+            id: 'cohesion',
+            label: 'Cohesive groups',
+            icon: 'heroicons_outline:cube',
+            hint: 'Dense cores, triangles and cliques',
+        },
+        {
+            id: 'similarity',
+            label: 'Similarity and prediction',
+            icon: 'heroicons_outline:sparkles',
+            hint: 'Nodes with shared neighbours, and likely missing links',
+        },
+        {
+            id: 'flow',
+            label: 'Flow and backbone',
+            icon: 'heroicons_outline:beaker',
+            hint: 'Maximum flow between two nodes, and the strongest links',
+        },
+        {
+            id: 'scoring',
+            label: 'Suspicion score',
+            icon: 'heroicons_outline:shield-exclamation',
+            hint: 'Nodes whose links look most unusual',
+        },
         {
             id: 'value-measures',
             label: 'Value Measures',
             icon: 'heroicons_outline:banknotes',
-            hint: 'Find entities by money flow: pass-through ratio, withdrawal concentration, structuring, benefit transfer',
+            hint: 'Find entities by how money moves through them',
         },
-        { id: 'pattern', label: 'Pattern match', icon: 'heroicons_outline:magnifying-glass-circle' },
+        {
+            id: 'pattern',
+            label: 'Pattern match',
+            icon: 'heroicons_outline:magnifying-glass-circle',
+            hint: 'Find chains of links that match a pattern',
+        },
         {
             id: 'temporal',
             label: 'Burst and periodicity',
             icon: 'heroicons_outline:clock',
             hint: 'Find bursts of activity and regular rhythms over the time column',
         },
-        { id: 'index-build', label: 'Edge index', icon: 'heroicons_outline:server-stack' },
+        {
+            id: 'index-build',
+            label: 'Link index',
+            icon: 'heroicons_outline:server-stack',
+            hint: 'Build the link index for fast reads',
+        },
     ];
+
+    /** A tool group's label by id ("cycles" ⇒ "Cycles"), for text that names another tool. */
+    toolLabel(id: string): string {
+        return this.allTools.find((t) => t.id === id)?.label ?? id;
+    }
 
     // ── The catalogue (§5.8, UIR-D10): one list grouped by question, for the host's Browser or Server tab ──
 
@@ -494,7 +594,7 @@ export class LinkAnalysisToolboxComponent {
         const cap = selectionNodeCapValue();
         if (!this.investigationsEnabled() || n <= cap) return '';
         const subject = this.workingSetNodes() !== null ? 'The Working Set' : 'This graph';
-        return `${subject} has ${n} nodes - above the ${cap}-node browser limit: a tool over its limit runs from the Server tab.`;
+        return `${subject} has ${fmt(n)} nodes, too big to answer on screen (limit ${fmt(cap)}): use the Whole Dataset tab.`;
     });
     /** Where the catalogue runs: the tab's side. The Explorer level has no server runs (its Server tab is locked). */
     readonly where = computed<CatalogueWhere>(() => this.side());
@@ -527,6 +627,20 @@ export class LinkAnalysisToolboxComponent {
         return CATALOGUE_TOOLS[id]?.runsOn ?? 'browser';
     }
 
+    /**
+     * The chip on a row that runs on both tabs, naming the OTHER tab ('' = the row runs only here). A row that runs
+     * only where it is listed carries no chip (T-087: "both / browser / server" told the analyst nothing).
+     */
+    alsoOn(runsOn: RunsOn): string {
+        if (runsOn !== 'both') return '';
+        return this.side() === 'browser' ? 'Also on Whole Dataset' : 'Also on screen';
+    }
+
+    /** A server row's size in words: the largest Working Set it answers at once (above it the run is queued). */
+    inlineCeiling(n: number | undefined): string {
+        return typeof n === 'number' && Number.isFinite(n) ? `Instant up to ${fmt(n)} nodes` : '';
+    }
+
     /** A browser group's cap in words: the smallest browser cap among the algorithms behind it; '' = no cap. */
     toolCap(id: string): string {
         const t = CATALOGUE_TOOLS[id];
@@ -535,7 +649,7 @@ export class LinkAnalysisToolboxComponent {
             .map((a) => browserAlgorithmCapValue(a as BrowserCappedAlgorithm))
             .filter((c) => Number.isFinite(c) && c > 0);
         const cap = id === 'scoring' ? suspicionNodeCapValue() : caps.length ? Math.min(...caps) : 0;
-        return cap ? `≤ ${cap} nodes in the browser` : '';
+        return cap ? `Up to ${fmt(cap)} nodes` : '';
     }
 
     /** The open tool group (accordion: one open at a time; `null` = all collapsed). */
@@ -562,7 +676,7 @@ export class LinkAnalysisToolboxComponent {
         const node = this.explainServerNode();
         return node ? { node, hops: this.explainHops() } : {};
     });
-    readonly explainIndexHold = computed(() => (this.explainServerNode() ? '' : 'Pick a node first.'));
+    readonly explainIndexHold = computed(() => (this.explainServerNode() ? '' : DISABLED_REASON.pickNode));
     /** `egoNetwork` params for a run on the index: the same Node as Explain; no hops (an ego network is one hop). */
     readonly egoIndexParams = computed<Record<string, unknown>>(() => {
         const node = this.explainServerNode();
@@ -672,7 +786,7 @@ export class LinkAnalysisToolboxComponent {
             if (carried) used = carried;
             else if (bound)
                 blocked.push(
-                    `This pattern orders its hops by time, and the Investigation's time column ${bound} is not on the links drawn here — run it from a query graph with Time set to ${defaults.timeCol || bound}.`,
+                    `The links drawn here do not carry the Investigation’s time column ${bound}. Draw a query graph and pick ${defaults.timeCol || bound} in the toolbar’s time filter.`,
                 );
             else blocked.push(patternColumnRefusal('time', defaults.timeCol));
         }
@@ -687,7 +801,7 @@ export class LinkAnalysisToolboxComponent {
         }
         return {
             timeAttr: used,
-            ...(used !== timeAttr ? { notice: `Using ${used} for this pack.` } : {}),
+            ...(used !== timeAttr ? { notice: usingColumnsNotice([used]) } : {}),
             ...(blocked.length ? { blocked: blocked.join(' ') } : {}),
         };
     });
@@ -718,7 +832,7 @@ export class LinkAnalysisToolboxComponent {
             ...(plan.kindCol ? { kindCol: plan.kindCol } : {}),
             ...(plan.timeCol ? { timeCol: plan.timeCol } : {}),
             ...(plan.blocked ? { blocked: plan.blocked } : {}),
-            ...(used.length ? { notice: `Using ${used.join(' / ')} for this pack.` } : {}),
+            ...(used.length ? { notice: usingColumnsNotice(used) } : {}),
         };
     });
 
@@ -732,6 +846,10 @@ export class LinkAnalysisToolboxComponent {
     readonly cycles = signal<GraphSelection[]>([]);
     /** Index of the cycle drawn on the canvas (-1 = none). */
     readonly selectedCycle = signal(-1);
+    /** The Cycles card's own line for an empty answer ('' = none), shown in the card rather than as an alert. */
+    readonly cyclesNote = signal('');
+    /** The Pattern card's note when the browser matcher stopped at its match limit ('' = it did not). */
+    readonly patternNote = signal('');
     readonly cutNodes = signal<string[]>([]);
     readonly cutEdges = signal<string[]>([]);
     /** The id map (= Working Set) each server cut-points half was computed for; null = none, or a local run. */
@@ -757,6 +875,29 @@ export class LinkAnalysisToolboxComponent {
     readonly flowResult = signal<{ value: number; minCut: GraphSelection } | null>(null);
     readonly spanningForest = signal<GraphSelection | null>(null);
     readonly suspicion = signal<SuspicionScore[]>([]);
+
+    // ── Why a button is disabled (X6): one phrase from DISABLED_REASON, '' = it can run ──
+
+    /** Shortest path / All paths: both ends picked. */
+    readonly pathWhyNot = computed(() => (this.pathFrom() && this.pathTo() ? '' : DISABLED_REASON.pickFromTo));
+    /** Find paths over the whole Dataset: a From node, and no search already running. */
+    readonly serverPathsWhyNot = computed(() =>
+        !this.pathFrom() ? DISABLED_REASON.pickNode : this.serverPathsBusy() ? DISABLED_REASON.searching : '',
+    );
+    readonly explainWhyNot = computed(() => (this.explainFor() ? '' : DISABLED_REASON.pickNode));
+    readonly scoreSeedWhyNot = computed(() => (this.scoreSeedPick() ? '' : DISABLED_REASON.pickNode));
+    readonly similarityWhyNot = computed(() => (this.similarityFor() ? '' : DISABLED_REASON.pickNode));
+    readonly flowWhyNot = computed(() => (this.flowFrom() && this.flowTo() ? '' : DISABLED_REASON.pickFromTo));
+    /** Find matches on the canvas, or over the open Investigation's Dataset for a branching pattern. */
+    readonly patternWhyNot = computed(() => {
+        const inv = this.investigationPatternColumns();
+        if (inv) return this.serverPatternBusy() ? DISABLED_REASON.searching : (inv.blocked ?? '');
+        return this.browserPatternColumns().blocked ?? '';
+    });
+    /** Search the whole Dataset for the branching pattern. */
+    readonly serverPatternWhyNot = computed(() =>
+        this.serverPatternBusy() ? DISABLED_REASON.searching : (this.serverPatternColumns().blocked ?? ''),
+    );
     /** ASSURE-RISK-SCORE-1: a saved risk-score model to read an entity's server-side Risk Score from. */
     readonly riskModel = signal('');
     /** The entity key whose Risk / Anomaly Score is shown: the node's label (its raw value) - the node id is `entity:<normalised key>`, which no score store holds. */
@@ -781,7 +922,7 @@ export class LinkAnalysisToolboxComponent {
                       algorithm,
                       params,
                       hold,
-                      note: `${subject} has ${n} nodes - above the ${cap}-node limit for running this in the browser.`,
+                      note: `${subject} has ${fmt(n)} nodes, too big to answer on screen (limit ${fmt(cap)}).`,
                   }
                 : null;
         // Each guarded algorithm hands over above ITS OWN browser cap (CL-3) - the cap it refuses at locally.
@@ -796,7 +937,7 @@ export class LinkAnalysisToolboxComponent {
         const pick = (a: string, b: string) => {
             const from = this.serverIds()?.serverNode(a);
             const to = this.serverIds()?.serverNode(b);
-            return from && to ? { params: { from, to }, hold: '' } : { params: {}, hold: 'Pick the two nodes first.' };
+            return from && to ? { params: { from, to }, hold: '' } : { params: {}, hold: DISABLED_REASON.pickFromTo };
         };
         const named = (prefix: string, s: ServerRunSpec | null): ServerRunSpec | null =>
             s && { ...s, note: prefix + s.note };
@@ -827,15 +968,15 @@ export class LinkAnalysisToolboxComponent {
                 'maxFlow',
                 browserAlgorithmCapValue('maxFlow'),
                 from && to ? { from, to } : {},
-                from && to ? '' : 'Pick a source and a sink first.',
+                from && to ? '' : DISABLED_REASON.pickFromTo,
             ),
             scoring: spec('suspicionScore', suspicionNodeCapValue()),
             path: spec(pathAlgorithm, selCap(pathAlgorithm), pathPick.params, pathPick.hold),
             allPaths: spec('allPaths', selCap('allPaths'), pathPick.params, pathPick.hold),
             cycles: spec('findCycles', selCap('findCycles')),
             // Two algorithms behind one button: each has its own control, so each note names which one it is.
-            cutNodes: named('Articulation nodes: ', spec('articulationPoints', selCap('articulationPoints'))),
-            cutEdges: named('Bridges: ', spec('bridges', selCap('bridges'))),
+            cutNodes: named('Cut nodes: ', spec('articulationPoints', selCap('articulationPoints'))),
+            cutEdges: named('Cut links: ', spec('bridges', selCap('bridges'))),
             forest: spec('maximumSpanningForest', selCap('maximumSpanningForest')),
         };
     });
@@ -963,6 +1104,8 @@ export class LinkAnalysisToolboxComponent {
         this.patternMatches.set([]);
         this.cycles.set([]);
         this.selectedCycle.set(-1);
+        this.cyclesNote.set('');
+        this.patternNote.set('');
         this.cutNodes.set([]);
         this.cutEdges.set([]);
         this.cutNodesMap = null;
@@ -994,7 +1137,7 @@ export class LinkAnalysisToolboxComponent {
         switch (tool) {
             case 'path': {
                 const p = this.pathResult();
-                return p ? `${p.hops.length} hops` : '';
+                return p ? plural(p.hops.length, 'hop', 'hops') : '';
             }
             case 'explain':
                 return this.explainText() ? this.label(this.explainFor()) : '';
@@ -1003,47 +1146,47 @@ export class LinkAnalysisToolboxComponent {
             case 'value-measures':
                 return '';
             case 'centrality':
-                return this.ranking().length ? `top ${this.ranking().length}` : '';
+                return this.ranking().length ? `Top ${this.ranking().length}` : '';
             case 'communities':
-                return this.communities().length ? `${this.communities().length} found` : '';
+                return this.communities().length ? plural(this.communities().length, 'group', 'groups') : '';
             case 'pattern':
-                return this.patternMatches().length ? `${this.patternMatches().length} matches` : '';
+                return this.patternMatches().length ? plural(this.patternMatches().length, 'match', 'matches') : '';
             case 'all-paths':
-                return this.allPathsResult().length ? `${this.allPathsResult().length} paths` : '';
+                return this.allPathsResult().length ? plural(this.allPathsResult().length, 'path', 'paths') : '';
             case 'server-paths': {
                 const sp = this.serverPaths();
-                return sp ? `${sp.paths.length} paths${sp.truncated ? ' · truncated' : ''}` : '';
+                return sp ? `${plural(sp.paths.length, 'path', 'paths')}${sp.truncated ? ', cut short' : ''}` : '';
             }
             case 'components':
-                return this.components().length ? `${this.components().length} found` : '';
+                return this.components().length ? plural(this.components().length, 'component', 'components') : '';
             case 'cycles':
-                return this.cycles().length ? `${this.cycles().length} found` : '';
+                return this.cycles().length ? plural(this.cycles().length, 'cycle', 'cycles') : '';
             case 'cut-points':
                 return this.cutNodes().length || this.cutEdges().length
-                    ? `${this.cutNodes().length} nodes · ${this.cutEdges().length} bridges`
+                    ? `${plural(this.cutNodes().length, 'cut node', 'cut nodes')}, ${plural(this.cutEdges().length, 'cut link', 'cut links')}`
                     : '';
             case 'cohesion':
                 return this.cohesionMetric() === 'cliques'
                     ? this.cliquesResult().length
-                        ? `${this.cliquesResult().length} cliques`
+                        ? plural(this.cliquesResult().length, 'clique', 'cliques')
                         : ''
                     : this.cohesionRanking().length
-                      ? `top ${this.cohesionRanking().length}`
+                      ? `Top ${this.cohesionRanking().length}`
                       : '';
             case 'similarity':
                 return this.similarityResult().length || this.predictions().length
-                    ? `${this.similarityResult().length} similar · ${this.predictions().length} predicted`
+                    ? `${this.similarityResult().length} similar, ${this.predictions().length} predicted`
                     : '';
             case 'flow': {
                 const f = this.flowResult();
                 return f
-                    ? `flow ${f.value}`
+                    ? `Flow ${f.value}`
                     : this.spanningForest()
-                      ? `${this.spanningForest()!.edgeIds.length} edges`
+                      ? plural(this.spanningForest()!.edgeIds.length, 'link', 'links')
                       : '';
             }
             case 'scoring':
-                return this.suspicion().length ? `top ${this.suspicion().length}` : '';
+                return this.suspicion().length ? `Top ${this.suspicion().length}` : '';
         }
     }
 
@@ -1065,7 +1208,7 @@ export class LinkAnalysisToolboxComponent {
         if (!p) {
             this.pathResult.set(null);
             this.emphasisChange.emit(null);
-            this.analysisError.set('No path connects the two nodes.');
+            this.analysisError.set(NO_PATH);
             return;
         }
         this.pathResult.set({ hops: p.nodeIds });
@@ -1184,7 +1327,7 @@ export class LinkAnalysisToolboxComponent {
         this.allPathsResult.set(paths);
         if (!paths.length) {
             this.emphasisChange.emit(null);
-            this.analysisError.set('No path connects the two nodes.');
+            this.analysisError.set(NO_PATH);
             return;
         }
         this.emphasisChange.emit({
@@ -1259,6 +1402,7 @@ export class LinkAnalysisToolboxComponent {
         // pack's steps kept its temporal constraint, so Search around stayed hidden with no visible reason.
         this.patternSteps.set(pack ? pack.steps.map((s) => ({ ...s })) : [{}, { direction: 'out' }]);
         this.patternMatches.set([]);
+        this.patternNote.set('');
         this.analysisError.set('');
         this.clearServerNotices();
     }
@@ -1300,6 +1444,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        this.patternNote.set('');
         this.clearServerNotices();
         const inv = this.investigationPatternColumns();
         const invStages = this.branchStages();
@@ -1342,9 +1487,7 @@ export class LinkAnalysisToolboxComponent {
         if (patternNeedsTime(steps) && !timeAttr) {
             this.patternMatches.set([]);
             this.emphasisChange.emit(null);
-            this.analysisError.set(
-                'This pattern requires the hops to be in time order — add the time column under Attribute columns in Settings ▸ Graph model and run it again, then pick it as the Time column under the Filter edges by time (clock) button in the toolbar.',
-            );
+            this.analysisError.set(NEEDS_TIME_COLUMN);
             return;
         }
         const matches = matchPattern(g, steps, { timeAttr });
@@ -1373,7 +1516,7 @@ export class LinkAnalysisToolboxComponent {
             return;
         }
         if (res.truncated) {
-            this.analysisError.set(`Showing the first ${res.matches.length} matches — there may be more.`);
+            this.patternNote.set(`Showing the first ${res.matches.length} matches. There may be more.`);
         }
         this.emphasisChange.emit({
             nodeIds: [...new Set(res.matches.flatMap((m) => m.nodeIds))],
@@ -1415,10 +1558,11 @@ export class LinkAnalysisToolboxComponent {
     private applyCycles(found: GraphSelection[]): void {
         const sorted = sortCyclesShortestFirst(found);
         this.cycles.set(sorted);
+        this.cyclesNote.set('');
         if (!sorted.length) {
             this.selectedCycle.set(-1);
             this.emphasisChange.emit(null);
-            this.analysisError.set('No cycles in this graph.');
+            this.cyclesNote.set('No cycles in this graph.');
             return;
         }
         // Draw the shortest cycle, not the union of all of them (which paints the whole core).
@@ -1462,10 +1606,10 @@ export class LinkAnalysisToolboxComponent {
             this.emphasisChange.emit(null);
             this.analysisError.set(
                 ran === 'both'
-                    ? 'No cut points — the graph has no single points of failure.'
+                    ? 'No cut points: the graph has no single point of failure.'
                     : ran === 'nodes'
-                      ? 'No articulation nodes found — links (bridges) have not been checked for this Working Set yet.'
-                      : 'No bridges found — nodes (articulation) have not been checked for this Working Set yet.',
+                      ? 'No cut nodes found. Cut links have not been checked yet.'
+                      : 'No cut links found. Cut nodes have not been checked yet.',
             );
             return;
         }

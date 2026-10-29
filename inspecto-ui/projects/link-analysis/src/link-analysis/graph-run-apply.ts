@@ -210,7 +210,7 @@ export function droppedNotice(c: DroppedCounts): string {
     if (c.nodes.dropped) parts.push(`${c.nodes.dropped} of ${c.nodes.total} result nodes`);
     if (c.edges.dropped) parts.push(`${c.edges.dropped} of ${c.edges.total} result links`);
     return parts.length
-        ? `${parts.join(' and ')} are not drawn on the canvas right now, so the result shown here leaves them out.`
+        ? `${parts.join(' and ')} are not on the canvas, so this result leaves them out.`
         : '';
 }
 
@@ -258,8 +258,8 @@ export function truncationNotice(r: GraphRunResult): string {
     if (!r.truncated) return '';
     const cuts = Object.entries(r.lists ?? {}).filter(([, c]) => c.truncated);
     if (!cuts.length)
-        return 'The server cut this result at its cap; raise graph_run.max_result_items in Settings to see more.';
+        return 'The server cut this result short at its limit. An administrator can raise the limit in Settings.';
     const limit = Math.max(...cuts.map(([, c]) => c.limit));
     const parts = cuts.map(([k, c]) => cutPhrase(k, c)).join('; ');
-    return `Showing ${parts} (the server cap is ${limit.toLocaleString('en-US')}; raise graph_run.max_result_items in Settings).`;
+    return `Showing ${parts} (cut at the server limit of ${limit.toLocaleString('en-US')}; an administrator can raise it in Settings).`;
 }

@@ -1,7 +1,8 @@
 /**
  * The Analysis catalogue (LA-STUDIO-UI-REORG-1 §5.8, UIR-D10): every browser tool group and every server algorithm
- * (`GET /inv/graph/algorithms`) appears ONCE, grouped by the question it answers. A Browser | Server toggle sets where
- * it runs; a row is badged `browser`, `server` or `both` and states its cap. Framework-free: the toolbox renders it.
+ * (`GET /inv/graph/algorithms`) appears ONCE, grouped by the question it answers. The On screen | Whole Dataset tabs
+ * (ids `browser` | `server`) set where it runs; a `both` row is chipped with the other tab ("Also on screen") and states
+ * its cap. Framework-free: the toolbox renders it.
  */
 
 /** Where a catalogue row can run. */
@@ -13,7 +14,7 @@ export type CatalogueQuestionId = 'connected' | 'important' | 'groups' | 'unusua
 export const CATALOGUE_QUESTIONS: readonly { id: CatalogueQuestionId; label: string }[] = [
     { id: 'connected', label: 'How are they connected?' },
     { id: 'important', label: 'Who matters most?' },
-    { id: 'groups', label: 'What groups and weak points are there?' },
+    { id: 'groups', label: 'Which groups and weak points exist?' },
     { id: 'unusual', label: 'What looks unusual?' },
 ];
 

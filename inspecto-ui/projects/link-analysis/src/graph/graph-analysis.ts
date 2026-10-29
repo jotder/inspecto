@@ -262,18 +262,18 @@ export function explainNode(g: G6GraphData, nodeId: string): string {
     const byKind = new Map<string, string[]>();
     for (const e of g.edges) {
         if (e.source === nodeId) {
-            const arr = byKind.get(`→ ${e.data.kind}`) ?? [];
+            const arr = byKind.get(`Out, ${e.data.kind}`) ?? [];
             arr.push(label(e.target));
-            byKind.set(`→ ${e.data.kind}`, arr);
+            byKind.set(`Out, ${e.data.kind}`, arr);
         } else if (e.target === nodeId) {
-            const arr = byKind.get(`← ${e.data.kind}`) ?? [];
+            const arr = byKind.get(`In, ${e.data.kind}`) ?? [];
             arr.push(label(e.source));
-            byKind.set(`← ${e.data.kind}`, arr);
+            byKind.set(`In, ${e.data.kind}`, arr);
         }
     }
     if (!byKind.size) return `${node.data.label} (${node.data.kind}) has no links in this graph.`;
     const parts = [...byKind.entries()].map(([k, targets]) => `${k}: ${targets.join(', ')}`);
-    return `${node.data.label} (${node.data.kind}) — ${parts.join(' · ')}`;
+    return `${node.data.label} (${node.data.kind}). ${parts.join('. ')}.`;
 }
 
 /** Node ranking entry for the centrality tables. */

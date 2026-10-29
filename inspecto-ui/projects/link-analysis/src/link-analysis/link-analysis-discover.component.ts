@@ -10,6 +10,7 @@ import type { GraphSelection } from '@inspecto/link-analysis/graph/graph-analysi
 import type { EntityListPurpose } from '@inspecto/link-analysis/api/inv.service';
 import { FoundResult, FoundRow, busiest, groups, route } from './discover';
 import type { PackTerms } from './grow-exclude';
+import { DISABLED_REASON } from './disabled-reasons';
 
 type Question = 'busiest' | 'groups' | 'route';
 
@@ -37,17 +38,17 @@ export interface FoundAction {
     template: `
         <section class="flex flex-col gap-2 text-sm" aria-labelledby="la-discover-title" data-testid="la-discover">
             <h3 id="la-discover-title" class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
-                Find something interesting
+                Quick questions
             </h3>
             @if (!graph()?.nodes?.length) {
                 <p class="text-secondary m-0 text-xs">Draw a graph first: these questions are asked of what is on screen.</p>
             } @else {
                 <div class="flex flex-wrap gap-1" role="group" aria-label="Questions">
                     <button mat-stroked-button type="button" data-testid="la-discover-busiest" (click)="ask('busiest')">
-                        Who is busiest
+                        Busiest nodes
                     </button>
                     <button mat-stroked-button type="button" data-testid="la-discover-groups" (click)="ask('groups')">
-                        Which groups stick together
+                        Tight groups
                     </button>
                     <button
                         mat-stroked-button
@@ -56,7 +57,7 @@ export interface FoundAction {
                         [attr.aria-expanded]="question() === 'route'"
                         (click)="question.set('route'); result.set(null)"
                     >
-                        How does A reach B
+                        Route from A to B
                     </button>
                 </div>
                 @if (question() === 'route') {
@@ -69,11 +70,19 @@ export interface FoundAction {
                             type="button"
                             class="self-start"
                             data-testid="la-discover-route-go"
-                            [disabled]="!fromValue() || !toValue()"
-                            (click)="ask('route')"
+                            [disabled]="!!routeWhyNot()"
+                            [disabledInteractive]="true"
+                            [matTooltip]="routeWhyNot()"
+                            [attr.aria-describedby]="routeWhyNot() ? 'la-discover-route-why' : null"
+                            (click)="!routeWhyNot() && ask('route')"
                         >
-                            Find the way
+                            Find route
                         </button>
+                        @if (routeWhyNot(); as why) {
+                            <p class="text-secondary m-0 text-xs" id="la-discover-route-why" data-testid="la-discover-route-why">
+                                {{ why }}
+                            </p>
+                        }
                     </div>
                 }
                 @if (result(); as r) {
@@ -127,7 +136,7 @@ export interface FoundAction {
                                                     type="button"
                                                     (click)="addToList.emit({ row, what: row.what, purpose: 'exclusion' })"
                                                 >
-                                                    Add to an exclusion list
+                                                    Add to exclusion list
                                                 </button>
                                             }
                                         </div>
@@ -171,6 +180,8 @@ export class LinkAnalysisDiscoverComponent {
     readonly fromValue = toSignal(this.from.valueChanges, { initialValue: null });
     readonly toValue = toSignal(this.to.valueChanges, { initialValue: null });
     readonly pickOptions = computed<PickerOption[]>(() => this.nodeOptions().map((n) => ({ value: n.id, label: n.label })));
+    /** Why *Find route* cannot run yet (X6); '' = it can. */
+    readonly routeWhyNot = computed(() => (this.fromValue() && this.toValue() ? '' : DISABLED_REASON.pickFromTo));
 
     ask(q: Question): void {
         const g = this.graph();

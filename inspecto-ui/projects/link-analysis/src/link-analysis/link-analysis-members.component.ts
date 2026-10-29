@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { Observable, firstValueFrom } from 'rxjs';
@@ -10,6 +11,7 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { limitRefusalMessage } from './limit-refusal';
+import { DISABLED_REASON, needsPermission } from './disabled-reasons';
 
 const ROLES: readonly InvestigationRole[] = ['lead', 'analyst', 'reviewer'];
 
@@ -18,7 +20,6 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
     const limit = limitRefusalMessage(err);
     if (limit) return limit;
     const status = (err as { status?: number } | null)?.status;
-    const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
             return 'Only a lead can grant or revoke members.';
@@ -29,7 +30,7 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
         case 409:
             return 'Someone changed the members at the same time. Reload and try again.';
         default:
-            return server;
+            return apiErrorMessage(err, fallback);
     }
 }
 
@@ -46,6 +47,7 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
     imports: [
         FormsModule,
         MatButtonModule,
+        MatTooltipModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         PenFieldComponent,
@@ -63,8 +65,7 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
             }
             @if (hidden()) {
                 <p class="text-secondary m-0">
-                    The member list is not available to you — only members of this Investigation can see who else works
-                    on it.
+                    Only members of this Investigation can see who else is on it.
                 </p>
             } @else if (data(); as d) {
                 <ul class="m-0 flex list-none flex-col gap-1 p-0">
@@ -95,9 +96,9 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
                     <div class="flex items-center gap-2 border-t pt-1" style="border-color: var(--gamma-border)">
                         <inspecto-pen-field
                             class="w-40"
-                            label="Subject"
-                            ariaLabel="Member subject"
-                            placeholder="Subject id"
+                            label="User"
+                            ariaLabel="User"
+                            placeholder="User id"
                             [maxlength]="200"
                             [ngModel]="subject()"
                             (ngModelChange)="subject.set('' + $event)"
@@ -109,17 +110,30 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
                             [ngModel]="role()"
                             (ngModelChange)="role.set($any($event))"
                         />
-                        <button mat-stroked-button [disabled]="busy() || !subject().trim()" (click)="grant()">
+                        <button
+                            mat-stroked-button
+                            data-testid="members-grant"
+                            [disabled]="busy() || !!grantWhyNot()"
+                            [disabledInteractive]="true"
+                            [matTooltip]="grantWhyNot()"
+                            [attr.aria-describedby]="grantWhyNot() ? 'members-grant-why' : null"
+                            (click)="!busy() && !grantWhyNot() && grant()"
+                        >
                             Grant
                         </button>
                     </div>
+                    @if (grantWhyNot(); as why) {
+                        <p class="text-secondary m-0 text-xs" id="members-grant-why" data-testid="members-grant-why">
+                            {{ why }}
+                        </p>
+                    }
                 } @else if (!canManage()) {
                     <p class="text-secondary m-0" data-testid="members-read-only">
-                        Read-only: granting or revoking members needs the Incident management capability.
+                        You cannot change members. {{ needsIncidentManagement }}
                     </p>
                 } @else {
                     <p class="text-secondary m-0">
-                        You are {{ d.you ?? 'a reader' }} here — only a lead can grant or revoke members.
+                        Only a lead can grant or revoke members.
                     </p>
                 }
             }
@@ -141,6 +155,9 @@ export class LinkAnalysisMembersComponent {
     readonly busy = signal(false);
     readonly error = signal('');
     readonly subject = signal('');
+    /** Why Grant cannot run yet (X6); '' = it can. */
+    readonly grantWhyNot = computed(() => (this.subject().trim() ? '' : DISABLED_REASON.fillRequired));
+    protected readonly needsIncidentManagement = needsPermission('Incident management');
     readonly role = signal<InvestigationRole>('analyst');
     /** With no Subject attached (`you` null) nothing is enforced server-side, so the controls are offered. */
     readonly isLead = computed(() => {

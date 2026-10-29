@@ -79,7 +79,7 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         expect(el.textContent).toContain('ana-1');
         expect(button(el, 'Grant')).toBeUndefined();
         expect(el.querySelector('[aria-label^="Revoke"]')).toBeNull();
-        expect(el.textContent).toContain('only a lead can grant or revoke');
+        expect(el.textContent).toContain('Only a lead can grant or revoke members.');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1: the read-only note state
     });
 
@@ -88,7 +88,7 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         expect(button(el, 'Grant')).toBeUndefined();
         expect(el.querySelector('[aria-label^="Revoke"]')).toBeNull();
         expect(el.querySelector('[data-testid="members-read-only"]')?.textContent).toContain(
-            'Incident management capability',
+            'You cannot change members. Needs Incident management.',
         );
         await expectNoA11yViolations(el);
     });
@@ -102,6 +102,19 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         await f.whenStable();
         expect(inv.grantInvestigationMember).toHaveBeenCalledWith('inv-1', 'new-1', 'reviewer');
         expect(c.subject()).toBe('');
+    });
+
+    it('X6: Grant with no user id is disabled with its reason, and a click grants nothing', async () => {
+        const { f, el, inv } = await create();
+        const grant = button(el, 'Grant')!;
+        expect(grant.getAttribute('aria-disabled')).toBe('true');
+        expect(grant.getAttribute('aria-describedby')).toContain('members-grant-why');
+        expect(el.querySelector('[data-testid="members-grant-why"]')?.textContent?.trim()).toBe(
+            'Fill the required fields to run.',
+        );
+        grant.click();
+        await f.whenStable();
+        expect(inv.grantInvestigationMember).not.toHaveBeenCalled();
     });
 
     it('revokes a member', async () => {
@@ -129,8 +142,10 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         (el.querySelector('[aria-label="Revoke lead-1"]') as HTMLButtonElement).click();
         await f.whenStable();
         f.detectChanges();
-        expect(el.textContent).toContain('always keeps one lead');
-        expect(el.textContent).not.toContain('cannot revoke the last lead'); // X5: the reason only
+        expect(el.textContent).toContain('Refused: an Investigation always keeps one lead. Make someone else a lead first.');
+        // X5: the plain reason only, never the raw server text as a suffix
+        expect(el.textContent).not.toContain('cannot revoke the last lead');
+        expect(el.textContent).not.toContain('Server:');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1: the refusal state
     });
 
@@ -138,7 +153,7 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         const { el } = await create({
             investigationMembers: vi.fn(() => throwError(() => http(404, 'no investigation'))),
         });
-        expect(el.textContent).toContain('not available to you');
+        expect(el.textContent).toContain('Only members of this Investigation can see who else is on it.');
         expect(button(el, 'Grant')).toBeUndefined();
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1: the not-a-member state
     });

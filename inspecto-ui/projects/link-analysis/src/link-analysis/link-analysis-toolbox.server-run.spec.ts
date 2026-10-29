@@ -196,7 +196,7 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
         expect(el.querySelector('[aria-controls="tool-index-build"]')).toBeNull();
         expect(el.querySelector('[aria-controls="tool-server-paths"]')).not.toBeNull();
         // the one locked line names the server algorithms and comes after the tools that do run
-        expect(locked(el)).toEqual([{ label: 'Run a server algorithm', reason: REASON, ariaDisabled: 'true' }]);
+        expect(locked(el)).toEqual([{ label: 'Run on the whole Dataset', reason: REASON, ariaDisabled: 'true' }]);
         const lock = el.querySelector('[data-testid="catalogue-server-locked"]')!;
         const paths = el.querySelector('[aria-controls="tool-server-paths"]')!;
         expect(paths.compareDocumentPosition(lock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -213,7 +213,7 @@ describe('LinkAnalysisToolboxComponent - Explorer level (LA-EDITIONS-1 ED-4, LA-
         c.centralityMetric.set('betweenness');
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="run-on-server"]')).toBeNull();
-        expect(el.textContent).toContain('This graph has 5 nodes - above the 3-node limit');
+        expect(el.textContent).toContain('This graph has 5 nodes, too big to answer on screen (limit 3).');
         expect(locked(el)).toEqual([{ label: 'Run on server', reason: REASON, ariaDisabled: 'true' }]);
         (el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement).click();
         expect(run).not.toHaveBeenCalled();
@@ -263,7 +263,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
         fixture.componentRef.setInput('side', 'server');
         fixture.detectChanges();
         expect(button(/Run on server/)).toBeDefined();
-        expect(el.textContent).toContain('This graph has 5 nodes - above the 3-node limit');
+        expect(el.textContent).toContain('This graph has 5 nodes, too big to answer on screen (limit 3).');
         expect(el.textContent).not.toMatch(/capped at/);
         expect(c.serverSpecs().centrality?.algorithm).toBe('betweennessCentrality');
     });
@@ -319,7 +319,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
         fixture.detectChanges();
         // before the pick the run is held, with the reason stated
         expect((button(/Run on server/) as HTMLButtonElement).disabled).toBe(true);
-        expect(fixture.nativeElement.textContent).toContain('Pick a source and a sink first.');
+        expect(fixture.nativeElement.textContent).toContain('Pick a From and a To node first.');
 
         c.flowFrom.set(nodeId('a'));
         c.flowTo.set(nodeId('e'));
@@ -385,7 +385,7 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
         big.c.tab.set('scoring');
         big.fixture.detectChanges();
         expect(big.c.serverSpecs().scoring?.note).toBe(
-            'The Working Set has 1225 nodes - above the 750-node limit for running this in the browser.',
+            'The Working Set has 1,225 nodes, too big to answer on screen (limit 750).',
         );
         expect(big.button(/Run on server/)).toBeDefined();
     });
@@ -435,7 +435,7 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
         fixture.detectChanges();
         expect(button(/Find shortest path/)).toBeUndefined();
         expect((button(/Run on server/) as HTMLButtonElement).disabled).toBe(true);
-        expect(fixture.nativeElement.textContent).toContain('Pick the two nodes first.');
+        expect(fixture.nativeElement.textContent).toContain('Pick a From and a To node first.');
 
         c.pathFrom.set(nodeId('a'));
         c.pathTo.set(nodeId('e'));
@@ -465,7 +465,7 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
         fixture.detectChanges();
         button(/Run on server/)!.click();
         expect(run.mock.calls[0][0].algorithm).toBe('weightedShortestPath');
-        expect(c.analysisError()).toBe('No path connects the two nodes.');
+        expect(c.analysisError()).toBe('No path connects the two nodes. Try Expand or search the whole Dataset.');
         expect(last()).toBeNull();
     });
 
@@ -554,8 +554,8 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
         fixture.detectChanges();
         const controls = () => el.querySelectorAll<HTMLButtonElement>('[data-testid="run-on-server"]');
         expect(controls()).toHaveLength(2);
-        expect(el.textContent).toContain('Articulation nodes: This graph');
-        expect(el.textContent).toContain('Bridges: This graph');
+        expect(el.textContent).toContain('Cut nodes: This graph');
+        expect(el.textContent).toContain('Cut links: This graph');
         controls()[0].click();
         fixture.detectChanges();
         expect(c.cutNodes()).toEqual(['b', 'c'].map(nodeId));
@@ -627,7 +627,7 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
         button(/Run on server/)!.click();
         fixture.detectChanges();
         expect(c.serverDropped()).toBe(
-            '1 of 3 result nodes and 1 of 2 result links are not drawn on the canvas right now, so the result shown here leaves them out.',
+            '1 of 3 result nodes and 1 of 2 result links are not on the canvas, so this result leaves them out.',
         );
         expect(el.querySelector('[data-testid="server-dropped"]')!.textContent).toContain('1 of 3 result nodes');
         // the drawn part is still applied
@@ -670,7 +670,7 @@ describe('LinkAnalysisToolboxComponent - the server result cap is never silent (
             }),
         );
         const text =
-            'Showing the first 10,000 of 25,311 scores (the server cap is 10,000; raise graph_run.max_result_items in Settings).';
+            'Showing the first 10,000 of 25,311 scores (cut at the server limit of 10,000; an administrator can raise it in Settings).';
         expect(c.serverTruncated()).toBe(text);
         expect(el.querySelector('[data-testid="server-truncated"]')!.textContent).toBe(text);
     });
@@ -708,7 +708,7 @@ describe('LinkAnalysisToolboxComponent - the server result cap is never silent (
         button(/Run on server/)!.click();
         fixture.detectChanges();
         expect(c.serverTruncated()).toBe(
-            'Showing the first 2 of 5 members of group 1 (the server cap is 2; raise graph_run.max_result_items in Settings).',
+            'Showing the first 2 of 5 members of group 1 (cut at the server limit of 2; an administrator can raise it in Settings).',
         );
         expect(el.querySelector('[data-testid="server-truncated"]')).not.toBeNull();
         c.reset();
@@ -767,7 +767,7 @@ describe('LinkAnalysisToolboxComponent - a server cut-points answer never combin
         controls()[0].click();
         fixture.detectChanges();
         expect(c.analysisError()).not.toContain('No cut points');
-        expect(c.analysisError()).toContain('No articulation nodes found');
+        expect(c.analysisError()).toContain('No cut nodes found. Cut links have not been checked yet.');
         controls()[1].click();
         fixture.detectChanges();
         expect(c.analysisError()).toContain('No cut points');
@@ -790,7 +790,7 @@ describe('LinkAnalysisToolboxComponent - All algorithms (server) results feed th
             ],
         });
         expect(c.ranking().map((s) => s.id)).toEqual([nodeId('c'), nodeId('a')]);
-        expect(c.toolBadge('centrality')).toBe('top 2');
+        expect(c.toolBadge('centrality')).toBe('Top 2');
     });
 
     it('a partition kind (connected components, Louvain) fills the same community view', () => {
@@ -838,7 +838,7 @@ describe('LinkAnalysisToolboxComponent - per-algorithm browser caps decide the h
         c.centralityMetric.set('closeness');
         fixture.detectChanges();
         expect(c.serverSpecs().centrality?.algorithm).toBe('closenessCentrality');
-        expect(el.textContent).toContain('above the 3-node limit');
+        expect(el.textContent).toContain('too big to answer on screen (limit 3)');
         fixture.componentRef.setInput('side', 'browser'); // hub stays a browser run: the Browser tab
         c.centralityMetric.set('hub');
         fixture.detectChanges();
@@ -860,7 +860,7 @@ describe('LinkAnalysisToolboxComponent - per-algorithm browser caps decide the h
         configureLaLimits({ 'browser_algorithms.findCycles': 3 });
         const { c } = make();
         expect(c.serverSpecs().cycles?.algorithm).toBe('findCycles');
-        expect(c.serverSpecs().cycles?.note).toContain('above the 3-node limit');
+        expect(c.serverSpecs().cycles?.note).toContain('too big to answer on screen (limit 3)');
         expect(c.serverSpecs().forest).toBeNull(); // its sibling keeps the general 2 500
     });
 });
