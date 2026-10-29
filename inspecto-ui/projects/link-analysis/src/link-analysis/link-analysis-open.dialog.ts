@@ -65,6 +65,8 @@ export interface OpenInvestigationRow {
     title: string | null;
     dataset: string;
     owner: string | null;
+    /** The owner's display name when the server resolved it; the login id (`owner`) shows otherwise. */
+    ownerName: string | null;
     changed: string | null;
     steps: number | null;
     caseRef?: string;
@@ -149,7 +151,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                         <mat-select [formControl]="owner">
                             <mat-option value="">Anyone</mat-option>
                             @for (o of owners(); track o) {
-                                <mat-option [value]="o">{{ o }}</mat-option>
+                                <mat-option [value]="o">{{ ownerLabel(o) }}</mat-option>
                             }
                         </mat-select>
                     </mat-form-field>
@@ -316,7 +318,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                 <dt class="text-secondary">Id</dt><dd class="m-0">{{ r.id }}</dd>
                                 <dt class="text-secondary">Dataset</dt><dd class="m-0">{{ r.dataset || '—' }}</dd>
                                 <dt class="text-secondary">Steps</dt><dd class="m-0">{{ r.steps ?? '—' }}</dd>
-                                <dt class="text-secondary">Owner</dt><dd class="m-0">{{ r.owner || '—' }}</dd>
+                                <dt class="text-secondary">Owner</dt><dd class="m-0" data-testid="la-open-inv-owner">{{ r.ownerName || r.owner || '—' }}</dd>
                                 <dt class="text-secondary">Created</dt><dd class="m-0">{{ when(r.changed) }}</dd>
                                 <dt class="text-secondary">Linked Case</dt><dd class="m-0">{{ r.caseRef || '—' }}{{ r.readOnly ? ' (read-only)' : '' }}</dd>
                                 <dt class="text-secondary">Industry pack</dt><dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
@@ -433,6 +435,7 @@ export class LinkAnalysisOpenDialog {
             title: i.title,
             dataset: i.dataset,
             owner: i.owner,
+            ownerName: i.ownerName ?? null,
             changed: i.createdAt,
             steps: i.headStep,
             caseRef: i.caseRef,
@@ -443,7 +446,7 @@ export class LinkAnalysisOpenDialog {
         const seen = new Set(rows.map((r) => r.id));
         for (const r of this.store.refs())
             if (!seen.has(r.id))
-                rows.push({ id: r.id, title: r.title ?? null, dataset: '', owner: null, changed: null, steps: null, readOnly: false, recent: true, listed: false });
+                rows.push({ id: r.id, title: r.title ?? null, dataset: '', owner: null, ownerName: null, changed: null, steps: null, readOnly: false, recent: true, listed: false });
         return rows;
     });
 
@@ -481,6 +484,15 @@ export class LinkAnalysisOpenDialog {
     readonly owners = computed(() =>
         [...new Set(this.allInvestigations().map((r) => r.owner).filter((o): o is string => !!o))].sort(),
     );
+    /** T-186: login id → display name, for the owners the server named. */
+    private readonly ownerNames = computed(
+        () => new Map(this.allInvestigations().filter((r) => r.owner && r.ownerName).map((r) => [r.owner!, r.ownerName!])),
+    );
+
+    /** An owner as people call them: the display name when known, else the login id. */
+    ownerLabel(owner: string): string {
+        return this.ownerNames().get(owner) ?? owner;
+    }
     readonly datasets = computed(() =>
         [
             ...new Set(

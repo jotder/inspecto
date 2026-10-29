@@ -64,6 +64,22 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
         expect(el.querySelector('[data-testid=modules-list]')!.textContent).not.toMatch(/geo-link(?! title)/);
     });
 
+    it('T-083: a reason naming another module says its plain name; an unlisted id or a longer word stays as written', () => {
+        const { el, open } = make(() =>
+            of({
+                hostBuildId: 'h',
+                modules: [
+                    m('la-core', { title: 'Link analysis core and ports' }),
+                    m('la-graph', { state: 'INERT', reasons: ['requires la-core (and la-core-x, not-listed)'] }),
+                ],
+            }),
+        );
+        open();
+        expect(el.querySelector('[data-testid=module-reason]')!.textContent!.trim()).toBe(
+            'requires Link analysis core and ports (and la-core-x, not-listed)',
+        );
+    });
+
     it('draws the list as an opaque card above the canvas, so graph labels do not bleed through it', () => {
         const { el, open } = make(() => of({ hostBuildId: 'h', modules: [m('geo-link')] }));
         open();

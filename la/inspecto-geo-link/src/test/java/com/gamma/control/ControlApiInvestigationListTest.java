@@ -62,7 +62,7 @@ class ControlApiInvestigationListTest {
     private static void subjects() {
         Set<String> all = Set.of("canManageIncidents");
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
-            case OWNER -> Optional.of(new Subject("analyst-1", all));
+            case OWNER -> Optional.of(new Subject("analyst-1", all, Set.of(), Map.of(), null, "Analyst One"));
             case MEMBER -> Optional.of(new Subject("analyst-2", all));     // the Case's assignee
             case STRANGER -> Optional.of(new Subject("analyst-3", all));
             default -> Optional.empty();
@@ -129,6 +129,7 @@ class ControlApiInvestigationListTest {
             for (JsonNode i : mine.get("items")) {
                 assertEquals("owner", i.get("access").asText());
                 assertEquals("analyst-1", i.get("owner").asText());
+                assertEquals("Analyst One", i.get("ownerName").asText(), "T-186: the caller resolves its own display name");
                 assertEquals("calls_ds", i.get("dataset").asText());
                 assertEquals("T " + i.get("id").asText(), i.get("title").asText());
                 assertTrue(i.hasNonNull("createdAt"), i.toString());
@@ -142,6 +143,7 @@ class ControlApiInvestigationListTest {
             assertEquals("case-member", item.get("access").asText());
             assertTrue(item.get("readOnly").asBoolean());
             assertEquals("CASE-1", item.get("caseRef").asText());
+            assertFalse(item.has("ownerName"), "no directory of other people's names: the UI shows the login id");
 
             assertEquals(List.of(), ids(ok(c, "GET", "/inv/investigations", null, STRANGER)), "a stranger sees none");
 

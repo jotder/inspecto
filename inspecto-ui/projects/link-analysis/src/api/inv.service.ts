@@ -683,6 +683,8 @@ export interface InvestigationListItem {
     title: string | null;
     dataset: string;
     owner: string | null;
+    /** T-186: the owner's display name, when the server can resolve it (today: the caller's own Investigations). */
+    ownerName?: string;
     createdAt: string;
     headStep: number;
     caseRef?: string;

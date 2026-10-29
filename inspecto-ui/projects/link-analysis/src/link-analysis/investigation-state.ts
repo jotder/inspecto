@@ -208,8 +208,8 @@ export function stepName(op: string | null | undefined): string {
 const REFUSALS_403: readonly [RegExp, string][] = [
     [/four-eyes:/i, ''], // a decision on someone's request: the server's sentence is the reason
     [
-        /needs four-eyes approval/i, // a stateless read above the Space's four-eyes thresholds
-        'This read needs a second person’s approval. Narrow it, or Expand from an Investigation so it can be approved.',
+        /needs four-eyes approval/i, // a stateless step (read, upload, import, graph run) above the Space's four-eyes thresholds
+        'This step needs a second person’s approval. Make it smaller, or take it as an Expand in an Investigation so it can be approved.',
     ],
     [/your role on investigation .* only a lead or reviewer decides/i, 'Only a lead or reviewer can decide this.'],
     [/your role on investigation .* only a lead changes it/i, 'Only a lead can change this Investigation.'],

@@ -671,27 +671,16 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 - **P3** · `LA-UI-TEXT-RESIDUALS-1` — **the few Link Analysis text items left after the UI text pass** [items: module.la-core · kind: chore]
   - **Context:** `LA-UI-TEXT-PASS-1` shipped 2026-10-29 (plan archived: `archived-documents/plans-archive/la-ui-text-pass.md`).
   - **T-028:** a Dataset's default Entity Type looked wrong once. Not reproducible from the code; needs a live repro.
-  - **T-083 (part):** show the module's plain name. That needs the server's module `title`; ids are tooltips now.
-  - **T-186 (part):** the Open… list shows the owner's login id. A display name needs a server field.
-  - **Four-eyes wording:** the refusal says "read" ("Narrow the read" on the server, "This read needs…" in the UI). It also guards analyst upload, identity import and graph runs, so it should say "step".
+  - **T-186 (rest):** File ▸ Open… shows the owner's display name only for the caller's own Investigations (the list's additive `ownerName`, from the signed-in Subject, 2026-10-29). Other owners still show their login id: the server keeps no directory of other people's names (a Subject carries only its own). Needs a name directory, or the creator's name recorded at create.
   - **Glossary text on other screens:** this waits on `INTELLIGENCE-GLOSSARY-ANNOTATED-1`, the first-line-only `GlossaryLoader`. Until then, Data browser and Catalog show "No definition found." for Dataset and Table, and the Graph Run row cleans badly.
 - **P2** · `LA-PRODUCT-NEXT-1` — **Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "What can this role do?", Investigation access review, a timeline scrubber, pattern-by-example (from a selection, saved as a pack, then as standing detection), and an entity-resolution suggestions spike** [items: module.la-core, module.access · kind: feature]
   - **Phase 1 is a security gap** (verified 2026-10-29): `PUT /access/roles` and `PUT /access/policies` write straight to disk, while Access Catalog and Profile edits go through `PendingChanges.hold`. So an Approval Policy cannot hold the write that grants capabilities.
   - **Decisions** NX-D1…NX-D7 were made by the assistant under operator delegation and are pending confirmation. The operator endorsed the pattern-by-example, scrubber and entity-resolution picks. The deferred ideas and their reasons are in the plan's §4, and the Reach review is in §5.
   - **Plan:** [`superpower/la-product-next-plan.md`](superpower/la-product-next-plan.md).
-- **P3** · `LA-INVESTIGATION-EDIT-HARDENING-1` — **harden the Investigation rename route (`PATCH /inv/investigations/{id}`, shipped 2026-10-29)** [items: module.la-core · kind: defect]
-  - **Found** by its independent review, none of it blocking.
-  - **Lost update:** two leads editing title and purpose at once can undo each other (`InvestigationRoutes` read-modify-write, no lock).
-  - **Edit vs delete race:** an edit that races a delete answers 500, not 404 (FS `writeDetails` takes no lock; PG throws on 0 rows).
-  - **Raw values in the audit event:** the edit's audit records the title and purpose unmasked on a masked Space.
-  - **Fragile details file:** a corrupt `investigation-details.json` blocks every open.
-  - **Hard-coded purpose limit:** the UI caps purpose at 1000 even where `input.purpose_length` is raised.
-  - **Test gaps:**
-    - no PG contract run of `writeDetails`/`details` (needs `INSPECTO_TEST_PG_URL`);
-    - no tests for masking, the embed overlay, the 503, or a pre-edit Dossier still verifying.
-  - **Also open:**
-    - The Act-tab header is not a pen field yet.
-    - The Dossier shows the title and purpose sealed at create.
+- **P3** · `LA-INVESTIGATION-EDIT-HARDENING-1` — **what is left of hardening the Investigation rename route (`PATCH /inv/investigations/{id}`): a Postgres run and one product call** [items: module.la-core · kind: defect]
+  - **Shipped 2026-10-29:** per-field merge in one read-modify-write per Investigation (`InvestigationStore.updateDetails`, FS lock / PG row lock), 404 on an edit racing a delete, masked audit (edit and delete), a corrupt `investigation-details.json` ignored with a WARN, the Space's `input.purpose_length` in the UI, the Act header's name as a pen field, and the tests (masking of the answer, list and embed; the embed overlay; the 503; a pre-edit Dossier still verifying).
+  - **Not run:** the Postgres contract case `updateDetailsIsOneReadModifyWriteAndAnAbsentInvestigationWritesNothing` (`PgInvestigationStoreContractTest`) needs `INSPECTO_TEST_PG_URL`; the PG code mirrors the FS code but has never executed.
+  - **Open call:** the Dossier states the title and purpose sealed at create, not the edited ones. Decide whether it should also show the edit (outside the hashed manifest).
 - **P3** · `LA-WHITEPAPER-DEMO-1` — **narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal record (11 PASS, T2 PARTIAL because no Risk Score model ships, T13 evidence only).** **Re-walked 2026-10-28 on today's build:** 11 PASS, T2 FAIL (the Risk Score Job scores 96 accounts but the Studio's Factors look-up sends the masked alias: `LA-SUSPICION-FACTORS-MASKED-1`), T13 evidence only; T11's viewer was missing from the console build (`LA-CONSOLE-EMBED-VIEWER-1`, fixed the same day; the public read itself PASS). Still owed: one spoken rehearsal with a sceptical second person, timed against 45 and 35 minutes. The two calls (Demo Users for a rehearsal, a real IdP sign-in only for the real review; keep T12 in the technical cut) were CONFIRMED by the operator 2026-10-25. → `okf/product/module/la-core/admin-guide-demo.md` section 9; `superpower/link-analysis-roadmap.md` §D2 [items: module.la-core · kind: chore · hold: external]
 - **P3** · `LA-SUSPICION-FACTORS-INVESTIGATION-1` — **an Investigation canvas's *Factors* still 404 on a masked Space (residual of `LA-SUSPICION-FACTORS-MASKED-1`, 2026-10-28).** An Investigation masks ids with its own per-Investigation key (`FsInvestigationStore.maskKey`, `EntityMasking`), not the Space key exploration uses, so `GET /risk-scores/{model}/{alias}` cannot resolve its alias. Fix: the Studio passes the Investigation id and the route resolves under that key after the Investigation read gate, or Investigations move to the Space key. Re-walk T2 on `mule-hub-case`. [items: module.la-core, module.scoring · kind: defect]
 

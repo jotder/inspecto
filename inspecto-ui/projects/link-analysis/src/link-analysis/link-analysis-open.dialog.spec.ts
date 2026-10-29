@@ -30,7 +30,7 @@ function create(opts: { tab?: 'views' | 'investigations'; confirm?: boolean } = 
         listInvestigations: vi.fn(() =>
             of({
                 items: [
-                    { id: 'inv-1', title: 'Mule ring', dataset: 'transfers', owner: 'ana', createdAt: '2026-10-25T09:00:00Z', headStep: 4, access: 'owner', readOnly: false },
+                    { id: 'inv-1', title: 'Mule ring', dataset: 'transfers', owner: 'ana', ownerName: 'Ana Analyst', createdAt: '2026-10-25T09:00:00Z', headStep: 4, access: 'owner', readOnly: false },
                     { id: 'inv-2', title: null, dataset: 'calls', owner: 'bo', createdAt: '2026-10-01T09:00:00Z', headStep: 2, caseRef: 'case-9', access: 'case-member', readOnly: true },
                 ],
                 total: 2,
@@ -166,6 +166,21 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         (el.querySelector('[data-testid="la-open-by-id"]') as HTMLButtonElement).click();
         expect(close).toHaveBeenCalledWith({ kind: 'investigation', id: 'inv-404', title: undefined });
         await expectNoA11yViolations(el);
+    });
+
+    it('T-186: shows the owner by display name where the server gave one, else by login id', async () => {
+        const { c, el, settle } = create({ tab: 'investigations' });
+        await settle();
+        expect(c.owners()).toEqual(['ana', 'bo']); // the filter still matches on the login id
+        expect(c.ownerLabel('ana')).toBe('Ana Analyst');
+        expect(c.ownerLabel('bo')).toBe('bo');
+        const owner = () => el.querySelector('[data-testid="la-open-inv-owner"]')?.textContent?.trim();
+        (el.querySelector('[data-testid="la-open-inv-inv-1"]') as HTMLButtonElement).click();
+        await settle();
+        expect(owner()).toBe('Ana Analyst');
+        (el.querySelector('[data-testid="la-open-inv-inv-2"]') as HTMLButtonElement).click();
+        await settle();
+        expect(owner()).toBe('bo');
     });
 
     it('LA-REORG-SETTINGS-GAPS-1: the list sorts by name or by last changed, and the Investigation preview shows its pack', async () => {

@@ -143,9 +143,14 @@ public interface InvestigationStore {
     /** Remove the Investigation's Case link; false when it had none. */
     boolean deleteCaseLink(String investigationId) throws IOException;
 
-    /** Write (or replace) the Investigation's edited details - {@code {title?, purpose?, updatedBy, updatedAt}} - OUTSIDE the
-     *  sealed header, which never changes (LA-INVESTIGATION-RENAME-1). */
-    void writeDetails(String investigationId, String json) throws IOException;
+    /**
+     * Read-modify-write the Investigation's edited details - {@code {title?, purpose?, updatedBy, updatedAt}} - OUTSIDE the
+     * sealed header, which never changes (LA-INVESTIGATION-RENAME-1). {@code merge} receives the current record, raw (null when
+     * never edited), and returns the new one; the read and the write are ONE act per Investigation (the same exclusion as an
+     * append), so two edits never undo each other (LA-INVESTIGATION-EDIT-HARDENING-1). False, writing nothing, when the
+     * Investigation does not exist (deleted under the edit).
+     */
+    boolean updateDetails(String investigationId, java.util.function.UnaryOperator<String> merge) throws IOException;
 
     /** The Investigation's edited details, raw, or empty when it was never edited. */
     Optional<String> details(String investigationId) throws IOException;

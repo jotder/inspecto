@@ -605,6 +605,7 @@ class ControlApiAnalystUploadTest {
             HttpResponse<String> r = up(c, "UPL_2.csv", CSV.repeat(2).getBytes(StandardCharsets.UTF_8));
             status(403, r, "more rows than four_eyes_budget_above");
             assertTrue(r.body().contains("four-eyes"), r.body());
+            assertTrue(r.body().contains("Make the step smaller") && !r.body().contains("the read"), "an upload is a step, not a read: " + r.body());
             assertEquals(List.of("UPL_1.csv"), inboxFiles(c));
         }
     }

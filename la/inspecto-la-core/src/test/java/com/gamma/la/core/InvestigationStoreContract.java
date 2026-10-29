@@ -319,8 +319,8 @@ abstract class InvestigationStoreContract {
         assertTrue(s.deleteCaseLink("w"));
         assertFalse(s.deleteCaseLink("w"));
         assertTrue(s.details("w").isEmpty());
-        s.writeDetails("w", "{\"title\":\"a\"}");
-        s.writeDetails("w", "{\"title\":\"b\"}");
+        assertTrue(s.updateDetails("w", current -> { assertNull(current, "never edited"); return "{\"title\":\"a\"}"; }));
+        assertTrue(s.updateDetails("w", current -> { assertEquals("{\"title\":\"a\"}", current); return "{\"title\":\"b\"}"; }));
         assertEquals("{\"title\":\"b\"}", s.details("w").orElseThrow());
         assertTrue(s.alertRuleBinding("w", "r").isEmpty());
         s.bindAlertRule("w", "r", "{\"rule\":\"r\"}");
@@ -333,6 +333,36 @@ abstract class InvestigationStoreContract {
     }
 
     // ── pending records: compare-and-set ────────────────────────────────────────────────────────────────
+
+    @Test
+    void updateDetailsIsOneReadModifyWriteAndAnAbsentInvestigationWritesNothing() throws Exception {
+        InvestigationStore s = fresh();
+        assertFalse(s.updateDetails("gone", current -> fail("never called for an absent Investigation")), "never created");
+        s.create("d", "{}");
+        assertTrue(s.deleteInvestigation("d"));
+        assertFalse(s.updateDetails("d", current -> "{\"title\":\"late\"}"), "an edit racing a delete is refused, not a failure");
+        assertTrue(s.details("d").isEmpty());
+
+        // LA-INVESTIGATION-EDIT-HARDENING-1: racing edits each see the record the previous one wrote - none is lost
+        s.create("e", "{}");
+        int writers = 8, each = 25;
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(writers);
+        try {
+            List<Future<?>> fs = new ArrayList<>();
+            for (int w = 0; w < writers; w++)
+                fs.add(pool.submit(() -> {
+                    go.await();
+                    for (int i = 0; i < each; i++) assertTrue(s.updateDetails("e", current -> (current == null ? "" : current) + "x"));
+                    return null;
+                }));
+            go.countDown();
+            for (Future<?> f : fs) f.get();
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(writers * each, s.details("e").orElseThrow().length(), "every edit read what the one before it wrote");
+    }
 
     @Test
     void replacePendingIsACompareAndSetAndExactlyOneRacerWins() throws Exception {

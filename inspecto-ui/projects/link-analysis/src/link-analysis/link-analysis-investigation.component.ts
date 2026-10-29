@@ -107,6 +107,7 @@ const MORE_STEPS: readonly { id: MoreStepId; label: string }[] = [
 ];
 
 import { LaFoldComponent } from './la-fold.component';
+import { laLimit } from './la-limits';
 
 @Component({
     selector: 'inspecto-link-analysis-investigation',
@@ -203,6 +204,8 @@ export class LinkAnalysisInvestigationComponent {
         if (this.detailsRole() === undefined || this.canEditDetails()) return '';
         return 'Only a lead can change the name or purpose.';
     });
+    /** The longest purpose the Space accepts (`input.purpose_length`, the server's own limit), read when the limits arrive. */
+    readonly purposeMax = computed(() => laLimit('input.purpose_length'));
     readonly detailsTitle = new FormControl('', { nonNullable: true });
     readonly detailsPurpose = new FormControl('', { nonNullable: true });
     readonly detailsTitleError = signal('');
@@ -246,9 +249,9 @@ export class LinkAnalysisInvestigationComponent {
     }
 
     constructor() {
-        // Settings ▸ General: read the caller's role once per open Investigation, and show the values in force.
+        // Settings ▸ General and the Act header: read the caller's role once per open Investigation, and show the values in force.
         effect(() => {
-            const id = this.section() === 'settings' ? this.store.activeId() : null;
+            const id = this.section() === 'settings' || this.section() === 'act' ? this.store.activeId() : null;
             this.detailsRole.set(undefined);
             if (id) untracked(() => void this.loadDetailsRole(id));
         });
@@ -408,7 +411,8 @@ export class LinkAnalysisInvestigationComponent {
     /** D-U5: the stated purpose / legal basis — required by the server, recorded and shown in the Dossier, not enforced. */
     readonly purpose = new FormControl('', {
         nonNullable: true,
-        validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(1000)],
+        // the Space's limit at check time, never a number of our own (it may be raised above the shipped 1000)
+        validators: [Validators.required, Validators.pattern(/\S/), (c) => Validators.maxLength(laLimit('input.purpose_length'))(c)],
     });
     readonly reason = new FormControl('', {
         nonNullable: true,

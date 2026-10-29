@@ -378,7 +378,7 @@
         "tags" : [ "inv" ],
         "summary" : "GET /inv/investigations (generated skeleton)",
         "operationId" : "getInvInvestigations",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The Investigations the caller may read, newest first, paged by limit and offset. Answers {items, total, offset, limit, truncated}; each item {id, title, dataset, owner, ownerName?, createdAt, headStep, caseRef?, access, readOnly}, the title masked per the Space's maskingMode. ownerName (T-186, additive) is the owner's display name where the server can resolve it: only the caller's own Investigations, from the signed-in Subject (there is no directory of other people's names); absent otherwise, so a client shows the owner login id.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -539,7 +539,7 @@
         "tags" : [ "inv" ],
         "summary" : "PATCH /inv/investigations/{investigationId}",
         "operationId" : "patchInvInvestigationsByInvestigationId",
-        "description" : "Rename an Investigation and/or restate its purpose (LA-INVESTIGATION-RENAME-1). Body {title?, purpose?}: at least one; title non-blank and at most 200 chars; purpose non-blank and within the Space's input.purpose_length. The sealed header is never rewritten: the edit is a details record beside it, shown by every read (log header, list, embed) while an issued Dossier still verifies. Gated on canManageIncidents and a lead of the Investigation (a non-lead member 403; a stranger or an unknown id 404). An audit event LINK_INVESTIGATION_EDITED records the fields changed with their values before and after. Answers {id, title, purpose, updatedBy, updatedAt}, masked per the Space's maskingMode.",
+        "description" : "Rename an Investigation and/or restate its purpose (LA-INVESTIGATION-RENAME-1). Body {title?, purpose?}: at least one; title non-blank and at most 200 chars; purpose non-blank and within the Space's input.purpose_length. The sealed header is never rewritten: the edit is a details record beside it, shown by every read (log header, list, embed) while an issued Dossier still verifies. Gated on canManageIncidents and a lead of the Investigation (a non-lead member 403; a stranger or an unknown id 404). An edit writes only the fields it was given, in one read-modify-write per Investigation, so two edits at once never undo each other (LA-INVESTIGATION-EDIT-HARDENING-1); an edit racing a delete answers 404. An unreadable details record is ignored with a warning (the sealed values show) and the next edit replaces it. An audit event LINK_INVESTIGATION_EDITED records the fields changed with their values before and after, masked per the Space's maskingMode. Answers {id, title, purpose, updatedBy, updatedAt}, masked per the Space's maskingMode.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -568,7 +568,7 @@
             "description" : "No canManageIncidents, or a member who is not a lead."
           },
           "404" : {
-            "description" : "No such Investigation, or not readable by the caller."
+            "description" : "No such Investigation, not readable by the caller, or deleted under the edit."
           },
           "422" : {
             "description" : "Neither field given, a blank or over-long title, or a blank or over-long purpose."

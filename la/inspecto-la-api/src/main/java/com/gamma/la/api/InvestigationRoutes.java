@@ -127,6 +127,7 @@ public final class InvestigationRoutes implements RouteModule {
         return java.util.Set.of("geoLink", "investigations");
     }
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(InvestigationRoutes.class);
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     /** The fifteen ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold}, {@code snapshot}, {@code compare}, {@code temporal} and LA-SEED-CONNECT-1's {@code connect}). */
     private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate",
@@ -194,7 +195,8 @@ public final class InvestigationRoutes implements RouteModule {
                         + parse(raw).get("id") + ") — approve or deny it first");
         int steps = inv.store().log(InvestigationStore.Scope.main(id)).size();
         int drafts = inv.store().draftHeaders(id).size();
-        Object title = inv.header().get("title");
+        // D-U6: masked as the edit's audit masks it, and computed BEFORE the delete takes the Investigation's mask key with it
+        Object title = inv.header().get("title") == null ? null : maskedText(EntityMasking.of(inv, List.of()), inv.header().get("title"));
         if (!inv.store().deleteInvestigation(id)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_DELETED, "link.investigation.deleted",
                 "link.investigation.deleted — " + id + (title == null ? "" : " '" + title + "'"),
@@ -237,32 +239,66 @@ public final class InvestigationRoutes implements RouteModule {
         }
         String purpose = hasPurpose ? purpose(body, writeRoot) : null;
         Inv inv = open(api, ex, id);
-        Object previousTitle = inv.header().get("title"), previousPurpose = inv.header().get("purpose");
-        Map<String, Object> details = new LinkedHashMap<>();
-        details.put("title", hasTitle ? title : previousTitle);
-        details.put("purpose", hasPurpose ? purpose : previousPurpose);
-        details.put("updatedBy", ApiContext.actor(ex));
-        details.put("updatedAt", Instant.now().toString());
-        inv.store().writeDetails(id, canonical(details));
+        // The SEALED header (never rewritten, so reading it outside the store's lock is safe): the base an edited field lays over.
+        Map<String, Object> sealed = parse(inv.store().header(id)
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'")));
+        String actor = ApiContext.actor(ex), at = Instant.now().toString();
+        String finalTitle = title;
+        Map<String, Object> before = new LinkedHashMap<>(), after = new LinkedHashMap<>();
+        // One read-modify-write per Investigation, merged per field: an edit writes only the fields it was given, so two
+        // leads editing at once never undo each other (LA-INVESTIGATION-EDIT-HARDENING-1).
+        boolean found = inv.store().updateDetails(id, current -> {
+            Map<String, Object> d = detailsOrEmpty(id, current);
+            for (String k : List.of("title", "purpose")) before.put(k, d.get(k) != null ? d.get(k) : sealed.get(k));
+            if (hasTitle) d.put("title", finalTitle);
+            if (hasPurpose) d.put("purpose", purpose);
+            d.put("updatedBy", actor);
+            d.put("updatedAt", at);
+            for (String k : List.of("title", "purpose")) after.put(k, d.get(k) != null ? d.get(k) : sealed.get(k));
+            return canonical(d);
+        });
+        if (!found) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");   // deleted under the edit
         List<String> changed = new ArrayList<>();
-        if (!java.util.Objects.equals(previousTitle, details.get("title"))) changed.add("title");
-        if (!java.util.Objects.equals(previousPurpose, details.get("purpose"))) changed.add("purpose");
+        for (String k : List.of("title", "purpose")) if (!java.util.Objects.equals(before.get(k), after.get(k))) changed.add(k);
+        // D-U6: the audit trail never holds what the Space masks - title and purpose masked as the list and the Dossier show them
+        EntityMasking mask = EntityMasking.of(inv, List.of());
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_EDITED, "link.investigation.edited",
                 "link.investigation.edited — " + id + " " + changed,
                 b -> b.attr("investigationId", id).attr("changed", String.join(",", changed))
-                        .attr("previousTitle", String.valueOf(previousTitle)).attr("title", String.valueOf(details.get("title")))
-                        .attr("previousPurpose", String.valueOf(previousPurpose)).attr("purpose", String.valueOf(details.get("purpose"))));
+                        .attr("previousTitle", maskedText(mask, before.get("title"))).attr("title", maskedText(mask, after.get("title")))
+                        .attr("previousPurpose", maskedText(mask, before.get("purpose"))).attr("purpose", maskedText(mask, after.get("purpose"))));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
-        out.putAll(details);
+        out.putAll(after);
+        out.put("updatedBy", actor);
+        out.put("updatedAt", at);
         return masked(inv, out);
+    }
+
+    /** Free text for an audit attribute, masked per the Space's {@code maskingMode} (D-U6); {@code "null"} when absent, as before. */
+    private static String maskedText(EntityMasking mask, Object text) {
+        return text == null ? "null" : mask.inText(String.valueOf(text));
+    }
+
+    /**
+     * The edited details as a map, or empty when never edited - or when the record is unreadable (not a JSON object): a corrupt
+     * {@code investigation-details.json} must never lock the Investigation out, so it is ignored with a warning and the sealed
+     * header shows (LA-INVESTIGATION-EDIT-HARDENING-1); the next edit replaces it.
+     */
+    static Map<String, Object> detailsOrEmpty(String id, String raw) {
+        if (raw == null) return new LinkedHashMap<>();
+        try {
+            return parse(raw);
+        } catch (IOException | RuntimeException corrupt) {
+            LOG.warn("investigation '{}': its edited details are unreadable and are ignored - the sealed title and purpose show ({})",
+                    id, corrupt.toString());
+            return new LinkedHashMap<>();
+        }
     }
 
     /** LA-INVESTIGATION-RENAME-1: the header as SHOWN — the sealed header with the edited title and purpose laid over it. */
     static Map<String, Object> withDetails(InvestigationStore store, String id, Map<String, Object> header) throws IOException {
-        String raw = store.details(id).orElse(null);
-        if (raw == null) return header;
-        Map<String, Object> d = parse(raw);
+        Map<String, Object> d = detailsOrEmpty(id, store.details(id).orElse(null));
         for (String k : List.of("title", "purpose")) if (d.get(k) != null) header.put(k, d.get(k));
         return header;
     }
@@ -438,7 +474,7 @@ public final class InvestigationRoutes implements RouteModule {
      * judged by {@link #openForRead} itself, so the list can never show what a read would refuse — the owner's own,
      * plus those shared READ-ONLY with a member of an open linked Case (LA-24), minus any whose bound Dataset the
      * caller cannot view (R3) or the Advanced PDP denies (D-E7). Gates: write root 503 → a bad limit/offset 422.
-     * Each item: {@code {id, title, dataset, owner, createdAt, headStep, caseRef?, access: owner|case-member}}; the
+     * Each item: {@code {id, title, dataset, owner, ownerName?, createdAt, headStep, caseRef?, access: owner|case-member}}; the
      * title is masked per the Space's {@code maskingMode} as the log masks it (D-U6). Read-shaped: no capability.
      */
     private Object list(ApiContext api, HttpExchange ex) throws IOException {
@@ -463,6 +499,10 @@ public final class InvestigationRoutes implements RouteModule {
             item.put("title", h.get("title") == null ? null : EntityMasking.of(inv, List.of()).inText(String.valueOf(h.get("title"))));
             item.put("dataset", h.get("dataset"));
             item.put("owner", h.get("owner"));
+            // T-186: the owner's display name, only where the server can resolve it. Nothing keeps a directory of other people's
+            // names (a Subject carries only its own, from the IdP), so that is the caller's own Investigation; absent otherwise.
+            subject.filter(s -> s.displayName() != null && s.id().equals(h.get("owner")))
+                    .ifPresent(s -> item.put("ownerName", s.displayName()));
             item.put("createdAt", h.get("createdAt"));
             List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
             item.put("headStep", log.isEmpty() ? 0 : ((Number) parse(log.get(log.size() - 1)).get("step")).intValue());

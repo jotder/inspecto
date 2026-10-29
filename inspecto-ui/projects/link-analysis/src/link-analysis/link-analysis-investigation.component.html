@@ -31,7 +31,7 @@
                                 ariaLabel="Purpose"
                                 [multiline]="true"
                                 [formControl]="detailsPurpose"
-                                [maxlength]="1000"
+                                [maxlength]="purposeMax()"
                                 [error]="detailsPurposeError()"
                                 data-testid="inv-settings-purpose"
                             />
@@ -538,8 +538,8 @@
                             label="Purpose"
                             [required]="true"
                             [formControl]="purpose"
-                            [maxlength]="1000"
-                            [error]="purpose.hasError('maxlength') ? 'At most 1000 characters.' : ''"
+                            [maxlength]="purposeMax()"
+                            [error]="purpose.hasError('maxlength') ? 'At most ' + purposeMax() + ' characters.' : ''"
                             data-testid="investigate-purpose"
                         />
                         <p class="text-secondary m-0 text-sm">Why you are investigating (stated reason or legal basis). Shown in the Dossier.</p>
@@ -587,8 +587,8 @@
                         label="Purpose"
                         [required]="true"
                         [formControl]="purpose"
-                        [maxlength]="1000"
-                        [error]="purpose.hasError('maxlength') ? 'At most 1000 characters.' : ''"
+                        [maxlength]="purposeMax()"
+                        [error]="purpose.hasError('maxlength') ? 'At most ' + purposeMax() + ' characters.' : ''"
                     />
                     <p class="text-secondary m-0 text-sm">Why you are investigating (stated reason or legal basis). Shown in the Dossier.</p>
                     <inspecto-pen-field label="Time column (optional)" [formControl]="timeColumn" [placeholder]="timeCol()" />
@@ -628,7 +628,19 @@
                     <!-- 1. Header: title, purpose, Working Set counts, degree reached; ⋯ holds Settings…, Close and Delete -->
                     <div class="flex items-start gap-1" data-testid="act-header">
                         <div class="min-w-0">
-                            <div class="truncate font-semibold">{{ store.displayTitle() || h.id }}</div>
+                            <!-- LA-INVESTIGATION-EDIT-HARDENING-1: a lead renames it here too, through the same route as Settings -->
+                            @if (canEditDetails()) {
+                                <inspecto-pen-field
+                                    class="font-semibold"
+                                    ariaLabel="Name"
+                                    [formControl]="detailsTitle"
+                                    [maxlength]="200"
+                                    [error]="detailsTitleError()"
+                                    data-testid="act-title"
+                                />
+                            } @else {
+                                <div class="truncate font-semibold">{{ store.displayTitle() || h.id }}</div>
+                            }
                             @if (h.purpose) {
                                 <div class="text-secondary truncate text-sm" [attr.title]="h.purpose">{{ h.purpose }}</div>
                             }

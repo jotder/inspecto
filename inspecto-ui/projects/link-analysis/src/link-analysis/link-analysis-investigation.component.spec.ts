@@ -24,7 +24,8 @@ import { PendingInvestigation } from './investigate-number';
 import { WidgetsService } from 'app/modules/admin/studio/widgets/widgets.service';
 import { Widget } from 'app/modules/admin/studio/widgets/widget-types';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
-import { penByLabel, penEdit, penError, penText, refresh } from '@inspecto/core/testing/pen-field';
+import { penByLabel, penEdit, penError, penOpen, penText, refresh } from '@inspecto/core/testing/pen-field';
+import { configureLaLimits, resetLaLimits } from './la-limits';
 
 @Component({
     standalone: true,
@@ -1234,6 +1235,54 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
             expect(part(el, 'settings').textContent).toContain("'title' is at most 200 chars");
             expect(penText(pen(el, 'inv-settings-title')!)).toBe('Burners');
             expect(store.header()?.title).toBe('Burners');
+        });
+
+        it('LA-INVESTIGATION-EDIT-HARDENING-1: a lead renames from the Act header through the same route; an analyst reads it', async () => {
+            const { fixture, store, el, inv } = create({ role: 'lead' });
+            await openInv(store);
+            fixture.detectChanges();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            const title = () => act(el).querySelector('[data-testid="act-title"]') as HTMLElement | null;
+            expect(penText(title()!)).toBe('Burners');
+            penEdit(fixture, title()!, 'Ring around c');
+            await fixture.whenStable();
+            fixture.detectChanges();
+            expect(inv.editInvestigation).toHaveBeenCalledWith('inv-1', { title: 'Ring around c' });
+            expect(store.header()?.title).toBe('Ring around c');
+            expect(penText(pen(el, 'inv-settings-title')!)).toBe('Ring around c');
+            await expectNoA11yViolations(act(el).querySelector('[data-testid="act-header"]') as HTMLElement);
+            TestBed.resetTestingModule();
+
+            const analyst = create({ role: 'analyst' });
+            await openInv(analyst.store);
+            analyst.fixture.detectChanges();
+            await analyst.fixture.whenStable();
+            analyst.fixture.detectChanges();
+            const header = act(analyst.el).querySelector('[data-testid="act-header"]')!;
+            expect(header.querySelector('[data-testid="act-title"]')).toBeNull();
+            expect(header.textContent).toContain('Burners');
+        });
+
+        it('the purpose limit is the Space\'s input.purpose_length, not a number of the UI\'s own', async () => {
+            configureLaLimits({ 'input.purpose_length': 3000 });
+            try {
+                const { fixture, store, el } = create({ role: 'lead' });
+                await openInv(store);
+                fixture.detectChanges();
+                await fixture.whenStable();
+                fixture.detectChanges();
+                const c = fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent))
+                    .componentInstance as LinkAnalysisInvestigationComponent;
+                expect(c.purposeMax()).toBe(3000);
+                c.purpose.setValue('x'.repeat(2000));
+                expect(c.purpose.hasError('maxlength')).toBe(false);
+                c.purpose.setValue('x'.repeat(3001));
+                expect(c.purpose.hasError('maxlength')).toBe(true);
+                expect(penOpen(fixture, pen(el, 'inv-settings-purpose')!).maxLength).toBe(3000);
+            } finally {
+                resetLaLimits();
+            }
         });
 
         it('a member who is not a lead, or a caller without the capability, reads them with the reason', async () => {

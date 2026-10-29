@@ -48,7 +48,7 @@ export function isLinkAnalysisModule(id: string): boolean {
                                     {{ label(m) }}
                                 </inspecto-chip>
                                 @if (m.reasons?.length) {
-                                    <span class="text-secondary">{{ m.reasons![0] }}</span>
+                                    <span class="text-secondary" data-testid="module-reason">{{ reason(m.reasons![0]) }}</span>
                                 }
                             </li>
                         } @empty {
@@ -65,15 +65,29 @@ export class LinkAnalysisModulesComponent {
     readonly open = signal(false);
     readonly modules = signal<ModuleView[] | null>(null);
     readonly error = signal('');
+    /** Every listed module's plain name by id (T-083), so a reason naming another module says its name, not its id. */
+    private readonly titles = signal(new Map<string, string>());
 
     toggle(): void {
         this.open.update((o) => !o);
         if (this.open() && !this.modules()) {
             this.runs.modules().subscribe({
-                next: (r) => this.modules.set(r.modules.filter((m) => isLinkAnalysisModule(m.id))),
+                next: (r) => {
+                    this.titles.set(new Map(r.modules.filter((m) => m.title).map((m) => [m.id, m.title])));
+                    this.modules.set(r.modules.filter((m) => isLinkAnalysisModule(m.id)));
+                },
                 error: () => this.error.set('The module list could not be read.'),
             });
         }
+    }
+
+    /** A server reason with each module id it names replaced by that module's title ("requires la-core" → "requires Link analysis core and ports"). */
+    reason(text: string): string {
+        // module ids are word characters and hyphens; split on everything else and swap whole ids only
+        return text
+            .split(/([^\w-]+)/)
+            .map((part) => this.titles().get(part) ?? part)
+            .join('');
     }
 
     label(m: ModuleView): string {

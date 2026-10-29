@@ -501,11 +501,11 @@ public final class PgInvestigationStore implements InvestigationStore {
     }
 
     @Override
-    public void writeDetails(String investigationId, String json) throws IOException {
-        tx(c -> {
-            if (update(c, "UPDATE " + t("la_investigation") + " SET details = ? WHERE id = ?", json, investigationId) != 1)
-                throw new IOException("no such investigation '" + investigationId + "'");
-            return null;
+    public boolean updateDetails(String investigationId, java.util.function.UnaryOperator<String> merge) throws IOException {
+        return tx(c -> {   // the Investigation row lock serialises the read-modify-write; a deleted row is no row: false, not a failure
+            List<String> row = strings(c, "SELECT details FROM " + t("la_investigation") + " WHERE id = ? FOR NO KEY UPDATE", investigationId);
+            if (row.isEmpty()) return false;
+            return update(c, "UPDATE " + t("la_investigation") + " SET details = ? WHERE id = ?", merge.apply(row.get(0)), investigationId) == 1;
         });
     }
 

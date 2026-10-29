@@ -1105,7 +1105,7 @@ public final class InvRoutes implements RouteModule {
         if (!exceeded.isEmpty())                                             // D-U7; no ticket id in the user's sentence
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, Character.toUpperCase(what.charAt(0)) + what.substring(1)
                     + " needs four-eyes approval (" + String.join(", ", exceeded) + "), and only an Investigation can hold "
-                    + "the request. Narrow the read, or Expand from an Investigation so a second person can approve it.");
+                    + "the request. Make the step smaller, or take it as an Expand in an Investigation so a second person can approve it.");
     }
 
     /**

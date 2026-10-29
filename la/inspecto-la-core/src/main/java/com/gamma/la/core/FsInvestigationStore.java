@@ -483,8 +483,17 @@ public final class FsInvestigationStore implements InvestigationStore {
     }
 
     @Override
-    public void writeDetails(String investigationId, String json) throws IOException {
-        snapshots.writeDetails(investigationId, json);
+    public boolean updateDetails(String investigationId, java.util.function.UnaryOperator<String> merge) throws IOException {
+        Path inv = investigationDir(investigationId);
+        synchronized (monitor(inv)) {   // the monitor deleteInvestigation takes before it moves the directory away
+            if (!Files.isRegularFile(inv.resolve("header.json"))) return false;
+            try (var held = lock(inv)) {
+                snapshots.writeDetails(investigationId, merge.apply(snapshots.readDetails(investigationId)));
+                return true;
+            } catch (java.nio.file.NoSuchFileException goneInAnotherJvm) {
+                return false;
+            }
+        }
     }
 
     @Override

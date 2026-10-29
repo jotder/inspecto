@@ -3,6 +3,7 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.audit.Event;
+import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.event.EventLog;
 import com.gamma.la.core.LinkEventTypes;
@@ -32,6 +33,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -60,10 +62,11 @@ class ControlApiInvestigationEditTest {
     @AfterEach
     void reset() {
         Authenticators.forTest(null);
+        System.clearProperty("la.embed.enabled");
     }
 
     private static void subjects() {
-        Set<String> all = Set.of("canManageIncidents");
+        Set<String> all = Set.of("canManageIncidents", "canShareInvestigation");
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case OWNER -> Optional.of(new Subject("analyst-1", all));
             case NOCAP -> Optional.of(new Subject("analyst-1", Set.of()));
@@ -163,6 +166,126 @@ class ControlApiInvestigationEditTest {
             assertEquals("Rehearsal run", a.get("previousTitle"));
             assertEquals("Fraud referral FR-9", a.get("previousPurpose"));
             assertEquals("analyst-1", a.get(com.gamma.audit.AuditAttrs.ACTOR));
+        }
+    }
+
+    private List<Event> edited(Ctx c, String body, String auth, JsonNode[] answer) throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        Consumer<Event> sub = seen::add;
+        EventLog.current().addSubscriber(sub);
+        try {
+            answer[0] = ok(c, "PATCH", INV, body, auth);
+        } finally {
+            EventLog.current().removeSubscriber(sub);
+        }
+        return seen.stream().filter(e -> e.type().equals(LinkEventTypes.LINK_INVESTIGATION_EDITED)).toList();
+    }
+
+    /**
+     * LA-INVESTIGATION-EDIT-HARDENING-1 — on a Space masking every entity, the edited title and purpose naming an entity are masked
+     * in the PATCH answer, the log header, the list, the embed view (which shows the EDIT, not the sealed header) and the audit
+     * event; the raw entity id appears in none of them.
+     */
+    @Test
+    void onAMaskedSpaceTheEditIsMaskedInTheAnswerTheListTheEmbedAndTheAudit(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        System.setProperty("la.embed.enabled", "true");
+        try (Ctx c = open(cfg, root)) {
+            ok(c, "POST", "/inv/investigations", CREATE, OWNER);
+            ok(c, "POST", INV + "/ops", "{\"op\":\"seed\",\"ids\":[\"a\"]}", OWNER);
+            ok(c, "POST", INV + "/ops", "{\"op\":\"expand\"}", OWNER);   // b and c join the masking universe
+            new LinkAnalysisSettings(null, null, null, "all", null, null, null, null, null, null, null, null, null, null, null, null)
+                    .write(root.resolve("link-analysis.toon"));
+
+            JsonNode[] out = new JsonNode[1];
+            List<Event> mine = edited(c, "{\"title\":\"Ring around b\",\"purpose\":\"Referral about c\"}", OWNER, out);
+            String title = out[0].get("title").asText(), purpose = out[0].get("purpose").asText();
+            assertTrue(title.startsWith("Ring around masked:"), "the answer masks the entity the title names: " + title);
+            assertTrue(purpose.startsWith("Referral about masked:"), purpose);
+
+            assertEquals(title, ok(c, "GET", INV + "/log", null, OWNER).at("/header/title").asText(), "the log header");
+            assertEquals(title, ok(c, "GET", "/inv/investigations", null, OWNER).at("/items/0/title").asText(), "the list");
+            String token = ok(c, "POST", INV + "/embeds", "{}", OWNER).get("token").asText();
+            HttpResponse<String> pub = send(c, "GET", "/public/investigations/" + token, null, null);
+            assertEquals(200, pub.statusCode(), pub.body());
+            JsonNode view = JSON.readTree(pub.body()).get("data").get("investigation");
+            assertEquals(title, view.get("title").asText(), "the embed shows the edited title, masked");
+            assertEquals(purpose, view.get("purpose").asText());
+
+            assertEquals(1, mine.size());
+            Map<String, String> a = mine.get(0).attributes();
+            assertEquals(title, a.get("title"), "the audit holds the title as the Space shows it, never the raw id");
+            assertEquals(purpose, a.get("purpose"));
+            assertEquals("Rehearsal run", a.get("previousTitle"), "no entity named: nothing to mask");
+            for (String v : List.of(a.get("title"), a.get("purpose"), mine.get(0).message()))
+                assertFalse(v.endsWith(" b") || v.endsWith(" c"), "no raw entity id in the audit: " + v);
+        }
+    }
+
+    /** A corrupt edited-details file is ignored with a warning: every open still answers, with the sealed values, and the next edit replaces it. */
+    @Test
+    void aCorruptDetailsFileNeverLocksTheInvestigationOut(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            ok(c, "POST", "/inv/investigations", CREATE, OWNER);
+            Path details = root.resolve("audit/snapshots/investigations/inv-a/investigation-details.json");
+            Files.writeString(details, "{\"title\": \"half writ");
+            JsonNode h = ok(c, "GET", INV + "/log", null, OWNER).get("header");
+            assertEquals("Rehearsal run", h.get("title").asText(), "the sealed title shows");
+            assertEquals("Fraud referral FR-9", h.get("purpose").asText());
+            assertEquals("Rehearsal run", ok(c, "GET", "/inv/investigations", null, OWNER).at("/items/0/title").asText());
+
+            ok(c, "PATCH", INV, "{\"purpose\":\"Fraud referral FR-11\"}", OWNER);
+            h = ok(c, "GET", INV + "/log", null, OWNER).get("header");
+            assertEquals("Rehearsal run", h.get("title").asText());
+            assertEquals("Fraud referral FR-11", h.get("purpose").asText(), "the edit replaced the corrupt record");
+        }
+    }
+
+    /** Two edits in turn, each naming one field: the second never undoes the first (each writes only the field it was given). */
+    @Test
+    void anEditWritesOnlyTheFieldsItWasGiven(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            ok(c, "POST", "/inv/investigations", CREATE, OWNER);
+            ok(c, "PATCH", INV, "{\"purpose\":\"Fraud referral FR-12\"}", OWNER);
+            ok(c, "PATCH", INV, "{\"title\":\"Second lead's title\"}", OWNER);
+            JsonNode d = JSON.readTree(Files.readString(root.resolve("audit/snapshots/investigations/inv-a/investigation-details.json")));
+            assertEquals("Second lead's title", d.get("title").asText());
+            assertEquals("Fraud referral FR-12", d.get("purpose").asText());
+            JsonNode[] out = new JsonNode[1];
+            Map<String, String> a = edited(c, "{\"title\":\"Second lead's title\"}", OWNER, out).get(0).attributes();
+            assertEquals("", a.get("changed"), "a no-op edit changes nothing");
+        }
+    }
+
+    /** No write root: 503 before anything is read. */
+    @Test
+    void withoutAWriteRootTheEditIs503(@TempDir Path cfg) throws Exception {
+        subjects();
+        Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
+        System.clearProperty("assist.write.root");
+        CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+        ControlApi api = new ControlApi(svc, 0);
+        api.start();
+        try (Ctx c = new Ctx(svc, api, api.port(), null)) {
+            HttpResponse<String> r = send(c, "PATCH", INV, "{\"title\":\"x\"}", OWNER);
+            assertEquals(503, r.statusCode(), r.body());
+        }
+    }
+
+    /** A Dossier issued BEFORE an edit still verifies after it: the edit never touches the sealed header the manifest hashes. */
+    @Test
+    void aDossierIssuedBeforeAnEditStillVerifies(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            ok(c, "POST", "/inv/investigations", CREATE, OWNER);
+            ok(c, "POST", INV + "/ops", "{\"op\":\"seed\",\"ids\":[\"a\"]}", OWNER);
+            ok(c, "POST", INV + "/ops", "{\"op\":\"expand\"}", OWNER);
+            JsonNode manifest = ok(c, "GET", INV + "/dossier", null, OWNER).get("manifest");
+            ok(c, "PATCH", INV, "{\"title\":\"Renamed after issue\",\"purpose\":\"Restated after issue\"}", OWNER);
+            JsonNode v = ok(c, "POST", INV + "/dossier/verify", "{\"manifest\":" + manifest + "}", OWNER);
+            assertTrue(v.get("verified").asBoolean(), v.toString());
         }
     }
 }

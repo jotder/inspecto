@@ -181,4 +181,26 @@ class ControlApiInvestigationDeleteTest {
             assertFalse(Files.exists(dir(c)));
         }
     }
+
+    /** LA-INVESTIGATION-EDIT-HARDENING-1: on a masked Space the delete's audit holds the (edited) title as the Space shows it, as the edit's does. */
+    @Test
+    void onAMaskedSpaceTheDeleteAuditMasksTheTitle(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            investigation(c);
+            ok(c, "PATCH", INV, "{\"title\":\"Ring around b\"}", OWNER);
+            Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
+            List<Event> seen = new CopyOnWriteArrayList<>();
+            Consumer<Event> sub = seen::add;
+            EventLog.current().addSubscriber(sub);
+            try {
+                ok(c, "DELETE", INV, null, OWNER);
+            } finally {
+                EventLog.current().removeSubscriber(sub);
+            }
+            Event e = seen.stream().filter(x -> x.type().equals(LinkEventTypes.LINK_INVESTIGATION_DELETED)).findFirst().orElseThrow();
+            assertTrue(e.attributes().get("title").startsWith("Ring around masked:"), e.attributes().toString());
+            assertFalse(e.message().contains("Ring around b'"), "no raw entity id in the message: " + e.message());
+        }
+    }
 }
