@@ -879,8 +879,8 @@
                             (click)="openAttachToCase()"
                             [disabled]="!!attachUnavailable()"
                             [disabledInteractive]="true"
-                            [matTooltip]="attachUnavailable() || 'Seal this analysis and attach it to a Case'"
-                            [attr.aria-label]="attachUnavailable() ? 'Attach to Case - ' + attachUnavailable() : 'Attach to Case'"
+                            [matTooltip]="attachUnavailable() || 'Save a snapshot on a Case'"
+                            [attr.aria-label]="attachUnavailable() ? 'Attach to Case: ' + attachUnavailable() : 'Attach to Case'"
                             data-testid="la-selection-attach"
                         >
                             <mat-icon svgIcon="heroicons_outline:paper-clip" aria-hidden="true"></mat-icon>

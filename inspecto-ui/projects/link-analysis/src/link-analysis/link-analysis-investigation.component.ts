@@ -103,7 +103,7 @@ const MORE_STEPS: readonly { id: MoreStepId; label: string }[] = [
     { id: 'threshold', label: 'Threshold' },
     { id: 'snapshot', label: 'Snapshot marker' },
     { id: 'compare', label: 'Compare' },
-    { id: 'connect', label: 'Connect seeds' },
+    { id: 'connect', label: 'Connect start entities' },
 ];
 
 import { LaFoldComponent } from './la-fold.component';

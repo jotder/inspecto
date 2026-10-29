@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { EntityProjection, EntityTypeRef, G6Node, typedEntityKey } from '@inspecto/core/graph';
 import { InvestigationLogEntry, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
-import { apiErrorMessage, needsPermission } from '@inspecto/core/api';
+import { apiErrorMessage } from '@inspecto/core/api';
 import type { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { resolveEntityId } from '@inspecto/core/graph';
 import { ProjectedGraph, projectTriples } from './entity-projection';
@@ -201,6 +201,35 @@ export function stepName(op: string | null | undefined): string {
 }
 
 /**
+ * The 403s the Link Analysis routes answer, each in a true plain reason (review 2026-10-29: X5 had turned every 403
+ * into "Needs Incident management.", a false reason for a member whose role is too low, a restricted list or a policy
+ * deny). Matched on the server's own wording; the order matters (the most specific first).
+ */
+const REFUSALS_403: readonly [RegExp, string][] = [
+    [/four-eyes:/i, ''], // a decision on someone's request: the server's sentence is the reason
+    [/four-eyes applies/i, ''],
+    [/your role on investigation .* only a lead or reviewer decides/i, 'Only a lead or reviewer can decide this.'],
+    [/your role on investigation .* only a lead changes it/i, 'Only a lead can change this Investigation.'],
+    [/your role on investigation .* does not (write|fork) a draft/i, 'Your role on this Investigation cannot change Drafts.'],
+    [/only the actor or a lead/i, 'Only the Draft’s author or a lead can do that.'],
+    [/only a lead of this investigation may grant or revoke/i, 'Only a lead can grant or revoke members.'],
+    [/entity list .* is restricted/i, 'This Entity List is restricted.'],
+    [/denied by access policy/i, 'An access policy denies this.'],
+    [/needs an authenticated Subject/i, 'Sign in to do this.'],
+];
+
+/**
+ * A 403 in a true plain reason. A missing capability (already "Needs <permission>." from `apiErrorMessage`) is said as
+ * `capability` when the caller words it better; a known refusal gets its own sentence; anything else is never
+ * guessed at: "This was refused." plus a short "Details:" line with the server's message.
+ */
+export function refusal403(server: string, capability?: string): string {
+    if (/^Needs [A-Z]|^Your role does not have the permission/.test(server)) return capability ?? server;
+    for (const [pattern, reason] of REFUSALS_403) if (pattern.test(server)) return reason || 'Refused: ' + server;
+    return server.trim() ? `This was refused. Details: ${server.trim()}` : 'This was refused.';
+}
+
+/**
  * A readable message for an Investigation route failure. 404 is deliberately ambiguous: the server answers it
  * for an unknown id AND for someone else's Investigation (owner-only), and for a bound Dataset the caller can
  * no longer view. 403 is the capability gate (`canManageIncidents`). 409 and 422 carry the server's own reason.
@@ -214,9 +243,7 @@ export function investigationErrorMessage(err: unknown, fallback: string): strin
         case 404:
             return 'This Investigation is not available: it does not exist, is not yours, or its Dataset is no longer shared with you.';
         case 403:
-            // a four-eyes refusal (the neighbours read of a node above the fan-out limit) is not a missing capability
-            if (/four-eyes/i.test(server)) return 'Refused: ' + server;
-            return needsPermission('canManageIncidents');
+            return refusal403(server);
         case 409:
             return 'Refused: ' + server;
         case 422:
@@ -238,7 +265,7 @@ export function entityListErrorMessage(
     err: unknown,
     fallback: string,
     onInvestigation = false,
-    forbidden = needsPermission('canManageIncidents'),
+    forbidden?: string,
 ): string {
     const limit = limitRefusalMessage(err);
     if (limit) return limit;
@@ -250,7 +277,7 @@ export function entityListErrorMessage(
                 ? 'The Entity List or the Investigation is not available: it does not exist or is not yours.'
                 : 'This Entity List no longer exists.';
         case 403:
-            return forbidden;
+            return refusal403(server, forbidden);
         case 409:
             return 'Refused: ' + server;
         case 422:
@@ -288,7 +315,7 @@ export function identityErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return IDENTITIES_NEED;
+            return refusal403(server, IDENTITIES_NEED);
         case 409:
             return 'Refused: ' + server;
         case 422:

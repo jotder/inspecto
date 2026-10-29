@@ -30,7 +30,7 @@ import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { domainProfiles } from '@inspecto/link-analysis/graph/domain-profile';
 import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
-import { investigationErrorMessage } from './investigation-state';
+import { investigationErrorMessage, stepName } from './investigation-state';
 import { limitRefusalMessage } from './limit-refusal';
 import { SAFE_ID_PATTERN, templatePreview } from './investigation-template';
 
@@ -76,7 +76,7 @@ export interface SaveTemplateData {
                 </inspecto-alert>
                 <ul class="m-0 pl-4 text-xs" aria-label="What the server dropped and generalised">
                     @for (d of t.dropped; track d.step) {
-                        <li>Step {{ d.step }} ({{ d.op }}, {{ d.count }} entities) — dropped.</li>
+                        <li>Step {{ d.step }} ({{ stepName(d.op) }}, {{ d.count }} entities): dropped.</li>
                     }
                     @for (g of t.generalised; track g.step) {
                         <li>
@@ -98,11 +98,11 @@ export interface SaveTemplateData {
                     <ul class="m-0 pl-4 text-xs">
                         @for (p of preview.parameters; track p.step) {
                             <li>
-                                Step {{ p.step }} {{ p.kind }} → parameter <code>{{ p.name }}</code>
+                                Step {{ p.step }} {{ stepName(p.kind) }} → parameter <code>{{ p.name }}</code>
                             </li>
                         }
                         @for (d of preview.dropped; track d.step) {
-                            <li>Step {{ d.step }} {{ d.op }} of {{ d.count }} entities → dropped</li>
+                            <li>Step {{ d.step }} ({{ stepName(d.op) }}, {{ d.count }} entities): dropped.</li>
                         }
                         @for (g of preview.generalised; track g.step) {
                             <li>
@@ -165,6 +165,7 @@ export interface SaveTemplateData {
     `,
 })
 export class SaveTemplateDialog {
+    readonly stepName = stepName;
     readonly data = inject<SaveTemplateData>(MAT_DIALOG_DATA);
     readonly ref = inject(MatDialogRef<SaveTemplateDialog, InvestigationTemplate | undefined>);
     private inv = inject(InvService);
@@ -240,14 +241,14 @@ function seedParameters(t: InvestigationTemplate) {
 /** The instantiate form for one template: a seed list per parameter, then the Dataset + column roles. */
 export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
     const specs: AttributeSpec[] = [
-        { key: 'title', label: 'Title', type: 'string', tier: 'required', required: false },
+        { key: 'title', label: 'Name', type: 'string', tier: 'required', required: false },
         {
             key: 'purpose',
-            label: 'Purpose / legal basis',
+            label: 'Purpose',
             type: 'string',
             tier: 'required',
             required: true,
-            help: 'Recorded with the new Investigation and shown in its Dossier (D-U5).',
+            help: 'Why you are investigating (stated reason or legal basis). Shown in the Dossier.',
         },
         ...seedParameters(t).map<AttributeSpec>((p) => ({
             key: `param:${p.name}`,
@@ -378,6 +379,7 @@ export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
     `,
 })
 export class InstantiateTemplateDialog {
+    readonly stepName = stepName;
     readonly ref = inject(MatDialogRef<InstantiateTemplateDialog, InstantiateTemplateResult | undefined>);
     private inv = inject(InvService);
     private confirm = inject(InspectoConfirmService);

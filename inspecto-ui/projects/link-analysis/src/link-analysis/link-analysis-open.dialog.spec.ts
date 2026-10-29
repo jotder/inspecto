@@ -182,6 +182,8 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         (el.querySelector('[data-testid="la-open-inv-inv-2"]') as HTMLButtonElement).click();
         await settle();
         expect(el.querySelector('[data-testid="la-open-inv-pack"]')?.textContent?.trim()).toBe('Space default');
+        // the list carries only createdAt (set once at create, fork or instantiate): the label says so (T-161 review)
+        expect(Array.from(el.querySelectorAll('dt')).map((d) => d.textContent?.trim())).toContain('Created');
 
         c.setTab('views');
         await settle();

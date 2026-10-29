@@ -162,7 +162,7 @@ export function overlayStartsOpen(stored: boolean | null, canvasWidth: number): 
                             style="border-color: var(--gamma-text-secondary); box-shadow: 0 0 0 3px var(--gamma-border)"
                             aria-hidden="true"
                         ></span>
-                        <span>Ringed: high connectivity — shown, not expanded</span>
+                        <span>Ringed: busy, shown but not expanded</span>
                         <span class="text-secondary ml-auto tabular-nums">{{ highConnectivity() }}</span>
                     </div>
                 }

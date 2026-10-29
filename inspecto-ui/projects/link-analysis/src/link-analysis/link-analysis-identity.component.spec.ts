@@ -67,7 +67,7 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         expect(inv.listIdentityGroups).not.toHaveBeenCalled();
         expect(el.querySelector('form')).toBeNull();
         expect(el.querySelector('[data-testid="identity-read-only"]')?.textContent).toContain(
-            'Incident management capability',
+            'need Incident management, also to read',
         );
         await expectNoA11yViolations(el);
     });
@@ -99,7 +99,9 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
 
     it('explains a 403 as a capability, not a broken chain', async () => {
         const { f, el } = create({
-            listIdentityGroups: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 403, error: {} }))),
+            listIdentityGroups: vi.fn(() =>
+                throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: "missing capability 'canManageIncidents'" } } })),
+            ),
         });
         await f.whenStable();
         f.detectChanges();

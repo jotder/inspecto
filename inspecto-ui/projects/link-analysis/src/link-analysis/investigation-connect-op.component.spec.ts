@@ -97,7 +97,7 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
         cmp.text.set('5551110001');
         fixture.detectChanges();
         const button = Array.from(el.querySelectorAll('button')).find((b) =>
-            b.textContent?.includes('Connect seeds'),
+            b.textContent?.includes('Connect start entities'),
         ) as HTMLButtonElement;
         expect(button.disabled).toBe(true);
         await cmp.connect();
@@ -112,7 +112,7 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
         const onSubmit = (e: Event) => seen.push(e);
         el.ownerDocument.addEventListener('submit', onSubmit);
         try {
-            (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Connect seeds')) as HTMLButtonElement).click();
+            (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Connect start entities')) as HTMLButtonElement).click();
             await fixture.whenStable();
         } finally {
             el.ownerDocument.removeEventListener('submit', onSubmit);

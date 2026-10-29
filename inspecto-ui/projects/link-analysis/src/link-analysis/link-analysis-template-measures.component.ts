@@ -81,7 +81,7 @@ import {
             </div>
             @if (!canWrite()) {
                 <p id="templates-read-only" class="text-secondary m-0" data-testid="templates-read-only">
-                    Read-only: saving or instantiating a template needs the Incident management capability.
+                    Read-only: saving or instantiating a template needs Incident management.
                 </p>
             }
         </section>

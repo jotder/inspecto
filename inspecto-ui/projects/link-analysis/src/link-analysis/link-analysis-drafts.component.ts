@@ -24,7 +24,7 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { limitRefusalMessage } from './limit-refusal';
-import { stepName } from './investigation-state';
+import { refusal403, stepName } from './investigation-state';
 
 /** A Draft refusal in an analyst's words: the reason only, never the server's raw text (X5); 409 and 422 carry the server's reason. */
 export function draftErrorMessage(err: unknown, fallback: string): string {
@@ -34,7 +34,7 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return 'Your role does not allow that on this Draft.';
+            return refusal403(server);
         case 404:
             return 'Not available: the Draft or Investigation is gone or not visible to you.';
         case 409:

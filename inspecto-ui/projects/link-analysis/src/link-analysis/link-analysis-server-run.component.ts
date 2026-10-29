@@ -279,7 +279,7 @@ export class LinkAnalysisServerRunComponent {
     /** DR-D3: an Investigation IS open but the canvas draws the query graph, so no id is passed - say that, not "open one". */
     readonly investigationOpen = input(false);
     private readonly notDrawn =
-        'Server tools run on the Working Set, but the canvas shows the query graph. Untick “Show the query graph (to pick seeds)” in the Investigation tab.';
+        'Whole Dataset tools run on the Working Set, but the canvas shows the full graph. Untick “Show the full graph to pick start entities” in the Investigation tab.';
     /** No role permission (G14, T-207): one line for both buttons. */
     private readonly notAllowed = 'Your role cannot run server tools. Needs Run link graph analysis.';
     /** No Investigation open (T-137): one line for both buttons. */

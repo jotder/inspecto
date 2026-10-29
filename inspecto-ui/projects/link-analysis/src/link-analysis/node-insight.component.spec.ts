@@ -318,7 +318,7 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         const { fixture, el, close } = make({ canManageLists: false });
         await settle(fixture);
         expect(el.querySelector<HTMLButtonElement>('[data-testid=add-watch-wl]')!.disabled).toBe(true);
-        expect(el.querySelector('[data-testid=lists-forbidden]')!.textContent).toContain('Manage incidents');
+        expect(el.querySelector('[data-testid=lists-forbidden]')!.textContent).toContain('needs Incident management');
         el.querySelector<HTMLButtonElement>('[data-testid=hide-node]')!.click();
         expect(close).toHaveBeenCalledWith('hide');
     });

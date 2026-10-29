@@ -377,7 +377,7 @@ describe('valueMeasureErrorMessage 403 (DR-D6)', () => {
     it('never shows the raw capability id', () => {
         const e = new HttpErrorResponse({
             status: 403,
-            error: { error: { message: 'missing capability canAuthorAlertRules' } },
+            error: { error: { message: "missing capability 'canAuthorAlertRules'" } },
         });
         expect(valueMeasureErrorMessage(e, 'f')).not.toContain('canAuthorAlertRules');
     });

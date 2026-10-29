@@ -281,7 +281,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
 
     it('a refused list write is a message, not a throw', async () => {
         const { store } = create({
-            changeEntityListMembers: () => throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: 'no' } } })),
+            changeEntityListMembers: () => throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: "missing capability 'canManageIncidents'" } } })),
         });
         const r = await store.addToList({ id: 'vip', entityType: 'msisdn' }, ['+44'], 'x', TERMS, true);
         expect(r.ok).toBe(false);

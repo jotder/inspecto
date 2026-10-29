@@ -316,7 +316,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                 <dt class="text-secondary">Dataset</dt><dd class="m-0">{{ r.dataset || '—' }}</dd>
                                 <dt class="text-secondary">Steps</dt><dd class="m-0">{{ r.steps ?? '—' }}</dd>
                                 <dt class="text-secondary">Owner</dt><dd class="m-0">{{ r.owner || '—' }}</dd>
-                                <dt class="text-secondary">Last changed</dt><dd class="m-0">{{ when(r.changed) }}</dd>
+                                <dt class="text-secondary">Created</dt><dd class="m-0">{{ when(r.changed) }}</dd>
                                 <dt class="text-secondary">Linked Case</dt><dd class="m-0">{{ r.caseRef || '—' }}{{ r.readOnly ? ' (read-only)' : '' }}</dd>
                                 <dt class="text-secondary">Pack</dt><dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
                             </dl>

@@ -67,7 +67,7 @@ import { parseSeedList } from './seed-list';
                     class="self-start"
                     [disabled]="store.busy() || list().ids.length < 2"
                 >
-                    Connect seeds
+                    Connect start entities
                 </button>
             </form>
             @if (error()) {

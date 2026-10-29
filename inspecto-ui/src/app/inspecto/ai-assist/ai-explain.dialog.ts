@@ -87,21 +87,56 @@ const DEFINITION_MAX = 220;
  *
  * A GLOSSARY row is binding vocabulary written for engineers: it carries ticket ids (`D-E1`, `LA-10`), routes
  * (`/inv/*`), class names in backticks, ⛔ / ✅ / ⚠ notes, "(internal document - not shipped)" links, escaped table
- * pipes (`\|`) and "Named by operator decision…" tails. This keeps the first sentence of the plain text before the
- * first such marker, drops every code span that is not a plain lower-case word, and ends on a full stop. A sentence
- * longer than about 220 characters is cut at a word and ends with "…". Returns '' when nothing readable is left.
+ * pipes (`\|`) and "Named by operator decision…" tails. This keeps the first COMPLETE sentence of the plain text before
+ * the first such marker and drops every code span and id.
+ *
+ * ⚠ The glossary lookup sends only the FIRST LINE of a row, which often stops mid-sentence ("…a database, cloud"). A
+ * fragment is never presented as complete: with no sentence end in the text, this returns '' and the dialog shows the
+ * term with no definition (review 2026-10-29). A complete sentence longer than about 220 characters is cut at a word
+ * and ends with "…", so the cut shows. Returns '' when nothing readable is left.
  */
 export function cleanGlossaryDefinition(raw: string): string {
+    const s = stripGlossaryMarkup(raw);
+    // The first complete sentence only.
+    const ends = /[.!?](?=\s+[A-Z(“"]|\s*$)/g;
+    let m: RegExpExecArray | null;
+    let sentence = '';
+    while ((m = ends.exec(s))) {
+        if (NOT_A_SENTENCE_END.test(s.slice(0, m.index + 1))) continue;
+        sentence = s.slice(0, m.index + 1).trim();
+        break;
+    }
+    if (!/[A-Za-z]/.test(sentence)) return '';
+    if (sentence.length > DEFINITION_MAX) {
+        const room = sentence.slice(0, DEFINITION_MAX);
+        sentence = room.slice(0, room.lastIndexOf(' ')).replace(/[\s,;:(—–-]+$/, '') + '…';
+    }
+    return sentence[0].toUpperCase() + sentence.slice(1);
+}
+
+/** A docs line cited as it stands, markup stripped; a line that does not end a sentence ends with "…". */
+export function cleanDocsSnippet(raw: string): string {
+    const s = stripGlossaryMarkup(raw).replace(/[\s,;:—–-]+$/, '');
+    if (!/[A-Za-z]/.test(s)) return '';
+    return /[.!?…]$/.test(s) ? s : s + '…';
+}
+
+/** Everything an engineer wrote for engineers, removed: ids, routes, code spans, marks, emphasis, escaped pipes. */
+function stripGlossaryMarkup(raw: string): string {
     let s = raw.replace(/\\\|/g, '|').replace(/\r?\n/g, ' ');
     // A leading annotation the loader left in: "*(Link Analysis)* — ".
     s = s.replace(/^\s*\*?\([^)]*\)\*?\s*[—–-]*\s*/, '');
     const cut = Math.min(...ENGINEER_MARKERS.map((m) => s.indexOf(m)).filter((i) => i >= 0), s.length);
     s = s.slice(0, cut);
     s = s.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'); // [text](target) -> text
-    s = s.replace(/`([^`]*)`/g, (_m, code: string) => (/^[a-z][a-z ]*$/.test(code) ? code : ' '));
+    s = s.replace(/`[^`]*`/g, ' '); // code spans: op ids, class names, keys - never analyst words
+    s = s.replace(/\bops\b/g, 'steps').replace(/\bop\b/g, 'step');
     s = s.replace(/\*\*|\*|(?<=^|\s)_|_(?=\s|[.,;:)]|$)/g, '');
     s = s.replace(/(^|[\s(])\/[\w/*{}.:-]+/g, '$1'); // routes
-    s = s.replace(/\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b/g, (id) => (/\d/.test(id) && !/^(SHA|UTF|ISO)-/.test(id) ? ' ' : id));
+    // ticket ids, with the word that pointed at them ("since BI-5" goes whole, never leaving "since ,")
+    s = s.replace(/(?:\b(?:since|per|under|see|in|by|from)\s+)?\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\b/g, (all, id: string) =>
+        /\d/.test(id) && !/^(SHA|UTF|ISO)-/.test(id) ? ' ' : all,
+    );
     s = s.replace(/[|]/g, ' ');
     for (let i = 0; i < 3; i++) {
         s = s
@@ -110,26 +145,10 @@ export function cleanGlossaryDefinition(raw: string): string {
             .replace(/\s*[,;:]\s*\)/g, ')')
             .replace(/\s+([,.;:)])/g, '$1')
             .replace(/([,;:])(?:\s*[,;:])+/g, '$1')
+            .replace(/\b(or|and),\s/g, '$1 ') // "or, since BI-5, a …" lost its aside: "or a …"
             .replace(/\s{2,}/g, ' ');
     }
-    s = s.trim().replace(/^[—–\-:,;\s]+/, '');
-    // The first sentence only.
-    const ends = /[.!?](?=\s+[A-Z(“"]|\s*$)/g;
-    let m: RegExpExecArray | null;
-    while ((m = ends.exec(s))) {
-        if (NOT_A_SENTENCE_END.test(s.slice(0, m.index + 1))) continue;
-        s = s.slice(0, m.index + 1);
-        break;
-    }
-    s = s.replace(/[\s,;:—–-]+$/, '').trim();
-    if (!/[A-Za-z]/.test(s)) return '';
-    if (s.length > DEFINITION_MAX) {
-        const room = s.slice(0, DEFINITION_MAX);
-        s = room.slice(0, room.lastIndexOf(' ')).replace(/[\s,;:(—–-]+$/, '') + '…';
-    } else if (!/[.!?…]$/.test(s)) {
-        s += '.';
-    }
-    return s[0].toUpperCase() + s.slice(1);
+    return s.trim().replace(/^[—–\-:,;\s]+/, '');
 }
 
 /**
@@ -254,7 +273,7 @@ export class AiExplainDialog {
                 term,
                 citations: (result.hits ?? [])
                     .filter((h) => isUserFacingDoc(h.file))
-                    .map((h) => ({ ...h, snippet: cleanGlossaryDefinition(h.snippet ?? '') }))
+                    .map((h) => ({ ...h, snippet: cleanDocsSnippet(h.snippet ?? '') }))
                     .filter((h) => h.snippet)
                     .slice(0, CITATION_LIMIT),
             })),

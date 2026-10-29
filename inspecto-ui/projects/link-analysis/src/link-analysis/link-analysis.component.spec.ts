@@ -3527,7 +3527,7 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
         fixture.detectChanges();
         expect(tabs(el)).toEqual([
             'Rows',
-            'Op log',
+            'Step log',
             'Working Set rows',
             'Coverage',
             'Annotations',
@@ -4376,6 +4376,27 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['NOPE-1', 'NOPE-2'] });
         expect(c.graph()).toBeNull();
         expect(c.startNotice()?.text).toBe('None of these are in Transfers: NOPE-1, NOPE-2. Check the spelling or pick another Dataset.');
+    });
+
+    it('T-016: a start that found nothing keeps the picked Dataset in the re-created box, under its "not in" notice', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        // another startable Dataset listed FIRST: a box re-created without the pick would jump back to it
+        const OTHER: Dataset = { ...TRANSFERS, id: 'other', name: 'Other' };
+        const { fixture } = create({ features: BASIC, datasets: [OTHER, TRANSFERS], expand });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        const box = (): LinkAnalysisStartBoxComponent => {
+            fixture.detectChanges();
+            return fixture.debugElement
+                .queryAll(By.directive(LinkAnalysisStartBoxComponent))
+                .map((d) => d.componentInstance as LinkAnalysisStartBoxComponent)
+                .find((b) => b.mode() === 'draw')!;
+        };
+        expect(box().form.controls.dataset.value).toBe('other');
+        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['NOPE-1'] });
+        await settle(fixture);
+        expect(c.startNotice()?.text).toBe('NOPE-1 is not in Transfers. Check the spelling or pick another Dataset.');
+        expect(box().form.controls.dataset.value).toBe('transfers');
     });
 
     it('a list draws its members with one ring', async () => {
@@ -5298,7 +5319,7 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
         await c.findPathsFromCleanup(4);
         expect(c.toolboxDockOpen()).toBe(true);
         expect(c.toolboxTab()).toBe('browser');
-        expect(warn).toHaveBeenCalledWith(expect.stringContaining('two seeds'), 'Find paths');
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('two start entities'), 'Find paths');
         expect(run).not.toHaveBeenCalled();
 
         c.onSelectionChange(['a', 'c']);

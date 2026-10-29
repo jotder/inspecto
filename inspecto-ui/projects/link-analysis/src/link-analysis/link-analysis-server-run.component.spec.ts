@@ -121,7 +121,7 @@ describe('LinkAnalysisServerRunComponent', () => {
         fixture.componentRef.setInput('investigationOpen', true);
         fixture.detectChanges();
         const text = q('blocked-reason')!.textContent!;
-        expect(text).toMatch(/Show the query graph/);
+        expect(text).toMatch(/Show the full graph to pick start entities/);
         expect(text).not.toMatch(/Open or start one/);
         expect(text).not.toMatch(/ - /);
     });

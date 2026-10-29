@@ -4,6 +4,9 @@ import { InvestigationLogEntry, WorkingSet } from '@inspecto/link-analysis/api/i
 import { EntityProjection } from '@inspecto/core/graph';
 import { entityId } from '@inspecto/core/graph';
 import {
+    refusal403,
+    entityListErrorMessage,
+    identityErrorMessage,
     stepName,
     effectiveOpSteps,
     idsInWorkingSet,
@@ -233,13 +236,13 @@ describe('LA-10 investigation-state', () => {
         expect(moveStep([1, 2, 3], 0, 1)).toEqual([2, 1, 3]);
     });
 
-    it('maps 404/403/409/422 to readable messages; 409/422 carry the server reason, 404/403 never print it (X5)', () => {
+    it('maps 404/403/409/422 to readable messages; 409/422 carry the server reason, a 404 never prints it (X5)', () => {
         const err = (status: number, message: string) =>
             new HttpErrorResponse({ status, error: { error: { message } } });
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).toContain('not yours');
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).not.toContain("no investigation 'x'");
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).not.toContain('Server:');
-        expect(investigationErrorMessage(err(403, 'missing canManageIncidents'), 'f')).toBe('Needs Incident management.');
+        expect(investigationErrorMessage(err(403, "missing capability 'canManageIncidents'"), 'f')).toBe('Needs Incident management.');
         const heldRead = investigationErrorMessage(err(403, 'a neighbours read of one entity (degree 60) is a sensitive read [fan-out 60 > 1] - four-eyes applies'), 'f');
         expect(heldRead).toContain('four-eyes applies');
         expect(heldRead).not.toContain('capability');
@@ -284,5 +287,49 @@ describe('stepName: plain step names, never an op id (LA-UI-TEXT-PASS-1 X9)', ()
         [undefined, 'Step'],
     ])('%s reads as %s', (op, name) => {
         expect(stepName(op)).toBe(name);
+    });
+});
+
+describe('refusal403: a true plain reason for every 403 (LA-UI-TEXT-PASS-1 X5 review)', () => {
+    const e403 = (message: string) => new HttpErrorResponse({ status: 403, error: { error: { message } } });
+
+    it('a member whose role is too low is told that, never that a permission is missing', () => {
+        const msg = investigationErrorMessage(e403("your role on investigation 'inv-1' is analyst — only a lead changes it"), 'f');
+        expect(msg).toBe('Only a lead can change this Investigation.');
+        expect(investigationErrorMessage(e403("your role on investigation 'inv-1' is analyst — only a lead or reviewer decides this"), 'f')).toBe(
+            'Only a lead or reviewer can decide this.',
+        );
+    });
+
+    it('a restricted Entity List says so, on the Investigation route and the list routes', () => {
+        const restricted = e403("entity list 'l-1' is restricted: only a holder of canManageExclusionCategories or canRevealLinkEntities may seed from it");
+        expect(investigationErrorMessage(restricted, 'f')).toBe('This Entity List is restricted.');
+        expect(entityListErrorMessage(restricted, 'f', true)).toBe('This Entity List is restricted.');
+    });
+
+    it('a policy deny says so', () => {
+        expect(investigationErrorMessage(e403('denied by access policy'), 'f')).toBe('An access policy denies this.');
+    });
+
+    it('a missing capability is the permission, worded by the screen where it knows better', () => {
+        expect(investigationErrorMessage(e403("missing capability 'canManageIncidents'"), 'f')).toBe('Needs Incident management.');
+        expect(identityErrorMessage(e403("missing capability 'canManageIncidents'"), 'f')).toBe(
+            'Identities need Incident management, also to read.',
+        );
+        // a restricted list on the identity route is still a restricted list, not the identity wording
+        expect(identityErrorMessage(e403("entity list 'x' is restricted: …"), 'f')).toBe('This Entity List is restricted.');
+    });
+
+    it('a four-eyes decision keeps the server sentence', () => {
+        expect(investigationErrorMessage(e403("four-eyes: 'a' requested this expand and cannot approve it"), 'f')).toBe(
+            "Refused: four-eyes: 'a' requested this expand and cannot approve it",
+        );
+    });
+
+    it('an unknown 403 is never guessed at: a generic reason and a Details line', () => {
+        expect(investigationErrorMessage(e403('something new the server says'), 'f')).toBe(
+            'This was refused. Details: something new the server says',
+        );
+        expect(refusal403('')).toBe('This was refused.');
     });
 });

@@ -79,7 +79,7 @@ import { investigationErrorMessage } from './investigation-state';
                 </form>
                 @if (!canWrite()) {
                     <p id="refs-read-only" class="text-secondary m-0" data-testid="references-read-only">
-                        Read-only: adding a reference needs the Incident management capability.
+                        Read-only: adding a reference needs Incident management.
                     </p>
                 } @else if (reviewer()) {
                     <p id="refs-read-only" class="text-secondary m-0" data-testid="references-read-only">

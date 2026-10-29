@@ -577,11 +577,11 @@ export function degreeState(
         blocked = `Degree ${last!.degree} is waiting for approval (request ${last!.awaitingApproval}) — a second person must approve this expand before it runs.`;
     else if (current >= maxDegree) blocked = `Degree ${maxDegree} reached.`;
     else if (last && last.decision !== 'denied' && last.degree === current + 1 && last.admitted === 0)
-        blocked = `Degree ${current + 1} found no new entities — there is nothing further to expand.`;
+        blocked = `Degree ${current + 1} found no new entities: there is nothing further to expand.`;
     else if (!frontier.length && heldHubs.length)
         blocked =
-            `Every entity at degree ${current} is flagged high connectivity, so none is expanded. Untick ` +
-            '“Hold supernodes” in Expand… or use “Expand anyway” on one of them.';
+            `Every entity at degree ${current} is busy, so none is expanded. Untick ` +
+            '“Hold busy entities” in Expand… or use “Expand anyway” on one of them.';
     // the server's cap on the ids one `expand` names (`investigation.max_frontier`)
     else if (frontier.length > laLimit('investigation.max_frontier'))
         blocked =

@@ -79,7 +79,7 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
         LinkAnalysisCaseFieldComponent,
     ],
     template: `
-        <h2 mat-dialog-title>Save this analysis</h2>
+        <h2 mat-dialog-title>Save snapshot</h2>
         <form [formGroup]="form" (ngSubmit)="save()">
             <mat-dialog-content class="flex flex-col gap-3">
                 <inspecto-alert variant="info">

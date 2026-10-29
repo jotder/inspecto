@@ -386,7 +386,7 @@ export class EntityComponent implements OnInit {
         if (!this.lens.canManageIncidents()) {
             this.identity.set({
                 members: null,
-                note: 'not assessed: reading identity groups needs the Manage incidents capability',
+                note: 'not assessed: reading identity groups needs Incident management',
             });
             return;
         }

@@ -58,7 +58,7 @@ function create({ groups = [GROUP], canManage = true, listError, session = false
     const store = { mergeDraft: signal<unknown>(null), canvas: signal<unknown>({}), apply: vi.fn(async () => true), error: signal('') };
     const inv = {
         listIdentityGroups: vi.fn(() =>
-            listError ? http(listError, 'no capability') : of({ groups, atSeq: 3, headSeq: 3, headHash: 'h' }),
+            listError ? http(listError, "missing capability 'canManageIncidents'") : of({ groups, atSeq: 3, headSeq: 3, headHash: 'h' }),
         ),
         identityGroup: vi.fn(() => of({ group: GROUP, atSeq: 3, headHash: 'h' })),
         assertIdentity: vi.fn(() => of({ assertion: GROUP.assertions[0], group: GROUP, atSeq: 3, headHash: 'h' })),
@@ -197,7 +197,7 @@ describe('LinkAnalysisIdentitiesComponent (LA-17 slice 2)', () => {
         const { el, inv, settle } = create({ canManage: false });
         await settle();
         expect(inv.listIdentityGroups).not.toHaveBeenCalled();
-        expect(el.textContent).toContain('needs the Incident-management capability');
+        expect(el.textContent).toContain('Identities need Incident management, also to read.');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
         expect(el.querySelector('form')).toBeNull();
     });

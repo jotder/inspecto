@@ -391,7 +391,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
     it('a 403 on register names the Workbench-authoring capability, not Incident management', async () => {
         const { inv, el, button, settle } = create();
         await settle();
-        inv.registerEntityListDataset.mockReturnValue(http(403, 'forbidden') as never);
+        inv.registerEntityListDataset.mockReturnValue(http(403, "missing capability 'canAuthorWorkbench'") as never);
         button('Register Known mules as a Dataset')!.click();
         await settle();
         const alert = el.querySelector('inspecto-alert')?.textContent;
@@ -415,7 +415,7 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
     it('without canManageIncidents the lists are read-only', async () => {
         const { el, button, settle } = create({ canWrite: false });
         await settle();
-        expect(el.textContent).toContain('needs the Incident-management capability');
+        expect(el.textContent).toContain('Read-only: changing Entity Lists needs Incident management.');
         expect(el.textContent).not.toContain('New list');
         expect(button('Retire Known mules')).toBeNull();
         expect(button('Add the selected entity to Known mules')).toBeNull();

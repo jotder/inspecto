@@ -409,7 +409,7 @@ export type DockTab = 'rows' | InvestigationSection | 'results';
 export type ToolboxTab = 'browser' | 'server' | 'investigation';
 const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean }[] = [
     { id: 'rows', label: 'Rows' },
-    { id: 'oplog', label: 'Op log', inv: true },
+    { id: 'oplog', label: 'Step log', inv: true },
     { id: 'ws-rows', label: 'Working Set rows', inv: true },
     { id: 'coverage', label: 'Coverage', inv: true },
     { id: 'annotations', label: 'Annotations', inv: true },
@@ -2280,7 +2280,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         }
         this.investigateIssue.set(
             `${bound.reason} Choose the Dataset holding ${bound.seed}'s links and run it; ${bound.seed} is queued as the first ` +
-                'seed of the Investigation you start from it.',
+                'start entity of the Investigation you start from it.',
         );
         this.investigation.queueSeeds([{ id: bound.seed, label: bound.seed, ids: [bound.seed] }]);
     }
@@ -3713,13 +3713,13 @@ Its prior copies stay in its version history.`,
         const seeds = [...new Set(this.cleanupSeeds())];
         // The server walk reads the query graph's mappings and ids, so it cannot take an Investigation's Working Set ids.
         const why = this.investigation.canvas() !== null
-            ? 'it walks the query graph, not an Investigation — use Connect seeds in the Investigation instead.'
+            ? 'it walks the full graph, not an Investigation. Use Connect start entities in the Investigation instead.'
             : !this.lastRun()
               ? 'draw a graph from a Dataset first.'
               : !this.traversalTargets().length
                 ? 'this graph has no link mapping the server can walk.'
                 : seeds.length < 2
-              ? 'it needs two seeds on the canvas.'
+              ? 'it needs two start entities on the canvas.'
               : null;
         this.openAnalysis();
         if (why) {

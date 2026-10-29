@@ -91,7 +91,7 @@ describe('LinkAnalysisBoundRulesComponent', () => {
         expect(btn().disabled).toBe(true);
         expect(btn().getAttribute('aria-describedby')).toBe('bound-rules-read-only');
         expect(ro.el.querySelector('[data-test=bound-rules-read-only]')!.textContent).toContain(
-            'Alert Rule authoring capability',
+            'needs Alert Rule authoring.',
         );
         await expectNoA11yViolations(ro.el);
         TestBed.resetTestingModule();

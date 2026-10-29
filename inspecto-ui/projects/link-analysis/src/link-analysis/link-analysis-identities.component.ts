@@ -67,8 +67,7 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                 </div>
                 @if (!canManage()) {
                     <p class="text-secondary m-0">
-                        Identity resolution needs the Incident-management capability — reading it too, because a group
-                        read would reveal which identifiers belong together.
+                        Identities need Incident management, also to read.
                     </p>
                 } @else {
                     @if (error()) {

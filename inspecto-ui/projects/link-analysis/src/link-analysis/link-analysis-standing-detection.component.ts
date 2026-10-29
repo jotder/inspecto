@@ -30,8 +30,8 @@ import { standingDetectionErrorMessage } from './standing-detection';
             <h4 id="la-standing-heading" class="m-0 text-xs font-semibold">Standing detection</h4>
             @if (!canAuthor()) {
                 <p class="text-secondary m-0" data-test="standing-no-cap">
-                    Enabling standing detection needs the Alert Rule authoring capability. Until it is enabled this rule
-                    is not evaluated.
+                    Enabling standing detection needs Alert Rule authoring. Until it is enabled this Alert Rule is not
+                    evaluated.
                 </p>
             } @else {
                 <p class="text-secondary m-0" data-test="standing-status">

@@ -38,7 +38,7 @@ describe('AiExplainDialog', () => {
 
     it('resolves each declared term through glossary_lookup, in the pane-declared order', () => {
         runTool.mockImplementation((_tool: string, args: { term: string }) =>
-            of({ term: args.term, definition: `definition of ${args.term}` }),
+            of({ term: args.term, definition: `definition of ${args.term}.` }),
         );
         const fixture = create(['Pipeline', 'Step']);
 
@@ -98,6 +98,15 @@ describe('AiExplainDialog', () => {
         runTool.mockReturnValue(of({ term: 'Dossier', definition: 'The *report* (`GET /inv/x`) of the `LA-10` thing. ⛔ Not a Case.' }));
         const fixture = create(['Dossier']);
         expect(fixture.componentInstance.entries()[0].definition).toBe('The report of the thing.');
+    });
+
+    it('shows a term whose glossary line was cut off with no definition, never the fragment', () => {
+        runTool.mockReturnValue(of({ term: 'Connection', definition: 'Named endpoint + credentials (SFTP, a database, cloud' }));
+        const fixture = create(['Connection']);
+        expect(fixture.componentInstance.entries()[0].definition).toBeUndefined();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('No definition found.');
+        expect(text).not.toContain('a database, cloud');
     });
 
     it('never cites a deployment, operations or internal README in the docs fallback', () => {
@@ -171,10 +180,33 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
     it('renders a nasty row as one clean, complete sentence', () => {
         const clean = cleanGlossaryDefinition(NASTY);
         expect(clean).toBe(
-            'The Link Analysis enquiry object: an ordered, replayable log of analyst ops (seed, expand, exclude) over a graph per Space, plus the Working Set it evaluates to.',
+            'The Link Analysis enquiry object: an ordered, replayable log of analyst steps over a graph per Space, plus the Working Set it evaluates to.',
         );
-        for (const junk of ['`', '*', '⛔', '✅', '\\|', '|', 'D-E1', 'LA-10', 'GLOSSARY-CASE-1', '/inv', 'internal document', 'Named by', 'InvestigationRoutes', '()'])
+        for (const junk of ['`', '*', '⛔', '✅', '\\|', '|', 'D-E1', 'LA-10', 'GLOSSARY-CASE-1', '/inv', 'internal document', 'Named by', 'InvestigationRoutes', '()', 'ops', 'seed'])
             expect(clean, junk).not.toContain(junk);
+    });
+
+    /**
+     * Real first lines of `docs/GLOSSARY.md` rows, exactly as the glossary lookup sends them (it reads one line per row,
+     * so most stop mid-sentence). A cut-off line must never read as a finished definition (review 2026-10-29).
+     */
+    it.each([
+        ['Dataset', 'The umbrella for any queryable relation the BI layer can bind to: **Table** \\| **Derived Table** \\|'],
+        ['Connection', 'Named endpoint + credentials for reaching a remote system (SFTP/FTP/FTPS, a database, cloud'],
+        ['Table', 'A Hive-style root directory of **Parquet** files, **partitioned by date / partition key** and'],
+        ['Widget', "A **Visualization Type + Config + a binding to a Dataset's resultset metadata** — i.e. the"],
+        ['Expectation', 'A **data-quality** rule that validates records against a Schema (non-null, range, regex,'],
+    ])('a cut-off %s row gives no definition, never a fragment with a full stop', (_term, firstLine) => {
+        expect(cleanGlossaryDefinition(firstLine)).toBe('');
+    });
+
+    it('ends a cut row at its last complete sentence, and drops an id together with the word that pointed at it', () => {
+        expect(cleanGlossaryDefinition('A single collected file. It is then parsed and')).toBe('A single collected file.');
+        expect(
+            cleanGlossaryDefinition(
+                'Watches an observability **Metric** — or, since BI-5, a BI **Measure** over a Dataset — against a threshold and fires an **Alert** when crossed. *(Widened)*',
+            ),
+        ).toBe('Watches an observability Metric — or a BI Measure over a Dataset — against a threshold and fires an Alert when crossed.');
     });
 
     it('keeps the first sentence only, and does not split on e.g.', () => {
@@ -183,9 +215,10 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
         );
     });
 
-    it('adds the closing full stop, capitalises, and cuts an over-long sentence at a word with an ellipsis', () => {
-        expect(cleanGlossaryDefinition('a thing on the graph')).toBe('A thing on the graph.');
-        const long = cleanGlossaryDefinition('word '.repeat(80).trim());
+    it('never adds a full stop to a fragment; capitalises; cuts an over-long sentence at a word with an ellipsis', () => {
+        expect(cleanGlossaryDefinition('a thing on the graph')).toBe('');
+        expect(cleanGlossaryDefinition('a thing on the graph.')).toBe('A thing on the graph.');
+        const long = cleanGlossaryDefinition('word '.repeat(80).trim() + '.');
         expect(long.length).toBeLessThanOrEqual(221);
         expect(long.endsWith('word…')).toBe(true);
     });

@@ -187,10 +187,10 @@ describe('indexRefusalMessage', () => {
         ["'seeds' lists 21 nodes; the index cap is 20 keys per level", /at most 20/],
         ['\'at\' cannot be combined with input "index"', /past step/],
         ['the Investigation hides entities, which the index cannot honour', /hides entities/],
-    ])('%s is put in words and keeps the server sentence', (server, words) => {
+    ])('%s is put in words, without the raw server sentence (X5)', (server, words) => {
         const msg = indexRefusalMessage(server);
         expect(msg).toMatch(words);
-        expect(msg).toContain(server);
+        expect(msg).not.toContain(server);
     });
     it('T-116: names the link index and never a config key', () => {
         const off = indexRefusalMessage('the edge index cannot serve this run (index_disabled)');
@@ -203,8 +203,8 @@ describe('indexRefusalMessage', () => {
             expect(m).not.toMatch(/index\.enabled|max_age_hours|is false/);
         }
     });
-    it('an unknown cause still shows the server sentence', () => {
-        expect(indexRefusalMessage('something new')).toBe('The link index run was refused: something new');
+    it('an unknown cause shows the server sentence as Details', () => {
+        expect(indexRefusalMessage('something new')).toBe('The link index run was refused. Details: something new');
     });
 });
 

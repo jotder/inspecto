@@ -68,8 +68,8 @@ describe('SaveTemplateDialog (LA-23)', () => {
         f.detectChanges();
         const el = f.nativeElement as HTMLElement;
         const preview = el.querySelector('[aria-label="What will change"]')!.textContent!;
-        expect(preview).toContain('seed → parameter seed1');
-        expect(preview).toContain('exclude of 2 entities → dropped');
+        expect(preview).toContain('Start → parameter seed1');
+        expect(preview).toContain('(Exclude, 2 entities): dropped.');
         expect(preview).toContain('expand of 1 named entities → expands the whole');
         await expectNoA11yViolations(el);
 

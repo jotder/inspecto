@@ -300,7 +300,7 @@ open a short *Investigate {number}* form in the Investigation tab that asks only
 2. **The two entity columns** (who → whom) are filled in when two columns look like the two ends of a link (payer /
    payee, caller / callee, from / to…); change them if the link runs the other way. **Derive mapping** asks the
    assistant to draft them and needs permission to author configuration.
-3. Optionally a **Link type column** (wire, card, cash_out, SMS…; kinds get colours and can be filtered) and
+3. Optionally a **Link kind column** (wire, card, cash_out, SMS…; kinds get colours and can be filtered) and
    **Attribute columns** (amount, country, time — they feed the timeline, Value Measures and pattern tools). **Add
    another mapping** stacks more column pairs. **Root**, **depth** and **direction** start from chosen entities and
    grow outwards.
@@ -394,7 +394,7 @@ dialog. Three sections look up only the entities they need on the server, so the
 
 ## 7. Expand and clean up the graph
 
-On an Investigation's canvas every change here is one **recorded** step of the Op log (`expand`, `exclude`,
+On an Investigation's canvas every change here is one **recorded** step of the step log (`expand`, `exclude`,
 `excludeBy`, `hide`, `annotate` or `undo`, so replay and the Dossier are unchanged); while exploring it changes only
 what you see. Every change ends with a one-line result and **Undo** (also **Ctrl+Z**). In a shared Investigation an
 Undo takes back only the step it names: if a colleague recorded a newer step meanwhile, nothing is undone and the log
@@ -452,7 +452,7 @@ entities*) with **Apply** / **Cancel**. While exploring it hides with Undo; in a
 
 **Hidden by lists (n)** shows the lists in force — *41 numbers hidden by 3 lists* — each with who keeps it and how
 many it removed; **Switch off** / **Switch on** a list, and **Show what was removed**. A **restricted** list's members
-are never listed to an analyst; its count is rounded (nearest 5, at least 5) here, in the Op log and in the Dossier.
+are never listed to an analyst; its count is rounded (nearest 5, at least 5) here, in the step log and in the Dossier.
 
 **First-time hints.** Expand…, the Held tray and Hidden by lists each explain themselves once and name this chapter;
 **Got it** hides the hint in this browser. Keyboard: **G** Expand…, **X** Exclude…, **C** Collapse, **Ctrl+Z** undo —
@@ -600,7 +600,7 @@ locked, with one line naming what has it.
 A **saved view** keeps the graph's start, mapping, layout, display options, filters and the Entity Lists it uses.
 Opening it draws its start again over the data as it is then — the list's members as they are now, the entities you
 started from and expanded, each with one ring — and hides again whatever its exclusion lists hold now. A view saved
-from **Explore dataset…** reruns that query. A view names a *Case* only by attaching: a Case is the Incident-management
+from **Explore Dataset…** reruns that query. A view names a *Case* only by attaching: a Case is the Incident-management
 record you attach evidence to.
 
 | Other ways out | Notes |
@@ -613,7 +613,7 @@ record you attach evidence to.
 
 ## 11. Investigations
 
-Use an Investigation when you need an **auditable** trail: an ordered **Op log** over a **Working Set** you grow and
+Use an Investigation when you need an **auditable** trail: an ordered **step log** over a **Working Set** you expand and
 prune deliberately. Every step is sealed with what it read, so it replays identically even if the data changes later.
 
 ### 11.1 Start one
@@ -690,7 +690,7 @@ open **selects** it for the next step.
 | Step | Effect |
 |---|---|
 | **seed** | Put starting entities into the Working Set (by id, or from an Entity List) |
-| **expand** | Follow links: direction, link kinds, time window, minimum events / distinct days, degree bounds, fan-out cap, budget, and the hub threshold (an added entity with more contacts is flagged *high connectivity* and not expanded further unless overridden) |
+| **expand** | Follow links: direction, link kinds, time window, minimum events / distinct days, degree bounds, fan-out cap, budget, and the busy limit (an added entity with more linked entities is *busy*: held, not expanded further unless overridden) |
 | **window** | The time range later expands inherit: from / to, slot, days of the week and **Excluded dates (holidays)** — a date, `FROM..TO`, or a yearly rule `*-MM-DD`, `*-MM-DOW#N` (e.g. `*-11-THU#4`) or `*-MM-DOW#L`, at most 32 rules |
 | **exclude** | Remove entities — a **reason is required** |
 | **hide / keep** | Hide from view only; **keep** protects an entity from exclusion |
@@ -845,8 +845,8 @@ Inspecto LA level (see [EDITIONS](../../../../EDITIONS.md) and the [level admin 
 
 | | Basic / Explorer level | Standard and above, with Investigations |
 |---|---|---|
-| Start from..., Expand…, Clean up, Collapse, browser catalogue, saved views, Snapshot | ✓ (exploring only: nothing recorded) | ✓ |
-| Investigations, Op log, Dossier, four-eyes, Drafts, Case history | hidden or locked, with one line naming what has it (*Start an Investigation from this*) | ✓ |
+| Start a graph, Expand…, Clean up, Collapse, browser catalogue, saved views, Snapshot | ✓ (exploring only: nothing recorded) | ✓ |
+| Investigations, step log, Dossier, four-eyes, Drafts, Case history | hidden or locked, with one line naming what has it (*Start an Investigation from this*) | ✓ |
 | Server side of the catalogue | hidden, with the reason | ✓ (with `canRunLinkGraphAnalysis`) |
 | *Read from a database*, *Keep this up to date* on Add data | locked | ✓ |
 
@@ -913,7 +913,7 @@ paths, patterns, Value Measures and the Working Set.
 | **Snapshot** | A frozen copy of what was on screen, with a fingerprint |
 | **Investigation** | The recorded, replayable work |
 | **Working Set** | The entities an Investigation currently holds |
-| **Op log** | The ordered steps of an Investigation |
+| **Step log** | The ordered steps of an Investigation |
 | **Draft** | A side line forked from the main log |
 | **Dossier** | The evidence document built from an Investigation |
 | **Entity List** | A named set of entities (watch, exclusion, known good, block) |
@@ -932,13 +932,13 @@ The Studio was reorganized on 2026-10-27 (`LA-STUDIO-UI-REORG-1`). Nothing was r
 | Old | Now |
 |---|---|
 | Query panel (left) | ⚙ Settings ▸ **Graph model** (status-bar chips and the pencil open it; **Refresh** in the status bar) |
-| Grow (popover, rung form) | **Expand…** dialog (**G**) — Degrees 1..N, *Hold supernodes*, Advanced: link kinds |
+| Grow (popover, rung form) | **Expand…** dialog (**G**) — Degrees 1..N, *Hold busy entities*, Advanced: link kinds |
 | Domain profile picker | None — the Space's **Industry pack** applies, shown in Graph model |
 | Save as a case (saved view) | **File ▸ Save view** / **Save view as…** |
 | Open saved views | **File ▸ Open…** ▸ *Saved views* |
 | Toolbox → View tab | The tool rail (layout, filters, Display options) and **Canvas mode** |
 | Toolbox → Analysis tab, *All algorithms (server)* | Right panel ▸ **Browser** and **Server** tabs (2026-10-29: the Analysis tab's Browser \| Server switch became two tabs) |
-| Start box's *Follow the money*, *Open a saved view*, *Explore a Dataset* cards | **File ▸ Examples ▸ Follow the money**, **File ▸ Open…**, **File ▸ Explore dataset…** |
+| Start box's *Follow the money*, *Open a saved view*, *Explore a Dataset* cards | **File ▸ Examples ▸ Follow the money**, **File ▸ Open…**, **File ▸ Explore Dataset…** |
 | Start box ▸ One entity ▸ *Investigate*, then the purpose form, then Expand… | One **New Investigation** form (File ▸ New): Start from, Name, Reason, optional Expand on start |
 | Selection bar, box select | Canvas toolbar selection group; **Shift+drag** lasso in Pan, or Lasso mode |
 | Investigation tab's Case, Members, Drafts, Oversight, Dossier cards | ⚙ Settings ▸ **Investigation settings** |
@@ -1741,7 +1741,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   only: the Postgres store (`inspecto-la-store-pg`) keeps its log tables append-only by trigger and answers **503** until a delete is designed for it
   (BACKLOG). Not covered: a Dossier bundle or snapshot already exported stays where it was exported, and an Alert Rule bound to the Investigation stays registered (its sweeps log "no investigation") until removed on its own.
 * **Rename an Investigation or restate its purpose** (`LA-INVESTIGATION-RENAME-1`, 2026-10-29; `PATCH /inv/investigations/{id}`,
-  body `{title?, purpose?}`). Open the Investigation, then **⋯ ▸ Settings… ▸ General**: **Title** and **Purpose** are pen fields — click the
+  body `{title?, purpose?}`). Open the Investigation, then **⋯ ▸ Settings… ▸ General**: **Name** and **Purpose** are pen fields — click the
   value or ✎, type, and press Enter (or click away) to save; Escape drops the edit. The Act panel's header and **File ▸ Open…** show the new
   name at once. **Who:** a lead (the owner is the implicit lead) holding `canManageIncidents`; anyone else sees both values read-only with
   the reason under them (a non-lead member is refused 403, a stranger reads 404). **Rules:** the title is non-blank and at most 200
@@ -3227,8 +3227,8 @@ facts are in [architecture.md](architecture.md) §6.14.
   `mat_outline:open_with`, distinct from full screen —, Collapse, Hide, Exclude and Merge only with an Investigation
   canvas, Attach to Case), Clean up (a broom, `mat_outline:cleaning_services`; heroicons has none), `la-group-held`
   (Held, Hidden); when the Studio header row is narrower than 1,350 px (its own width, so the console side nav counts) the groups after Canvas mode fold into `la-canvas-tools-more`. The G6 `brush-select` box is removed; a saved view naming it opens as Pan.
-- **Expand dialog** (replaces the earlier popover and rung form): From, Direction, Degrees, *Hold supernodes above
-  H links*, Advanced; preview line first; in an Investigation one `expand` step per degree under one undo group.
+- **Expand dialog** (replaces the earlier popover and rung form): From, Direction, Degrees, *Hold busy entities (more than
+  H linked)*, Advanced; preview line first; in an Investigation one `expand` step per degree under one undo group.
 - **Collapse** folds the pendant neighbours (links read undirected) into a `+n` badge; display state only, also in
   an Investigation. **Clean up** (`inspecto-link-analysis-cleanup`) states its effect, then Apply / Cancel; in an
   Investigation `recordCleanup` records `hide` over the complement plus an `annotate` carrying the reason (OP-1).
@@ -3239,7 +3239,7 @@ facts are in [architecture.md](architecture.md) §6.14.
 - **Right panel**: Analysis (Discover + one catalogue with a Browser | Server toggle; server rows carry
   `data-server-algorithm`; *Open in the dock* fills the Results tab) and Investigation (the Act panel: header with
   `⋯` Settings… / Close / Delete, seed queue, Expand…, Selected entity, Held, Scope list, More steps ▾, last 5 steps).
-- **Dock** (`la-dock`, `DOCK_TABS`): Rows, Results, and with an Investigation Op log, Working Set rows, Coverage,
+- **Dock** (`la-dock`, `DOCK_TABS`): Rows, Results, and with an Investigation Step log, Working Set rows, Coverage,
   Annotations, Excluded entities. State in `localStorage` `inspecto.la.dock`, height `inspecto.split.link-analysis.dock`.
 - **Domain profile**: no picker; `profileId = investigation.boundProfileId() ?? boundProfile() ??
   activeDomainProfileId()`; shown read-only at the top of Graph model.
@@ -3398,7 +3398,7 @@ The beginner's path, step by step, is in the [Part I §2 and §3](#2-quick-start
 *Details about entities*, drop the file, check the detected columns (a guess is marked **A guess** until confirmed),
 say what each column holds and which way a link goes, then **Create and run**. The committed Dataset carries
 `primaryEntityType` and `defaultLinkMapping`, so Link Analysis can draw it with no saved view. The result offers
-**Explore in Link Analysis** (opens **Start from...** with the Dataset picked, `?dataset=<id>`), **Add details about
+**Explore in Link Analysis** (opens **Start a graph** with the Dataset picked, `?dataset=<id>`), **Add details about
 these entities** and **Add another file**; the Dataset card offers **Add a file** and **Run now**. *Keep this up to
 date* and *Read from a database or a remote system* are locked on Basic. With sign-in an administrator turns adding data
 on per Space (**Settings → Add data**; after a refused change or a failed read it offers **Try again**, which reads the
@@ -3412,10 +3412,10 @@ Detail: [Part I §3.3](#33-entities-what-the-columns-hold).
 
 ## Start from one entity, a list, a paste or a Dataset
 
-The first screen of Link Analysis is the **Start from...** box: pick the **Dataset**, then start from **One entity**
+The first screen of Link Analysis is the **Start a graph** box: pick the **Dataset**, then start from **One entity**
 (Entity Type first, then the value, with a type-ahead from `POST /inv/entities/{type}/suggest`, busiest first),
-**A list** (an Entity List), **A paste** (values one per line; values not in the Dataset are
-reported) or **The whole Dataset** (warned first when it holds more Entities than the projection node cap). A list or
+**Entity List**, **Pasted values** (values one per line; values not in the Dataset are
+reported) or **Whole Dataset** (warned first when it holds more Entities than the projection node cap). A list or
 paste draws its first 25 values and reports the rest as "N more values not drawn". A start
 draws through the neighbours read, one per value, holds busy neighbours above the Space's hub threshold and marks the
 starting entities as grown, so **Expand…** continues from the ring. On the Investigations level, **One entity** seeds an

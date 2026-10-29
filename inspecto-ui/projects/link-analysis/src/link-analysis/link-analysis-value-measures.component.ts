@@ -41,6 +41,7 @@ import {
     valueMeasureQuery,
     valueMeasureWindowIssue,
 } from './value-measures';
+import { refusal403 } from './investigation-state';
 
 /** A value-measure failure in the analyst's words; 422 carries the server's own sentence verbatim. */
 export function valueMeasureErrorMessage(err: unknown, fallback: string): string {
@@ -50,13 +51,13 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return 'You are not allowed to do this with your current role. Ask an administrator if you need it.';
+            return refusal403(server);
         case 404:
-            return 'That Dataset (or Investigation) is not available to you. Server: ' + server;
+            return 'That Dataset or Investigation is not available to you.';
         case 409:
-            return 'Refused — ' + server;
+            return 'Refused: ' + server;
         case 422:
-            return 'The server refused this: ' + server;
+            return 'Refused: ' + server;
         case 503:
             return 'Value Measures are not available here: the Link Analysis module, or the alert engine for watching, is not installed.';
         default:

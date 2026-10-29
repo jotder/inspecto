@@ -6,6 +6,7 @@ import { InvService, InvestigationLog, PendingExpansion, WorkingSet } from '@ins
 import { LensService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
+import { refusal403 } from './investigation-state';
 
 /** A readable message for a four-eyes / reveal refusal; the server's own reason is always kept. */
 export function oversightErrorMessage(err: unknown, fallback: string): string {
@@ -13,7 +14,7 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
     const server = apiErrorMessage(err, fallback);
     switch (status) {
         case 403:
-            return 'Refused: ' + server;
+            return refusal403(server);
         case 404:
             return 'Not available: the Investigation or request does not exist or is not visible to you.';
         case 409:

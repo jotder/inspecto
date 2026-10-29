@@ -114,7 +114,7 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                         </div>
                         @if (!canAuthor()) {
                             <p id="bound-rules-read-only" class="text-secondary m-0" data-test="bound-rules-read-only">
-                                Read-only: editing an Alert Rule needs the Alert Rule authoring capability.
+                                Read-only: editing an Alert Rule needs Alert Rule authoring.
                             </p>
                         }
                     }

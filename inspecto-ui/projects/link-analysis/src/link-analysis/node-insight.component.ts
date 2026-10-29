@@ -347,7 +347,7 @@ interface Membership {
                 </div>
                 @if (!ctx().canManageLists && addTargets().length) {
                     <p class="text-secondary mt-1 text-xs" data-testid="lists-forbidden">
-                        Adding to a list needs the Manage incidents capability.
+                        Adding to a list: needs Incident management.
                     </p>
                 } @else if (memberships() && !eligibleLists().length) {
                     <p class="text-secondary mt-1 text-xs" data-testid="lists-none">

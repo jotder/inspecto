@@ -351,7 +351,7 @@ export function indexRefusalMessage(serverMessage: string): string {
         [/cannot run from the index/, 'This algorithm cannot run from the link index. Run it on the Working Set.'],
     ];
     const hit = rules.find(([re]) => re.test(m));
-    return hit ? `${hit[1]} (Server: ${m})` : `The link index run was refused: ${m}`;
+    return hit ? hit[1] : `The link index run was refused. Details: ${m}`;
 }
 
 /**

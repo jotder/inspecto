@@ -251,7 +251,7 @@ describe('LinkAnalysisServerRunComponent - input index', () => {
         q('run-on-index')!.click();
         fixture.detectChanges();
         expect(el.textContent).toMatch(/No link index has been built/);
-        expect(el.textContent).toMatch(/no_index/);
+        expect(el.textContent).not.toMatch(/no_index/); // X5: the reason, never the server's raw sentence
         expect(runs.run).toHaveBeenCalledTimes(1);
         expect(runs.run.mock.calls[0][0]).toMatchObject({ input: 'index' });
     });

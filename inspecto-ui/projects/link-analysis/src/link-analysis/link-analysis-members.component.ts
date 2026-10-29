@@ -12,6 +12,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { limitRefusalMessage } from './limit-refusal';
 import { DISABLED_REASON, needsPermission } from './disabled-reasons';
+import { refusal403 } from './investigation-state';
 
 const ROLES: readonly InvestigationRole[] = ['lead', 'analyst', 'reviewer'];
 
@@ -22,7 +23,7 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
     const status = (err as { status?: number } | null)?.status;
     switch (status) {
         case 403:
-            return 'Only a lead can grant or revoke members.';
+            return refusal403(apiErrorMessage(err, fallback));
         case 404:
             return 'Not available: you or that person are not a member of this Investigation.';
         case 422:

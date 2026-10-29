@@ -33,7 +33,7 @@ import { LA_CASES } from '@inspecto/link-analysis/la-host';
             }
             @if (!canWrite()) {
                 <p id="case-link-read-only" class="text-secondary m-0" data-testid="case-link-read-only">
-                    Read-only: linking or unlinking a Case needs the Incident management capability.
+                    Read-only: linking or unlinking a Case needs Incident management.
                 </p>
             }
             @if (link(); as l) {

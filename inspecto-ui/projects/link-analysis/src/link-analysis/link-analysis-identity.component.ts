@@ -94,8 +94,7 @@ export function importFieldNames(message: string): string {
 
             @if (!canManage()) {
                 <p class="text-secondary m-0" data-testid="identity-read-only">
-                    Read-only: the Identity Fact log and its import need the Incident management capability - reading
-                    it too, because a group read would reveal which identifiers belong together.
+                    Read-only: the Identity Fact log and its import need Incident management, also to read.
                 </p>
             } @else {
             <form

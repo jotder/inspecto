@@ -172,7 +172,7 @@ describe('investigate-number - next degree', () => {
     it('is blocked when the last expand of the next degree found nobody new', () => {
         const none: DegreeOutcome = { degree: 2, admitted: 0, linksAdded: 0, truncated: false, fanOutCapped: 0 };
         expect(degreeState(ws(entity('s', 0), entity('a', 1)), 4, [none]).blocked).toBe(
-            'Degree 2 found no new entities — there is nothing further to expand.',
+            'Degree 2 found no new entities: there is nothing further to expand.',
         );
         // an earlier empty degree does not block a later one
         expect(degreeState(ws(entity('s', 0), entity('a', 1), entity('b', 2)), 4, [none]).blocked).toBeNull();
@@ -184,7 +184,7 @@ describe('investigate-number - next degree', () => {
         expect(state).toMatchObject({ current: 1, frontier: ['a'], heldHubs: ['h'], blocked: null });
         expect(degreeState(ws(entity('s', 0), entity('a', 1), hub), 4, [], true).frontier).toEqual(['a', 'h']);
         // Every outer entity flagged: nothing to name, and the way out is stated.
-        expect(degreeState(ws(entity('s', 0), hub), 4).blocked).toContain('Hold supernodes');
+        expect(degreeState(ws(entity('s', 0), hub), 4).blocked).toContain('Hold busy entities');
         expect(degreeState(ws(entity('s', 0), hub), 4, [], true).blocked).toBeNull();
     });
 

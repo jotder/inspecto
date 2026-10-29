@@ -79,7 +79,7 @@ import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/l
                 </div>
                 @if (!canWrite()) {
                     <p class="text-secondary m-0">
-                        Changing Entity Lists needs the Incident-management capability — you can read them.
+                        Read-only: changing Entity Lists needs Incident management.
                     </p>
                 }
                 @if (error()) {
