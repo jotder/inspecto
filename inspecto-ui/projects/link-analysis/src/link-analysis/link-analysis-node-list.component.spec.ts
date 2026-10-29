@@ -86,7 +86,7 @@ describe('LinkAnalysisNodeListComponent (LA-A11Y-AUDIT-1: the canvas text altern
         });
         f.detectChanges();
         expect(rows()[0].textContent).toContain('not expanded yet');
-        expect(rows()[1].textContent).toContain('high connectivity, not expanded');
+        expect(rows()[1].textContent).toContain('busy, not expanded');
         expect(rows()[1].textContent).not.toContain('not expanded yet');
         expect(rows()[2].textContent).not.toContain('expanded');
         await expectNoA11yViolations(el);

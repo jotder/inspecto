@@ -87,7 +87,7 @@ export const NODE_LIST_PAGE = 500;
                                     {{ n.data.label }}
                                     @if (n.data.highConnectivity) {
                                         <span class="text-secondary text-xs" data-testid="node-flag-hub">
-                                            (high connectivity, not expanded)</span
+                                            (busy, not expanded)</span
                                         >
                                     } @else if (n.data.unexpanded) {
                                         <span class="text-secondary text-xs" data-testid="node-flag-unexpanded">

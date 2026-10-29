@@ -283,7 +283,7 @@ export class LinkAnalysisServerRunComponent {
     /** No role permission (G14, T-207): one line for both buttons. */
     private readonly notAllowed = 'Your role cannot run server tools. Needs Run link graph analysis.';
     /** No Investigation open (T-137): one line for both buttons. */
-    private readonly noInvestigation = 'Server tools run on an open Investigation. Open or start one first.';
+    private readonly noInvestigation = 'Whole Dataset tools run on an open Investigation. Open or start one first.';
     /** A reason the run cannot start yet that the toolbox knows (e.g. no source and sink picked); '' = none. */
     readonly hold = input('');
     /** May the Subject start a run (`canRunLinkGraphAnalysis`)? */

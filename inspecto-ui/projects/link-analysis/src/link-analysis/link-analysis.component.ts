@@ -2484,7 +2484,7 @@ Its prior copies stay in its version history.`,
     queueSeedsAndOpen(seeds: QueuedSeed[]): void {
         if (!this.investigationsEnabled()) return; // Basic: the "start an Investigation" action is not offered
         if (!seeds.length) {
-            this.toastr.info('None of the top results can seed an Investigation.', 'Nothing to queue');
+            this.toastr.info('None of the top results can start an Investigation.', 'Nothing to queue');
             return;
         }
         this.investigation.queueSeeds(seeds);

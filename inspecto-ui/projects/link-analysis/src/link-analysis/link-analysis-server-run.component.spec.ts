@@ -112,7 +112,7 @@ describe('LinkAnalysisServerRunComponent', () => {
         const { q } = make({ investigationId: null });
         expect((q('run-on-server') as HTMLButtonElement).disabled).toBe(true);
         expect(q('blocked-reason')!.textContent!.trim()).toBe(
-            'Server tools run on an open Investigation. Open or start one first.',
+            'Whole Dataset tools run on an open Investigation. Open or start one first.',
         );
     });
 

@@ -92,7 +92,7 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
                             </div>
                         } @else {
                             <span class="text-secondary"
-                                >Waiting for a different person with the approve-expansions capability.</span
+                                >Waiting for a different person who can approve expansions.</span
                             >
                         }
                     </div>

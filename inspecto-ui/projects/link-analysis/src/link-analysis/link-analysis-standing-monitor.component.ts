@@ -88,7 +88,7 @@ export class LinkAnalysisStandingMonitorComponent {
             this.summary.set(summariseStandingEvents(swept, refused, PAGE));
         } catch {
             this.summary.set(null);
-            this.error.set('The sweep events could not be read — reading the event log needs its own capability.');
+            this.error.set('The sweep events could not be read. Needs permission to read the event log.');
         } finally {
             this.busy.set(false);
         }

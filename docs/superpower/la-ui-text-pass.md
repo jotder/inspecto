@@ -1,6 +1,28 @@
 # Link Analysis UI text pass (LA-UI-TEXT-PASS-1)
 
-**Status:** ACTIVE 2026-10-29: findings logged, fixes next.
+**Status:** ACTIVE 2026-10-29. The first fix pass has shipped in three lanes: T1 `5b4f7c339` + `750713ff7`, T2 `466a15c7b` + `1a6b7eac2`, T3 `25e59534b` + `f3b8fa108`. Each lane passed an independent review.
+
+**Operator decisions (2026-10-29):**
+- All G decisions are accepted.
+- **G16 changed:** the toolbox tabs are **On screen** / **Whole Dataset**. The internal `side` ids stay `browser` / `server`.
+
+**Done:**
+- All 18 H rows.
+- X1–X9.
+- G1–G18 across the Link Analysis UI.
+- About shows hand-written definitions. A cut-off glossary line shows "No definition found." and is never passed off as a full sentence.
+- 403s map to true reasons (`refusal403`).
+
+**Left (fix next):**
+- **M/L rows not yet reached:** T-028, T-045, T-056–061, T-064, T-065, T-067, T-070, T-074, T-075, T-077, T-079, T-080, T-082, T-083, T-152–155, T-170, T-171 (per-row line), T-178, T-179, T-185–187, T-190, T-193, T-196–198, T-209.
+- **Other screens:**
+  - T-001/002: sign-in, outside the Studio.
+  - T-118: algorithm-level descriptions need a catalogue field.
+  - T-129: the pattern time note comes from `PatternRoutes.java`.
+- **Residuals:**
+  - The four-eyes "sensitive read" 403 still shows the server sentence, with its ticket id.
+  - The glossary row for Graph Run cleans badly; nothing asks for it today.
+  - The root cause is backend: `GlossaryLoader` parses the first line only. That is `INTELLIGENCE-GLOSSARY-ANNOTATED-1`; Data browser and Catalog now show "No definition found." for Dataset and Table until it is fixed.
 
 **Scope:** every caption, label, description, hint, tooltip, placeholder, empty state, error, toast and confirm text in the Link Analysis Studio (`/studio/link-analysis`), the Browser and Server tool panels, the Java algorithm catalogue (`Algorithm.java`), and the shared components the Studio uses (pen-field, option-picker, AI explain, `api-base.ts`). Code comments are out of scope.
 
