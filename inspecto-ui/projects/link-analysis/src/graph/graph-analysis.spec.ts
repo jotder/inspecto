@@ -113,8 +113,7 @@ describe('explainNode', () => {
     it('summarizes links grouped by kind and direction', () => {
         const s = explainNode(g, 'a');
         expect(s).toContain('a (entity)');
-        expect(s).toContain('→ link: b, c');
-        expect(s).toContain('← link: d');
+        expect(s).toBe('a (entity). Out, link: b, c. In, link: d.');
     });
 
     it('handles unknown and isolated nodes', () => {

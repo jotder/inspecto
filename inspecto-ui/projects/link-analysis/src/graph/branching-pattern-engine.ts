@@ -2,6 +2,7 @@ import type { BranchStage, LegThreshold } from '@inspecto/core/graph/branching-s
 import type { G6Edge, G6GraphData } from '@inspecto/core/graph/graph-types';
 import type { GraphSelection } from './graph-analysis';
 import { analysisNodeCapValue, baseEdgeKind, edgeTimeIndex, followsInTime } from './graph-analysis';
+import { NEEDS_TIME_COLUMN } from '@inspecto/link-analysis/link-analysis/disabled-reasons';
 
 /**
  * **Branching pattern runtime (LA-14b)** — fan-out / fan-in motifs over the shared {@link G6GraphData} shape.
@@ -158,7 +159,7 @@ export function matchBranchingPattern(
         return refuse(`Branching patterns are capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }
     if (branchingNeedsTime(stages) && !timeAttr) {
-        return refuse('This pattern has a time window or ordering — add the time column under Attribute columns in Settings ▸ Graph model and run it again, then pick it as the Time column under the Filter edges by time (clock) button in the toolbar.');
+        return refuse(NEEDS_TIME_COLUMN);
     }
 
     const last = stages.length - 1;
@@ -167,7 +168,7 @@ export function matchBranchingPattern(
     );
     if (closureFault >= 0) {
         return refuse(
-            'closesToStart is only valid on the last stage of a motif, which must be a fan-in after at least one other stage.',
+            'Only the last stage can end at the starting account, and it must be a many-send-to-one stage after another stage.',
         );
     }
 
@@ -185,13 +186,13 @@ export function matchBranchingPattern(
             const valued = legs.filter((e) => numericAttr(e, th.attr) !== undefined);
             if (!valued.length) {
                 return refuse(
-                    `No link carries a numeric ${th.attr}, so the threshold ${thresholdLabel(th)} cannot be evaluated — add ${th.attr} under Attribute columns in Settings ▸ Graph model.`,
+                    `No link has a number in ${th.attr}, so ${thresholdLabel(th)} cannot be checked. Add ${th.attr} under Attribute columns in Settings ▸ Graph model.`,
                 );
             }
             legs = valued.filter((e) => passes(th, numericAttr(e, th.attr)!));
             if (!legs.length) {
                 return refuse(
-                    `No link in this graph passes ${thresholdLabel(th)}. If the view filters ${th.attr} (for example to ≥ 5 000), the legs this pattern looks for were removed before it ran — clear that filter rather than read this as "none found".`,
+                    `No link in this graph passes ${thresholdLabel(th)}. If a filter on ${th.attr} is on, it may have removed the links this pattern needs: clear it and run again.`,
                 );
             }
         }

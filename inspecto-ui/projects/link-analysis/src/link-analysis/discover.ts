@@ -157,7 +157,7 @@ export function route(g: G6GraphData, from: string, to: string, t: PackTerms): F
         return {
             heading,
             rows: [],
-            empty: `${label(from)} and ${label(to)} are not linked on this graph. Expand… (G) from one of them may connect them.`,
+            empty: `${label(from)} and ${label(to)} are not linked on this graph. Try Expand from one of them.`,
         };
     const hops = path.edgeIds.length;
     const chain = path.nodeIds.map(label).join(directed ? ' → ' : ' – ');

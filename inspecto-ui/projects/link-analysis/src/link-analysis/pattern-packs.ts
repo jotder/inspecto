@@ -1,6 +1,7 @@
 import { BranchStage, LegThreshold } from '@inspecto/link-analysis/graph/branching-pattern-engine';
 import { PatternStep } from '@inspecto/link-analysis/graph/graph-analysis';
 import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
+import { NEEDS_TIME_COLUMN } from './disabled-reasons';
 
 /**
  * **Link Analysis — pattern packs** (V2). A pattern pack is a named, parameterized investigation
@@ -163,7 +164,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Layering chain',
         category: 'money',
         description:
-            'Funds relayed through a chain of intermediaries (A → B → C → D) to obscure origin — classic placement/layering. Each hop must come after the one before it, within 48 hours.',
+            'Money relayed through a chain of accounts (A → B → C → D) to hide where it came from. Each hop follows the one before within 48 hours.',
         steps: [
             {},
             { direction: 'out' },
@@ -178,7 +179,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Pass-through intermediary',
         category: 'money',
         description:
-            'A single intermediary that receives then forwards (A → M → B), the forward coming after the receipt and within 48 hours. Inspect the middle node — it is the mule/shell to scrutinize.',
+            'One account receives money and forwards it within 48 hours (A → M → B). Check the middle account.',
         steps: [
             {},
             { direction: 'out' },
@@ -191,7 +192,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Inbound collector',
         category: 'money',
         description:
-            'Many parties converging INTO one account (they → M → target). Start from the collector and follow incoming links.',
+            'Many parties sending into one account. Start from the collector and follow incoming links.',
         steps: [{}, { direction: 'in' }, { direction: 'in' }],
     },
     {
@@ -199,7 +200,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Relay chain (any link kind)',
         category: 'telecom',
         description:
-            'A generic relay hop A → B → C over ANY link kind, matched in the browser on the loaded graph — the building block of relaying that hides where contact ends up. Set the link kinds to narrow it; a Space pattern pack pins them for you.',
+            'A relay A → B → C over any link kind, on the graph on screen. Set link kinds to narrow it.',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
     },
     {
@@ -207,7 +208,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Circular flow',
         category: 'money',
         description:
-            'Value or contacts returning to their origin (A → … → A). Use the Cycles tool — a closed loop is not a simple path motif.',
+            'Value or contacts returning to where they started (A → … → A).',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
         tool: 'cycles',
     },
@@ -216,7 +217,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Shared associates',
         category: 'identity',
         description:
-            'Distinct identities that share the same devices/accounts. Use Similarity from a seed node, or Cohesive groups for the whole ring.',
+            'Different identities that share devices or accounts. Use Similarity from one node, or Cohesive groups for the whole ring.',
         steps: [{}, { direction: 'both' }],
         tool: 'similarity',
     },
@@ -225,7 +226,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Structuring (smurfing)',
         category: 'money',
         description:
-            'Many deposits just under a reporting threshold converging on one collector within a day, which then splits the total across two or more intermediaries that re-converge on one exit — each move after the one before, within 48 hours. Set the threshold band to your reporting limit; the legs are matched INSIDE the band, so never filter the view to large amounts first.',
+            'Many deposits just under a reporting threshold reach one collector within a day, then split and merge again on one exit within 48 hours. Set the value band to your reporting limit, and do not filter out small amounts first.',
         steps: [],
         // LA-14b. The band is the point: `max` is the reporting threshold (a deposit AT it is reported) and
         // `min` keeps the ordinary long tail of small payments out. 900–1 000 matches the demo corpus; a real
@@ -241,7 +242,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Layering network (split and merge)',
         category: 'money',
         description:
-            'Funds split from one account across three or more parallel intermediaries within a day, which then re-converge on one account — each leg after the one before, within 48 hours. The branching sibling of Layering chain: a chain follows one path, this finds the fan-out/fan-in web that a chain search misses.',
+            'Money split from one account across three or more accounts within a day, then merged into one account within 48 hours.',
         steps: [],
         // LA-LAYERING-1. No threshold on purpose: layering is about the SHAPE and its time order, not an amount band.
         stages: [
@@ -254,7 +255,7 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Circular financing (branching)',
         category: 'money',
         description:
-            'Value circulated through two successive split-and-merge rounds — split across two or more parties, re-converged, split again and re-converged — each leg after the one before, within 48 hours — and the final merge must land back on the ORIGINAL splitter, so a match is a proven round trip, not just a web. For a single exact loop (A → … → A) use the Cycles tool (Circular flow).',
+            'Money split and merged twice, ending back at the account that first split it, each step within 48 hours. For a single loop, use the Cycles tool.',
         steps: [],
         // LA-CIRCFIN-1 + LA-CIRCFIN-2: the last stage `closesToStart`, so its collector must be stage 0's splitter.
         stages: [
@@ -359,7 +360,7 @@ export function resolvePatternColumns(
     return {
         ...(kindCol ? { kindCol } : {}),
         ...(timeCol ? { timeCol } : {}),
-        ...(filled.length ? { notice: `Using ${filled.join(' / ')} for this pack.` } : {}),
+        ...(filled.length ? { notice: usingColumnsNotice(filled) } : {}),
         ...(missing.length ? { blocked: missing.join(' ') } : {}),
     };
 }
@@ -367,6 +368,13 @@ export function resolvePatternColumns(
 /** The plain refusal for a column the pattern needs and does not have, naming the profile's column when there is one. */
 export function patternColumnRefusal(what: 'time' | 'kind', suggested: string | undefined): string {
     return what === 'time'
-        ? `This pattern needs a time column — ${suggested ? `pick ${suggested} as the Time column under the Filter edges by time (clock) button in the toolbar` : 'pick the Time column under the Filter edges by time (clock) button in the toolbar'}.`
-        : `This pattern needs a link kind column — ${suggested ? `set Link type column to ${suggested} in Settings ▸ Graph model` : 'set Link type column in Settings ▸ Graph model'}.`;
+        ? `${NEEDS_TIME_COLUMN}${suggested ? ` Use ${suggested}.` : ''}`
+        : `Needs a link kind column: set Link kind column${suggested ? ` to ${suggested}` : ''} in Settings ▸ Graph model.`;
+}
+
+/** The notice for columns a pattern run fills in by itself: "Using the first_seen column for this pattern." */
+export function usingColumnsNotice(cols: readonly string[]): string {
+    return cols.length > 1
+        ? `Using the ${cols.slice(0, -1).join(', ')} and ${cols[cols.length - 1]} columns for this pattern.`
+        : `Using the ${cols[0]} column for this pattern.`;
 }

@@ -4875,7 +4875,7 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         made.fixture.detectChanges();
         const el = made.fixture.nativeElement as HTMLElement;
         const discover = el.querySelector('[data-testid="la-discover"]') as HTMLElement;
-        expect(discover.textContent).toContain('Who is busiest');
+        expect(discover.textContent).toContain('Busiest nodes');
         (el.querySelector('[data-testid="la-discover-busiest"]') as HTMLButtonElement).click();
         made.fixture.detectChanges();
         expect(discover.querySelector('[data-testid="la-discover-reading"]')?.textContent).toContain(

@@ -14,6 +14,7 @@ import { GENERIC_PROFILE, installDomainProfiles, profileFromPack } from '@inspec
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
+import { NEEDS_TIME_COLUMN } from './disabled-reasons';
 
 /** A tiny two-cluster graph: a–b–c plus d–e (mirrors the studio spec fixture). */
 const GRAPH: G6GraphData = {
@@ -149,7 +150,7 @@ describe('LinkAnalysisToolboxComponent', () => {
         c.communityMethod.set('louvain');
         c.runCommunities();
         expect(c.communities()).toHaveLength(2); // a–b–c and d–e
-        expect(c.toolBadge('communities')).toBe('2 found');
+        expect(c.toolBadge('communities')).toBe('2 groups');
         expect(last()?.groups?.get('a')).toBe(last()?.groups?.get('c'));
         expect(last()?.groups?.get('a')).not.toBe(last()?.groups?.get('d'));
     });
@@ -174,10 +175,10 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(c.toolBadge('explain')).toBe('B');
 
         c.runCentrality();
-        expect(c.toolBadge('centrality')).toBe('top 5');
+        expect(c.toolBadge('centrality')).toBe('Top 5');
 
         c.runCommunities();
-        expect(c.toolBadge('communities')).toBe('2 found');
+        expect(c.toolBadge('communities')).toBe('2 groups');
     });
 
     it('pattern: builds a motif, matches it, gates on node kind, and focuses a match', () => {
@@ -273,7 +274,7 @@ describe('LinkAnalysisToolboxComponent', () => {
 
         c.runCycles();
         expect(c.cycles().length).toBeGreaterThan(0);
-        expect(c.toolBadge('cycles')).toMatch(/found/);
+        expect(c.toolBadge('cycles')).toMatch(/^\d+ cycles?$/);
 
         c.runCutPoints();
         expect(c.cutNodes()).toContain('a'); // removing the hub isolates x and y
@@ -462,7 +463,7 @@ describe('LinkAnalysisToolboxComponent', () => {
         fixture.componentRef.setInput('timeAttr', 'BOOKED_AT');
         c.loadPatternPack('structuring');
         c.runPattern();
-        expect(c.analysisError()).toContain('removed before it ran');
+        expect(c.analysisError()).toContain('may have removed the links this pattern needs');
         expect(c.analysisError()).not.toBe('No matches for this pattern.');
     });
 
@@ -494,7 +495,7 @@ describe('LinkAnalysisToolboxComponent', () => {
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         const serverButton = () =>
-            [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Run on server'));
+            [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Search whole Dataset'));
         expect(serverButton()).toBeUndefined(); // complete graph: the browser answer is honest
 
         fixture.componentRef.setInput('graphTruncated', true);
@@ -504,7 +505,7 @@ describe('LinkAnalysisToolboxComponent', () => {
         fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'tx: PAYER → PAYEE' }]);
         fixture.componentRef.setInput('timeAttr', 'BOOKED'); // structuring windows and orders its legs
         fixture.detectChanges();
-        expect(el.textContent).toContain('first links a truncation cuts');
+        expect(el.textContent).toContain('This graph was cut short, which may hide small links this pattern needs.');
         const asked: unknown[] = [];
         c.runPatternOnServer.subscribe((r) => asked.push(r));
         serverButton()!.click();
@@ -525,11 +526,11 @@ describe('LinkAnalysisToolboxComponent', () => {
         c.loadPatternPack('structuring');
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelector('[aria-label="Server pattern search"]')?.textContent?.replace(/\s+/g, ' ')).toContain(
-            'Server: 1 match over the whole Dataset',
+        expect(el.querySelector('[aria-label="Whole Dataset pattern search"]')?.textContent?.replace(/\s+/g, ' ')).toContain(
+            '1 match in the whole Dataset',
         );
-        expect(el.textContent).toContain('The match limit cut the answer short');
-        const item = el.querySelector<HTMLButtonElement>('[aria-label="Server pattern matches"] button')!;
+        expect(el.textContent).toContain('Cut at the match limit: more matches exist than are shown.');
+        const item = el.querySelector<HTMLButtonElement>('[aria-label="Whole Dataset pattern matches"] button')!;
         expect(item.textContent).toContain('S1, S2 +1 ⇒ HUB ⇒ R1, R2 ⇒ OFF');
         item.click();
         expect(last()).toEqual({ nodeIds: match.nodeIds, edgeIds: match.edgeIds });
@@ -543,7 +544,7 @@ describe('LinkAnalysisToolboxComponent', () => {
             refusal: 'No link carries a numeric AMOUNT.',
         });
         fixture.detectChanges();
-        expect(el.querySelector('[aria-label="Server pattern search"]')?.textContent).toContain(
+        expect(el.querySelector('[aria-label="Whole Dataset pattern search"]')?.textContent).toContain(
             'No link carries a numeric AMOUNT.',
         );
     });
@@ -561,7 +562,7 @@ describe('LinkAnalysisToolboxComponent', () => {
         fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         c.tab.set('server-paths');
         fixture.detectChanges();
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Load an Entity/Link projection first');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Draw a graph from an Entity/Link query first.');
     });
 
     it('find paths (server): emits the walk request — To optional, depth clamped to the server fence', () => {
@@ -597,10 +598,10 @@ describe('LinkAnalysisToolboxComponent', () => {
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('[role="status"]')?.textContent?.replace(/\s+/g, ' ')).toContain(
-            '1 path · longest 2 hops · searched up to 6 hops',
+            '1 path, longest 2 hops (searched up to 6)',
         );
-        expect(el.textContent).toContain('Edge-yield cap reached');
-        expect(c.toolBadge('server-paths')).toBe('1 paths · truncated');
+        expect(el.textContent).toContain('Search stopped early');
+        expect(c.toolBadge('server-paths')).toBe('1 path, cut short');
         const item = el.querySelector<HTMLButtonElement>('[aria-label="Server paths"] button')!;
         expect(item.textContent).toContain('A → B → C');
         item.click();
@@ -684,7 +685,7 @@ describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', 
     it('says what to do next under the ranking, and offers to start an Investigation from the top results', async () => {
         const { c, fixture } = ranked(true);
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelector('[data-testid="result-next-hint"]')?.textContent).toContain('click a row');
+        expect(el.querySelector('[data-testid="result-next-hint"]')?.textContent).toContain('Click a row to find it.');
         const seeds: unknown[][] = [];
         c.seedFromResults.subscribe((s) => seeds.push(s));
         const action = Array.from(el.querySelectorAll('button')).find((b) =>
@@ -704,7 +705,7 @@ describe('LinkAnalysisToolboxComponent - result actions (operator 2026-10-10)', 
         const el = fixture.nativeElement as HTMLElement;
         const next = el.querySelector('inspecto-link-analysis-result-next') as HTMLElement;
         const hint = next.querySelector('[data-testid="result-next-hint"]')?.textContent ?? '';
-        expect(hint).toContain('click a row');
+        expect(hint).toContain('Click a row to find it.');
         expect(hint).not.toMatch(/start an Investigation/i);
         const action = next.querySelector('[data-testid="locked-action"]') as HTMLButtonElement;
         expect(action.textContent).toContain('Start an Investigation from the top results');
@@ -748,7 +749,7 @@ describe('LinkAnalysisToolboxComponent - entity scores', () => {
         c.riskModel.set('m');
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        (el.querySelector('tbody button[aria-label^="Show the Risk Score of"]') as HTMLButtonElement).click();
+        (el.querySelector('tbody button[aria-label^="Show factors for"]') as HTMLButtonElement).click();
         expect(['A1', 'B2']).toContain(c.riskEntity());
     });
 
@@ -766,7 +767,7 @@ describe('LinkAnalysisToolboxComponent - entity scores', () => {
         c.riskModel.set('m');
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        (el.querySelector('tbody button[aria-label^="Show the Risk Score of"]') as HTMLButtonElement).click();
+        (el.querySelector('tbody button[aria-label^="Show factors for"]') as HTMLButtonElement).click();
         expect(['masked:aaaa', 'masked:bbbb']).toContain(c.riskEntity());
     });
 });
@@ -810,10 +811,10 @@ describe('LinkAnalysisToolboxComponent - DR-D5 results', () => {
         fixture.detectChanges();
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain(c.loadedPack()!.description.slice(0, 30));
-        expect(text).not.toContain('Choose a pattern');
+        expect(text).not.toContain('Pick a pattern or build your own');
         c.loadPatternPack('');
         fixture.detectChanges();
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Choose a pattern');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Pick a pattern or build your own');
     });
 
     it('Cycles lists the shortest first, labels the length and draws only the selected cycle', () => {
@@ -876,7 +877,7 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         },
     };
     const serverButton = (el: HTMLElement) =>
-        [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Run on server'));
+        [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Search whole Dataset'));
 
     function telecom(kindCol?: string) {
         const t = make(GRAPH, [ringPack]);
@@ -903,7 +904,7 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('[data-testid="server-pattern-columns-notice"]')?.textContent).toContain(
-            'Using link_kind / first_seen for this pack',
+            'Using the link_kind and first_seen columns for this pattern',
         );
         const asked: unknown[] = [];
         c.runPatternOnServer.subscribe((r) => asked.push(r));
@@ -930,14 +931,14 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        expect(serverButton(el)!.disabled).toBe(true);
+        expect(serverButton(el)!.getAttribute('aria-disabled')).toBe('true');
         expect(el.querySelector('[data-testid="server-pattern-columns-blocked"]')?.textContent).toContain(
-            'This pattern needs a time column',
+            'Needs a time column',
         );
         const find = [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Find matches'))!;
-        expect(find.disabled).toBe(true);
+        expect(find.getAttribute('aria-disabled')).toBe('true');
         expect(el.querySelector('[data-testid="pattern-columns-blocked"]')?.textContent).toContain(
-            'This pattern needs a link kind column',
+            'Needs a link kind column',
         );
         const asked: unknown[] = [];
         c.runPatternOnServer.subscribe((r) => asked.push(r));
@@ -959,13 +960,13 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         const el = t.fixture.nativeElement as HTMLElement;
         expect(el.querySelector('[data-testid="pattern-columns-blocked"]')).toBeNull();
         expect(el.querySelector('[data-testid="investigation-pattern-columns-notice"]')?.textContent).toContain(
-            'Using link_kind / first_seen for this pack',
+            'Using the link_kind and first_seen columns for this pattern',
         );
         expect(el.querySelector('[data-testid="investigation-pattern-scope"]')?.textContent).toContain(
-            'not only the Working Set',
+            'matches can include entities not in the Working Set',
         );
         const find = [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Find matches'))!;
-        expect(find.disabled).toBe(false);
+        expect(find.getAttribute('aria-disabled')).not.toBe('true');
         const asked: unknown[] = [];
         t.c.runPatternOnServer.subscribe((r) => asked.push(r));
         find.click();
@@ -990,7 +991,7 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         expect(t.c.investigationPatternColumns()).toEqual({
             kindCol: 'link_kind',
             timeCol: 'first_seen',
-            notice: 'Using link_kind / first_seen for this pack.',
+            notice: 'Using the link_kind and first_seen columns for this pattern.',
         });
     });
 
@@ -1007,7 +1008,7 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         t.fixture.detectChanges();
         const cols = t.c.investigationPatternColumns()!;
         expect(cols.timeCol).toBe('first_seen');
-        expect(cols.notice).toBe('Using link_kind / first_seen for this pack.');
+        expect(cols.notice).toBe('Using the link_kind and first_seen columns for this pattern.');
         const el = t.fixture.nativeElement as HTMLElement;
         expect(el.querySelector('[data-testid="investigation-pattern-columns-notice"]')?.textContent).not.toContain(
             'last_seen',
@@ -1022,9 +1023,9 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         const { fixture, c } = telecom('link_kind');
         fixture.componentRef.setInput('profileId', 'telecom');
         fixture.detectChanges();
-        expect(c.browserPatternColumns().blocked).toBe('This pattern needs a time column — pick first_seen as the Time column under the Filter edges by time (clock) button in the toolbar.');
+        expect(c.browserPatternColumns().blocked).toBe(`${NEEDS_TIME_COLUMN} Use first_seen.`);
         c.runPattern();
-        expect(c.analysisError()).toBe('This pattern needs a time column — pick first_seen as the Time column under the Filter edges by time (clock) button in the toolbar.');
+        expect(c.analysisError()).toBe(`${NEEDS_TIME_COLUMN} Use first_seen.`);
     });
 
     it('LA-DEMO-POLISH-1 (1): a hand-built ordered motif uses the Investigation bound time column when the links carry it', () => {
@@ -1039,7 +1040,7 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         t.c.loadedPack.set(null);
         t.c.patternSteps.set([{}, { direction: 'out' }, { direction: 'out', afterPrevious: true }]);
         t.c.runPattern();
-        expect(t.c.analysisError()).toContain('requires the hops to be in time order');
+        expect(t.c.analysisError()).toBe(NEEDS_TIME_COLUMN);
         t.fixture.componentRef.setInput('investigationTimeCol', 'last_seen');
         t.fixture.detectChanges();
         t.c.loadedPack.set(null);
@@ -1066,13 +1067,13 @@ describe('LinkAnalysisToolboxComponent - pattern pack columns (telecom review)',
         const cols = t.c.browserPatternColumns();
         expect(cols.blocked ?? '').not.toContain('needs a time column');
         expect(cols.timeAttr).toBe('last_seen');
-        expect(cols.notice).toBe('Using last_seen for this pack.');
+        expect(cols.notice).toBe('Using the last_seen column for this pattern.');
 
         t.fixture.componentRef.setInput('investigationTimeCol', 'first_seen');
         t.fixture.componentRef.setInput('graph', GRAPH);
         t.fixture.detectChanges();
         expect(t.c.browserPatternColumns().blocked).toContain(
-            "Investigation's time column first_seen is not on the links",
+            'do not carry the Investigation’s time column first_seen',
         );
     });
 });
@@ -1120,18 +1121,22 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             // LA-PANELS-REDESIGN-1: what runs on the server is listed in the Server tab only
             expect(names).not.toContain('Value Measures');
             expect(names).not.toContain('Burst and periodicity');
-            expect(names).not.toContain('Find paths (server)');
+            expect(names).not.toContain('Find paths');
             expect(names).not.toContain('Propagated risk');
             expect(el.querySelector('[data-testid=catalogue-where]')).toBeNull(); // no toggle: the host's tab is the side
             expect(Array.from(el.querySelectorAll('h3[data-question]')).map((h) => h.textContent!.trim())).toEqual([
                 'How are they connected?',
                 'Who matters most?',
-                'What groups and weak points are there?',
+                'Which groups and weak points exist?',
                 'What looks unusual?',
             ]);
             expect(c.runsOn('centrality')).toBe('both');
             expect(c.runsOn('explain')).toBe('both'); // its edge-index reads run on the server
-            expect(c.toolCap('centrality')).toBe('≤ 500 nodes in the browser'); // betweenness is the lowest
+            expect(c.toolCap('centrality')).toBe('Up to 500 nodes'); // betweenness is the lowest
+            // T-087: a row that also runs on the other tab names it; no raw "both / browser / server" chip
+            const chips = Array.from(el.querySelectorAll('section > button inspecto-chip')).map((x) => x.textContent!.trim());
+            expect(chips).toContain('Also on Whole Dataset');
+            expect(chips.filter((t) => /^(both|browser|server|suggested)$/.test(t))).toEqual([]);
             await expectNoA11yViolations(el);
         });
 
@@ -1148,7 +1153,7 @@ describe('LinkAnalysisToolboxComponent search around', () => {
                     'Propagated risk',
                     'Ego network',
                     'PageRank',
-                    'Find paths (server)',
+                    'Find paths',
                     'Value Measures',
                     'Burst and periodicity',
                     'Explain node', // a both group with no server twin: its server controls live in the group
@@ -1156,8 +1161,10 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             );
             expect(names).not.toContain('Centrality'); // under its cap its server twins are the algorithm rows
             const risk = el.querySelector('[data-server-algorithm=propagatedRisk]')!;
-            expect(risk.textContent).toContain('server');
-            expect(el.querySelector('[data-server-algorithm=pageRank]')!.textContent).toContain('both');
+            expect(risk.querySelector('inspecto-chip')).toBeNull(); // runs only here: no where-chip
+            expect(risk.textContent).toContain('Instant up to');
+            expect(risk.textContent).not.toMatch(/waits for|≤/);
+            expect(el.querySelector('[data-server-algorithm=pageRank]')!.textContent).toContain('Also on screen');
             (risk.querySelector('button') as HTMLButtonElement).click();
             fixture.detectChanges();
             const panel = risk.querySelector('inspecto-link-analysis-server-algorithms')!;
@@ -1172,7 +1179,7 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             const el: HTMLElement = fixture.nativeElement;
             expect(c.where()).toBe('browser');
             expect(el.querySelector('[data-testid=catalogue-over-cap]')!.textContent).toContain(
-                'The Working Set has 3000 nodes - above the 2500-node browser limit: a tool over its limit runs from the Server tab.',
+                'The Working Set has 3,000 nodes, too big to answer on screen (limit 2,500): use the Whole Dataset tab.',
             );
             fixture.componentRef.setInput('side', 'server');
             fixture.detectChanges();
@@ -1187,12 +1194,82 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             const el: HTMLElement = fixture.nativeElement;
             expect(el.querySelector('[data-testid=catalogue-server-locked]')).toBeNull();
             expect(c.where()).toBe('browser');
-            expect(rows(el)).not.toContain('Edge index');
+            expect(rows(el)).not.toContain('Link index');
             fixture.componentRef.setInput('side', 'server');
             fixture.detectChanges();
             expect(el.querySelectorAll('[data-testid=catalogue-server-locked]')).toHaveLength(1);
-            expect(rows(el)).toEqual(expect.arrayContaining(['Find paths (server)', 'Value Measures', 'Burst and periodicity']));
-            expect(rows(el)).not.toContain('Edge index');
+            expect(rows(el)).toEqual(expect.arrayContaining(['Find paths', 'Value Measures', 'Burst and periodicity']));
+            expect(rows(el)).not.toContain('Link index');
         });
+    });
+});
+
+describe('LinkAnalysisToolboxComponent - disabled reasons (LA-UI-TEXT-PASS-1 X6)', () => {
+    const btn = (el: HTMLElement, text: string) =>
+        [...el.querySelectorAll<HTMLButtonElement>('section > div button')].find((b) =>
+            b.textContent?.trim().includes(text),
+        )!;
+
+    /** Disabled with the phrase: still focusable, described by a visible line, and a click runs nothing. */
+    function expectReason(el: HTMLElement, button: HTMLButtonElement, id: string, phrase: string): void {
+        expect(button.getAttribute('aria-disabled')).toBe('true');
+        expect(button.getAttribute('aria-describedby')).toContain(`why-${id}`);
+        expect(el.querySelector(`[data-testid="why-${id}"]`)?.textContent?.trim()).toBe(phrase);
+    }
+
+    it('every Find button that needs a pick says which, and runs nothing until it has it', async () => {
+        const { fixture, c, emphases } = make();
+        const el: HTMLElement = fixture.nativeElement;
+        const cases: [tab: Parameters<typeof c.toggleTool>[0], label: string, id: string, phrase: string][] = [
+            ['path', 'Find shortest path', 'path', 'Pick a From and a To node first.'],
+            ['all-paths', 'Find all paths', 'all-paths', 'Pick a From and a To node first.'],
+            ['explain', 'Explain node', 'explain', 'Pick a node first.'],
+            ['similarity', 'Find similar nodes', 'similar', 'Pick a node first.'],
+            ['flow', 'Find maximum flow', 'flow', 'Pick a From and a To node first.'],
+        ];
+        for (const [tab, label, id, phrase] of cases) {
+            c.tab.set(tab);
+            fixture.detectChanges();
+            const b = btn(el, label);
+            expectReason(el, b, id, phrase);
+            b.click();
+            expect(emphases).toEqual([]);
+        }
+        c.tab.set('flow');
+        c.flowFrom.set('a');
+        c.flowTo.set('c');
+        fixture.detectChanges();
+        expect(btn(el, 'Find maximum flow').getAttribute('aria-disabled')).not.toBe('true');
+        expect(el.querySelector('[data-testid="why-flow"]')).toBeNull();
+        await expectNoA11yViolations(el);
+    });
+
+    it('server tools: Find paths and Add node say why they wait', () => {
+        const { fixture, c } = make(GRAPH, [], true);
+        const el: HTMLElement = fixture.nativeElement;
+        fixture.componentRef.setInput('side', 'server');
+        fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'calls' }]);
+        c.tab.set('server-paths');
+        fixture.detectChanges();
+        expectReason(el, btn(el, 'Find paths'), 'server-paths', 'Pick a node first.');
+        c.pathFrom.set('a');
+        fixture.componentRef.setInput('serverPathsBusy', true);
+        fixture.detectChanges();
+        expectReason(el, btn(el, 'Find paths'), 'server-paths', 'Searching…');
+        c.tab.set('explain');
+        fixture.detectChanges();
+        expectReason(el, btn(el, 'Add node'), 'add-node', 'Pick a node first.');
+    });
+});
+
+describe('LinkAnalysisToolboxComponent - empty canvas (T-089)', () => {
+    it('says to draw a graph first, and stops saying it once a graph is drawn', () => {
+        const empty = make(null);
+        empty.fixture.detectChanges();
+        const el: HTMLElement = empty.fixture.nativeElement;
+        expect(el.querySelector('[data-testid="catalogue-no-graph"]')?.textContent?.trim()).toBe('Draw a graph first.');
+        empty.fixture.componentRef.setInput('graph', GRAPH);
+        empty.fixture.detectChanges();
+        expect(el.querySelector('[data-testid="catalogue-no-graph"]')).toBeNull();
     });
 });

@@ -128,14 +128,14 @@ describe('matchBranchingPattern (LA-14b)', () => {
         const res = matchBranchingPattern(large, STRUCTURING, { timeAttr: 'AT' });
         expect(res.matches).toHaveLength(0);
         expect(res.refusal).toContain('900 ≤ AMOUNT < 1000');
-        expect(res.refusal).toContain('removed before it ran');
+        expect(res.refusal).toContain('may have removed the links this pattern needs');
     });
 
     it('refuses when no link carries the threshold attribute', () => {
         const g = graph([...deposits]);
         g.edges.forEach((e) => delete e.data.attrs!['AMOUNT']);
         expect(matchBranchingPattern(g, STRUCTURING, { timeAttr: 'AT' }).refusal).toMatch(
-            /No link carries a numeric AMOUNT/,
+            /No link has a number in AMOUNT/,
         );
     });
 
@@ -260,7 +260,7 @@ describe('layering-network and circular-financing packs (run through the matcher
             [{ ...fo, closesToStart: true }, fi],
             [fo, { ...fo, closesToStart: true }],
         ] as BranchStage[][]) {
-            expect(run(bad).refusal).toContain('closesToStart');
+            expect(run(bad).refusal).toContain('Only the last stage can end at the starting account');
         }
     });
 });

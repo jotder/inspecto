@@ -62,7 +62,7 @@ describe('LinkAnalysisDiscoverComponent - Find something interesting (LA-ONBOARD
     it('three plain questions; Who is busiest reads each row in the pack words; the actions carry the row (no violations)', async () => {
         const { el, host, click, button } = mount();
         const asked = Array.from(el.querySelectorAll('[role="group"] button')).map((b) => b.textContent!.trim());
-        expect(asked).toEqual(['Who is busiest', 'Which groups stick together', 'How does A reach B']);
+        expect(asked).toEqual(['Busiest nodes', 'Tight groups', 'Route from A to B']);
         click('[data-testid="la-discover-busiest"]');
         const readings = Array.from(el.querySelectorAll('[data-testid="la-discover-reading"]')).map((p) => p.textContent!.trim());
         expect(readings[0]).toBe('HUB takes part in 5 transfers, the most on this graph.');
@@ -86,13 +86,22 @@ describe('LinkAnalysisDiscoverComponent - Find something interesting (LA-ONBOARD
         const { el, fixture, click } = mount();
         click('[data-testid="la-discover-route"]');
         const go = el.querySelector('[data-testid="la-discover-route-go"]') as HTMLButtonElement;
-        expect(go.disabled).toBe(true);
+        // X6: disabled with its reason, still focusable, and a click does nothing.
+        expect(go.getAttribute('aria-disabled')).toBe('true');
+        expect(el.querySelector('[data-testid="la-discover-route-why"]')?.textContent?.trim()).toBe(
+            'Pick a From and a To node first.',
+        );
+        expect(go.getAttribute('aria-describedby')).toContain('la-discover-route-why');
+        go.click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="la-discover-reading"]')).toBeNull();
         const discover = fixture.debugElement.query((x) => x.componentInstance instanceof LinkAnalysisDiscoverComponent)
             .componentInstance as LinkAnalysisDiscoverComponent;
         discover.from.setValue('C');
         discover.to.setValue('B');
         fixture.detectChanges();
-        expect(go.disabled).toBe(false);
+        expect(go.getAttribute('aria-disabled')).not.toBe('true');
+        expect(el.querySelector('[data-testid="la-discover-route-why"]')).toBeNull();
         click('[data-testid="la-discover-route-go"]');
         expect(el.querySelector('[data-testid="la-discover-reading"]')?.textContent?.trim()).toBe(
             'C and B are linked through 2 transfers, not all in one direction: C – HUB – B.',

@@ -9,6 +9,7 @@ import { GraphSelection } from '@inspecto/link-analysis/graph/graph-analysis';
 import { TemporalPatternResult } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisTemporalFindingsComponent, TemporalRunRequest } from './link-analysis-temporal-findings.component';
 import { TemporalFindingsState, allTemporalSelection, temporalResultToState } from './temporal-findings';
+import { NEEDS_TIME_COLUMN } from './disabled-reasons';
 
 const id = (raw: string, end: 'source' | 'target') => resolveEntityId([], raw, () => false, end);
 
@@ -116,9 +117,9 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         host.time.set('');
         fixture.detectChanges();
         const note = el.querySelector('[data-test=temporal-no-time]')?.textContent ?? '';
-        // it points to where the Time column really is: no "Query panel" exists in the Studio (UI test 2026-10-29)
+        // X8: the one shared "needs a time column" sentence, pointing to where the Time column really is
+        expect(note.trim()).toBe(NEEDS_TIME_COLUMN);
         expect(note).toContain('Settings ▸ Graph model');
-        expect(note).toContain('Filter edges by time (clock) button');
         expect(note).not.toMatch(/query panel/i);
         expect(el.querySelector('[data-test=temporal-run]')).toBeNull();
         await expectNoA11yViolations(el);
@@ -159,7 +160,7 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
             ),
         );
         fixture.detectChanges();
-        expect(el.textContent).toContain('1 burst(s) found');
+        expect(el.textContent).toContain('1 burst found.');
         expect(el.querySelector('[data-test=temporal-finding]')!.textContent).toContain('a');
         expect(el.querySelector('[data-test=temporal-finding]')!.textContent).not.toContain('→');
         await expectNoA11yViolations(el);
@@ -169,10 +170,9 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         const { fixture, host, el } = setup();
         host.state.set(temporalResultToState(RESULT, GRAPH));
         fixture.detectChanges();
-        const text = el.textContent ?? '';
-        expect(text).toContain('2 burst(s) found');
-        expect(text).toContain('1 not drawn on this canvas');
-        expect(text).toContain('2 row(s) skipped');
+        expect(el.querySelector('[data-test=temporal-summary] p')!.textContent!.trim()).toBe(
+            '2 bursts found. 1 not on the canvas. 2 rows skipped (no readable time).',
+        );
         expect(el.querySelector('[data-test=temporal-truncated]')!.textContent).toContain('row limit');
         const items = Array.from(el.querySelectorAll<HTMLButtonElement>('[data-test=temporal-finding]'));
         expect(items.map((b) => b.disabled)).toEqual([false, true]);
@@ -198,14 +198,16 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         fixture.detectChanges();
         const button = el.querySelector<HTMLButtonElement>('[data-test=temporal-seal-button]')!;
         expect(button.textContent).toContain('Seal these findings');
-        expect(button.disabled).toBe(true);
-        expect(el.querySelector('[data-test=temporal-seal-note]')!.textContent).toContain('Open an Investigation');
+        // X6: disabled with its reason, still focusable and described by the visible line
+        expect(button.getAttribute('aria-disabled')).toBe('true');
+        expect(button.getAttribute('aria-describedby')).toContain('la-temporal-seal-note');
+        expect(el.querySelector('[data-test=temporal-seal-note]')!.textContent!.trim()).toBe('Open an Investigation first.');
         button.click();
         expect(host.sealRequested).not.toHaveBeenCalled();
 
         host.canSeal.set(true);
         fixture.detectChanges();
-        expect(button.disabled).toBe(false);
+        expect(button.getAttribute('aria-disabled')).not.toBe('true');
         expect(el.querySelector('[data-test=temporal-seal-note]')!.textContent).toContain(
             'Working Set does not change',
         );
@@ -221,8 +223,8 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         host.sealed.set({ step: 4, count: 1, outsideWorkingSet: 2, fingerprint: 'abcdef0123456789' });
         fixture.detectChanges();
         const sealed = el.querySelector('[data-test=temporal-sealed]')!.textContent ?? '';
-        expect(sealed).toContain('Sealed at step 4: 1 finding(s)');
-        expect(sealed).toContain('2 outside it');
+        expect(sealed).toContain('Sealed at step 4: 1 finding in');
+        expect(sealed).toContain('(2 outside it were left out)');
         expect(sealed).toContain('abcdef012345');
         host.sealed.set(null);
         host.sealError.set('this Investigation has no time column');
@@ -231,7 +233,7 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         expect(el.textContent).toContain('this Investigation has no time column');
         host.sealBusy.set(true);
         fixture.detectChanges();
-        expect(el.querySelector<HTMLButtonElement>('[data-test=temporal-seal-button]')!.disabled).toBe(true);
+        expect(el.querySelector<HTMLButtonElement>('[data-test=temporal-seal-button]')!.getAttribute('aria-disabled')).toBe('true');
         await expectNoA11yViolations(el);
     });
 });

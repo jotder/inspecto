@@ -84,9 +84,8 @@ that would otherwise hide everything.
    very busy accounts are held, not drawn. An account that links to almost everyone (a big merchant) only hides the
    pattern: right-click it, **Exclude…**, and add it to a list whose purpose is *Never follow these (exclusion)*, so
    it stays out of every later step too.
-7. **Find something interesting.** Open the right panel's **Analysis** tab: **Who is busiest**, **Which groups stick
-   together** (the chain shows as one group) and **How does A reach B** (from the victim's account to the cash-out
-   account). Each answer is one sentence, with **Show on graph**, **Start from these** and **Add to a list**.
+7. **Quick questions.** Open the right panel's **On screen** tab: **Busiest nodes**, **Tight groups** (the chain shows
+   as one group) and **Route from A to B** (from the victim's account to the cash-out account). Each answer is one sentence, with **Show on graph**, **Start from these** and **Add to a list**.
 8. **Save view.** **File ▸ Save view as…** asks a name, *Mule ring*. A saved view keeps the graph's start and the
    lists it uses; it re-reads your data when it opens, so it is not evidence.
 9. **Come back.** The front page now shows **My work**: open *Mule ring* to draw it again over the data as it is
@@ -463,17 +462,17 @@ not in a text field, grid, menu or dialog.
 
 ## 8. The analysis catalogue
 
-The right panel's **Browser** and **Server** tabs.
+The right panel's **On screen** and **Whole Dataset** tabs.
 
-**Find something interesting** (Browser tab): three plain questions about the graph on screen.
+**Quick questions** (On screen tab): three plain questions about the graph on screen.
 
-* **Who is busiest** — the five entities with the most links, each in one sentence (*MERCHANT-BIG takes part in 270
+* **Busiest nodes** — the five entities with the most links, each in one sentence (*MERCHANT-BIG takes part in 270
   transfers, the most on this graph.*). When the busiest has at least 5 links and twice the next, it asks: *Add it to
-  an exclusion list?*
-* **Which groups stick together** — groups of three or more that link mostly among themselves (*Group 1: 9 accounts,
+  an exclusion list?* (button **Add to exclusion list**)
+* **Tight groups** — groups of three or more that link mostly among themselves (*Group 1: 9 accounts,
   14 transfers among them within 3 days*).
-* **How does A reach B** — choose **From** and **To**: the shortest chain following the links' direction, or in either
-  direction when there is none (it says which).
+* **Route from A to B** — choose **From** and **To**, then **Find route**: the shortest chain following the links'
+  direction, or in either direction when there is none (it says which).
 
 Every result row offers **Show on graph**, **Start from these** (a new graph from those entities and one ring) and
 **Add to a list** (purpose in plain words: *Watch these*, *Never follow these*, *Known good*, *Block*; a reason is
@@ -481,24 +480,32 @@ recorded).
 
 **One catalogue, one entry per algorithm**, ordered by the question each answers. It is split by where a tool runs:
 
-* **The Browser tab** works on the graph on screen. It holds every tool that runs in the browser, including those that
-  can also run on the server (*both*).
-* **The Server tab** lists the server algorithms (29 on a standard install). It runs them over the whole Dataset or
-  the open Investigation's Working Set, whatever its size, with the answer summarised in words and *Highlight on
-  canvas*. It also holds the tools that only read the server: *Find paths (server)*, *Value Measures*, *Burst and
-  periodicity* and *Edge index*.
-* **A *both* tool** shows only that side's controls in each tab. *Explain node* runs its neighbourhood in the browser;
-  its edge-index reads are in the Server tab. *Pattern match* finds matches in the Browser tab, and its **Run on
-  server** is in the Server tab.
+* **The On screen tab** works on the graph on screen. It holds every tool that runs in the browser, including those
+  that can also run on the whole Dataset.
+* **The Whole Dataset tab** lists the server algorithms (29 on a standard install). It runs them over the whole Dataset
+  or the open Investigation's Working Set, whatever its size, with the answer summarised in words and *Highlight on
+  canvas*. It also holds the tools that only read the server: *Find paths*, *Value Measures*, *Burst and periodicity*
+  and *Link index*.
+* **A tool on both tabs** shows only that tab's controls in each. *Explain node* runs its neighbourhood on screen; its
+  link-index reads are in the Whole Dataset tab. *Pattern match* finds matches on screen, and its **Search whole
+  Dataset** is in the Whole Dataset tab.
 
-Each row shows a badge (*both*, *server*) and its limit (*≤ 2500 nodes in the browser*). Over the browser limit, the
-Browser tab says so. That tool's **Run on server** is then in the Server tab, listed with the same settings.
+Each row says what it does in one line, and its limit (*Up to 2,500 nodes*; a server algorithm says *Instant up to
+100,000 nodes*: above that it is queued). A row that also runs on the other tab is chipped *Also on Whole Dataset* or
+*Also on screen*; a row the Industry pack suggests is chipped *Suggested*. Over the on-screen limit the On screen tab
+says so (*too big to answer on screen: use the Whole Dataset tab*), and that tool's **Run on server** is then in the
+Whole Dataset tab, listed with the same settings.
+
+A button that cannot run yet stays focusable and says why, as its tooltip and as a line under it, in one of a few fixed
+phrases: *Pick a node first.*, *Pick a From and a To node first.*, *Fill the required fields to run.*, *Searching…*,
+*Open an Investigation first.* A tool that needs a time column says *Needs a time column: add one in Settings ▸ Graph
+model, then pick it in the toolbar's time filter.*
 
 The tools keep their results when you switch tabs.
 
-On the Explorer level and on Basic, the Server tab still runs the Dataset reads that need no Investigation:
-*Find paths (server)*, *Value Measures*, *Burst and periodicity* and the pattern's **Run on server**. One locked line
-after them, *Run a server algorithm*, says what has the server algorithms.
+On the Explorer level and on Basic, the Whole Dataset tab still runs the Dataset reads that need no Investigation:
+*Find paths*, *Value Measures*, *Burst and periodicity* and the pattern's **Search whole Dataset**. One locked line
+after them, *Run on the whole Dataset*, says what has the server algorithms.
 
 Click a ranking row to select and centre that node. A long result has **Open in the dock** (the dock's **Results**
 tab).
@@ -541,8 +548,10 @@ Dataset and column roles (value, time, link kind) — prefilled from an open Inv
 
 ## 9. Pattern matching
 
-**Pattern match** opens on the first pack, with its description; pick a **pattern pack** to pre-fill the motif, edit
-the thresholds (always visible) and run it. *Custom motif* with no kinds set says *Choose a pattern*.
+**Pattern match** opens on the first pattern, with its description; pick a **Pattern** to pre-fill the steps, edit
+the thresholds (always visible) and run it with **Find matches**. *Custom pattern* says *Pick a pattern or build your
+own. A step with no link kind matches any link.* A step list can also be shown as **Conditions** (start Entity Type,
+then direction, link kind and Entity Type per step).
 
 | Pack | Looks for |
 |---|---|
@@ -775,7 +784,7 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 ## 13. Worked examples
 
 **Find a money-mule ring.** Choose **File ▸ Examples ▸ Follow the money**, or open `mule_layering_ring` (on the
-`la-showcase` Space Template: 112 accounts over three days). Browser ▸ **Suspicion score** ▸ **Score nodes** puts the relays and
+`la-showcase` Space Template: 112 accounts over three days). On screen ▸ **Suspicion score** ▸ **Find suspicious nodes** puts the relays and
 the hub in the top decile. **Pattern match ▸ Structuring (smurfing)** finds `MULE-HUB-01`: 96 in-band legs from 12
 payers. **Value Measures ▸ Pass-through** flags 13 accounts (the two relays at ≈ 0.985, the hub at 0.979, `SHELL-A`
 above 1); **Velocity** shows them forwarding within hours (median 1.5 h and 2.5 h for the relays, 6 h for the hub).
@@ -3424,8 +3433,8 @@ On the la-app front page, after the Space guide, **My work** lists:
   rows loaded and rows set aside, read from the ingest audit ledger (`GET /runs/{pipeline}/batches`). After *Add a
   file* it also says replaced or appended and the net change in rows, from the Dataset's `lastImport`.
 
-**Find something interesting** (top of the Browser tab) asks *Who is busiest*, *Which groups stick together* and *How
-does A reach B*, each answered in one sentence with **Show on graph**, **Start from these** and **Add to a list**.
+**Quick questions** (top of the On screen tab) asks *Busiest nodes*, *Tight groups* and *Route from A to B*, each
+answered in one sentence with **Show on graph**, **Start from these** and **Add to a list**.
 Code: `la-app` `my-work.ts`, `discover.ts`; detail: [architecture §3.4](architecture.md).
 
 ## Screens

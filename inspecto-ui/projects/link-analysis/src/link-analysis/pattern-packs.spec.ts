@@ -6,6 +6,7 @@ import {
     patternPackFromContent,
     resolvePatternColumns,
 } from './pattern-packs';
+import { NEEDS_TIME_COLUMN } from './disabled-reasons';
 
 /**
  * `patternPackFromContent` parses free-form authored TOON — a `pattern-pack` component has no backend
@@ -218,7 +219,7 @@ describe('pattern pack columns (telecom packs on a projection without link_kind 
         expect(resolvePatternColumns({ kind: true, time: true }, {}, 'telecom')).toEqual({
             kindCol: 'link_kind',
             timeCol: 'first_seen',
-            notice: 'Using link_kind / first_seen for this pack.',
+            notice: 'Using the link_kind and first_seen columns for this pattern.',
         });
         // the analyst's own columns always win, and nothing is announced
         expect(resolvePatternColumns({ kind: true, time: true }, { kindCol: 'K', timeCol: 'T' }, 'telecom')).toEqual({
@@ -231,10 +232,10 @@ describe('pattern pack columns (telecom packs on a projection without link_kind 
         const plan = resolvePatternColumns({ kind: true, time: true }, {}, 'finance');
         expect(plan.kindCol).toBeUndefined();
         expect(plan.blocked).toContain(
-            'This pattern needs a time column — pick the Time column under the Filter edges by time (clock) button in the toolbar.',
+            NEEDS_TIME_COLUMN,
         );
         expect(plan.blocked).not.toMatch(/query panel/i); // no such panel in the Studio (UI test 2026-10-29)
-        expect(plan.blocked).toContain('This pattern needs a link kind column');
+        expect(plan.blocked).toContain('Needs a link kind column');
         expect(resolvePatternColumns({ kind: false, time: false }, {}, null)).toEqual({});
     });
 });
@@ -274,6 +275,6 @@ describe('defaultPatternPack', () => {
     it('the built-in relay says it is the any-kind pack, not the Space chain', () => {
         const relay = PATTERN_PACKS.find((p) => p.id === 'forwarding-relay')!;
         expect(relay.label).toBe('Relay chain (any link kind)'); // neutral: the telecom pack relabels it (pattern.forwarding-relay)
-        expect(relay.description).toContain('ANY link kind');
+        expect(relay.description).toContain('any link kind');
     });
 });

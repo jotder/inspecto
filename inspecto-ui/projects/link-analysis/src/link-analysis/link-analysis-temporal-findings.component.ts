@@ -1,11 +1,32 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { TemporalSeries } from '@inspecto/link-analysis/api/inv.service';
 import { GraphSelection } from '@inspecto/link-analysis/graph/graph-analysis';
 import { PlacedTemporalFinding, TemporalFindingsState, allTemporalSelection } from './temporal-findings';
+import { DISABLED_REASON, NEEDS_TIME_COLUMN } from './disabled-reasons';
+
+/** "1 burst" / "3 bursts": a real plural, never "burst(s)". */
+const plural = (n: number, one: string, many: string): string => `${n.toLocaleString('en')} ${n === 1 ? one : many}`;
+
+/** A period in the largest whole unit ("every hour", "every 90 seconds"). */
+function every(seconds: number): string {
+    const units: [number, string][] = [
+        [86_400, 'day'],
+        [3_600, 'hour'],
+        [60, 'minute'],
+    ];
+    for (const [size, unit] of units) {
+        if (seconds >= size && seconds % size === 0) {
+            const n = seconds / size;
+            return n === 1 ? `every ${unit}` : `every ${n} ${unit}s`;
+        }
+    }
+    return seconds === 1 ? 'every second' : `every ${seconds} seconds`;
+}
 
 /** What the analyst asked for; the host turns it into `POST /inv/pattern/temporal`. Numbers are already in range. */
 export interface TemporalRunRequest {
@@ -31,7 +52,7 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
     selector: 'inspecto-link-analysis-temporal-findings',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, MatButtonModule, InspectoAlertComponent, InspectoOptionPickerComponent],
+    imports: [FormsModule, MatButtonModule, MatTooltipModule, InspectoAlertComponent, InspectoOptionPickerComponent],
     host: { class: 'block' },
     template: `
         <section class="flex flex-col gap-2" aria-labelledby="la-temporal-heading" data-test="temporal">
@@ -40,22 +61,22 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
             </h3>
             @if (!timeColumn()) {
                 <p class="text-secondary m-0" data-test="temporal-no-time">
-                    Add a time column under Attribute columns in Settings ▸ Graph model, then pick it as the Time column under the Filter edges by time (clock) button in the toolbar, to look for bursts and regular intervals.
+                    {{ needsTimeColumn }}
                 </p>
             } @else if (!mappings().length) {
                 <p class="text-secondary m-0" data-test="temporal-no-mapping">
-                    This graph has no Dataset edge mapping to scan. Run an entity projection first.
+                    Draw a graph from an Entity/Link query first.
                 </p>
             } @else {
                 <p class="text-secondary m-0">
-                    Looks at event times over the whole Dataset. A link is a source → target pair as the Dataset spells
-                    it; an entity pools every event it takes part in, as source or as target.
+                    Scans event times across the whole Dataset. Each link, or each entity (all its events together), is
+                    checked.
                 </p>
                 <div class="flex flex-wrap items-end gap-2">
                     @if (mappings().length > 1) {
                         <inspecto-option-picker
                             class="w-56"
-                            label="Edge mapping"
+                            label="Link Dataset"
                             [options]="mappings()"
                             [ngModel]="mapping()"
                             (ngModelChange)="mapping.set($any($event))"
@@ -63,21 +84,21 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                     }
                     <inspecto-option-picker
                         class="w-40"
-                        label="Series per"
+                        label="Check each"
                         [options]="seriesOptions"
                         [ngModel]="series()"
                         (ngModelChange)="series.set($any($event))"
                     />
                     <inspecto-option-picker
                         class="w-40"
-                        label="Look for"
+                        label="Find"
                         [options]="modeOptions"
                         [ngModel]="mode()"
                         (ngModelChange)="mode.set($any($event))"
                     />
                     @if (mode() === 'burst') {
                         <label class="flex flex-col text-xs">
-                            Window (seconds)
+                            Burst window (seconds)
                             <input
                                 class="w-24 rounded border px-2 py-1"
                                 type="number"
@@ -90,7 +111,7 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                         </label>
                     } @else {
                         <label class="flex flex-col text-xs">
-                            Max irregularity (0 to 1)
+                            Largest irregularity (0 to 1)
                             <input
                                 class="w-24 rounded border px-2 py-1"
                                 type="number"
@@ -104,7 +125,7 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                         </label>
                     }
                     <label class="flex flex-col text-xs">
-                        Min events
+                        Fewest events
                         <input
                             class="w-20 rounded border px-2 py-1"
                             type="number"
@@ -122,38 +143,22 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                         [disabled]="busy()"
                         (click)="run()"
                     >
-                        {{ busy() ? 'Scanning…' : 'Find on the whole Dataset' }}
+                        {{ busy() ? 'Scanning…' : 'Scan Dataset' }}
                     </button>
                 </div>
             }
             @if (error()) {
-                <inspecto-alert variant="error" title="Burst and periodicity">{{ error() }}</inspecto-alert>
+                <inspecto-alert variant="error" title="Scan failed">{{ error() }}</inspecto-alert>
             }
             @if (state(); as s) {
                 <div role="status" class="flex flex-col gap-1" data-test="temporal-summary">
-                    <p class="m-0 text-xs">
-                        {{ s.findings.length }}
-                        {{
-                            s.mode === 'burst'
-                                ? 'burst(s)'
-                                : s.series === 'entity'
-                                  ? 'regular entity(ies)'
-                                  : 'regular link(s)'
-                        }}
-                        found
-                        @if (s.offCanvas) {
-                            · {{ s.offCanvas }} not drawn on this canvas
-                        }
-                        @if (s.skippedNoTime) {
-                            · {{ s.skippedNoTime }} row(s) skipped (no readable time)
-                        }
-                    </p>
+                    <p class="m-0 text-xs">{{ summary(s) }}</p>
                     @if (s.truncated) {
                         <p class="text-warn m-0 text-xs" data-test="temporal-truncated">
                             {{
                                 s.rowCapped
                                     ? 'Only part of the Dataset was scanned (row limit), so more may exist.'
-                                    : 'The list is cut at its limit — the strongest findings are shown first.'
+                                    : 'Result cut short: the strongest findings are shown first.'
                             }}
                         </p>
                     }
@@ -166,31 +171,30 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                             type="button"
                             data-test="temporal-seal-button"
                             [disabled]="!canSeal() || sealBusy()"
-                            (click)="sealRequested.emit()"
+                            [disabledInteractive]="true"
+                            [matTooltip]="canSeal() ? '' : disabledReason.openInvestigation"
+                            aria-describedby="la-temporal-seal-note"
+                            (click)="canSeal() && !sealBusy() && sealRequested.emit()"
                         >
                             {{ sealBusy() ? 'Sealing…' : 'Seal these findings' }}
                         </button>
                     </div>
-                    <p class="text-secondary m-0 text-xs" data-test="temporal-seal-note">
+                    <p class="text-secondary m-0 text-xs" id="la-temporal-seal-note" data-test="temporal-seal-note">
                         @if (canSeal()) {
-                            Records a step in the open Investigation's log: the scan is re-run over its own edge
-                            columns, kept to the links or entities of its Working Set, and sealed with a fingerprint.
-                            The Working Set does not change.
+                            Records these findings in the Investigation’s log. The Working Set does not change.
                         } @else {
-                            Open an Investigation to seal these findings into its log.
+                            {{ disabledReason.openInvestigation }}
                         }
                     </p>
                     @if (sealed(); as z) {
                         <p role="status" class="m-0 text-xs" data-test="temporal-sealed">
-                            Sealed at step {{ z.step }}: {{ z.count }} finding(s) on the Working Set
-                            @if (z.outsideWorkingSet) {
-                                ({{ z.outsideWorkingSet }} outside it, not kept)
-                            }
-                            · fingerprint {{ z.fingerprint.slice(0, 12) }}
+                            Sealed at step {{ z.step }}: {{ z.count }} {{ z.count === 1 ? 'finding' : 'findings' }} in
+                            the Working Set{{ z.outsideWorkingSet ? ' (' + z.outsideWorkingSet + ' outside it were left out)' : '' }}.
+                            Fingerprint {{ z.fingerprint.slice(0, 12) }}.
                         </p>
                     }
                     @if (sealError()) {
-                        <inspecto-alert variant="error" title="Seal these findings">{{ sealError() }}</inspecto-alert>
+                        <inspecto-alert variant="error" title="Seal failed">{{ sealError() }}</inspecto-alert>
                     }
                 </div>
                 @if (s.findings.length) {
@@ -200,10 +204,18 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                             type="button"
                             data-test="temporal-all"
                             [disabled]="!hasDrawn()"
-                            (click)="highlight.emit(all())"
+                            [disabledInteractive]="true"
+                            [matTooltip]="hasDrawn() ? '' : noneOnCanvas"
+                            [attr.aria-describedby]="hasDrawn() ? null : 'la-temporal-all-why'"
+                            (click)="hasDrawn() && highlight.emit(all())"
                         >
                             Highlight all on canvas
                         </button>
+                        @if (!hasDrawn()) {
+                            <p class="text-secondary m-0 text-xs" id="la-temporal-all-why" data-test="temporal-all-why">
+                                {{ noneOnCanvas }}
+                            </p>
+                        }
                     </div>
                     <ul class="m-0 flex list-none flex-col gap-1 p-0" aria-label="Findings">
                         @for (p of s.findings; track $index) {
@@ -218,7 +230,7 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                                 >
                                     <span class="font-medium">{{ subject(p) }}</span>
                                     <span class="text-secondary block">
-                                        {{ detail(p) }}{{ p.onCanvas ? '' : ' — not drawn on this canvas' }}
+                                        {{ detail(p) }}{{ p.onCanvas ? '' : '. Not on the canvas' }}
                                     </span>
                                 </button>
                             </li>
@@ -226,7 +238,8 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                     </ul>
                 } @else {
                     <p class="text-secondary m-0 text-xs" data-test="temporal-none">
-                        Nothing matched. Try a wider window or fewer minimum events.
+                        Nothing matched. Try {{ mode() === 'burst' ? 'a larger burst window' : 'a larger irregularity' }} or
+                        fewer events.
                     </p>
                 }
             }
@@ -272,6 +285,25 @@ export class LinkAnalysisTemporalFindingsComponent {
     readonly maxCv = signal(0.1);
 
     readonly hasDrawn = computed(() => !!this.state()?.findings.some((f) => f.onCanvas));
+    protected readonly needsTimeColumn = NEEDS_TIME_COLUMN;
+    protected readonly disabledReason = DISABLED_REASON;
+    protected readonly noneOnCanvas = 'None of these findings are on the canvas.';
+
+    /** "3 bursts found. 1 not on the canvas. 2 rows skipped (no readable time)." */
+    summary(s: TemporalFindingsState): string {
+        const n = s.findings.length;
+        const found =
+            s.mode === 'burst'
+                ? plural(n, 'burst', 'bursts')
+                : s.series === 'entity'
+                  ? plural(n, 'regular entity', 'regular entities')
+                  : plural(n, 'regular link', 'regular links');
+        return [
+            `${found} found.`,
+            ...(s.offCanvas ? [`${s.offCanvas.toLocaleString('en')} not on the canvas.`] : []),
+            ...(s.skippedNoTime ? [`${plural(s.skippedNoTime, 'row', 'rows')} skipped (no readable time).`] : []),
+        ].join(' ');
+    }
 
     num(e: Event): number {
         return (e.target as HTMLInputElement).valueAsNumber;
@@ -298,7 +330,7 @@ export class LinkAnalysisTemporalFindingsComponent {
     detail(p: PlacedTemporalFinding): string {
         const f = p.finding;
         return f.periodSeconds !== undefined
-            ? `${f.events} events about every ${f.periodSeconds} s (irregularity ${f.cv?.toFixed(3)}), ${f.first} to ${f.last}`
+            ? `${f.events} events about ${every(f.periodSeconds)} (irregularity ${f.cv?.toFixed(2)}), ${f.first} to ${f.last}`
             : `${f.events} events from ${f.start} to ${f.end}`;
     }
 
