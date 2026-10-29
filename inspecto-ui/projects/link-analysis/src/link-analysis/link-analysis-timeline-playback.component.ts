@@ -15,7 +15,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { G6GraphData } from '@inspecto/core/graph';
 import { GraphSelection } from '@inspecto/link-analysis/graph/graph-analysis';
-import { activeInSlice, playbackSlice, playbackSliceCount, prefersReducedMotion } from './timeline-playback';
+import { activeInSlice, playbackSlice, playbackSliceCount } from './timeline-playback';
 
 /** Milliseconds one slice stays on screen while playing. */
 const TICK_MS = 1000;
@@ -25,9 +25,9 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
 /**
  * **Timeline playback** (LA-INVESTIGATION-OPS-DEFERRED-1, SPA slice). Steps through the timeline column's range in
  * equal slices (play / pause / step / scrub) and emits the links whose date falls in the current slice, so the canvas
- * highlights them. It only EMITS A HIGHLIGHT: the graph, the timeline filter and the cutoff are untouched. Under
- * `prefers-reduced-motion` nothing advances by itself — Play is disabled and the step buttons and the scrubber do the
- * work, one deliberate move at a time.
+ * highlights them. It only EMITS A HIGHLIGHT: the graph, the timeline filter and the cutoff are untouched. Play only
+ * starts on the user's press and pauses on the next one (WCAG 2.2.2), so it is offered under `prefers-reduced-motion`
+ * too (operator, 2026-10-29).
  */
 @Component({
     selector: 'inspecto-link-analysis-timeline-playback',
@@ -57,8 +57,7 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
                 type="button"
                 data-test="playback-play"
                 [attr.aria-label]="playing() ? 'Pause playback' : 'Play timeline'"
-                [matTooltip]="reduced ? 'Autoplay is off (reduced motion) — use the step buttons' : ''"
-                [disabled]="reduced || (!playing() && atEnd())"
+                [disabled]="!playing() && atEnd()"
                 (click)="toggle()"
             >
                 <mat-icon [svgIcon]="playing() ? 'heroicons_outline:pause' : 'heroicons_outline:play'"></mat-icon>
@@ -106,12 +105,6 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
             >
                 {{ status() }}
             </p>
-            @if (reduced) {
-                <p class="text-secondary m-0 w-full text-xs" data-test="playback-reduced">
-                    Your system asks for reduced motion, so playback does not advance by itself. Step through the slices
-                    instead.
-                </p>
-            }
         </section>
     `,
 })
@@ -127,8 +120,6 @@ export class LinkAnalysisTimelinePlaybackComponent {
     readonly highlight = output<GraphSelection | null>();
 
     protected readonly Math = Math;
-    /** Read once: a user who flips the setting mid-session gets it on the next open, which is fine for a toggle. */
-    protected readonly reduced = prefersReducedMotion();
     /** `-1` = not started (nothing highlighted). */
     readonly index = signal(-1);
     readonly playing = signal(false);
@@ -190,7 +181,6 @@ export class LinkAnalysisTimelinePlaybackComponent {
 
     toggle(): void {
         if (this.playing()) return this.halt();
-        if (this.reduced) return;
         if (this.atEnd()) this.go(0);
         else if (this.index() < 0) this.go(0);
         this.playing.set(true);

@@ -128,16 +128,16 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         expect(q('playback-status').textContent).toContain('Not started');
     });
 
-    it('under reduced motion never advances by itself: Play is disabled, stepping still works', async () => {
-        const { fixture, host, el, q } = setup(true);
-        expect(q('playback-play').disabled).toBe(true);
-        expect(q('playback-reduced')).not.toBeNull();
+    it('plays under reduced motion too, with no extra note: Play is user-started and pausable', async () => {
+        const { fixture, el, q } = setup(true);
+        expect(q('playback-play').disabled).toBe(false);
+        expect(el.textContent).not.toContain('reduced motion');
         q('playback-play').click();
-        vi.advanceTimersByTime(10_000);
-        expect(host.lit).not.toHaveBeenCalled();
-        q('playback-forward').click();
+        vi.advanceTimersByTime(2000);
         fixture.detectChanges();
-        expect(host.lit).toHaveBeenCalledTimes(1);
+        expect(q('playback-status').textContent).toContain('Slice 3 of 20');
+        q('playback-play').click();
+        fixture.detectChanges();
         vi.useRealTimers(); // axe schedules with timers
         await expectNoA11yViolations(el);
     });

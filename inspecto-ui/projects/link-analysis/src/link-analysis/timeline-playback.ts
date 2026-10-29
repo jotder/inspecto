@@ -43,10 +43,3 @@ export function activeInSlice(g: G6GraphData, col: string, slice: PlaybackSlice)
     }
     return { nodeIds: [...nodeIds], edgeIds };
 }
-
-/** True when the system asks for reduced motion; false where `matchMedia` is missing (SSR, jsdom). */
-export function prefersReducedMotion(): boolean {
-    return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        : false;
-}
