@@ -1,6 +1,7 @@
 # Link Analysis right panel redesign (`LA-PANELS-REDESIGN-1`)
 
-Status: **ACTIVE 2026-10-29**, one lane (`C:\sandbox\la-panels`). Item: `module.la-core`.
+Status: **SHIPPED 2026-10-29** (`fa3017df2`, review fixes `f90d66a6f`), archived — current truth is the la-core user
+guide. Item: `module.la-core`.
 
 ## Request (operator, verbatim)
 

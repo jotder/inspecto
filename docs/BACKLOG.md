@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **76<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 60<!--count:backlog-p3--> × P3** —
+> **75<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 60<!--count:backlog-p3--> × P3** —
+> ⬇ **76 → 75 (P2 16 → 15) on 2026-10-29**: closed P2 feature `LA-PANELS-REDESIGN-1` — shipped `fa3017df2` + `f90d66a6f` (review fixes: New Investigation… switches tab, Explorer Server tab, "The graph on screen" start, whole-Dataset guard); plan archived.
 > ⬆ **75 → 76 (P2 15 → 16) on 2026-10-29**: filed P2 feature `LA-PANELS-REDESIGN-1` (operator ask: Browser · Server · Investigation tabs, one New form, File menu holds Open / Explore / Examples).
 > ⬇ **76 → 75 (P3 61 → 60) on 2026-10-28**: closed P3 defect `LA-SPACE-SWITCH-TOAST-1` — cause: a `?investigation=` deep link sets the store's active id before the open is tried, and the id stays set after the 404, so the page remembered "Investigation <id>" as open in the Space it failed in, and the next Space switch said it "stays in" that Space. The remembered record now counts an Investigation only once its log has loaded (`rememberOpen` in `link-analysis.component.ts`); spec in `link-analysis.component.spec.ts` (the 404 deep-link case leaves no record).
 > ↔ **76 (P3 61) on 2026-10-28**: closed P3 defect `LA-SUSPICION-FACTORS-MASKED-1` and filed its residual P3 `LA-SUSPICION-FACTORS-INVESTIGATION-1`. Cause: on a masked Space the Studio's *Factors* sends the node's alias (`masked:`, the Space key's `MaskTokens` token) and `GET /risk-scores/{model}/{key}` matched raw keys only, so it answered 404. Fix: the route resolves a `masked:` alias to the scored key it tokenises (after the data-scope gate; RowScope judged on the resolved key; a 404 names only the alias; the key is masked on read as before). `ControlApiRiskScoreTest` reads by alias over real HTTP (200 for an analyst, raw key absent; revealer sees it; unknown alias 404). An Investigation canvas masks with its own key and stays open as the residual.
@@ -361,11 +362,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 60<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 60<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 76<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 75<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -529,7 +530,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Onboarding & bundles
 
-- **P2** · `LA-PANELS-REDESIGN-1` — **the Link Analysis right panel redesigned: three tabs Browser · Server · Investigation (the Analysis tab split by where each tool runs), pen fields and popup pickers throughout, one New form (Start from One entity / A list / A paste / The whole Dataset, default Name and Reason, optional Expand on start), and Open… / Explore dataset… / Examples under the File menu.** → [`superpower/la-panels-redesign.md`](superpower/la-panels-redesign.md) [items: module.la-core · kind: feature]
 - **P2** · `ONBOARDING-FIRST-RUN-1` — **console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion `LA-ONBOARD-1` OB-1 expects.** Operator 2026-10-22: file first is the primary path (guided editor = expert path), detected settings are pre-applied with evidence and low confidence flagged, missing capabilities are shown locked with a reason, all nine console first-time use cases are must-have; the Inspecto LA answers A-1…A-16 apply where they touch the console. Builds on `LA-ONBOARD-1`'s shared pieces (the `/onboard/files` route, sample loading, the locked-with-reason component, counters, the walkthrough fixes) and adds: console entry points and Add data on the shared screen, the console Space guide, format evidence in the import draft (delimiter, dates, nested JSON record path, file-name dates), a fix catalogue behind "problems in plain words" (used by both UIs), the console Dataset page (manual-run gesture, *Keep this up to date* on Standard, feed offers), lookups, remote systems (Standard). OF-1…OF-3 answered 2026-10-25 (OF-2: 200 values, still to build). → `superpower/first-run-onboarding-plan.md` · `okf/product/module/etl/spec-first-time-user-use-cases.md` [items: layer.product, module.etl, module.processor, edition.basic · kind: feature]
 
 #### Datasets & lineage
