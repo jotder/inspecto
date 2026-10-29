@@ -416,7 +416,7 @@
         "tags" : [ "inv" ],
         "summary" : "Unsaved Investigation preview: the Working Set its seed / expand steps would build (stores nothing)",
         "operationId" : "postInvExpandPreview",
-        "description" : "LA-UNSAVED-INVESTIGATION-1. Body = the binding a create takes (dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?, entityType? / sourceType? / targetType?) and steps[], the seed / expand bodies the step route would append, in order (1 to 100). Each step is validated, read and evaluated by the same code as an append (bindings, frontier, four-eyes, the expand read with its budget, fan-out, hub threshold, direction, window and link kinds), so the Working Set equals what those steps record once saved. An expand above the four-eyes thresholds is not read: the walk stops with needsApproval. Ids in and out are the Space's exploration aliases when it masks. Read-shaped and ungated like the explorer's neighbours reads; expensive rate class. Gates: write root 503, bad body or step 422, unknown or not-viewable Dataset 404, unknown column or bad zone 422. 503 on Basic.",
+        "description" : "LA-UNSAVED-INVESTIGATION-1. Body = the binding a create takes (dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?, entityType? / sourceType? / targetType?) and steps[], the seed / expand bodies the step route would append, in order (1 to 4: the Studio sends the Working Set as one seed and the next degree, never the history); the expands read at most investigation.expand_budget_max rows in total (else 422). Each step is validated, read and evaluated by the same code as an append (bindings, frontier, four-eyes, the expand read with its budget, fan-out, hub threshold, direction, window and link kinds), so the Working Set equals what those steps record once saved. An expand above the four-eyes thresholds is not read: the walk stops with needsApproval. On a masked Space ids are taken ONLY as aliases its reads served (a raw value is 422, so guesses cannot be matched in bulk) and answered as aliases; each expand read is audited (LINK_EXPANDED) as the explorer's neighbours read is. Read-shaped and ungated like the explorer's neighbours reads; expensive rate class. Gates: write root 503, bad body or step 422, unknown or not-viewable Dataset 404, unknown column or bad zone 422. 503 on Basic.",
         "requestBody" : {
           "required" : true,
           "content" : {
@@ -444,7 +444,7 @@
         },
         "responses" : {
           "200" : {
-            "description" : "Envelope data: workingSet (entities, links, excluded, hash), steps[] ({step, op, needsApproval, admitted[]} or {step, needsApproval: true, exceeded[]}) and masked."
+            "description" : "Envelope data: workingSet (entities, links, excluded; no hash), steps[] ({step, op, needsApproval, admitted[]} or {step, needsApproval: true, exceeded[]}) and masked."
           },
           "404" : { "description" : "Unknown or not-viewable Dataset." },
           "422" : { "description" : "A bad body, step, column or zone." },

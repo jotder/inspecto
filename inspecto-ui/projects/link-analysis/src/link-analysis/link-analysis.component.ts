@@ -449,6 +449,25 @@ function readDock(): { open: boolean; tab: DockTab } {
     return { open: false, tab: 'rows' };
 }
 
+/**
+ * The Working Set so far plus one previewed degree: entities and links joined (a new entity one hop past the furthest),
+ * the busy flags the preview read kept. \`seeds\` (a Start from selected) are start entities, hop 0.
+ */
+export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: readonly string[] = []): WorkingSet {
+    const hop = prev.entities.length ? Math.max(...prev.entities.map((e) => e.hop)) + 1 : 1;
+    const start = new Set(seeds);
+    const entities = new Map(prev.entities.map((e) => [e.id, e]));
+    for (const e of next.entities) {
+        const had = entities.get(e.id);
+        if (had) {
+            if (e.highConnectivity && !had.highConnectivity) entities.set(e.id, { ...had, highConnectivity: true });
+        } else entities.set(e.id, { ...e, hop: start.has(e.id) || (!prev.entities.length && e.hop === 0) ? 0 : hop });
+    }
+    const key = (l: WorkingSet['links'][number]) => `${l.source}\u0000${l.target}\u0000${l.kind}`;
+    const links = new Map(prev.links.map((l) => [key(l), l]));
+    for (const l of next.links) if (!links.has(key(l))) links.set(key(l), l);
+    return { entities: [...entities.values()], links: [...links.values()], excluded: [], hash: '' };
+}
 @Component({
     selector: 'inspecto-link-analysis',
     standalone: true,
@@ -2133,6 +2152,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (!(await this.leaveUnsaved())) return;
         this.startNotice.set(null);
         this.investigateIssue.set('');
+        this.unsavedWs.set(null);
         const zone = req.timeColZone || undefined;
         const common = { presets: this.degreePresets(), maxDegree: this.maxDegree(), profileId: activeDomainProfileId() };
         if (req.start.kind === 'graph') {
@@ -2186,8 +2206,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
             return;
         }
-        const found = await this.drawStart(ds, values, entityType);   // finds the values the Dataset holds
-        if (!found.length) return;
+        const drawn = await this.drawStart(ds, values, entityType);   // finds the values the Dataset holds
+        if (!drawn.length) return;
+        // the start entities as the Space's reads name them: an alias on a masked Space (the preview takes no raw value there)
+        const startNodes = new Set(this.expandedNodeIds());
+        const found = [...new Set((this.graph()?.nodes ?? []).filter((n) => startNodes.has(n.id)).flatMap((n) => rawIdsOf(n)))];
         const unsaved: UnsavedBinding = {
             projection: binding.projection,
             timeCol: req.timeCol || binding.timeCol,
@@ -2201,7 +2224,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const type = binding.projection.entityType;
         const seed: UnsavedStep = { kind: 'seed', ids: found, ...(type ? { entityType: type } : {}) };
         // the ring and the further degrees, read by the server with the presets: the screen is what Save records
-        const walk = await this.walkUnsaved(unsaved, [seed], found, this.startRing(Math.max(1, req.degrees)));
+        const walk = await this.walkUnsaved(unsaved, null, found, found, this.startRing(Math.max(1, req.degrees)));
         if (!walk) {
             this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
             return;
@@ -2232,8 +2255,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             const n = nodes.find((x) => x.id === id);
             return n ? rawIdsOf(n) : [id];
         }))];
-        const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld() };
-        const walk = await this.walkUnsaved(u.binding, u.steps, named, req);
+        const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld(), ws: this.unsavedWs() };
+        const walk = await this.walkUnsaved(u.binding, this.unsavedWs(), [], named, req);
         if (!walk) {
             this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
             this.toastr.info(UNSAVED_FOUR_EYES);
@@ -2258,6 +2281,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 this.graph.set(before.graph);
                 this.expandedNodeIds.set(before.expanded);
                 this.growExclude.basicHeld.set(before.held);
+                this.unsavedWs.set(before.ws);
                 this.investigation.popUnsaved();
                 this.growExclude.lastChange.set({ text: 'Undone.' });
             },
@@ -2266,31 +2290,42 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         return true;
     }
 
+    /** The unsaved Working Set on the canvas, as the server previewed it (each preview sends it, not the step history). */
+    private readonly unsavedWs = signal<WorkingSet | null>(null);
+
     /**
      * Walk an unsaved Expand degree by degree through the server's preview (\`POST /inv/expand/preview\`, the step route's own
-     * code, with the presets and the fold filters of \`req\`): each degree expands from what the previous one admitted, less
-     * the busy entities held. Null when a degree would be held for four-eyes approval (it cannot run unsaved).
+     * code, with the presets and the fold filters of \`req\`): each request sends the Working Set so far as ONE seed and the
+     * ONE degree it walks next - never the history, so its cost does not grow with it - and merges what that degree admitted.
+     * Each degree expands from what the previous one admitted, less the busy entities held. On a masked Space every id is
+     * an alias the Space served. Null when a degree would be held for four-eyes approval (it cannot run unsaved).
      */
     private async walkUnsaved(
         b: UnsavedBinding,
-        base: readonly UnsavedStep[],
+        current: WorkingSet | null,
+        seeds: string[],
         from: string[],
         req: GrowRequest,
     ): Promise<{ walked: string[][]; ws: WorkingSet } | null> {
         const walked: string[][] = [];
         const cap = laLimit('investigation.max_frontier');
         let frontier = from.slice(0, cap);
-        let ws: WorkingSet = { entities: [], links: [], excluded: [], hash: '' };
+        let ws: WorkingSet = current ?? { entities: [], links: [], excluded: [], hash: '' };
+        let extra = seeds;
         for (let d = 1; d <= Math.max(1, req.degrees) && frontier.length; d++) {
-            const next = [...walked, frontier];
+            const held = [...new Set([...ws.entities.map((e) => e.id), ...extra])];
             const res = await this.investigation.previewUnsaved(
-                [...base, { kind: 'expand', from: 'ids', ids: next[0], req, walked: next }],
+                [
+                    { kind: 'seed', ids: held },
+                    { kind: 'expand', from: 'ids', ids: frontier, req, walked: [frontier] },
+                ],
                 b,
             );
             const last = res.steps.at(-1);
             if (last?.needsApproval) return null;
             walked.push(frontier);
-            ws = res.workingSet;
+            ws = mergeWorkingSets(ws, res.workingSet, extra);
+            extra = [];
             const busy = new Set(ws.entities.filter((e) => e.highConnectivity).map((e) => e.id));
             frontier = (last?.admitted ?? []).filter((id) => !req.hold || !busy.has(id)).slice(0, cap);
         }
@@ -2302,6 +2337,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const g = workingSetToGraph(ws, b.projection);
         const maxHop = Math.max(0, ...ws.entities.map((e) => e.hop));
         const inner = new Set(ws.entities.filter((e) => e.hop < maxHop).map((e) => e.id));
+        this.unsavedWs.set(ws);
         this.graph.set(g);
         this.lastRun.set(this.runOf('entity-projection', { projection: b.projection }, g));
         this.expandedNodeIds.set(g.nodes.filter((n) => rawIdsOf(n).some((id) => inner.has(id))).map((n) => n.id));
@@ -2332,7 +2368,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const seed: UnsavedStep = { kind: 'seed', ids: values, ...(type ? { entityType: type } : {}) };
         let walk: Awaited<ReturnType<LinkAnalysisComponent['walkUnsaved']>>;
         try {
-            walk = await this.walkUnsaved(u.binding, [...u.steps, seed], values, this.startRing());
+            walk = await this.walkUnsaved(u.binding, this.unsavedWs(), values, values, this.startRing());
         } catch (err) {
             this.toastr.error(invErrorMessage(err, 'The start could not be drawn.'));
             return; // nothing is recorded

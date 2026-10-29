@@ -1445,7 +1445,7 @@ public final class InvRoutes implements RouteModule {
                 o.fingerprintKnown(), null);
     }
 
-    private static void audit(HttpExchange ex, String datasetId, String neighborsOf, int rows, boolean truncated,
+    static void audit(HttpExchange ex, String datasetId, String neighborsOf, int rows, boolean truncated,
                               IndexedRead.Outcome<?> source) {
         try {
             boolean expand = neighborsOf != null;

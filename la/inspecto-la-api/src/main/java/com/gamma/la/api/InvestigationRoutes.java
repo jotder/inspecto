@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.MaskTokens;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.InvestigationStores;
 import com.gamma.la.core.InvestigationVersionConflictException;
@@ -677,8 +678,11 @@ public final class InvestigationRoutes implements RouteModule {
 
     /** The ops an unsaved Investigation can take before it is saved (LA-UNSAVED-INVESTIGATION-1): starts and Expands. */
     private static final Set<String> UNSAVED_OPS = Set.of("seed", "expand");
-    /** The longest unsaved step list one preview evaluates (each expand is read again on every preview). */
-    static final int UNSAVED_MAX_STEPS = 100;
+    /**
+     * The longest step list one preview evaluates. The Studio sends the current Working Set as one seed plus the ONE degree it
+     * walks next (never the whole history), and a start sends its seed plus the ring: four leaves room, no more.
+     */
+    static final int UNSAVED_MAX_STEPS = 4;
 
     /**
      * {@code POST /inv/expand/preview} (LA-UNSAVED-INVESTIGATION-1) - the unsaved Investigation's dry run: the binding a
@@ -703,7 +707,8 @@ public final class InvestigationRoutes implements RouteModule {
         String timeCol = ident(body, "timeCol", false);
         String eventsCol = ident(body, "eventsCol", false);
         if (!(body.get("steps") instanceof List<?> steps) || steps.isEmpty() || steps.size() > UNSAVED_MAX_STEPS)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'steps': 1 to " + UNSAVED_MAX_STEPS + " seed / expand bodies");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'steps': 1 to " + UNSAVED_MAX_STEPS
+                    + " seed / expand bodies - send the Working Set as one seed and the next degree, not the whole history");
         String[] endpointTypes = endpointTypes(writeRoot, body);
 
         String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);   // unknown / not viewable: 404
@@ -734,6 +739,9 @@ public final class InvestigationRoutes implements RouteModule {
         List<Map<String, Object>> log = new ArrayList<>();
         InvestigationEvaluator.State state = evaluate(log, -1, null);
         List<Map<String, Object>> out = new ArrayList<>();
+        // the rows one preview may read, across all its expands: one expand's own maximum (each budget is at most that)
+        int maxRows = SpaceLimits.get(writeRoot, LaLimit.INVESTIGATION_EXPAND_BUDGET_MAX);
+        long rowsAsked = 0;
         for (int i = 0; i < steps.size(); i++) {
             if (!(steps.get(i) instanceof Map<?, ?> raw))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "step " + (i + 1) + " must be an object");
@@ -742,8 +750,20 @@ public final class InvestigationRoutes implements RouteModule {
             if (op == null || !UNSAVED_OPS.contains(op))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "step " + (i + 1) + ": an unsaved Investigation takes "
                         + new TreeSet<>(UNSAVED_OPS) + " only, got '" + op + "'");
-            for (String k : List.of("ids", "expandHubs", "only"))   // the explorer's aliases in, the raw values the reads take
-                if (b.get(k) instanceof List<?> l) b.put(k, l.stream().map(v -> mask.in(String.valueOf(v))).toList());
+            // the explorer's aliases in, the raw values the reads take. On a masked Space ONLY an alias this Space served is
+            // taken: a raw value would come back as its alias and let a caller match guesses in bulk (ReferenceRows' rule)
+            for (String k : List.of("ids", "expandHubs", "only"))
+                if (b.get(k) instanceof List<?> l) {
+                    List<String> in = new ArrayList<>();
+                    for (Object v : l) {
+                        String id = String.valueOf(v);
+                        if (mask.active() && !id.startsWith(MaskTokens.TOKEN_PREFIX))
+                            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "step " + (i + 1) + ": this Space masks entity ids, "
+                                    + "so '" + k + "' takes only the aliases its reads served - draw the entity first, then start from it");
+                        in.add(mask.in(id));
+                    }
+                    b.put(k, in);
+                }
             Map<String, Object> params = params(op, b, SpaceLimits.of(writeRoot));
             requireBindings(header, op, params, "step " + (i + 1) + ": ");
             Map<String, Object> entry = entry(log.size() + 1, "op", ex);
@@ -763,7 +783,17 @@ public final class InvestigationRoutes implements RouteModule {
                     out.add(held);
                     break;
                 }
-                entry.put("read", expandRead(api, ex, inv, params, fr, state));
+                rowsAsked += ((Number) params.get("budget")).longValue();
+                if (rowsAsked > maxRows)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this preview would read up to " + rowsAsked
+                            + " rows; one preview reads at most " + maxRows + " - preview one degree at a time");
+                Map<String, Object> read = expandRead(api, ex, inv, params, fr, state);
+                entry.put("read", read);
+                // audited as the explorer's neighbours read is: one event per read, the values as the caller sees them
+                List<String> from = new ArrayList<>();
+                for (String f : strings(params.get("ids"))) from.add(mask.out(f));
+                InvRoutes.audit(ex, dataset, String.join(",", from), ((Number) read.get("rowCount")).intValue(),
+                        Boolean.TRUE.equals(read.get("truncated")), null);
             }
             log.add(roundTrip(entry));
             InvestigationEvaluator.State next = evaluate(log, -1, null);
@@ -788,7 +818,6 @@ public final class InvestigationRoutes implements RouteModule {
             l.put("source", mask.out(String.valueOf(l.get("source"))));
             l.put("target", mask.out(String.valueOf(l.get("target"))));
         }
-        ws.put("hash", state.hash());
         Map<String, Object> answer = new LinkedHashMap<>();
         answer.put("workingSet", ws);
         answer.put("steps", out);

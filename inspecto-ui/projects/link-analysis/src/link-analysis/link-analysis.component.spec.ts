@@ -31,7 +31,7 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, nodeDisplayId, snapshotTitle } from './link-analysis.component';
+import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, mergeWorkingSets, nodeDisplayId, snapshotTitle } from './link-analysis.component';
 import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
 import { GRAPH_CACHE_TTL_MS, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { SpacesService } from '@inspecto/core/api';
@@ -5139,6 +5139,37 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         // and each degree was sent as the step route body Save sends: the presets laid under, the fold filters on top
         const sent = previewUnsaved.mock.calls.at(-1)![0].steps.at(-1) as Record<string, unknown>;
         expect(sent).toEqual(expect.objectContaining({ op: 'expand', ids: ['MULE-HUB-01.n.n.n'], direction: 'either', hubThreshold: 500 }));
+        // every preview sends the Working Set as one seed and ONE degree: never the history, so its cost does not grow with it
+        for (const [body] of previewUnsaved.mock.calls) expect(body.steps.map((x) => x.op)).toEqual(['seed', 'expand']);
+    });
+
+    it('on a masked Space the unsaved start seeds from the alias the explorer drew, never the typed value', async () => {
+        // the explorer's neighbours read answers aliases: the drawn start is the node every link touches
+        const masked = vi.fn(async () => ({
+            nodes: [
+                { id: 'n0', data: { label: 'masked:00000000000000aa', kind: 'entity' } },
+                { id: 'n1', data: { label: 'masked:00000000000000bb', kind: 'entity' } },
+            ],
+            edges: [{ id: 'e', source: 'n0', target: 'n1', data: { kind: 'link' } }],
+        }));
+        const previewUnsaved = fakeUnsaved();
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand: masked as never,
+            inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const [seed] = c.investigation.unsaved()!.steps;
+        expect(seed).toEqual(expect.objectContaining({ kind: 'seed', ids: ['masked:00000000000000aa'] }));
+        expect(JSON.stringify(previewUnsaved.mock.calls)).not.toContain('MULE-HUB-01');
     });
 
     it('a start whose ring the Space would hold for four-eyes is refused up front, and draws nothing', async () => {
@@ -6151,5 +6182,22 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         expect(empty?.textContent).toContain('Add start entities');
         expect(empty.querySelector('button')).toBeNull();
         fixture.destroy();
+    });
+});
+
+describe('mergeWorkingSets (LA-UNSAVED-INVESTIGATION-1)', () => {
+    const e = (id: string, hop: number, extra: object = {}) => ({ id, type: null, hop, seed: id, admittedBy: 1, hidden: false, kept: false, ...extra });
+    it('joins one previewed degree onto the Working Set so far: new entities one hop out, links once, busy flags kept', () => {
+        const prev = { entities: [e('a', 0), e('b', 1)], links: [{ source: 'a', target: 'b', kind: 'k', count: 1, admittedBy: 2 }], excluded: [], hash: '' };
+        const next = {
+            entities: [e('a', 0), e('b', 0, { highConnectivity: true }), e('c', 1)],
+            links: [{ source: 'a', target: 'b', kind: 'k', count: 1, admittedBy: 2 }, { source: 'b', target: 'c', kind: 'k', count: 1, admittedBy: 2 }],
+            excluded: [],
+            hash: '',
+        };
+        const m = mergeWorkingSets(prev, next);
+        expect(m.entities.map((x) => [x.id, x.hop, !!x.highConnectivity])).toEqual([['a', 0, false], ['b', 1, true], ['c', 2, false]]);
+        expect(m.links).toHaveLength(2);
+        expect(mergeWorkingSets(prev, { ...next, entities: [...next.entities, e('s', 0)] }, ['s']).entities.find((x) => x.id === 's')!.hop).toBe(0);
     });
 });

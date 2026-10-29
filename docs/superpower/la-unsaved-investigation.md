@@ -54,7 +54,12 @@ through the existing step route `POST /inv/investigations/{id}/ops`, in order:
   `expandFrontier`, `sensitivity`, the shared `expandRead`, the evaluator): presets (window, minimum events, row budget,
   fan-out, busy limit) and the fold filters apply, so the drawing equals what Save records. Read-shaped and ungated like
   the explorer's neighbours reads, expensive rate class, aliases in and out as exploration; a four-eyes-sensitive degree
-  answers `needsApproval` and cannot run unsaved. Parity is pinned by `ControlApiUnsavedPreviewTest`. The Save fallback
+  answers `needsApproval` and cannot run unsaved. Parity is pinned by `ControlApiUnsavedPreviewTest`. Security review
+  (2026-10-30): on a masked Space the route takes only aliases its reads served (a raw id is 422 and nothing is minted or
+  written to the alias book, so guesses cannot be matched in bulk; the Studio seeds from the alias the explorer drew);
+  each expand read is audited as `LINK_EXPANDED`; one request holds at most 4 steps and reads at most
+  `investigation.expand_budget_max` rows; the Studio sends the Working Set as one seed plus the next degree and merges
+  the answer (`mergeWorkingSets`), so the cost does not grow with the history; no hash is returned. The Save fallback
   above stays as a safety net (data that changed between the preview and Save).
 
 The server evaluates every replayed step, so the saved Working Set is the server's (window presets, row budgets, busy
