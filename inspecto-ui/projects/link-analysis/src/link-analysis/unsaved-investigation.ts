@@ -16,7 +16,17 @@ export type UnsavedStep =
      * An Expand: per degree one `expand` op. `outer` starts from the Working Set's outer ring (no ids named, so a masked
      * alias never travels); `ids` starts from the named values.
      */
-    | { kind: 'expand'; from: 'outer' | 'ids'; ids: string[]; req: GrowRequest };
+    | {
+          kind: 'expand';
+          from: 'outer' | 'ids';
+          ids: string[];
+          req: GrowRequest;
+          /**
+           * The exact values each degree expanded from on screen (capped as the screen caps them), so Save records the
+           * same Working Set that was drawn. Present = replayed as these lists, one \`expand\` op per degree.
+           */
+          walked?: string[][];
+      };
 
 /** What Save binds the Investigation to (the same binding the New form used to create one at once). */
 export interface UnsavedBinding {
@@ -42,6 +52,10 @@ export interface UnsavedInvestigation {
 /** The reason an unsaved Expand is refused: a held step needs a recorded Investigation. */
 export const UNSAVED_FOUR_EYES =
     'This Expand needs approval from a second person, so it cannot run unsaved. Save first, then Expand.';
+
+/** The same refusal for a start (its ring is an Expand): nothing to save yet, so say what to do instead. */
+export const UNSAVED_FOUR_EYES_START =
+    "This start's ring needs a second person's approval, so it cannot run unsaved. Save first: start from the whole Dataset, Save, then start from the selected entities.";
 
 /** The reason the steps other than Start and Expand are not offered while unsaved. */
 export const SAVE_FIRST = 'Save first: this step changes a recorded Working Set.';
@@ -77,13 +91,20 @@ export interface UnsavedSaveOutcome {
 }
 
 /** The replay stopped at step `at` (1-based): name it and the steps that were not recorded. */
-export function replayStopMessage(steps: readonly UnsavedStep[], at: number, cause: 'refused' | 'held', reason = ''): string {
+export function replayStopMessage(
+    steps: readonly UnsavedStep[],
+    at: number,
+    cause: 'refused' | 'held',
+    reason = '',
+    /** Steps recorded on the server before the stop; absent = the steps before \`at\`. */
+    recorded = at - 1,
+): string {
     const step = steps[at - 1];
     const what = step ? `Step ${at} (${unsavedStepLine(step)})` : `Step ${at}`;
     const head =
         cause === 'held'
             ? `Saved. ${what} is waiting for a second person's approval.`
-            : `Saved with ${many(at - 1, 'step', 'steps')}. ${what} was refused${reason ? `: ${reason.trim().replace(/\.?$/, '.')}` : '.'}`;
+            : `Saved with ${many(recorded, 'step', 'steps')}. ${what} was refused${reason ? `: ${reason.trim().replace(/\.?$/, '.')}` : '.'}`;
     const first = at + 1;
     if (first > steps.length) return head;
     return `${head} ${first === steps.length ? `Step ${first} was` : `Steps ${first} to ${steps.length} were`} not recorded.`;

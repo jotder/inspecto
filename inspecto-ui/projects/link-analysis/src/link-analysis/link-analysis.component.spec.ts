@@ -4751,7 +4751,8 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(u.defaults.name).toBe('Members of “Suspects”');
         expect(u.steps).toEqual([
             { kind: 'seed', ids: ['S-1', 'S-2'], entityType: 'account' },
-            { kind: 'expand', from: 'outer', ids: [], req: expect.objectContaining({ degrees: 1, direction: 'either', hold: true }) },
+            // the drawn ring, as the screen drew it: from exactly the values found
+            { kind: 'expand', from: 'ids', ids: ['S-1', 'S-2'], walked: [['S-1', 'S-2']], req: expect.objectContaining({ degrees: 1, direction: 'either', hold: true }) },
         ]);
         expect(c.graph()).not.toBeNull();
         expect(c.openWorkLabel()).toBe('the unsaved Investigation');
@@ -4916,7 +4917,10 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await c.onExpand({ ctx, req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
         const steps = c.investigation.unsaved()!.steps;
         expect(steps).toHaveLength(3);
-        expect(steps[2]).toEqual({ kind: 'expand', from: 'outer', ids: [], req: expect.objectContaining({ direction: 'out' }) });
+        expect(steps[2]).toEqual(
+            expect.objectContaining({ kind: 'expand', from: 'outer', ids: [], req: expect.objectContaining({ direction: 'out' }) }),
+        );
+        expect(steps[2].kind === 'expand' && steps[2].walked?.length).toBe(1); // the exact values degree 1 expanded from
         c.growExclude.lastChange()!.undo!();
         expect(c.investigation.unsaved()!.steps).toHaveLength(2);
     });
@@ -5066,6 +5070,89 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         expect(c.graph()?.nodes.length).toBeGreaterThan(0);
         expect(c.workingSetCanvas()).toBe(false); // the canvas draws the explorer graph
+    });
+
+    const ring2 = (label: string) => ({
+        nodes: [{ id: label, data: { label, kind: 'entity' } }, ...Array.from({ length: 30 }, (_, i) => ({ id: `${label}.${i}`, data: { label: `${label}.${i}`, kind: 'entity' } }))],
+        edges: Array.from({ length: 30 }, (_, i) => ({ id: `${label}-${i}`, source: label, target: `${label}.${i}`, data: { kind: 'link' } })),
+    });
+
+    it('a multi-degree Expand that stopped early on screen records exactly the capped values each degree expanded from', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring2(label) as never);
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const ctx = c.growContext();
+        await c.onExpand({ ctx, req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        const step = c.investigation.unsaved()!.steps.at(-1)!;
+        const walked = step.kind === 'expand' ? step.walked! : [];
+        // the 30-node ring is capped at 25 on screen, and the walk stopped at the cap after degree 1
+        expect(walked).toHaveLength(1);
+        expect(walked[0]).toHaveLength(c.selectionExpandCap);
+        const drawn = expand.mock.calls.slice(-c.selectionExpandCap).map((a) => a[1]);
+        expect(walked[0]).toEqual(drawn);
+    });
+
+    it('a start whose ring the Space would hold for four-eyes is refused up front, and draws nothing', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        expect(expand).not.toHaveBeenCalled();
+        expect(c.investigation.unsaved()).toBeNull();
+        expect(c.startNotice()?.text).toContain("needs a second person's approval, so it cannot run unsaved. Save first");
+    });
+
+    it('Start from selected: refused up front for four-eyes, and records nothing when its draw fails', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({ start: { kind: 'dataset', datasetId: 'transfers' }, defaults: { name: 'A', purpose: 'B' }, timeCol: '', timeColZone: '', degrees: 0 });
+        c.onSelectionChange([c.graph()!.nodes[0].id]);
+        // the draw fails: nothing is recorded
+        expand.mockRejectedValueOnce(new Error('down'));
+        await c.startFromSelected();
+        expect(c.investigation.unsaved()!.steps).toEqual([]);
+        // four-eyes: refused before any read
+        Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
+        const calls = expand.mock.calls.length;
+        await c.startFromSelected();
+        expect(expand.mock.calls.length).toBe(calls);
+        expect(c.investigation.unsaved()!.steps).toEqual([]);
+        expect(c.growExclude.lastChange()?.text).toContain('Save first');
+    });
+
+    it('Close ▸ Save that stops partway keeps the saved Investigation open, its message on the tab', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [{ kind: 'seed', ids: ['A-1'] }]);
+        vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmUnsavedChanges').mockResolvedValue('save');
+        vi.spyOn(c, 'saveUnsaved').mockImplementation(async () => {
+            c.investigation.unsaved.set(null);
+            c.investigation.activeId.set('inv-1');
+            c.investigation.error.set('Saved with 0 steps. Step 1 (Start from 1 entity) was refused: no.');
+            return true;
+        });
+        await c.closeOpenWork();
+        expect(c.investigation.activeId()).toBe('inv-1'); // not closed
+        expect(c.investigation.error()).toContain('was refused');
     });
 });
 

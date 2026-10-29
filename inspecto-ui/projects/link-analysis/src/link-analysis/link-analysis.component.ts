@@ -121,7 +121,7 @@ import {
     SaveInvestigationDialogData,
     SaveInvestigationDialogResult,
 } from './link-analysis-save-investigation.dialog';
-import { UNSAVED_FOUR_EYES, UnsavedStep } from './unsaved-investigation';
+import { UNSAVED_FOUR_EYES, UNSAVED_FOUR_EYES_START, UnsavedStep } from './unsaved-investigation';
 import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
 import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.component';
 import { ExcludeDialogData, ExcludeDialogResult, LinkAnalysisExcludeDialog } from './link-analysis-exclude.dialog';
@@ -158,6 +158,7 @@ import {
 import { workingSetStats, attrColumns, isTemporalColumn } from '@inspecto/link-analysis/graph/working-set-stats';
 import {
     DEFAULT_MAX_DEGREE,
+    DegreePresets,
     DomainProfileId,
     activeDomainProfileId,
     domainProfile,
@@ -2180,6 +2181,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             const windowEnd = laDs ? await this.latestEventTime(laDs, binding.timeCol) : null;
             if (windowEnd) binding = { ...binding, windowEnd };
         }
+        if (this.heldUnsaved(binding.presets)) {
+            this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
+            return;
+        }
         const found = await this.drawStart(ds, values, entityType);
         if (!found.length) return;
         this.boundProfile.set(binding.profileId);
@@ -2197,7 +2202,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             req.defaults,
             [
                 { kind: 'seed', ids: found, ...(binding.projection.entityType ? { entityType: binding.projection.entityType } : {}) },
-                { kind: 'expand', from: 'outer', ids: [], req: this.startRing() },
+                { kind: 'expand', from: 'ids', ids: found, req: this.startRing(), walked: [found] },
             ],
         );
         if (req.degrees > 1) {
@@ -2220,16 +2225,16 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private async expandUnsaved(ctx: GrowContext, req: GrowRequest, from: string | null): Promise<boolean> {
         const u = this.investigation.unsaved();
         if (!u) return false;
-        if (expandApproval(this.investigation.withPresets(u.binding.presets, {}), this.fourEyesLimits()).exceeded.length) {
+        if (this.heldUnsaved(u.binding.presets)) {
             this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
             this.toastr.info(UNSAVED_FOUR_EYES);
             return false;
         }
         const nodes = this.graph()?.nodes ?? [];
         const named = growIds(ctx, req).map((id) => nodes.find((n) => n.id === id)?.data.label ?? id);
-        await this.growBasic(ctx, req);
-        const step: UnsavedStep =
-            from === 'outer' ? { kind: 'expand', from: 'outer', ids: [], req } : { kind: 'expand', from: 'ids', ids: named, req };
+        const walked = await this.growBasic(ctx, req);
+        // the exact values each degree expanded from, capped as the screen capped them: Save records what was drawn
+        const step: UnsavedStep = { kind: 'expand', from: from === 'outer' ? 'outer' : 'ids', ids: from === 'outer' ? [] : named, req, walked };
         this.investigation.recordUnsaved(step);
         const change = this.growExclude.lastChange();
         if (change?.undo) {
@@ -2248,17 +2253,29 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** How many entities are selected on the canvas (Start from selected names them). */
     readonly selectionCount = computed(() => this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND).length);
 
+    /** Would the Space hold an Expand with these presets for a second person's approval? (Then it cannot run unsaved.) */
+    private heldUnsaved(presets: DegreePresets): boolean {
+        return expandApproval(this.investigation.withPresets(presets, {}), this.fourEyesLimits()).exceeded.length > 0;
+    }
+
     /** "Start from selected" while unsaved (D3): the selected entities and their links join the graph, recorded as a start. */
     async startFromSelected(): Promise<void> {
         const u = this.investigation.unsaved();
         const picked = this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND);
         if (!u || !picked.length) return;
+        if (this.heldUnsaved(u.binding.presets)) {
+            this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+            this.toastr.info(UNSAVED_FOUR_EYES);
+            return;
+        }
         const values = picked.map((n) => n.data.label);
+        const before = this.graph();
         for (const n of picked) await this.expandNode(n.id, n.data.label, n.data.spellings);
+        if (this.graph() === before) return; // the draw failed (its error is shown): nothing is recorded
         const type = u.binding.projection.entityType;
         this.investigation.recordUnsaved(
             { kind: 'seed', ids: values, ...(type ? { entityType: type } : {}) },
-            { kind: 'expand', from: 'ids', ids: values, req: this.startRing() },
+            { kind: 'expand', from: 'ids', ids: values, req: this.startRing(), walked: [values] },
         );
     }
 
@@ -2787,8 +2804,10 @@ Its prior copies stay in its version history.`,
      * saved is the one thing Close would lose, so that is asked first.
      */
     async closeOpenWork(): Promise<void> {
+        const hadUnsaved = !!this.investigation.unsaved();
         if (!(await this.leaveUnsaved())) return;
-        this.investigation.discardUnsaved(); // saved just now: Close closes the saved one too
+        // Saved just now but stopped partway: keep it open, so the message saying what was not recorded stays on screen.
+        if (hadUnsaved && this.investigation.active() && this.investigation.error()) return;
         const draft = this.importDraft();
         if (
             draft &&
@@ -4957,7 +4976,8 @@ Its prior copies stay in its version history.`,
     }
 
     /** Basic Grow (§3.5): neighbours reads merged into the explorer graph — not recorded; Undo restores the graph. */
-    private async growBasic(ctx: GrowContext, req: GrowRequest): Promise<void> {
+    private async growBasic(ctx: GrowContext, req: GrowRequest): Promise<string[][]> {
+        const walked: string[][] = [];
         const before = {
             graph: this.graph(),
             expanded: this.expandedNodeIds(),
@@ -4983,6 +5003,11 @@ Its prior copies stay in its version history.`,
             if (!frontier.length) break;
             applied = d;
             const known = new Set((this.graph()?.nodes ?? []).map((n) => n.id));
+            walked.push(
+                frontier
+                    .slice(0, this.selectionExpandCap)
+                    .map((id) => this.graph()?.nodes.find((n) => n.id === id)?.data.label ?? id),
+            );
             for (const id of frontier.slice(0, this.selectionExpandCap)) {
                 const node = this.graph()?.nodes.find((n) => n.id === id);
                 if (!node) continue;
@@ -5023,6 +5048,7 @@ Its prior copies stay in its version history.`,
             },
         });
         this.drawAnnouncement.set(text);
+        return walked;
     }
 
     /** The nodes "Exclude…" acts on: the given ones, else the selection, else the picked Investigation entity. */

@@ -1161,3 +1161,44 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         expect(t.store.unsaved()!.steps).toHaveLength(3);
     });
 });
+
+describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSAVED-INVESTIGATION-1 review)', () => {
+    const REQ = { direction: 'either' as const, degrees: 3, linkKinds: null, hold: true, threshold: 500 };
+    function serve(t: ReturnType<typeof setup>, refuseAt?: number) {
+        const sent: Record<string, unknown>[] = [];
+        t.sets['inv-1'] = ws([]);
+        t.inv.appendInvestigationOp.mockImplementation((_id: string, op: Record<string, unknown>) => {
+            sent.push(op);
+            if (sent.length === refuseAt)
+                return throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } }));
+            t.logs['inv-1'] = { ...t.logs['inv-1'], entries: [...t.logs['inv-1'].entries, entry(sent.length, { op: op['op'] as never })] };
+            return of({ ...step(sent.length, op['op'] as string), delta: { ...step(0, '').delta, admitted: ['z'] } });
+        });
+        return sent;
+    }
+
+    it('an Expand recorded with its walked lists replays exactly those values, one expand per degree, no more', async () => {
+        const t = setup();
+        const sent = serve(t);
+        t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
+            { kind: 'seed', ids: ['a'] },
+            { kind: 'expand', from: 'outer', ids: [], req: REQ, walked: [['a'], ['b', 'c']] },
+        ]);
+        const out = await t.store.saveUnsaved('n', 'p');
+        expect(sent.map((o) => o['ids'])).toEqual([['a'], ['a'], ['b', 'c']]); // degree 3 stopped early on screen: not sent
+        expect(out.recorded).toBe(3);
+    });
+
+    it('an Expand refused at its degree 2 counts the degree already recorded', async () => {
+        const t = setup();
+        serve(t, 3);
+        t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
+            { kind: 'seed', ids: ['a'] },
+            { kind: 'expand', from: 'outer', ids: [], req: REQ, walked: [['a'], ['b']] },
+        ]);
+        const out = await t.store.saveUnsaved('n', 'p');
+        expect(out.recorded).toBe(2); // the seed and degree 1
+        expect(out.message).toContain('Saved with 2 steps. Step 2');
+        expect(t.store.error()).toBe(out.message);
+    });
+});

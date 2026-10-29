@@ -203,41 +203,64 @@ export class InvestigationSessionStore {
         this.unsaved.set(null);
         this.windowEnd.set(b.windowEnd ?? null);
         const id = this.activeId();
+        /** Server steps recorded so far: a seed is one, an Expand one per degree. */
+        let recorded = 0;
         for (let i = 0; i < u.steps.length; i++) {
             const step = u.steps[i];
-            const ok = step.kind === 'seed' ? await this.replaySeed(step) : await this.replayExpand(step, b);
-            if (this.activeId() !== id) return { created: true, recorded: i, message: '' };
-            if (ok === 'held') return { created: true, recorded: i + 1, message: replayStopMessage(u.steps, i + 1, 'held') };
-            if (!ok) {
-                const message = replayStopMessage(u.steps, i + 1, 'refused', this.error());
+            const r = step.kind === 'seed' ? await this.replaySeed(step) : await this.replayExpand(step, b);
+            recorded += r.recorded;
+            if (this.activeId() !== id) return { created: true, recorded, message: '' };
+            if (r.ok === 'held') {
+                const message = replayStopMessage(u.steps, i + 1, 'held');
+                this.error.set(message); // kept on the tab, not only in a toast
+                return { created: true, recorded, message };
+            }
+            if (!r.ok) {
+                const message = replayStopMessage(u.steps, i + 1, 'refused', this.error(), recorded);
                 this.error.set(message);
-                return { created: true, recorded: i, message };
+                return { created: true, recorded, message };
             }
         }
-        return { created: true, recorded: u.steps.length, message: '' };
+        return { created: true, recorded, message: '' };
     }
 
-    private async replaySeed(step: Extract<UnsavedStep, { kind: 'seed' }>): Promise<boolean> {
+    private async replaySeed(step: Extract<UnsavedStep, { kind: 'seed' }>): Promise<{ ok: boolean; recorded: number }> {
         const ok = await this.apply({ op: 'seed', ids: step.ids, ...(step.entityType ? { entityType: step.entityType } : {}) });
         if (ok) this.showWorkingSet.set(true);
-        return ok;
+        return { ok, recorded: ok ? 1 : 0 };
     }
 
     /** One unsaved Expand, degree by degree as `growInvestigation` walks it: the outer ring (or the named values) first. */
-    private async replayExpand(step: Extract<UnsavedStep, { kind: 'expand' }>, b: UnsavedBinding): Promise<boolean | 'held'> {
+    private async replayExpand(
+        step: Extract<UnsavedStep, { kind: 'expand' }>,
+        b: UnsavedBinding,
+    ): Promise<{ ok: boolean | 'held'; recorded: number }> {
+        // What the screen drew, degree by degree: each list is one recorded expand, nothing more is walked.
+        if (step.walked) {
+            let recorded = 0;
+            for (const ids of step.walked) {
+                if (!ids.length) continue;
+                if (!(await this.apply(growExpandBody(ids, step.req, this.withPresets(b.presets, {}))))) return { ok: false, recorded };
+                recorded++;
+                if (this.lastStep()?.status === 'pending') return { ok: 'held', recorded };
+            }
+            return { ok: true, recorded };
+        }
+        let recorded = 0;
         let frontier = step.ids;
         if (step.from === 'outer') {
             const d = degreeState(this.workingSet(), b.maxDegree, this.degreeOutcomes(), !step.req.hold, this.overrideSteps());
             frontier = step.req.hold ? d.frontier : [...d.frontier, ...d.heldHubs];
         }
         for (let d = 1; d <= step.req.degrees && frontier.length; d++) {
-            if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}))))) return false;
+            if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}))))) return { ok: false, recorded };
+            recorded++;
             const done = this.lastStep();
-            if (done?.status === 'pending') return 'held';
+            if (done?.status === 'pending') return { ok: 'held', recorded };
             const flagged = new Set(done?.read?.hubs?.map((h) => h.id) ?? []);
             frontier = (done?.delta?.admitted ?? []).filter((x) => !flagged.has(x));
         }
-        return true;
+        return { ok: true, recorded };
     }
 
     /** Every Investigation this screen knows about (created here or restored from a saved view). */
