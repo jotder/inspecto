@@ -2985,7 +2985,7 @@ Its prior copies stay in its version history.`,
      */
     readonly snapshotUnavailable = computed(() => {
         if (!this.lens.canManageIncidents()) return needsPermission('canManageIncidents');
-        return this.snapshotData() ? '' : DRAW_FIRST;
+        return this.snapshotData()?.graph.nodes.length ? '' : DRAW_FIRST;
     });
 
     /** Why "Attach to Case" is unavailable to this user — empty when it is available. Attaching needs `canManageIncidents`. */
