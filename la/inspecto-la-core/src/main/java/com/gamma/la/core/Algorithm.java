@@ -53,7 +53,7 @@ public enum Algorithm {
     /** 3 / 35 / 878 ms. */
     BRIDGES("bridges", "Bridges", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, false),
     /** 2 / 16 / 254 ms. */
-    IS_FOREST("isForest", "Is it a tree?", Cost.SYNC, 100_000, ResultKind.FLAG, false, false, false, false),
+    IS_FOREST("isForest", "Free of cycles?", Cost.SYNC, 100_000, ResultKind.FLAG, false, false, false, false),
     /** 2 / 12 / 224 ms. */
     DESCENDANTS("descendants", "Descendants", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, true),
     /** 10 / 100 / 931 ms after LA-GRAPH-QUADRATIC-1 (binary heap; was 46 / 1 740 / t). 10⁵ is 0.9-2.8 s with the machine busy: 10⁴. */
