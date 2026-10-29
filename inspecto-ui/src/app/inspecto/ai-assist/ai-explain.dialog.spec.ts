@@ -82,6 +82,27 @@ describe('AiExplainDialog', () => {
         expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('No canonical definition');
     });
 
+    it('with the intelligence module absent (503) it still shows the definitions the pane supplied, and says where they came from', () => {
+        runTool.mockReturnValue(throwError(() => MODULE_ABSENT));
+        const fixture = create(['Entity', 'Link'], { Entity: 'A business node.', Link: 'A business edge.' });
+        const el = fixture.nativeElement as HTMLElement;
+
+        expect(el.textContent).not.toContain('AI assistance unavailable');
+        expect(el.textContent).toContain('A business node.');
+        expect(el.textContent).toContain('A business edge.');
+        const source = el.querySelector('[data-testid="explain-source"]')?.textContent ?? '';
+        expect(source).toContain('as this screen defines them');
+        expect(source).not.toContain('from the project glossary');
+    });
+
+    it('says "from the project glossary" only when the glossary answered', () => {
+        runTool.mockImplementation((_tool: string, args: { term: string }) => of({ term: args.term, definition: 'canonical' }));
+        const fixture = create(['Dataset'], { Dataset: 'own words' });
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="explain-source"]')?.textContent).toContain(
+            'from the project glossary',
+        );
+    });
+
     it('never cites a deployment, operations or internal README in the docs fallback', () => {
         runTool.mockImplementation((tool: string) =>
             tool === 'glossary_lookup'
@@ -108,6 +129,10 @@ describe('AiExplainDialog', () => {
         expect(isUserFacingDoc('README.md')).toBe(false);
         expect(isUserFacingDoc('okf/product/layer/platform/spec-build-test.md')).toBe(false);
         expect(isUserFacingDoc('superpower/la-plan.md')).toBe(false);
+        // history is never current guidance, even a file there named like a guide
+        expect(isUserFacingDoc('archived-documents/superpower-reviews/user-guide-audit.md')).toBe(false);
+        expect(isUserFacingDoc('docs/archived-documents/plans-archive/admin-guide-old.md')).toBe(false);
+        expect(isUserFacingDoc(['archived-documents', 'x', 'GLOSSARY.md'].join('\\'))).toBe(false);
     });
 
     it('degrades to an explanation on 503 instead of failing, and does not retry per term', () => {

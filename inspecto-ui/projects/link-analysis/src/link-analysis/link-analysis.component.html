@@ -24,9 +24,9 @@
             <button
                 mat-menu-item
                 (click)="saveOpenView()"
-                [disabled]="!graph() || saving() || !!viewSaveBlocked()"
-                [matTooltip]="viewSaveBlocked()"
-                [attr.aria-label]="viewSaveBlocked() ? 'Save view — ' + viewSaveBlocked() : null"
+                [disabled]="!graph() || saving() || !!viewOverwriteBlocked()"
+                [matTooltip]="viewOverwriteBlocked()"
+                [attr.aria-label]="viewOverwriteBlocked() ? 'Save view — ' + viewOverwriteBlocked() : null"
                 data-testid="la-save-view"
             >
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
@@ -45,7 +45,7 @@
                 <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
                 <span>Save view as…</span>
             </button>
-            @if (viewSaveBlocked(); as why) {
+            @if (viewOverwriteBlocked(); as why) {
                 <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs" data-testid="la-save-view-locked">{{ why }}</p>
             }
             <button
@@ -1346,7 +1346,7 @@
                         @if (newFormInDock()) {
                             <!-- the Investigation tab's New form is on screen: one form for one job, so only a pointer here -->
                             <p class="text-secondary m-0 max-w-md p-4 text-center text-sm" data-testid="la-start-pointer">
-                                Start a new Investigation with the form in the Investigation tab on the right.
+                                Start a new Investigation with the form in the Investigation tab.
                             </p>
                         } @else {
                             <inspecto-link-analysis-start-box

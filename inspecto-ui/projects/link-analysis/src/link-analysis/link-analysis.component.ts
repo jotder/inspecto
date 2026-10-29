@@ -296,7 +296,7 @@ import { SessionService } from '@inspecto/core/api';
 import { DatePipe } from '@angular/common';
 import { GraphQueryCache, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { deepEqual } from '@inspecto/link-analysis/api/stable-json';
-import { ViewAccessContext, viewDeleteBlock, viewSaveBlock } from './view-access';
+import { ViewAccessContext, viewDeleteBlock, viewEditBlock, viewSaveBlock } from './view-access';
 import { LA_ABOUT_DEFINITIONS, LA_ABOUT_TERMS } from './about-terms';
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
@@ -563,6 +563,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }));
     /** Why File ▸ Save view / Save view as… are locked; '' = they are not. */
     readonly viewSaveBlocked = computed(() => viewSaveBlock(this.viewAccess()));
+    /**
+     * Why File ▸ Save view cannot save over the OPEN view (a view-only share, `ComponentAccess.requireEdit`); '' = it can,
+     * or none is open. Save view as… still works: it creates a copy.
+     */
+    readonly viewOverwriteBlocked = computed(() => {
+        const open = this.views().find((v) => v.id === this.openViewId());
+        return this.viewSaveBlocked() || (open ? viewEditBlock(open, this.viewAccess()) : '');
+    });
     private datasetsService = inject(LA_DATASETS);
     private readonly limits = inject(LinkAnalysisSettingsService);
     /** Installs the Space's Industry packs into the Domain Profile registry (LA-EDITIONS-1). */
@@ -2357,6 +2365,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             canDeleteInvestigations: this.lens.canManageIncidents(),
             viewSaveBlock: this.viewSaveBlocked(),
             viewDeleteBlock: (v) => viewDeleteBlock(v, this.viewAccess()),
+            viewEditBlock: (v) => viewEditBlock(v, this.viewAccess()),
         };
         this.dialog
             .open<LinkAnalysisOpenDialog, LaOpenDialogData, LaOpenResult>(LinkAnalysisOpenDialog, {
@@ -2378,7 +2387,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     /** File ▸ Save view: over the open saved view; with none open it asks for a name (Save view as…). */
     async saveOpenView(): Promise<void> {
-        if (this.viewSaveBlocked()) return;
+        if (this.viewOverwriteBlocked()) return;
         const open = this.views().find((v) => v.id === this.openViewId());
         if (!open) {
             this.fileTrigger?.openMenu();

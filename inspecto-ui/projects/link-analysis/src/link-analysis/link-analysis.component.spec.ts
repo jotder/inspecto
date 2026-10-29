@@ -5459,6 +5459,37 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.destroy();
     });
 
+    it('File ▸ Save view will not save over a view shared with me to view only; Save view as… still makes a copy', async () => {
+        const view: LinkAnalysisView = {
+            id: 'team_view',
+            name: 'team_view',
+            sourceId: 'entity-projection',
+            query: {},
+            owner: 'lead',
+            shared: true,
+            shares: [{ subjectType: 'user', subjectId: 'fm.analyst', access: 'view' }],
+        };
+        const { fixture, save } = create({ views: [view] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.views.set([view]);
+        c.openViewId.set(view.id);
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canAuthorWorkbench']);
+        session.actor.set('fm.analyst');
+        fixture.detectChanges();
+        expect(c.viewOverwriteBlocked()).toContain('shared with you to view only');
+        expect(c.viewSaveBlocked()).toBe('');
+        openFileMenu(fixture);
+        expect(fileItem('la-save-view')!.disabled).toBe(true);
+        expect(fileItem('la-save-view-as')!.disabled).toBe(false);
+        await c.saveOpenView();
+        expect(save).not.toHaveBeenCalled();
+        fixture.destroy();
+    });
+
     it('after File ▸ Close the workspace row is not held at the open dock height (no dock is drawn)', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
@@ -5482,7 +5513,9 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         c.toolboxTab.set('investigation');
         fixture.detectChanges();
         expect(c.newFormInDock()).toBe(true);
-        expect(el.querySelector('[data-testid="la-start-pointer"]')?.textContent).toContain('Investigation tab');
+        const pointer = el.querySelector('[data-testid="la-start-pointer"]')?.textContent ?? '';
+        expect(pointer).toContain('Investigation tab');
+        expect(pointer).not.toMatch(/on the right|below/); // the dock stacks on narrow screens: no position words
         expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the New form only
         c.toolboxTab.set('browser');
         fixture.detectChanges();

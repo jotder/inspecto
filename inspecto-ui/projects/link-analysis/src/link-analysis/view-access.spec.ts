@@ -3,8 +3,10 @@ import {
     VIEW_AUTHOR_REASON,
     VIEW_DELETE_AUTHOR_REASON,
     VIEW_DELETE_OWNER_REASON,
+    VIEW_EDIT_SHARE_REASON,
     ViewAccessContext,
     viewDeleteBlock,
+    viewEditBlock,
     viewSaveBlock,
 } from './view-access';
 
@@ -29,5 +31,29 @@ describe('saved view access (mirrors the /components write gates)', () => {
         expect(viewDeleteBlock({ ...shared, owner: 'fm.analyst' }, author)).toBe('');
         expect(viewDeleteBlock(shared, { ...author, canConfigureAccess: true })).toBe('');
         expect(viewDeleteBlock(shared, { ...author, actor: null })).toBe('');
+    });
+});
+
+describe('saved view edit in place (mirrors ComponentAccess.requireEdit)', () => {
+    const viewOnly = { shared: true, owner: 'lead', shares: [{ subjectType: 'user', subjectId: 'fm.analyst', access: 'view' }] };
+
+    it('a view shared with me to view only cannot be saved over or renamed, said in words', () => {
+        expect(viewEditBlock(viewOnly, author)).toBe(VIEW_EDIT_SHARE_REASON);
+        expect(VIEW_EDIT_SHARE_REASON).toContain('view only');
+    });
+
+    it('an edit share, the owner, an access admin, an unshared view or no sign-in may edit', () => {
+        const editShare = { ...viewOnly, shares: [{ subjectType: 'user', subjectId: 'fm.analyst', access: 'edit' }] };
+        expect(viewEditBlock(editShare, author)).toBe('');
+        expect(viewEditBlock({ ...viewOnly, owner: 'fm.analyst' }, author)).toBe('');
+        expect(viewEditBlock(viewOnly, { ...author, canConfigureAccess: true })).toBe('');
+        expect(viewEditBlock({}, author)).toBe('');
+        expect(viewEditBlock(viewOnly, { ...author, actor: null })).toBe('');
+    });
+
+    it('a role share granting edit gets the benefit of the doubt (the SPA does not know the roles); no capability still locks', () => {
+        const roleEdit = { ...viewOnly, shares: [{ subjectType: 'role', subjectId: 'operations', access: 'edit' }] };
+        expect(viewEditBlock(roleEdit, author)).toBe('');
+        expect(viewEditBlock({}, reader)).toBe(VIEW_AUTHOR_REASON);
     });
 });

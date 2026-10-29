@@ -60,6 +60,15 @@ export interface LinkAnalysisView {
      */
     owner?: string;
     shared?: boolean;
+    /** The share entries as stored (`subjectType` user|role, `subjectId`, `access` view|edit); present when shared. */
+    shares?: ViewShare[];
+}
+
+/** One stored share of a Component (`ComponentAccess`): who it is shared with and at what level. */
+export interface ViewShare {
+    subjectType: string;
+    subjectId: string;
+    access: string;
 }
 
 /** The Entity Lists a case uses (A-1b). */
@@ -177,8 +186,17 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         lists: listsOf(c.lists),
         start: startOf(c.start),
         ...(typeof c.owner === 'string' && c.owner ? { owner: c.owner } : {}),
-        ...(c.shares != null ? { shared: true } : {}),
+        ...(c.shares != null ? { shared: true, shares: sharesOf(c.shares) } : {}),
     };
+}
+
+/** Stored share entries read defensively: a malformed entry grants nothing (as on the server), so it is dropped. */
+function sharesOf(v: unknown): ViewShare[] {
+    if (!Array.isArray(v)) return [];
+    const str = (x: unknown) => (typeof x === 'string' ? x.trim() : '');
+    return v
+        .filter((e): e is Record<string, unknown> => !!e && typeof e === 'object')
+        .map((e) => ({ subjectType: str(e['subjectType']), subjectId: str(e['subjectId']), access: str(e['access']) }));
 }
 
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '') : []);

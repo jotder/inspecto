@@ -816,14 +816,18 @@ If a control is greyed out, hover it: it names what is missing.
 
 **Read-only roles.** Without *Incident management* the Investigation tab says *Your role can't change Investigations
 (needs Incident management) - you can read this one*: you can open, read, replay, re-read and build, download and verify
-the Dossier; every write control is disabled with that sentence. Without `canAuthorWorkbench`, Settings → Link Analysis
-shows its values with no Save, and File ▸ Save view, Save view as… and Delete view are greyed out with the reason. A
-refusal shows the server's reason; a missing permission is named in words (*Your role does not have the Workbench
-author permission*). *Not found* on an Investigation can mean it does
+the Dossier; every write control is disabled with that sentence. A refusal shows the server's reason; a missing
+permission is named in words (*Your role does not have the Workbench author permission*). *Not found* on an Investigation can mean it does
 not exist, is not yours, or its Dataset is no longer shared with you — the same answer on purpose. In the
 `la-showcase` demo, *Demo RA Analyst* and *Demo Manager* are read-only; *Demo FM Analyst* holds manage-incidents,
 graph-run, index-build and Alert Rule authoring; *Demo FM Manager* is the second approver; *Demo Admin* also holds
 `canAuthorWorkbench`.
+
+**Saved views and settings (Workbench author).** Without the *Workbench author* permission (`canAuthorWorkbench`) —
+a separate question from *Incident management* — Settings → Link Analysis shows its values with no Save, and File ▸
+Save view, Save view as… and Delete view (and Rename, Duplicate and Delete in File ▸ Open…) are greyed out with the
+reason. A view shared with you to view only cannot be saved over or renamed (use Save view as… for a copy), and only
+its owner can delete a shared view.
 
 **Editions and levels.** Link Analysis is in every edition, but what it offers depends on the edition and on the
 Inspecto LA level (see [EDITIONS](../../../../EDITIONS.md) and the [level admin guide](admin-guide-la-level.md)):
