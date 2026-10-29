@@ -154,6 +154,8 @@ export class InvestigationSessionStore {
      * and the ordered steps taken; null = none. Nothing of it is on the server until {@link saveUnsaved}.
      */
     readonly unsaved = signal<UnsavedInvestigation | null>(null);
+    /** "Add start entities…" is open on the open Investigation: the tab shows the start form in add mode. */
+    readonly addingStart = signal(false);
 
     /** Start working unsaved over this binding (any open Investigation is left first). */
     beginUnsaved(binding: UnsavedBinding, defaults: { name: string; purpose: string }, steps: UnsavedStep[] = []): void {
@@ -230,28 +232,43 @@ export class InvestigationSessionStore {
         return { ok, recorded: ok ? 1 : 0 };
     }
 
+    /** The server Working Set's outer ring, as "Expand next degree" reads it (held hubs only when Hold is off). */
+    private outerFrontier(step: Extract<UnsavedStep, { kind: 'expand' }>, b: UnsavedBinding): string[] {
+        const d = degreeState(this.workingSet(), b.maxDegree, this.degreeOutcomes(), !step.req.hold, this.overrideSteps());
+        return step.req.hold ? d.frontier : [...d.frontier, ...d.heldHubs];
+    }
+
     /** One unsaved Expand, degree by degree as `growInvestigation` walks it: the outer ring (or the named values) first. */
     private async replayExpand(
         step: Extract<UnsavedStep, { kind: 'expand' }>,
         b: UnsavedBinding,
     ): Promise<{ ok: boolean | 'held'; recorded: number }> {
-        // What the screen drew, degree by degree: each list is one recorded expand, nothing more is walked.
+        // What the screen drew, degree by degree: one recorded expand per list, nothing more is walked. The explorer draw
+        // cannot apply the profile presets (window, minimum events, row budget, fan-out), so the server may have admitted
+        // fewer: each list is spoken in this Investigation's ids (\`exploreAliases\`), kept to what the Working Set holds,
+        // and a degree whose values the server never admitted expands from what the server's previous degree admitted.
         if (step.walked) {
             let recorded = 0;
-            for (const ids of step.walked) {
-                if (!ids.length) continue;
+            let admitted = step.from === 'outer' ? this.outerFrontier(step, b) : [];
+            for (const values of step.walked) {
+                const ws = this.workingSet();
+                const back = new Map(Object.entries(ws?.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]));
+                const held = new Set((ws?.entities ?? []).map((e) => e.id));
+                const named = [...new Set(values.map((v) => back.get(v) ?? v))].filter((id) => held.has(id));
+                const ids = named.length ? named : admitted;
+                if (!ids.length) break;
                 if (!(await this.apply(growExpandBody(ids, step.req, this.withPresets(b.presets, {}))))) return { ok: false, recorded };
                 recorded++;
-                if (this.lastStep()?.status === 'pending') return { ok: 'held', recorded };
+                const done = this.lastStep();
+                if (done?.status === 'pending') return { ok: 'held', recorded };
+                const flagged = new Set(done?.read?.hubs?.map((h) => h.id) ?? []);
+                admitted = (done?.delta?.admitted ?? []).filter((x) => !flagged.has(x));
             }
             return { ok: true, recorded };
         }
         let recorded = 0;
         let frontier = step.ids;
-        if (step.from === 'outer') {
-            const d = degreeState(this.workingSet(), b.maxDegree, this.degreeOutcomes(), !step.req.hold, this.overrideSteps());
-            frontier = step.req.hold ? d.frontier : [...d.frontier, ...d.heldHubs];
-        }
+        if (step.from === 'outer') frontier = this.outerFrontier(step, b);
         for (let d = 1; d <= step.req.degrees && frontier.length; d++) {
             if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}))))) return { ok: false, recorded };
             recorded++;
@@ -419,6 +436,7 @@ export class InvestigationSessionStore {
         this.hubContacts.set(new Map());
         this.windowEnd.set(null);
         this.lastOverride.set(null);
+        this.addingStart.set(false);
     }
 
     /** Stop remembering an id (e.g. one the server no longer answers for). Nothing is deleted server-side. */

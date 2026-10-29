@@ -91,6 +91,7 @@ const answer = (over: Partial<EntitySuggestions> = {}): EntitySuggestions => ({
         (start)="starts.push($event)"
         (create)="creates.push($event)"
         [columns]="columns()"
+        [adding]="adding()"
         (openAddData)="addDataClicks = addDataClicks + 1"
     ></inspecto-link-analysis-start-box>`,
 })
@@ -99,6 +100,7 @@ class Host {
     readonly lists = signal<EntityListSummary[]>([LIST]);
     readonly dataset = signal<string | null>('transfers');
     readonly columns = signal<{ name: string; type: string }[]>([]);
+    readonly adding = signal(false);
     readonly notice = signal<StartNotice | null>(null);
     readonly addData = signal(true);
     readonly mode = signal<'draw' | 'investigation'>('draw');
@@ -588,5 +590,19 @@ describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () 
 
     it('never puts a raw identifier in the Purpose', () => {
         expect(d({ value: 'AC-1' }).purpose).not.toContain('AC-1');
+    });
+});
+
+describe('LinkAnalysisStartBoxComponent - add mode (Add start entities…)', () => {
+    it('shows only the start inputs, no whole Dataset, and says it records one Start step', () => {
+        const { fixture, box, el } = create();
+        fixture.componentInstance.mode.set('investigation');
+        fixture.componentInstance.adding.set(true);
+        fixture.detectChanges();
+        expect(box.kindOptions().map((o) => o.value)).toEqual(['entity', 'list', 'paste']);
+        expect(q(el, 'new-time-col')).toBeNull();
+        expect(q(el, 'new-degrees')).toBeNull();
+        expect(q(el, 'start-submit')?.textContent?.trim()).toBe('Add start entities');
+        expect(q(el, 'start-what')?.textContent).toContain('one Start step');
     });
 });

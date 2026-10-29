@@ -673,8 +673,11 @@ approval from a second person, so it cannot run unsaved. Save first, then Expand
 in the Dossier), both pre-filled from the start: *Account MULE-HUB-01* / *Review of an Account and its links*,
 *Members of “Suspects”* / *Review of the members of “Suspects” and their links*, *Transfers* / *Review of the links in
 Transfers*. In a Space that masks values the default Name leaves the value out (*Phone number*). Your edits are kept if
-you cancel. Save then creates the Investigation and records the steps in order, each with your name. The server reads
-each step again, so the saved Working Set is the server's (its window, row limits and busy limit apply). If a step is
+you cancel. Save then creates the Investigation and records the steps in order, each with your name: every Expand
+degree names the entities it expanded from on screen. The server reads each step again with the Industry pack's
+settings (time window, minimum events, row limit, neighbours per entity), which the unsaved drawing does not apply. So
+the saved Working Set can be smaller than the drawing; a degree whose entities the server did not admit expands from
+what it did admit, so Save still completes. If a step is
 refused partway, the Investigation is saved with the steps before it and a message names the steps that were not
 recorded. If a step needs a second person's approval, Save stops there and the step waits for approval.
 
@@ -705,14 +708,16 @@ Top to bottom, most important first:
 3. **Expand** ([§7.1](#71-expand)): the degree reached (*Degree 1 of 4*) and the per-degree results, then ONE Expand
    form — From (the outer ring is the next degree), Degrees (**− n +**), Direction, **Expand** with its preview and
    four-eyes line, and the Links / Time / Limits folds. A reader sees *Needs Incident management.* instead of the form.
-4. **Selected entity:** Start, Keep, Hide, Exclude, Annotate, Expand one hop, **Pick neighbours…** (tick some, or
+4. **Add start entities…** (with *Incident management*): the start form (Start from, Entity Type and value, an Entity
+   List or pasted values) records them as one Start step, also entities not in the Working Set yet.
+5. **Selected entity:** Start, Keep, Hide, Exclude, Annotate, Expand one hop, **Pick neighbours…** (tick some, or
    **Add the 10 strongest**: one expand to only those), its neighbours; **Expand all**.
-5. **Busy entities** (each with its sealed count, *Busy: 650 linked entities (limit 500), not expanded*, and
+6. **Busy entities** (each with its sealed count, *Busy: 650 linked entities (limit 500), not expanded*, and
    **Expand anyway**).
-6. **Steps**, in visible groups, each action a button that opens in place under its group: **Connect** (Connect start
+7. **Steps**, in visible groups, each action a button that opens in place under its group: **Connect** (Connect start
    entities) · **Time** (Time window, Snapshot marker) · **Compare** (Threshold, Compare).
-7. **Scope list:** entity ids to **Include** or **Leave out**.
-8. Two links: **Open the Step log** (the dock's Step log tab) and **Investigation settings…**.
+8. **Scope list:** entity ids to **Include** or **Leave out**.
+9. Two links: **Open the Step log** (the dock's Step log tab) and **Investigation settings…**.
 
 The tab lists no steps: the full record is in the dock's **Step log** (with **Undo** and **Re-order steps…**, which
 creates a fork), beside **Working Set rows**, **Coverage**, **Annotations** (entity and link) and **Excluded

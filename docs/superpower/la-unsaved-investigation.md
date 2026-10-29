@@ -42,10 +42,15 @@ when the dialog is cancelled. Save then calls the existing `POST /inv/investigat
 through the existing step route `POST /inv/investigations/{id}/ops`, in order:
 
 - `seed` → one `seed` op with the values and the Entity Type.
-- `expand` from the outer ring → per degree, one `expand` op whose ids are the server Working Set's outer ring
-  (`degreeState`), then what the previous degree admitted (the same walk as `growInvestigation`), with the profile
-  presets laid under (`withPresets`) and the recorded Direction, Link kinds and Hold (`growExpandBody`).
-- `expand` from named values → the same, starting from those values.
+- `expand` → per degree, one `expand` op naming the values that degree expanded from on screen (`walked`, capped at
+  `selectionExpandCap` and stopped where the screen stopped), with the profile presets laid under (`withPresets`) and
+  the recorded Direction, Link kinds and Hold (`growExpandBody`). Each list is first spoken in the Investigation's own
+  ids (the Working Set's `exploreAliases`, so a masked Space's aliases are resolved) and kept to what the Working Set
+  holds; a degree whose values the server never admitted expands from what the server's previous degree admitted
+  (the first degree from the outer ring, `degreeState`). The server never gets an id it would refuse (422).
+- The explorer draw cannot apply the presets (window, minimum events, row budget, fan-out: the neighbours read takes
+  only direction, link kinds and the busy limit), so where they cut, the saved Working Set is smaller than the drawing.
+  Making the draw equal the server's admission needs a server preview without an Investigation; deferred (§6).
 
 The server evaluates every replayed step, so the saved Working Set is the server's (window presets, row budgets, busy
 limit, exclusion lists in force). It can differ from the unsaved explorer drawing where those presets cut: that is the
@@ -61,7 +66,8 @@ below are said plainly.
 | A step refused mid-replay | The replay stops. The Investigation exists with the steps before it; the message names the refused step and the steps not recorded. The tab then shows the saved Investigation. |
 | A replayed expand held for four-eyes | The replay stops there: the held step is on record waiting for approval; the steps after it are named as not recorded. |
 | Four-eyes while unsaved | An unsaved Expand whose presets would be held (`expandApproval` over the profile presets and the Space's limits) is refused before it runs: "This Expand needs approval from a second person, so it cannot run unsaved. Save first, then Expand." |
-| Masking | Start values are the values the analyst typed or chose (as today's New form seeds). An Expand from the outer ring replays without naming ids, so masked aliases never travel. An Expand from named values sends the canvas values; a masked alias the server cannot resolve is refused and stops the replay (said, not hidden). |
+| Masking | Start values are the values the analyst typed or chose (as today's New form seeds). Expand lists are sent as value lists: each value is mapped to the Investigation's own id through the Working Set's `exploreAliases` before it is sent; one the Working Set does not hold falls back to the server's own walk, never a refused id. |
+| Busy entities | An unsaved Expand with Hold unticked asks the same override confirmation as the saved path; the start ring and Start from selected run the four-eyes check up front. |
 | Reader without Incident management | Explores unsaved (start, Expand); Save is disabled with "Needs Incident management." |
 | Close, File ▸ New, File ▸ Open | Ask "Save, Discard or Cancel" while unsaved. |
 | Reload or leaving the browser tab | The browser's leave prompt (`beforeunload`). Unsaved work is held in memory only, so a reload loses it. Moving to another page of the same Space keeps it (the page is kept alive, `KEEP_ALIVE`). |
@@ -93,3 +99,6 @@ Time: Time window, Snapshot marker · Compare: Threshold, Compare) · Scope list
 
 - Unsaved work survives a reload only if it is kept in the browser; not built (D2 says in memory; the leave prompt warns).
 - Keep / Hide / Exclude / Annotate and the other steps while unsaved.
+- An unsaved draw that applies the profile presets exactly (a server preview of an expand without an Investigation).
+- On a saved Investigation, **Add start entities…** opens the start form in add mode and records one `seed` step
+  (replaces what the removed checkbox offered: start entities outside the Working Set).

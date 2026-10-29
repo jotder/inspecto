@@ -510,6 +510,7 @@
             }
             <!-- the page projects ONE Expand form; captured once, stamped where it shows (a slot in an unrendered branch swallows it) -->
             <ng-template #expandSlot><ng-content select="[laExpand]" /></ng-template>
+            <ng-template #startSlot><ng-content select="[laNewInvestigation]" /></ng-template>
             @if (!store.active() && store.unsaved(); as u) {
                 <!-- ── LA-UNSAVED-INVESTIGATION-1: working before Save ── -->
                 <div class="flex flex-wrap items-center gap-2" data-testid="unsaved-header">
@@ -644,7 +645,7 @@
                     </form>
                 } @else if (!store.queuedSeeds().length) {
                     <!-- LA-PANELS-REDESIGN-1: the New Investigation form (the page projects it; File ▸ New lands here) -->
-                    <ng-content select="[laNewInvestigation]" />
+                    <ng-container [ngTemplateOutlet]="startSlot" />
                 } @else if (projection(); as p) {
                     <!-- Top results queued from the On screen / Whole Dataset tools: they become the first step -->
                     <p class="text-secondary m-0 text-sm" data-testid="investigation-queued-start">
@@ -925,6 +926,24 @@
                 <inspecto-alert variant="info" title="Kept entities were not excluded">
                     {{ store.lastStep()!.protected!.join(', ') }} — a keep step protects them.
                 </inspecto-alert>
+            }
+            @if (canWrite()) {
+                <div class="flex flex-col gap-2" data-testid="act-add-start">
+                    <div>
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-testid="add-start-entities"
+                            [attr.aria-expanded]="store.addingStart()"
+                            (click)="store.addingStart.set(!store.addingStart())"
+                        >
+                            Add start entities…
+                        </button>
+                    </div>
+                    @if (store.addingStart()) {
+                        <ng-container [ngTemplateOutlet]="startSlot" />
+                    }
+                </div>
             }
             <div class="flex flex-col gap-2" data-testid="act-selected">
                 <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Selected entity</h3>

@@ -1218,7 +1218,7 @@
                                 class="absolute inset-x-0 top-1/4 z-10 mx-auto block w-full max-w-md p-4"
                                 icon="heroicons_outline:magnifying-glass-plus"
                                 title="The Working Set is empty"
-                                message="No start entities yet. Draw a graph, select entities on it, then choose Start from selected in the Investigation tab."
+                                message="No start entities yet. In the Investigation tab choose Add start entities…, or select entities on a graph and choose Start."
                                 data-testid="la-empty-working-set"
                             ></inspecto-empty-state>
                         }
@@ -1635,7 +1635,8 @@
                                         [graphOnScreen]="graphOnScreen()"
                                         [columns]="startColumns()"
                                         (datasetPicked)="readStartColumns($event)"
-                                        (create)="startUnsaved($event)"
+                                        [adding]="investigation.active()"
+                                        (create)="onStartForm($event)"
                                         (listsWanted)="refreshEntityLists()"
                                     ></inspecto-link-analysis-start-box>
                                 </inspecto-link-analysis-investigation>

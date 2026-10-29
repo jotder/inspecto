@@ -2268,7 +2268,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.toastr.info(UNSAVED_FOUR_EYES);
             return;
         }
-        const values = picked.map((n) => n.data.label);
+        // every spelling the node stands for, as the tab's Start seeds them (never only the label)
+        const values = [...new Set(picked.flatMap((n) => rawIdsOf(n)))];
         const before = this.graph();
         for (const n of picked) await this.expandNode(n.id, n.data.label, n.data.spellings);
         if (this.graph() === before) return; // the draw failed (its error is shown): nothing is recorded
@@ -2338,6 +2339,27 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (choice === 'save') return this.saveUnsaved();
         this.investigation.discardUnsaved();
         return true;
+    }
+
+    /**
+     * "Add start entities…" on an open Investigation (the start form in add mode): the values it names - one entity, an
+     * Entity List's members, pasted values - are recorded as ONE \`seed\` step, outside the Working Set as they may be.
+     */
+    async addStartEntities(req: UnsavedStartRequest): Promise<void> {
+        if (!this.investigation.active() || req.start.kind === 'graph' || req.start.kind === 'dataset') return;
+        const start = req.start;
+        const v = start.kind === 'entity' ? { values: [start.value], entityType: start.entityType } : await this.startValues(start);
+        if (!v?.values.length) return;
+        const type = v.entityType ?? this.investigation.binding()?.entityType;
+        if (await this.investigation.apply({ op: 'seed', ids: v.values, ...(type ? { entityType: type } : {}) })) {
+            this.investigation.showWorkingSet.set(true);
+            this.investigation.addingStart.set(false);
+        }
+    }
+
+    /** The start form's answer: a new unsaved start, or - on an open Investigation - more start entities. */
+    onStartForm(req: UnsavedStartRequest): void {
+        void (this.investigation.active() ? this.addStartEntities(req) : this.startUnsaved(req));
     }
 
     /** Reloading or leaving the browser tab with unsaved steps: the browser asks first (they are held in memory only). */
@@ -4936,6 +4958,8 @@ Its prior copies stay in its version history.`,
             return;
         }
         if (this.investigation.unsaved()) {
+            // through busy entities is the same sealed override once saved: ask first, as the saved path does
+            if (!req.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
             await this.expandUnsaved(ctx, req, from);
             return;
         }

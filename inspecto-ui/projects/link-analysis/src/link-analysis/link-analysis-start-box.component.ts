@@ -110,7 +110,7 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                 Draw a few entities and their links, then Expand one degree at a time.
             </p>
         } @else {
-            <h3 class="m-0 text-base font-semibold" [id]="titleId()">New Investigation</h3>
+            <h3 class="m-0 text-base font-semibold" [id]="titleId()">{{ adding() ? 'Add start entities' : 'New Investigation' }}</h3>
             <p class="text-secondary mb-2 mt-1 text-sm">
                 Start, then Expand. Nothing is recorded until you Save; Save asks for a Name and a Purpose.
             </p>
@@ -252,7 +252,7 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                         }
                     }
                 }
-                @if (mode() === 'investigation') {
+                @if (mode() === 'investigation' && !adding()) {
                     <inspecto-option-picker
                         data-testid="new-time-col"
                         label="Time column"
@@ -379,6 +379,8 @@ export class LinkAnalysisStartBoxComponent {
     readonly maskingMode = input<string | null>(null);
     /** The profile's last degree: Degrees offers no more. */
     readonly maxDegree = input(3);
+    /** Add mode (an open Investigation's "Add start entities…"): only the start inputs; Start records ONE seed step. */
+    readonly adding = input(false);
     /** Saving an Investigation needs Incident management; starting unsaved does not (the form says so under Start). */
     readonly canWrite = input(true);
     /** The picked Dataset's columns (the page reads them); the Time column picker offers them. */
@@ -397,6 +399,7 @@ export class LinkAnalysisStartBoxComponent {
     readonly graphOnScreen = input<{ name: string } | null>(null);
     /** Start from's choices: the four starts, plus *The graph on screen* in the New form while a graph is drawn. */
     readonly kindOptions = computed<PickerOption[]>(() => {
+        if (this.adding()) return KINDS.filter((k) => k.value !== 'dataset');
         const g = this.mode() === 'investigation' ? this.graphOnScreen() : null;
         return g
             ? [...KINDS, { value: 'graph', label: 'Graph on screen', hint: `${g.name}, no start entities yet` }]
@@ -615,6 +618,7 @@ export class LinkAnalysisStartBoxComponent {
     });
 
     readonly submitLabel = computed(() => {
+        if (this.adding()) return 'Add start entities';
         if (this.mode() === 'investigation') return 'Start';
         switch (this.kind()) {
             case 'list':
@@ -631,6 +635,7 @@ export class LinkAnalysisStartBoxComponent {
     /** What pressing the button will do on this level, in one line. */
     readonly whatHappens = computed(() => {
         const kind = this.kind();
+        if (this.adding()) return 'Records them as one Start step of this Investigation.';
         if (this.mode() === 'investigation') {
             if (kind === 'graph') return 'Works on the graph on screen, with no start entities yet. Nothing is recorded until you Save.';
             if (kind === 'dataset') return 'Draws the whole Dataset, with no start entities yet. Nothing is recorded until you Save.';

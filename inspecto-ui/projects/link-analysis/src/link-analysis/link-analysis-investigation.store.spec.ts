@@ -1164,38 +1164,80 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
 
 describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSAVED-INVESTIGATION-1 review)', () => {
     const REQ = { direction: 'either' as const, degrees: 3, linkKinds: null, hold: true, threshold: 500 };
-    function serve(t: ReturnType<typeof setup>, refuseAt?: number) {
+    /**
+     * A fake server that keeps a real Working Set: a seed adds its ids at hop 0; an expand admits what \`admits\` gives for
+     * the ids it named (at the next hop), and 422s an id the Working Set does not hold - as InvestigationRoutes does.
+     */
+    function serve(t: ReturnType<typeof setup>, admits: (ids: string[], n: number) => string[], aliases: Record<string, string> = {}) {
         const sent: Record<string, unknown>[] = [];
-        t.sets['inv-1'] = ws([]);
+        t.sets['inv-1'] = { ...ws([]), exploreAliases: aliases } as WorkingSet;
         t.inv.appendInvestigationOp.mockImplementation((_id: string, op: Record<string, unknown>) => {
             sent.push(op);
-            if (sent.length === refuseAt)
-                return throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } }));
-            t.logs['inv-1'] = { ...t.logs['inv-1'], entries: [...t.logs['inv-1'].entries, entry(sent.length, { op: op['op'] as never })] };
-            return of({ ...step(sent.length, op['op'] as string), delta: { ...step(0, '').delta, admitted: ['z'] } });
+            const n = sent.length;
+            const ids = op['ids'] as string[];
+            const cur = t.sets['inv-1'];
+            const held = new Set(cur.entities.map((e) => e.id));
+            if (op['op'] === 'expand' && ids.some((id) => !held.has(id)))
+                return throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'not in the Working Set' } } }));
+            const admitted = op['op'] === 'seed' ? ids.map((id) => Object.entries(aliases).find(([, e]) => e === id)?.[0] ?? id) : admits(ids, n);
+            const hop = op['op'] === 'seed' ? 0 : Math.max(0, ...cur.entities.map((e) => e.hop)) + 1;
+            t.sets['inv-1'] = {
+                ...cur,
+                entities: [...cur.entities, ...admitted.filter((id) => !held.has(id)).map((id) => ({ ...ws([id]).entities[0], hop }))],
+                hash: `h${n}`,
+            };
+            t.logs['inv-1'] = { ...t.logs['inv-1'], entries: [...t.logs['inv-1'].entries, entry(n, { op: op['op'] as never })] };
+            return of({ ...step(n, op['op'] as string), delta: { ...step(0, '').delta, admitted } });
         });
         return sent;
     }
-
-    it('an Expand recorded with its walked lists replays exactly those values, one expand per degree, no more', async () => {
-        const t = setup();
-        const sent = serve(t);
+    const begin = (t: ReturnType<typeof setup>, walked: string[][], seed = ['a']) =>
         t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
-            { kind: 'seed', ids: ['a'] },
-            { kind: 'expand', from: 'outer', ids: [], req: REQ, walked: [['a'], ['b', 'c']] },
+            { kind: 'seed', ids: seed },
+            { kind: 'expand', from: 'outer', ids: [], req: REQ, walked },
         ]);
+
+    it('replays exactly the values each degree expanded from on screen, one expand per degree, no more', async () => {
+        const t = setup();
+        const sent = serve(t, (ids) => (ids[0] === 'a' ? ['b', 'c'] : ['d']));
+        begin(t, [['a'], ['b', 'c']]);
         const out = await t.store.saveUnsaved('n', 'p');
         expect(sent.map((o) => o['ids'])).toEqual([['a'], ['a'], ['b', 'c']]); // degree 3 stopped early on screen: not sent
+        expect(out).toEqual({ created: true, recorded: 3, message: '' });
+    });
+
+    it('the server admits fewer than the screen drew: a degree it never admitted expands from what it did admit, and Save completes', async () => {
+        const t = setup();
+        // the presets (a window, a row budget) cut degree 1 on the server: it admits only z, never b or c
+        const sent = serve(t, (ids) => (ids[0] === 'a' ? ['z'] : ['y']));
+        begin(t, [['a'], ['b', 'c']]);
+        const out = await t.store.saveUnsaved('n', 'p');
+        expect(sent.map((o) => o['ids'])).toEqual([['a'], ['a'], ['z']]); // never b or c: no 422
+        expect(out).toEqual({ created: true, recorded: 3, message: '' });
+        expect(t.store.workingSet()!.entities.map((e) => e.id)).toEqual(['a', 'z', 'y']);
+    });
+
+    it('on a masked Space the drawn aliases are spoken in this Investigation\'s own ids before they are sent', async () => {
+        const t = setup();
+        // synthetic aliases: the explorer drew the Space's alias sp-*, the Investigation names them inv-*
+        const aliases = { 'inv-1a': 'sp-1a', 'inv-2b': 'sp-2b' };
+        const sent = serve(t, (ids) => (ids[0] === 'inv-1a' ? ['inv-2b'] : []), aliases);
+        begin(t, [['sp-1a'], ['sp-2b']], ['sp-1a']);
+        const out = await t.store.saveUnsaved('n', 'p');
+        expect(sent.map((o) => o['ids'])).toEqual([['sp-1a'], ['inv-1a'], ['inv-2b']]);
         expect(out.recorded).toBe(3);
+        expect(out.message).toBe('');
     });
 
     it('an Expand refused at its degree 2 counts the degree already recorded', async () => {
         const t = setup();
-        serve(t, 3);
-        t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
-            { kind: 'seed', ids: ['a'] },
-            { kind: 'expand', from: 'outer', ids: [], req: REQ, walked: [['a'], ['b']] },
-        ]);
+        serve(t, () => ['b']);
+        const impl = t.inv.appendInvestigationOp.getMockImplementation()!;
+        let n = 0;
+        t.inv.appendInvestigationOp.mockImplementation((id: string, op: Record<string, unknown>) =>
+            ++n === 3 ? throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } })) : impl(id, op),
+        );
+        begin(t, [['a'], ['b']]);
         const out = await t.store.saveUnsaved('n', 'p');
         expect(out.recorded).toBe(2); // the seed and degree 1
         expect(out.message).toContain('Saved with 2 steps. Step 2');

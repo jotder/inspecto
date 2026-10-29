@@ -1428,3 +1428,25 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
         await expectNoA11yViolations(el);
     });
 });
+
+describe('LinkAnalysisInvestigationComponent - Add start entities… (LA-UNSAVED-INVESTIGATION-1 review)', { timeout: 45_000 }, () => {
+    it('opens the start form on the open Investigation, to pick start entities outside the Working Set', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="projected-new-form"]')).toBeNull();
+        const add = el.querySelector('[data-testid="add-start-entities"]') as HTMLButtonElement;
+        add.click();
+        fixture.detectChanges();
+        expect(add.getAttribute('aria-expanded')).toBe('true');
+        expect(el.querySelector('[data-testid="act-add-start"] [data-testid="projected-new-form"]')).not.toBeNull();
+        await expectNoA11yViolations(el.querySelector('[data-testid="act-add-start"]') as HTMLElement);
+    });
+
+    it('is not offered to a reader', async () => {
+        const { fixture, store, el } = create({ canManage: false });
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="add-start-entities"]')).toBeNull();
+    });
+});

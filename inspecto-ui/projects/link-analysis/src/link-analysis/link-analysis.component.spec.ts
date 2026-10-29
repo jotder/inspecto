@@ -5138,6 +5138,62 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(c.growExclude.lastChange()?.text).toContain('Save first');
     });
 
+    it('an unsaved Expand through busy entities asks first, as the saved path does; No records nothing', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
+        const calls = expand.mock.calls.length;
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: false, threshold: 500 }, from: 'outer' });
+        expect(ask).toHaveBeenCalledWith(expect.stringContaining('Busy entities can pull in many unrelated entities'), expect.anything());
+        expect(expand.mock.calls.length).toBe(calls);
+        expect(c.investigation.unsaved()!.steps).toHaveLength(2);
+    });
+
+    it('Start from selected seeds every spelling of a merged node, as the tab\'s Start does', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({ start: { kind: 'dataset', datasetId: 'transfers' }, defaults: { name: 'A', purpose: 'B' }, timeCol: '', timeColZone: '', degrees: 0 });
+        const n = c.graph()!.nodes[0];
+        c.graph.set({ ...c.graph()!, nodes: [{ ...n, data: { ...n.data, spellings: ['ID-7', 'id 7'] } }, ...c.graph()!.nodes.slice(1)] });
+        c.onSelectionChange([n.id]);
+        await c.startFromSelected();
+        const [seed, ring1] = c.investigation.unsaved()!.steps;
+        expect(seed).toEqual(expect.objectContaining({ kind: 'seed', ids: ['ID-7', 'id 7'] }));
+        expect(ring1).toEqual(expect.objectContaining({ kind: 'expand', walked: [['ID-7', 'id 7']] }));
+    });
+
+    it('Add start entities… seeds the start form\'s values into the open Investigation as ONE step', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-1');
+        c.investigation.addingStart.set(true);
+        const apply = vi.spyOn(c.investigation, 'apply').mockResolvedValue(true);
+        const start = vi.spyOn(c, 'startUnsaved');
+        c.onStartForm({
+            start: { kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'A-2'] },
+            defaults: { name: '', purpose: '' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        await settle(fixture);
+        expect(start).not.toHaveBeenCalled(); // not a new unsaved start
+        expect(apply).toHaveBeenCalledWith({ op: 'seed', ids: ['A-1', 'A-2'], entityType: 'account' });
+        expect(c.investigation.addingStart()).toBe(false);
+    });
+
     it('Close ▸ Save that stops partway keeps the saved Investigation open, its message on the tab', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
@@ -6051,7 +6107,7 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.detectChanges();
         const empty = fixture.nativeElement.querySelector('[data-testid="la-empty-working-set"]') as HTMLElement;
         expect(empty?.textContent).toContain('The Working Set is empty');
-        expect(empty?.textContent).toContain('Start from selected');
+        expect(empty?.textContent).toContain('Add start entities');
         expect(empty.querySelector('button')).toBeNull();
         fixture.destroy();
     });
