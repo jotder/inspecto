@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **78<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 62<!--count:backlog-p3--> × P3** —
+> **79<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 62<!--count:backlog-p3--> × P3** —
+> ⬆ **78 → 79 (P2 16 → 17) on 2026-10-29**: filed P2 feature `LA-PRODUCT-NEXT-1` (the LA feature brainstorm's five phases; phase 1 brings role and access-policy edits under maker-checker; plan in `superpower/la-product-next-plan.md`).
 > ⬆ **77 → 78 (P2 15 → 16) on 2026-10-29**: filed P2 chore `LA-UI-TEXT-PASS-1` (the LA UI text review: 209 findings, plan in `superpower/la-ui-text-pass.md`).
 > ⬆ **76 → 77 (P3 61 → 62) on 2026-10-29**: filed P3 defect `LA-INVESTIGATION-EDIT-HARDENING-1` (the review residuals of the Investigation rename route, `PATCH /inv/investigations/{id}`).
 > ⬆ **75 → 76 (P3 60 → 61) on 2026-10-29**: filed P3 defect `INTELLIGENCE-GLOSSARY-ANNOTATED-1` (LA UI test: the glossary loader skips annotated entries; `docs_search` reads internal docs; the UI side shipped with the LA UI test fixes).
@@ -365,11 +366,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 62<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 62<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 78<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 79<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -677,6 +678,10 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
     - malformed New-form defaults.
   - **Before fixing:** 8 vocabulary choices are operator calls.
   - **Plan:** [`superpower/la-ui-text-pass.md`](superpower/la-ui-text-pass.md).
+- **P2** · `LA-PRODUCT-NEXT-1` — **Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "What can this role do?", Investigation access review, time-cutoff playback, and a pattern from the selection** [items: module.la-core, module.access · kind: feature]
+  - **Phase 1 is a security gap** (verified 2026-10-29): `PUT /access/roles` and `PUT /access/policies` write straight to disk, while Access Catalog and Profile edits go through `PendingChanges.hold`. So an Approval Policy cannot hold the write that grants capabilities.
+  - **Decisions** NX-D1…NX-D4 were made by the assistant under operator delegation and are pending confirmation. The deferred ideas and their reasons are in the plan's §4.
+  - **Plan:** [`superpower/la-product-next-plan.md`](superpower/la-product-next-plan.md).
 - **P3** · `LA-INVESTIGATION-EDIT-HARDENING-1` — **harden the Investigation rename route (`PATCH /inv/investigations/{id}`, shipped 2026-10-29)** [items: module.la-core · kind: defect]
   - **Found** by its independent review, none of it blocking.
   - **Lost update:** two leads editing title and purpose at once can undo each other (`InvestigationRoutes` read-modify-write, no lock).

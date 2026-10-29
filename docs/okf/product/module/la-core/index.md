@@ -43,6 +43,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §9-§10; plan archived l… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-UI-TEXT-PASS-1` | P2 | chore | make every Link Analysis Studio caption, hint, tooltip and message compact, plain and consistent | — |
+| `LA-PRODUCT-NEXT-1` | P2 | feature | Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "Wh… | — |
 | `LA-INVESTIGATION-EDIT-HARDENING-1` | P3 | defect | harden the Investigation rename route (PATCH /inv/investigations/{id}, shipped 2026-10-29) | — |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
 | `LA-SUSPICION-FACTORS-INVESTIGATION-1` | P3 | defect | an Investigation canvas's *Factors* still 404 on a masked Space (residual of LA-SUSPICION-FACTORS-MASKED-1, 2026-10-28). | — |
