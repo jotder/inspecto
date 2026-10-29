@@ -227,6 +227,8 @@ public final class PgInvestigationStore implements InvestigationStore {
             // set_bytes: the running total of this Investigation's sets (main + live Drafts); NULL = not counted yet (a table made before the
             // counter existed): computed once, lazily, under the row lock, then kept in the SAME transaction as every write that changes a set.
             "ALTER TABLE " + t("la_investigation") + " ADD COLUMN IF NOT EXISTS set_bytes bigint",
+            // details: the title and purpose as edited after create (LA-INVESTIGATION-RENAME-1); the sealed header never changes
+            "ALTER TABLE " + t("la_investigation") + " ADD COLUMN IF NOT EXISTS details text",
             "CREATE TABLE IF NOT EXISTS " + t("la_log") + " (inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), draft text NOT NULL DEFAULT '', "
                     + "seq int NOT NULL, line text NOT NULL, PRIMARY KEY (inv, draft, seq))",
             "CREATE TABLE IF NOT EXISTS " + t("la_set") + " (inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), draft text NOT NULL DEFAULT '', "
@@ -496,6 +498,20 @@ public final class PgInvestigationStore implements InvestigationStore {
     @Override
     public boolean deleteCaseLink(String investigationId) throws IOException {
         return tx(c -> update(c, "UPDATE " + t("la_investigation") + " SET case_link = NULL WHERE id = ? AND case_link IS NOT NULL", investigationId) == 1);
+    }
+
+    @Override
+    public void writeDetails(String investigationId, String json) throws IOException {
+        tx(c -> {
+            if (update(c, "UPDATE " + t("la_investigation") + " SET details = ? WHERE id = ?", json, investigationId) != 1)
+                throw new IOException("no such investigation '" + investigationId + "'");
+            return null;
+        });
+    }
+
+    @Override
+    public Optional<String> details(String investigationId) throws IOException {
+        return Optional.ofNullable(tx(c -> one(c, "SELECT details FROM " + t("la_investigation") + " WHERE id = ?", investigationId)));
     }
 
     @Override

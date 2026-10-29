@@ -663,6 +663,21 @@ export interface WorkingSet {
 }
 
 /** One row of `GET /inv/investigations` — what the caller may read: their own and those shared through an open Case. */
+/** `PATCH /inv/investigations/{id}`: at least one field; the title is non-blank (at most 200 chars), the purpose non-blank. */
+export interface InvestigationDetailsChange {
+    title?: string;
+    purpose?: string;
+}
+
+/** The answer to an edit: the title and purpose now in force (masked as the log masks the header), by whom and when. */
+export interface InvestigationDetails {
+    id: string;
+    title: string | null;
+    purpose: string | null;
+    updatedBy: string;
+    updatedAt: string;
+}
+
 export interface InvestigationListItem {
     id: string;
     title: string | null;
@@ -1811,6 +1826,11 @@ export class InvService {
         return this.http.delete<{ id: string; deleted: boolean; steps: number; drafts: number }>(
             apiUrl(`/inv/investigations/${encodeURIComponent(id)}`),
         );
+    }
+
+    /** Rename an Investigation and/or restate its purpose (LA-INVESTIGATION-RENAME-1) — a lead with `canManageIncidents`; the sealed header is kept. */
+    editInvestigation(id: string, change: InvestigationDetailsChange): Observable<InvestigationDetails> {
+        return this.http.patch<InvestigationDetails>(apiUrl(`/inv/investigations/${encodeURIComponent(id)}`), change);
     }
 
     createInvestigation(req: InvestigationCreateRequest): Observable<InvestigationHeader> {

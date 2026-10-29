@@ -8,8 +8,10 @@ import {
     input,
     output,
     signal,
+    untracked,
     viewChild,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LensService } from '@inspecto/core/api';
 import {
     FormControl,
@@ -188,12 +190,74 @@ export class LinkAnalysisInvestigationComponent {
     /** The Act panel's last five steps, newest first. */
     readonly lastSteps = computed(() => (this.store.log()?.entries ?? []).slice(-5).reverse());
 
+    // ── Settings ▸ General: rename and restate the purpose (LA-INVESTIGATION-RENAME-1) ──
+    /** The caller's role on the open Investigation (members route): null = no Subject, nothing enforced; 'reader' = not a member; undefined = not read yet. */
+    private readonly detailsRole = signal<string | null | undefined>(undefined);
+    /** Title and Purpose are editable for a lead holding `canManageIncidents` — the server's own gate. */
+    readonly canEditDetails = computed(
+        () => this.canWrite() && (this.detailsRole() === 'lead' || this.detailsRole() === null),
+    );
+    /** Why Title and Purpose are read-only; '' while they are editable or the role is still being read. */
+    readonly detailsReadOnlyReason = computed(() => {
+        if (!this.canWrite()) return 'Renaming an Investigation needs the Incident management capability.';
+        if (this.detailsRole() === undefined || this.canEditDetails()) return '';
+        return 'Only a lead of this Investigation can rename it or change its purpose.';
+    });
+    readonly detailsTitle = new FormControl('', { nonNullable: true });
+    readonly detailsPurpose = new FormControl('', { nonNullable: true });
+    readonly detailsTitleError = signal('');
+    readonly detailsPurposeError = signal('');
+
+    /** Commit one edited field; a blank value is refused here, a server refusal puts the value in force back. */
+    async saveDetails(field: 'title' | 'purpose', value: string): Promise<void> {
+        const id = this.store.activeId();
+        if (!id || !this.canEditDetails()) return;
+        const error = field === 'title' ? this.detailsTitleError : this.detailsPurposeError;
+        const v = value.trim();
+        if (!v) {
+            error.set(field === 'title' ? 'A title is required.' : 'A purpose is required.');
+            return;
+        }
+        error.set('');
+        if (!(await this.store.editDetails(id, { [field]: v }))) this.showDetails();
+    }
+
+    /** Put the values in force into the two fields (no commit fires). */
+    private showDetails(): void {
+        const h = this.store.header();
+        this.detailsTitle.setValue(this.store.displayTitle() || h?.id || '', { emitEvent: false });
+        this.detailsPurpose.setValue(h?.purpose ?? '', { emitEvent: false });
+    }
+
+    private async loadDetailsRole(id: string): Promise<void> {
+        let role: string | null = 'reader';
+        try {
+            role = (await firstValueFrom(this.inv.investigationMembers(id))).you;
+        } catch {
+            // not a member (a Case member reads 404): read-only
+        }
+        if (this.store.activeId() === id) this.detailsRole.set(role);
+    }
+
     /** Back on the tab: one instance (the Act panel) re-reads, so a decision made elsewhere shows without reopening. */
     onWindowFocus(): void {
         if (this.section() === 'act') void this.store.reload();
     }
 
     constructor() {
+        // Settings ▸ General: read the caller's role once per open Investigation, and show the values in force.
+        effect(() => {
+            const id = this.section() === 'settings' ? this.store.activeId() : null;
+            this.detailsRole.set(undefined);
+            if (id) untracked(() => void this.loadDetailsRole(id));
+        });
+        effect(() => {
+            this.store.header();
+            this.store.displayTitle();
+            untracked(() => this.showDetails());
+        });
+        this.detailsTitle.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => void this.saveDetails('title', v));
+        this.detailsPurpose.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => void this.saveDetails('purpose', v));
         // Prefill the time column from the canvas / Dataset default; an analyst's own edit is never overwritten.
         effect(() => {
             const col = this.timeCol();

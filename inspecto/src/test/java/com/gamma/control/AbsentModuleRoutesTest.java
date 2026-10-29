@@ -52,7 +52,7 @@ class AbsentModuleRoutesTest {
 
     @Test
     void theSurfaceIsReadFromTheManifestsOfTheOptionalModules() {
-        assertEquals(82 + 6 + 5 + 1 + 3 + 3 + 1 + 1, AbsentModuleRoutes.surface("la-api", "geo-link").size()); // + the 4 Entity profile routes (2026-10-15), + 5 integration routes (LA-EDITIONS-1 phases 5-6), + the analyst upload route (LA-ANALYST-UPLOAD-1), + its status reads and delete (LA-I2-GAPS-RESIDUALS-1), + the two Grow previews (LA-GROW-EXCLUDE-1), + GET /inv/exclusion-lists (LA-GROW-EXCLUDE-1 phase 4), + the Start box type-ahead (LA-ONBOARD-1 phase 6), + DELETE /inv/investigations/{id} (LA-INVESTIGATION-DELETE-1)
+        assertEquals(82 + 6 + 5 + 1 + 3 + 3 + 1 + 1 + 1, AbsentModuleRoutes.surface("la-api", "geo-link").size()); // + the 4 Entity profile routes (2026-10-15), + 5 integration routes (LA-EDITIONS-1 phases 5-6), + the analyst upload route (LA-ANALYST-UPLOAD-1), + its status reads and delete (LA-I2-GAPS-RESIDUALS-1), + the two Grow previews (LA-GROW-EXCLUDE-1), + GET /inv/exclusion-lists (LA-GROW-EXCLUDE-1 phase 4), + the Start box type-ahead (LA-ONBOARD-1 phase 6), + DELETE /inv/investigations/{id} (LA-INVESTIGATION-DELETE-1), + PATCH /inv/investigations/{id} (LA-INVESTIGATION-RENAME-1)
         assertEquals(List.of("GET /risk-scores/([^/]+)/([^/]+)", "GET /risk-score-lists/([^/]+)", "POST /risk-scores/preview"),
                 AbsentModuleRoutes.surface("scoring").stream().map(r -> r[0] + " " + r[1]).toList());
     }

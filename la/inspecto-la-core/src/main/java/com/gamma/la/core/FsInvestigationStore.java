@@ -483,6 +483,16 @@ public final class FsInvestigationStore implements InvestigationStore {
     }
 
     @Override
+    public void writeDetails(String investigationId, String json) throws IOException {
+        snapshots.writeDetails(investigationId, json);
+    }
+
+    @Override
+    public Optional<String> details(String investigationId) throws IOException {
+        return Optional.ofNullable(snapshots.readDetails(investigationId));
+    }
+
+    @Override
     public boolean createTemplate(String id, String json) throws IOException {
         Path root = snapshots.templateDirectory().normalize();
         Path target = root.resolve(id + ".json").normalize();

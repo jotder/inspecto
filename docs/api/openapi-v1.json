@@ -12880,6 +12880,50 @@
         },
         "x-generated" : true,
         "x-optional-module" : true
+      },
+      "patch" : {
+        "tags" : [ "inv" ],
+        "summary" : "PATCH /inv/investigations/{investigationId}",
+        "operationId" : "patchInvInvestigationsByInvestigationId",
+        "description" : "Rename an Investigation and/or restate its purpose (LA-INVESTIGATION-RENAME-1). Body {title?, purpose?}: at least one; title non-blank and at most 200 chars; purpose non-blank and within the Space's input.purpose_length. The sealed header is never rewritten: the edit is a details record beside it, shown by every read (log header, list, embed) while an issued Dossier still verifies. Gated on canManageIncidents and a lead of the Investigation (a non-lead member 403; a stranger or an unknown id 404). An audit event LINK_INVESTIGATION_EDITED records the fields changed with their values before and after. Answers {id, title, purpose, updatedBy, updatedAt}, masked per the Space's maskingMode.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string" }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "title" : { "type" : "string", "maxLength" : 200 },
+                  "purpose" : { "type" : "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped {id, title, purpose, updatedBy, updatedAt}."
+          },
+          "403" : {
+            "description" : "No canManageIncidents, or a member who is not a lead."
+          },
+          "404" : {
+            "description" : "No such Investigation, or not readable by the caller."
+          },
+          "422" : {
+            "description" : "Neither field given, a blank or over-long title, or a blank or over-long purpose."
+          },
+          "503" : {
+            "description" : "No write root, or Investigations are not available in this edition (Basic)."
+          }
+        },
+        "x-optional-module" : true
       }
     },
     "/inv/investigations/{investigationId}/embeds" : {

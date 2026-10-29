@@ -318,6 +318,10 @@ abstract class InvestigationStoreContract {
         assertEquals("{\"caseRef\":\"c1\"}", s.caseLink("w").orElseThrow());
         assertTrue(s.deleteCaseLink("w"));
         assertFalse(s.deleteCaseLink("w"));
+        assertTrue(s.details("w").isEmpty());
+        s.writeDetails("w", "{\"title\":\"a\"}");
+        s.writeDetails("w", "{\"title\":\"b\"}");
+        assertEquals("{\"title\":\"b\"}", s.details("w").orElseThrow());
         assertTrue(s.alertRuleBinding("w", "r").isEmpty());
         s.bindAlertRule("w", "r", "{\"rule\":\"r\"}");
         assertEquals("{\"rule\":\"r\"}", s.alertRuleBinding("w", "r").orElseThrow());

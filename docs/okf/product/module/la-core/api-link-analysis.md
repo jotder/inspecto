@@ -15,7 +15,7 @@ Grouped; the authoritative list is each module's `META-INF/inspecto/module.toon`
 | Group | Routes |
 |---|---|
 | Exploration | `POST /inv/projection`, `/inv/projection/neighbors`, `/inv/projection/neighbors/preview` (Grow preview, read-only, Basic too), `/inv/traversal/recursive-paths`, `/inv/pattern/*`, `POST /geo/projection`, `/geo/routes` |
-| Investigations | `GET`/`POST /inv/investigations`, `.../ops`, `.../expand/preview` (Grow preview: dry-run expand, appends nothing), `/undo`, `/reorder`, `/replay`, `/log`, `/working-set`, `/members`, `/case` |
+| Investigations | `GET`/`POST /inv/investigations`, `PATCH`/`DELETE /inv/investigations/{id}` (rename and restate the purpose / delete), `.../ops`, `.../expand/preview` (Grow preview: dry-run expand, appends nothing), `/undo`, `/reorder`, `/replay`, `/log`, `/working-set`, `/members`, `/case` |
 | Four-eyes | `GET /inv/pending`, `.../pending/{id}/approve`, `/deny` |
 | Drafts | `.../drafts`, `/rebase`, `/promote`, `/discard`, `/conflicts` |
 | Dossier, embeds | `.../dossier`, `/dossier/bundle`, `/verify`, `.../embeds` |

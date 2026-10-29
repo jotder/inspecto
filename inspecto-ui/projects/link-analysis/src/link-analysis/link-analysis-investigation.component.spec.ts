@@ -131,9 +131,26 @@ const refused = (message: string) =>
     throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message } } }));
 
 function create(
-    opts: { canManage?: boolean; noWidgetLibrary?: boolean; ws?: WorkingSet; confirm?: () => Promise<boolean> } = {},
+    opts: {
+        canManage?: boolean;
+        noWidgetLibrary?: boolean;
+        ws?: WorkingSet;
+        confirm?: () => Promise<boolean>;
+        /** The caller's role the members route answers; absent = the route is not mocked (the call fails). */
+        role?: 'lead' | 'analyst' | null;
+    } = {},
 ) {
     const inv = {
+        ...(opts.role !== undefined
+            ? {
+                  investigationMembers: vi.fn(() =>
+                      of({ investigationId: 'inv-1', owner: 'alice', members: [], history: [], you: opts.role }),
+                  ),
+              }
+            : {}),
+        editInvestigation: vi.fn((id: string, c: { title?: string; purpose?: string }) =>
+            of({ id, title: c.title ?? 'Burners', purpose: c.purpose ?? null, updatedBy: 'alice', updatedAt: 'x' }),
+        ),
         createInvestigation: vi.fn(() => of(LOG.header)),
         investigationLog: vi.fn(() => of(LOG)),
         replayInvestigation: vi.fn(() => of({ workingSet: opts.ws ?? WS })),
@@ -1148,6 +1165,90 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
         expect(text).toContain("The Space's pack");
         expect(settings.querySelector('[data-testid="inv-settings-delete"]')).not.toBeNull();
         await expectNoA11yViolations(settings);
+    });
+
+    describe('rename and restate the purpose (LA-INVESTIGATION-RENAME-1)', () => {
+        const pen = (el: HTMLElement, id: string) =>
+            part(el, 'settings').querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
+
+        it('a lead edits Title and Purpose in place; the header, the Act panel and the remembered ref show the new name', async () => {
+            const { fixture, store, el, inv } = create({ role: 'lead' });
+            await openInv(store);
+            fixture.detectChanges();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            expect(inv.investigationMembers).toHaveBeenCalledWith('inv-1');
+            expect(penText(pen(el, 'inv-settings-title')!)).toBe('Burners');
+            expect(part(el, 'settings').querySelector('[data-testid="inv-settings-details-readonly"]')).toBeNull();
+
+            penEdit(fixture, pen(el, 'inv-settings-title')!, 'Ring around b');
+            await fixture.whenStable();
+            fixture.detectChanges();
+            expect(inv.editInvestigation).toHaveBeenCalledWith('inv-1', { title: 'Ring around b' });
+            expect(store.header()?.title).toBe('Ring around b');
+            expect(store.refs().find((r) => r.id === 'inv-1')?.title).toBe('Ring around b');
+            expect(act(el).querySelector('[data-testid="act-header"]')!.textContent).toContain('Ring around b');
+
+            penEdit(fixture, pen(el, 'inv-settings-purpose')!, 'Fraud referral FR-10');
+            await fixture.whenStable();
+            fixture.detectChanges();
+            expect(inv.editInvestigation).toHaveBeenLastCalledWith('inv-1', { purpose: 'Fraud referral FR-10' });
+            expect(store.header()?.purpose).toBe('Fraud referral FR-10');
+            await expectNoA11yViolations(part(el, 'settings'));
+        });
+
+        it('a blank title is refused in place and never sent', async () => {
+            const { fixture, store, el, inv } = create({ role: 'lead' });
+            await openInv(store);
+            fixture.detectChanges();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            penEdit(fixture, pen(el, 'inv-settings-title')!, '   ');
+            refresh(fixture);
+            expect(penError(pen(el, 'inv-settings-title')!)).toBe('A title is required.');
+            expect(inv.editInvestigation).not.toHaveBeenCalled();
+        });
+
+        it('a server refusal shows why and puts the name in force back', async () => {
+            const { fixture, store, el, inv } = create({ role: 'lead' });
+            inv.editInvestigation.mockReturnValue(refused("'title' is at most 200 chars"));
+            await openInv(store);
+            fixture.detectChanges();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            penEdit(fixture, pen(el, 'inv-settings-title')!, 'Too long');
+            await fixture.whenStable();
+            refresh(fixture);
+            expect(part(el, 'settings').textContent).toContain("'title' is at most 200 chars");
+            expect(penText(pen(el, 'inv-settings-title')!)).toBe('Burners');
+            expect(store.header()?.title).toBe('Burners');
+        });
+
+        it('a member who is not a lead, or a caller without the capability, reads them with the reason', async () => {
+            const analyst = create({ role: 'analyst' });
+            await openInv(analyst.store);
+            analyst.fixture.detectChanges();
+            await analyst.fixture.whenStable();
+            analyst.fixture.detectChanges();
+            const settings = part(analyst.el, 'settings');
+            expect(settings.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
+            expect(settings.querySelector('[data-testid="inv-settings-general"]')!.textContent).toContain('Burners');
+            expect(settings.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
+                'Only a lead of this Investigation',
+            );
+            TestBed.resetTestingModule();
+
+            const nocap = create({ role: 'lead', canManage: false });
+            await openInv(nocap.store);
+            nocap.fixture.detectChanges();
+            await nocap.fixture.whenStable();
+            nocap.fixture.detectChanges();
+            const s2 = part(nocap.el, 'settings');
+            expect(s2.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
+            expect(s2.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
+                'Incident management capability',
+            );
+        });
     });
 
     it('lists the last steps newest first; Open the Op log and Settings… ask the screen', async () => {

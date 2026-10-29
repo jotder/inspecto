@@ -1715,6 +1715,16 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   time, id, title, owner and the number of steps and Drafts removed, emitted once the removal has happened (a refused or failed delete leaves no false record). ⚠ Filesystem backend
   only: the Postgres store (`inspecto-la-store-pg`) keeps its log tables append-only by trigger and answers **503** until a delete is designed for it
   (BACKLOG). Not covered: a Dossier bundle or snapshot already exported stays where it was exported, and an Alert Rule bound to the Investigation stays registered (its sweeps log "no investigation") until removed on its own.
+* **Rename an Investigation or restate its purpose** (`LA-INVESTIGATION-RENAME-1`, 2026-10-29; `PATCH /inv/investigations/{id}`,
+  body `{title?, purpose?}`). Open the Investigation, then **⋯ ▸ Settings… ▸ General**: **Title** and **Purpose** are pen fields — click the
+  value or ✎, type, and press Enter (or click away) to save; Escape drops the edit. The Act panel's header and **File ▸ Open…** show the new
+  name at once. **Who:** a lead (the owner is the implicit lead) holding `canManageIncidents`; anyone else sees both values read-only with
+  the reason under them (a non-lead member is refused 403, a stranger reads 404). **Rules:** the title is non-blank and at most 200
+  characters; the purpose is non-blank and within the Space's `input.purpose_length` (422 otherwise, shown in place). **What changes:** the
+  title and purpose every read shows (log header, list, embed). The sealed header is never rewritten — the edit is a `details` record
+  beside it (`investigation-details.json`, or the `details` column on Postgres) — so a Dossier issued before the edit still verifies, and a Dossier
+  built now states the purpose and title sealed at create. **Audit:** event `LINK_INVESTIGATION_EDITED` (`link.investigation.edited`)
+  with actor, time, the fields changed and their values before and after.
 * **Case-team sharing** (LA-24, decision D-U10, shipped 2026-09-30; `InvestigationCaseRoutes`). An
   Investigation may carry an OPTIONAL `caseRef` — `caseRef` on create, `PUT`/`DELETE /inv/investigations/{id}/case`
   (owner-only, `canManageIncidents`; linking also needs a Case the caller can see, and refuses a closed one 409).

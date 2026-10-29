@@ -143,6 +143,13 @@ public interface InvestigationStore {
     /** Remove the Investigation's Case link; false when it had none. */
     boolean deleteCaseLink(String investigationId) throws IOException;
 
+    /** Write (or replace) the Investigation's edited details - {@code {title?, purpose?, updatedBy, updatedAt}} - OUTSIDE the
+     *  sealed header, which never changes (LA-INVESTIGATION-RENAME-1). */
+    void writeDetails(String investigationId, String json) throws IOException;
+
+    /** The Investigation's edited details, raw, or empty when it was never edited. */
+    Optional<String> details(String investigationId) throws IOException;
+
     /** Save one Investigation Template. False when the id is already taken, never an overwrite (409). */
     boolean createTemplate(String id, String json) throws IOException;
 

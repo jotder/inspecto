@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-119 test class(es): 18 unit, 101 real-HTTP control-plane, 0 IT.
+120 test class(es): 18 unit, 102 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -70,6 +70,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiInvestigationConnectOpTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationConnectOpTest.java` | LA-SEED-CONNECT-1, over real HTTP: the {@code connect} op - the shortest connection for every pair of seeds within 3 hops, |
 | `ControlApiInvestigationDataChangesTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationDataChangesTest.java` | LA-DATA-TRUST-1 S5 — {@code GET /inv/investigations/{id}/data-changes} over real HTTP with an ARMED Authenticator (with no |
 | `ControlApiInvestigationDeleteTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationDeleteTest.java` | LA-INVESTIGATION-DELETE-1 — {@code DELETE /inv/investigations/{id}} over real HTTP with an ARMED Authenticator (with no Subject |
+| `ControlApiInvestigationEditTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationEditTest.java` | LA-INVESTIGATION-RENAME-1 — {@code PATCH /inv/investigations/{id}} over real HTTP with an ARMED Authenticator (with no Subject |
 | `ControlApiInvestigationEmbedTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationEmbedTest.java` | LA-EMBED-VIEW-1 slices S1-S3 over real HTTP with an ARMED Authenticator (with no Subject {@code withCapability} is a no-op and every |
 | `ControlApiInvestigationEndpointTypeTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationEndpointTypeTest.java` | ONB-LA-ENDPOINT-TYPE-1 over real HTTP: an Investigation may declare its binding's endpoint Entity Type at create |
 | `ControlApiInvestigationEntityListOpsTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationEntityListOpsTest.java` | LA-17 step 4 — the Entity List ops {@code excludeBy} and {@code seedBy} over real HTTP, against the op contract |

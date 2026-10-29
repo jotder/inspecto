@@ -136,7 +136,8 @@ public final class PublicInvestigationRoutes implements RouteModule {
 
         String rawHeader = store.header(invId).orElse(null);
         if (rawHeader == null) throw revokedAndDenied(ex, store, rec, token, "INVESTIGATION_GONE", now);
-        @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(rawHeader, Map.class);
+        @SuppressWarnings("unchecked") Map<String, Object> header = InvestigationRoutes.withDetails(store, invId,
+                ApiContext.JSON.readValue(rawHeader, Map.class));
         InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(store, root, invId, header);
         String why = liveness(api, inv, rec, root);
         if (why != null) throw revokedAndDenied(ex, store, rec, token, why, now);

@@ -7,6 +7,7 @@ import {
     DraftReplayResult,
     ExpandRung,
     InvService,
+    InvestigationDetailsChange,
     InvestigationLog,
     InvestigationOpRequest,
     InvestigationReplayResult,
@@ -308,6 +309,19 @@ export class InvestigationSessionStore {
         return this.run('Could not delete the Investigation.', async () => {
             await firstValueFrom(this.inv.deleteInvestigation(id));
             this.forget(id);
+        });
+    }
+
+    /** Rename an Investigation and/or restate its purpose on the server, then show it here: the open log's header and the
+     *  remembered ref (File ▸ Open… Recent) take the new values. A refusal leaves both as they were and shows why. */
+    async editDetails(id: string, change: InvestigationDetailsChange): Promise<boolean> {
+        return this.run('Could not save the change.', async () => {
+            const d = await firstValueFrom(this.inv.editInvestigation(id, change));
+            this.log.update((l) =>
+                l && this.activeId() === id ? { ...l, header: { ...l.header, title: d.title, purpose: d.purpose } } : l,
+            );
+            if (change.title !== undefined)
+                this.refs.update((all) => all.map((r) => (r.id === id ? { ...r, title: change.title } : r)));
         });
     }
 

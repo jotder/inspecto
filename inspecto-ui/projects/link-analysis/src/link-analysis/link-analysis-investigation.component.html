@@ -9,10 +9,36 @@
                 @if (store.header(); as h) {
     <la-fold title="General" [forceOpen]="true">
                 <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm" data-testid="inv-settings-general">
+                    <!-- LA-INVESTIGATION-RENAME-1: a lead with the capability renames it and restates its purpose in place -->
                     <dt class="text-secondary">Title</dt>
-                    <dd class="m-0">{{ store.displayTitle() || h.id }}</dd>
+                    <dd class="m-0 min-w-0">
+                        @if (canEditDetails()) {
+                            <inspecto-pen-field
+                                ariaLabel="Title"
+                                [formControl]="detailsTitle"
+                                [maxlength]="200"
+                                [error]="detailsTitleError()"
+                                data-testid="inv-settings-title"
+                            />
+                        } @else {
+                            {{ store.displayTitle() || h.id }}
+                        }
+                    </dd>
                     <dt class="text-secondary">Purpose</dt>
-                    <dd class="m-0">{{ h.purpose || '—' }}</dd>
+                    <dd class="m-0 min-w-0">
+                        @if (canEditDetails()) {
+                            <inspecto-pen-field
+                                ariaLabel="Purpose"
+                                [multiline]="true"
+                                [formControl]="detailsPurpose"
+                                [maxlength]="1000"
+                                [error]="detailsPurposeError()"
+                                data-testid="inv-settings-purpose"
+                            />
+                        } @else {
+                            {{ h.purpose || '—' }}
+                        }
+                    </dd>
                     <dt class="text-secondary">Dataset</dt>
                     <dd class="m-0">{{ h.dataset }}</dd>
                     <dt class="text-secondary">Time column</dt>
@@ -22,6 +48,9 @@
                     <dt class="text-secondary">Industry pack</dt>
                     <dd class="m-0">{{ h.pack || "The Space's pack" }}</dd>
                 </dl>
+                @if (detailsReadOnlyReason(); as why) {
+                    <p class="text-secondary m-0 text-xs" data-testid="inv-settings-details-readonly">{{ why }}</p>
+                }
                 <div>
                     <button
                         mat-stroked-button

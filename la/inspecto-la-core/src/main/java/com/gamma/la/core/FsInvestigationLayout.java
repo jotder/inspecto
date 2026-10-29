@@ -312,6 +312,24 @@ final class FsInvestigationLayout {
         return Files.deleteIfExists(investigationDir(investigationId).resolve("case-link.json"));
     }
 
+    // ── Edited details (LA-INVESTIGATION-RENAME-1) — title and purpose as edited after create, OUTSIDE the sealed header ──
+    //   investigations/<id>/investigation-details.json   {title?, purpose?, updatedBy, updatedAt}. Rewritten atomically, last writer wins;
+    // never hashed into the header or the Dossier manifest, so an edit never invalidates an issued Dossier.
+
+    /** Write (or replace) the Investigation's edited details. */
+    public void writeDetails(String investigationId, String json) throws IOException {
+        Path d = investigationDir(investigationId);
+        Path tmp = Files.createTempFile(d, ".details-", ".tmp");
+        Files.writeString(tmp, json, StandardCharsets.UTF_8);
+        replaceAtomically(tmp, d.resolve("investigation-details.json"));
+    }
+
+    /** The Investigation's edited details, raw, or null when it was never edited. */
+    public String readDetails(String investigationId) throws IOException {
+        Path f = investigationDir(investigationId).resolve("investigation-details.json");
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+    }
+
     // ── External references (D-6) — append-only pointers OUTSIDE the sealed header ──────────────────────────
     //   investigations/<id>/references.jsonl   one JSON line per reference; only ever appended, never rewritten.
     // A pointer to something in another system, not evidence: it is not in the header (write-once) nor in the

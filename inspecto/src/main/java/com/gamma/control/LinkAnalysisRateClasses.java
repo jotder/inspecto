@@ -98,6 +98,7 @@ final class LinkAnalysisRateClasses {
             {"DELETE", "/inv/investigations/([^/]+)/standing-detection/([^/]+)"},
             {"PUT", "/inv/investigations/([^/]+)/alert-rules/([^/]+)"},
             {"DELETE", "/inv/investigations/([^/]+)"},
+            {"PATCH", "/inv/investigations/([^/]+)"},   // LA-INVESTIGATION-RENAME-1: rewrites one small record
             {"GET", "/inv/investigations/([^/]+)/case"},
             {"PUT", "/inv/investigations/([^/]+)/case"},
             {"DELETE", "/inv/investigations/([^/]+)/case"},

@@ -148,6 +148,8 @@ public final class InvestigationRoutes implements RouteModule {
         api.get("/inv/investigations", (e, m) -> list(api, e));
         api.delete("/inv/investigations/([^/]+)", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> delete(api, e, m.group(1))));
+        api.patch("/inv/investigations/([^/]+)", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> edit(api, e, m.group(1), api.body(e))));
         api.post("/inv/investigations/([^/]+)/ops", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> appendOp(api, e, m.group(1), api.body(e))));
         // LA-GROW-EXCLUDE-1 GE-3: gated as the append it dry-runs (a lead's act on the main log), though it persists nothing
@@ -204,6 +206,65 @@ public final class InvestigationRoutes implements RouteModule {
         out.put("steps", steps);
         out.put("drafts", drafts);
         return out;
+    }
+
+    /** The longest title an edit accepts - the New Investigation form's limit. */
+    static final int TITLE_MAX = 200;
+
+    /**
+     * {@code PATCH /inv/investigations/{id}} (LA-INVESTIGATION-RENAME-1) — body {@code {title?, purpose?}}: rename the Investigation
+     * and/or restate its purpose. The sealed header is never rewritten: the edit is a details record beside it
+     * ({@link InvestigationStore#writeDetails}), laid over the header by {@link #open}, so every answer shows it while the
+     * Dossier manifest (which hashes the raw header) still verifies. Gates, in order: {@code canManageIncidents} 403 → write
+     * root 503 → a body naming neither field, a blank or longer-than-{@value #TITLE_MAX} title, or a blank or over-long
+     * purpose 422 → {@link #open} lead-only (422 unsafe id · 404 absent or not readable · 403 a non-lead member) → write the
+     * record, THEN the audit event {@code LINK_INVESTIGATION_EDITED}. Answers {@code {id, title, purpose, updatedBy,
+     * updatedAt}}, masked per the Space's {@code maskingMode} as the log masks the header.
+     */
+    private static Object edit(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation edit");
+        boolean hasTitle = body.containsKey("title"), hasPurpose = body.containsKey("purpose");
+        if (!hasTitle && !hasPurpose)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'title' or 'purpose'");
+        String title = null;
+        if (hasTitle) {
+            title = ApiContext.str(body, "title");
+            if (title == null || title.isBlank())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'title' must not be blank");
+            title = title.trim();
+            if (title.length() > TITLE_MAX)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'title' is at most " + TITLE_MAX + " chars");
+        }
+        String purpose = hasPurpose ? purpose(body, writeRoot) : null;
+        Inv inv = open(api, ex, id);
+        Object previousTitle = inv.header().get("title"), previousPurpose = inv.header().get("purpose");
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("title", hasTitle ? title : previousTitle);
+        details.put("purpose", hasPurpose ? purpose : previousPurpose);
+        details.put("updatedBy", ApiContext.actor(ex));
+        details.put("updatedAt", Instant.now().toString());
+        inv.store().writeDetails(id, canonical(details));
+        List<String> changed = new ArrayList<>();
+        if (!java.util.Objects.equals(previousTitle, details.get("title"))) changed.add("title");
+        if (!java.util.Objects.equals(previousPurpose, details.get("purpose"))) changed.add("purpose");
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_EDITED, "link.investigation.edited",
+                "link.investigation.edited — " + id + " " + changed,
+                b -> b.attr("investigationId", id).attr("changed", String.join(",", changed))
+                        .attr("previousTitle", String.valueOf(previousTitle)).attr("title", String.valueOf(details.get("title")))
+                        .attr("previousPurpose", String.valueOf(previousPurpose)).attr("purpose", String.valueOf(details.get("purpose"))));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.putAll(details);
+        return masked(inv, out);
+    }
+
+    /** LA-INVESTIGATION-RENAME-1: the header as SHOWN — the sealed header with the edited title and purpose laid over it. */
+    static Map<String, Object> withDetails(InvestigationStore store, String id, Map<String, Object> header) throws IOException {
+        String raw = store.details(id).orElse(null);
+        if (raw == null) return header;
+        Map<String, Object> d = parse(raw);
+        for (String k : List.of("title", "purpose")) if (d.get(k) != null) header.put(k, d.get(k));
+        return header;
     }
 
     /** One opened Investigation: its store, write root and parsed header. Package-private for {@link WorkingSetRoutes}. */
@@ -2498,7 +2559,7 @@ public final class InvestigationRoutes implements RouteModule {
         InvestigationStore store = InvestigationStores.of(writeRoot);
         String raw = store.header(id).orElse(null);
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
-        @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(raw, Map.class);
+        @SuppressWarnings("unchecked") Map<String, Object> header = withDetails(store, id, ApiContext.JSON.readValue(raw, Map.class));
         Optional<Subject> subject = ApiContext.subject(ex);
         Map<String, InvestigationMembers.Role> roles = InvestigationMemberStore.roles(store, id, header.get("owner"));
         ApiException roleRefusal = null;

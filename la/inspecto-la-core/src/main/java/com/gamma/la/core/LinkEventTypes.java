@@ -244,6 +244,11 @@ public final class LinkEventTypes {
      *  the record that the evidence existed, because the log it describes is gone. */
     public static final String LINK_INVESTIGATION_DELETED = "LINK_INVESTIGATION_DELETED";
 
+    /** An Investigation was renamed or its purpose restated ({@code PATCH /inv/investigations/{id}}, LA-INVESTIGATION-RENAME-1).
+     *  {@code investigationId}, {@code changed} (the fields that changed), and the {@code title} / {@code purpose} before
+     *  ({@code previousTitle}, {@code previousPurpose}) and after: the sealed header keeps the values stated at create. */
+    public static final String LINK_INVESTIGATION_EDITED = "LINK_INVESTIGATION_EDITED";
+
     /** An Investigation was linked to a Case ({@code PUT /inv/investigations/{id}/case}, or {@code caseRef} at create,
      *  LA-24) by its owner. {@code investigationId}, {@code caseId} and {@code verified} (false when Case management
      *  is not installed, so the Case could not be checked and the link grants nothing). */

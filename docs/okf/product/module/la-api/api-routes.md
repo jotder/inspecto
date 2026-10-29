@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-95 route(s) registered; 95 in the OpenAPI contract, 0 not.
+96 route(s) registered; 96 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -49,6 +49,7 @@ tags: [api, routes, generated]
 | GET | `/inv/investigations` | GET /inv/investigations (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
 | POST | `/inv/investigations` | POST /inv/investigations (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
 | DELETE | `/inv/investigations/{investigationId}` | DELETE /inv/investigations/{investigationId} (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
+| PATCH | `/inv/investigations/{investigationId}` | PATCH /inv/investigations/{investigationId} | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
 | DELETE | `/inv/investigations/{investigationId}/case` | DELETE /inv/investigations/{investigationId}/case (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/case` | GET /inv/investigations/{investigationId}/case (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java` |
 | PUT | `/inv/investigations/{investigationId}/case` | PUT /inv/investigations/{investigationId}/case (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java` |

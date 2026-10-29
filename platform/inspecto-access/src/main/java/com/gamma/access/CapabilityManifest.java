@@ -37,6 +37,8 @@ public final class CapabilityManifest {
             // LA-GROW-EXCLUDE-1: the Grow preview dry-runs that append - gated as it is, though it persists nothing
             new Entry("POST", "/inv/investigations/([^/]+)/expand/preview", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("DELETE", "/inv/investigations/([^/]+)", Roles.CAN_MANAGE_INCIDENTS),
+            // LA-INVESTIGATION-RENAME-1: rename / restate the purpose - a lead's edit, gated as the delete is
+            new Entry("PATCH", "/inv/investigations/([^/]+)", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/undo", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/reorder", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationTemplateRoutes (LA-23) — saving a method and instantiating one into a new Investigation
