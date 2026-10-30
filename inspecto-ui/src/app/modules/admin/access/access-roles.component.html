@@ -6,6 +6,11 @@
             struck-through capability is granted by the role but denied by its Access Profile (the effective grant).
         </p>
         <span class="flex-1"></span>
+        @if (product()) {
+            <mat-slide-toggle [checked]="showAll()" (change)="showAll.set($event.checked)">
+                Show all capabilities
+            </mat-slide-toggle>
+        }
         @if (canEdit()) {
             <button mat-flat-button color="primary" type="button" (click)="newRole()" [disabled]="saving()">
                 <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
@@ -71,16 +76,31 @@
                                 variant="outline"
                                 [tone]="cap.deniedByProfile ? 'neutral' : 'primary'"
                                 [matTooltip]="
-                                    cap.deniedByProfile ? 'Denied by this role\'s Access Profile — not effective' : ''
+                                    cap.deniedByProfile
+                                        ? (capabilityLabel(cap.capability) !== cap.capability
+                                              ? cap.capability + ' — '
+                                              : '') + 'Denied by this role\'s Access Profile — not effective'
+                                        : capabilityLabel(cap.capability) !== cap.capability
+                                          ? cap.capability
+                                          : ''
                                 "
                             >
-                                <span [class.line-through]="cap.deniedByProfile">{{ cap.capability }}</span>
+                                <span [class.line-through]="cap.deniedByProfile">{{
+                                    capabilityLabel(cap.capability)
+                                }}</span>
                                 @if (cap.deniedByProfile) {
                                     <span class="sr-only">(denied by Access Profile)</span>
                                 }
                             </inspecto-chip>
                         } @empty {
-                            <span class="text-secondary text-sm">No capabilities — a recognised, read-only role.</span>
+                            <span class="text-secondary text-sm">{{
+                                card.hidden
+                                    ? 'None that this app uses.'
+                                    : 'No capabilities — a recognised, read-only role.'
+                            }}</span>
+                        }
+                        @if (card.hidden) {
+                            <span class="text-secondary text-xs">+{{ card.hidden }} used elsewhere</span>
                         }
                     </div>
                     @if (card.role.dataScopes?.length) {

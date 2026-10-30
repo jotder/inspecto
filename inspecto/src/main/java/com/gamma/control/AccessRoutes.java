@@ -13,6 +13,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -25,6 +26,8 @@ import com.gamma.access.Roles;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
 import com.gamma.access.AccessPolicyStore;
+import com.gamma.access.AccessGrants;
+import com.gamma.access.CapabilityManifest;
 import static com.gamma.util.Values.trimOrEmpty;
 
 /**
@@ -49,6 +52,10 @@ final class AccessRoutes implements RouteModule {
     private static final String CATALOG_TYPE = "access-catalog";
     private static final String PROFILE_TYPE = "access-profile";
     private static final String CATALOG_ID = "catalog";
+    /** Maker-checker kinds of the two settings documents ({@code roles.toon}, {@code access-policies.toon}),
+     *  governable like any config kind ({@link ApprovalPolicy#GOVERNABLE}); each doc is one target. */
+    static final String ROLES_KIND = "access-roles";
+    static final String POLICIES_KIND = "access-policies";
     private static final Set<String> SUBJECT_TYPES = Set.of("lens", "role");
     private static final Set<String> NODE_KINDS = Set.of("menu", "pane", "action");
     private static final Set<String> GRANT_VALUES = Set.of("allow", "deny");
@@ -56,6 +63,8 @@ final class AccessRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/access/roles", (e, m) -> ETags.respond(e, roles(api)));
+        // "What can this role do?" — ungated like the /access reads beside it, and on every edition with roles.
+        api.get("/access/roles/([^/]+)/effective", (e, m) -> effective(api, ApiContext.name(m)));
         api.put("/access/roles", ApiContext.withCapability("canConfigureAccess",
                 (e, m) -> saveRoles(api, e, api.body(e))));
         api.get("/access/policies", (e, m) -> ETags.respond(e, policies(api, e)));
@@ -100,6 +109,52 @@ final class AccessRoutes implements RouteModule {
         out.put("roles", rows);
         if (!doc.attributeClaims().isEmpty())
             out.put("identity", Map.of("attributeClaims", doc.attributeClaims()));
+        out.put("products", products());
+        return out;
+    }
+
+    /** {@link CapabilityManifest#PRODUCTS}, sorted, so a product's Access page can show only its capabilities. */
+    private static Map<String, List<String>> products() {
+        Map<String, List<String>> out = new java.util.TreeMap<>();
+        CapabilityManifest.PRODUCTS.forEach((product, caps) -> out.put(product, caps.stream().sorted().toList()));
+        return out;
+    }
+
+    /**
+     * What ONE role may do: each capability its row grants, allowed or denied, with the reason — the role table
+     * (seed or authored) grants it, and the role's own Access Profile may deny it ({@link AccessGrants}, as the
+     * Authenticator strips it). A user holding several roles gets the union, so this is the floor of what a holder
+     * of this role can do. Access Policies (Advanced) decide per request and are not folded in: {@code policies}
+     * says whether an engine is active, and {@code POST /access/policies/preview} shows their effect per role.
+     */
+    private Object effective(ApiContext api, String role) {
+        Path root = api.writeRoot();
+        Roles.Doc doc = Roles.load(root);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("role", role);
+        if (doc.unreadable()) {
+            out.put("capabilities", List.of());
+            out.put("error", "roles.toon is unreadable — all role grants are suspended (fail-closed) until it is fixed or re-saved");
+            return out;
+        }
+        Roles.Def def = Roles.effective(root).get(role);
+        if (def == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "role '" + role + "' not found");
+        out.put("source", doc.authored().containsKey(role) ? "authored" : "seed");
+        Set<String> denied = AccessGrants.deniedCapabilities(root, Set.of(role));
+        List<Map<String, Object>> caps = new java.util.ArrayList<>();
+        for (String cap : def.capabilities().stream().sorted().toList()) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("capability", cap);
+            boolean isDenied = denied.contains(cap);
+            c.put("allowed", !isDenied);
+            // AccessGrants also denies everything when the Access Catalog is unreadable, so the reason names both.
+            c.put("reason", isDenied ? "denied by Access Profile enforcement (the role's profile, or an unreadable "
+                    + "Access Catalog)" : "granted by the role table");
+            caps.add(c);
+        }
+        out.put("capabilities", caps);
+        if (def.dataScopes() != null) out.put("dataScopes", def.dataScopes().stream().sorted().toList());
+        out.put("policies", AccessDeciders.active().isPresent());
         return out;
     }
 
@@ -117,8 +172,29 @@ final class AccessRoutes implements RouteModule {
         Map<String, Roles.Def> authored = Roles.validate(body.get("roles"));
         List<String> attributeClaims = Roles.attributeClaims(body.get("identity"));
         AccessPolicyStore.requireLoadableUnder(root, attributeClaims);   // F1: never deny-all as a side effect
+        PendingChanges.hold(api, ex, ROLES_KIND, "roles", rolesContent(authored, attributeClaims),
+                Files.exists(root.resolve(Roles.FILE)) ? rolesContent(Roles.load(root)) : null);   // maker-checker
         Roles.write(root, authored, attributeClaims);
         return ETags.respond(ex, roles(api));
+    }
+
+    /** The authored roles doc as the content a Pending Change pins (sorted, so the version is order-free). */
+    private static Map<String, Object> rolesContent(Map<String, Roles.Def> authored, List<String> attributeClaims) {
+        Map<String, Object> roles = new java.util.TreeMap<>();
+        authored.forEach((name, def) -> {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("capabilities", def.capabilities().stream().sorted().toList());
+            if (def.dataScopes() != null) r.put("dataScopes", def.dataScopes().stream().sorted().toList());
+            roles.put(name, r);
+        });
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("roles", roles);
+        doc.put("attributeClaims", attributeClaims.stream().sorted().toList());
+        return doc;
+    }
+
+    private static Map<String, Object> rolesContent(Roles.Doc doc) {
+        return doc.unreadable() ? Map.of("unreadable", true) : rolesContent(doc.authored(), doc.attributeClaims());
     }
 
     private static Map<String, Object> roleShape(String name, Roles.Def def, String source) {
@@ -236,8 +312,27 @@ final class AccessRoutes implements RouteModule {
         List<AccessPolicies.Policy> policies =
                 AccessPolicyStore.validate(body.get("policies"), Roles.load(root).attributeClaims());
         requireNoSelfLockout(ex, policies);
+        AccessPolicies.Doc current = AccessPolicyStore.load(root);
+        PendingChanges.hold(api, ex, POLICIES_KIND, "policies", policiesContent(policies),
+                !Files.exists(root.resolve(AccessPolicyStore.FILE)) ? null
+                        : current.unreadable() ? Map.of("unreadable", true)
+                        : policiesContent(current.policies()));   // maker-checker
         AccessPolicyStore.write(root, policies);
         return ETags.respond(ex, policies(api, ex));
+    }
+
+    /** The policies doc as the content a Pending Change pins (order kept: deny-overrides reads it in order). */
+    private static Map<String, Object> policiesContent(List<AccessPolicies.Policy> policies) {
+        List<Map<String, Object>> rows = policies.stream().map(p -> {
+            Map<String, Object> r = new LinkedHashMap<String, Object>();
+            r.put("name", p.name());
+            r.put("effect", p.effect());
+            r.put("actions", p.actions().stream().sorted().toList());
+            r.put("resourceKinds", p.resourceKinds().stream().sorted().toList());
+            r.put("when", p.when());
+            return r;
+        }).toList();
+        return Map.of("policies", rows);
     }
 
     /**

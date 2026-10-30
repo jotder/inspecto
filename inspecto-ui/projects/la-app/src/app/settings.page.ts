@@ -8,6 +8,7 @@ import { SessionService } from 'app/inspecto/auth/session.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { AccessPageComponent } from './access.page';
+import { InvestigationAccessPageComponent } from './investigation-access.page';
 import {
     AddDataSettingsComponent,
     AnalysisLimitsSettingsComponent,
@@ -118,6 +119,16 @@ export class SettingsPageComponent {
             description: 'Your own limits for this browser.',
             audience: 'me',
             component: MyBrowserSettingsComponent,
+            canChange: () => true,
+        },
+        {
+            id: 'investigation-access',
+            title: 'Investigation access',
+            icon: 'heroicons_outline:key',
+            description: 'Who can open your Investigations.',
+            audience: 'me',
+            component: InvestigationAccessPageComponent,
+            // the server decides each revoke (lead + capability); the page shows Revoke only where it would succeed
             canChange: () => true,
         },
         {

@@ -73,7 +73,7 @@ describe('SettingsPageComponent (compact master-detail, split by audience)', () 
             sections: [...g.querySelectorAll<HTMLButtonElement>('button')].map((b) => b.dataset['section']),
         }));
         expect(groups).toEqual([
-            { label: 'My settings', sections: ['my-browser'] },
+            { label: 'My settings', sections: ['my-browser', 'investigation-access'] },
             { label: 'This Space', sections: ['link-analysis', 'analysis-limits', 'add-data', 'access'] },
             { label: 'This server', sections: ['host-resources', 'getting-started-counters'] },
         ]);
@@ -91,8 +91,9 @@ describe('SettingsPageComponent (compact master-detail, split by audience)', () 
 
     it('lists every section for every user but marks the ones they may not change read-only', async () => {
         const plain = await render();
-        expect(names(plain)).toHaveLength(7);
+        expect(names(plain)).toHaveLength(8);
         expect(readOnly(plain, 'my-browser')).toBe(false);
+        expect(readOnly(plain, 'investigation-access')).toBe(false); // the server decides each revoke
         for (const id of ['link-analysis', 'analysis-limits', 'access', 'host-resources'])
             expect(readOnly(plain, id), id).toBe(true);
     });

@@ -11,7 +11,16 @@ import { forkJoin, Observable } from 'rxjs';
 
 import { AccessStateService } from 'app/inspecto/access/access-state.service';
 import { CatalogIndex, deriveSpaceAccessCatalog, indexCatalog, resolveGrant } from 'app/inspecto/access/access-catalog';
-import { AccessCatalog, AccessGrant, AccessNode, AccessService, apiErrorMessage, LensService } from 'app/inspecto/api';
+import {
+    AccessCatalog,
+    AccessGrant,
+    AccessNode,
+    AccessService,
+    apiErrorMessage,
+    heldChange,
+    heldMessage,
+    LensService,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { TreeTableComponent } from 'app/inspecto/tree-table/tree-table.component';
 import { TreeNode } from 'app/inspecto/tree-table/tree-types';
@@ -162,7 +171,16 @@ export class AccessComponent {
             }
         }
         forkJoin(puts).subscribe({
-            next: () => {
+            next: (results) => {
+                const held = results.map(heldChange).filter((h) => h !== null);
+                if (held.length) {
+                    // Whatever was held wrote nothing: re-read, so the matrix shows what is stored.
+                    this.saving.set(false);
+                    for (const h of held) this.toastr.info(heldMessage(h));
+                    this.load();
+                    this.accessState.reload();
+                    return;
+                }
                 this.savedVersion.update((v) => v + 1);
                 this.baseline.set(cloneDeep(this.grants()));
                 this.saving.set(false);

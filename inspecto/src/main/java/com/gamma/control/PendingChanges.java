@@ -523,7 +523,7 @@ public final class PendingChanges {
      * The routes a Pending Change may be REPLAYED through (re-verification finding 2 (i)): exactly the routes
      * whose handler reaches {@link #hold} before it writes — {@code ConfigWriteFunnelTest} pins this table to the
      * inventory it scans. Approve refuses (409, nothing dispatched) a recorded request outside it, so a record
-     * naming any other route — {@code PUT /access/roles}, say — can never be replayed, whoever wrote it.
+     * naming any other route — {@code PUT /settings/approval}, say — can never be replayed, whoever wrote it.
      * Keyed {@code "METHOD pattern"} with the route-table pattern.
      */
     static final List<String> REPLAYABLE = List.of(
@@ -544,6 +544,7 @@ public final class PendingChanges {
             "POST /alerts/rules", "PUT /alerts/rules/([^/]+)", "DELETE /alerts/rules/([^/]+)",
             "POST /decision-rules", "PUT /decision-rules/([^/]+)", "DELETE /decision-rules/([^/]+)",
             "POST /expectations", "PUT /expectations/([^/]+)", "DELETE /expectations/([^/]+)",
+            "PUT /access/roles", "PUT /access/policies",
             "PUT /access/catalog", "PUT /access/profiles/([^/]+)", "DELETE /access/profiles/([^/]+)",
             "POST /requirements/([^/]+)/kpi",
             "POST /jobs", "PUT /jobs/([^/]+)", "DELETE /jobs/([^/]+)", "POST /jobs/([^/]+)/enable",

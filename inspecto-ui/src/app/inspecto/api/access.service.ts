@@ -60,6 +60,8 @@ export interface RoleDef {
 export interface RolesDoc {
     roles: RoleDef[];
     error?: string;
+    /** Product → the capabilities its screens gate (`CapabilityManifest.PRODUCTS`), e.g. `link-analysis`. */
+    products?: Record<string, string[]>;
 }
 
 /** One Access Policy (ABAC A2/A3): an allow/deny over subject/resource/environment attributes. */

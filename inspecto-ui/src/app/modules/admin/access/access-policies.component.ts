@@ -13,6 +13,8 @@ import {
     AccessService,
     apiErrorMessage,
     ExplainResult,
+    heldChange,
+    heldMessage,
     isStaleVersionError,
     LensService,
     PoliciesDoc,
@@ -157,7 +159,9 @@ export class AccessPoliciesComponent {
         );
         if (!ok) return;
         this.persist(this.authored().filter((r) => r.name !== p.name)).subscribe({
-            next: () => this.toastr.success(`Policy '${p.name}' deleted`),
+            next: (doc) => {
+                if (!heldChange(doc)) this.toastr.success(`Policy '${p.name}' deleted`);
+            },
             error: (err) => this.toastr.error(this.saveError(err)),
         });
     }
@@ -179,7 +183,8 @@ export class AccessPoliciesComponent {
             })
             .afterClosed()
             .subscribe((saved) => {
-                if (saved) this.toastr.success(`Policy '${saved.name}' saved — it applies on the next request`);
+                if (saved && !this.lastSaveHeld)
+                    this.toastr.success(`Policy '${saved.name}' saved — it applies on the next request`);
             });
     }
 
@@ -188,12 +193,18 @@ export class AccessPoliciesComponent {
         return this.rows().filter((r) => r.source === 'authored');
     }
 
+    /** Whether the last save was held for approval rather than written (the dialog closes either way). */
+    private lastSaveHeld = false;
+
     private persist(authored: PolicyDef[]): Observable<PoliciesDoc> {
         this.saving.set(true);
         return this.api.savePolicies(authored, this.etag).pipe(
             tap({
                 next: (doc) => {
-                    this.apply(doc);
+                    const held = heldChange(doc);
+                    this.lastSaveHeld = !!held;
+                    if (held) this.toastr.info(heldMessage(held));
+                    else this.apply(doc); // a held save wrote nothing: keep the stored policies on screen
                     this.saving.set(false);
                 },
                 error: () => this.saving.set(false),

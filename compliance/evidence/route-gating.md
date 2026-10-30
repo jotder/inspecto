@@ -81,12 +81,12 @@ system: the evidence cannot say something the code does not.
 
 | Method | Route | Posture | Declared as | Registered at |
 |---|---|---|---|---|
-| PUT | `/access/catalog` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:76` |
-| PUT | `/access/policies` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:62` |
-| POST | `/access/policies/preview` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:68` |
-| DELETE | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:81` |
-| PUT | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:79` |
-| PUT | `/access/roles` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:59` |
+| PUT | `/access/catalog` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:85` |
+| PUT | `/access/policies` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:71` |
+| POST | `/access/policies/preview` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:77` |
+| DELETE | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:90` |
+| PUT | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:88` |
+| PUT | `/access/roles` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:68` |
 | POST | `/action-requests` | gated | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java:75` |
 | POST | `/action-requests/([^/]+)/approve` | gated | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java:77` |
 | POST | `/action-requests/([^/]+)/decline` | gated | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java:79` |

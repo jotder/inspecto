@@ -52,6 +52,21 @@ export interface PendingChangeDecision {
     result?: { status: number; body: unknown };
 }
 
+/**
+ * The Pending Change a write was HELD as, or `null` when it was written. A held write answers `202
+ * {status: 'pending', pendingChange}` instead of the saved content, so a caller must check this before treating
+ * the answer as the new state — otherwise it shows "saved" over content that was never written.
+ */
+export function heldChange(res: unknown): PendingChange | null {
+    const r = res as { status?: unknown; pendingChange?: PendingChange } | null;
+    return r?.status === 'pending' && r.pendingChange ? r.pendingChange : null;
+}
+
+/** The one toast text for a held write. */
+export function heldMessage(held: PendingChange): string {
+    return `Held for approval as ${held.id} — it applies once another approver accepts it under Pending Changes`;
+}
+
 /** One kind's rule in the Approval Policy. */
 export interface ApprovalRule {
     required: boolean;

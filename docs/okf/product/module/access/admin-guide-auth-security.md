@@ -105,7 +105,16 @@ server-side authorization system, all behind the existing SPIs (core stays auth-
   no restart. `RoleMapper` lost its hardcoded switch and resolves through the table. **Fail-closed:** an
   existing-but-unreadable `roles.toon` suspends all role grants. `GET/PUT /access/roles` author it (PUT gated
   `canConfigureAccess`); Settings ▸ Access ▸ **Roles** tab (R5) edits it with source badges + the
-  profile-deny strike-through overlay.
+  profile-deny strike-through overlay. **Per-product view (`LA-PRODUCT-NEXT-1` phase 2, 2026-10-30):**
+  `GET /access/roles` also answers `products` — product → the capabilities its screens gate, from
+  `CapabilityManifest.PRODUCTS` (today `link-analysis`; `CapabilityManifestTest` derives the floor: every
+  capability an `/inv` or `/geo` route demands must be tagged). The Link Analysis app's Access page mounts the same
+  Roles editor with `product="link-analysis"` and LA labels, so it lists only those capabilities ("+N used
+  elsewhere", *Show all capabilities* to see the rest). A tag is presentation, never authorization.
+  `GET /access/roles/{name}/effective` (ungated, like the other `/access` reads) answers one role's capabilities,
+  each `allowed` or denied with its `reason` — granted by the role table, or denied by the role's Access Profile as
+  `AccessGrants` resolves it against the SAVED catalog; 404 for an unknown role. Access Policies decide per request
+  and are not folded in: `policies: true` says an engine is active, and `POST /access/policies/preview` shows them.
 - **Access-Profile enforcement (R2).** Enforcement happens at *authentication* time — `AccessGrants` resolves
   the subject's held roles against saved `subjectType: role` Access Profiles over the Access Catalog
   (nearest-ancestor grant, root default allow, **union across roles**, deny binds via catalog action nodes →
@@ -798,6 +807,20 @@ four-eyes precedent (D-U7): `canApproveChanges` on the route (a literal gate, in
 authenticated Subject, else 403 → already decided or expired 409 → the kind's `approverCapability` (default
 `canApproveChanges`) → with `fourEyes` (the default) the author deciding their own change is 403, whether
 approving or declining. `canApproveChanges` is seeded to `admin` only (`super` holds everything).
+
+- **Access settings hold too (`LA-PRODUCT-NEXT-1` phase 1, 2026-10-29).** The role table (`PUT /access/roles`,
+  kind `access-roles`) and the Access Policies (`PUT /access/policies`, kind `access-policies`) are governable like
+  the Access Catalog and Access Profiles always were. Before this, a policy could hold a deny overlay but not the
+  write that grants capabilities, `canApproveChanges` included. The hold is the platform's one Pending Change hold,
+  so a save from the console's Settings ▸ Access and from the Link Analysis app's Access page is held alike.
+  Every Access screen (Roles, Policies, and the Catalog / Profile matrix) reads a `202` as *held*, not saved: it
+  says "Held for approval as `<id>`", keeps or re-reads the stored state, and the change waits under Pending Changes.
+  The check is the shared `heldChange()` (`inspecto/api/pending-changes.service.ts`); a new screen that writes a
+  governable kind uses it too. Each document is ONE
+  target (name `roles` / `policies`): a second proposal while one waits is 409, and an edit made after a proposal
+  makes it stale (409 at approve, propose again). The would-lock-out check on policies runs at propose time AND at
+  apply, as the author. ⚠ **Recovery:** if no approver is left to decide a held access change, the host administrator
+  edits `approval.toon` or the access file on disk, as for any other held kind.
 
 - **A policy that could never approve is refused.** Requiring approval on a build with no Authenticator is
   422 at save: without Subjects an author and an approver cannot be told apart.

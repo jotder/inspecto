@@ -2,13 +2,23 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { CatalogIndex, deriveSpaceAccessCatalog, indexCatalog, resolveGrant } from 'app/inspecto/access/access-catalog';
-import { AccessNode, AccessProfile, AccessService, apiErrorMessage, LensService, RoleDef } from 'app/inspecto/api';
+import {
+    AccessNode,
+    AccessProfile,
+    AccessService,
+    apiErrorMessage,
+    heldChange,
+    heldMessage,
+    LensService,
+    RoleDef,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -37,6 +47,7 @@ interface CapabilityState {
     imports: [
         MatButtonModule,
         MatIconModule,
+        MatSlideToggleModule,
         MatTooltipModule,
         ChipComponent,
         InspectoAlertComponent,
@@ -57,6 +68,20 @@ export class AccessRolesComponent {
 
     /** Role id -> plain label shown instead of the id (the id stays what is stored and matched). Inspecto LA passes one. */
     readonly labels = input<Record<string, string>>({});
+    /** Capability id -> plain label (the id stays in the tooltip). Inspecto LA passes one. */
+    readonly capabilityLabels = input<Record<string, string>>({});
+    /** Show only the capabilities this product's screens gate (`GET /access/roles` `products`), with a Show all
+     *  switch. Unset = every capability, as the console shows them. */
+    readonly product = input<string | null>(null);
+    readonly showAll = signal(false);
+    private readonly products = signal<Record<string, string[]>>({});
+
+    /** The product's capabilities, or null when every capability is shown. */
+    private readonly productCaps = computed<Set<string> | null>(() => {
+        const p = this.product();
+        if (!p || this.showAll()) return null;
+        return new Set(this.products()[p] ?? []);
+    });
 
     readonly loading = signal(true);
     readonly saving = signal(false);
@@ -81,20 +106,29 @@ export class AccessRolesComponent {
     });
 
     /** Per role: its granted capabilities with the profile-deny overlay (the effective view). */
-    readonly cards = computed(() =>
-        this.rows().map((r) => ({
-            role: r,
-            capabilities: r.capabilities.map(
-                (c): CapabilityState => ({
-                    capability: c,
-                    deniedByProfile: this.deniedCaps(r.name).has(c),
-                }),
-            ),
-        })),
-    );
+    readonly cards = computed(() => {
+        const only = this.productCaps();
+        return this.rows().map((r) => {
+            const shown = only ? r.capabilities.filter((c) => only.has(c)) : r.capabilities;
+            return {
+                role: r,
+                capabilities: shown.map(
+                    (c): CapabilityState => ({
+                        capability: c,
+                        deniedByProfile: this.deniedCaps(r.name).has(c),
+                    }),
+                ),
+                hidden: r.capabilities.length - shown.length,
+            };
+        });
+    });
 
     label(roleId: string): string {
         return this.labels()[roleId] ?? roleId;
+    }
+
+    capabilityLabel(capability: string): string {
+        return this.capabilityLabels()[capability] ?? capability;
     }
 
     constructor() {
@@ -149,7 +183,14 @@ export class AccessRolesComponent {
         this.saving.set(true);
         this.api.saveRoles(authored).subscribe({
             next: (doc) => {
+                const held = heldChange(doc);
+                if (held) {
+                    this.saving.set(false);
+                    this.toastr.info(heldMessage(held));
+                    return; // nothing was written: the table keeps the stored roles
+                }
                 this.rows.set(doc.roles ?? []);
+                if (doc.products) this.products.set(doc.products);
                 this.docError.set(doc.error ?? null);
                 this.saving.set(false);
                 this.toastr.success('Role definitions saved — grants apply on the next request');
@@ -169,6 +210,7 @@ export class AccessRolesComponent {
         }).subscribe({
             next: ({ roles, profiles }) => {
                 this.rows.set(roles.roles ?? []);
+                this.products.set(roles.products ?? {});
                 this.docError.set(roles.error ?? null);
                 const byRole: Record<string, AccessProfile> = {};
                 for (const p of profiles ?? []) {

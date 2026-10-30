@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-355 route(s) registered; 355 in the OpenAPI contract, 0 not.
+356 route(s) registered; 356 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -26,6 +26,7 @@ tags: [api, routes, generated]
 | PUT | `/access/profiles/{profileId}` | PUT /access/profiles/{profileId} (generated skeleton) | access | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` |
 | GET | `/access/roles` | GET /access/roles (generated skeleton) | access | — | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` |
 | PUT | `/access/roles` | PUT /access/roles (generated skeleton) | access | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` |
+| GET | `/access/roles/{roleId}/effective` | GET /access/roles/{roleId}/effective (generated skeleton) | access | — | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` |
 | GET | `/agent/actions` | GET /agent/actions (generated skeleton) | agent | — | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java` |
 | GET | `/agent/actions/{actionId}` | GET /agent/actions/{actionId} (generated skeleton) | agent | — | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java` |
 | GET | `/agent/approvals` | GET /agent/approvals (generated skeleton) | agent | `canRevealLinkEntities` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java` |

@@ -44,7 +44,7 @@ public final class AccessPolicyStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(AccessPolicyStore.class);
 
-    static final String FILE = "access-policies.toon";
+    public static final String FILE = "access-policies.toon";
 
     /** The {@code subject.*} keys {@code PolicyEngine} binds besides the allowlisted A1 claims. */
     static final Set<String> SUBJECT_KEYS = Set.of("id", "capabilities", "dataScopes", "roles");

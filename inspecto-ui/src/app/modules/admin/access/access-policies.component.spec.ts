@@ -54,7 +54,7 @@ function create(
         savePolicies,
         explain,
     };
-    const toastr = { success: vi.fn(), error: vi.fn() };
+    const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     const confirm = {
         confirm: vi.fn(() => Promise.resolve(true)),
         confirmDestructive: vi.fn(() => Promise.resolve(true)),
@@ -179,6 +179,17 @@ describe('AccessPoliciesComponent', () => {
         await c.remove(AUTHORED);
         expect(confirm.confirmDestructive).toHaveBeenCalled();
         expect(savePolicies).toHaveBeenCalledWith([other], '"sha256:abc"');
+    });
+
+    it('a delete held for approval keeps the stored policies and says it is held, not deleted', async () => {
+        const other: PolicyDef = { name: 'b', effect: 'allow', source: 'authored' };
+        const held = { status: 'pending', pendingChange: { id: 'pc-2' } } as unknown as PoliciesDoc;
+        const { c, toastr } = create({ policies: [AUTHORED, other, SEED], save: () => of(held) });
+        await c.remove(AUTHORED);
+        expect(c.rows().map((r) => r.name)).toEqual([AUTHORED.name, 'b', SEED.name]); // never emptied
+        expect(toastr.success).not.toHaveBeenCalled();
+        expect(toastr.info).toHaveBeenCalledWith(expect.stringContaining('Held for approval as pc-2'));
+        expect(c.saving()).toBe(false);
     });
 
     it('reports a stale save as a concurrent edit, not a generic failure', async () => {

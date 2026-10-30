@@ -43,17 +43,20 @@ function create(
         profiles?: unknown[];
         canEdit?: boolean;
         dialogResult?: RoleDef;
+        held?: boolean;
     } = {},
 ) {
     const saveRoles = vi.fn((authored: RoleDef[]) =>
-        of({ roles: authored.map((r) => ({ ...r, source: 'authored' as const })) }),
+        opts.held
+            ? of({ status: 'pending', pendingChange: { id: 'pc-1' } } as unknown as { roles: RoleDef[] })
+            : of({ roles: authored.map((r) => ({ ...r, source: 'authored' as const })) }),
     );
     const api = {
         roles: vi.fn(() => of({ roles: opts.roles ?? [SEED_OPS, AUTHORED], error: opts.error })),
         profiles: vi.fn(() => of(opts.profiles ?? [])),
         saveRoles,
     };
-    const toastr = { success: vi.fn(), error: vi.fn() };
+    const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     TestBed.configureTestingModule({
         imports: [AccessRolesComponent],
         providers: [
@@ -71,7 +74,6 @@ function create(
 }
 
 describe('AccessRolesComponent', () => {
-
     it('shows a role by its label, card and button names alike, when a labels map is passed', () => {
         const role: RoleDef = { name: 'pipeline-developer', capabilities: ['canOperateRuns'], source: 'authored' };
         const { fixture } = create({ roles: [role] });
@@ -141,6 +143,16 @@ describe('AccessRolesComponent', () => {
         ]);
         expect(c.rows().every((r) => r.source === 'authored')).toBe(true); // reloaded from the PUT response
         expect(toastr.success).toHaveBeenCalled();
+    });
+
+    it('a save held for approval keeps the stored roles and says it is held, not saved', () => {
+        const { c, toastr } = create({ dialogResult: { name: 'operations', capabilities: [] }, held: true });
+        c.edit(SEED_OPS);
+        expect(c.rows().map((r) => r.name)).toEqual(['operations', 'fraud-analyst']); // never emptied
+        expect(c.rows()[0].source).toBe('seed');
+        expect(toastr.success).not.toHaveBeenCalled();
+        expect(toastr.info).toHaveBeenCalledWith(expect.stringContaining('Held for approval as pc-1'));
+        expect(c.saving()).toBe(false);
     });
 
     it('is read-only without the access-configuration capability', () => {

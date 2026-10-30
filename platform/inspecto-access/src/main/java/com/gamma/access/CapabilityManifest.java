@@ -655,4 +655,20 @@ public final class CapabilityManifest {
         for (Entry e : ENTRIES) out.add(e.capability());
         return out;
     }
+
+    /** The Link Analysis product, as a {@link #PRODUCTS} key. */
+    public static final String LINK_ANALYSIS = "link-analysis";
+
+    /**
+     * Which product's screens each capability gates ({@code LA-PRODUCT-NEXT-1} phase 2): a product's own Access page
+     * shows only its capabilities, in its own words. Not an authorization rule — every capability still means what
+     * its routes say, everywhere. The floor is DERIVED ({@code CapabilityManifestTest}): every capability an
+     * {@code /inv} or {@code /geo} route demands is tagged Link Analysis; the rest are the platform capabilities its
+     * screens also gate on (Alert Rules and Alerts, uploads, saved views and Datasets, Spaces, access).
+     */
+    public static final java.util.Map<String, Set<String>> PRODUCTS = java.util.Map.of(LINK_ANALYSIS, Set.of(
+            Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,
+            Roles.CAN_BUILD_LINK_INDEX, Roles.CAN_SHARE_INVESTIGATION, Roles.CAN_MANAGE_EXCLUSION_CATEGORIES,
+            Roles.CAN_UPLOAD_DATA, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_WORK_INCIDENTS,
+            Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_ADMINISTER, Roles.CAN_CONFIGURE_ACCESS));
 }

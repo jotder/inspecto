@@ -199,6 +199,19 @@ class CapabilityManifestTest {
         return found;
     }
 
+    /** LA-PRODUCT-NEXT-1 phase 2: the Link Analysis tag can never miss a capability an LA route demands. */
+    @Test
+    void everyCapabilityALinkAnalysisRouteDemandsIsTaggedLinkAnalysis() {
+        Set<String> tagged = CapabilityManifest.PRODUCTS.get(CapabilityManifest.LINK_ANALYSIS);
+        Set<String> missing = new java.util.TreeSet<>();
+        for (CapabilityManifest.Entry e : CapabilityManifest.ENTRIES)
+            if ((e.pattern().startsWith("/inv/") || e.pattern().startsWith("/geo/")) && !tagged.contains(e.capability()))
+                missing.add(e.capability() + " (" + e.method() + " " + e.pattern() + ")");
+        assertTrue(missing.isEmpty(), "tag these Link Analysis in CapabilityManifest.PRODUCTS: " + missing);
+        for (Set<String> caps : CapabilityManifest.PRODUCTS.values())
+            assertTrue(Roles.KNOWN_CAPABILITIES.containsAll(caps), "a product tags an unknown capability: " + caps);
+    }
+
     private static String key(String method, String pattern, String capability) {
         return method.toUpperCase(Locale.ROOT) + " " + pattern + " -> " + capability;
     }

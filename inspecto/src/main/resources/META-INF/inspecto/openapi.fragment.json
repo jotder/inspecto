@@ -207,6 +207,7 @@
     "/config/icon-map",
     "/nav/menus",
     "/access/roles",
+    "/access/roles/{roleId}/effective",
     "/access/policies",
     "/access/policies/preview",
     "/access/explain",
@@ -5826,6 +5827,28 @@
         "summary" : "PUT /access/roles (generated skeleton)",
         "operationId" : "putAccessRoles",
         "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/access/roles/{roleId}/effective" : {
+      "get" : {
+        "tags" : [ "access" ],
+        "summary" : "GET /access/roles/{roleId}/effective (generated skeleton)",
+        "operationId" : "getAccessRolesByRoleIdEffective",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "roleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

@@ -61,9 +61,12 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
      * <p>{@code job} is governable since 2026-09-28 (operator): the six {@code /jobs} writers hold; a Job's
      * RUN-time writes do not, by decision. {@code channel} and {@code notification-rule}
      * since 2026-10-06: the six {@code /notifications/channels*} + {@code /notifications/rules*} writers hold.
+     * {@code access-roles} and {@code access-policies} since 2026-10-29 ({@code LA-PRODUCT-NEXT-1} phase 1): the
+     * role table and the Access Policies grant and take away capabilities, so they hold like the Access Catalog
+     * and Profiles always did.
      * ⛔ Deliberately NOT governable: {@code requirement} (a business request's triage lifecycle, not config the
      * engine runs), Connections
-     * (secret-aware CRUD of their own), and the Space settings documents — {@code approval.toon} above all,
+     * (secret-aware CRUD of their own), and the other Space settings documents — {@code approval.toon} above all,
      * since a policy that could hold its own change could never be turned off.
      */
     static final Set<String> GOVERNABLE = governable();
@@ -71,7 +74,8 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
     private static Set<String> governable() {
         Set<String> s = new TreeSet<>(ComponentStore.WRITABLE_TYPES);
         s.remove("requirement");
-        s.addAll(Set.of("pipeline", "schema", "enrichment", "meta", JobRoutes.KIND));
+        s.addAll(Set.of("pipeline", "schema", "enrichment", "meta", JobRoutes.KIND,
+                AccessRoutes.ROLES_KIND, AccessRoutes.POLICIES_KIND));
         // Optional modules contribute their own kinds (GovernableKindProvider, MODULE-REORG-1 P1) — e.g.
         // inspecto-entity-list contributes "entity-list" (ASSURE-ENTITY-LISTS-1, D-P5). Fail-soft discovery;
         // an absent module's kind is simply not governable.

@@ -11,15 +11,17 @@ import { ToastrService } from 'ngx-toastr';
 import { AccessComponent } from './access.component';
 
 describe('AccessComponent', () => {
-    async function create() {
+    async function create(held = false) {
         const api = {
             catalog: vi.fn(() => of({ version: 0, nodes: [] })),
             profiles: vi.fn(() => of([])),
-            saveCatalog: vi.fn((_c: unknown) => of({ version: 1, nodes: [] })),
+            saveCatalog: vi.fn((_c: unknown) =>
+                of(held ? { status: 'pending', pendingChange: { id: 'pc-3' } } : { version: 1, nodes: [] }),
+            ),
             saveProfile: vi.fn((_p: unknown) => of({})),
         };
         const accessState = { reload: vi.fn() };
-        const toastr = { success: vi.fn(), error: vi.fn() };
+        const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
         TestBed.configureTestingModule({
             imports: [AccessComponent],
             providers: [
@@ -76,6 +78,17 @@ describe('AccessComponent', () => {
         expect(c.dirty()).toBe(false);
         expect(accessState.reload).toHaveBeenCalled();
         expect(toastr.success).toHaveBeenCalled();
+    });
+
+    it('a save held for approval re-reads what is stored and says it is held, not saved', async () => {
+        const { c, api, toastr } = await create(true);
+        c.cycle('system-maintenance-group', 'business');
+        c.save();
+        expect(toastr.success).not.toHaveBeenCalled();
+        expect(toastr.info).toHaveBeenCalledWith(expect.stringContaining('Held for approval as pc-3'));
+        expect(api.catalog).toHaveBeenCalledTimes(2); // re-read after the hold
+        expect(c.dirty()).toBe(false); // the matrix shows the stored grants again
+        expect(c.saving()).toBe(false);
     });
 
     it('search filters the tree keeping ancestors of matches', async () => {

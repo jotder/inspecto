@@ -666,7 +666,11 @@ class ControlApiPendingChangesTest {
 
     // ── re-verification finding 2: a Pending Change record is tamper-evident and replays only maker-checker routes ──
 
-    /** A record naming PUT /access/roles as seeded roles — what the verifier forged to rewrite roles.toon. */
+    /**
+     * A record naming a route that is NOT on the replay allowlist — PUT /settings/approval, which lifts the policy.
+     * (The verifier forged one naming PUT /access/roles; that route holds since LA-PRODUCT-NEXT-1 phase 1, and its
+     * replay is refused by the kind/name check instead — {@link #aRecordForAnotherTargetCannotReplayARoleWrite}.)
+     */
     private static Map<String, Object> forged(String id) {
         Map<String, Object> rec = new java.util.LinkedHashMap<>();
         rec.put("id", id);
@@ -682,9 +686,13 @@ class ControlApiPendingChangesTest {
         rec.put("fourEyes", true);
         rec.put("baseVersion", "absent");
         rec.put("proposedVersion", "absent");
-        rec.put("request", Map.of("method", "PUT", "path", "/access/roles",
-                "body", "{\"roles\":[{\"name\":\"developer\",\"capabilities\":[\"canAdminister\"]}]}", "headers", Map.of()));
+        rec.put("request", Map.of("method", "PUT", "path", "/settings/approval",
+                "body", "{\"approval\":{}}", "headers", Map.of()));
         return rec;
+    }
+
+    private static boolean policyStillHolds(Path root) throws Exception {
+        return Files.readString(root.resolve("approval.toon")).contains("pattern-pack");
     }
 
     @Test
@@ -702,7 +710,7 @@ class ControlApiPendingChangesTest {
             HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
             assertEquals(409, r.statusCode(), r.body());
             assertTrue(r.body().contains("integrity"), r.body());
-            assertFalse(Files.exists(root.resolve("roles.toon")), "nothing was dispatched");
+            assertTrue(policyStillHolds(root), "nothing was dispatched");
         }
     }
 
@@ -717,7 +725,25 @@ class ControlApiPendingChangesTest {
             HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
             assertEquals(409, r.statusCode(), r.body());
             assertTrue(r.body().contains("not a maker-checker route"), r.body());
-            assertFalse(Files.exists(root.resolve("roles.toon")), "nothing was dispatched");
+            assertTrue(policyStillHolds(root), "nothing was dispatched");
+        }
+    }
+
+    @Test
+    void aRecordForAnotherTargetCannotReplayARoleWrite(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = "pc-20260926000000-0ddba2";
+            Map<String, Object> rec = forged(id);   // approved as a pattern-pack create…
+            rec.put("request", Map.of("method", "PUT", "path", "/access/roles",   // …but replays a role grant
+                    "body", "{\"roles\":[{\"name\":\"developer\",\"capabilities\":[\"canAdminister\"]}]}",
+                    "headers", Map.of()));
+            PendingChanges.save(root, rec);   // a VALID MAC; the route IS replayable now
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("but its replay writes"), "refused by the kind/name check: " + r.body());
+            assertFalse(Files.exists(root.resolve("roles.toon")), "the kind/name check refused the replay");
         }
     }
 
@@ -1210,6 +1236,66 @@ class ControlApiPendingChangesTest {
             data(send(c, "POST", "/pending-changes/" + id + "/decline", "{}", CHECKER), 200);
             assertFalse(data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200).has("approverCheck"),
                     "only a pending change carries it");
+        }
+    }
+
+    // ── LA-PRODUCT-NEXT-1 phase 1: the role table and the Access Policies hold like any config kind ──────────
+
+    private static final String AUDITOR = "{\"roles\":[{\"name\":\"auditor\",\"capabilities\":[\"canOperateRuns\"]}]}";
+    private static final String FREEZE = "{\"policies\":[{\"name\":\"freeze\",\"effect\":\"deny\","
+            + "\"target\":{\"actions\":[\"write\"]},\"when\":\"subject.id == 'nobody'\"}]}";
+
+    @Test
+    void aRoleEditIsHeldAndAppliedOnlyByASecondApprover(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, "{\"approval\":{\"access-roles\":{\"required\":true}}}");
+            JsonNode held = data(send(c, "PUT", "/access/roles", AUDITOR, ADMIN), 202);
+            String id = held.at("/pendingChange/id").asText();
+            assertFalse(Files.exists(root.resolve(Roles.FILE)), "held, not written");
+            assertEquals(403, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", ADMIN).statusCode(),
+                    "four-eyes: the author cannot approve their own role grant");
+            assertTrue(data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER), 200)
+                    .get("applied").asBoolean());
+            assertTrue(Roles.load(root).authored().containsKey("auditor"), "applied as proposed");
+        }
+    }
+
+    @Test
+    void anAccessPolicyEditIsHeldAndAppliedByASecondApprover(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, "{\"approval\":{\"access-policies\":{\"required\":true}}}");
+            String id = data(send(c, "PUT", "/access/policies", FREEZE, ADMIN), 202).at("/pendingChange/id").asText();
+            assertFalse(Files.exists(root.resolve("access-policies.toon")), "held, not written");
+            assertTrue(data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER), 200)
+                    .get("applied").asBoolean());
+            assertTrue(Files.readString(root.resolve("access-policies.toon")).contains("freeze"));
+        }
+    }
+
+    @Test
+    void aRoleEditMadeAfterTheProposalMakesItStale(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            String id;
+            policy(c, "{\"approval\":{\"access-roles\":{\"required\":true}}}");
+            id = data(send(c, "PUT", "/access/roles", AUDITOR, ADMIN), 202).at("/pendingChange/id").asText();
+            Roles.write(root, Roles.validate(JSON.readValue("[{\"name\":\"other\",\"capabilities\":[]}]", List.class)),
+                    List.of());   // the table moved underneath the proposal
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
+            assertEquals(409, r.statusCode(), r.body());
+            assertFalse(Roles.load(root).authored().containsKey("auditor"), "a stale grant is never applied");
+        }
+    }
+
+    @Test
+    void withNoPolicyForAccessKindsARoleEditWritesStraightAway(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);   // a policy exists, but it does not name access-roles
+            data(send(c, "PUT", "/access/roles", AUDITOR, ADMIN), 200);
+            assertTrue(Roles.load(root).authored().containsKey("auditor"));
         }
     }
 

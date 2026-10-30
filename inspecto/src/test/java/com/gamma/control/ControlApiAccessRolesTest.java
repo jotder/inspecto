@@ -150,6 +150,46 @@ class ControlApiAccessRolesTest {
         }
     }
 
+    // ── LA-PRODUCT-NEXT-1 phase 2: product tags and "What can this role do?" ─────────────────────────────
+
+    @Test
+    void theRoleTableNamesEachProductsCapabilities(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            JsonNode la = json(send(c.port, "GET", "/access/roles", null)).at("/products/link-analysis");
+            assertTrue(contains(la, "canRevealLinkEntities") && contains(la, "canManageIncidents"), la.toString());
+            assertFalse(contains(la, "canOnboardConnections"), "a console-only capability is not tagged: " + la);
+        }
+    }
+
+    @Test
+    void effectiveNamesEachCapabilityAndTheProfileDenyThatRemovesIt(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("cfg"))) {
+            JsonNode plain = json(send(c.port, "GET", "/access/roles/admin/effective", null));
+            assertEquals("seed", plain.get("source").asText());
+            JsonNode configure = byCapability(plain.get("capabilities"), "canConfigureAccess");
+            assertTrue(configure.get("allowed").asBoolean(), plain.toString());
+            assertEquals("granted by the role table", configure.get("reason").asText());
+
+            // a catalog action bound to canConfigureAccess, and admin's own Access Profile denying it
+            json(send(c.port, "PUT", "/access/catalog", "{\"version\":1,\"nodes\":[{\"id\":\"access-edit\","
+                    + "\"label\":\"Edit access\",\"kind\":\"action\",\"capability\":\"canConfigureAccess\"}]}"));
+            json(send(c.port, "PUT", "/access/profiles/role-admin", "{\"subjectType\":\"role\",\"subjectId\":\"admin\","
+                    + "\"grants\":{\"access-edit\":\"deny\"}}"));
+            JsonNode denied = byCapability(json(send(c.port, "GET", "/access/roles/admin/effective", null))
+                    .get("capabilities"), "canConfigureAccess");
+            assertFalse(denied.get("allowed").asBoolean(), denied.toString());
+            assertTrue(denied.get("reason").asText().startsWith("denied by Access Profile enforcement"), denied.toString());
+
+            assertEquals(404, send(c.port, "GET", "/access/roles/nobody/effective", null).statusCode());
+        }
+    }
+
+    private static JsonNode byCapability(JsonNode caps, String capability) {
+        for (JsonNode c : caps) if (capability.equals(c.get("capability").asText())) return c;
+        fail("no row for " + capability + " in " + caps);
+        return null;
+    }
+
     private static JsonNode byName(JsonNode roles, String name) {
         for (JsonNode r : roles) if (name.equals(r.get("name").asText())) return r;
         return null;
