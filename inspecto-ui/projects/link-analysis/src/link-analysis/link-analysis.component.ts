@@ -2369,7 +2369,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const n = u ? expandStepDegrees(u.steps.at(-1)) : this.investigation.activeId() ? this.growExclude.lastExpandDegrees() : null;
         return n !== null && n <= this.maxDegree() ? n : null;
     });
-    private resizing = false;
+    /** One lock for an Expand and a Degrees resize: either one, while the other runs, would draw over a Working Set it never saw. */
+    private expandBusy = false;
 
     /** The context of the outer ring alone (what raising Degrees expands from), whatever the form's "From" says. */
     private outerContext(): GrowContext {
@@ -2385,24 +2386,27 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     async onDegreesChange({ degrees, req }: ExpandDegreesChange): Promise<void> {
         const have = this.lastExpandDegrees();
-        if (this.resizing || have === null || degrees === have) return this.tabExpand?.syncDegrees();
-        this.resizing = true;
+        if (this.expandBusy || have === null || degrees === have) return this.tabExpand?.syncDegrees();
+        this.expandBusy = true;
         try {
             const ctx = this.outerContext();
+            // the stepper changes Degrees only: an unsaved Expand grows with its OWN request, the one Save replays
+            const own = this.investigation.unsaved()?.steps.at(-1);
+            const asked = own?.kind === 'expand' ? own.req : req;
             if (degrees > have) {
                 if (ctx.blocked) {
                     this.growExclude.lastChange.set({ text: ctx.blocked });
                     return;
                 }
-                if (!req.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
+                if (!asked.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
             }
-            const more = { ...req, degrees: degrees - have };
+            const more = { ...asked, degrees: degrees - have };
             if (this.investigation.unsaved()) await this.resizeUnsaved(degrees, have, ctx, more);
             else if (degrees < have) await this.growExclude.trimLastExpand(degrees);
             else if (!(await this.growExclude.growInvestigation(ctx, more, this.degreePresets(), true)))
                 this.toastr.error(this.investigation.error() || 'The Expand was refused.');
         } finally {
-            this.resizing = false;
+            this.expandBusy = false;
             this.tabExpand?.syncDegrees();
         }
     }
@@ -5182,7 +5186,20 @@ Its prior copies stay in its version history.`,
     }
 
     /** The Expand dialog's choice, walked degree by degree: recorded `expand` steps, or the explorer's neighbours reads. */
-    async onExpand({ ctx, req, from }: ExpandRun): Promise<void> {
+    async onExpand(run: ExpandRun): Promise<void> {
+        if (this.expandBusy) {
+            this.growExclude.lastChange.set({ text: 'Another change is still running.' });
+            return;
+        }
+        this.expandBusy = true;
+        try {
+            await this.runExpand(run);
+        } finally {
+            this.expandBusy = false;
+        }
+    }
+
+    private async runExpand({ ctx, req, from }: ExpandRun): Promise<void> {
         this.growExclude.growOpen.set(false);
         if (ctx.mode === 'investigation') {
             // going through hubs is a sealed override: ask first, as Expand anyway does

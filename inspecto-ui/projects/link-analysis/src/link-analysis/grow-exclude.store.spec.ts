@@ -208,6 +208,15 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
             expect(store.lastExpandDegrees()).toBe(1);
         });
 
+        it('Undo of a raise leaves the Expand it joined as the bound one again', async () => {
+            const { store } = create({}, three());
+            await store.growInvestigation(CTX, REQ, {});
+            await store.growInvestigation(CTX, { ...REQ, degrees: 2 }, {}, true);
+            expect(store.lastExpandDegrees()).toBe(3);
+            expect(await store.undoLast()).toBe(true);
+            expect(store.lastExpandDegrees()).toBe(1);
+        });
+
         it('Save binds the Expand it replayed last, but only to Expand steps', async () => {
             const { store, session } = create();
             await session.apply({ op: 'seed', ids: ['a'] });

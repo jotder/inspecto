@@ -14,7 +14,7 @@ import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Observable, Subject, delay, firstValueFrom, of, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, defer, delay, firstValueFrom, of, throwError } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
@@ -5164,11 +5164,23 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     describe('LA-DEGREES-TRIM-1: Degrees is the last Expand’s size', () => {
         const REQ = { direction: 'either' as const, degrees: 3, linkKinds: null, hold: true, threshold: 500 };
+        // every unsaved preview waits on `gate`, so a test can hold an Expand mid-walk
+        let gate: Promise<void> = Promise.resolve();
+        let release: () => void = () => undefined;
+        const hold = () => (gate = new Promise<void>((r) => (release = r)));
         async function expanded3() {
+            gate = Promise.resolve();
+            const base = fakeUnsaved();
+            const previewUnsaved = vi.fn((body: Parameters<typeof base>[0]) =>
+                defer(async () => {
+                    await gate;
+                    return firstValueFrom(base(body));
+                }),
+            );
             const { fixture } = create({
                 datasets: [TRANSFERS],
                 expand: vi.fn(async (_id: string, label: string) => ring(label)),
-                inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+                inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
             });
             await settle(fixture);
             const c = fixture.componentInstance;
@@ -5180,7 +5192,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
                 degrees: 1,
             });
             await c.onExpand({ ctx: c.growContext(), req: REQ, from: 'outer' });
-            return c;
+            return Object.assign(c, { previewUnsaved });
         }
         const labels = (c: LinkAnalysisComponent) => c.graph()!.nodes.map((n) => n.data.label).sort();
 
@@ -5211,6 +5223,38 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             expect(labels(c)).toHaveLength(5);
             expect(c.investigation.unsaved()!.steps).toHaveLength(steps); // the same step grew, no new one
             expect(c.lastExpandDegrees()).toBe(3);
+        });
+
+        it('raising grows with the Expand’s OWN request, so the screen draws what Save replays (not the form’s changed Direction)', async () => {
+            const c = await expanded3();
+            await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } });
+            await c.onDegreesChange({ degrees: 3, req: { ...REQ, direction: 'out', degrees: 3 } });
+            const step = c.investigation.unsaved()!.steps.at(-1)!;
+            expect(step.kind === 'expand' && step.req.direction).toBe('either');
+            const sent = c.previewUnsaved.mock.calls.at(-1)![0].steps.at(-1) as Record<string, unknown>;
+            expect(sent['direction']).toBe('either'); // what was drawn
+            expect(c.investigation.unsavedOps(c.investigation.unsaved()!.steps.slice(-1), c.investigation.unsaved()!.binding).every((o) => o.op !== 'expand' || o.direction === 'either')).toBe(true); // what Save sends
+        });
+
+        it('a Degrees change while an Expand is still walking is ignored, and an Expand while a resize runs is refused', async () => {
+            const c = await expanded3();
+            const steps = () => c.investigation.unsaved()!.steps;
+            const walkedOf = (i: number) => (steps()[i].kind === 'expand' ? (steps()[i] as { walked: string[][] }).walked.length : -1);
+            hold();
+            const running = c.onExpand({ ctx: c.growContext(), req: { ...REQ, degrees: 1 }, from: 'outer' });
+            await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } }); // lands mid-walk
+            release();
+            await running;
+            expect(steps()).toHaveLength(4); // the new Expand is recorded ...
+            expect(walkedOf(2)).toBe(3); // ... on the Expand it grew from, not a trimmed one
+            // the other way round: a resize holds the lock, an Expand asked meanwhile is refused
+            hold();
+            const resizing = c.onDegreesChange({ degrees: 2, req: { ...REQ, degrees: 2 } });
+            await c.onExpand({ ctx: c.growContext(), req: { ...REQ, degrees: 1 }, from: 'outer' });
+            expect(c.growExclude.lastChange()?.text).toBe('Another change is still running.');
+            release();
+            await resizing;
+            expect(steps()).toHaveLength(4);
         });
 
         it('is not bound when the newest step is not an Expand (a start): lowering changes nothing', async () => {

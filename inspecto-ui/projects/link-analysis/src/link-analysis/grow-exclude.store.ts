@@ -293,9 +293,22 @@ export class GrowExcludeStore {
                 `${many(links, t.link, t.links)} added` +
                 (held ? `; ${many(held, `busy ${t.node}`, `busy ${t.nodes}`)} held.` : '.') +
                 stop,
-            ...this.undoOf(made),
+            ...this.joinedUndo(this.undoOf(made), id, joined),
         });
         return true;
+    }
+
+    /** Undo of a raise (`extend`) takes back its steps only: the Expand it joined is the newest again, so rebind to it. */
+    private joinedUndo(change: Pick<LastChange, 'undo' | 'valid'>, id: string | null, joined: number[]): Pick<LastChange, 'undo' | 'valid'> {
+        const undo = change.undo;
+        if (!undo || !id || !joined.length) return change;
+        return {
+            ...change,
+            undo: async () => {
+                await undo();
+                this.expandRun.set({ id, steps: joined }); // still checked against the log: a refused undo leaves it unbound
+            },
+        };
     }
 
     /** "Remove held super nodes": ONE `exclude` of every held entity with the reason (§3.2, GE-4). */
