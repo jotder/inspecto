@@ -1703,6 +1703,33 @@ export function linkPrediction(
     return out.sort((x, y) => y.score - x.score || compareUnits(x.source, y.source)).slice(0, limit);
 }
 
+/** Two same-type entities that may be one, with the kinds of neighbour they share (the reason shown to the analyst). */
+export interface DuplicateSuggestion extends PredictedLink {
+    /** Shared neighbours counted by Entity Type, most first: `[['phone', 1], ['device', 1]]`. */
+    shared: [string, number][];
+}
+
+/**
+ * `LA-PRODUCT-NEXT-1` phase 6 — *possible duplicates*: Adamic-Adar over non-adjacent pairs of the SAME Entity Type, top
+ * `limit` (default 20). The spike (plan §3 phase 6) measured top-20 precision 1.0 and no hub decoy in the top 20; below
+ * 20 about one in four is a household (two people at one address), hence the default and the `shared` reason. A
+ * suggestion, never a merge. Capped as {@link linkPrediction} is.
+ */
+export function possibleDuplicates(g: G6GraphData, limit = 20): DuplicateSuggestion[] {
+    requireUnderCap(g, 'Possible duplicates', browserAlgorithmCapValue('linkPrediction'));
+    const kind = new Map(g.nodes.map((n) => [n.id, String(n.data.kind)]));
+    const sameKind = linkPrediction(g, { limit: Number.MAX_SAFE_INTEGER }).filter(
+        (l) => kind.get(l.source) === kind.get(l.target),
+    );
+    const nb = undirectedNeighbors(g);
+    return sameKind.slice(0, limit).map((l) => {
+        const counts = new Map<string, number>();
+        const b = nb.get(l.target)!;
+        for (const c of nb.get(l.source)!) if (b.has(c)) counts.set(kind.get(c)!, (counts.get(kind.get(c)!) ?? 0) + 1);
+        return { ...l, shared: [...counts].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])) };
+    });
+}
+
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 // V2 — Suspicious-node scoring (a composite risk signal over the centrality family)
 // ══════════════════════════════════════════════════════════════════════════════════════════════

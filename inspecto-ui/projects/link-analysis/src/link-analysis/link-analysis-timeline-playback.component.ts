@@ -15,7 +15,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { G6GraphData } from '@inspecto/core/graph';
 import { GraphSelection } from '@inspecto/link-analysis/graph/graph-analysis';
-import { activeInSlice, playbackSlice, playbackSliceCount } from './timeline-playback';
+import {
+    PlaybackWindow,
+    activeInSlice,
+    ageOpacity,
+    playbackSlice,
+    playbackSliceCount,
+    playbackWindow,
+    sealedWindow,
+} from './timeline-playback';
 
 /** Milliseconds one slice stays on screen while playing. */
 const TICK_MS = 1000;
@@ -91,6 +99,35 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
                     (input)="seek($event)"
                 />
             </label>
+            <label class="flex items-center gap-1 text-xs">
+                <span class="text-secondary">Window</span>
+                <select
+                    class="bg-card rounded border px-1 py-0.5"
+                    data-test="playback-window"
+                    [value]="window()"
+                    (change)="setWindow($event)"
+                >
+                    @for (w of windows; track w.id) {
+                        <option [value]="w.id">{{ w.label }}</option>
+                    }
+                </select>
+            </label>
+            <label class="flex items-center gap-1 text-xs">
+                <input type="checkbox" data-test="playback-fade" [checked]="fade()" (change)="toggleFade($event)" />
+                Age fade
+            </label>
+            @if (sealable() && index() >= 0) {
+                <button
+                    mat-stroked-button
+                    type="button"
+                    class="!min-h-0 !px-2 !py-1 text-xs"
+                    data-test="playback-seal"
+                    matTooltip="Record this window as a step of the Investigation"
+                    (click)="sealWindow()"
+                >
+                    Seal this window
+                </button>
+            }
             <button
                 mat-button
                 type="button"
@@ -120,13 +157,32 @@ export class LinkAnalysisTimelinePlaybackComponent {
     /** `[min, max]` epoch millis of that column — the playback's range. */
     readonly extent = input.required<[number, number]>();
 
-    /** The slice's links to highlight, or `null` to clear the highlight. */
-    readonly highlight = output<GraphSelection | null>();
+    /**
+     * Whether "Seal this window" is offered: the host sets it only inside an Investigation the caller may change, whose
+     * bound event-time column is this strip's column (a window on another column would seal a different moment).
+     */
+    readonly sealable = input(false);
+
+    /** The window's links to highlight (with their age fade), or `null` to clear the highlight. */
+    readonly highlight = output<(GraphSelection & { edgeOpacity?: Map<string, number> }) | null>();
+    /** "Seal this window": the window as the Investigation `window` op's `[from, to)`. */
+    readonly seal = output<{ from: string; to: string }>();
 
     protected readonly Math = Math;
+    readonly windows: { id: PlaybackWindow; label: string }[] = [
+        { id: 'slice', label: 'This slice' },
+        { id: '1d', label: 'Last day' },
+        { id: '7d', label: 'Last 7 days' },
+        { id: '30d', label: 'Last 30 days' },
+        { id: 'all', label: 'From the start' },
+    ];
     /** `-1` = not started (nothing highlighted). */
     readonly index = signal(-1);
     readonly playing = signal(false);
+    /** How far back from the handle the highlight reaches. */
+    readonly window = signal<PlaybackWindow>('slice');
+    /** Age fade (on by default): older links in the window fade, so new activity stands out. */
+    readonly fade = signal(true);
     readonly count = computed(() => playbackSliceCount(this.extent()));
     readonly atEnd = computed(() => this.index() >= this.count() - 1);
 
@@ -134,12 +190,20 @@ export class LinkAnalysisTimelinePlaybackComponent {
         const i = this.index();
         if (i < 0) return null;
         const slice = playbackSlice(this.extent(), i);
-        return { slice, selection: activeInSlice(this.graph() ?? { nodes: [], edges: [] }, this.column(), slice) };
+        const range = playbackWindow(this.extent(), slice, this.window());
+        const g = this.graph() ?? { nodes: [], edges: [] };
+        const selection = activeInSlice(g, this.column(), range);
+        return {
+            slice,
+            range,
+            selection,
+            opacity: this.fade() ? ageOpacity(g, this.column(), range, selection.edgeIds) : null,
+        };
     });
 
     readonly valueText = computed(() => {
         const a = this.active();
-        return a ? `${label(a.slice.start)} to ${label(a.slice.end)} UTC` : 'not started';
+        return a ? `${label(a.range.start)} to ${label(a.range.end)} UTC` : 'not started';
     });
 
     readonly status = computed(() => {
@@ -147,7 +211,7 @@ export class LinkAnalysisTimelinePlaybackComponent {
         if (!a)
             return `Not started. ${this.count()} slices from ${label(this.extent()[0])} to ${label(this.extent()[1])} UTC.`;
         const n = a.selection.edgeIds.length;
-        return `Slice ${a.slice.index + 1} of ${a.slice.count}: ${label(a.slice.start)} to ${label(a.slice.end)} UTC. ${n} ${n === 1 ? 'link' : 'links'} active.`;
+        return `Slice ${a.slice.index + 1} of ${a.slice.count}: ${label(a.range.start)} to ${label(a.range.end)} UTC. ${n} ${n === 1 ? 'link' : 'links'} active.`;
     });
 
     private timer: ReturnType<typeof setInterval> | null = null;
@@ -166,7 +230,13 @@ export class LinkAnalysisTimelinePlaybackComponent {
             untracked(() => {
                 if (!a) return;
                 this.lit = true;
-                this.highlight.emit(a.selection.edgeIds.length ? a.selection : null);
+                this.highlight.emit(
+                    a.selection.edgeIds.length
+                        ? a.opacity
+                            ? { ...a.selection, edgeOpacity: a.opacity }
+                            : a.selection
+                        : null,
+                );
             });
         });
         // Outputs are dead once destroyed, so the host clears the highlight when it removes this strip.
@@ -193,6 +263,21 @@ export class LinkAnalysisTimelinePlaybackComponent {
             this.go(this.index() + 1);
             if (this.atEnd()) this.halt();
         }, TICK_MS);
+    }
+
+    setWindow(e: Event): void {
+        this.window.set((e.target as HTMLSelectElement).value as PlaybackWindow);
+    }
+
+    toggleFade(e: Event): void {
+        this.fade.set((e.target as HTMLInputElement).checked);
+    }
+
+    sealWindow(): void {
+        const a = this.active();
+        if (!a || !this.sealable()) return;
+        this.halt();
+        this.seal.emit(sealedWindow(a.range));
     }
 
     reset(): void {

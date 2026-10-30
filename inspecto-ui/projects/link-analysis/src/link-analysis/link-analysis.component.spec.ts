@@ -1920,6 +1920,39 @@ describe('LinkAnalysisComponent', () => {
         expect(text('working-set-on-screen')).toBe('2 nodes · 1 link on screen');
         fixture.destroy();
     });
+    it('LA-PRODUCT-NEXT-1 phase 4: Seal this window is offered only in an Investigation bound to the timeline column, with the capability', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canManageIncidents']);
+        c.timeColumn.set('ts');
+        expect(c.playbackSealable()).toBe(false); // no Investigation open
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst', timeCol: 'other' },
+            entries: [],
+        } as never);
+        expect(c.playbackSealable()).toBe(false); // bound to another column: it would seal a different moment
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst', timeCol: 'ts' },
+            entries: [],
+        } as never);
+        expect(c.playbackSealable()).toBe(true);
+        const apply = vi.spyOn(c.investigation, 'apply').mockResolvedValue(true);
+        await c.sealPlaybackWindow({ from: '2026-01-01T00:00:00.000Z', to: '2026-01-08T00:00:00.000Z' });
+        expect(apply).toHaveBeenCalledWith({
+            op: 'window',
+            window: { from: '2026-01-01T00:00:00.000Z', to: '2026-01-08T00:00:00.000Z' },
+        });
+        session.capabilities.set([]);
+        expect(c.playbackSealable()).toBe(false);
+        apply.mockClear();
+        await c.sealPlaybackWindow({ from: '2026-01-01T00:00:00.000Z', to: '2026-01-08T00:00:00.000Z' });
+        expect(apply).not.toHaveBeenCalled();
+        fixture.destroy();
+    });
     it('LA-UNEXPANDED-MARKER-1 (b): Next unexpanded picks each unexpanded node in turn; Only unexpanded draws just the frontier', async () => {
         const { fixture } = create();
         fixture.detectChanges();
@@ -3837,6 +3870,19 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         });
         expect(c.investigation.mergeDraft()).toBeNull();
         TestBed.inject(MatDialog).closeAll();
+        fixture.destroy();
+    });
+
+    it('phase 6 Merge… on a suggested pair the form refuses warns why and prefills nothing', async () => {
+        const { fixture, c } = await inInvestigation(['msisdn:masked:0123456789abcdef', 'imsi:1']);
+        const warn = vi.spyOn(TestBed.inject(ToastrService), 'warning');
+        const [a, b] = (c.canvasData()?.nodes ?? []).map((n) => n.id);
+        c.mergeNodes([a, b]);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('masked entity cannot be merged'));
+        c.mergeNodes([a, 'not-on-the-canvas']);
+        expect(warn).toHaveBeenLastCalledWith('Only entities in the open Investigation can be merged. Expand to them first.');
+        expect(c.investigation.mergeDraft()).toBeNull();
+        expect(c.settingsOpen()).toBe(false);
         fixture.destroy();
     });
 

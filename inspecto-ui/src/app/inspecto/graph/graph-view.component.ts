@@ -48,6 +48,8 @@ export interface GraphEmphasis {
     nodeIds: string[];
     edgeIds?: string[];
     groups?: Map<string, string>;
+    /** A listed edge's opacity in (0, 1] (the timeline's age fade); a listed edge not in the map is full-strength. */
+    edgeOpacity?: Map<string, number>;
 }
 
 /** Line pattern for a relationship kind (Link Analysis "Display" menu). */
@@ -689,6 +691,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private styleEdgeColor = '';
     private emNodes: Set<string> | null = null;
     private emEdges: Set<string> | null = null;
+    private emEdgeOpacity: Map<string, number> | null = null;
     private emGroups: Map<string, string> | null = null;
     private groupSwatch = new Map<string, string>();
     /** The page's multi-selection, read LIVE by the node mappers (a halo + a thicker outline). */
@@ -1065,6 +1068,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const em = this.emphasis;
         this.emNodes = em ? new Set(em.nodeIds) : null;
         this.emEdges = em?.edgeIds ? new Set(em.edgeIds) : null;
+        this.emEdgeOpacity = em?.edgeOpacity ?? null;
         this.emGroups = em?.groups ?? null;
         this.groupSwatch = new Map<string, string>();
         for (const g of this.emGroups?.values() ?? []) {
@@ -1313,7 +1317,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 type: 'line',
                 style: {
                     stroke: (d) => this.edgeColorOf(d),
-                    opacity: (d) => (this.emEdges ? (this.emEdges.has(d.id as string) ? 1 : 0.2) : 1),
+                    opacity: (d) =>
+                        this.emEdges
+                            ? this.emEdges.has(d.id as string)
+                                ? (this.emEdgeOpacity?.get(d.id as string) ?? 1)
+                                : 0.2
+                            : 1,
                     endArrow: true,
                     // A dry-run's provenance rows (PIPELINE-DRYRUN-1) paint their edge dashed regardless of
                     // the Display-menu pattern override, so a simulated run stays visually distinct.

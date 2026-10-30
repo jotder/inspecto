@@ -29,13 +29,17 @@ const EXTENT: [number, number] = [Date.parse('2026-01-01T00:00:00Z'), Date.parse
         [graph]="graph()"
         column="ts"
         [extent]="extent()"
+        [sealable]="sealable()"
         (highlight)="lit($event)"
+        (seal)="sealed($event)"
     />`,
 })
 class HostComponent {
     readonly graph = signal<G6GraphData | null>(GRAPH);
     readonly extent = signal<[number, number]>(EXTENT);
-    readonly lit = vi.fn<(s: GraphSelection | null) => void>();
+    readonly sealable = signal(false);
+    readonly lit = vi.fn<(s: (GraphSelection & { edgeOpacity?: Map<string, number> }) | null) => void>();
+    readonly sealed = vi.fn<(w: { from: string; to: string }) => void>();
 }
 
 function setup(reduced = false) {
@@ -78,7 +82,7 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         const { fixture, host, q } = setup();
         q('playback-forward').click();
         fixture.detectChanges();
-        expect(host.lit).toHaveBeenLastCalledWith({ nodeIds: ['a', 'b'], edgeIds: ['e1'] });
+        expect(host.lit).toHaveBeenLastCalledWith(expect.objectContaining({ nodeIds: ['a', 'b'], edgeIds: ['e1'] }));
         expect(q('playback-status').textContent).toContain('Slice 1 of 20');
         expect(q('playback-status').textContent).toContain('1 link active');
         q('playback-forward').click();
@@ -87,7 +91,7 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         expect(q('playback-status').textContent).toContain('0 links active');
         q('playback-back').click();
         fixture.detectChanges();
-        expect(host.lit).toHaveBeenLastCalledWith({ nodeIds: ['a', 'b'], edgeIds: ['e1'] });
+        expect(host.lit).toHaveBeenLastCalledWith(expect.objectContaining({ nodeIds: ['a', 'b'], edgeIds: ['e1'] }));
         // disabled with its reason: still focusable, so the tooltip says why (T-076)
         expect(q('playback-back').getAttribute('aria-disabled')).toBe('true');
     });
@@ -114,7 +118,7 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         fixture.detectChanges();
         expect(q('playback-status').textContent).toContain(`Slice ${PLAYBACK_SLICES} of ${PLAYBACK_SLICES}`);
         expect(q('playback-play').getAttribute('aria-label')).toBe('Play');
-        expect(host.lit).toHaveBeenLastCalledWith({ nodeIds: ['b', 'c'], edgeIds: ['e2'] });
+        expect(host.lit).toHaveBeenLastCalledWith(expect.objectContaining({ nodeIds: ['b', 'c'], edgeIds: ['e2'] }));
     });
 
     it('scrubs with the slider and clears the highlight on reset', () => {
@@ -123,7 +127,7 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         scrub.value = String(PLAYBACK_SLICES - 1);
         scrub.dispatchEvent(new Event('input'));
         fixture.detectChanges();
-        expect(host.lit).toHaveBeenLastCalledWith({ nodeIds: ['b', 'c'], edgeIds: ['e2'] });
+        expect(host.lit).toHaveBeenLastCalledWith(expect.objectContaining({ nodeIds: ['b', 'c'], edgeIds: ['e2'] }));
         q('playback-reset').click();
         fixture.detectChanges();
         expect(host.lit).toHaveBeenLastCalledWith(null);
@@ -164,5 +168,57 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         fixture.detectChanges();
         expect(q('playback-status').textContent).toContain('Not started');
         expect(host.lit).toHaveBeenLastCalledWith(null);
+    });
+    it('widens the highlight back from the handle with the Window picker', () => {
+        const { fixture, host, q } = setup();
+        const scrub = q('playback-scrub') as unknown as HTMLInputElement;
+        scrub.value = String(PLAYBACK_SLICES - 1);
+        scrub.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        expect(host.lit).toHaveBeenLastCalledWith(expect.objectContaining({ edgeIds: ['e2'] }));
+        const pick = q('playback-window') as unknown as HTMLSelectElement;
+        pick.value = '7d';
+        pick.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        expect(host.lit).toHaveBeenLastCalledWith(expect.objectContaining({ edgeIds: ['e1', 'e2'] }));
+        expect(q('playback-status').textContent).toContain('2026-01-01 00:00 to 2026-01-03 00:00 UTC. 2 links active');
+    });
+
+    it('fades older links in the window by default, and stops fading when Age fade is off', () => {
+        const { fixture, host, q } = setup();
+        const pick = q('playback-window') as unknown as HTMLSelectElement;
+        pick.value = 'all';
+        pick.dispatchEvent(new Event('change'));
+        const scrub = q('playback-scrub') as unknown as HTMLInputElement;
+        scrub.value = String(PLAYBACK_SLICES - 1);
+        scrub.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        const faded = host.lit.mock.lastCall![0]!.edgeOpacity!;
+        expect(faded.get('e2')).toBe(1); // at the handle
+        expect(faded.get('e1')).toBe(0.45); // at the window's start: the floor, still above the 0.2 dim
+        const fade = q('playback-fade') as unknown as HTMLInputElement;
+        fade.checked = false;
+        fade.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        expect(host.lit.mock.lastCall![0]!.edgeOpacity).toBeUndefined();
+    });
+
+    it('offers Seal only when the host allows it, and emits the window as [from, to)', () => {
+        const { fixture, host, q } = setup();
+        q('playback-forward').click();
+        fixture.detectChanges();
+        expect(q('playback-seal')).toBeNull();
+        host.sealable.set(true);
+        fixture.detectChanges();
+        const pick = q('playback-window') as unknown as HTMLSelectElement;
+        pick.value = 'all';
+        pick.dispatchEvent(new Event('change'));
+        const scrub = q('playback-scrub') as unknown as HTMLInputElement;
+        scrub.value = String(PLAYBACK_SLICES - 1);
+        scrub.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        q('playback-seal').click();
+        // the last slice keeps its end: the half-open op gets one millisecond past it
+        expect(host.sealed).toHaveBeenCalledWith({ from: '2026-01-01T00:00:00.000Z', to: '2026-01-03T00:00:00.001Z' });
     });
 });

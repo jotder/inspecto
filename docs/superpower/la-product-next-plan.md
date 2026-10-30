@@ -40,6 +40,9 @@ Most of the brainstorm's ideas already exist. Grounded on 2026-10-29 in the la-c
 
 ### Phase 1 — maker-checker covers role and access-policy edits (platform, S–M)
 
+**BUILT 2026-10-30** (lane `mc-access-roles`, independently verified). It also makes every Access screen read a held `202`
+as *held*, via the shared `heldChange()`. As-built: the access admin guide, maker-checker section.
+
 **Gap (verified 2026-10-29):** `AccessRoutes.saveCatalog` and `saveProfile` / `deleteProfile` call
 `PendingChanges.hold`, but `saveRoles` (`AccessRoutes.java` line 114) and `savePolicies` write straight to disk.
 `ConfigWriteFunnelTest.WRITERS` records `savePolicies` as not governed only because the document "is not a
@@ -59,6 +62,16 @@ access write: the one that grants capabilities, `canApproveChanges` included. Th
 
 ### Phase 2 — the LA Access page speaks LA (backend S + UI M)
 
+**BUILT 2026-10-30** (same lane; review findings fixed and re-checked). As built, it differs from the plan below in
+three ways:
+- The tag is `CapabilityManifest.PRODUCTS`, published as `products` on `GET /access/roles`.
+- The path is `/access/roles/{roleId}/effective`, declared in the module OpenAPI fragment.
+- The la-app page reuses the console Roles editor's existing strike-through view, so no separate "What can this role
+  do?" screen was built.
+
+`canAuthorWorkbench` stays visible in LA, because it gates Datasets, Entity Types and saved views there. As-built:
+the access admin guide, R1 paragraph.
+
 - Tag each capability with the products it applies to (`CapabilityManifest` is the single source;
   `CapabilityManifestTest` pins the tags), and publish the tags on `GET /access/roles`.
 - In la-app's Access page, filter `AccessRolesComponent` to LA capabilities and show them with LA labels. This
@@ -72,6 +85,13 @@ access write: the one that grants capabilities, `canApproveChanges` included. Th
 
 ### Phase 3 — Investigation access review (M; one grounding pass first)
 
+**BUILT 2026-10-30 as "leads only"** (operator decision 2026-10-30, the same lane). The grounding found that a non-member
+gets 404 on an Investigation by design (D19), so an admin-wide review would WIDEN access. Built instead: la-app
+Settings ▸ My settings ▸ *Investigation access*, over the Investigations the caller can already open, with Revoke where
+they are the lead. It is UI only and uses the existing routes, with no new backend route. Investigation access is
+members plus embed links; a "view-only share" belongs to saved views. Admin oversight across the Space is NOT built:
+it would need a new capability that reverses D19, so reopen it only on a named ask. As-built: the la-core user guide.
+
 - One admin list across the Space's Investigations: Members, view-only shares and live embed links per
   Investigation, with Revoke. It reuses the per-Investigation routes for each action.
 - **Grounding owed before building:** whether a cross-Investigation read exists, and which capability
@@ -81,6 +101,18 @@ access write: the one that grants capabilities, `canApproveChanges` included. Th
   revoke writes the same audit row the per-Investigation action writes.
 
 ### Phase 4 — the timeline scrubber (UI M, no new backend)
+
+> **BUILT 2026-10-30 (uncommitted, lane `mc-access-roles`).** Scrub, Play and step were already shipped as the
+> timeline playback strip (2026-10-05), so this phase extended it. It added a Window picker (slice / 1 / 7 / 30 days /
+> from the start), an age fade that is on by default with a 0.45 floor above the 0.2 dim (the new
+> `GraphEmphasis.edgeOpacity`), and *Seal this window* (the `window` op, offered only when the Investigation's
+> `timeCol` is the timeline's column and the caller holds `canManageIncidents`).
+>
+> Deviations from the bullets below:
+> - links outside the window are **dimmed, not hidden**, so the layout does not re-run on every tick;
+> - the scrubber is a highlight, not Undo-recorded state.
+>
+> Still owed: the browser drive on `la-showcase` and the "replays to the same Working Set" check.
 
 This builds on the existing *Filter edges by time* control instead of adding a second one. The 2026-10 grounding
 refused G6 `timebar` because it duplicated that control.
@@ -99,6 +131,25 @@ refused G6 `timebar` because it duplicated that control.
 ### Phase 5 — pattern-by-example
 
 **5a. A pattern from the selection (UI M).**
+
+> **BUILT 2026-10-30 (uncommitted, lane `mc-access-roles`):** `pattern-from-selection.ts` plus *Use selection as
+> pattern* in the toolbox, and a removable *After the previous hop* chip on a linear step.
+>
+> Deviations from the bullets below:
+> - **Times give the order only, not gap ceilings.** The builder can't edit a gap, and an exact gap fits one example.
+> - **No value attribute is mapped anywhere,** so a fan gets a band only when its legs carry one numeric column.
+> - **Server runs are unchanged.** *Search whole Dataset* stays on a truncated graph, and the Investigation server run
+>   stays pack-only.
+>
+> Still owed: the showcase drive.
+>
+> **5b BUILT 2026-10-30 (uncommitted):** *Save as pattern pack* (`save-pattern-pack.dialog.ts`, `patternPackToContent`).
+> - **Capability:** the grounding found `pattern-pack` absent from `ImportCapabilityGuard.KIND_CAPABILITY`, so the
+>   generic door demands `canAuthorWorkbench`. The action shows only to holders of it.
+> - **Visibility:** the pack has no `shares`, so everyone in the Space sees it.
+> - **Not built:** saving over an existing pack.
+>
+> **5c is not started:** it needs measuring first.
 - *Use as pattern* on a canvas selection:
   - **A path** becomes linear `PatternStep[]`: node kinds, link kinds and direction come from the selection, and
     gaps come from edge times when the graph has a time column.
@@ -118,6 +169,36 @@ refused G6 `timebar` because it duplicated that control.
   client never reads is a bug" rule.
 
 **5c. A pattern as standing detection (backend M–L; measure first).**
+
+> **MEASURED 2026-10-30: PARKED, by this section's own rule.**
+>
+> **Method:**
+> - One whole-Dataset `POST /inv/pattern/branching` over real HTTP, using a throwaway probe test that was not kept.
+> - The motif was a 5-leg fan-in with a `900 ≤ AMOUNT < 1000` band and a 72 h window, then a 2-leg fan-out after it.
+> - The feed was a synthetic transfer view, `range(n)` over n/20 accounts, with a planted ring. `pattern.timeout_s` was
+>   raised to 300 s, and each size was run twice on the dev laptop.
+>
+> **Results:**
+>
+> | Rows | Runs | Found the planted ring? |
+> |---|---|---|
+> | 10⁵ | 1.8 s, 1.6 s | yes |
+> | 10⁶ | 12.3 s, 13.5 s | yes |
+> | 10⁷ | 108 s, 140 s | yes |
+> | 10⁸ | interrupted at the 300 s cap, both runs | — |
+>
+> Cost is about linear, roughly 11–14 µs per row.
+>
+> **Verdict:**
+> - Already at 10⁶ rows, one run exceeds the route's own default budget (`pattern.timeout_s` = 10 s).
+> - At 10⁷ rows, one run takes about two minutes. A sweep repeating it every interval is not viable on the real
+>   Datasets this would watch. The index is proven to 10⁸ edges.
+>
+> **Caveat:** the view computes every row, its string concatenation and its timestamp cast on each run. A Parquet-backed
+> Dataset may scan faster, but not by the 10–100× needed.
+>
+> **What would reopen it:** an incremental sweep that reads only the legs since the last run (per-day delta, or the
+> index's delta files) instead of the whole Dataset. That is its own design item, not 5c.
 - Per NX-D5, add a Measure kind *pattern matches*: the match count of a saved pattern pack over the bound
   Dataset. *Watch* on it creates an Alert Rule, and *Enable standing detection* runs it under the existing
   `StandingDetection` authority (owner re-decided, masking snapshot, aggregate-only audit, Alert evidence that
@@ -141,6 +222,46 @@ The question is whether LA can suggest *these two identifiers may be one entity*
   **Go** if top-20 precision is at least 0.9 and no hub decoy reaches the top 20.
 - **If go:** a *Possible duplicates* list in Settings ▸ Identities, where each row pre-fills the existing Merge form
   (NX-D6). **If no-go:** record the numbers here and close the idea.
+
+**MEASURED 2026-10-30 — GO, with conditions; the list is not built yet.**
+
+*Method.* A throwaway vitest probe, deleted after the run. It built a synthetic graph of about 950 nodes (under the
+1 000-node `linkPrediction` browser cap) and ran three seeds. The graph holds:
+- 60 single accounts, each with its own device, phone and address, 3–6 counterparties drawn with a popularity skew,
+  and three hubs (bank, telco, shop) at 60 % each;
+- 20 **easy** splits that share device, phone and address, plus most counterparties;
+- 20 **hard** splits that share only a phone and one counterparty;
+- 15 **household** decoys: two people at one address, half of them also sharing the home device;
+- 15 **hub** decoys: two people sharing every hub and the two busiest counterparties.
+
+Candidates are account pairs with at least one shared neighbour (about 16–17k per seed). They are ranked by the
+toolbox's existing scores, with no attribute matching.
+
+| Score | Top-20 precision | Top-50 precision | Hub decoys in top 20 | Household decoys in top 50 | Hard pairs in top 50 |
+|---|---|---|---|---|---|
+| Adamic-Adar | **1.00 / 1.00 / 1.00** | 0.68 / 0.74 / 0.68 | 0 / 0 / 0 | 10 / 9 / 13 | 14 / 17 / 14 |
+| Common neighbours | 0.75 / 0.85 / 0.90 | 0.32 / 0.34 / 0.40 | 0 | 1 | 1–2 |
+| Jaccard | 0.90 / 0.90 / 1.00 | 0.40 / 0.42 / 0.40 | 0 | 0 | 0–1 |
+
+*Verdict.* Adamic-Adar meets the gate on every seed: top-20 precision is 1.0, and no hub decoy reaches the top 20.
+It is also the only score that finds the hard pairs. Common neighbours and Jaccard fail the gate.
+
+*Conditions* (they are what the numbers say about real use):
+1. **Show only the top 20.** Below the top 20, about one suggestion in four is a household: two people sharing an
+   address or a home device.
+2. **Every row shows its reason.** List the shared neighbours by kind, for example *shares phone, device, address*.
+   That lets the analyst reject a household at a glance, and a *shares an address only* row reads as weak.
+3. **Name-attribute matching** would separate households from splits. It was not measured, because the fixture
+   maps no name column.
+
+*Caveat.* The fixture is ours, and its 20 easy pairs are exactly the top 20, so the gate measures the easy case.
+Real data has more households and shared corporate devices than this fixture does.
+
+**6b BUILT 2026-10-30 (uncommitted).** The operator chose the current canvas as the candidate source, so the list lives
+where the canvas is: Analysis ▸ Similarity ▸ *Possible duplicates*, not Settings ▸ Identities. It shows the top 20
+pairs with their shared-neighbour reason. Each row's **Merge…** prefills the existing Merge form through the
+*Merge with...* path. The browser cap of 1 000 nodes applies. A server-side source is not built; reopen it on a named
+ask. Specs: `graph-analysis.spec.ts` (*possible duplicates…*) and `link-analysis-toolbox.component.spec.ts` (*phase 6…*).
 
 ## 4. Deferred, with the reason (no board row; reopen on a named ask)
 

@@ -30,7 +30,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ComponentsService } from '@inspecto/core/api';
+import { ComponentsService, LensService, heldMessage } from '@inspecto/core/api';
+import { MatDialog } from '@angular/material/dialog';
 import {
     GraphRunResult,
     GraphRunsService,
@@ -52,6 +53,7 @@ import {
     NodeScore,
     PatternStep,
     PredictedLink,
+    DuplicateSuggestion,
     SuspicionScore,
     BrowserCappedAlgorithm,
     allPaths,
@@ -76,6 +78,7 @@ import {
     kCore,
     katzCentrality,
     linkPrediction,
+    possibleDuplicates,
     louvainCommunities,
     matchPattern,
     edgeTimeIndex,
@@ -103,6 +106,8 @@ import {
     resolvePatternColumns,
     usingColumnsNotice,
 } from './pattern-packs';
+import { patternFromSelection } from './pattern-from-selection';
+import { SavePatternPackData, SavePatternPackDialog, SavePatternPackResult } from './save-pattern-pack.dialog';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { FormsModule } from '@angular/forms';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
@@ -382,6 +387,8 @@ export class LinkAnalysisToolboxComponent {
      * A motif with an ordering constraint cannot be evaluated without it — see {@link runPattern}.
      */
     readonly timeAttr = input<string>('');
+    /** The entities box-selected on the canvas — the example *Use selection as pattern* reads (phase 5a). */
+    readonly canvasSelection = input<string[]>([]);
 
     /**
      * LA-11: the edge mappings a server traversal can walk (the loaded query's), as picker options whose value
@@ -451,6 +458,8 @@ export class LinkAnalysisToolboxComponent {
     readonly findPaths = output<FindPathsRequest>();
     /** LA-14b: run the branching motif server-side over the whole Dataset. */
     readonly runPatternOnServer = output<ServerPatternRequest>();
+    /** Phase 6: "Merge…" on a possible duplicate — the host hands the two node ids to the Identities Merge form. */
+    readonly mergePair = output<[string, string]>();
 
     /** The analysis tool groups (the accordion = the graph-algorithms toolbox). */
     /**
@@ -870,6 +879,8 @@ export class LinkAnalysisToolboxComponent {
     readonly similarityFor = signal('');
     readonly similarityResult = signal<NodeScore[]>([]);
     readonly predictions = signal<PredictedLink[]>([]);
+    /** Phase 6: the top same-type pairs that may be one entity. */
+    readonly duplicates = signal<DuplicateSuggestion[]>([]);
     readonly flowFrom = signal('');
     readonly flowTo = signal('');
     readonly flowResult = signal<{ value: number; minCut: GraphSelection } | null>(null);
@@ -1114,6 +1125,7 @@ export class LinkAnalysisToolboxComponent {
         this.cliquesResult.set([]);
         this.similarityResult.set([]);
         this.predictions.set([]);
+        this.duplicates.set([]);
         this.flowResult.set(null);
         this.spanningForest.set(null);
         this.suspicion.set([]);
@@ -1389,6 +1401,67 @@ export class LinkAnalysisToolboxComponent {
 
     /** Set once the investigator chooses a pack, so a late profile / Space-pack load never overrides it. */
     private packPicked = false;
+
+    private readonly lens = inject(LensService);
+    private readonly dialog = inject(MatDialog);
+    /**
+     * Phase 5b: *Save as pattern pack* writes through the generic `POST /components/pattern-pack` door, which demands
+     * `canAuthorWorkbench` (`pattern-pack` is not in `ImportCapabilityGuard.KIND_CAPABILITY`), so only holders see it.
+     */
+    readonly canSavePatternPack = computed(() => this.lens.canAuthorWorkbench());
+
+    /** Save the builder's motif as a Space pattern pack; on success it joins the picker and stays loaded. */
+    savePatternPack(): void {
+        if (!this.canSavePatternPack()) return;
+        const stages = this.branchStages();
+        this.dialog
+            .open<SavePatternPackDialog, SavePatternPackData, SavePatternPackResult | undefined>(SavePatternPackDialog, {
+                data: {
+                    steps: this.patternSteps(),
+                    stages,
+                    takenIds: this.patternPacks().map((p) => p.id),
+                },
+                width: '28rem',
+            })
+            .afterClosed()
+            .subscribe((saved) => {
+                if (!saved) return;
+                const { pack, held } = saved;
+                // A held write saved nothing yet: it joins the picker only once another approver accepts it.
+                if (held) return this.patternNote.set(`${heldMessage(held)}.`);
+                this.patternPacks.update((all) => [...all, pack]);
+                this.packPicked = true;
+                this.loadedPack.set(pack);
+                this.patternNote.set(`Saved as the pattern pack “${pack.label}”. Everyone in this Space can now pick it.`);
+            });
+    }
+
+    /** Why *Use selection as pattern* is off ('' = on). */
+    readonly selectionPatternWhyNot = computed(() =>
+        this.canvasSelection().length < 2 ? 'Box-select two or more linked entities on the graph first.' : '',
+    );
+
+    /**
+     * `LA-PRODUCT-NEXT-1` phase 5a — pattern-by-example: the canvas selection becomes the builder's motif (a chain →
+     * steps, a star → branching stages), to loosen and run like any pack. A shape it cannot read is said, not guessed.
+     */
+    useSelectionAsPattern(): void {
+        const g = this.graph();
+        if (!g || this.selectionPatternWhyNot()) return;
+        const derived = patternFromSelection(g, this.canvasSelection(), this.timeAttr());
+        this.analysisError.set('');
+        if (derived.kind === 'refused') {
+            this.analysisError.set(derived.reason);
+            return;
+        }
+        this.packPicked = true;
+        this.loadedPack.set(null);
+        this.branchStages.set(derived.kind === 'fan' ? derived.stages : null);
+        this.patternSteps.set(derived.kind === 'path' ? derived.steps : [{}, { direction: 'out' }]);
+        this.patternMatches.set([]);
+        this.patternNote.set(`From your selection: ${derived.summary} Loosen it, then find matches.`);
+        this.clearServerNotices();
+    }
 
     private applyPatternPack(id: string): void {
         const pack = this.patternPacks().find((p) => p.id === id) ?? null;
@@ -1689,6 +1762,29 @@ export class LinkAnalysisToolboxComponent {
 
     focusPrediction(p: PredictedLink): void {
         this.emphasisChange.emit({ nodeIds: [p.source, p.target], edgeIds: [] });
+    }
+
+    /** Merging writes an Identity Fact: inside an Investigation, with `canManageIncidents` (as "Merge with..."). */
+    readonly canMergeDuplicates = computed(() => this.investigationOpen() && this.lens.canManageIncidents());
+
+    runDuplicates(): void {
+        const g = this.graph();
+        if (!g) return;
+        this.analysisError.set('');
+        this.clearServerNotices();
+        try {
+            const found = possibleDuplicates(g);
+            this.duplicates.set(found);
+            if (!found.length) this.analysisError.set('No possible duplicates: no two entities of one type share a neighbour.');
+        } catch (err) {
+            this.duplicates.set([]);
+            this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');
+        }
+    }
+
+    /** "shares phone, device ×2" — the reason a pair is suggested. */
+    sharedLabel(d: DuplicateSuggestion): string {
+        return 'shares ' + d.shared.map(([k, n]) => (n > 1 ? `${k} ×${n}` : k)).join(', ');
     }
 
     // ── V2: flow & backbone ──

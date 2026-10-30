@@ -1240,6 +1240,22 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
     /** True while the canvas draws an open Investigation's Working Set, not the query graph. */
     readonly workingSetCanvas = computed(() => this.investigation.canvas() !== null);
+    /**
+     * LA-PRODUCT-NEXT-1 phase 4: the playback offers "Seal this window" only inside an open Investigation the caller may
+     * change, whose bound event-time column is the timeline's column — sealing a window read on another column would
+     * record a different moment than the one on screen.
+     */
+    readonly playbackSealable = computed(() => {
+        const timeCol = this.investigation.header()?.timeCol;
+        return this.investigation.active() && this.lens.canManageIncidents() && !!timeCol && timeCol === this.timeColumn();
+    });
+
+    /** Seal the playback's window as the Investigation's `window` op, so the moment replays as a step. */
+    async sealPlaybackWindow(window: { from: string; to: string }): Promise<void> {
+        if (!this.playbackSealable()) return;
+        if (await this.investigation.apply({ op: 'window', window }))
+            this.toastr.success(`Window ${window.from.slice(0, 16)} to ${window.to.slice(0, 16)} UTC sealed as a step`);
+    }
     /** Why the query-graph-only tools are disabled on an Investigation canvas (they would silently do nothing). */
     readonly queryGraphOnlyReason = 'Applies to the query graph — the Investigation canvas draws its Working Set.';
     /** Working Set links the canvas left off at the render ceiling (0 = all drawn). */
@@ -3015,10 +3031,28 @@ Its prior copies stay in its version history.`,
     /** Hands the two selected entities to the Identity section (Investigation tab); nothing is written until it is confirmed there. */
     mergeSelected(): void {
         if (this.mergeUnavailable()) return;
+        this.mergeNodes(this.selectedNodes().map((n) => n.id));
+    }
+
+    /** Phase 6 "Merge…" on a possible duplicate, and "Merge with...": prefill the Identities Merge form from two canvas nodes. */
+    mergeNodes(nodeIds: string[]): void {
+        if (!this.lens.canManageIncidents()) return;
         const ws = this.investigation.workingSet();
-        const ids = this.selectedNodes().flatMap((n) => idsInWorkingSet(n, ws));
-        const { pair } = mergePairOf(ids, ws);
-        if (!pair) return;
+        const nodes = this.canvasData()?.nodes ?? [];
+        const ids = nodeIds.flatMap((id) => {
+            const node = nodes.find((n) => n.id === id);
+            return node ? idsInWorkingSet(node, ws) : [];
+        });
+        const { pair, reason } = mergePairOf(ids, ws);
+        if (!pair) {
+            // A suggested pair outside the Working Set would otherwise read "Select exactly two entities".
+            this.toastr.warning(
+                ids.length !== 2 && nodeIds.length === 2
+                    ? 'Only entities in the open Investigation can be merged. Expand to them first.'
+                    : reason,
+            );
+            return;
+        }
         this.investigation.mergeDraft.set(pair);
         // LA-I2-GAPS-RESIDUALS-1 (5): open what holds the prefilled merge, so the next step is on screen. Identities moved
         // to ⚙ Settings ▸ Data (§5.10).

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { G6GraphData } from '@inspecto/core/graph';
-import { PLAYBACK_SLICES, activeInSlice, playbackSlice, playbackSliceCount } from './timeline-playback';
+import {
+    AGE_FADE_FLOOR,
+    PLAYBACK_SLICES,
+    activeInSlice,
+    ageOpacity,
+    playbackSlice,
+    playbackSliceCount,
+    playbackWindow,
+    sealedWindow,
+} from './timeline-playback';
 
 const edge = (id: string, source: string, target: string, ts?: string) => ({
     id,
@@ -57,5 +66,44 @@ describe('timeline playback slices', () => {
         for (let i = 0; i < PLAYBACK_SLICES; i++)
             seen.push(...activeInSlice(GRAPH, 'ts', playbackSlice(EXTENT, i)).edgeIds);
         expect(seen.sort()).toEqual(['e1', 'e2', 'e3']);
+    });
+
+    it('a window reaches back from the handle, never before the data starts', () => {
+        const last = playbackSlice(EXTENT, PLAYBACK_SLICES - 1);
+        expect(playbackWindow(EXTENT, last, 'slice')).toBe(last);
+        expect(playbackWindow(EXTENT, last, '1d').start).toBe(Date.parse('2026-01-02T00:00:00Z'));
+        expect(playbackWindow(EXTENT, last, '30d').start).toBe(EXTENT[0]);
+        expect(activeInSlice(GRAPH, 'ts', playbackWindow(EXTENT, last, 'all')).edgeIds).toEqual(['e1', 'e2', 'e3']);
+    });
+
+    it('fades by age from 1 at the handle to the floor at the window start', () => {
+        const range = playbackWindow(EXTENT, playbackSlice(EXTENT, PLAYBACK_SLICES - 1), 'all');
+        const o = ageOpacity(GRAPH, 'ts', range, ['e1', 'e2', 'e3', 'e4']);
+        expect(o.get('e3')).toBe(1);
+        expect(o.get('e2')).toBeCloseTo(1 - (1 - AGE_FADE_FLOOR) / 2, 1);
+        expect(o.get('e1')).toBe(AGE_FADE_FLOOR);
+        expect(o.has('e4')).toBe(false); // no parseable date
+    });
+
+    it('seals a window as a half-open [from, to) that keeps the end of the last slice', () => {
+        expect(sealedWindow(playbackSlice(EXTENT, 0))).toEqual({
+            from: '2026-01-01T00:00:00.000Z',
+            to: new Date(playbackSlice(EXTENT, 0).end).toISOString(),
+        });
+        expect(sealedWindow(playbackSlice(EXTENT, PLAYBACK_SLICES - 1)).to).toBe('2026-01-03T00:00:00.001Z');
+    });
+
+    it('seals exactly the whole milliseconds the highlight holds when slice bounds are fractional', () => {
+        const odd: [number, number] = [0, 1001]; // 1001 ms / 20 slices: every inner bound is fractional
+        for (let i = 0; i < PLAYBACK_SLICES; i++) {
+            const slice = playbackSlice(odd, i);
+            const w = sealedWindow(slice);
+            const from = Date.parse(w.from);
+            const to = Date.parse(w.to);
+            for (let t = 0; t <= 1001; t++) {
+                const lit = t >= slice.start && (slice.last ? t <= slice.end : t < slice.end);
+                expect(t >= from && t < to, `slice ${i} at ${t} ms`).toBe(lit);
+            }
+        }
     });
 });

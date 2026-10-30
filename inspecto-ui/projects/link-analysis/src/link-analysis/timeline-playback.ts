@@ -43,3 +43,57 @@ export function activeInSlice(g: G6GraphData, col: string, slice: PlaybackSlice)
     }
     return { nodeIds: [...nodeIds], edgeIds };
 }
+
+/** The window widths the strip offers, trailing the handle (the slice's end). `slice` = the slice alone; `all` = from the start. */
+export type PlaybackWindow = 'slice' | '1d' | '7d' | '30d' | 'all';
+
+const DAY_MS = 86_400_000;
+const WIDTH_MS: Record<'1d' | '7d' | '30d', number> = { '1d': DAY_MS, '7d': 7 * DAY_MS, '30d': 30 * DAY_MS };
+
+/** The faintest an in-window link fades to: above the 0.2 the canvas dims an out-of-window link to, so it stays legible. */
+export const AGE_FADE_FLOOR = 0.45;
+
+/**
+ * The range the strip highlights for `slice` and `window`: the slice itself, or `window` back from the handle (the slice's
+ * end), never before the data's start. Same half-open rule as a slice (the last one includes its end).
+ */
+export function playbackWindow(
+    extent: readonly [number, number],
+    slice: PlaybackSlice,
+    window: PlaybackWindow,
+): PlaybackSlice {
+    if (window === 'slice') return slice;
+    const start = window === 'all' ? extent[0] : Math.max(extent[0], slice.end - WIDTH_MS[window]);
+    return { ...slice, start: Math.min(start, slice.start) };
+}
+
+/**
+ * Age fade: each active link's opacity by its age back from the handle — 1 at the handle, {@link AGE_FADE_FLOOR} at the
+ * window's start — so the newest activity stands out. A link with no parseable date is not in the map.
+ */
+export function ageOpacity(
+    g: G6GraphData,
+    col: string,
+    range: PlaybackSlice,
+    edgeIds: readonly string[],
+): Map<string, number> {
+    const ids = new Set(edgeIds);
+    const span = range.end - range.start;
+    const out = new Map<string, number>();
+    for (const e of g.edges) {
+        if (!ids.has(e.id)) continue;
+        const t = Date.parse(e.data.attrs?.[col] ?? '');
+        if (!Number.isFinite(t)) continue;
+        const age = span > 0 ? Math.min(1, Math.max(0, (range.end - t) / span)) : 0;
+        out.set(e.id, Math.round((1 - (1 - AGE_FADE_FLOOR) * age) * 100) / 100);
+    }
+    return out;
+}
+
+/** The Investigation `window` op that seals `range` (`[from, to)`, UTC ISO instants; the last slice's end is kept in). */
+export function sealedWindow(range: PlaybackSlice): { from: string; to: string } {
+    return {
+        from: new Date(Math.ceil(range.start)).toISOString(),
+        to: new Date(Math.ceil(range.end) + (range.last ? 1 : 0)).toISOString(),
+    };
+}

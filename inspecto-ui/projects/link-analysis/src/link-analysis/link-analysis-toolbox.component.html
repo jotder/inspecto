@@ -796,6 +796,10 @@
                                         Predict links
                                     </button>
                                 }
+                                <button mat-stroked-button data-testid="find-duplicates" (click)="runDuplicates()">
+                                    <mat-icon svgIcon="heroicons_outline:users"></mat-icon>
+                                    Possible duplicates
+                                </button>
                                 @if (similarityWhyNot(); as why) {
                                     <p class="text-secondary m-0 w-full text-xs" id="why-similar" data-testid="why-similar">{{ why }}</p>
                                 }
@@ -858,6 +862,35 @@
                                                     p.score | number: '1.0-2'
                                                 }})
                                             </button>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            @if (duplicates().length) {
+                                <p class="text-secondary m-0 mt-2 text-xs">
+                                    Suggestions only: two people at one address also share neighbours. Check the reason
+                                    before merging.
+                                </p>
+                                <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Possible duplicates">
+                                    @for (d of duplicates(); track $index; let i = $index) {
+                                        <li class="flex flex-wrap items-center gap-2">
+                                            <button
+                                                class="min-h-6 text-left underline-offset-2 hover:underline"
+                                                (click)="focusPrediction(d)"
+                                            >
+                                                {{ d.sourceLabel }} ↔ {{ d.targetLabel }}
+                                            </button>
+                                            <span class="text-secondary text-xs">{{ sharedLabel(d) }}</span>
+                                            @if (canMergeDuplicates()) {
+                                                <button
+                                                    mat-button
+                                                    [attr.data-testid]="'merge-duplicate-' + i"
+                                                    [attr.aria-label]="'Merge ' + d.sourceLabel + ' with ' + d.targetLabel"
+                                                    (click)="mergePair.emit([d.source, d.target])"
+                                                >
+                                                    Merge…
+                                                </button>
+                                            }
                                         </li>
                                     }
                                 </ul>
@@ -1040,6 +1073,30 @@
                                     [ngModel]="loadedPack()?.id ?? ''"
                                     (ngModelChange)="loadPatternPack($event)"
                                 />
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    data-testid="pattern-from-selection"
+                                    (click)="!selectionPatternWhyNot() && useSelectionAsPattern()"
+                                    [disabled]="!!selectionPatternWhyNot()"
+                                    [disabledInteractive]="true"
+                                    [matTooltip]="selectionPatternWhyNot() || 'Read the selected entities and their links as a pattern'"
+                                >
+                                    <mat-icon svgIcon="heroicons_outline:cursor-click"></mat-icon>
+                                    Use selection as pattern
+                                </button>
+                                @if (canSavePatternPack()) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        data-testid="pattern-save-pack"
+                                        matTooltip="Save this pattern for everyone in this Space"
+                                        (click)="savePatternPack()"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
+                                        Save as pattern pack
+                                    </button>
+                                }
                             </div>
                             @if (!loadedPack()) {
                                 <p class="text-sm text-secondary" role="status">
@@ -1076,15 +1133,20 @@
                                                 @if (st.windowHours) {
                                                     · within {{ st.windowHours }} hours
                                                 }
-                                                @if (st.afterPrevious) {
-                                                    · after the previous stage{{
-                                                        st.maxGapHours ? ', within ' + st.maxGapHours + ' hours' : ''
-                                                    }}
-                                                }
                                                 @if (st.closesToStart) {
                                                     · ends at the starting account
                                                 }
                                             </span>
+                                            <!-- Every constraint a stage carries is on screen and removable (phase 5a: a derived star has no pack text). -->
+                                            @if (st.edgeKind) {
+                                                <inspecto-chip variant="soft" tone="primary" [removable]="true" data-testid="stage-edge-kind" [removeLabel]="'Stage ' + (i + 1) + ': any link kind'" (removed)="updateBranchStage(i, { edgeKind: undefined })">Link kind {{ st.edgeKind }}</inspecto-chip>
+                                            }
+                                            @if (st.nodeKind) {
+                                                <inspecto-chip variant="soft" tone="primary" [removable]="true" data-testid="stage-node-kind" [removeLabel]="'Stage ' + (i + 1) + ': any Entity Type'" (removed)="updateBranchStage(i, { nodeKind: undefined })">Entity Type {{ st.nodeKind }}</inspecto-chip>
+                                            }
+                                            @if (st.afterPrevious) {
+                                                <inspecto-chip variant="soft" tone="primary" [removable]="true" data-testid="stage-after-previous" [removeLabel]="'Stage ' + (i + 1) + ': drop the order'" (removed)="updateBranchStage(i, { afterPrevious: undefined, maxGapHours: undefined })">After the previous stage{{ st.maxGapHours ? ', within ' + st.maxGapHours + ' hours' : '' }}</inspecto-chip>
+                                            }
                                         </li>
                                     }
                                 </ol>
@@ -1281,6 +1343,20 @@
                                                 [ngModel]="step.nodeKind ?? ''"
                                                 (ngModelChange)="updatePatternStep(i, { nodeKind: $event || undefined })"
                                             />
+                                            @if (i > 0 && step.afterPrevious) {
+                                                <inspecto-chip
+                                                    variant="soft"
+                                                    tone="primary"
+                                                    [removable]="true"
+                                                    data-testid="step-after-previous"
+                                                    [removeLabel]="'Step ' + (i + 1) + ': drop the order'"
+                                                    (removed)="updatePatternStep(i, { afterPrevious: undefined, maxGapHours: undefined })"
+                                                >
+                                                    After the previous hop{{
+                                                        step.maxGapHours ? ', within ' + step.maxGapHours + ' hours' : ''
+                                                    }}
+                                                </inspecto-chip>
+                                            }
                                             @if (i > 0) {
                                                 <button
                                                     mat-icon-button

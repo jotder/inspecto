@@ -378,3 +378,56 @@ export function usingColumnsNotice(cols: readonly string[]): string {
         ? `Using the ${cols.slice(0, -1).join(', ')} and ${cols[cols.length - 1]} columns for this pattern.`
         : `Using the ${cols[0]} column for this pattern.`;
 }
+
+/**
+ * `LA-PRODUCT-NEXT-1` phase 5b — a motif as `pattern-pack` component content, the shape {@link patternPackFromContent}
+ * reads back. Every step (and every stage) carries every column, blank where absent, because TOON writes a list of
+ * maps as a tabular array and a ragged row is not one. `maxGapHours` / `windowHours` of 0 mean none.
+ */
+export function patternPackToContent(pack: Omit<PatternPack, 'tool'>): Record<string, unknown> {
+    // A band with neither bound is no band: written as one, the reader would refuse the whole pack.
+    const band = (t: LegThreshold | undefined) => (t && (t.min !== undefined || t.max !== undefined) ? t : undefined);
+    const head = {
+        id: pack.id,
+        name: pack.id,
+        label: pack.label,
+        category: pack.category,
+        description: pack.description,
+    };
+    if (pack.stages?.length)
+        return {
+            ...head,
+            stages: pack.stages.map((s) => ({
+                shape: s.shape,
+                minBranches: s.minBranches,
+                edgeKind: s.edgeKind ?? '',
+                nodeKind: s.nodeKind ?? '',
+                windowHours: s.windowHours ?? 0,
+                afterPrevious: !!s.afterPrevious,
+                maxGapHours: s.maxGapHours ?? 0,
+                closesToStart: !!s.closesToStart,
+                thresholdAttr: band(s.threshold)?.attr ?? '',
+                thresholdMin: band(s.threshold)?.min ?? '',
+                thresholdMax: band(s.threshold)?.max ?? '',
+            })),
+        };
+    return {
+        ...head,
+        steps: pack.steps.map((s) => ({
+            direction: s.direction ?? '',
+            nodeKind: s.nodeKind ?? '',
+            edgeKind: s.edgeKind ?? '',
+            afterPrevious: !!s.afterPrevious,
+            maxGapHours: s.maxGapHours ?? 0,
+        })),
+    };
+}
+
+/** A pack id from its name: lower-case words joined by `-` (the component id rule); blank when nothing is left. */
+export function patternPackId(label: string): string {
+    return label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 60);
+}

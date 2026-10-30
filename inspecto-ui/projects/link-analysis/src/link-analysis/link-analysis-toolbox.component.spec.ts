@@ -15,6 +15,7 @@ import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { NEEDS_TIME_COLUMN } from './disabled-reasons';
+import { SessionService } from 'app/inspecto/auth/session.service';
 
 /** A tiny two-cluster graph: a–b–c plus d–e (mirrors the studio spec fixture). */
 const GRAPH: G6GraphData = {
@@ -456,6 +457,119 @@ describe('LinkAnalysisToolboxComponent', () => {
         c.runPattern();
         expect(c.patternMatches()).toHaveLength(0);
         expect(c.patternPacks().find((p) => p.id === 'structuring')!.stages![0].threshold!.max).toBe(1000);
+    });
+
+    it('LA-PRODUCT-NEXT-1 5a: a selected fan-in becomes a branching motif that finds its own source shape', () => {
+        const { fixture, c, last } = make(structuringGraph());
+        fixture.componentRef.setInput('timeAttr', 'BOOKED_AT');
+        c.tab.set('pattern');
+        fixture.detectChanges();
+        const button = () =>
+            (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+                '[data-testid="pattern-from-selection"]',
+            )!;
+        expect(button().getAttribute('aria-disabled')).toBe('true'); // nothing selected: off, with its reason
+        fixture.componentRef.setInput('canvasSelection', ['hub', 's1', 's2', 's3', 's4', 's5']);
+        fixture.detectChanges();
+        button().click();
+        fixture.detectChanges();
+        expect(c.branchStages()).toEqual([
+            {
+                shape: 'fan-in',
+                minBranches: 5,
+                edgeKind: 'pays',
+                nodeKind: 'acct',
+                threshold: { attr: 'AMOUNT', min: 950, max: 951 },
+            },
+        ]);
+        expect(c.patternNote()).toContain('A star: 5 send to one.');
+        // every constraint the selection put on the stage is on screen and removable
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="stage-edge-kind"]')?.textContent).toContain('Link kind pays');
+        expect(el.querySelector('[data-testid="stage-node-kind"]')?.textContent).toContain('Entity Type acct');
+        expect(
+            el.querySelector('[data-testid="stage-node-kind"] button')?.getAttribute('aria-label'),
+        ).toBe('Stage 1: any Entity Type');
+        (el.querySelector('[data-testid="stage-node-kind"] button') as HTMLButtonElement).click();
+        expect(c.branchStages()![0].nodeKind).toBeUndefined();
+        c.updateBranchStage(0, { nodeKind: 'acct' });
+        c.runPattern();
+        expect(c.analysisError()).toBe('');
+        expect(c.patternMatches()).toHaveLength(1);
+        expect(last()?.nodeIds).toContain('hub');
+    });
+
+    it('LA-PRODUCT-NEXT-1 5a: a selected chain becomes steps, its order shown and removable; a non-shape is refused', () => {
+        const { fixture, c } = make(structuringGraph());
+        fixture.componentRef.setInput('timeAttr', 'BOOKED_AT');
+        c.tab.set('pattern');
+        fixture.componentRef.setInput('canvasSelection', ['s1', 'hub', 'r1', 'off']);
+        c.useSelectionAsPattern();
+        fixture.detectChanges();
+        expect(c.branchStages()).toBeNull();
+        expect(c.patternSteps()).toHaveLength(4);
+        const chips = (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="step-after-previous"]');
+        expect(chips.length).toBe(2); // the order the example happened in is on screen, not hidden
+        c.updatePatternStep(2, { afterPrevious: undefined });
+        c.runPattern();
+        expect(c.patternMatches().length).toBeGreaterThanOrEqual(1);
+
+        fixture.componentRef.setInput('canvasSelection', ['s1', 'r1']); // not linked to each other
+        c.useSelectionAsPattern();
+        expect(c.analysisError()).toContain('not all linked');
+        expect(c.patternSteps()).toHaveLength(4); // a refusal leaves the builder as it was
+    });
+
+    it('LA-PRODUCT-NEXT-1 5b: Save as pattern pack shows only to a canAuthorWorkbench holder (the route it writes through)', () => {
+        const { fixture, c } = make();
+        c.tab.set('pattern');
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canManageIncidents']);
+        fixture.detectChanges();
+        const save = () => (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pattern-save-pack"]');
+        expect(save()).toBeNull();
+        session.capabilities.set(['canAuthorWorkbench']);
+        fixture.detectChanges();
+        expect(save()).not.toBeNull();
+    });
+
+    it('LA-PRODUCT-NEXT-1 phase 6: Possible duplicates lists same-type pairs with a reason; Merge… needs an Investigation and canManageIncidents', () => {
+        const dup: G6GraphData = {
+            nodes: [
+                { id: 'a1', data: { label: 'A1', kind: 'account' as never } },
+                { id: 'a2', data: { label: 'A2', kind: 'account' as never } },
+                { id: 'p', data: { label: 'P', kind: 'phone' as never } },
+                { id: 'd', data: { label: 'D', kind: 'device' as never } },
+            ],
+            edges: [
+                ['a1', 'p'],
+                ['a2', 'p'],
+                ['a1', 'd'],
+                ['a2', 'd'],
+            ].map(([s, t]) => ({ id: `${s}-${t}`, source: s, target: t, data: {} as never })),
+        };
+        const { fixture, c } = make(dup);
+        c.tab.set('similarity');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        (el.querySelector('[data-testid="find-duplicates"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(c.duplicates().map((d) => [d.source, d.target])).toEqual([['a1', 'a2']]);
+        expect(el.textContent).toContain('shares device, phone');
+        expect(el.querySelector('[data-testid="merge-duplicate-0"]')).toBeNull(); // no Investigation open
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canAuthorWorkbench']);
+        fixture.componentRef.setInput('investigationOpen', true);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="merge-duplicate-0"]')).toBeNull(); // open, but no canManageIncidents
+        session.capabilities.set(['canManageIncidents']);
+        fixture.detectChanges();
+        const merged: [string, string][] = [];
+        c.mergePair.subscribe((p) => merged.push(p));
+        (el.querySelector('[data-testid="merge-duplicate-0"]') as HTMLButtonElement).click();
+        expect(merged).toEqual([['a1', 'a2']]);
     });
 
     it('structuring pack: says the legs were filtered away instead of "No matches" (§2.6 trap)', () => {

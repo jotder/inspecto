@@ -27,6 +27,7 @@ import {
     kCore,
     katzCentrality,
     linkPrediction,
+    possibleDuplicates,
     louvainCommunities,
     matchPattern,
     maxFlow,
@@ -592,6 +593,35 @@ describe('jaccardSimilarity / linkPrediction', () => {
     it('link prediction proposes the missing a↔b edge', () => {
         const pred = linkPrediction(shared, { method: 'common-neighbors' });
         expect(pred[0]).toMatchObject({ source: 'a', target: 'b', score: 2 });
+    });
+
+    it('possible duplicates pairs only one Entity Type, ranks the shared phone and device first and says so', () => {
+        const dup: G6GraphData = {
+            nodes: [
+                node('a1', 'account'),
+                node('a2', 'account'),
+                node('a3', 'account'),
+                node('p', 'phone'),
+                node('d', 'device'),
+                node('h', 'merchant'),
+            ],
+            edges: [edge('a1', 'p'), edge('a2', 'p'), edge('a1', 'd'), edge('a2', 'd')].concat(
+                ['a1', 'a2', 'a3'].map((a) => edge(a, 'h')),
+            ),
+        };
+        const found = possibleDuplicates(dup);
+        expect(found.every((s) => s.source.startsWith('a') && s.target.startsWith('a'))).toBe(true);
+        expect(found[0]).toMatchObject({
+            source: 'a1',
+            target: 'a2',
+            shared: [
+                ['device', 1],
+                ['merchant', 1],
+                ['phone', 1],
+            ],
+        });
+        expect(found[0].score).toBeGreaterThan(found[1].score); // a hub-only pair ranks below
+        expect(possibleDuplicates(dup, 1)).toHaveLength(1);
     });
 });
 

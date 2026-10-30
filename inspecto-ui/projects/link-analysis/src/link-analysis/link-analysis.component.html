@@ -1198,7 +1198,9 @@
                             [graph]="displayed()"
                             [column]="timeColumn()"
                             [extent]="ext"
+                            [sealable]="playbackSealable()"
                             (highlight)="emphasis.set($event)"
+                            (seal)="sealPlaybackWindow($event)"
                         ></inspecto-link-analysis-timeline-playback>
                     }
 
@@ -1538,6 +1540,7 @@
                             [suggested]="profile().suggestedTools"
                             [labelOf]="labelOf"
                             [timeAttr]="timeColumn()"
+                            [canvasSelection]="selectedOnCanvas()"
                             [traversalMappings]="traversalMappingOptions()"
                             [indexMappings]="indexMappings()"
                             [serverPaths]="serverPaths()"
@@ -1563,6 +1566,7 @@
                             (seedFromResults)="queueSeedsAndOpen($event)"
                             (findPaths)="findPaths($event)"
                             (runPatternOnServer)="runPatternOnServer($event)"
+                            (mergePair)="mergeNodes($event)"
                         >
                         <!-- §5.8: Temporal findings is the catalogue's "Burst and periodicity" entry. -->
                         <inspecto-link-analysis-temporal-findings

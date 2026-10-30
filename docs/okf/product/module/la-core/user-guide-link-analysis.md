@@ -569,6 +569,34 @@ the thresholds (always visible) and run it with **Find matches**. *Custom patter
 own. A step with no link kind matches any link.* A step list can also be shown as **Conditions** (start Entity Type,
 then direction, link kind and Entity Type per step).
 
+**Use selection as pattern** (`LA-PRODUCT-NEXT-1` phase 5a, 2026-10-30; `pattern-from-selection.ts`). Box-select two
+or more entities on the graph, then press it beside the Pattern picker. The selection and the links among them load as
+a motif you can loosen and run with **Find matches**:
+- **A chain** (each entity linked to the next) loads as steps:
+  - each step's direction, link kind and Entity Type come from the selection; an untyped entity is a wildcard;
+  - the chain is read the way most of its links run;
+  - with a time column, a hop that happened after the previous one gets an **After the previous hop** chip. Remove the
+    chip to drop that order.
+- **A star** (many entities linked to one) loads as branching stages:
+  - *many send to one*, *one sends to many*, or both in turn. "In turn" means after the previous stage, and only when
+    every outgoing link came after every incoming one;
+  - each stage's breadth is the number of selected counterparties;
+  - a value band `[min, max)` is added only when the legs carry exactly one numeric column besides the time.
+
+Anything else is refused in plain words: a selection that isn't all linked, a mixed shape, or a star with two-way links.
+Three entities are always read as a chain: a two-leg fan-in (`s1 → hub ← s2`) loads as an outgoing step followed by an
+incoming one, not as a star. Each stage shows its link kind, Entity Type and order as removable chips. The chips show
+on packs too.
+
+Calls made:
+- **Order only, never the example's exact gaps or windows:** those would fit this one example alone.
+- **No hidden constraint:** every constraint a derived step or stage carries (order, link kind, Entity Type) is shown and removable, for
+  packs too.
+- ***Search whole Dataset* stays where it was** (a truncated graph on the Server side); a derived motif runs there like
+  a pack.
+- **In an Investigation, a derived fan runs in the browser over the drawn graph.** The over-the-Investigation server
+  run stays a pack-only path.
+
 | Pack | Looks for |
 |---|---|
 | **Layering chain** | Money passed through a run of intermediaries |
@@ -1153,6 +1181,23 @@ A **pattern pack** is a named starter motif that pre-fills the pattern-match bui
 per-Space **`pattern-pack` `ComponentStore` kind**, authored at
 `spaces/<space>/config/registry/pattern-packs/*.toon` and read by the toolbox over
 `GET /components/pattern-pack`. Six are seeded in each tracked Space.
+
+**Save as pattern pack** (`LA-PRODUCT-NEXT-1` phase 5b, 2026-10-30; `save-pattern-pack.dialog.ts`). The Pattern match
+tool saves the motif in the builder (steps or branching stages, as edited) as a new pack of this Space. You give it a
+name, a category (money, telecom or identity) and a description. The dialog writes `POST /components/pattern-pack`,
+and the pack joins the picker at once.
+- **Who sees the button:** only holders of `canAuthorWorkbench`, the capability that route demands. `pattern-pack` is
+  not in `ImportCapabilityGuard.KIND_CAPABILITY`, so the generic door's capability applies.
+- **Who sees the pack:** with no `shares`, the component is visible to everyone in the Space.
+- **The id** is the name in lower-case words joined by `-`. A name whose id is already in the picker is refused before
+  the write, because an authored pack with a built-in's id would silently replace it. The server's 409 covers a race.
+- **The content** is `patternPackToContent`: every step or stage row carries every column, blank where absent, so TOON
+  writes a tabular array. It reads back through `patternPackFromContent` unchanged.
+- **Under maker-checker** (a policy for `pattern-pack`, or an unreadable policy file), the write is held (202). The
+  dialog then says so through `heldMessage`, and the pack joins the picker only once another approver accepts it.
+- **A band with both bounds cleared** is saved as no band. The reader refuses a band with no bound and would drop the
+  whole pack.
+- **Not built:** overwrite or edit of an existing pack from here. Use the component's own editor or version history.
 
 * **No new endpoint and no new capability.** `/components/{type}` CRUD is generic (the `findings-spec`
   precedent), so the whole backend change is two registrations: `ComponentStore.WRITABLE_TYPES` and
@@ -2280,6 +2325,20 @@ betweenness and suspicion).
 * **ag-Grid pair and the audited-pages table (2026-10-14, `LA-A11Y-AUDIT-1`, spec level; NOT DRIVEN live).** Re-verified on master `a85dc3f7c`: the shared `inspecto-data-table` wrapper needs no further change - no rows and not loading mounts the empty state, loading with no rows mounts the skeleton (`showLoadingPlaceholder`), so ag-Grid's empty `.ag-header-row` / empty `.ag-center-cols-viewport` never mount; a populated grid has focusable cells. `data-table.component.spec.ts` 46/46 green (axe on the standard tier, skeleton, empty and loading states). The two axe hits that still appear on a POPULATED grid in the hidden Browser pane are the pane's artefact (header cells tagged `ag-header-parent-hidden`, `visibility:hidden`), did not reproduce with the pane visible on 2026-10-14, and stay a documented vendor exception if they return. Audited pages: sign-in, Link Analysis (idle, graph, node list, Analysis / View / Investigation tabs and every section), Connect seeds, Compare, Dossier, Identity, Entity Lists, Alerts, Geo, Settings, Installed modules, embed viewer: clean in dark and light, live (passes 7-9 above) and in jsdom specs. Left: WebGL map canvases (axe cannot judge them), a screen-reader reading, forced-colors paint, Dossier / identity dialogs over real Case data.
 * **Residual pass (2026-10-18, `LA-A11Y-AUDIT-1`; decided under operator delegation).** BUILT: a *Skip to main content* link is the first tab stop of the console shell (`classic.component.html`, hidden until focused; `skipToContent()` focuses `main#main-content` without touching the URL, because a `#` href would reach the router), so a keyboard user no longer passes every nav stop and the PerfectScrollbar thumb first; the lens and Space switcher triggers are named *<visible label>, switch lens* / *<visible label>, switch space* (WCAG 2.5.3 label in name). Specs: `classic.component.spec.ts`, `lens-switcher.component.spec.ts`, `space-switcher.component.spec.ts`. DRIVEN LIVE (dev server over a stub API): Tab lands on the skip link, Enter focuses `main`, axe 4.12.1 0 violations on Home. DECIDED: the ag-Grid pair stays a **documented vendor exception with no workaround** - it reproduces only in a hidden Browser pane, where ag-Grid's own `visibility:hidden` header cells make axe see an empty row; a visible pane is clean, and overriding ag-Grid's ARIA to satisfy a hidden-pane artefact would risk the real reading. The shell not re-reading `isScreenSmall` on an EMULATED viewport resize is not a defect (a real zoom fires the media queries). Left for a person: a screen-reader reading, forced-colors paint, WebGL map canvases, Dossier / identity dialogs and Geo at narrow widths over real data.
 * **la-app Settings, split by audience (2026-10-16, operator: "similar style like main inspecto settings, drawer like compact format; split user and admin configuration; a user views/changes whichever they are privileged to").** `projects/la-app/src/app/settings.page.ts` is the console's master-detail Settings (menu of drawers left, common panel right, `:section` route matched by one config for `/settings` and `/settings/<section>`) in compact form, with the drawers grouped by who the setting is for: **My settings** (*My browser*: personal limits, no privilege), **This Space** (*Link Analysis* settings via `canAuthorWorkbench`, *Analysis limits* via the server's per-item `editable`, *Access* = the console's `AccessRolesComponent` roles editor via `canConfigureAccess`), **This server** (*Host resources*, system admin via `editable`). Every section is listed for every user; one the user may not change opens read-only and carries a *Read-only* chip in the menu (the server stays the judge: its 403 is shown). Settings is in the rail for everyone. The console components gained default-preserving inputs so one page can draw one part: `LinkAnalysisLimitsComponent.sections` (`analysis | host | browser`, all three by default) and `LinkAnalysisSettingsComponent.withLimits` (true by default); the console's Settings > Link Analysis is unchanged. No unsaved-changes guard on a section switch yet. Role ASSIGNMENT stays in the IdP (WSO2 groups = role names).
+* **Settings ▸ My settings ▸ Investigation access (2026-10-30, `LA-PRODUCT-NEXT-1` phase 3; operator: leads only).**
+  `projects/la-app/src/app/investigation-access.page.ts` lists the Investigations the caller can already open
+  (`GET /inv/investigations`), each with its members (`GET …/members`) and its ACTIVE embed links (`GET …/embeds`;
+  expired and revoked ones are not "live"). Revoke is offered only where the caller is the lead AND holds
+  `canManageIncidents` (members) or `canShareInvestigation` (links), and it goes through the Investigation's own route
+  (`POST …/members/revoke`, `POST …/embeds/{grantId}/revoke`), so the server still decides. The last lead never gets a
+  Revoke (the server keeps one, 422); the owner always folds in as a lead, so an Investigation nobody was added to
+  lists just its owner. Revoking a member also revokes the links they made (server side), so the page re-reads the
+  links afterwards. An Investigation shared through a Case (`access: case-member`) has no member list to read
+  (members-only route); its card says so and names the Case.
+  ⛔ Nothing is widened: there is no admin-wide view, because a non-member gets 404 on an Investigation by design
+  (D19). The page is NOT paged: past the list's first page it says "Showing the first N of M Investigations". It reads
+  four Investigations at a time; a failing read degrades only that card. A "view-only share" is a saved-view
+  (component) share, not an Investigation one, so it is not on this page.
 * **Footer status bar carries the page's status items (2026-10-16, operator: counts live in the footer, so not on the canvas).** The canvas "Render status" strip no longer states "N nodes · M links drawn" (the footer states the counts) and no longer carries the caps or *Installed modules*; it keeps only what the render left out (the render-limit note, *Investigation Working Set*, labels off above N nodes). In the footer, left to right: **Caps** (`inspecto-link-analysis-caps`: projection / analysis / graph-run node caps, read from values the page already holds) at the left edge, the title and query chips, the counts, and **Installed modules** at the right edge. Both are `relative` hosts whose list is an opaque card anchored `bottom-full` (opening upward over the canvas, never in the footer's flow). The strip is `role="group"` because it can be empty and axe refuses an `aria-label` on a role-less empty `div`. The counts read *N nodes · M links on screen* and count what the canvas draws (`canvasData`): the Working Set while an Investigation is open, so they match its count (2026-10-29; they once counted the query graph underneath). The *Last neighbour expand* note names the Dataset it read and is hidden while a Working Set is drawn, which has its own read line.
 * **The footer strip is gone; Expand lives in the Investigation tab (2026-10-29, `LA-INV-EXPAND-1`, operator).** The bullet above is history. (1) **No status bar under the canvas** (the bottom dock stays): the graph model and Refresh are in ⚙ Settings ▸ Graph model, the counts are the Graph counts card's, the selection count is the canvas toolbar chip. **Limits** is `inspecto-link-analysis-caps` rendered by the Graph counts card (`LinkAnalysisWorkingSetComponent [limits]`, the host's `graphLimits()`) at the card's bottom right: an icon button (`heroicons_outline:scale`, aria-label *Limits*, `aria-expanded`, `aria-controls`) whose popover opens under it (`top-full right-0`); Escape closes it and returns focus to the button. **Installed modules** is the ⚙ Settings section `modules` (group *This Studio*); the host creates the component only while that section is shown, so `GET /modules` is read when first shown, not at page load. (2) **Expand** (`LinkAnalysisExpandComponent`) has an `embedded` input: for an open Investigation the host projects it into the Investigation tab (`<ng-content select="[laExpand]">`, inside the Expand section, only for a writer; a reader sees *Needs Incident management.*) and every entry point (toolbar, G, More ▸ Expand…, right-click ▸ Expand…) calls `openExpand()`, which opens the tab and, after the next render, calls the section's `focus()`. The explorer graph (nothing recorded) keeps the canvas popup. The form's order: From, Degrees (`inspecto-stepper-field`, shared in `inspecto/components/`: `role="spinbutton"`, arrows / Home / End, *Fewer degrees* / *More degrees* buttons inert at a bound with a reason from `disabled-reasons.ts`), Direction (`inspecto-option-picker`), the Expand button with its preview, four-eyes and why-not lines, then the Links / Time / Limits `la-fold`s, closed, each with a one-line `hint` summary; a filter in error opens its fold on Expand. The embedded form re-picks the default From when the set of starts changes (a new selection), and skips a preview read while an Expand walks. The New form's *Expand on start* uses the same stepper (0 = *Don't expand*, value text). The Investigation tab lists no steps any more: one line, **Open the Step log** / **Investigation settings…**; Replay stays in Settings ▸ *Replay and drift*. (3) The dock's tab strip is plain text tabs (no cell borders), the active one `text-primary` with the `--gamma-primary` underline, `flex-nowrap overflow-x-auto` so a narrow dock scrolls them. (4) Review fixes the same day: the Graph counts card (and its minimised chip) leads with what the canvas draws, *N nodes · M links on screen* (`onScreenCounts()` over `canvasData`, so the Working Set while an Investigation is open), the tiles below labelled *Totals for the full graph, before grouping*; the embedded Expand reads its preview 300 ms after its start changes and only while `active` (the toolbox is open), so a run of selection clicks is one read; with *Show the full graph to pick start entities* ticked the Expand section says *Expand works on the Working Set; untick …* instead of standing empty; and Expand on start says its own cap (*Expand on start goes up to 3 degrees; expand further from the Investigation tab.*) when the pack allows more, the pack's reason only when the pack stops first.
 
@@ -2831,6 +2890,28 @@ on the next one (WCAG 2.2.2), so no note is shown (operator, 2026-10-29). Calls 
 no per-link timestamps (it is sealed), so playback exists on the query-graph canvas only, like the timeline filter
 beside it; a link carries ONE date, so an aggregated link plays at the date it carries; fixed 20 slices, no
 slice-size knob; no jump to a burst. Clearing the time column clears the highlight.
+
+**Window, age fade and Seal this window (`LA-PRODUCT-NEXT-1` phase 4, 2026-10-30).** The same strip grows three
+controls:
+- **Window:** *This slice* (the default, the same range as before; with the age fade on, its links now draw at
+  0.45–1 instead of a flat 1), *Last day*, *Last 7 days*, *Last 30 days* or *From the start*. The
+  highlight then reaches back that far from the handle (the slice's end), never before the data starts.
+- **Age fade:** on by default. Inside the window, each link's opacity follows its age back from the handle: full at the
+  handle, down to 0.45 at the window's start. That floor stays above the 0.2 the canvas dims an out-of-window link to,
+  so a faded link is still told apart from a dimmed one. Turn it off for flat highlighting.
+- **Seal this window:** shown only when an Investigation is open, you hold `canManageIncidents`, and the Investigation's
+  bound event-time column is the timeline's column. Sealing on another column would record a different moment. It
+  appends the Investigation's `window` op with the window as `[from, to)` UTC instants (the last slice keeps its end),
+  so the moment replays as a step. The strip itself shows only on the query-graph canvas, so inside an open
+  Investigation, Seal is reachable while the Working Set is not drawn.
+
+Calls made:
+- **Links outside the window are dimmed, not hidden.** Hiding them would re-run the layout on every tick and move the
+  graph under the reader; the *Filter edges by time* cutoff still hides.
+- **The scrubber stays a highlight**, so Undo does not record it.
+- **The strip reads dates the way the timeline filter does** (`Date.parse` of the projected string). A naive timestamp
+  in a Dataset is read in the browser's zone. The window the server applies reads it in the Investigation's
+  `timeColZone`, so on such a Dataset a sealed window can sit an offset away from the highlight.
 
 **Time-respecting paths and burst / periodicity (2026-10-04).** Two operator-approved pieces, both built as
 **stateless Dataset reads, not Investigation ops and not graph-run algorithms** — an op only appends a
@@ -3400,6 +3481,25 @@ Refusals read as a cause plus a next step (DR-D6 conventions): 413 names the lim
 - **Disabled with a tooltip** when the capability is missing, the selection is not exactly two entities, or either is a masked alias (the server also refuses an alias, see the backend concept §6.7). The action opens ⚙ Settings ▸ Identities (since `LA-STUDIO-UI-REORG-1` P2a; before, the Investigation tab), where the Identity section takes the hand-off into its form and clears it (2026-10-18; spec *opens the Investigation tab holding the prefilled merge*). `mergeUnavailable` is pinned by five direct specs in `link-analysis.component.spec.ts` (available; no open Investigation; capability missing; not exactly two typed entities; masked alias).
 - **Driven live 2026-10-28** (Advanced `-DemoAuth -Ui la-app` bundle, Demo Admin, the seeded `mule-hub-case`): `account` is a masked Entity Type, so under the default `typed` masking every role sees aliases and *Merge...* stays disabled, as designed. With the Space's masking mode set to `none` for the drive (then restored): shift-click two accounts, toolbar ⋯ ▸ *Merge...* opens ⚙ Settings ▸ Identities prefilled (SMURF-01, MULE-HUB-01), a reason and *Assert same entity* answered 201 ("the group now holds 3 identifiers"), and *Add a resolve step* sealed step 9 (`resolve`, 1 group, 3 member keys).
 - **Fixed by that drive:** no submit button inside ⚙ Settings submitted. The overlay's backdrop listener was `$event.target === $event.currentTarget && requestClose()`, which is `false` for a click inside the panel, and Angular treats a listener returning `false` as `preventDefault()`. It is now `onBackdropClick($event)` (returns nothing); spec *a submit button inside a section still submits* in `link-analysis-settings.component.spec.ts` fails on the old handler.
+
+### Possible duplicates (Analysis ▸ Similarity; `LA-PRODUCT-NEXT-1` phase 6, 2026-10-30)
+
+- **What it lists:** *Possible duplicates* lists the 20 pairs of entities most likely to be one entity.
+  - Only entities of the same Entity Type are paired, and only pairs not already linked to each other.
+  - Pairs are ranked by Adamic-Adar, so a rare shared neighbour counts for more than a busy hub (`possibleDuplicates`, `graph-analysis.ts`).
+  - Each row gives its reason as the kinds of neighbour the pair shares, for example *shares device, phone*.
+  - Clicking a pair highlights both entities on the canvas.
+- **Scope and limits:** it scores the graph on the canvas, not the whole Dataset (operator decision, 2026-10-30). It runs in the browser and has the same node cap as *Predict links* (`browser_algorithms.linkPrediction`).
+- **Why only 20:** the phase 6 spike (plan `la-product-next-plan.md` §3 phase 6) measured all 20 top suggestions as true duplicates and no hub look-alike among them. Below the top 20, about one suggestion in four was two people sharing an address or a home device. The list says these are suggestions, so read the reason before merging.
+- **Merge…:** each row's **Merge…** hands the pair to the same prefill as *Merge with...*. That host path is `mergeNodes`, shared with `mergeSelected`.
+  - The button shows only inside an Investigation and only with `canManageIncidents`.
+  - A pair the Merge form would refuse shows a warning toast instead:
+    - `mergePairOf`'s reason for a masked alias or an entity that is not typed;
+    - *Only entities in the open Investigation can be merged* for a pair outside the Working Set.
+  - Spec *phase 6 Merge… on a suggested pair…* in `link-analysis.component.spec.ts` covers both.
+  - On a canvas where every node has one kind, such as a saved view's untyped `entity` nodes, the list is plain link prediction.
+  - Nothing is written until the analyst confirms in ⚙ Settings ▸ Identities.
+- **Not driven in the browser yet:** under the default `typed` masking a masked Entity Type such as `account` is refused at *Merge…*, as at *Merge with...*.
 
 ### Entity Type icons, driven live (2026-10-28)
 
