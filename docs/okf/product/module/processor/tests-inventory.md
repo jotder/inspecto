@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-361 test class(es): 132 unit, 229 real-HTTP control-plane, 0 IT.
+363 test class(es): 134 unit, 229 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -374,6 +374,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ShippedJobStoreKeyNamesARealStoreTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ShippedJobStoreKeyNamesARealStoreTest.java` | A job's {@code store:} key is a <b>data-store id</b>, never a path. It is read at |
 | `SlaSweepModuleGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SlaSweepModuleGateTest.java` | {@code MODULE-REORG-1 P4f}: the SLA sweep tick of {@code CollectorService} consults the Space's module gate. The |
 | `SpaceBootstrapTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceBootstrapTest.java` | Builds one space's runtime from its own {@code config/} directory (the per-space analogue of ServiceBootstrap). |
+| `SpaceDataRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDataRootTest.java` | SPACE-DATA-ROOT-1: where a Space's data, audit and DuckDB stores live, and the load-time checks. |
 | `SpaceDiscoveryRuleTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDiscoveryRuleTest.java` | Which folders under the Spaces root {@link SpaceManager#discover} admits — real folder trees, no mocks. |
 | `SpaceIdTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceIdTest.java` | The filesystem-safe space-id guard: lower-case alnum + hyphen only, so an id can never escape {@code spaces/}. |
 | `SpaceInboxAuditTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceInboxAuditTest.java` | Two Spaces polling one inbox — scale-out plan §5.3. |
@@ -382,6 +383,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SpaceManagerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTest.java` | The multi-space container: single-service wrapping, boot discovery, concurrent isolation, orderly shutdown. |
 | `SpaceMigratorTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceMigratorTest.java` | The migrate command: a flat working-directory layout relocates into spaces/&lt;id&gt;/ that discovers cleanly. |
 | `SpacePartitionTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpacePartitionTest.java` | Static work distribution — scale-out plan §5.3. Which Spaces a pod hosts, and what it does when the |
+| `SpaceRefTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceRefTest.java` | {@code <id>.ref} Space references, booted together with a convention data root (SPACE-DATA-ROOT-1). |
 | `SpaceRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceRootTest.java` | {@link SpaceRoot#under} per-space DB URLs: asking for any DuckDB URL mints {@code <base>/duckdb/} first. |
 | `StatusProjectionFreshnessTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/StatusProjectionFreshnessTest.java` | Freshness of the DB-backed status projection — the blocker that gated serving the ledgers from a |
 | `StreamLaneSchedulerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/StreamLaneSchedulerTest.java` | The continuous lane's WIRING (ASSURE-PUSH-INGEST-1): a {@code trigger: {type: stream}} remote Pipeline gets a |

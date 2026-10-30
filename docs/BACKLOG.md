@@ -25,7 +25,7 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **78<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 63<!--count:backlog-p3--> × P3** —
+> **79<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 64<!--count:backlog-p3--> × P3** —
 > ⬇ **79 → 78 (P2 16 → 15) on 2026-10-30**: closed P2 feature `LA-PRODUCT-NEXT-1` — shipped `bb85cc532` (phases 1–3, access) and `29d8c6e0f` (phases 4–6, Link Analysis), merged `ddf10a369`. Phase 5c (patterns as standing detection) was measured and parked: 12–13 s per whole-Dataset run at 1M rows, so it needs an incremental sweep first. Phase 6 shipped *Possible duplicates* over the canvas only; a server-side source waits for an ask. Plan archived.
 > ⬇ **80 → 79 (P2 17 → 16) on 2026-10-30**: closed P2 `LA-UNSAVED-INVESTIGATION-1` (shipped, `f83bce424`…`226571957`; known limit: an unsaved Working Set larger than `input.max_ids` is refused with 422); `LA-DEGREES-TRIM-1` shipped (residual `LA-DEGREES-TRIM-2`).
 > ⬆ **79 → 80 (P3 62 → 63) on 2026-10-30**: filed P3 feature `LA-DEGREES-TRIM-2` (the Degrees stepper binds to a reopened Investigation's last Expand).
@@ -373,10 +373,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 64<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 78<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 64<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 79<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -602,6 +602,8 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 #### Exchange & jobs
 
 - **P3** · **Bundle / Exchange — "load as draft" residuals** — ✅ **every slice SHIPPED 2026-09-25** (all eight calls answered that day): **Import as draft…** beside **Import…** in the Dashboard, Widget, Dataset, authored Pipeline, Link Analysis view and Geo map view editors — prerequisites write-through imported first, the target held unsaved in memory under a shared banner, Save through the editor's own route (`If-Match` + a diff for an existing id), advisory integrity findings from `POST /bundle/preview` re-checked just before Save. As-built: `okf/product/module/processor/spec-metadata-bundle.md`; design archived. Re-ranked P2 → P3. ✅ 2026-10-04: `/bundle/preview` and `/bundle/import` now judge an LA/Geo view's `query.projection.datasetId`, so those banners show real findings. Left: ~~Pipeline drafts still read "not checked"~~ ✅ 2026-10-04 (operator: the preview runs full validation — `/bundle/preview` runs the graph Save's Validate + save gate on a `pipeline` item, writing nothing; the banner shows the findings); ~~LA/Geo Save runs no re-check (`LaTransfer` has no preview seam)~~ ✅ 2026-10-06 (operator, 2026-10-06: add the re-check — `LaTransfer.recheck`, wired to `BundleTransferService.draftIntegrity`; LA and Geo *Save draft* re-run the preview over the content about to be written and show the findings in the banner and toast); a browser pass over the six editors. **2026-10-18 (re-verified, decided under operator delegation):** kept — the browser pass is the only item left; it needs no decision and no outside trigger, just a live session over a built bundle, so it stays open rather than retiring. → `okf/product/module/processor/spec-metadata-bundle.md` [items: module.exchange, module.processor · kind: feature]
+
+- **P3** · `SPACE-DATA-ROOT-CONFIG-AUDIT-1` — LA snapshots (`SnapshotStore`, `FsInvestigationLayout`), LA upload records (`UploadRoutes`) and the entity-list fact log (`EntityFactLog`) write under `config/audit/`, so they stay with the config when a Space's data root is moved (`SPACE-DATA-ROOT-1`, 2026-10-30) and they grow inside the config tree. Decide whether they belong under the data root's `audit/` (a move of existing files plus a dual-read). [items: module.la-core, module.entity-list, module.config · kind: chore · hold: operator]
 
 #### API contract & vocabulary
 

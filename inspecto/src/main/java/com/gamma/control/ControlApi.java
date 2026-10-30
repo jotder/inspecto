@@ -546,6 +546,10 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // Multi-space mode: -Dspaces.root points at a container dir of spaces/<id>/; each is booted in isolation.
         // Legacy single-tenant mode (no -Dspaces.root): build the one default space from the CLI config args.
         String spacesRoot = System.getProperty("spaces.root");
+        // No flag and no config args: the install's own spaces/ (the launchers run from the install dir and pass the
+        // same default, SPACES_ROOT=spaces), so a bare server is multi-Space too. Config args keep the single mode.
+        if ((spacesRoot == null || spacesRoot.isBlank()) && args.length == 0)
+            spacesRoot = Path.of("spaces").toAbsolutePath().toString();
         SpaceManager spaces;
         if (spacesRoot != null && !spacesRoot.isBlank()) {
             spaces = SpaceManager.discover(Path.of(spacesRoot.trim()));
@@ -557,11 +561,6 @@ public final class ControlApi implements AutoCloseable, HostContext {
                         + "subtree) there and restart, or create one in Settings -> Spaces", spacesRoot);
             }
         } else {
-            if (args.length < 1) {
-                System.err.println("Usage: ControlApi [-Dcontrol.port=8080] [-Dspaces.root=DIR] "
-                        + "[-Dservice.poll.seconds=N] [-Dservice.max.runs=M] <pipeline.toon | dir> [more ...]");
-                System.exit(1);
-            }
             try {
                 spaces = SpaceManager.single(CollectorService.fromArgs(args));
             } catch (com.gamma.service.EmptyConfigException e) {

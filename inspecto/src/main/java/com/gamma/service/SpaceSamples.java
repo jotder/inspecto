@@ -70,7 +70,7 @@ public final class SpaceSamples {
         Path base = ctx.root().base();
         Map<String, Integer> copied = new LinkedHashMap<>();
         List<PipelineLoad> out = new ArrayList<>();
-        Path samples = base.resolve("data").resolve("samples");
+        Path samples = ctx.root().dataRoot().resolve("data").resolve("samples");
         if (Files.isDirectory(samples)) {
             try (Stream<Path> dirs = Files.list(samples)) {
                 for (Path dir : dirs.filter(Files::isDirectory).sorted().toList()) {
@@ -114,7 +114,7 @@ public final class SpaceSamples {
     /** The Pipeline's {@code dirs.poll}, resolved against the Space when relative. */
     private static Path inbox(Path base, PipelineConfig cfg) {
         Path poll = Path.of(cfg.dirs().poll());
-        return poll.isAbsolute() ? poll : base.resolve(poll);
+        return com.gamma.config.safety.PathJail.onDataRoot(poll.isAbsolute() ? poll : base.resolve(poll).normalize());
     }
 
     private static int copyFiles(Path from, Path to) throws IOException {

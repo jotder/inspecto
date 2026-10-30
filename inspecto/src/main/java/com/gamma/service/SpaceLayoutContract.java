@@ -59,7 +59,7 @@ final class SpaceLayoutContract {
 
         // 1. Canonical subdirs present.
         for (String sub : REQUIRED_SUBDIRS) {
-            Path dir = base.resolve(sub);
+            Path dir = root.dataRoot().resolve(sub);
             if (!Files.isDirectory(dir))
                 found.add(new Violation("missing-subdir", dir,
                         "canonical subdir '" + sub + "/' is missing"));
@@ -68,7 +68,7 @@ final class SpaceLayoutContract {
         // 2. Axes never mix: embedded-DB state must live only under duckdb/. Scan the small config/ and
         //    audit/ trees (data/ is skipped — it can be large, and DB files there are not the migrator's axis).
         scanForDbFiles(base.resolve("config"), found);
-        scanForDbFiles(base.resolve("audit"), found);
+        scanForDbFiles(root.dataRoot().resolve("audit"), found);
 
         // 3. Unexpected top-level entries (dotfiles/atomic-write temp files ignored).
         try (Stream<Path> top = Files.list(base)) {

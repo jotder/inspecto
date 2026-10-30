@@ -157,9 +157,12 @@ public final class SpaceManager implements AutoCloseable {
         // §5.3: which Spaces are THIS pod's. Absent a partition.toon this hosts everything, so the
         // single-node path is unchanged; a malformed one is fatal rather than defaulted (see SpacePartition).
         SpacePartition partition = SpacePartition.load(m.spacesRoot);
+        SpaceDataRoot.registerSpacesRoot(m.spacesRoot);
+        List<Path> candidates;
         try (Stream<Path> dirs = Files.list(spacesRoot)) {
-            dirs.filter(Files::isDirectory)
-                .sorted()
+            candidates = dirs.map(p -> Files.isRegularFile(p) && p.getFileName().toString().endsWith(REF_SUFFIX) ? m.followRef(p) : p)
+                .filter(p -> p != null && Files.isDirectory(p))
+                .sorted(java.util.Comparator.comparing(p -> p.getFileName().toString()))
                 .filter(d -> {
                     String why = notASpaceReason(d);
                     // only folders that look like Spaces are worth a line: a plain dir without config/ is just a dir
@@ -168,12 +171,100 @@ public final class SpaceManager implements AutoCloseable {
                     return why == null;
                 })
                 .filter(d -> m.ownedByThisPod(partition, d))
-                .peek(d -> com.gamma.pipeline.exec.EgressAllowlist.migrate(d.resolve("config")))   // WEBHOOK-EGRESS-POLICY-1
-                .forEach(m::bootQuietly);
+                .toList();
+        }
+        // Every base and data root is known BEFORE any Space boots, so an overlap is refused whatever the boot order.
+        candidates = m.withoutOverlaps(candidates);
+        for (Path d : candidates) DiscoveredRoots.register(d.getFileName().toString(), d.toAbsolutePath().normalize());
+        for (Path d : candidates) {
+            com.gamma.pipeline.exec.EgressAllowlist.migrate(d.resolve("config"));   // WEBHOOK-EGRESS-POLICY-1
+            m.bootQuietly(d);
         }
         log.info("SpaceManager: {} space(s) booted from {}", m.spaces.size(), spacesRoot.toAbsolutePath());
         m.auditInboxOwnership();   // §5.3: two Spaces on one inbox = silent double-ingestion
         return m;
+    }
+
+    /** A Space reference: {@code <spaces root>/<id>.ref} holds the absolute path of a Space folder kept elsewhere. */
+    static final String REF_SUFFIX = ".ref";
+
+    /**
+     * The Space folder a {@code <id>.ref} points at, or {@code null} (logged, recorded as skipped) when it cannot be
+     * followed: blank, relative, missing, inside the spaces root, named other than {@code <id>} (the folder name IS
+     * the Space id, everywhere), or shadowed by a real {@code <id>/} folder beside the ref.
+     */
+    Path followRef(Path ref) {
+        String file = ref.getFileName().toString();
+        String id = file.substring(0, file.length() - REF_SUFFIX.length());
+        if (Files.isDirectory(spacesRoot.resolve(id))) {   // the real folder boots; the Space is not skipped
+            log.warn("Space reference {} is shadowed by the folder '{}' beside it - ignored", ref, id);
+            return null;
+        }
+        String why;
+        Path target = null;
+        try {
+            String text = Files.readString(ref).trim();
+            target = text.isEmpty() ? null : Path.of(text);
+            if (target == null || !target.isAbsolute()) why = "must hold an absolute path to a Space folder";
+            else if (!target.getFileName().toString().equals(id))
+                why = "points at '" + target.getFileName() + "', but the folder name must be the Space id '" + id + "'";
+            else if (com.gamma.config.safety.PathJail.canonical(target).startsWith(
+                    com.gamma.config.safety.PathJail.canonical(spacesRoot)))
+                why = "points inside the spaces root - put the folder there directly instead";
+            else if (!Files.isDirectory(target)) why = "points at " + target + ", which does not exist";
+            else why = null;
+        } catch (IOException | RuntimeException e) {
+            why = "is unreadable: " + e.getMessage();
+        }
+        if (why == null) return target.toAbsolutePath().normalize();
+        log.error("Space reference {} {} - Space '{}' not booted", ref, why, id);
+        skipped.put(id, new SkippedSpace(id, "SPACE_REF_INVALID", "the Space reference " + file + " " + why));
+        return null;
+    }
+
+    /**
+     * {@code candidates} minus every Space whose folder or data root overlaps (is, contains, or sits inside) another
+     * Space's folder or data root, or whose folder contains the spaces root — either would reach the other's
+     * {@code config/} or stores through its own allowed roots (CROSS-SPACE-JAIL-1). Two overlapping folders refuse
+     * both; a moved data root reaching into another Space refuses only the Space that declared it.
+     */
+    private List<Path> withoutOverlaps(List<Path> candidates) {
+        Path root = com.gamma.config.safety.PathJail.canonical(spacesRoot);
+        List<Path[]> areas = new ArrayList<>();   // per candidate: {canonical base, canonical data root}
+        for (Path c : candidates) {
+            SpaceRoot r = SpaceRoot.under(c);
+            areas.add(new Path[]{com.gamma.config.safety.PathJail.canonical(r.base()),
+                    com.gamma.config.safety.PathJail.canonical(r.dataRoot())});
+        }
+        List<Path> out = new ArrayList<>();
+        for (int i = 0; i < candidates.size(); i++) {
+            String why = null;
+            Path base = areas.get(i)[0];
+            if (root.startsWith(base)) why = "its folder " + base + " contains the spaces root";
+            for (int j = 0; j < candidates.size() && why == null; j++) {
+                if (j == i) continue;
+                Path theirBase = areas.get(j)[0];
+                for (Path mine : areas.get(i))
+                    for (Path theirs : areas.get(j))
+                        // j's moved data root reaching into i's folder is j's fault: j is refused, not i
+                        if (why == null && !(mine.equals(base) && !theirs.equals(theirBase))
+                                && (mine.startsWith(theirs) || theirs.startsWith(mine)))
+                            why = mine + " overlaps Space '" + candidates.get(j).getFileName() + "' at " + theirs;
+            }
+            if (why == null) {
+                out.add(candidates.get(i));
+                continue;
+            }
+            String id = candidates.get(i).getFileName().toString();
+            log.error("Space '{}' not booted: {}", id, why);
+            skipped.put(id, new SkippedSpace(id, "SPACE_OVERLAP", why));
+        }
+        return out;
+    }
+
+    /** Whether {@code id} is taken on disk: a folder or a {@code <id>.ref} under the spaces root. */
+    private boolean takenOnDisk(SpaceId id) {
+        return Files.exists(spacesRoot.resolve(id.value())) || Files.exists(spacesRoot.resolve(id.value() + REF_SUFFIX));
     }
 
     /** Name tokens (split on {@code - _ . space}) that mark a folder as a copy, never a live Space. */
@@ -308,6 +399,7 @@ public final class SpaceManager implements AutoCloseable {
         SpaceRoot root = SpaceRoot.under(base);
         DiscoveredRoots.register(root.id(), root.base());
         try {
+            SpaceDataRoot.adoptSeeded(root);   // a new Space's seeded data/ goes to its data_root (SPACE-DATA-ROOT-1)
             SpaceContext ctx = loadAsSpace(root);
             try {
                 ctx.start();
@@ -372,7 +464,7 @@ public final class SpaceManager implements AutoCloseable {
             if (spaces.containsKey(id))
                 throw new IllegalStateException("Space already exists: " + id.value());
             Path base = spacesRoot.resolve(id.value());
-            if (Files.exists(base))
+            if (takenOnDisk(id))
                 throw new IllegalStateException("Space directory already exists: " + base);
             for (String sub : SPACE_SUBDIRS) Files.createDirectories(base.resolve(sub));
             String name = (displayName == null || displayName.isBlank()) ? id.value() : displayName.trim();
@@ -415,12 +507,18 @@ public final class SpaceManager implements AutoCloseable {
             if (spaces.containsKey(id))
                 throw new IllegalStateException("Space already exists: " + id.value());
             Path base = spacesRoot.resolve(id.value());
-            if (Files.exists(base))
+            if (takenOnDisk(id))
                 throw new IllegalStateException("Space directory already exists: " + base);
             for (String sub : SPACE_SUBDIRS) Files.createDirectories(base.resolve(sub));
             BundleImporter.writeConfig(bundle, base.resolve("config"), false, new ImportJournal());   // a NEW Space: nothing to overwrite
             Path manifest = base.resolve("space.toon");
-            if (bundle.spaceToon() != null) Files.write(manifest, bundle.spaceToon());
+            if (bundle.spaceToon() != null) {
+                // The exporting Space's data_root belongs to it: the new Space takes the convention default instead.
+                Files.write(manifest, bundle.spaceToon());
+                SpaceContext.SpaceManifest m = SpaceContext.SpaceManifest.read(manifest, id.value());
+                if (!m.dataRoot().isBlank())
+                    new SpaceContext.SpaceManifest(m.displayName(), m.description(), m.createdAt()).write(manifest);
+            }
             else new SpaceContext.SpaceManifest(id.value(), "", Instant.now().toString()).write(manifest);
 
             com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
@@ -587,7 +685,7 @@ public final class SpaceManager implements AutoCloseable {
             if (spaces.containsKey(id))
                 throw new IllegalStateException("Space already exists: " + id.value());
             Path base = spacesRoot.resolve(id.value());
-            if (Files.exists(base))
+            if (takenOnDisk(id))
                 throw new IllegalStateException("Space directory already exists: " + base);
             // Seeded and gated in a unique staging dir under the `_staging` sentinel (discovery boots only a
             // `<root>/<id>/config`, so it never admits one), then renamed into place. A refusal whose cleanup
@@ -659,8 +757,8 @@ public final class SpaceManager implements AutoCloseable {
             if (ctx == null) return null;
             String name = (displayName == null || displayName.isBlank()) ? id.value() : displayName.trim();
             SpaceContext.SpaceManifest updated = new SpaceContext.SpaceManifest(
-                    name, description == null ? "" : description.trim(), ctx.manifest().createdAt());
-            updated.write(spacesRoot.resolve(id.value()).resolve("space.toon"));
+                    name, description == null ? "" : description.trim(), ctx.manifest().createdAt(), ctx.manifest().dataRoot());
+            updated.write(ctx.root().base().resolve("space.toon"));   // a referenced Space lives outside the spaces root
             ctx.updateManifest(updated);
             log.info("Updated space '{}' display metadata", id.value());
             return ctx;
@@ -676,9 +774,10 @@ public final class SpaceManager implements AutoCloseable {
     public boolean isLastOnDisk(SpaceId id) throws IOException {
         if (spacesRoot == null || !Files.isDirectory(spacesRoot)) return false;
         try (Stream<Path> dirs = Files.list(spacesRoot)) {
-            return dirs.filter(Files::isDirectory)
-                    .filter(d -> notASpaceReason(d) == null)
-                    .allMatch(d -> d.getFileName().toString().equals(id.value()));
+            return dirs.filter(d -> Files.isDirectory(d) ? notASpaceReason(d) == null
+                            : d.getFileName().toString().endsWith(REF_SUFFIX))
+                    .allMatch(d -> d.getFileName().toString().equals(id.value())
+                            || d.getFileName().toString().equals(id.value() + REF_SUFFIX));
         }
     }
 
@@ -721,6 +820,14 @@ public final class SpaceManager implements AutoCloseable {
         DiscoveredRoots.unregister(id.value());   // a deleted space's base leaves with it
         if (purge) {
             Path base = spacesRoot.resolve(id.value()).normalize();   // SpaceId is jailed: no separators/.. can escape
+            // A referenced Space's folder (and data root) lives outside the spaces root: purge drops only the reference.
+            Path ref = spacesRoot.resolve(id.value() + REF_SUFFIX);
+            if (Files.isRegularFile(ref) && !ctx.root().base().equals(base)) {   // only when the ref is what booted
+                Files.delete(ref);
+                log.info("Deleted space '{}' - removed its reference {}; the folder {} was left on disk",
+                        id.value(), ref, ctx.root().base());
+                return true;
+            }
             // ⛔ The containment verdict must not be reported as a purge. Both roots are absolute and
             // normalized (spacesRoot at discover()), so this holds today by construction — but the old
             // form logged "Deleted + purged" whether the delete ran, was skipped for escaping, or found
@@ -731,6 +838,12 @@ public final class SpaceManager implements AutoCloseable {
             if (Files.isDirectory(base)) {
                 deleteRecursively(base);
                 log.info("Deleted + purged space '{}' ({})", id.value(), base);
+                // A data_root off the base is purged too, but only when its stamp names this Space (SPACE-DATA-ROOT-1).
+                Path dataRoot = ctx.root().dataRoot();
+                if (!dataRoot.equals(base) && SpaceDataRoot.ownedBy(dataRoot, ctx.root().base())) {
+                    deleteRecursively(dataRoot);
+                    log.info("Purged space '{}' data root ({})", id.value(), dataRoot);
+                }
             } else {
                 log.info("Deleted space '{}' — nothing to purge, no directory at {}", id.value(), base);
             }

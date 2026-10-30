@@ -57,9 +57,14 @@ public final class SpaceContext implements AutoCloseable {
      * The {@code space.toon} display metadata. The manifest is optional — a space is discovered by its
      * {@code config/} subtree, so a missing or unreadable manifest defaults the display name to the id.
      */
-    public record SpaceManifest(String displayName, String description, String createdAt) {
+    public record SpaceManifest(String displayName, String description, String createdAt, String dataRoot) {
 
         private static final Logger log = LoggerFactory.getLogger(SpaceContext.class);
+
+        /** A manifest with no {@code data_root} (the Space's state stays under its base, or the convention mount). */
+        public SpaceManifest(String displayName, String description, String createdAt) {
+            this(displayName, description, createdAt, "");
+        }
 
         /** Write this manifest to {@code space.toon} at {@code path} (canonical TOON, crash-safe). */
         void write(Path path) throws IOException {
@@ -67,23 +72,25 @@ public final class SpaceContext implements AutoCloseable {
             m.put("display_name", displayName);
             m.put("description", description);
             m.put("created_at", createdAt);
+            if (dataRoot != null && !dataRoot.isBlank()) m.put("data_root", dataRoot);
             AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".space-");
         }
 
         /** Read {@code space.toon} at {@code path}, defaulting the display name to {@code fallbackId} when absent. */
         static SpaceManifest read(Path path, String fallbackId) {
-            String displayName = fallbackId, description = "", createdAt = "";
+            String displayName = fallbackId, description = "", createdAt = "", dataRoot = "";
             if (Files.exists(path)) {
                 try {
                     Map<String, Object> m = ToonHelper.load(path.toString());
                     displayName = ToonHelper.opt(m, "display_name", fallbackId);
                     description = ToonHelper.opt(m, "description", "");
                     createdAt   = ToonHelper.opt(m, "created_at", "");
+                    dataRoot    = ToonHelper.opt(m, "data_root", "");
                 } catch (Exception e) {
                     log.warn("Could not read space manifest {} — defaulting: {}", path, e.getMessage());
                 }
             }
-            return new SpaceManifest(displayName, description, createdAt);
+            return new SpaceManifest(displayName, description, createdAt, dataRoot);
         }
     }
 }

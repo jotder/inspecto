@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.config`](../../../../../product-map/module/config.toon).
 
-22 test class(es): 22 unit, 0 real-HTTP control-plane, 0 IT.
+23 test class(es): 23 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -35,6 +35,7 @@ mvn -o test -pl platform/inspecto-config -Dtest=ConfigCodecTest,ConfigLoaderTest
 | `DiscoveredRootsTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/DiscoveredRootsTest.java` | Pins a Space's allowed roots (PATH-2 tier 3, narrowed by {@code CROSS-SPACE-JAIL-1}): operator-declared |
 | `EgressGateTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/EgressGateTest.java` | Slice S4 of {@code policy-narrowing-design.md}: the verdicts of {@link EgressGate} over an explicit tier. |
 | `JobPathResolutionTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/JobPathResolutionTest.java` | A job's relative path resolves against the <b>Space config root</b>, not the process working directory |
+| `PathJailDataRootTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/PathJailDataRootTest.java` | SPACE-DATA-ROOT-1: paths under a Space's data/, audit/, duckdb/ resolve onto its registered data root. |
 | `PathJailObjectStoreTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/PathJailObjectStoreTest.java` | {@link PathJail#requireObjectStore} — the object-store containment rule (SCALEOUT-OBJSTORE-DATABASE-DIR-1). |
 | `PathJailTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/PathJailTest.java` | Adversarial coverage for the shared containment primitive. |
 | `RetentionSweepJobPathsResolveUnderTheSpaceRootTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/RetentionSweepJobPathsResolveUnderTheSpaceRootTest.java` | Pins the three committed {@code task: cleanup} job path values against the rule their runtime |

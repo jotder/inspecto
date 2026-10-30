@@ -43,7 +43,9 @@ mechanism is [Multi-Space Hosting](../processor/architecture-multi-space.md); th
 
 **Boot modes** (`ControlApi.main` reads the `spaces.root` system property):
 
-- **single** — no `-Dspaces.root`: `SpaceManager.single(CollectorService)` over `SpaceRoot.legacy()`, the
+- **default root** — no `-Dspaces.root` and no config args: discover mode over `<working dir>/spaces`, i.e.
+  `<install_dir>/spaces` (the launchers run from the install dir), since 2026-10-30.
+- **single** — no `-Dspaces.root` but config args given: `SpaceManager.single(CollectorService)` over `SpaceRoot.legacy()`, the
   pre-Spaces flat layout relative to the working directory. `supportsCrud()` is false, so Space CRUD answers
   409 "this server hosts a single space".
 - **discover** — `-Dspaces.root=<dir>`: `SpaceManager.discover(root)` boots every `spaces/<id>/` that has a
@@ -64,6 +66,32 @@ mechanism is [Multi-Space Hosting](../processor/architecture-multi-space.md); th
 `audit/`, `duckdb/`, and authored Pipelines under `config/pipelines/` (an older `config/flows/` still
 resolves). Each store accessor (`objectsDbUrl()`, `jobRunDbUrl()`, ...) gives the per-Space default; a
 `-D` flag can still override it. `_`-prefixed directories (`_templates/`, `_shared/`) are never Spaces.
+
+**Data root (`SPACE-DATA-ROOT-1`, 2026-10-30).** Config always stays in `spaces/<id>/` (`space.toon`, `config/`,
+`config.secrets/`). The high-growth state — `data/` (inbox, lake, backups, events, …), `audit/` and `duckdb/` — sits
+under `SpaceRoot.dataRoot()`, which is: `data_root:` in `space.toon` (absolute) → else `-Dspaces.data.root`/`<id>`
+by convention (a mounted NFS / SMB / s3fs / CSI volume) → else the Space directory (today's layout). Configs do
+not change: a path that resolves under `<space>/data|audit|duckdb` — `data/orders/inbox`, `../data/backups` — is
+redirected onto the data root by `PathJail.onDataRoot`, and the data root is an allowed root of its own Space only.
+At load (`SpaceDataRoot.claim`) a moved Space is refused, never split, when: `data_root` is relative, inside
+`config/` or a `*.secrets` dir; the mount (its parent) is missing; the Space folder still holds files in `data/`,
+`audit/` or `duckdb/` (move them first — nothing is moved at boot); or the `.inspecto-space` stamp in the data root
+names another Space directory (a copied Space folder must get its own data root). A newly created Space's seeded
+`data/` is moved onto its data root (`adoptSeeded`); `DELETE ?purge=true` purges the data root only when its stamp
+names the Space; a bundle import drops the exporter's `data_root`.
+⚠ DuckDB needs random writes: put `duckdb/` (the whole data root) on block storage or NFS, not on an
+object-storage mount (s3fs / mountpoint-s3). On such a mount the inbox loses atomic rename (move = copy + delete).
+**Space references.** A regular file `<spaces root>/<id>.ref` holding an absolute path boots the Space folder it
+names (`SpaceManager.followRef`): the folder must be named `<id>`, exist, and lie outside the spaces root; a real
+`<id>/` folder beside it wins. An unfollowable ref is skipped with `SPACE_REF_INVALID`. Create refuses an id taken
+by a ref; `update` writes `space.toon` in the referenced folder; purge deletes only the `.ref` (the folder and its
+data root stay).
+**Overlap refusal (`SPACE_OVERLAP`).** Discovery resolves every candidate's folder and data root before any Space
+boots: two overlapping Space folders (a ref target inside another, or containing the spaces root) are both refused;
+a data root that is, contains or sits inside another Space's folder or data root refuses only the Space that
+declared it. A runtime create meets the same rule in `SpaceDataRoot.stake`.
+⚠ LA snapshots, LA upload records and the entity-list fact log write `config/audit/`, not the Space's `audit/`,
+so they stay with the config.
 
 **Request binding.** `ControlApi.dispatch` strips `/api/v1`, matches `/spaces/{id}/…`, rewrites the path
 and binds the `space` SLF4J MDC key for the request; an un-prefixed path binds the current Space.
@@ -89,8 +117,10 @@ one `lifecycleLock`; reads are lock-free. `createFromTemplate` copies the templa
 
 | Key / file | Where | Meaning |
 |---|---|---|
-| `-Dspaces.root=<dir>` | JVM flag | discover mode; unset = single flat Space |
-| `space.toon` | Space directory | the Space manifest (display name, description) |
+| `-Dspaces.root=<dir>` | JVM flag | discover mode; unset = `<install_dir>/spaces`, or a single flat Space when config args are given |
+| `<id>.ref` | spaces root | Space reference: absolute path of a Space folder kept elsewhere |
+| `space.toon` | Space directory | the Space manifest (display name, description, optional absolute `data_root`) |
+| `-Dspaces.data.root=<mount>` | JVM flag | convention data root `<mount>/<id>` for every Space without `data_root` |
 | `modules.toon` → `disabled: [ids]` | Space config root | Enabled gate; absent file = all installed modules on; unknown ids kept as `inert` |
 | `template.toon` → `name`, `tagline`, `description`, `icon`, `contents[]` | template directory | gallery entry, e.g. `spaces/_templates/orders-starter/template.toon` |
 

@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.entity-list` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `SPACE-DATA-ROOT-CONFIG-AUDIT-1` | P3 | chore | LA snapshots (SnapshotStore, FsInvestigationLayout), LA upload records (UploadRoutes) and the entity-list fact log (EntityFactLog) write… | operator |

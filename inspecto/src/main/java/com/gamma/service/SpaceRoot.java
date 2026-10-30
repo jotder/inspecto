@@ -33,6 +33,13 @@ public interface SpaceRoot {
     /** Directory scanned for this space's {@code *.toon} config; {@code null} for {@link #legacy()} (configs come from CLI args). */
     Path config();
 
+    /**
+     * Where this space's high-growth state lives — {@code data/}, {@code audit/} and {@code duckdb/} sit under it
+     * ({@code SPACE-DATA-ROOT-1}). {@link #base()} unless moved: {@code data_root:} in {@code space.toon} wins, else
+     * {@code -Dspaces.data.root}{@code /<id>} by convention (a mounted NFS / SMB / s3fs / CSI volume).
+     */
+    Path dataRoot();
+
     /** Jobs audit directory (run journal, watermarks, branch-commit logs). */
     String auditDir();
 
@@ -128,9 +135,27 @@ public interface SpaceRoot {
         return new LegacySpaceRoot();
     }
 
-    /** A self-contained space rooted at {@code base}: {@code base/{config,data,audit,duckdb}}. */
+    /** A self-contained space rooted at {@code base}: {@code base/config}, and {@code {data,audit,duckdb}} under its {@link #dataRoot()}. */
     static SpaceRoot under(Path base) {
-        return new DirSpaceRoot(base.toAbsolutePath().normalize());
+        Path b = base.toAbsolutePath().normalize();
+        return new DirSpaceRoot(b, dataRootFor(b));
+    }
+
+    /** The JVM flag naming the mount every space's data root defaults under, as {@code <mount>/<space id>}. */
+    String DATA_ROOT_PROPERTY = "spaces.data.root";
+
+    /**
+     * {@link #dataRoot()} for the space at {@code base}: {@code space.toon data_root} (resolved against {@code base}
+     * when relative — {@code SpaceBootstrap} refuses that at load), else {@code -Dspaces.data.root/<id>}, else {@code base}.
+     */
+    static Path dataRootFor(Path base) {
+        String declared = SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "").dataRoot();
+        if (!declared.isBlank()) return base.resolve(declared.trim()).normalize();
+        String mount = System.getProperty(DATA_ROOT_PROPERTY);
+        // Only a Space (a dir with config/) takes the convention; the spaces root itself (the fleet inbox registry) stays put.
+        if (mount != null && !mount.isBlank() && base.getFileName() != null && Files.isDirectory(base.resolve("config")))
+            return Path.of(mount.trim()).toAbsolutePath().normalize().resolve(base.getFileName().toString());
+        return base;
     }
 
     /** Shared dual-read rule for the Tier 3 {@code flows/}→{@code pipelines/} rename (vocabulary plan §4):
@@ -151,6 +176,8 @@ final class LegacySpaceRoot implements SpaceRoot {
     public Path base() { return Path.of("").toAbsolutePath(); }
 
     public Path config() { return null; }
+
+    public Path dataRoot() { return base(); }
 
     public String auditDir() { return "jobs_audit"; }
 
@@ -219,11 +246,15 @@ final class LegacySpaceRoot implements SpaceRoot {
     }
 }
 
-/** A self-contained per-space directory: {@code base/{config,data,audit,duckdb}}. */
+/** A self-contained per-space directory: {@code base/config}, and {@code {data,audit,duckdb}} under {@code dataRoot}. */
 final class DirSpaceRoot implements SpaceRoot {
     private final Path base;
+    private final Path dataRoot;
 
-    DirSpaceRoot(Path base) { this.base = base; }
+    DirSpaceRoot(Path base, Path dataRoot) {
+        this.base = base;
+        this.dataRoot = dataRoot;
+    }
 
     public String id() { return base.getFileName().toString(); }
 
@@ -231,9 +262,11 @@ final class DirSpaceRoot implements SpaceRoot {
 
     public Path config() { return base.resolve("config"); }
 
-    public String auditDir() { return base.resolve("audit").toString(); }
+    public Path dataRoot() { return dataRoot; }
 
-    public String dataDir() { return base.resolve("data").toString(); }
+    public String auditDir() { return dataRoot.resolve("audit").toString(); }
+
+    public String dataDir() { return dataRoot.resolve("data").toString(); }
 
     /** Pre-rebrand {@code config/flows/} is honoured when present and {@code config/pipelines/} is absent
      *  (dual-read, same shape as {@link LegacySpaceRoot#statusDbUrl()}) — no boot-time move, since renaming
@@ -241,13 +274,13 @@ final class DirSpaceRoot implements SpaceRoot {
      *  the moment anything writes there. */
     public Path pipelinesDir() { return SpaceRoot.pipelinesSubdir(config()); }
 
-    public Path eventsDir() { return base.resolve("data").resolve("events"); }
+    public Path eventsDir() { return dataRoot.resolve("data").resolve("events"); }
 
     /** JDBC URL under {@code <base>/duckdb/}, minting the dir first: repo-checked-out spaces gitignore
      *  {@code duckdb/}, and DuckDB does not create parent dirs — without the mkdir every DB-backed store
      *  would silently degrade to in-memory on a fresh checkout (ServiceStores' fail-open contract). */
     private String duckdb(String file) {
-        Path dir = base.resolve("duckdb");
+        Path dir = dataRoot.resolve("duckdb");
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {

@@ -25,18 +25,40 @@ Config files live under a space's `config/<adapter>/` directory (e.g. `spaces/<i
 ## Spaces (multi-project layout)
 
 One server can host **many isolated spaces** (projects) at once. A space is a self-contained directory under a
-container root — launch with `-Dspaces.root=<dir>` (no code default: unset means single-tenant mode; `serve.sh`/`serve.bat` default `SPACES_ROOT=spaces`):
+container root — `-Dspaces.root=<dir>`, default `<install_dir>/spaces` when no config args are given
+(`serve.sh`/`serve.bat` pass the same `SPACES_ROOT=spaces`):
 
 ```
 spaces/
   <id>/                     # id: [a-z0-9-], 1–63 chars, not starting with '-'
-    space.toon              # manifest: display_name, description, created_at
+    space.toon              # manifest: display_name, description, created_at, optional data_root
     config/                 # this space's *.toon tree (scanned at boot; hot-reloadable)
-    data/  ( data/events/ ) # partition output  ( + rolling Parquet events )
-    audit/                  # run journal, watermarks, commit logs
-    duckdb/                 # this space's *.duckdb / *.db stores
+    data/  ( data/events/ ) # partition output, inbox, backups  ( + rolling Parquet events )   ┐ under the
+    audit/                  # run journal, watermarks, commit logs                               │ data root
+    duckdb/                 # this space's *.duckdb / *.db stores                                ┘
     pipelines/              # authored pipelines (`flows/` is read only as a legacy fallback)
+  <id>.ref                  # a Space reference: one line, the absolute path of a Space folder kept elsewhere
 ```
+
+**Data root — config here, high-growth state on a bigger disk.** `data/`, `audit/` and `duckdb/` live under the
+Space's data root: `data_root: <absolute path>` in `space.toon`, else `-Dspaces.data.root=<mount>` → `<mount>/<id>`,
+else the Space folder. Configs are unchanged — `data/orders/inbox` or `../data/backups` resolve onto the data root.
+Example (all configs in `C:\sandbox\spaces`, all data in `C:\data`):
+
+```
+-Dspaces.root=C:\sandbox\spaces -Dspaces.data.root=C:\data
+C:\sandbox\spaces\demo\{space.toon, config\}      C:\data\demo\{data\, audit\, duckdb\, .inspecto-space}
+```
+
+Moving an existing Space: stop the server, move its `data/`, `audit/`, `duckdb/` into `<data root>/` (nothing else
+may be in that folder), set the flag or `data_root`, start. A Space whose folder still holds files in those dirs,
+or whose data root is stamped (`.inspecto-space`) by another Space folder, or whose mount is missing, is not booted
+(`GET /spaces` lists it as skipped with the reason). ⚠ Keep `duckdb/` off object-storage mounts (s3fs,
+mountpoint-s3): DuckDB needs random writes.
+
+**Space references.** `<id>.ref` in the spaces root holds the absolute path of a Space folder elsewhere (e.g.
+`C:\sandbox\spaces\demo` from an install's `spaces\demo.ref`). The folder must be named `<id>` and lie outside the
+spaces root; a real `<id>/` beside the ref wins. Purge of a referenced Space deletes only the `.ref`.
 
 Each space is fully isolated: its own service, scheduler, event log, stores, connection registry and metric
 `space` label. Store **backends** (`status.backend`, `objects.backend`, `events.backend`, …) stay process-global
@@ -51,7 +73,7 @@ Each space is fully isolated: its own service, scheduler, event log, stores, con
 - **Space CRUD** is server-global and lives on the wire-protocol page — the seven routes are documented
   in [multi-space](../processor/architecture-multi-space.md); this file covers on-disk layout and `SpaceMigrator`
   only.
-- **Single-tenant mode** (no `-Dspaces.root`, a config/dir passed on the CLI) hosts one `default` space and is
+- **Single-tenant mode** (no `-Dspaces.root` AND a config/dir passed on the CLI) hosts one `default` space and is
   byte-identical to the pre-spaces behaviour; CRUD returns `409`.
 
 ### Migrating a flat deployment

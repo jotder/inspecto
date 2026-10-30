@@ -216,6 +216,7 @@ public record SafetyPolicy(
             if (!s.isBlank()) roots.add(Paths.get(s.trim()).toAbsolutePath().normalize());
         }
         DiscoveredRoots.baseOf(spaceId).ifPresent(roots::add);
+        DiscoveredRoots.dataRootOf(spaceId).ifPresent(roots::add);   // a Space's data_root is its own, like its base
         return roots;
     }
 

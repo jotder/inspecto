@@ -398,9 +398,9 @@ public final class PathJail {
         } catch (RuntimeException ex) {
             throw new Escape(field, s, "is not a valid path: " + ex.getMessage());
         }
-        if (base == null || authored.isAbsolute()) return authored.toAbsolutePath().normalize();
+        if (base == null || authored.isAbsolute()) return onDataRoot(authored.toAbsolutePath().normalize());
 
-        Path baseRelative = base.toAbsolutePath().normalize().resolve(authored).normalize();
+        Path baseRelative = onDataRoot(base.toAbsolutePath().normalize().resolve(authored).normalize());
         if (Files.exists(baseRelative)) return baseRelative;
 
         Path cwdRelative = authored.toAbsolutePath().normalize();
@@ -410,6 +410,31 @@ public final class PathJail {
                     + "working directory the way it used to be. Make it absolute, or respell it relative to "
                     + base.toAbsolutePath().normalize() + "; it is not resolved silently either way");
         return baseRelative;
+    }
+
+    /** The Space state directories a {@code data_root} carries; each sits under the data root, never the base. */
+    private static final java.util.Set<String> STATE_DIRS = java.util.Set.of("data", "audit", "duckdb");
+
+    /**
+     * <b>The data_root rule</b> ({@code SPACE-DATA-ROOT-1}): a path under a Space's {@code data/}, {@code audit/}
+     * or {@code duckdb/} lives under that Space's data root when one is registered ({@link DiscoveredRoots#registerDataRoot})
+     * — {@code spaces/demo/data/orders} becomes {@code <data_root>/data/orders}. So a config keeps saying
+     * {@code data/orders} or {@code ../data/orders} and moving a Space's data is one line in {@code space.toon}.
+     * Any other path, or a Space with no data root, is returned unchanged.
+     */
+    public static Path onDataRoot(Path resolved) {
+        if (resolved == null) return null;
+        java.util.Map<Path, Path> relocated = DiscoveredRoots.relocated();
+        if (relocated.isEmpty()) return resolved;
+        Path c = canonical(resolved);   // a junction, 8.3 alias or trailing dot must not walk around the redirect
+        for (java.util.Map.Entry<Path, Path> e : relocated.entrySet()) {
+            Path base = canonical(e.getKey());
+            if (!c.startsWith(base) || c.equals(base)) continue;
+            Path rel = base.relativize(c);
+            if (STATE_DIRS.contains(canonicalSegment(rel.getName(0).toString())))
+                return e.getValue().resolve(rel).normalize();
+        }
+        return resolved;
     }
 
     /** {@link #resolveJobPath} + the containment check, for a run-time task holding the Space root. */
@@ -457,12 +482,22 @@ public final class PathJail {
             if (base.startsWith(r))
                 throw new Escape(field, value, "is the Space directory " + base + " (or contains it); a data "
                         + "directory must be a subdirectory such as data/<pipeline>/…, never the Space root");
-            if (r.equals(base.resolve("data")))
+            if (r.equals(base.resolve("data")) || r.equals(canonical(onDataRoot(base.resolve("data")))))
                 throw new Escape(field, value, "is the Space data root " + r + "; a data directory must be a "
                         + "subdirectory such as data/<pipeline>/…, never the data root itself");
             if (r.startsWith(base.resolve("config")))
                 throw new Escape(field, value, "is under the Space's config/ tree (" + base.resolve("config")
                         + "); a data directory may never be a config directory");
+        }
+        // A moved data root holds data/, audit/ and duckdb/: like the Space root, it may never BE (or sit under) a data home.
+        for (Path dataRoot : DiscoveredRoots.relocated().values()) {
+            Path d = canonical(dataRoot);
+            if (d.startsWith(r))
+                throw new Escape(field, value, "is the Space data root " + d + " (or contains it); a data directory "
+                        + "must be a subdirectory such as data/<pipeline>/…");
+            if (r.startsWith(d.resolve("audit")) || r.startsWith(d.resolve("duckdb")))
+                throw new Escape(field, value, "is under the Space data root's audit/ or duckdb/ (" + d
+                        + "); a data directory must be under data/");
         }
     }
 
@@ -496,6 +531,7 @@ public final class PathJail {
         String dd = System.getProperty("data.dir");
         if (dd != null && !dd.isBlank() && canonical(Paths.get(dd.trim())).equals(c)) return true;
         for (Path base : DiscoveredRoots.all()) if (canonical(base).resolve("data").equals(c)) return true;
+        for (Path dataRoot : DiscoveredRoots.relocated().values()) if (canonical(dataRoot).resolve("data").equals(c)) return true;
         return false;
     }
 
@@ -509,6 +545,12 @@ public final class PathJail {
         if (spaceDirOf(d) != null) return "is under a config/ directory";
         for (Path base : DiscoveredRoots.all())
             if (canonical(base).startsWith(d)) return "is or contains the Space root " + base;
+        for (Path dataRoot : DiscoveredRoots.relocated().values()) {
+            Path dr = canonical(dataRoot);
+            if (dr.startsWith(d)) return "is or contains the Space data root " + dataRoot;
+            if (d.startsWith(dr.resolve("audit")) || d.startsWith(dr.resolve("duckdb")))
+                return "is under the Space data root's audit/ or duckdb/";
+        }
         if (Files.isDirectory(d.resolve("config"))) return "is a Space root (it holds config/)";
         // processing.refusal: a restricted store holds files refused FOR their content; DuckDB's allowed_directories
         // matches by prefix, so an allowlisted dir that is, is under, or directly holds one would expose it.

@@ -26,6 +26,11 @@ final class SpaceBootstrap {
         SpaceContext.SpaceManifest manifest =
                 SpaceContext.SpaceManifest.read(root.base().resolve("space.toon"), id.value());
 
+        // Data, audit and DuckDB stores may live on another volume (SPACE-DATA-ROOT-1): check and claim it, then
+        // publish it so every config path under data/, audit/ or duckdb/ resolves there (PathJail.onDataRoot).
+        SpaceDataRoot.claim(root, manifest);
+        com.gamma.config.safety.DiscoveredRoots.registerDataRoot(id.value(), root.dataRoot());
+
         // Advisory storage-layout-contract check (WARN-only; never blocks boot).
         SpaceLayoutContract.verify(root);
 

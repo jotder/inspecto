@@ -50,9 +50,45 @@ public final class DiscoveredRoots {
         if (spaceId != null && base != null) ROOTS.put(spaceId, base.toAbsolutePath().normalize());
     }
 
+    /** {@code space id -> data root} for a Space whose data, audit and DuckDB stores live off its base
+     *  ({@code space.toon data_root} or {@code -Dspaces.data.root}); absent when they live under the base. */
+    private static final Map<String, Path> DATA_ROOTS = new ConcurrentHashMap<>();
+
+    /** Publish a Space's data root; one equal to its base (or {@code null}) clears it. */
+    public static void registerDataRoot(String spaceId, Path dataRoot) {
+        if (spaceId == null) return;
+        Path base = ROOTS.get(spaceId);
+        Path d = dataRoot == null ? null : dataRoot.toAbsolutePath().normalize();
+        if (d == null || d.equals(base)) DATA_ROOTS.remove(spaceId);
+        else DATA_ROOTS.put(spaceId, d);
+    }
+
+    /** The data root registered for {@code spaceId} when it is off the Space's base. */
+    static Optional<Path> dataRootOf(String spaceId) {
+        return spaceId == null ? Optional.empty() : Optional.ofNullable(DATA_ROOTS.get(spaceId));
+    }
+
+    /** {@code space id -> data root} for every Space whose data root is off its base (a snapshot). */
+    public static Map<String, Path> dataRoots() {
+        return Map.copyOf(DATA_ROOTS);
+    }
+
+    /** {@code base -> data root} for every Space whose data root is off its base (a snapshot). */
+    static Map<Path, Path> relocated() {
+        Map<Path, Path> out = new java.util.HashMap<>();
+        DATA_ROOTS.forEach((id, d) -> {
+            Path base = ROOTS.get(id);
+            if (base != null) out.put(base, d);
+        });
+        return out;
+    }
+
     /** Remove a no-longer-hosted Space's base (idempotent; an unknown id is a no-op). */
     public static void unregister(String spaceId) {
-        if (spaceId != null) ROOTS.remove(spaceId);
+        if (spaceId != null) {
+            ROOTS.remove(spaceId);
+            DATA_ROOTS.remove(spaceId);
+        }
     }
 
     /** The base registered for {@code spaceId}, for {@link SafetyPolicy#forSpace(String)}. */
@@ -74,5 +110,6 @@ public final class DiscoveredRoots {
      *  into the next test's containment verdicts. Production never calls this. */
     public static void clear() {
         ROOTS.clear();
+        DATA_ROOTS.clear();
     }
 }

@@ -1026,7 +1026,7 @@ single-writer-locked (documented in `ServiceStores`). Locations come from
 
 | Layout | Capability file locations |
 |---|---|
-| **`DirSpaceRoot`** (per-space dir) | `<spaceBase>/duckdb/<file>` — e.g. `spaces/demo/duckdb/inspecto-ops.db` |
+| **`DirSpaceRoot`** (per-space dir) | `<dataRoot>/duckdb/<file>` — e.g. `spaces/demo/duckdb/inspecto-ops.db`; `<dataRoot>` is the Space dir unless `space.toon data_root` / `-Dspaces.data.root` moves it (`SPACE-DATA-ROOT-1`) |
 | **`LegacySpaceRoot`** (flat working dir) | `./inspecto-ops.db`, `./inspecto-ops-links.db`, `./inspecto-ops-notes.db`, `./inspecto-status.db`, `./jobs_report.duckdb`, `./provenance.duckdb`, `./inspecto-acquisition.db`, `./inspecto-consignment-outputs.db`, `./inspecto-file-stages.db`, `./inspecto-delivery-receipts.db` |
 
 So across N spaces you get N separate sets of these files. Events live under `<dataDir>/events/`

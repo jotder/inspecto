@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Spaces — features
 
-**Availability:** Offering: every edition (multi-Space hosting needs `-Dspaces.root`).
+**Availability:** Offering: every edition (multi-Space hosting is the default: `<install_dir>/spaces`, or `-Dspaces.root`; data can live elsewhere via `-Dspaces.data.root` / `space.toon data_root`).
 
 ## What it does
 
