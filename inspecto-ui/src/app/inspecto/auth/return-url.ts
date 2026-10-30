@@ -19,6 +19,7 @@ export function safeReturnUrl(raw: string | null | undefined): string | null {
     }
     // Backslashes and control characters are normalised to '/' or stripped by browsers: `/\evil` becomes `//evil`.
     for (const v of [raw, decoded]) {
+        // eslint-disable-next-line no-control-regex -- matching control characters is the point: they are an open-redirect vector
         if (v.includes('\\') || /[\u0000-\u001f\u007f]/.test(v) || v.startsWith('//')) return null;
     }
     let parsed: URL;

@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { LAYERED_MAX_RANK_WIDTH, layeredShapeReason, layeredWidestRank } from './la-limits';
 
 /** LA-DAGRE-WIDE-SHALLOW-FIT-1: a providers → claims graph stacks hundreds of nodes in one Layered rank. */

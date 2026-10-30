@@ -9,7 +9,9 @@ import {
     signal,
     untracked,
 } from '@angular/core';
-import { LensService, SessionService } from '@inspecto/core/api';
+import { LensService } from '@inspecto/core/api';
+// eslint-disable-next-line no-restricted-imports -- only `actor`, to tell the viewer's own Drafts from others'; LA_FEATURES carries module flags, not identity
+import { SessionService } from '@inspecto/core/api';
 import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 import {
