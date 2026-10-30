@@ -139,7 +139,7 @@ Name decided (D16): **Draft** (not "sandbox": that is the SQL lockdown; ⛔ not 
 
 | Id | State |
 |---|---|
-| `LA-PRODUCT-NEXT-1` | open 2026-10-29: the feature brainstorm's six phases, plan [`la-product-next-plan.md`](la-product-next-plan.md) |
+| `LA-PRODUCT-NEXT-1` | shipped 2026-10-30 (5c parked), plan [archived](../archived-documents/plans-archive/la-product-next-plan.md) |
 | `LA-EMBED-VIEW-1` | closed 2026-10-14 (built; section 3 is the design record) |
 | `LA-APP-REAL-SIGNIN-1` | closed 2026-10-13: la-app signed in through a real WSO2 IS from the SPA |
 | `LA-INDEX-SCALE-MEASURE-1` | open; item (3) = 10^9 run (bucket count ~256-1024 at 10^9; extrapolation only) |

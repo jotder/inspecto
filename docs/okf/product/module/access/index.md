@@ -36,4 +36,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `LINEAGE-SCHEMA-CLASS-LOST-1` | P2 | defect | a classified raw field can lose its class in the pipeline-schema lineage, so BI / share / evidence masking serves the stored column raw t… | — |
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |
-| `LA-PRODUCT-NEXT-1` | P2 | feature | Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "Wh… | — |

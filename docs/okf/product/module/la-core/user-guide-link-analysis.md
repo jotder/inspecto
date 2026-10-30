@@ -3519,7 +3519,7 @@ Refusals read as a cause plus a next step (DR-D6 conventions): 413 names the lim
   - Each row gives its reason as the kinds of neighbour the pair shares, for example *shares device, phone*.
   - Clicking a pair highlights both entities on the canvas.
 - **Scope and limits:** it scores the graph on the canvas, not the whole Dataset (operator decision, 2026-10-30). It runs in the browser and has the same node cap as *Predict links* (`browser_algorithms.linkPrediction`).
-- **Why only 20:** the phase 6 spike (plan `la-product-next-plan.md` §3 phase 6) measured all 20 top suggestions as true duplicates and no hub look-alike among them. Below the top 20, about one suggestion in four was two people sharing an address or a home device. The list says these are suggestions, so read the reason before merging.
+- **Why only 20:** the phase 6 spike (plan `archived-documents/plans-archive/la-product-next-plan.md` §3 phase 6) measured all 20 top suggestions as true duplicates and no hub look-alike among them. Below the top 20, about one suggestion in four was two people sharing an address or a home device. The list says these are suggestions, so read the reason before merging.
 - **Merge…:** each row's **Merge…** hands the pair to the same prefill as *Merge with...*. That host path is `mergeNodes`, shared with `mergeSelected`.
   - The button shows only inside an Investigation and only with `canManageIncidents`.
   - A pair the Merge form would refuse shows a warning toast instead:

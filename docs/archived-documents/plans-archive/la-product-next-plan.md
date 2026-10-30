@@ -1,6 +1,6 @@
 # Link Analysis — next product steps (`LA-PRODUCT-NEXT-1`)
 
-**Status:** PLAN 2026-10-29, amended the same day (phases 4 and 5 widened, phase 6 and the §5 Reach review added at
+**Status:** SHIPPED 2026-10-30 (`bb85cc532`, `29d8c6e0f`, merge `ddf10a369`); 5c measured and parked. Was: PLAN 2026-10-29, amended the same day (phases 4 and 5 widened, phase 6 and the §5 Reach review added at
 the operator's request). Nothing is built. It comes from the 2026-10-29 Link Analysis feature brainstorm. The operator
 delegated every call ("balance complexity against real-world need"), so each decision below is
 **assistant-decided under operator delegation, pending confirmation**. The exception is the three picks the operator
