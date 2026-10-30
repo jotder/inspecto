@@ -1,4 +1,5 @@
 import type { EntityProjection } from '@inspecto/core/graph';
+import type { WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import type { DegreePresets, DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import type { GrowRequest } from './grow-exclude';
 
@@ -26,6 +27,11 @@ export type UnsavedStep =
            * same Working Set that was drawn. Present = replayed as these lists, one \`expand\` op per degree.
            */
           walked?: string[][];
+          /**
+           * LA-DEGREES-TRIM-1 (screen only, never sent): the Working Set after each degree, one per `walked` list. Lowering
+           * Degrees redraws `stages[M-1]` and drops the rest, so the terminal entities leave the canvas and the step.
+           */
+          stages?: WorkingSet[];
       };
 
 /** What Save binds the Investigation to (the same binding the New form used to create one at once). */
@@ -108,4 +114,30 @@ export function replayStopMessage(
     const first = at + 1;
     if (first > steps.length) return head;
     return `${head} ${first === steps.length ? `Step ${first} was` : `Steps ${first} to ${steps.length} were`} not recorded.`;
+}
+
+/** The Degrees of an unsaved Expand the stepper can resize: the degrees it walked, when it kept what each one drew. */
+export function expandStepDegrees(step: UnsavedStep | undefined): number | null {
+    if (step?.kind !== 'expand' || !step.walked?.length || step.stages?.length !== step.walked.length) return null;
+    return step.walked.length;
+}
+
+/**
+ * LA-DEGREES-TRIM-1: the step cut to its first `degrees` degrees and the Working Set that many degrees drew (the
+ * terminal entities and the links only they carried are gone). Null when it cannot be cut (not an Expand, nothing to cut).
+ */
+export function trimExpandStep(step: UnsavedStep | undefined, degrees: number): { step: UnsavedStep; ws: WorkingSet } | null {
+    const have = expandStepDegrees(step);
+    if (!have || step?.kind !== 'expand' || degrees < 1 || degrees >= have) return null;
+    return {
+        step: { ...step, walked: step.walked!.slice(0, degrees), stages: step.stages!.slice(0, degrees), req: { ...step.req, degrees } },
+        ws: step.stages![degrees - 1],
+    };
+}
+
+/** LA-DEGREES-TRIM-1: the step with further degrees walked from its outer ring appended (raising Degrees). */
+export function extendExpandStep(step: UnsavedStep, more: { walked: string[][]; stages: WorkingSet[] }): UnsavedStep {
+    if (step.kind !== 'expand' || !expandStepDegrees(step) || !more.walked.length) return step;
+    const walked = [...step.walked!, ...more.walked];
+    return { ...step, walked, stages: [...step.stages!, ...more.stages], req: { ...step.req, degrees: walked.length } };
 }

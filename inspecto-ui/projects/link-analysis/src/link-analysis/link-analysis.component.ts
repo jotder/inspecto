@@ -114,14 +114,23 @@ import {
     removedRows,
     withUndrawnLinks,
 } from './grow-exclude';
-import { ExpandRun, LinkAnalysisExpandComponent } from './link-analysis-expand.component';
+import { ExpandDegreesChange, ExpandRun, LinkAnalysisExpandComponent } from './link-analysis-expand.component';
 import { SAVE_NEEDS } from './link-analysis-start-box.component';
 import {
     LinkAnalysisSaveInvestigationDialog,
     SaveInvestigationDialogData,
     SaveInvestigationDialogResult,
 } from './link-analysis-save-investigation.dialog';
-import { UNSAVED_FOUR_EYES, UNSAVED_FOUR_EYES_START, UnsavedBinding, UnsavedStep, unsavedStepLine } from './unsaved-investigation';
+import {
+    UNSAVED_FOUR_EYES,
+    UNSAVED_FOUR_EYES_START,
+    UnsavedBinding,
+    UnsavedStep,
+    expandStepDegrees,
+    extendExpandStep,
+    trimExpandStep,
+    unsavedStepLine,
+} from './unsaved-investigation';
 import type { WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
 import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.component';
@@ -2240,7 +2249,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.boundProfile.set(binding.profileId);
         this.investigation.beginUnsaved(unsaved, req.defaults, [
             seed,
-            { kind: 'expand', from: 'ids', ids: found, req: this.startRing(walk.walked.length), walked: walk.walked },
+            { kind: 'expand', from: 'ids', ids: found, req: this.startRing(walk.walked.length), walked: walk.walked, stages: walk.stages },
         ]);
         this.drawUnsaved(walk.ws, unsaved);
         this.openInvestigation();
@@ -2258,11 +2267,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.toastr.info(UNSAVED_FOUR_EYES);
             return false;
         }
-        const nodes = this.graph()?.nodes ?? [];
-        const named = [...new Set(growIds(ctx, req).flatMap((id) => {
-            const n = nodes.find((x) => x.id === id);
-            return n ? rawIdsOf(n) : [id];
-        }))];
+        const named = this.rawNamed(growIds(ctx, req));
         const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld(), ws: this.unsavedWs() };
         const walk = await this.walkUnsaved(u.binding, this.unsavedWs(), [], named, req);
         if (!walk) {
@@ -2275,7 +2280,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             return false;
         }
         // each degree's frontier, as the server read it: Save sends exactly these lists
-        const step: UnsavedStep = { kind: 'expand', from: from === 'outer' ? 'outer' : 'ids', ids: from === 'outer' ? [] : named, req, walked: walk.walked };
+        const step: UnsavedStep = { kind: 'expand', from: from === 'outer' ? 'outer' : 'ids', ids: from === 'outer' ? [] : named, req, walked: walk.walked, stages: walk.stages };
         this.investigation.recordUnsaved(step);
         const added = walk.ws.entities.length - (before.graph?.nodes.length ?? 0);
         this.drawUnsaved(walk.ws, u.binding);
@@ -2314,8 +2319,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         seeds: string[],
         from: string[],
         req: GrowRequest,
-    ): Promise<{ walked: string[][]; ws: WorkingSet } | null> {
+    ): Promise<{ walked: string[][]; stages: WorkingSet[]; ws: WorkingSet } | null> {
         const walked: string[][] = [];
+        const stages: WorkingSet[] = [];
         const cap = laLimit('investigation.max_frontier');
         let frontier = from.slice(0, cap);
         let ws: WorkingSet = current ?? { entities: [], links: [], excluded: [], hash: '' };
@@ -2333,11 +2339,128 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             if (last?.needsApproval) return null;
             walked.push(frontier);
             ws = mergeWorkingSets(ws, res.workingSet, extra);
+            stages.push(ws);
             extra = [];
             const busy = new Set(ws.entities.filter((e) => e.highConnectivity).map((e) => e.id));
             frontier = (last?.admitted ?? []).filter((id) => !req.hold || !busy.has(id)).slice(0, cap);
         }
-        return { walked, ws };
+        return { walked, stages, ws };
+    }
+
+    /** Canvas ids as the Space's reads name them: every spelling a drawn node stands for (an alias on a masked Space). */
+    private rawNamed(ids: string[]): string[] {
+        const nodes = this.graph()?.nodes ?? [];
+        return [
+            ...new Set(
+                ids.flatMap((id) => {
+                    const n = nodes.find((x) => x.id === id);
+                    return n ? rawIdsOf(n) : [id];
+                }),
+            ),
+        ];
+    }
+
+    /**
+     * LA-DEGREES-TRIM-1: the Degrees of the last Expand while the newest step is an Expand (the Expand form's stepper then
+     * resizes it); null = the stepper is only the next Expand's request.
+     */
+    readonly lastExpandDegrees = computed<number | null>(() => {
+        const u = this.investigation.unsaved();
+        const n = u ? expandStepDegrees(u.steps.at(-1)) : this.investigation.activeId() ? this.growExclude.lastExpandDegrees() : null;
+        return n !== null && n <= this.maxDegree() ? n : null;
+    });
+    private resizing = false;
+
+    /** The context of the outer ring alone (what raising Degrees expands from), whatever the form's "From" says. */
+    private outerContext(): GrowContext {
+        const ctx = this.growContext();
+        const o = ctx.sources?.find((s) => s.value === 'outer');
+        return o ? { ...ctx, frontier: o.frontier, heldFrontier: o.heldFrontier, from: o.from, blocked: ctx.blocked ?? o.blocked } : ctx;
+    }
+
+    /**
+     * LA-DEGREES-TRIM-1: the Degrees stepper moved on the last Expand. Lower: its outermost degrees leave the Working Set
+     * and the recorded step (unsaved: the step is cut and the canvas redrawn; saved: those steps are undone). Higher: more
+     * degrees expand from the outer ring and join the same Expand. The stepper then shows what the Expand really is.
+     */
+    async onDegreesChange({ degrees, req }: ExpandDegreesChange): Promise<void> {
+        const have = this.lastExpandDegrees();
+        if (this.resizing || have === null || degrees === have) return this.tabExpand?.syncDegrees();
+        this.resizing = true;
+        try {
+            const ctx = this.outerContext();
+            if (degrees > have) {
+                if (ctx.blocked) {
+                    this.growExclude.lastChange.set({ text: ctx.blocked });
+                    return;
+                }
+                if (!req.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
+            }
+            const more = { ...req, degrees: degrees - have };
+            if (this.investigation.unsaved()) await this.resizeUnsaved(degrees, have, ctx, more);
+            else if (degrees < have) await this.growExclude.trimLastExpand(degrees);
+            else if (!(await this.growExclude.growInvestigation(ctx, more, this.degreePresets(), true)))
+                this.toastr.error(this.investigation.error() || 'The Expand was refused.');
+        } finally {
+            this.resizing = false;
+            this.tabExpand?.syncDegrees();
+        }
+    }
+
+    private async resizeUnsaved(degrees: number, have: number, ctx: GrowContext, more: GrowRequest): Promise<void> {
+        const u = this.investigation.unsaved();
+        const step = u?.steps.at(-1);
+        if (!u || !step) return;
+        const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld(), ws: this.unsavedWs(), step };
+        let next: UnsavedStep;
+        let ws: WorkingSet;
+        if (degrees < have) {
+            const cut = trimExpandStep(step, degrees);
+            if (!cut) return;
+            next = cut.step;
+            ws = cut.ws;
+        } else {
+            if (this.heldUnsaved(u.binding.presets)) {
+                this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+                this.toastr.info(UNSAVED_FOUR_EYES);
+                return;
+            }
+            const walk = await this.walkUnsaved(u.binding, before.ws, [], this.rawNamed(growIds(ctx, more)), more);
+            if (!walk) {
+                this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+                this.toastr.info(UNSAVED_FOUR_EYES);
+                return;
+            }
+            if (!walk.walked.length) {
+                this.growExclude.lastChange.set({ text: 'There is nothing to expand from yet.' });
+                return;
+            }
+            next = extendExpandStep(step, walk);
+            ws = walk.ws;
+        }
+        this.investigation.replaceLastUnsaved(next);
+        this.drawUnsaved(ws, u.binding);
+        const after = this.graph();
+        const moved = Math.abs(ws.entities.length - (before.ws?.entities.length ?? 0));
+        const to = expandStepDegrees(next) ?? degrees;
+        const t = ctx.terms;
+        const text =
+            degrees < have
+                ? `Lowered to ${to === 1 ? 'one degree' : to + ' degrees'}: removed ${moved.toLocaleString('en-GB')} ${moved === 1 ? t.node : t.nodes} and the ${t.links} only they carried (not saved yet).`
+                : `Raised to ${to} degrees: added ${moved.toLocaleString('en-GB')} ${moved === 1 ? t.node : t.nodes} (not saved yet).`;
+        this.growExclude.lastChange.set({
+            text,
+            valid: () => this.graph() === after,
+            undo: () => {
+                this.graph.set(before.graph);
+                this.expandedNodeIds.set(before.expanded);
+                this.growExclude.basicHeld.set(before.held);
+                this.unsavedWs.set(before.ws);
+                this.investigation.replaceLastUnsaved(before.step);
+                this.growExclude.lastChange.set({ text: 'Undone.' });
+            },
+        });
+        this.drawAnnouncement.set(text);
     }
 
     /** Draw the unsaved Working Set the server previewed: the canvas is exactly what Save records. */
@@ -2386,7 +2509,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.toastr.info(UNSAVED_FOUR_EYES);
             return;
         }
-        this.investigation.recordUnsaved(seed, { kind: 'expand', from: 'ids', ids: values, req: this.startRing(walk.walked.length), walked: walk.walked });
+        this.investigation.recordUnsaved(seed, { kind: 'expand', from: 'ids', ids: values, req: this.startRing(walk.walked.length), walked: walk.walked, stages: walk.stages });
         this.drawUnsaved(walk.ws, u.binding);
     }
 
@@ -2426,6 +2549,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.toastr.error(out.message || 'Could not save the Investigation.');
             return false;
         }
+        if (!out.message && u.steps.at(-1)?.kind === 'expand') this.growExclude.bindLastExpand(expandStepDegrees(u.steps.at(-1)) ?? 0);
         if (out.message) this.toastr.warning(out.message);
         else this.toastr.success(`Saved ${answer.name}, ${out.recorded === 1 ? 'one step' : out.recorded + ' steps'} recorded.`);
         this.showSeedlessStart();

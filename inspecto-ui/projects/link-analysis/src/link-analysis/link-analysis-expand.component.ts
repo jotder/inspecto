@@ -53,6 +53,12 @@ export interface ExpandRun {
     from: ExpandFrom | null;
 }
 
+/** LA-DEGREES-TRIM-1: the stepper, bound to the last Expand, was moved to `degrees` (with the form's request as it stands). */
+export interface ExpandDegreesChange {
+    degrees: number;
+    req: GrowRequest;
+}
+
 /**
  * LA-STUDIO-UI-REORG-1 §5.4 (UIR-D5) — the **Expand** form: one form for every multi-degree expand. In order of
  * importance: From, Degrees (a − N + stepper), Direction (a popup choice), the Expand button with a preview line of
@@ -136,6 +142,11 @@ export interface ExpandRun {
                     [maxReason]="mostDegreesReason()"
                     data-testid="la-expand-degrees"
                 ></inspecto-stepper-field>
+                @if (lastExpand() !== null) {
+                    <p class="text-secondary m-0 text-xs" data-testid="la-expand-degrees-bound">
+                        Degrees follows the last Expand: fewer removes its outermost degrees from the Working Set, more expands further.
+                    </p>
+                }
                 @if (formValue().degrees > 1) {
                     <p class="text-secondary m-0 text-xs">
                         Stops early if a degree would expand from more than {{ ctx().frontierCap.toLocaleString('en-GB') }} {{ t().nodes }}.
@@ -362,7 +373,13 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     readonly embedded = input(false);
     /** The tab section is on screen (the toolbox is open on the Investigation tab): previews are read only then. */
     readonly onScreen = input(true);
+    /**
+     * LA-DEGREES-TRIM-1: the Degrees of the last Expand while the newest step IS an Expand (null otherwise). The stepper then
+     * shows it and a change is handed to the screen (`degreesChange`) rather than waiting for Expand.
+     */
+    readonly lastExpand = input<number | null>(null);
     readonly expand = output<ExpandRun>();
+    readonly degreesChange = output<ExpandDegreesChange>();
     readonly closed = output<void>();
 
     readonly store = inject(GrowExcludeStore);
@@ -569,6 +586,11 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
             .pipe(debounceTime(300), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
                 if (this.previewKey() !== this.previewedKey) this.refresh();
             });
+        // the stepper settled (+/- clicks batch) on a size other than the last Expand's: the screen resizes that Expand
+        this.form.controls.degrees.valueChanges.pipe(debounceTime(300), takeUntilDestroyed(this.destroyRef)).subscribe((d) => {
+            const last = this.lastExpand();
+            if (last !== null && d !== last) this.degreesChange.emit({ degrees: d, req: this.request() });
+        });
         // the popup takes focus when it opens; the tab section is focused by the screen, only when Expand is asked for
         if (!this.embedded()) queueMicrotask(() => this.focus());
     }
@@ -592,9 +614,23 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         this.sourceKeys = keys;
         const max = Math.max(1, this.ctx().maxDegree);
         if (this.form.controls.degrees.value > max) this.form.controls.degrees.setValue(max, { emitEvent: false });
+        if (this.lastExpand() !== this.seenLastExpand) {
+            this.seenLastExpand = this.lastExpand();
+            this.syncDegrees();
+        }
         this.formValue.set(this.form.getRawValue());
         if (this.embedded()) this.startChanged.next();
         else if (this.previewKey() !== this.previewedKey) this.refresh();
+    }
+
+    private seenLastExpand: number | null = null;
+
+    /** Put the stepper back on the last Expand's Degrees (it moved, or the screen refused to resize it). */
+    syncDegrees(): void {
+        const last = this.lastExpand();
+        if (last === null) return;
+        this.form.controls.degrees.setValue(Math.min(last, Math.max(1, this.ctx().maxDegree)), { emitEvent: false });
+        this.formValue.set(this.form.getRawValue());
     }
 
     /** The Advanced read settings as the server takes them; `{}` on the explorer graph. */

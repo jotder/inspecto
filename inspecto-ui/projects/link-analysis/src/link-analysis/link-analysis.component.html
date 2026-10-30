@@ -1615,7 +1615,9 @@
                                             [ctx]="growContext()"
                                             [presets]="degreePresets()"
                                             [limits]="fourEyesLimits()"
+                                            [lastExpand]="lastExpandDegrees()"
                                             (expand)="onExpand($event)"
+                                            (degreesChange)="onDegreesChange($event)"
                                         ></inspecto-link-analysis-expand>
                                     }
                                     <!-- the ONE start form (File ▸ New and the centre pointer land here); it starts unsaved -->

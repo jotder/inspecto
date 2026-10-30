@@ -4807,7 +4807,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(u.steps).toEqual([
             { kind: 'seed', ids: ['S-1', 'S-2'], entityType: 'account' },
             // the drawn ring, as the screen drew it: from exactly the values found
-            { kind: 'expand', from: 'ids', ids: ['S-1', 'S-2'], walked: [['S-1', 'S-2']], req: expect.objectContaining({ degrees: 1, direction: 'either', hold: true }) },
+            { kind: 'expand', from: 'ids', ids: ['S-1', 'S-2'], walked: [['S-1', 'S-2']], stages: [expect.anything()], req: expect.objectContaining({ degrees: 1, direction: 'either', hold: true }) },
         ]);
         expect(c.graph()).not.toBeNull();
         expect(c.openWorkLabel()).toBe('the unsaved Investigation');
@@ -5160,6 +5160,66 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(sent).toEqual(expect.objectContaining({ op: 'expand', ids: ['MULE-HUB-01.n.n.n'], direction: 'either', hubThreshold: 500 }));
         // every preview sends the Working Set as one seed and ONE degree: never the history, so its cost does not grow with it
         for (const [body] of previewUnsaved.mock.calls) expect(body.steps.map((x) => x.op)).toEqual(['seed', 'expand']);
+    });
+
+    describe('LA-DEGREES-TRIM-1: Degrees is the last Expand’s size', () => {
+        const REQ = { direction: 'either' as const, degrees: 3, linkKinds: null, hold: true, threshold: 500 };
+        async function expanded3() {
+            const { fixture } = create({
+                datasets: [TRANSFERS],
+                expand: vi.fn(async (_id: string, label: string) => ring(label)),
+                inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+            });
+            await settle(fixture);
+            const c = fixture.componentInstance;
+            await c.startUnsaved({
+                start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+                defaults: { name: 'A', purpose: 'B' },
+                timeCol: '',
+                timeColZone: '',
+                degrees: 1,
+            });
+            await c.onExpand({ ctx: c.growContext(), req: REQ, from: 'outer' });
+            return c;
+        }
+        const labels = (c: LinkAnalysisComponent) => c.graph()!.nodes.map((n) => n.data.label).sort();
+
+        it('lowering Degrees drops the outermost entities from the canvas AND from the recorded step; Undo brings them back', async () => {
+            const c = await expanded3();
+            expect(c.lastExpandDegrees()).toBe(3);
+            expect(labels(c)).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'MULE-HUB-01.n.n', 'MULE-HUB-01.n.n.n', 'MULE-HUB-01.n.n.n.n']);
+            await c.onDegreesChange({ degrees: 2, req: { ...REQ, degrees: 2 } });
+            // the terminal entity is gone from the canvas ...
+            expect(labels(c)).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'MULE-HUB-01.n.n', 'MULE-HUB-01.n.n.n']);
+            // ... and from what Save would record
+            const step = c.investigation.unsaved()!.steps.at(-1)!;
+            expect(step.kind === 'expand' && step.walked).toEqual([['MULE-HUB-01.n'], ['MULE-HUB-01.n.n']]);
+            expect(step.kind === 'expand' && step.req.degrees).toBe(2);
+            expect(c.lastExpandDegrees()).toBe(2);
+            expect(c.growExclude.lastChange()?.text).toContain('Lowered to 2 degrees: removed 1 node and the links only they carried');
+            await c.growExclude.lastChange()!.undo!();
+            expect(labels(c)).toHaveLength(5);
+            expect(c.lastExpandDegrees()).toBe(3);
+        });
+
+        it('raising Degrees expands the extra degrees from the outer ring into the same step', async () => {
+            const c = await expanded3();
+            await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } });
+            expect(labels(c)).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'MULE-HUB-01.n.n']);
+            const steps = c.investigation.unsaved()!.steps.length;
+            await c.onDegreesChange({ degrees: 3, req: { ...REQ, degrees: 3 } });
+            expect(labels(c)).toHaveLength(5);
+            expect(c.investigation.unsaved()!.steps).toHaveLength(steps); // the same step grew, no new one
+            expect(c.lastExpandDegrees()).toBe(3);
+        });
+
+        it('is not bound when the newest step is not an Expand (a start): lowering changes nothing', async () => {
+            const c = await expanded3();
+            c.investigation.recordUnsaved({ kind: 'seed', ids: ['Z'] });
+            expect(c.lastExpandDegrees()).toBeNull();
+            await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } });
+            expect(labels(c)).toHaveLength(5);
+        });
     });
 
     it('on a masked Space the unsaved start seeds from the alias the explorer drew, never the typed value', async () => {

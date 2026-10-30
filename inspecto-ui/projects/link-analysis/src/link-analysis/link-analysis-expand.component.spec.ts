@@ -12,7 +12,7 @@ import { pickerSet } from '@inspecto/core/testing/pen-field';
 import { GrowContext } from './grow-exclude';
 import { GrowExcludeStore } from './grow-exclude.store';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
-import { ExpandRun, LinkAnalysisExpandComponent } from './link-analysis-expand.component';
+import { ExpandDegreesChange, ExpandRun, LinkAnalysisExpandComponent } from './link-analysis-expand.component';
 
 const TERMS = { node: 'number', nodes: 'numbers', link: 'call', links: 'calls' };
 const CTX: GrowContext = {
@@ -53,7 +53,9 @@ const PREVIEW: GrowPreview = {
         [onScreen]="active()"
         [presets]="{ budget: 100 }"
         [limits]="limits()"
+        [lastExpand]="lastExpand()"
         (expand)="runs.push($event)"
+        (degreesChange)="changes.push($event)"
         (closed)="closed = closed + 1"
     ></inspecto-link-analysis-expand>`,
 })
@@ -62,7 +64,9 @@ class Host {
     readonly embedded = signal(false);
     readonly active = signal(true);
     readonly limits = signal<{ budgetAbove: number | null; fanOutAbove: number | null } | null>(null);
+    readonly lastExpand = signal<number | null>(null);
     readonly runs: ExpandRun[] = [];
+    readonly changes: ExpandDegreesChange[] = [];
     closed = 0;
 }
 
@@ -412,5 +416,51 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         go(el).click();
         expect(host.runs[0].req.rung).toBeUndefined();
         await expectNoA11yViolations(el);
+    });
+    describe('Degrees bound to the last Expand (LA-DEGREES-TRIM-1)', () => {
+        it('shows the last Expand’s degrees and, once the stepper settles, hands the new size to the screen', async () => {
+            const { fixture, el, host } = create({ embedded: true });
+            host.lastExpand.set(3);
+            await settle(fixture);
+            expect(spin(el).getAttribute('aria-valuenow')).toBe('3');
+            expect(q(el, 'la-expand-degrees-bound')?.textContent).toContain('fewer removes its outermost degrees');
+            degreesTo(el, 1); // two clicks, one change
+            await settle(fixture, 350);
+            expect(host.changes).toEqual([{ degrees: 1, req: expect.objectContaining({ degrees: 1, direction: 'either' }) }]);
+            expect(host.runs).toHaveLength(0); // nothing expanded by the stepper itself
+        });
+
+        it('follows the screen when the last Expand changes, and does not hand that move back', async () => {
+            const { fixture, el, host } = create({ embedded: true });
+            host.lastExpand.set(3);
+            await settle(fixture);
+            host.lastExpand.set(2);
+            await settle(fixture, 350);
+            expect(spin(el).getAttribute('aria-valuenow')).toBe('2');
+            expect(host.changes).toEqual([]);
+        });
+
+        it('puts the stepper back on the last Expand when the screen refuses to resize it', async () => {
+            const { fixture, el, host, cmp } = create({ embedded: true });
+            host.lastExpand.set(3);
+            await settle(fixture);
+            degreesTo(el, 4);
+            await settle(fixture, 350);
+            expect(host.changes).toHaveLength(1);
+            cmp.syncDegrees(); // the screen's answer when it did not resize (lastExpand stays 3)
+            await settle(fixture);
+            expect(spin(el).getAttribute('aria-valuenow')).toBe('3');
+        });
+
+        it('is only the next Expand’s request when the last step is not an Expand: no line, no change handed over', async () => {
+            const { fixture, el, host } = create({ embedded: true });
+            await settle(fixture);
+            degreesTo(el, 3);
+            await settle(fixture, 350);
+            expect(q(el, 'la-expand-degrees-bound')).toBeNull();
+            expect(host.changes).toEqual([]);
+            go(el).click();
+            expect(host.runs[0].req.degrees).toBe(3);
+        });
     });
 });

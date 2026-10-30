@@ -203,6 +203,11 @@ export class InvestigationSessionStore {
         this.unsaved.update((u) => (u ? { ...u, steps: u.steps.slice(0, -1) } : u));
     }
 
+    /** LA-DEGREES-TRIM-1: the newest unsaved step becomes this one (Degrees resized it); nothing happens without unsaved work. */
+    replaceLastUnsaved(step: UnsavedStep): void {
+        this.unsaved.update((u) => (u && u.steps.length ? { ...u, steps: [...u.steps.slice(0, -1), step] } : u));
+    }
+
     /** Keep the Save dialog's edits, so a cancelled Save opens with them next time. */
     keepSaveDraft(name: string, purpose: string): void {
         this.unsaved.update((u) => (u ? { ...u, draft: { name, purpose } } : u));
