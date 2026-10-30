@@ -417,7 +417,7 @@ Investigation open it is the **Expand** section of the **Investigation** tab: th
   from the outer ring into the same Expand. The first degree always stays. Unsaved, the Expand is cut or extended in
   place (Ctrl+Z restores it); in a saved Investigation the removed degrees are `undo` steps (newest first, a
   colleague's newer step refuses it), kept in the log, and Ctrl+Z does not bring them back (raise Degrees again; Ctrl+Z
-  does undo a raise). Raising always grows with the Expand's own Direction, link kinds and Hold, whatever the form now
+  does undo a raise). In an unsaved Investigation, raising grows with the Expand's own Direction, link kinds and Hold, whatever the form now
   says. An Expand and a Degrees change never run at the same time; the later one is ignored. It applies about 0.3 s after you stop clicking. When the newest
   step is not an Expand (a start, a clean-up, a colleague's step, a reopened Investigation) the stepper is only the next
   Expand's request, as before.
