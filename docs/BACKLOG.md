@@ -25,9 +25,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **80<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 63<!--count:backlog-p3--> × P3** —
+> **79<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 63<!--count:backlog-p3--> × P3** —
+> ⬇ **80 → 79 (P2 17 → 16) on 2026-10-30**: closed P2 `LA-UNSAVED-INVESTIGATION-1` (shipped, `f83bce424`…`226571957`; known limit: an unsaved Working Set larger than `input.max_ids` is refused with 422); `LA-DEGREES-TRIM-1` shipped (residual `LA-DEGREES-TRIM-2`).
 > ⬆ **79 → 80 (P3 62 → 63) on 2026-10-30**: filed P3 feature `LA-DEGREES-TRIM-2` (the Degrees stepper binds to a reopened Investigation's last Expand).
-> ⬆ **78 → 79 (P2 16 → 17) on 2026-10-29**: filed P2 feature `LA-UNSAVED-INVESTIGATION-1` (start and Expand unsaved, Name and Purpose asked on Save, which replays the steps; the Investigation tab simplified; plan in `superpower/la-unsaved-investigation.md`).
+> ⬆ **78 → 79 (P2 16 → 17) on 2026-10-29**: filed P2 feature `LA-UNSAVED-INVESTIGATION-1` (start and Expand unsaved, Name and Purpose asked on Save, which replays the steps; the Investigation tab simplified; plan in `archived-documents/plans-archive/la-unsaved-investigation.md`).
 > ⬇ **79 → 78 (P3 63 → 62) on 2026-10-29**: closed P3 defect `INTELLIGENCE-GLOSSARY-ANNOTATED-1` — `GlossaryLoader` returns whole entries (continuation lines joined, annotated entries parsed, `A / B` answers for each half) and `docs_search` reads user-facing docs only; as built in `okf/product/module/intelligence/user-guide-inline-ai-authoring.md`.
 > ↔ **79 (P2 17 → 16, P3 62 → 63) on 2026-10-29**: closed P2 chore `LA-UI-TEXT-PASS-1` (two passes shipped, plan archived) and filed its residuals as P3 chore `LA-UI-TEXT-RESIDUALS-1`.
 > ⬆ **78 → 79 (P2 16 → 17) on 2026-10-29**: filed P2 feature `LA-PRODUCT-NEXT-1` (the LA feature brainstorm's five phases; phase 1 brings role and access-policy edits under maker-checker; plan in `superpower/la-product-next-plan.md`).
@@ -370,11 +371,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 80<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 79<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -665,8 +666,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 - **P3** · `LA-UI-TEXT-RESIDUALS-1` — **the few Link Analysis text items left after the UI text pass** [items: module.la-core · kind: chore]
   - **Context:** `LA-UI-TEXT-PASS-1` shipped 2026-10-29 (plan archived: `archived-documents/plans-archive/la-ui-text-pass.md`).
   - **T-186 (rest):** File ▸ Open… shows the owner's display name only for the caller's own Investigations (the list's additive `ownerName`, from the signed-in Subject, 2026-10-29). Other owners still show their login id: the server keeps no directory of other people's names (a Subject carries only its own). Needs a name directory, or the creator's name recorded at create.
-- **P2** · `LA-UNSAVED-INVESTIGATION-1` — **start and Expand an Investigation unsaved; Save asks for the Name and Purpose, creates it and replays the steps in order; the Investigation tab simplified (one start form, one Expand control, visible step groups)** [items: module.la-core · kind: feature]
-  - **Plan:** [`superpower/la-unsaved-investigation.md`](superpower/la-unsaved-investigation.md).
 - **P2** · `LA-PRODUCT-NEXT-1` — **Link Analysis next steps from the 2026-10-29 brainstorm: maker-checker on role and access-policy edits, an LA-scoped Access page with "What can this role do?", Investigation access review, a timeline scrubber, pattern-by-example (from a selection, saved as a pack, then as standing detection), and an entity-resolution suggestions spike** [items: module.la-core, module.access · kind: feature]
   - **Phase 1 is a security gap** (verified 2026-10-29): `PUT /access/roles` and `PUT /access/policies` write straight to disk, while Access Catalog and Profile edits go through `PendingChanges.hold`. So an Approval Policy cannot hold the write that grants capabilities.
   - **Decisions** NX-D1…NX-D7 were made by the assistant under operator delegation and are pending confirmation. The operator endorsed the pattern-by-example, scrubber and entity-resolution picks. The deferred ideas and their reasons are in the plan's §4, and the Reach review is in §5.

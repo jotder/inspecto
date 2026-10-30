@@ -1,6 +1,6 @@
 # Unsaved Investigation and the simpler Investigation tab (`LA-UNSAVED-INVESTIGATION-1`)
 
-**Status:** PLAN 2026-10-29, being built in lane `la-unsaved`. Item `module.la-core`. Backlog row P2 feature
+**Status:** SHIPPED 2026-10-30 (`f83bce424`…`226571957`). Item `module.la-core`. Backlog row P2 feature
 `LA-UNSAVED-INVESTIGATION-1`.
 
 ## 1. The operator's request and decisions
