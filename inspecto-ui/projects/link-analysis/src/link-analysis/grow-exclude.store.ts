@@ -183,14 +183,63 @@ export class GrowExcludeStore {
     // ── Investigation actions (each one recorded op) ──
 
     /**
+     * LA-DEGREES-TRIM-1: the steps the last Expand recorded in this browser (one per degree), so the Degrees stepper can
+     * resize it. Set by `growInvestigation` and by Save (`bindLastExpand`); it counts only while they are the newest.
+     */
+    private readonly expandRun = signal<{ id: string; steps: number[] } | null>(null);
+
+    /** The Degrees of the last Expand while its steps are still the newest effective ones; null = the stepper is not bound. */
+    readonly lastExpandDegrees = computed<number | null>(() => {
+        const run = this.expandRun();
+        if (!run || run.id !== this.investigation.activeId()) return null;
+        const ops = (this.investigation.log()?.entries ?? []).filter((e) => e.kind === 'op' && e.undoneBy == null);
+        return ops.slice(-run.steps.length).map((e) => e.step).join(',') === run.steps.join(',') ? run.steps.length : null;
+    });
+
+    /** After Save replayed an unsaved Expand as `degrees` steps: those newest steps are the last Expand. */
+    bindLastExpand(degrees: number): void {
+        const id = this.investigation.activeId();
+        const ops = (this.investigation.log()?.entries ?? []).filter((e) => e.kind === 'op' && e.undoneBy == null).slice(-degrees);
+        if (id && degrees > 0 && ops.length === degrees && ops.every((e) => e.op === 'expand'))
+            this.expandRun.set({ id, steps: ops.map((e) => e.step) });
+    }
+
+    /**
+     * Lowering Degrees to `degrees`: the last Expand's outermost degrees are taken back, newest first, one `undo` per step
+     * naming it (a colleague's newer step is refused, never undone). The log keeps them as undone steps - it is append-only.
+     */
+    async trimLastExpand(degrees: number): Promise<boolean> {
+        const run = this.expandRun();
+        const have = this.lastExpandDegrees();
+        if (!run || !have || degrees < 1 || degrees >= have) return false;
+        const drop = run.steps.slice(degrees);
+        let done = 0;
+        for (const step of [...drop].reverse()) {
+            if (!(await this.investigation.undo(step))) break;
+            done++;
+        }
+        if (done) this.expandRun.set({ id: run.id, steps: run.steps.slice(0, have - done) });
+        const many = (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'degree' : 'degrees'}`;
+        this.lastChange.set({
+            text:
+                done === drop.length
+                    ? `Lowered to ${many(degrees)}: the outer ${many(done)} of the last Expand removed from the Working Set (${done === 1 ? 'one step' : done + ' steps'} undone, kept in the log).`
+                    : this.investigation.error() || `Only ${many(done)} of the last Expand could be removed.`,
+        });
+        return done === drop.length;
+    }
+
+    /**
      * The Expand dialog's walk (LA-STUDIO-UI-REORG-1 §5.4): one recorded `expand` per degree, each from what the previous
      * one admitted minus the held hubs (they go to the Held tray). It stops early at the frontier cap, when a degree admits
      * nobody, and at a four-eyes hold — and says which. The steps it made are ONE change for Undo (newest first, OP-4).
+     * `extend` (LA-DEGREES-TRIM-1, raising Degrees) adds the degrees to the last Expand's run instead of starting a new one.
      */
-    async growInvestigation(ctx: GrowContext, req: GrowRequest, presets: DegreePresets): Promise<boolean> {
+    async growInvestigation(ctx: GrowContext, req: GrowRequest, presets: DegreePresets, extend = false): Promise<boolean> {
         const inv = this.investigation;
         const t = ctx.terms;
         let frontier = growIds(ctx, req);
+        const joined = extend && this.lastExpandDegrees() ? this.expandRun()!.steps : []; // read before the walk adds steps
         const made: number[] = [];
         let admitted = 0;
         let links = 0;
@@ -234,6 +283,9 @@ export class GrowExcludeStore {
             }
         }
         if (!made.length) return false;
+        // `extend` (raising Degrees) joins the last Expand's run while it is still the newest steps
+        const id = inv.activeId();
+        if (id) this.expandRun.set({ id, steps: [...joined, ...made] });
         const many = (n: number, one: string, more: string) => `${n.toLocaleString('en')} ${n === 1 ? one : more}`;
         this.lastChange.set({
             text:
@@ -241,9 +293,22 @@ export class GrowExcludeStore {
                 `${many(links, t.link, t.links)} added` +
                 (held ? `; ${many(held, `busy ${t.node}`, `busy ${t.nodes}`)} held.` : '.') +
                 stop,
-            ...this.undoOf(made),
+            ...this.joinedUndo(this.undoOf(made), id, joined),
         });
         return true;
+    }
+
+    /** Undo of a raise (`extend`) takes back its steps only: the Expand it joined is the newest again, so rebind to it. */
+    private joinedUndo(change: Pick<LastChange, 'undo' | 'valid'>, id: string | null, joined: number[]): Pick<LastChange, 'undo' | 'valid'> {
+        const undo = change.undo;
+        if (!undo || !id || !joined.length) return change;
+        return {
+            ...change,
+            undo: async () => {
+                await undo();
+                this.expandRun.set({ id, steps: joined }); // still checked against the log: a refused undo leaves it unbound
+            },
+        };
     }
 
     /** "Remove held super nodes": ONE `exclude` of every held entity with the reason (§3.2, GE-4). */

@@ -1056,3 +1056,191 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
         });
     });
 });
+
+describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIGATION-1)', () => {
+    const RING = { direction: 'either' as const, degrees: 1, linkKinds: null, hold: true, threshold: 500 };
+    const begin = (store: InvestigationSessionStore) =>
+        store.beginUnsaved({ projection: P, timeCol: 'call_ts', presets: { budget: 2000 }, maxDegree: 3 }, { name: 'Phone number', purpose: 'Review' }, [
+            { kind: 'seed', ids: ['a'], entityType: 'msisdn' },
+            { kind: 'expand', from: 'outer', ids: [], req: RING },
+            { kind: 'expand', from: 'ids', ids: ['b'], req: { ...RING, direction: 'out' } },
+        ]);
+
+    /** The fake server: a seed puts its ids at hop 0, an expand admits `<id>-n` at the next hop. */
+    function server(t: ReturnType<typeof setup>, refuseAt?: number, holdAt?: number) {
+        const sent: Record<string, unknown>[] = [];
+        t.sets['inv-1'] = ws([]);
+        t.inv.appendInvestigationOp.mockImplementation((_id: string, op: Record<string, unknown>) => {
+            sent.push(op);
+            const n = sent.length;
+            if (n === refuseAt) return throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } }));
+            const ids = op['ids'] as string[];
+            const cur = t.sets['inv-1'];
+            const admitted = op['op'] === 'seed' ? ids : ids.map((id) => id + '-n');
+            const hop = op['op'] === 'seed' ? 0 : Math.max(0, ...cur.entities.map((e) => e.hop)) + 1;
+            t.sets['inv-1'] = {
+                ...cur,
+                entities: [...cur.entities, ...admitted.map((id) => ({ ...ws([id]).entities[0], hop }))],
+                hash: `h${n}`,
+            };
+            t.logs['inv-1'] = { ...t.logs['inv-1'], entries: [...t.logs['inv-1'].entries, entry(n, { op: op['op'] as never })] };
+            return of({ ...step(n, op['op'] as string), status: n === holdAt ? 'pending' : undefined, delta: { ...step(n, '').delta, admitted } });
+        });
+        return sent;
+    }
+
+    it('records steps while unsaved, drops one on Undo, and keeps the Save dialog edits', () => {
+        const { store, inv } = setup();
+        begin(store);
+        store.recordUnsaved({ kind: 'seed', ids: ['c'] });
+        expect(store.unsaved()!.steps).toHaveLength(4);
+        store.popUnsaved();
+        expect(store.unsaved()!.steps).toHaveLength(3);
+        store.keepSaveDraft('Operation Larch', 'Warrant 7');
+        expect(store.unsaved()!.draft).toEqual({ name: 'Operation Larch', purpose: 'Warrant 7' });
+        expect(store.unsaved()!.defaults).toEqual({ name: 'Phone number', purpose: 'Review' });
+        expect(inv.createInvestigation).not.toHaveBeenCalled(); // nothing on the server while unsaved
+        store.discardUnsaved();
+        expect(store.unsaved()).toBeNull();
+    });
+
+    it('Save creates with the Name and Purpose, then replays every step in order through the step route', async () => {
+        const t = setup();
+        const sent = server(t);
+        begin(t.store);
+        const out = await t.store.saveUnsaved('Operation Larch', 'Warrant 7');
+        expect(t.inv.createInvestigation).toHaveBeenCalledWith(
+            expect.objectContaining({ title: 'Operation Larch', purpose: 'Warrant 7', timeCol: 'call_ts', entityType: 'msisdn' }),
+        );
+        expect(sent.map((o) => [o['op'], o['ids']])).toEqual([
+            ['seed', ['a']],
+            ['expand', ['a']], // the outer ring of the replayed Working Set
+            ['expand', ['b']], // the named values
+        ]);
+        expect(sent[1]).toEqual(expect.objectContaining({ direction: 'either', hubThreshold: 500, budget: 2000 }));
+        expect(sent[2]).toEqual(expect.objectContaining({ direction: 'out' }));
+        expect(out).toEqual({ created: true, recorded: 3, message: '' });
+        expect(t.store.unsaved()).toBeNull();
+        expect(t.store.activeId()).toBe('inv-1');
+    });
+
+    it('a step refused partway stops the replay: the steps before it are saved, the rest named as not recorded', async () => {
+        const t = setup();
+        const sent = server(t, 2);
+        begin(t.store);
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(sent).toHaveLength(2); // the third step is never sent
+        expect(out.created).toBe(true);
+        expect(out.recorded).toBe(1);
+        expect(out.message).toContain('Saved with 1 step. Step 2 (Expand 1 degree from the outer ring, both ways) was refused');
+        expect(out.message).toContain('Step 3 was not recorded.');
+        expect(t.store.error()).toBe(out.message);
+        expect(t.store.activeId()).toBe('inv-1'); // the saved Investigation is open
+    });
+
+    it('a replayed step held for four-eyes approval stops the replay there', async () => {
+        const t = setup();
+        const sent = server(t, undefined, 2);
+        begin(t.store);
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(sent).toHaveLength(2);
+        expect(out.recorded).toBe(2);
+        expect(out.message).toContain("Step 2 (Expand 1 degree from the outer ring, both ways) is waiting for a second person's approval.");
+        expect(out.message).toContain('Step 3 was not recorded.');
+    });
+
+    it('a refused create keeps the unsaved work, so nothing is lost', async () => {
+        const t = setup();
+        t.inv.createInvestigation.mockImplementation(() =>
+            throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: 'no' } } })) as never,
+        );
+        begin(t.store);
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(out.created).toBe(false);
+        expect(t.inv.appendInvestigationOp).not.toHaveBeenCalled();
+        expect(t.store.unsaved()!.steps).toHaveLength(3);
+    });
+});
+
+describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSAVED-INVESTIGATION-1 review)', () => {
+    const REQ = { direction: 'either' as const, degrees: 3, linkKinds: null, hold: true, threshold: 500 };
+    /**
+     * A fake server that keeps a real Working Set: a seed adds its ids at hop 0; an expand admits what \`admits\` gives for
+     * the ids it named (at the next hop), and 422s an id the Working Set does not hold - as InvestigationRoutes does.
+     */
+    function serve(t: ReturnType<typeof setup>, admits: (ids: string[], n: number) => string[], aliases: Record<string, string> = {}) {
+        const sent: Record<string, unknown>[] = [];
+        t.sets['inv-1'] = { ...ws([]), exploreAliases: aliases } as WorkingSet;
+        t.inv.appendInvestigationOp.mockImplementation((_id: string, op: Record<string, unknown>) => {
+            sent.push(op);
+            const n = sent.length;
+            const ids = op['ids'] as string[];
+            const cur = t.sets['inv-1'];
+            const held = new Set(cur.entities.map((e) => e.id));
+            if (op['op'] === 'expand' && ids.some((id) => !held.has(id)))
+                return throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'not in the Working Set' } } }));
+            const admitted = op['op'] === 'seed' ? ids.map((id) => Object.entries(aliases).find(([, e]) => e === id)?.[0] ?? id) : admits(ids, n);
+            const hop = op['op'] === 'seed' ? 0 : Math.max(0, ...cur.entities.map((e) => e.hop)) + 1;
+            t.sets['inv-1'] = {
+                ...cur,
+                entities: [...cur.entities, ...admitted.filter((id) => !held.has(id)).map((id) => ({ ...ws([id]).entities[0], hop }))],
+                hash: `h${n}`,
+            };
+            t.logs['inv-1'] = { ...t.logs['inv-1'], entries: [...t.logs['inv-1'].entries, entry(n, { op: op['op'] as never })] };
+            return of({ ...step(n, op['op'] as string), delta: { ...step(0, '').delta, admitted } });
+        });
+        return sent;
+    }
+    const begin = (t: ReturnType<typeof setup>, walked: string[][], seed = ['a']) =>
+        t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
+            { kind: 'seed', ids: seed },
+            { kind: 'expand', from: 'outer', ids: [], req: REQ, walked },
+        ]);
+
+    it('replays exactly the values each degree expanded from on screen, one expand per degree, no more', async () => {
+        const t = setup();
+        const sent = serve(t, (ids) => (ids[0] === 'a' ? ['b', 'c'] : ['d']));
+        begin(t, [['a'], ['b', 'c']]);
+        const out = await t.store.saveUnsaved('n', 'p');
+        expect(sent.map((o) => o['ids'])).toEqual([['a'], ['a'], ['b', 'c']]); // degree 3 stopped early on screen: not sent
+        expect(out).toEqual({ created: true, recorded: 3, message: '' });
+    });
+
+    it('the server admits fewer than the screen drew: a degree it never admitted expands from what it did admit, and Save completes', async () => {
+        const t = setup();
+        // the presets (a window, a row budget) cut degree 1 on the server: it admits only z, never b or c
+        const sent = serve(t, (ids) => (ids[0] === 'a' ? ['z'] : ['y']));
+        begin(t, [['a'], ['b', 'c']]);
+        const out = await t.store.saveUnsaved('n', 'p');
+        expect(sent.map((o) => o['ids'])).toEqual([['a'], ['a'], ['z']]); // never b or c: no 422
+        expect(out).toEqual({ created: true, recorded: 3, message: '' });
+        expect(t.store.workingSet()!.entities.map((e) => e.id)).toEqual(['a', 'z', 'y']);
+    });
+
+    it('on a masked Space the drawn aliases are spoken in this Investigation\'s own ids before they are sent', async () => {
+        const t = setup();
+        // synthetic aliases: the explorer drew the Space's alias sp-*, the Investigation names them inv-*
+        const aliases = { 'inv-1a': 'sp-1a', 'inv-2b': 'sp-2b' };
+        const sent = serve(t, (ids) => (ids[0] === 'inv-1a' ? ['inv-2b'] : []), aliases);
+        begin(t, [['sp-1a'], ['sp-2b']], ['sp-1a']);
+        const out = await t.store.saveUnsaved('n', 'p');
+        expect(sent.map((o) => o['ids'])).toEqual([['sp-1a'], ['inv-1a'], ['inv-2b']]);
+        expect(out.recorded).toBe(3);
+        expect(out.message).toBe('');
+    });
+
+    it('an Expand refused at its degree 2 counts the degree already recorded', async () => {
+        const t = setup();
+        serve(t, () => ['b']);
+        const impl = t.inv.appendInvestigationOp.getMockImplementation()!;
+        let n = 0;
+        t.inv.appendInvestigationOp.mockImplementation((id: string, op: Record<string, unknown>) =>
+            ++n === 3 ? throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } })) : impl(id, op),
+        );
+        begin(t, [['a'], ['b']]);
+        const out = await t.store.saveUnsaved('n', 'p');
+        expect(out.recorded).toBe(2); // the seed and degree 1
+        expect(out.message).toContain('Saved with 2 steps. Step 2');
+        expect(t.store.error()).toBe(out.message);
+    });
+});

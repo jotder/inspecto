@@ -163,6 +163,72 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         expect(await store.undoLast()).toBe(false); // nothing of ours left: the screen's own Undo runs
     });
 
+    describe('Degrees bound to the last Expand (LA-DEGREES-TRIM-1)', () => {
+        const three = () => [step(), step({ delta: { ...step().delta, admitted: ['d'] } }), step({ delta: { ...step().delta, admitted: ['e'] } })];
+
+        it('lowering 3 to 1 undoes the outer two degrees, newest first, each naming its step', async () => {
+            const { store, session } = create({}, three());
+            await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {});
+            expect(store.lastExpandDegrees()).toBe(3);
+            expect(await store.trimLastExpand(1)).toBe(true);
+            expect(session.undo.mock.calls).toEqual([[3], [2]]); // the first degree stays
+            expect(store.lastExpandDegrees()).toBe(1);
+            expect(store.lastChange()?.text).toBe('Lowered to 1 degree: the outer 2 degrees of the last Expand removed from the Working Set (2 steps undone, kept in the log).');
+        });
+
+        it('is not bound once another step follows (a colleague’s, or a click elsewhere): nothing is trimmed', async () => {
+            const { store, session } = create({}, three());
+            await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {});
+            await session.apply({ op: 'hide', ids: ['x'] });
+            expect(store.lastExpandDegrees()).toBeNull();
+            expect(await store.trimLastExpand(1)).toBe(false);
+            expect(session.undo).not.toHaveBeenCalled();
+        });
+
+        it('stops at a refused undo (a team member’s newer step) and keeps the degrees it could not remove', async () => {
+            const { store, session } = create({}, three());
+            await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {});
+            session.undo.mockImplementationOnce(async (undoes?: number) => {
+                session.error.set(`Refused - step ${undoes} is not the newest step any more`);
+                return false;
+            });
+            expect(await store.trimLastExpand(1)).toBe(false);
+            expect(session.undo.mock.calls).toEqual([[3]]);
+            expect(store.lastExpandDegrees()).toBe(3);
+            expect(store.lastChange()?.text).toContain('not the newest step');
+        });
+
+        it('raising expands further and joins the same Expand; a fresh Expand starts its own', async () => {
+            const { store } = create({}, three());
+            await store.growInvestigation(CTX, REQ, {});
+            expect(store.lastExpandDegrees()).toBe(1);
+            await store.growInvestigation(CTX, { ...REQ, degrees: 2 }, {}, true);
+            expect(store.lastExpandDegrees()).toBe(3);
+            await store.growInvestigation(CTX, REQ, {});
+            expect(store.lastExpandDegrees()).toBe(1);
+        });
+
+        it('Undo of a raise leaves the Expand it joined as the bound one again', async () => {
+            const { store } = create({}, three());
+            await store.growInvestigation(CTX, REQ, {});
+            await store.growInvestigation(CTX, { ...REQ, degrees: 2 }, {}, true);
+            expect(store.lastExpandDegrees()).toBe(3);
+            expect(await store.undoLast()).toBe(true);
+            expect(store.lastExpandDegrees()).toBe(1);
+        });
+
+        it('Save binds the Expand it replayed last, but only to Expand steps', async () => {
+            const { store, session } = create();
+            await session.apply({ op: 'seed', ids: ['a'] });
+            await session.apply({ op: 'expand', ids: ['a'] });
+            await session.apply({ op: 'expand', ids: ['b'] });
+            store.bindLastExpand(2);
+            expect(store.lastExpandDegrees()).toBe(2);
+            store.bindLastExpand(3); // would take the seed in
+            expect(store.lastExpandDegrees()).toBe(2);
+        });
+    });
+
     it('stops at the frontier cap with a message naming the degree reached; the degrees made stay one Undo', async () => {
         const wide = step({ delta: { ...step().delta, admitted: ['b', 'c', 'd'] } });
         const { store, applied } = create({}, [wide]);

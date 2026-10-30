@@ -25,7 +25,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **78<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 62<!--count:backlog-p3--> × P3** —
+> **79<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 63<!--count:backlog-p3--> × P3** —
+> ⬇ **80 → 79 (P2 17 → 16) on 2026-10-30**: closed P2 `LA-UNSAVED-INVESTIGATION-1` (shipped, `f83bce424`…`226571957`; known limit: an unsaved Working Set larger than `input.max_ids` is refused with 422); `LA-DEGREES-TRIM-1` shipped (residual `LA-DEGREES-TRIM-2`).
+> ⬆ **79 → 80 (P3 62 → 63) on 2026-10-30**: filed P3 feature `LA-DEGREES-TRIM-2` (the Degrees stepper binds to a reopened Investigation's last Expand).
+> ⬆ **78 → 79 (P2 16 → 17) on 2026-10-29**: filed P2 feature `LA-UNSAVED-INVESTIGATION-1` (start and Expand unsaved, Name and Purpose asked on Save, which replays the steps; the Investigation tab simplified; plan in `archived-documents/plans-archive/la-unsaved-investigation.md`).
 > ⬇ **79 → 78 (P3 63 → 62) on 2026-10-29**: closed P3 defect `INTELLIGENCE-GLOSSARY-ANNOTATED-1` — `GlossaryLoader` returns whole entries (continuation lines joined, annotated entries parsed, `A / B` answers for each half) and `docs_search` reads user-facing docs only; as built in `okf/product/module/intelligence/user-guide-inline-ai-authoring.md`.
 > ↔ **79 (P2 17 → 16, P3 62 → 63) on 2026-10-29**: closed P2 chore `LA-UI-TEXT-PASS-1` (two passes shipped, plan archived) and filed its residuals as P3 chore `LA-UI-TEXT-RESIDUALS-1`.
 > ⬆ **78 → 79 (P2 16 → 17) on 2026-10-29**: filed P2 feature `LA-PRODUCT-NEXT-1` (the LA feature brainstorm's five phases; phase 1 brings role and access-policy edits under maker-checker; plan in `superpower/la-product-next-plan.md`).
@@ -369,10 +372,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 62<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 62<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 78<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 79<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -673,6 +676,7 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
   - **Open call:** the Dossier states the title and purpose sealed at create, not the edited ones. Decide whether it should also show the edit (outside the hashed manifest).
 - **P3** · `LA-WHITEPAPER-DEMO-1` — **narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal record (11 PASS, T2 PARTIAL because no Risk Score model ships, T13 evidence only).** **Re-walked 2026-10-28 on today's build:** 11 PASS, T2 FAIL (the Risk Score Job scores 96 accounts but the Studio's Factors look-up sends the masked alias: `LA-SUSPICION-FACTORS-MASKED-1`), T13 evidence only; T11's viewer was missing from the console build (`LA-CONSOLE-EMBED-VIEWER-1`, fixed the same day; the public read itself PASS). Still owed: one spoken rehearsal with a sceptical second person, timed against 45 and 35 minutes. The two calls (Demo Users for a rehearsal, a real IdP sign-in only for the real review; keep T12 in the technical cut) were CONFIRMED by the operator 2026-10-25. → `okf/product/module/la-core/admin-guide-demo.md` section 9; `superpower/link-analysis-roadmap.md` §D2 [items: module.la-core · kind: chore · hold: external]
 - **P3** · `LA-SUSPICION-FACTORS-INVESTIGATION-1` — **an Investigation canvas's *Factors* still 404 on a masked Space (residual of `LA-SUSPICION-FACTORS-MASKED-1`, 2026-10-28).** An Investigation masks ids with its own per-Investigation key (`FsInvestigationStore.maskKey`, `EntityMasking`), not the Space key exploration uses, so `GET /risk-scores/{model}/{alias}` cannot resolve its alias. Fix: the Studio passes the Investigation id and the route resolves under that key after the Investigation read gate, or Investigations move to the Space key. Re-walk T2 on `mule-hub-case`. [items: module.la-core, module.scoring · kind: defect]
+- **P3** · `LA-DEGREES-TRIM-2` — **bind the Degrees stepper to the last Expand of a reopened saved Investigation (residual of `LA-DEGREES-TRIM-1`, 2026-10-30).** The stepper resizes the newest Expand only for one made (or saved) in this browser, because the step log records no grouping of an Expand's degrees; after a reload it is the next Expand's request again. Fix needs a group id on the `expand` step params (server) or a derivation rule agreed with the operator. [items: module.la-core · kind: feature]
 
 ## 4. Engineering platform — build, test, CI & tooling
 

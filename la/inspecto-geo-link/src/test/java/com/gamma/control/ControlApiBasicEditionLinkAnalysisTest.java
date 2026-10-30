@@ -79,6 +79,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
             new String[]{"GET", "/inv/investigations"},                       // InvestigationRoutes
             new String[]{"POST", "/inv/investigations"},                      // InvestigationRoutes (a write)
             new String[]{"POST", "/inv/investigations/x/expand/preview"},     // InvestigationRoutes: the Grow preview (LA-GROW-EXCLUDE-1)
+            new String[]{"POST", "/inv/expand/preview"},                      // InvestigationRoutes: the unsaved preview (LA-UNSAVED-INVESTIGATION-1)
             new String[]{"GET", "/inv/investigations/x/dossier"},             // DossierRoutes
             new String[]{"GET", "/inv/investigations/x/dossier/bundle"},      // DossierBundleRoutes
             new String[]{"GET", "/inv/investigations/x/drafts"},              // DraftRoutes

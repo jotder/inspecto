@@ -370,6 +370,34 @@ export interface ExpandRung {
     only?: string[];
 }
 
+/** \`POST /inv/expand/preview\` (LA-UNSAVED-INVESTIGATION-1): a create's binding and the seed / expand bodies, in order. */
+export interface UnsavedPreviewRequest {
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    linkKindCol?: string;
+    timeCol?: string;
+    timeColZone?: string;
+    eventsCol?: string;
+    entityType?: string;
+    steps: InvestigationOpRequest[];
+}
+
+/** One step of the unsaved preview: what it admitted, or the four-eyes thresholds it crossed (the walk stops there). */
+export interface UnsavedPreviewStep {
+    step: number;
+    op?: string;
+    needsApproval: boolean;
+    admitted?: string[];
+    exceeded?: string[];
+}
+
+export interface UnsavedPreviewResult {
+    workingSet: WorkingSet;
+    steps: UnsavedPreviewStep[];
+    masked: boolean;
+}
+
 /** `POST /inv/investigations` — bound to one Dataset + the projection's columns. */
 export interface InvestigationCreateRequest {
     id?: string;
@@ -2208,6 +2236,14 @@ export class InvService {
     /** A dry run of one `expand` body over the Investigation (nothing sealed, no step). */
     previewExpand(id: string, body: Extract<InvestigationOpRequest, { op: 'expand' }>): Observable<GrowPreview> {
         return this.http.post<GrowPreview>(invPath(id, 'expand/preview'), body);
+    }
+
+    /**
+     * LA-UNSAVED-INVESTIGATION-1: the unsaved Investigation's dry run (\`POST /inv/expand/preview\`) - the Working Set its
+     * seed / expand steps would build, evaluated by the same code as the step route, so the screen draws what Save records.
+     */
+    previewUnsaved(req: UnsavedPreviewRequest): Observable<UnsavedPreviewResult> {
+        return this.http.post<UnsavedPreviewResult>(apiUrl('/inv/expand/preview'), req);
     }
 
     /** The explorer's (Basic) dry run: what ONE neighbours step from `req.ids` would add. */

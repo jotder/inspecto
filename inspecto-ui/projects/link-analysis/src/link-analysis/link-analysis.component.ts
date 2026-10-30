@@ -71,7 +71,7 @@ import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-star
 import {
     START_MAX_SEEDS,
     StartDataset,
-    NewInvestigationRequest,
+    UnsavedStartRequest,
     StartRequest,
     datasetForType,
     genericBinding,
@@ -97,13 +97,14 @@ import {
     parseInvestigateParams,
     sameInvestigateRequest,
 } from './investigate-number';
-import { degreeState } from './investigate-number';
+import { degreeState, expandApproval } from './investigate-number';
 import { GrowExcludeStore } from './grow-exclude.store';
 import {
     ExpandSource,
     GrowContext,
     GrowRequest,
     drawnValues,
+    growIds,
     frontierCapStop,
     filterExpansion,
     growKeepsEdge,
@@ -113,7 +114,24 @@ import {
     removedRows,
     withUndrawnLinks,
 } from './grow-exclude';
-import { ExpandRun, LinkAnalysisExpandComponent } from './link-analysis-expand.component';
+import { ExpandDegreesChange, ExpandRun, LinkAnalysisExpandComponent } from './link-analysis-expand.component';
+import { SAVE_NEEDS } from './link-analysis-start-box.component';
+import {
+    LinkAnalysisSaveInvestigationDialog,
+    SaveInvestigationDialogData,
+    SaveInvestigationDialogResult,
+} from './link-analysis-save-investigation.dialog';
+import {
+    UNSAVED_FOUR_EYES,
+    UNSAVED_FOUR_EYES_START,
+    UnsavedBinding,
+    UnsavedStep,
+    expandStepDegrees,
+    extendExpandStep,
+    trimExpandStep,
+    unsavedStepLine,
+} from './unsaved-investigation';
+import type { WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
 import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.component';
 import { ExcludeDialogData, ExcludeDialogResult, LinkAnalysisExcludeDialog } from './link-analysis-exclude.dialog';
@@ -150,6 +168,7 @@ import {
 import { workingSetStats, attrColumns, isTemporalColumn } from '@inspecto/link-analysis/graph/working-set-stats';
 import {
     DEFAULT_MAX_DEGREE,
+    DegreePresets,
     DomainProfileId,
     activeDomainProfileId,
     domainProfile,
@@ -286,7 +305,7 @@ import { foldBranches, foldableOf } from '@inspecto/link-analysis/graph/graph-cl
 import { autoStyle } from './auto-style';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
-import { idsInWorkingSet, mergePairOf, rawIdsOf } from './investigation-state';
+import { idsInWorkingSet, mergePairOf, rawIdsOf, workingSetToGraph } from './investigation-state';
 import type { ColDef } from 'ag-grid-community';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
@@ -416,11 +435,12 @@ export function nodeDisplayId(id: string, types: readonly (string | null | undef
 }
 
 /** The bottom dock's tabs (§5.9); `inv` = an Investigation tab. */
-export type DockTab = 'rows' | InvestigationSection | 'results';
+export type DockTab = 'rows' | 'steps' | InvestigationSection | 'results';
 /** The right dock's tabs (LA-PANELS-REDESIGN-1). */
 export type ToolboxTab = 'browser' | 'server' | 'investigation';
-const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean }[] = [
+const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean; unsaved?: boolean }[] = [
     { id: 'rows', label: 'Rows' },
+    { id: 'steps', label: 'Steps', unsaved: true },
     { id: 'oplog', label: 'Step log', inv: true },
     { id: 'ws-rows', label: 'Working Set rows', inv: true },
     { id: 'coverage', label: 'Coverage', inv: true },
@@ -439,6 +459,25 @@ function readDock(): { open: boolean; tab: DockTab } {
     return { open: false, tab: 'rows' };
 }
 
+/**
+ * The Working Set so far plus one previewed degree: entities and links joined (a new entity one hop past the furthest),
+ * the busy flags the preview read kept. \`seeds\` (a Start from selected) are start entities, hop 0.
+ */
+export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: readonly string[] = []): WorkingSet {
+    const hop = prev.entities.length ? Math.max(...prev.entities.map((e) => e.hop)) + 1 : 1;
+    const start = new Set(seeds);
+    const entities = new Map(prev.entities.map((e) => [e.id, e]));
+    for (const e of next.entities) {
+        const had = entities.get(e.id);
+        if (had) {
+            if (e.highConnectivity && !had.highConnectivity) entities.set(e.id, { ...had, highConnectivity: true });
+        } else entities.set(e.id, { ...e, hop: start.has(e.id) || (!prev.entities.length && e.hop === 0) ? 0 : hop });
+    }
+    const key = (l: WorkingSet['links'][number]) => `${l.source}\u0000${l.target}\u0000${l.kind}`;
+    const links = new Map(prev.links.map((l) => [key(l), l]));
+    for (const l of next.links) if (!links.has(key(l))) links.set(key(l), l);
+    return { entities: [...entities.values()], links: [...links.values()], excluded: [], hash: '' };
+}
 @Component({
     selector: 'inspecto-link-analysis',
     standalone: true,
@@ -511,6 +550,7 @@ function readDock(): { open: boolean; tab: DockTab } {
         }
     `,
     host: {
+        '(window:beforeunload)': 'onBeforeUnload($event)',
         '(document:fullscreenchange)': 'onFullscreenChange()',
         '(document:keydown)': 'onHistoryKeydown($event)',
     },
@@ -1527,10 +1567,17 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly dockShown = computed(() => !!this.graph() || this.workingSetCanvas() || !!this.investigation.active());
     /** The dock's chosen tab; an Investigation tab falls back to Rows while none is open (see `dockTabShown`). */
     readonly dockTab = signal<DockTab>(readDock().tab);
-    /** The dock's tabs: Rows always; the Investigation's only while one is open, and never on the Explorer level. */
-    readonly dockTabs = computed<readonly { id: DockTab; label: string }[]>(() =>
-        this.investigationsEnabled() && this.investigation.active() ? DOCK_TABS : DOCK_TABS.filter((t) => !t.inv),
-    );
+    /**
+     * The dock's tabs: Rows and Results always; the Investigation's only while one is open (never on the Explorer level);
+     * Steps only while an unsaved Investigation is (an open one has the Step log).
+     */
+    readonly dockTabs = computed<readonly { id: DockTab; label: string }[]>(() => {
+        const open = this.investigationsEnabled() && !!this.investigation.active();
+        const unsaved = this.investigationsEnabled() && !!this.investigation.unsaved();
+        return DOCK_TABS.filter((t) => (t.inv ? open : t.unsaved ? unsaved : true));
+    });
+    /** The unsaved Investigation's steps in order, one line each (the dock's Steps tab). */
+    readonly unsavedStepLines = computed<readonly string[]>(() => (this.investigation.unsaved()?.steps ?? []).map(unsavedStepLine));
     readonly dockTabShown = computed<DockTab>(() =>
         this.dockTabs().some((t) => t.id === this.dockTab()) ? this.dockTab() : 'rows',
     );
@@ -2084,35 +2131,27 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly canStartInvestigation = computed(() => this.lens.canManageIncidents());
 
     /**
-     * File ▸ New (LA-PANELS-REDESIGN-1): close what is open, then - on the Investigations level - show the ONE New
-     * Investigation form in the Investigation tab. The Explorer level lands on the start box.
-     */
-    /**
-     * The start box's *New Investigation…* (Investigations level). Nothing is drawn on the landing, so there is nothing to
-     * close: the tab switches at once, as File ▸ New lands. A pending deep-link form or queued seeds would hide the New
-     * form, so they are dropped - the analyst asked for a new one.
+     * The centre pointer "Start from the Investigation tab →" (LA-UNSAVED-INVESTIGATION-1 D1): the start form lives only in
+     * the Investigation tab. A pending deep-link form or queued seeds would hide it, so they are dropped.
      */
     openNewInvestigation(): void {
         if (!this.investigationsEnabled()) return;
         this.pendingInvestigation.set(null);
         this.investigation.clearQueuedSeeds();
         this.openInvestigation();
-        this.newInvForm?.resetNew(); // a new one starts fresh, never with the last typed Name
     }
 
-    /**
-     * The Investigation tab's New Investigation form is on screen (Investigations level, the dock open on that tab, nothing
-     * open, no pending or queued start): the centre start box then gives way to a pointer, so two forms never do one job.
-     */
-    readonly newFormInDock = computed(
-        () =>
-            this.investigationsEnabled() &&
-            this.toolboxDockOpen() &&
-            this.toolboxTab() === 'investigation' &&
-            !this.investigation.active() &&
-            !this.pendingInvestigation() &&
-            !this.investigation.queuedSeeds().length,
-    );
+    /** The picked Dataset's columns, for the start form's Time column picker. */
+    readonly startColumns = signal<{ name: string; type: string }[]>([]);
+    async readStartColumns(datasetId: string): Promise<void> {
+        const ds = (await this.datasetsLoaded).find((d) => d.id === datasetId);
+        try {
+            const cols = ds ? await this.datasetRows.columns(ds) : [];
+            this.startColumns.set(cols.map((c) => ({ name: c.name, type: c.type })));
+        } catch {
+            this.startColumns.set([]); // the picker offers the Dataset's own time column only
+        }
+    }
 
     /** The graph on screen, for the New form's *The graph on screen* (a seedless Investigation over its mapping). */
     readonly graphOnScreen = computed<{ name: string } | null>(() => {
@@ -2126,59 +2165,55 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         await this.closeOpenWork();
         if (this.openWorkLabel() || !this.investigationsEnabled()) return; // Close was declined, or there is no Investigation
         this.openInvestigation();
-        this.newInvForm?.resetNew(); // a new one starts fresh, never with the last typed Name
+        this.newInvForm?.resetNew(); // a new one starts fresh
+    }
+
+    /** The ring a start draws (`drawStart`): one degree both ways, busy neighbours held at the Space's busy limit. */
+    private startRing(degrees = 1): GrowRequest {
+        return { direction: 'either', degrees, linkKinds: null, hold: true, threshold: this.growThreshold() };
     }
 
     /**
-     * The New Investigation form's answer: create the Investigation, record the start as its seed step and expand
-     * `degrees` degrees with the profile's presets - one press, no second form (LA-PANELS-REDESIGN-1). One entity binds as
-     * a deep link does (a Domain Profile's mapping, else the Dataset's); a list or a paste is drawn first and its found
-     * values are seeded; the whole Dataset is drawn and an Investigation is created over its mapping, with no seed.
+     * The start form's answer (LA-UNSAVED-INVESTIGATION-1 D2): draw the start on the explorer graph and work UNSAVED - no
+     * Name or Purpose, nothing on the server. One entity binds as a deep link does (a Domain Profile's mapping, else the
+     * Dataset's); a list or a paste binds generically. The values found are recorded as a `seed` step and the drawn ring as
+     * an `expand` from the outer ring; Degrees above one walk further. The whole Dataset and the graph on screen start
+     * seedless. Save (`saveUnsaved`) asks for the Name and Purpose and records the steps.
      */
-    async createInvestigation(req: NewInvestigationRequest): Promise<void> {
+    async startUnsaved(req: UnsavedStartRequest): Promise<void> {
         if (!this.investigationsEnabled() || this.starting() || this.investigation.chainRunning()) return;
+        if (!(await this.leaveUnsaved())) return;
+        this.startNotice.set(null);
+        this.investigateIssue.set('');
+        this.unsavedWs.set(null);
+        const zone = req.timeColZone || undefined;
+        const common = { presets: this.degreePresets(), maxDegree: this.maxDegree(), profileId: activeDomainProfileId() };
         if (req.start.kind === 'graph') {
-            // A seedless Investigation over the graph on screen (a saved view, a custom Explore dataset… mapping), as the
-            // old projection start did: the drawn graph's one mapping, the query's filter not carried over.
             const p = this.investigationProjection();
             if (!p) return;
-            this.startNotice.set(null);
-            this.investigateIssue.set('');
-            const started = await this.investigation.start(
-                p,
-                req.purpose,
-                req.title,
-                req.timeCol || this.investigationTimeDefault(),
-                req.timeColZone,
+            this.investigation.beginUnsaved(
+                { ...common, projection: p, timeCol: req.timeCol || this.investigationTimeDefault() || undefined, timeColZone: zone },
+                req.defaults,
             );
-            if (started) this.showSeedlessStart();
             return;
         }
         const start = req.start;
         const ds = this.startCatalogue().datasets.find((d) => d.id === start.datasetId);
         if (!ds) return;
         this.forgetOpenView();
-        this.startNotice.set(null);
-        this.investigateIssue.set('');
         if (start.kind === 'dataset') {
             await this.startFrom(start);
-            if (!this.graph()) return; // the draw failed (its error is on screen): nothing is created
-            this.investigation.close();
+            if (!this.graph()) return; // the draw failed (its error is on screen)
             this.boundProfile.set(activeDomainProfileId());
-            const started = await this.investigation.start(
-                ds.mapping,
-                req.purpose,
-                req.title,
-                req.timeCol || ds.timeCol,
-                req.timeColZone,
-                undefined,
-                ds.mapping.entityType,
-                activeDomainProfileId(),
+            this.investigation.beginUnsaved(
+                { ...common, projection: ds.mapping, timeCol: req.timeCol || ds.timeCol, timeColZone: zone },
+                req.defaults,
             );
-            if (started) this.showSeedlessStart();
             return;
         }
         let binding: PendingInvestigation;
+        let values: string[];
+        let entityType: string | undefined;
         if (start.kind === 'entity') {
             const bound = await this.bindInvestigation({ seed: start.value, entityType: start.entityType, dataset: ds.id });
             if ('reason' in bound) {
@@ -2186,40 +2221,406 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 return;
             }
             binding = bound.binding;
+            values = [binding.seed];
+            entityType = start.entityType;
         } else {
-            const values = await this.startValues(start);
-            if (!values) return;
-            const found = await this.drawStart(ds, values.values, values.entityType);
-            if (!found.length) return;
-            const name =
-                start.kind === 'list'
-                    ? (this.entityLists().find((l) => l.id === start.listId)?.title ?? 'list')
-                    : `${found.length} pasted values`;
-            const generic = genericBinding(name, values.entityType ?? '', ds, activeDomainProfileId());
-            // the projection the draw used: the start's own type, else the Dataset's mapping as it is
-            binding = { ...generic, ...(values.entityType ? {} : { projection: ds.mapping }), seeds: found };
+            const v = await this.startValues(start);
+            if (!v) return;
+            values = v.values;
+            entityType = v.entityType;
+            const name = start.kind === 'list' ? (this.entityLists().find((l) => l.id === start.listId)?.title ?? 'list') : 'pasted values';
+            const generic = genericBinding(name, entityType ?? '', ds, activeDomainProfileId());
+            binding = { ...generic, ...(entityType ? {} : { projection: ds.mapping }) };
             const laDs = (await this.datasetsLoaded).find((d) => d.id === ds.id);
             const windowEnd = laDs ? await this.latestEventTime(laDs, binding.timeCol) : null;
             if (windowEnd) binding = { ...binding, windowEnd };
         }
-        this.investigation.close();
-        this.boundProfile.set(binding.profileId);
-        const ok = await this.investigation.investigateNumber({
+        if (this.heldUnsaved(binding.presets)) {
+            this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
+            return;
+        }
+        const drawn = await this.drawStart(ds, values, entityType);   // finds the values the Dataset holds
+        if (!drawn.length) return;
+        // the start entities as the Space's reads name them: an alias on a masked Space (the preview takes no raw value there)
+        const startNodes = new Set(this.expandedNodeIds());
+        const found = [...new Set((this.graph()?.nodes ?? []).filter((n) => startNodes.has(n.id)).flatMap((n) => rawIdsOf(n)))];
+        const unsaved: UnsavedBinding = {
             projection: binding.projection,
-            purpose: req.purpose,
-            title: req.title,
             timeCol: req.timeCol || binding.timeCol,
-            timeColZone: req.timeColZone,
+            timeColZone: zone,
             eventsCol: binding.eventsCol,
-            seed: binding.seed,
-            seeds: binding.seeds,
             presets: binding.presets,
             maxDegree: binding.maxDegree,
-            degrees: req.degrees,
             windowEnd: binding.windowEnd,
             profileId: binding.profileId,
+        };
+        const type = binding.projection.entityType;
+        const seed: UnsavedStep = { kind: 'seed', ids: found, ...(type ? { entityType: type } : {}) };
+        // the ring and the further degrees, read by the server with the presets: the screen is what Save records
+        const walk = await this.walkUnsaved(unsaved, null, found, found, this.startRing(Math.max(1, req.degrees)));
+        if (!walk) {
+            this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
+            return;
+        }
+        this.boundProfile.set(binding.profileId);
+        this.investigation.beginUnsaved(unsaved, req.defaults, [
+            seed,
+            { kind: 'expand', from: 'ids', ids: found, req: this.startRing(walk.walked.length), walked: walk.walked, stages: walk.stages },
+        ]);
+        this.drawUnsaved(walk.ws, unsaved);
+        this.openInvestigation();
+    }
+
+    /**
+     * An Expand while unsaved: refused when the Space would hold it for four-eyes approval (a held step needs a recorded
+     * Investigation), else the explorer's Grow, recorded as one unsaved step. Its Undo drops the step too.
+     */
+    private async expandUnsaved(ctx: GrowContext, req: GrowRequest, from: string | null): Promise<boolean> {
+        const u = this.investigation.unsaved();
+        if (!u) return false;
+        if (this.heldUnsaved(u.binding.presets)) {
+            this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+            this.toastr.info(UNSAVED_FOUR_EYES);
+            return false;
+        }
+        const named = this.rawNamed(growIds(ctx, req));
+        const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld(), ws: this.unsavedWs() };
+        const walk = await this.walkUnsaved(u.binding, this.unsavedWs(), [], named, req);
+        if (!walk) {
+            this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+            this.toastr.info(UNSAVED_FOUR_EYES);
+            return false;
+        }
+        if (!walk.walked.length) {
+            this.growExclude.lastChange.set({ text: 'There is nothing to expand from yet.' });
+            return false;
+        }
+        // each degree's frontier, as the server read it: Save sends exactly these lists
+        const step: UnsavedStep = { kind: 'expand', from: from === 'outer' ? 'outer' : 'ids', ids: from === 'outer' ? [] : named, req, walked: walk.walked, stages: walk.stages };
+        this.investigation.recordUnsaved(step);
+        const added = walk.ws.entities.length - (before.graph?.nodes.length ?? 0);
+        this.drawUnsaved(walk.ws, u.binding);
+        const after = this.graph();
+        const t = ctx.terms;
+        const text = `Expanded ${walk.walked.length === 1 ? 'one degree' : walk.walked.length + ' degrees'}: added ${Math.max(0, added).toLocaleString('en-GB')} ${added === 1 ? t.node : t.nodes} (not saved yet).`;
+        this.growExclude.lastChange.set({
+            text,
+            valid: () => this.graph() === after,
+            undo: () => {
+                this.graph.set(before.graph);
+                this.expandedNodeIds.set(before.expanded);
+                this.growExclude.basicHeld.set(before.held);
+                this.unsavedWs.set(before.ws);
+                this.investigation.popUnsaved();
+                this.growExclude.lastChange.set({ text: 'Undone.' });
+            },
         });
-        if (ok || this.investigation.active()) this.openInvestigation();
+        this.drawAnnouncement.set(text);
+        return true;
+    }
+
+    /** The unsaved Working Set on the canvas, as the server previewed it (each preview sends it, not the step history). */
+    private readonly unsavedWs = signal<WorkingSet | null>(null);
+
+    /**
+     * Walk an unsaved Expand degree by degree through the server's preview (\`POST /inv/expand/preview\`, the step route's own
+     * code, with the presets and the fold filters of \`req\`): each request sends the Working Set so far as ONE seed and the
+     * ONE degree it walks next - never the history, so its cost does not grow with it - and merges what that degree admitted.
+     * Each degree expands from what the previous one admitted, less the busy entities held. On a masked Space every id is
+     * an alias the Space served. Null when a degree would be held for four-eyes approval (it cannot run unsaved).
+     */
+    private async walkUnsaved(
+        b: UnsavedBinding,
+        current: WorkingSet | null,
+        seeds: string[],
+        from: string[],
+        req: GrowRequest,
+    ): Promise<{ walked: string[][]; stages: WorkingSet[]; ws: WorkingSet } | null> {
+        const walked: string[][] = [];
+        const stages: WorkingSet[] = [];
+        const cap = laLimit('investigation.max_frontier');
+        let frontier = from.slice(0, cap);
+        let ws: WorkingSet = current ?? { entities: [], links: [], excluded: [], hash: '' };
+        let extra = seeds;
+        for (let d = 1; d <= Math.max(1, req.degrees) && frontier.length; d++) {
+            const held = [...new Set([...ws.entities.map((e) => e.id), ...extra])];
+            const res = await this.investigation.previewUnsaved(
+                [
+                    { kind: 'seed', ids: held },
+                    { kind: 'expand', from: 'ids', ids: frontier, req, walked: [frontier] },
+                ],
+                b,
+            );
+            const last = res.steps.at(-1);
+            if (last?.needsApproval) return null;
+            walked.push(frontier);
+            ws = mergeWorkingSets(ws, res.workingSet, extra);
+            stages.push(ws);
+            extra = [];
+            const busy = new Set(ws.entities.filter((e) => e.highConnectivity).map((e) => e.id));
+            frontier = (last?.admitted ?? []).filter((id) => !req.hold || !busy.has(id)).slice(0, cap);
+        }
+        return { walked, stages, ws };
+    }
+
+    /** Canvas ids as the Space's reads name them: every spelling a drawn node stands for (an alias on a masked Space). */
+    private rawNamed(ids: string[]): string[] {
+        const nodes = this.graph()?.nodes ?? [];
+        return [
+            ...new Set(
+                ids.flatMap((id) => {
+                    const n = nodes.find((x) => x.id === id);
+                    return n ? rawIdsOf(n) : [id];
+                }),
+            ),
+        ];
+    }
+
+    /**
+     * LA-DEGREES-TRIM-1: the Degrees of the last Expand while the newest step is an Expand (the Expand form's stepper then
+     * resizes it); null = the stepper is only the next Expand's request.
+     */
+    readonly lastExpandDegrees = computed<number | null>(() => {
+        const u = this.investigation.unsaved();
+        const n = u ? expandStepDegrees(u.steps.at(-1)) : this.investigation.activeId() ? this.growExclude.lastExpandDegrees() : null;
+        return n !== null && n <= this.maxDegree() ? n : null;
+    });
+    /** One lock for an Expand and a Degrees resize: either one, while the other runs, would draw over a Working Set it never saw. */
+    private expandBusy = false;
+
+    /** The context of the outer ring alone (what raising Degrees expands from), whatever the form's "From" says. */
+    private outerContext(): GrowContext {
+        const ctx = this.growContext();
+        const o = ctx.sources?.find((s) => s.value === 'outer');
+        return o ? { ...ctx, frontier: o.frontier, heldFrontier: o.heldFrontier, from: o.from, blocked: ctx.blocked ?? o.blocked } : ctx;
+    }
+
+    /**
+     * LA-DEGREES-TRIM-1: the Degrees stepper moved on the last Expand. Lower: its outermost degrees leave the Working Set
+     * and the recorded step (unsaved: the step is cut and the canvas redrawn; saved: those steps are undone). Higher: more
+     * degrees expand from the outer ring and join the same Expand. The stepper then shows what the Expand really is.
+     */
+    async onDegreesChange({ degrees, req }: ExpandDegreesChange): Promise<void> {
+        const have = this.lastExpandDegrees();
+        if (this.expandBusy || have === null || degrees === have) return this.tabExpand?.syncDegrees();
+        this.expandBusy = true;
+        try {
+            const ctx = this.outerContext();
+            // the stepper changes Degrees only: an unsaved Expand grows with its OWN request, the one Save replays
+            const own = this.investigation.unsaved()?.steps.at(-1);
+            const asked = own?.kind === 'expand' ? own.req : req;
+            if (degrees > have) {
+                if (ctx.blocked) {
+                    this.growExclude.lastChange.set({ text: ctx.blocked });
+                    return;
+                }
+                if (!asked.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
+            }
+            const more = { ...asked, degrees: degrees - have };
+            if (this.investigation.unsaved()) await this.resizeUnsaved(degrees, have, ctx, more);
+            else if (degrees < have) await this.growExclude.trimLastExpand(degrees);
+            else if (!(await this.growExclude.growInvestigation(ctx, more, this.degreePresets(), true)))
+                this.toastr.error(this.investigation.error() || 'The Expand was refused.');
+        } finally {
+            this.expandBusy = false;
+            this.tabExpand?.syncDegrees();
+        }
+    }
+
+    private async resizeUnsaved(degrees: number, have: number, ctx: GrowContext, more: GrowRequest): Promise<void> {
+        const u = this.investigation.unsaved();
+        const step = u?.steps.at(-1);
+        if (!u || !step) return;
+        const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld(), ws: this.unsavedWs(), step };
+        let next: UnsavedStep;
+        let ws: WorkingSet;
+        if (degrees < have) {
+            const cut = trimExpandStep(step, degrees);
+            if (!cut) return;
+            next = cut.step;
+            ws = cut.ws;
+        } else {
+            if (this.heldUnsaved(u.binding.presets)) {
+                this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+                this.toastr.info(UNSAVED_FOUR_EYES);
+                return;
+            }
+            const walk = await this.walkUnsaved(u.binding, before.ws, [], this.rawNamed(growIds(ctx, more)), more);
+            if (!walk) {
+                this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+                this.toastr.info(UNSAVED_FOUR_EYES);
+                return;
+            }
+            if (!walk.walked.length) {
+                this.growExclude.lastChange.set({ text: 'There is nothing to expand from yet.' });
+                return;
+            }
+            next = extendExpandStep(step, walk);
+            ws = walk.ws;
+        }
+        this.investigation.replaceLastUnsaved(next);
+        this.drawUnsaved(ws, u.binding);
+        const after = this.graph();
+        const moved = Math.abs(ws.entities.length - (before.ws?.entities.length ?? 0));
+        const to = expandStepDegrees(next) ?? degrees;
+        const t = ctx.terms;
+        const text =
+            degrees < have
+                ? `Lowered to ${to === 1 ? 'one degree' : to + ' degrees'}: removed ${moved.toLocaleString('en-GB')} ${moved === 1 ? t.node : t.nodes} and the ${t.links} only they carried (not saved yet).`
+                : `Raised to ${to} degrees: added ${moved.toLocaleString('en-GB')} ${moved === 1 ? t.node : t.nodes} (not saved yet).`;
+        this.growExclude.lastChange.set({
+            text,
+            valid: () => this.graph() === after,
+            undo: () => {
+                this.graph.set(before.graph);
+                this.expandedNodeIds.set(before.expanded);
+                this.growExclude.basicHeld.set(before.held);
+                this.unsavedWs.set(before.ws);
+                this.investigation.replaceLastUnsaved(before.step);
+                this.growExclude.lastChange.set({ text: 'Undone.' });
+            },
+        });
+        this.drawAnnouncement.set(text);
+    }
+
+    /** Draw the unsaved Working Set the server previewed: the canvas is exactly what Save records. */
+    private drawUnsaved(ws: WorkingSet, b: UnsavedBinding): void {
+        const g = workingSetToGraph(ws, b.projection);
+        const maxHop = Math.max(0, ...ws.entities.map((e) => e.hop));
+        const inner = new Set(ws.entities.filter((e) => e.hop < maxHop).map((e) => e.id));
+        this.unsavedWs.set(ws);
+        this.graph.set(g);
+        this.lastRun.set(this.runOf('entity-projection', { projection: b.projection }, g));
+        this.expandedNodeIds.set(g.nodes.filter((n) => rawIdsOf(n).some((id) => inner.has(id))).map((n) => n.id));
+        this.growExclude.basicHeld.set(new Map(ws.entities.filter((e) => e.highConnectivity).map((e) => [e.id, e.contacts ?? null])));
+    }
+
+    /** How many entities are selected on the canvas (Start from selected names them). */
+    readonly selectionCount = computed(() => this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND).length);
+
+    /** Would the Space hold an Expand with these presets for a second person's approval? (Then it cannot run unsaved.) */
+    private heldUnsaved(presets: DegreePresets): boolean {
+        return expandApproval(this.investigation.withPresets(presets, {}), this.fourEyesLimits()).exceeded.length > 0;
+    }
+
+    /** "Start from selected" while unsaved (D3): the selected entities and their links join the graph, recorded as a start. */
+    async startFromSelected(): Promise<void> {
+        const u = this.investigation.unsaved();
+        const picked = this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND);
+        if (!u || !picked.length) return;
+        if (this.heldUnsaved(u.binding.presets)) {
+            this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+            this.toastr.info(UNSAVED_FOUR_EYES);
+            return;
+        }
+        // every spelling the node stands for, as the tab's Start seeds them (never only the label)
+        const values = [...new Set(picked.flatMap((n) => rawIdsOf(n)))];
+        const type = u.binding.projection.entityType;
+        const seed: UnsavedStep = { kind: 'seed', ids: values, ...(type ? { entityType: type } : {}) };
+        let walk: Awaited<ReturnType<LinkAnalysisComponent['walkUnsaved']>>;
+        try {
+            walk = await this.walkUnsaved(u.binding, this.unsavedWs(), values, values, this.startRing());
+        } catch (err) {
+            this.toastr.error(invErrorMessage(err, 'The start could not be drawn.'));
+            return; // nothing is recorded
+        }
+        if (!walk) {
+            this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
+            this.toastr.info(UNSAVED_FOUR_EYES);
+            return;
+        }
+        this.investigation.recordUnsaved(seed, { kind: 'expand', from: 'ids', ids: values, req: this.startRing(walk.walked.length), walked: walk.walked, stages: walk.stages });
+        this.drawUnsaved(walk.ws, u.binding);
+    }
+
+    /**
+     * Save (LA-UNSAVED-INVESTIGATION-1): ask for the Name and Purpose (the start's defaults, or the last edits), then create
+     * the Investigation and replay the unsaved steps in order. False when it was not saved (no permission, cancelled, the
+     * create refused) - the unsaved work stays.
+     */
+    async saveUnsaved(): Promise<boolean> {
+        const u = this.investigation.unsaved();
+        if (!u) return true;
+        if (!this.canStartInvestigation()) {
+            this.toastr.info(SAVE_NEEDS);
+            return false;
+        }
+        const draft = u.draft ?? u.defaults;
+        const answer = await firstValueFrom(
+            this.dialog
+                .open<LinkAnalysisSaveInvestigationDialog, SaveInvestigationDialogData, SaveInvestigationDialogResult>(
+                    LinkAnalysisSaveInvestigationDialog,
+                    {
+                        width: '32rem',
+                        maxWidth: '95vw',
+                        data: {
+                            name: draft.name,
+                            purpose: draft.purpose,
+                            steps: u.steps.length,
+                            keep: (name, purpose) => this.investigation.keepSaveDraft(name, purpose),
+                        },
+                    },
+                )
+                .afterClosed(),
+        );
+        if (!answer) return false;
+        const out = await this.investigation.saveUnsaved(answer.name, answer.purpose);
+        if (!out.created) {
+            this.toastr.error(out.message || 'Could not save the Investigation.');
+            return false;
+        }
+        if (!out.message && u.steps.at(-1)?.kind === 'expand') this.growExclude.bindLastExpand(expandStepDegrees(u.steps.at(-1)) ?? 0);
+        if (out.message) this.toastr.warning(out.message);
+        else this.toastr.success(`Saved ${answer.name}, ${out.recorded === 1 ? 'one step' : out.recorded + ' steps'} recorded.`);
+        this.showSeedlessStart();
+        this.openInvestigation();
+        return true;
+    }
+
+    /**
+     * Before something replaces unsaved work (Close, New, Open, a new start): "Save, Discard or Cancel". True = go on
+     * (saved or discarded, or nothing was unsaved).
+     */
+    async leaveUnsaved(): Promise<boolean> {
+        const u = this.investigation.unsaved();
+        if (!u) return true;
+        const n = u.steps.length;
+        const choice = await this.confirm.confirmUnsavedChanges(
+            `This Investigation is not saved${n ? ` (${n === 1 ? 'one step' : n + ' steps'})` : ''}. Save it to keep the steps, or discard them.`,
+            { title: 'Unsaved Investigation', saveText: 'Save…', discardText: 'Discard', cancelText: 'Cancel' },
+        );
+        if (choice === 'cancel') return false;
+        if (choice === 'save') return this.saveUnsaved();
+        this.investigation.discardUnsaved();
+        return true;
+    }
+
+    /**
+     * "Add start entities…" on an open Investigation (the start form in add mode): the values it names - one entity, an
+     * Entity List's members, pasted values - are recorded as ONE \`seed\` step, outside the Working Set as they may be.
+     */
+    async addStartEntities(req: UnsavedStartRequest): Promise<void> {
+        if (!this.investigation.active() || req.start.kind === 'graph' || req.start.kind === 'dataset') return;
+        const start = req.start;
+        const v = start.kind === 'entity' ? { values: [start.value], entityType: start.entityType } : await this.startValues(start);
+        if (!v?.values.length) return;
+        const type = v.entityType ?? this.investigation.binding()?.entityType;
+        if (await this.investigation.apply({ op: 'seed', ids: v.values, ...(type ? { entityType: type } : {}) })) {
+            this.investigation.showWorkingSet.set(true);
+            this.investigation.addingStart.set(false);
+        }
+    }
+
+    /** The start form's answer: a new unsaved start, or - on an open Investigation - more start entities. */
+    onStartForm(req: UnsavedStartRequest): void {
+        void (this.investigation.active() ? this.addStartEntities(req) : this.startUnsaved(req));
+    }
+
+    /** Reloading or leaving the browser tab with unsaved steps: the browser asks first (they are held in memory only). */
+    onBeforeUnload(e: BeforeUnloadEvent): void {
+        if (!this.investigation.unsaved()) return;
+        e.preventDefault();
+        e.returnValue = '';
     }
 
     /**
@@ -2466,7 +2867,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
 
     /** File ▸ Open… (§5.11): one dialog over saved views and Investigations; the list is re-read after, since it renames, copies and deletes. */
-    openOpenDialog(): void {
+    async openOpenDialog(): Promise<void> {
+        if (!(await this.leaveUnsaved())) return;
         const data: LaOpenDialogData = {
             opsEnabled: !!this.opsEnabled(),
             shareable: (v) => this.shareable(v),
@@ -2646,6 +3048,7 @@ Its prior copies stay in its version history.`,
             const title = `Investigation ${inv.displayTitle()}`;
             return inv.activeDraftId() ? `Draft ${inv.activeDraftId()} of ${title}` : title;
         }
+        if (inv.unsaved()) return 'the unsaved Investigation';
         if (this.importDraft()) return `unsaved view ${this.importDraft()!.id}`;
         return this.graph() ? 'the analysis' : '';
     });
@@ -2677,6 +3080,10 @@ Its prior copies stay in its version history.`,
      * saved is the one thing Close would lose, so that is asked first.
      */
     async closeOpenWork(): Promise<void> {
+        const hadUnsaved = !!this.investigation.unsaved();
+        if (!(await this.leaveUnsaved())) return;
+        // Saved just now but stopped partway: keep it open, so the message saying what was not recorded stays on screen.
+        if (hadUnsaved && this.investigation.active() && this.investigation.error()) return;
         const draft = this.importDraft();
         if (
             draft &&
@@ -4813,13 +5220,32 @@ Its prior copies stay in its version history.`,
     }
 
     /** The Expand dialog's choice, walked degree by degree: recorded `expand` steps, or the explorer's neighbours reads. */
-    async onExpand({ ctx, req }: ExpandRun): Promise<void> {
+    async onExpand(run: ExpandRun): Promise<void> {
+        if (this.expandBusy) {
+            this.growExclude.lastChange.set({ text: 'Another change is still running.' });
+            return;
+        }
+        this.expandBusy = true;
+        try {
+            await this.runExpand(run);
+        } finally {
+            this.expandBusy = false;
+        }
+    }
+
+    private async runExpand({ ctx, req, from }: ExpandRun): Promise<void> {
         this.growExclude.growOpen.set(false);
         if (ctx.mode === 'investigation') {
             // going through hubs is a sealed override: ask first, as Expand anyway does
             if (!req.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
             if (!(await this.growExclude.growInvestigation(ctx, req, this.degreePresets())))
                 this.toastr.error(this.investigation.error() || 'The Expand was refused.');
+            return;
+        }
+        if (this.investigation.unsaved()) {
+            // through busy entities is the same sealed override once saved: ask first, as the saved path does
+            if (!req.hold && !(await this.confirmHubOverride(ctx.heldFrontier))) return;
+            await this.expandUnsaved(ctx, req, from);
             return;
         }
         await this.growBasic(ctx, req);
@@ -4859,7 +5285,8 @@ Its prior copies stay in its version history.`,
     }
 
     /** Basic Grow (§3.5): neighbours reads merged into the explorer graph — not recorded; Undo restores the graph. */
-    private async growBasic(ctx: GrowContext, req: GrowRequest): Promise<void> {
+    private async growBasic(ctx: GrowContext, req: GrowRequest): Promise<string[][]> {
+        const walked: string[][] = [];
         const before = {
             graph: this.graph(),
             expanded: this.expandedNodeIds(),
@@ -4885,6 +5312,11 @@ Its prior copies stay in its version history.`,
             if (!frontier.length) break;
             applied = d;
             const known = new Set((this.graph()?.nodes ?? []).map((n) => n.id));
+            walked.push(
+                frontier
+                    .slice(0, this.selectionExpandCap)
+                    .map((id) => this.graph()?.nodes.find((n) => n.id === id)?.data.label ?? id),
+            );
             for (const id of frontier.slice(0, this.selectionExpandCap)) {
                 const node = this.graph()?.nodes.find((n) => n.id === id);
                 if (!node) continue;
@@ -4925,6 +5357,7 @@ Its prior copies stay in its version history.`,
             },
         });
         this.drawAnnouncement.set(text);
+        return walked;
     }
 
     /** The nodes "Exclude…" acts on: the given ones, else the selection, else the picked Investigation entity. */

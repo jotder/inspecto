@@ -14,7 +14,7 @@ import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Subject, delay, of, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, defer, delay, firstValueFrom, of, throwError } from 'rxjs';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
@@ -31,7 +31,7 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, nodeDisplayId, snapshotTitle } from './link-analysis.component';
+import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, mergeWorkingSets, nodeDisplayId, snapshotTitle } from './link-analysis.component';
 import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
 import { GRAPH_CACHE_TTL_MS, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { SpacesService } from '@inspecto/core/api';
@@ -239,6 +239,42 @@ installDomainProfiles(
 // ...and hands the registry back empty, so a later spec in the same worker does not inherit these packs.
 afterAll(() => installDomainProfiles([], null));
 
+/**
+ * LA-UNSAVED-INVESTIGATION-1: a fake \`POST /inv/expand/preview\` - a seed adds its ids at hop 0, an expand admits
+ * \`admit(id)\` per id at the next hop (by default \`<id>.n\`). Synthetic values only.
+ */
+function fakeUnsaved(admit: (id: string) => string[] = (id) => [`${id}.n`]) {
+    return vi.fn((req: { steps: { op: string; ids?: string[] }[] }) => {
+        const entities = new Map<string, number>();
+        const links: { source: string; target: string; kind: string; count: number; admittedBy: number }[] = [];
+        const steps: { step: number; op: string; needsApproval: boolean; admitted: string[] }[] = [];
+        req.steps.forEach((st, i) => {
+            const before = new Set(entities.keys());
+            if (st.op === 'seed') {
+                for (const id of st.ids ?? []) if (!entities.has(id)) entities.set(id, 0);
+            } else {
+                const hop = Math.max(0, ...entities.values()) + 1;
+                for (const id of st.ids ?? [])
+                    for (const n of admit(id)) {
+                        if (!entities.has(n)) entities.set(n, hop);
+                        links.push({ source: id, target: n, kind: 'link', count: 1, admittedBy: i + 1 });
+                    }
+            }
+            steps.push({ step: i + 1, op: st.op, needsApproval: false, admitted: [...entities.keys()].filter((x) => !before.has(x)) });
+        });
+        return of({
+            workingSet: {
+                entities: [...entities].map(([id, hop]) => ({ id, type: null, hop, seed: id, admittedBy: 1, hidden: false, kept: false })),
+                links,
+                excluded: [],
+                hash: 'h',
+            },
+            steps,
+            masked: false,
+        });
+    });
+}
+
 describe('nodeDisplayId (T-061 node card ID)', () => {
     it('strips only a known type prefix, so a key that holds a colon survives whole', () => {
         expect(nodeDisplayId('party:p-17', ['entity', 'party'])).toBe('p-17');
@@ -252,7 +288,8 @@ describe('LinkAnalysisComponent', () => {
     it('renders the empty state, is a11y-clean, and validates the mapping before querying', async () => {
         const { fixture, queried } = create();
         fixture.detectChanges();
-        expect(fixture.nativeElement.textContent).toContain('Start a graph');
+        // the Investigations level: the empty canvas points to the start form in the Investigation tab (D1)
+        expect(fixture.nativeElement.textContent).toContain('Start from the Investigation tab');
         await fixture.componentInstance.run(); // no mapping picked yet
         expect(fixture.componentInstance.loadError()).toMatch(/From and To columns/);
         expect(queried).toHaveLength(0);
@@ -528,7 +565,7 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         expect(c.graph()).toBeNull();
         expect(c.lastRun()).toBeNull();
-        expect(el.textContent).toContain('Start a graph');
+        expect(el.textContent).toContain('Start from the Investigation tab');
         expect(c.openWorkLabel()).toBe('');
     }, 45_000);
 
@@ -2767,7 +2804,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
     };
 
     it('replaces the empty canvas with the Start box; Open, Explore and the examples moved to the File menu', () => {
-        const { fixture } = create();
+        const { fixture } = create({ features: { ...STANDARD_EDITION_FEATURES, investigations: signal(false) } }); // the Explorer level keeps the centre box (D1)
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.textContent).toContain('Start a graph');
@@ -3699,6 +3736,25 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
             t.textContent?.trim(),
         );
 
+    it('operator 2026-10-30: an unsaved Investigation has a Steps tab beside Rows and Results, listing the steps in order', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        expect(tabs(el)).not.toContain('Steps');
+        c.investigation.beginUnsaved(
+            { projection: { datasetId: 'calls', sourceCol: 'A', targetCol: 'B' }, presets: {}, maxDegree: 4 },
+            { name: 'n', purpose: 'p' },
+            [{ kind: 'seed', ids: ['a', 'b'] }],
+        );
+        c.openDock('steps');
+        fixture.detectChanges();
+        expect(tabs(el)).toEqual(['Rows', 'Steps', 'Results']);
+        const steps = Array.from(el.querySelectorAll('[data-testid="dock-steps"] li')).map((li) => li.textContent!.trim());
+        expect(steps).toEqual(['Start from 2 entities']);
+    });
+
     it('operator 2026-10-29: the tab strip is plain text tabs (no cell borders), one row that scrolls sideways, axe-clean', async () => {
         const { fixture } = create();
         fixture.detectChanges();
@@ -4135,7 +4191,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         }));
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
         fixture.detectChanges();
         expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1', 'x2']);
         expect(c.graph()!.nodes.map((n) => n.id)).toEqual(expect.arrayContaining(['x1', 'x2', 'x3']));
@@ -4166,7 +4222,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             })),
         } as never;
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
         expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1']);
         expect(c.growExclude.basicHeld().get('x2')).toBe(900);
     });
@@ -4181,7 +4237,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         });
         const { c } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
         expect(expand).toHaveBeenCalledTimes(1);
         expect(c.growExclude.lastChange()?.text).toContain('Stopped after degree 1: the next degree would grow from 30 nodes, above the frontier cap of 25.');
     });
@@ -4201,7 +4257,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
         expect(c.growContext()).toMatchObject({ mode: 'basic', frontier: ['c'], from: 'the 1 node you selected', blocked: null });
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
         fixture.detectChanges();
         const ids = () => c.graph()!.nodes.map((n) => n.id).sort();
         expect(ids()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']); // the incoming g was not kept
@@ -4221,7 +4277,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         }));
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['a']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
         expect(c.growExclude.undoable()).toBe(true);
         await c.expandNode('b', 'B'); // another change to the graph
         fixture.detectChanges();
@@ -4347,14 +4403,14 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         await settle(fixture, 10);
         (document.querySelector('[data-testid="la-node-menu-grow"]') as HTMLButtonElement).click();
         await landed('node menu');
-        // the section is the real Expand form, recorded: its Expand walks the Investigation (Expand next degree stays beside it)
-        expect(section()!.closest('[data-testid="degrees"]')!.querySelector('[data-testid="expand-next-degree"]')).not.toBeNull();
+        // the section is the real Expand form, recorded: its Expand walks the Investigation (ONE control, no "Expand next degree")
+        expect(section()!.closest('[data-testid="degrees"]')!.querySelector('[data-testid="expand-next-degree"]')).toBeNull();
         const onExpand = vi.spyOn(c, 'onExpand').mockResolvedValue();
         (section()!.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).click();
         expect(onExpand).toHaveBeenCalledWith(expect.objectContaining({ ctx: expect.objectContaining({ mode: 'investigation' }) }));
     });
 
-    it('LA-INV-EXPAND-1: with the full graph shown instead of the Working Set, the Expand section says why it has no form', async () => {
+    it('LA-UNSAVED-INVESTIGATION-1 D3: no "Show the full graph" checkbox, and ONE Expand control (no "Expand next degree")', async () => {
         const { fixture, c, el } = await drawn();
         c.investigation.activeId.set('inv-9');
         c.investigation.log.set({ header: { sourceCol: 's', targetCol: 't', title: 'Ring' }, entries: [] } as never);
@@ -4366,18 +4422,12 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         } as never);
         c.openInvestigation();
         fixture.detectChanges();
-        const section = () => el.querySelector('[data-testid="degrees"]') as HTMLElement;
-        expect(section().querySelector('[data-testid="la-expand-section"]')).not.toBeNull();
-        expect(section().querySelector('[data-testid="expand-full-graph"]')).toBeNull();
-        c.investigation.showWorkingSet.set(false);
-        fixture.detectChanges();
-        expect(c.growMode()).toBe('basic');
-        expect(section().querySelector('[data-testid="la-expand-section"]')).toBeNull();
-        expect(section().querySelector('[data-testid="expand-full-graph"]')!.textContent!.trim()).toBe(
-            'Expand works on the Working Set; untick “Show the full graph to pick start entities”.',
-        );
+        const section = el.querySelector('[data-testid="degrees"]') as HTMLElement;
+        expect(section.querySelector('[data-testid="la-expand-section"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="expand-next-degree"]')).toBeNull();
+        expect(el.textContent).not.toContain('Show the full graph');
+        expect(el.querySelector('[data-testid="expand-full-graph"]')).toBeNull();
     });
-
     it('Investigation: Grow appends ONE expand from the outer ring; held busy nodes carry the badge; Remove held is one exclude', async () => {
         const { c } = await drawn();
         c.investigation.activeId.set('inv-9');
@@ -4416,11 +4466,11 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             c.investigation.lastStep.set({ step: ops.length, op: op.op, delta: { admitted: [], excluded: ['ws-hub'], linksAdded: 0 } } as never);
             return true;
         });
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
         expect(ops).toEqual([{ op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500 }]);
         // Hold off goes through hubs: a sealed override, so it asks first; No sends nothing
         const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 } });
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 }, from: null });
         expect(ask).toHaveBeenCalledWith(expect.stringContaining('1 held busy entity'), expect.anything());
         expect(ops).toHaveLength(1);
         await c.removeHeld();
@@ -4777,41 +4827,37 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect([...c.expandedNodeIds()].sort()).toEqual(['S-1', 'S-2']);
     });
 
-    it('LA-PANELS-REDESIGN-1: the New form starts a list Investigation in ONE press - drawn, every member seeded, expanded as asked', async () => {
+    it('LA-UNSAVED-INVESTIGATION-1: a list start draws its members UNSAVED - nothing created, seed and ring recorded', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
         const { fixture } = create({
             datasets: [TRANSFERS],
             expand,
-            inv: { previewNeighbors: preview(), getEntityList } as unknown as Partial<InvService>,
+            inv: { previewNeighbors: preview(), getEntityList, previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
         });
         await settle(fixture);
         const c = fixture.componentInstance;
-        const chain = vi.spyOn(c.investigation, 'investigateNumber').mockResolvedValue(true);
-        await c.createInvestigation({
+        const start = vi.spyOn(c.investigation, 'start');
+        await c.startUnsaved({
             start: { kind: 'list', datasetId: 'transfers', listId: 'suspects' },
-            title: 'Investigation — list Suspects',
-            purpose: 'Review of the members of list Suspects and their links',
+            defaults: { name: 'Members of “Suspects”', purpose: 'Review of the members' },
             timeCol: '',
             timeColZone: 'Europe/London',
             degrees: 1,
         });
-        expect(chain).toHaveBeenCalledWith(
-            expect.objectContaining({
-                seeds: ['S-1', 'S-2'],
-                projection: expect.objectContaining({ entityType: 'account' }),
-                title: 'Investigation — list Suspects',
-                purpose: 'Review of the members of list Suspects and their links',
-                timeColZone: 'Europe/London',
-                degrees: 1,
-            }),
-        );
-        // no second form: nothing pending, nothing queued
-        expect(c.pendingInvestigation()).toBeNull();
-        expect(c.investigation.queuedSeeds()).toEqual([]);
+        expect(start).not.toHaveBeenCalled(); // no Name, no Purpose, nothing on the server
+        const u = c.investigation.unsaved()!;
+        expect(u.binding.timeColZone).toBe('Europe/London');
+        expect(u.binding.projection).toEqual(expect.objectContaining({ entityType: 'account' }));
+        expect(u.defaults.name).toBe('Members of “Suspects”');
+        expect(u.steps).toEqual([
+            { kind: 'seed', ids: ['S-1', 'S-2'], entityType: 'account' },
+            // the drawn ring, as the screen drew it: from exactly the values found
+            { kind: 'expand', from: 'ids', ids: ['S-1', 'S-2'], walked: [['S-1', 'S-2']], stages: [expect.anything()], req: expect.objectContaining({ degrees: 1, direction: 'either', hold: true }) },
+        ]);
         expect(c.graph()).not.toBeNull();
+        expect(c.openWorkLabel()).toBe('the unsaved Investigation');
     });
-
     it('LA-PANELS-REDESIGN-1: the start box only draws a list on the Investigations level - no pending form, no queue', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
@@ -4833,6 +4879,8 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await settle(fixture);
         fixture.detectChanges();
         const reread = vi.spyOn(fixture.componentInstance as unknown as { refreshEntityLists(): void }, 'refreshEntityLists');
+        fixture.componentInstance.openNewInvestigation(); // the start form lives in the Investigation tab (D1)
+        fixture.detectChanges();
         const box = fixture.debugElement.query((d) => d.name === 'inspecto-link-analysis-start-box');
         const kind = (box.componentInstance as { form: { controls: { kind: { setValue(v: string): void } } } }).form.controls.kind;
         kind.setValue('paste');
@@ -4913,29 +4961,100 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    it('Investigations level, one entity from the New form: an account seeds an Investigation over its Dataset (generic binding, OB-9)', async () => {
+    it('LA-UNSAVED-INVESTIGATION-1: one entity starts unsaved over its binding; Degrees 2 walks one more degree, recorded', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'Account', purpose: 'Review of an Account and its links' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 2,
+        });
+        const u = c.investigation.unsaved()!;
+        expect(u.binding.projection).toEqual(MAPPING);
+        expect(u.steps.map((x) => x.kind)).toEqual(['seed', 'expand']);
+        expect(u.steps[0]).toEqual({ kind: 'seed', ids: ['MULE-HUB-01'], entityType: MAPPING.entityType });
+        // the ring and one degree more, each from what the server admitted
+        expect(u.steps[1]).toEqual(expect.objectContaining({ walked: [['MULE-HUB-01'], ['MULE-HUB-01.n']], req: expect.objectContaining({ degrees: 2 }) }));
+        expect(c.investigateIssue()).toBe('');
+        expect(c.toolboxTab()).toBe('investigation');
+    });
+
+    it('LA-UNSAVED-INVESTIGATION-1: an unsaved Expand the Space would hold for four-eyes is refused before it runs', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
+        const calls = expand.mock.calls.length;
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        expect(expand.mock.calls.length).toBe(calls); // nothing read
+        expect(c.investigation.unsaved()!.steps).toHaveLength(2); // nothing recorded
+        expect(c.growExclude.lastChange()?.text).toContain('cannot run unsaved. Save first');
+    });
+
+    it('LA-UNSAVED-INVESTIGATION-1: an unsaved Expand is recorded, and its Undo drops the step', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const ctx = c.growContext();
+        await c.onExpand({ ctx, req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        const steps = c.investigation.unsaved()!.steps;
+        expect(steps).toHaveLength(3);
+        expect(steps[2]).toEqual(
+            expect.objectContaining({ kind: 'expand', from: 'outer', ids: [], req: expect.objectContaining({ direction: 'out' }) }),
+        );
+        expect(steps[2].kind === 'expand' && steps[2].walked?.length).toBe(1); // the exact values degree 1 expanded from
+        c.growExclude.lastChange()!.undo!();
+        expect(c.investigation.unsaved()!.steps).toHaveLength(2);
+    });
+
+    it('LA-UNSAVED-INVESTIGATION-1: Close with unsaved steps asks Save, Discard or Cancel', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
-        const chain = vi.spyOn(c.investigation, 'investigateNumber').mockResolvedValue(true);
-        await c.createInvestigation({
-            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
-            title: 'Investigation — Account MULE-HUB-01',
-            purpose: 'Review of Account MULE-HUB-01 and its links',
-            timeCol: '',
-            timeColZone: '',
-            degrees: 0,
-        });
-        expect(chain).toHaveBeenCalledWith(
-            expect.objectContaining({ seed: 'MULE-HUB-01', projection: MAPPING, presets: {}, degrees: 0 }),
-        );
-        expect(c.pendingInvestigation()).toBeNull(); // no second form
-        expect(c.investigateIssue()).toBe('');
+        c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
+            { kind: 'seed', ids: ['A-1'] },
+        ]);
+        const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmUnsavedChanges').mockResolvedValue('cancel');
+        await c.closeOpenWork();
+        expect(ask).toHaveBeenCalledWith(expect.stringContaining('not saved (one step)'), expect.objectContaining({ discardText: 'Discard' }));
+        expect(c.investigation.unsaved()).not.toBeNull(); // Cancel keeps it
+        ask.mockResolvedValue('discard');
+        await c.newWork();
+        expect(c.investigation.unsaved()).toBeNull();
+        // Save without Incident management: refused with the reason, the work stays
+        c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' });
+        Object.defineProperty(c, 'canStartInvestigation', { value: () => false });
+        ask.mockResolvedValue('save');
+        await c.closeOpenWork();
+        expect(c.investigation.unsaved()).not.toBeNull();
+        // the browser asks before a reload drops it
+        const e = { preventDefault: vi.fn(), returnValue: undefined } as unknown as BeforeUnloadEvent;
+        c.onBeforeUnload(e);
+        expect(e.preventDefault).toHaveBeenCalled();
     });
-
     it('Investigations level, the start box draws one entity with its ring - it seeds nothing', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview() } as Partial<InvService> });
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startFrom({ kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' });
@@ -4950,7 +5069,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const { fixture } = create({
             datasets: [TRANSFERS],
             expand,
-            inv: { previewNeighbors: preview() } as Partial<InvService>,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
         });
         await settle(fixture);
         const c = fixture.componentInstance;
@@ -4973,7 +5092,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(form?.textContent).toContain('New Investigation');
     });
 
-    it('the start box’s New Investigation… switches the dock to the Investigation tab at once, as File ▸ New does', async () => {
+    it('the centre pointer opens the Investigation tab at its start form (D1), dropping a queue that would hide it', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         fixture.detectChanges();
@@ -4983,94 +5102,354 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         c.investigation.queueSeeds([{ id: 'q', label: 'q', ids: ['q'] }]); // e.g. a deep link that could not bind
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        (el.querySelector('[data-testid="start-new-investigation"]') as HTMLButtonElement).click();
+        (el.querySelector('[data-testid="la-start-pointer"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(c.toolboxTab()).toBe('investigation');
         expect(el.querySelector('#la-toolbox-tab-investigation')!.getAttribute('aria-selected')).toBe('true');
-        expect(c.investigation.queuedSeeds()).toEqual([]); // nothing hides the New form
+        expect(c.investigation.queuedSeeds()).toEqual([]); // nothing hides the start form
         expect(el.querySelector('[laNewInvestigation] [data-testid="start-kind"]')).not.toBeNull();
     });
-
-    it('the New form’s whole Dataset draws it, then creates the Investigation over its mapping with the profile bound', async () => {
+    it('the start form’s whole Dataset draws it and starts unsaved over its mapping with the profile bound, no steps yet', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
-        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
-        await c.createInvestigation({
+        const start = vi.spyOn(c.investigation, 'start');
+        await c.startUnsaved({
             start: { kind: 'dataset', datasetId: 'transfers' },
-            title: 'Investigation — whole Transfers',
-            purpose: 'Review of the links in Transfers',
+            defaults: { name: 'Transfers', purpose: 'Review of the links in Transfers' },
             timeCol: '',
             timeColZone: '',
             degrees: 0,
         });
         expect(c.graph()).not.toBeNull();
-        expect(start).toHaveBeenCalledWith(
-            MAPPING,
-            'Review of the links in Transfers',
-            'Investigation — whole Transfers',
-            undefined,
-            '',
-            undefined,
-            MAPPING.entityType,
-            expect.any(String),
+        expect(start).not.toHaveBeenCalled();
+        expect(c.investigation.unsaved()).toEqual(
+            expect.objectContaining({ binding: expect.objectContaining({ projection: MAPPING }), steps: [] }),
         );
         expect(c.boundProfile()).not.toBeNull();
     });
-
-    it('the New form’s whole Dataset creates NOTHING when the draw fails', async () => {
+    it('the start form’s whole Dataset starts nothing when the draw fails', async () => {
         const { fixture } = create({ datasets: [TRANSFERS], fail: true });
         await settle(fixture);
         const c = fixture.componentInstance;
-        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
-        await c.createInvestigation({
+        await c.startUnsaved({
             start: { kind: 'dataset', datasetId: 'transfers' },
-            title: 'x',
-            purpose: 'y',
+            defaults: { name: 'x', purpose: 'y' },
             timeCol: '',
             timeColZone: '',
             degrees: 0,
         });
         expect(c.graph()).toBeNull();
-        expect(start).not.toHaveBeenCalled();
+        expect(c.investigation.unsaved()).toBeNull();
     });
-
-    it('the New form’s "The graph on screen" starts a seedless Investigation over the drawn mapping', async () => {
+    it('the start form’s "The graph on screen" starts unsaved over the drawn mapping, with its time column', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
         Object.defineProperty(c, 'investigationProjection', { value: () => MAPPING });
-        const start = vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
-        const chain = vi.spyOn(c.investigation, 'investigateNumber');
-        await c.createInvestigation({
+        await c.startUnsaved({
             start: { kind: 'graph' },
-            title: 'Investigation — Transfers',
-            purpose: 'Review of the graph on screen',
+            defaults: { name: 'Graph on screen', purpose: 'Review of the graph on screen' },
             timeCol: 'booked_at',
             timeColZone: 'UTC',
             degrees: 0,
         });
-        expect(start).toHaveBeenCalledWith(MAPPING, 'Review of the graph on screen', 'Investigation — Transfers', 'booked_at', 'UTC');
-        expect(chain).not.toHaveBeenCalled(); // no seed step
-        expect(c.investigation.showWorkingSet()).toBe(false); // seedless: the drawn graph stays, seeds are picked there
+        expect(c.investigation.unsaved()!.binding).toEqual(
+            expect.objectContaining({ projection: MAPPING, timeCol: 'booked_at', timeColZone: 'UTC' }),
+        );
+        expect(c.investigation.unsaved()!.steps).toEqual([]);
     });
-
-    it('a whole-Dataset Investigation keeps the drawn graph on the canvas, not its empty Working Set (UI test 2026-10-29)', async () => {
+    it('a whole-Dataset start keeps the drawn graph on the canvas while unsaved (no Working Set yet)', async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
-        vi.spyOn(c.investigation, 'start').mockResolvedValue(true);
-        await c.createInvestigation({
+        await c.startUnsaved({
             start: { kind: 'dataset', datasetId: 'transfers' },
-            title: 'Investigation — whole Transfers',
-            purpose: 'Review of the links in Transfers',
+            defaults: { name: 'Transfers', purpose: 'Review' },
             timeCol: '',
             timeColZone: '',
             degrees: 0,
         });
         expect(c.graph()?.nodes.length).toBeGreaterThan(0);
-        expect(c.investigation.showWorkingSet()).toBe(false);
-        expect(c.workingSetCanvas()).toBe(false); // the canvas draws the query graph
+        expect(c.workingSetCanvas()).toBe(false); // the canvas draws the explorer graph
+    });
+
+
+    it('every unsaved degree is read by the server preview with the presets: the canvas IS the Working Set Save records', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        // the server admits fewer than an explorer read would (its presets cut): one neighbour per entity
+        const previewUnsaved = fakeUnsaved((id) => [`${id}.n`]);
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        // the start's ring is the server's, not the explorer's ring
+        expect(c.graph()!.nodes.map((n) => n.data.label).sort()).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n']);
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        const step = c.investigation.unsaved()!.steps.at(-1)!;
+        expect(step.kind === 'expand' && step.walked).toEqual([['MULE-HUB-01.n'], ['MULE-HUB-01.n.n'], ['MULE-HUB-01.n.n.n']]);
+        // what is drawn is exactly the Working Set the last preview answered
+        const last = await firstValueFrom(previewUnsaved.mock.results.at(-1)!.value as Observable<{ workingSet: { entities: { id: string }[] } }>);
+        expect(c.graph()!.nodes.map((n) => n.data.label).sort()).toEqual(last.workingSet.entities.map((e) => e.id).sort());
+        // and each degree was sent as the step route body Save sends: the presets laid under, the fold filters on top
+        const sent = previewUnsaved.mock.calls.at(-1)![0].steps.at(-1) as Record<string, unknown>;
+        expect(sent).toEqual(expect.objectContaining({ op: 'expand', ids: ['MULE-HUB-01.n.n.n'], direction: 'either', hubThreshold: 500 }));
+        // every preview sends the Working Set as one seed and ONE degree: never the history, so its cost does not grow with it
+        for (const [body] of previewUnsaved.mock.calls) expect(body.steps.map((x) => x.op)).toEqual(['seed', 'expand']);
+    });
+
+    describe('LA-DEGREES-TRIM-1: Degrees is the last Expand’s size', () => {
+        const REQ = { direction: 'either' as const, degrees: 3, linkKinds: null, hold: true, threshold: 500 };
+        // every unsaved preview waits on `gate`, so a test can hold an Expand mid-walk
+        let gate: Promise<void> = Promise.resolve();
+        let release: () => void = () => undefined;
+        const hold = () => (gate = new Promise<void>((r) => (release = r)));
+        async function expanded3() {
+            gate = Promise.resolve();
+            const base = fakeUnsaved();
+            const previewUnsaved = vi.fn((body: Parameters<typeof base>[0]) =>
+                defer(async () => {
+                    await gate;
+                    return firstValueFrom(base(body));
+                }),
+            );
+            const { fixture } = create({
+                datasets: [TRANSFERS],
+                expand: vi.fn(async (_id: string, label: string) => ring(label)),
+                inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+            });
+            await settle(fixture);
+            const c = fixture.componentInstance;
+            await c.startUnsaved({
+                start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+                defaults: { name: 'A', purpose: 'B' },
+                timeCol: '',
+                timeColZone: '',
+                degrees: 1,
+            });
+            await c.onExpand({ ctx: c.growContext(), req: REQ, from: 'outer' });
+            return Object.assign(c, { previewUnsaved });
+        }
+        const labels = (c: LinkAnalysisComponent) => c.graph()!.nodes.map((n) => n.data.label).sort();
+
+        it('lowering Degrees drops the outermost entities from the canvas AND from the recorded step; Undo brings them back', async () => {
+            const c = await expanded3();
+            expect(c.lastExpandDegrees()).toBe(3);
+            expect(labels(c)).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'MULE-HUB-01.n.n', 'MULE-HUB-01.n.n.n', 'MULE-HUB-01.n.n.n.n']);
+            await c.onDegreesChange({ degrees: 2, req: { ...REQ, degrees: 2 } });
+            // the terminal entity is gone from the canvas ...
+            expect(labels(c)).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'MULE-HUB-01.n.n', 'MULE-HUB-01.n.n.n']);
+            // ... and from what Save would record
+            const step = c.investigation.unsaved()!.steps.at(-1)!;
+            expect(step.kind === 'expand' && step.walked).toEqual([['MULE-HUB-01.n'], ['MULE-HUB-01.n.n']]);
+            expect(step.kind === 'expand' && step.req.degrees).toBe(2);
+            expect(c.lastExpandDegrees()).toBe(2);
+            expect(c.growExclude.lastChange()?.text).toContain('Lowered to 2 degrees: removed 1 node and the links only they carried');
+            await c.growExclude.lastChange()!.undo!();
+            expect(labels(c)).toHaveLength(5);
+            expect(c.lastExpandDegrees()).toBe(3);
+        });
+
+        it('raising Degrees expands the extra degrees from the outer ring into the same step', async () => {
+            const c = await expanded3();
+            await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } });
+            expect(labels(c)).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'MULE-HUB-01.n.n']);
+            const steps = c.investigation.unsaved()!.steps.length;
+            await c.onDegreesChange({ degrees: 3, req: { ...REQ, degrees: 3 } });
+            expect(labels(c)).toHaveLength(5);
+            expect(c.investigation.unsaved()!.steps).toHaveLength(steps); // the same step grew, no new one
+            expect(c.lastExpandDegrees()).toBe(3);
+        });
+
+        it('raising grows with the Expand’s OWN request, so the screen draws what Save replays (not the form’s changed Direction)', async () => {
+            const c = await expanded3();
+            await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } });
+            await c.onDegreesChange({ degrees: 3, req: { ...REQ, direction: 'out', degrees: 3 } });
+            const step = c.investigation.unsaved()!.steps.at(-1)!;
+            expect(step.kind === 'expand' && step.req.direction).toBe('either');
+            const sent = c.previewUnsaved.mock.calls.at(-1)![0].steps.at(-1) as Record<string, unknown>;
+            expect(sent['direction']).toBe('either'); // what was drawn
+            expect(c.investigation.unsavedOps(c.investigation.unsaved()!.steps.slice(-1), c.investigation.unsaved()!.binding).every((o) => o.op !== 'expand' || o.direction === 'either')).toBe(true); // what Save sends
+        });
+
+        it('a Degrees change while an Expand is still walking is ignored, and an Expand while a resize runs is refused', async () => {
+            const c = await expanded3();
+            const steps = () => c.investigation.unsaved()!.steps;
+            const walkedOf = (i: number) => (steps()[i].kind === 'expand' ? (steps()[i] as { walked: string[][] }).walked.length : -1);
+            hold();
+            const running = c.onExpand({ ctx: c.growContext(), req: { ...REQ, degrees: 1 }, from: 'outer' });
+            await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } }); // lands mid-walk
+            release();
+            await running;
+            expect(steps()).toHaveLength(4); // the new Expand is recorded ...
+            expect(walkedOf(2)).toBe(3); // ... on the Expand it grew from, not a trimmed one
+            // the other way round: a resize holds the lock, an Expand asked meanwhile is refused
+            hold();
+            const resizing = c.onDegreesChange({ degrees: 2, req: { ...REQ, degrees: 2 } });
+            await c.onExpand({ ctx: c.growContext(), req: { ...REQ, degrees: 1 }, from: 'outer' });
+            expect(c.growExclude.lastChange()?.text).toBe('Another change is still running.');
+            release();
+            await resizing;
+            expect(steps()).toHaveLength(4);
+        });
+
+        it('is not bound when the newest step is not an Expand (a start): lowering changes nothing', async () => {
+            const c = await expanded3();
+            c.investigation.recordUnsaved({ kind: 'seed', ids: ['Z'] });
+            expect(c.lastExpandDegrees()).toBeNull();
+            await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } });
+            expect(labels(c)).toHaveLength(5);
+        });
+    });
+
+    it('on a masked Space the unsaved start seeds from the alias the explorer drew, never the typed value', async () => {
+        // the explorer's neighbours read answers aliases: the drawn start is the node every link touches
+        const masked = vi.fn(async () => ({
+            nodes: [
+                { id: 'n0', data: { label: 'masked:00000000000000aa', kind: 'entity' } },
+                { id: 'n1', data: { label: 'masked:00000000000000bb', kind: 'entity' } },
+            ],
+            edges: [{ id: 'e', source: 'n0', target: 'n1', data: { kind: 'link' } }],
+        }));
+        const previewUnsaved = fakeUnsaved();
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand: masked as never,
+            inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const [seed] = c.investigation.unsaved()!.steps;
+        expect(seed).toEqual(expect.objectContaining({ kind: 'seed', ids: ['masked:00000000000000aa'] }));
+        expect(JSON.stringify(previewUnsaved.mock.calls)).not.toContain('MULE-HUB-01');
+    });
+
+    it('a start whose ring the Space would hold for four-eyes is refused up front, and draws nothing', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        expect(expand).not.toHaveBeenCalled();
+        expect(c.investigation.unsaved()).toBeNull();
+        expect(c.startNotice()?.text).toContain("needs a second person's approval, so it cannot run unsaved. Save first");
+    });
+
+    it('Start from selected: refused up front for four-eyes, and records nothing when its draw fails', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({ start: { kind: 'dataset', datasetId: 'transfers' }, defaults: { name: 'A', purpose: 'B' }, timeCol: '', timeColZone: '', degrees: 0 });
+        c.onSelectionChange([c.graph()!.nodes[0].id]);
+        // the draw (the server preview) fails: nothing is recorded
+        vi.spyOn(c.investigation, 'previewUnsaved').mockRejectedValueOnce(new Error('down'));
+        await c.startFromSelected();
+        expect(c.investigation.unsaved()!.steps).toEqual([]);
+        // four-eyes: refused before any read
+        Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
+        const calls = expand.mock.calls.length;
+        await c.startFromSelected();
+        expect(expand.mock.calls.length).toBe(calls);
+        expect(c.investigation.unsaved()!.steps).toEqual([]);
+        expect(c.growExclude.lastChange()?.text).toContain('Save first');
+    });
+
+    it('an unsaved Expand through busy entities asks first, as the saved path does; No records nothing', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
+        const calls = expand.mock.calls.length;
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: false, threshold: 500 }, from: 'outer' });
+        expect(ask).toHaveBeenCalledWith(expect.stringContaining('Busy entities can pull in many unrelated entities'), expect.anything());
+        expect(expand.mock.calls.length).toBe(calls);
+        expect(c.investigation.unsaved()!.steps).toHaveLength(2);
+    });
+
+    it('Start from selected seeds every spelling of a merged node, as the tab\'s Start does', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({ start: { kind: 'dataset', datasetId: 'transfers' }, defaults: { name: 'A', purpose: 'B' }, timeCol: '', timeColZone: '', degrees: 0 });
+        const n = c.graph()!.nodes[0];
+        c.graph.set({ ...c.graph()!, nodes: [{ ...n, data: { ...n.data, spellings: ['ID-7', 'id 7'] } }, ...c.graph()!.nodes.slice(1)] });
+        c.onSelectionChange([n.id]);
+        await c.startFromSelected();
+        const [seed, ring1] = c.investigation.unsaved()!.steps;
+        expect(seed).toEqual(expect.objectContaining({ kind: 'seed', ids: ['ID-7', 'id 7'] }));
+        expect(ring1).toEqual(expect.objectContaining({ kind: 'expand', walked: [['ID-7', 'id 7']] }));
+    });
+
+    it('Add start entities… seeds the start form\'s values into the open Investigation as ONE step', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-1');
+        c.investigation.addingStart.set(true);
+        const apply = vi.spyOn(c.investigation, 'apply').mockResolvedValue(true);
+        const start = vi.spyOn(c, 'startUnsaved');
+        c.onStartForm({
+            start: { kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'A-2'] },
+            defaults: { name: '', purpose: '' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        await settle(fixture);
+        expect(start).not.toHaveBeenCalled(); // not a new unsaved start
+        expect(apply).toHaveBeenCalledWith({ op: 'seed', ids: ['A-1', 'A-2'], entityType: 'account' });
+        expect(c.investigation.addingStart()).toBe(false);
+    });
+
+    it('Close ▸ Save that stops partway keeps the saved Investigation open, its message on the tab', async () => {
+        const { fixture } = create({ datasets: [TRANSFERS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [{ kind: 'seed', ids: ['A-1'] }]);
+        vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmUnsavedChanges').mockResolvedValue('save');
+        vi.spyOn(c, 'saveUnsaved').mockImplementation(async () => {
+            c.investigation.unsaved.set(null);
+            c.investigation.activeId.set('inv-1');
+            c.investigation.error.set('Saved with 0 steps. Step 1 (Start from 1 entity) was refused: no.');
+            return true;
+        });
+        await c.closeOpenWork();
+        expect(c.investigation.activeId()).toBe('inv-1'); // not closed
+        expect(c.investigation.error()).toContain('was refused');
     });
 });
 
@@ -5897,26 +6276,22 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.destroy();
     });
 
-    it('with the New form in the Investigation tab, the centre shows a pointer instead of a second form', () => {
+    it('D1: on the Investigations level the centre is a pointer to the Investigation tab, never a second start form', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         const el = fixture.nativeElement as HTMLElement;
         c.toolboxDockOpen.set(true);
-        c.toolboxTab.set('investigation');
-        fixture.detectChanges();
-        expect(c.newFormInDock()).toBe(true);
-        const pointer = el.querySelector('[data-testid="la-start-pointer"]')?.textContent ?? '';
-        expect(pointer).toContain('Investigation tab');
-        expect(pointer).not.toMatch(/on the right|below/); // the dock stacks on narrow screens: no position words
-        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the New form only
         c.toolboxTab.set('browser');
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="la-start-pointer"]')).toBeNull();
-        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the centre box is back
+        const pointer = el.querySelector('[data-testid="la-start-pointer"]')?.textContent ?? '';
+        expect(pointer).toContain('Start from the Investigation tab');
+        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(0); // the tab is not open
+        c.toolboxTab.set('investigation');
+        fixture.detectChanges();
+        expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the tab's form only
         fixture.destroy();
     });
-
-    it('File ▸ New resets the New form: the last typed Name does not survive Close then New', async () => {
+    it('File ▸ New resets the start form: the last typed value does not survive Close then New', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         c.toolboxDockOpen.set(true);
@@ -5926,16 +6301,14 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
             .queryAll(By.directive(LinkAnalysisStartBoxComponent))
             .map((d) => d.componentInstance as LinkAnalysisStartBoxComponent)
             .find((b) => b.mode() === 'investigation')!;
-        form.form.controls.name.setValue('Ring 7 typed by hand');
-        form.form.controls.name.markAsDirty();
+        form.form.controls.value.setValue('typed by hand');
+        form.form.controls.degrees.setValue(3);
         await c.newWork();
         fixture.detectChanges();
-        expect(form.form.controls.name.value).not.toBe('Ring 7 typed by hand');
-        expect(form.form.controls.name.value).toBe(form.defaults().name);
-        expect(form.form.controls.name.pristine).toBe(true);
+        expect(form.form.controls.value.value).toBe('');
+        expect(form.form.controls.degrees.value).toBe(1);
         fixture.destroy();
     });
-
     it('a refused full screen says so in a toast instead of doing nothing', async () => {
         const { fixture } = create();
         fixture.detectChanges();
@@ -5961,7 +6334,7 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.destroy();
     });
 
-    it('an empty Working Set on the canvas says so, with a one-click "Show the query graph"', async () => {
+    it('an empty Working Set on the canvas says so, and how to pick start entities (no checkbox, no toggle)', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         // a real signal BEFORE the first read, so the page's computeds depend on it (as the layout-cap specs do)
@@ -5975,8 +6348,25 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.detectChanges();
         const empty = fixture.nativeElement.querySelector('[data-testid="la-empty-working-set"]') as HTMLElement;
         expect(empty?.textContent).toContain('The Working Set is empty');
-        (empty.querySelector('button') as HTMLButtonElement).click();
-        expect(c.investigation.showWorkingSet()).toBe(false);
+        expect(empty?.textContent).toContain('Add start entities');
+        expect(empty.querySelector('button')).toBeNull();
         fixture.destroy();
+    });
+});
+
+describe('mergeWorkingSets (LA-UNSAVED-INVESTIGATION-1)', () => {
+    const e = (id: string, hop: number, extra: object = {}) => ({ id, type: null, hop, seed: id, admittedBy: 1, hidden: false, kept: false, ...extra });
+    it('joins one previewed degree onto the Working Set so far: new entities one hop out, links once, busy flags kept', () => {
+        const prev = { entities: [e('a', 0), e('b', 1)], links: [{ source: 'a', target: 'b', kind: 'k', count: 1, admittedBy: 2 }], excluded: [], hash: '' };
+        const next = {
+            entities: [e('a', 0), e('b', 0, { highConnectivity: true }), e('c', 1)],
+            links: [{ source: 'a', target: 'b', kind: 'k', count: 1, admittedBy: 2 }, { source: 'b', target: 'c', kind: 'k', count: 1, admittedBy: 2 }],
+            excluded: [],
+            hash: '',
+        };
+        const m = mergeWorkingSets(prev, next);
+        expect(m.entities.map((x) => [x.id, x.hop, !!x.highConnectivity])).toEqual([['a', 0, false], ['b', 1, true], ['c', 2, false]]);
+        expect(m.links).toHaveLength(2);
+        expect(mergeWorkingSets(prev, { ...next, entities: [...next.entities, e('s', 0)] }, ['s']).entities.find((x) => x.id === 's')!.hop).toBe(0);
     });
 });

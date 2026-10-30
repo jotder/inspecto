@@ -12,6 +12,7 @@ import {
     InvestigationOpRequest,
     InvestigationReplayResult,
     InvestigationStepResult,
+    UnsavedPreviewResult,
     WorkingSet,
 } from '@inspecto/link-analysis/api/inv.service';
 import {
@@ -53,6 +54,14 @@ import {
     windowLabel,
 } from './investigate-number';
 import { laLimit } from './la-limits';
+import { growExpandBody } from './grow-exclude';
+import {
+    UnsavedBinding,
+    UnsavedInvestigation,
+    UnsavedSaveOutcome,
+    UnsavedStep,
+    replayStopMessage,
+} from './unsaved-investigation';
 
 /** The query parameter that keeps the open Investigation across a reload (`?investigation=<id>`). */
 export const INVESTIGATION_PARAM = 'investigation';
@@ -139,6 +148,171 @@ export class InvestigationSessionStore {
                 replaceUrl: true,
             });
         });
+    }
+
+    /**
+     * LA-UNSAVED-INVESTIGATION-1: the Investigation being worked on before Save — its binding, default Name and Purpose
+     * and the ordered steps taken; null = none. Nothing of it is on the server until {@link saveUnsaved}.
+     */
+    readonly unsaved = signal<UnsavedInvestigation | null>(null);
+    /** "Add start entities…" is open on the open Investigation: the tab shows the start form in add mode. */
+    readonly addingStart = signal(false);
+
+    /** Start working unsaved over this binding (any open Investigation is left first). */
+    beginUnsaved(binding: UnsavedBinding, defaults: { name: string; purpose: string }, steps: UnsavedStep[] = []): void {
+        this.close();
+        this.unsaved.set({ binding, defaults, draft: null, steps: [...steps] });
+    }
+
+    /** Append the steps just run on the canvas; nothing happens without unsaved work. */
+    recordUnsaved(...steps: UnsavedStep[]): void {
+        this.unsaved.update((u) => (u ? { ...u, steps: [...u.steps, ...steps] } : u));
+    }
+
+    /** The step route bodies these unsaved steps are: a seed, and one \`expand\` per walked degree with the presets laid under. */
+    unsavedOps(steps: readonly UnsavedStep[], b: UnsavedBinding): InvestigationOpRequest[] {
+        return steps.flatMap((s): InvestigationOpRequest[] =>
+            s.kind === 'seed'
+                ? [{ op: 'seed', ids: s.ids, ...(s.entityType ? { entityType: s.entityType } : {}) }]
+                : (s.walked ?? [s.ids]).map((ids) => growExpandBody(ids, s.req, this.withPresets(b.presets, {}))),
+        );
+    }
+
+    /**
+     * The Working Set these unsaved steps build, as the server evaluates them (\`POST /inv/expand/preview\`, the step
+     * route's own code): the screen draws exactly what Save will record.
+     */
+    previewUnsaved(steps: readonly UnsavedStep[], b: UnsavedBinding): Promise<UnsavedPreviewResult> {
+        const p = b.projection;
+        return firstValueFrom(
+            this.inv.previewUnsaved({
+                dataset: p.datasetId,
+                sourceCol: p.sourceCol,
+                targetCol: p.targetCol,
+                ...(p.linkKindCol ? { linkKindCol: p.linkKindCol } : {}),
+                ...(b.timeCol ? { timeCol: b.timeCol, ...(b.timeColZone ? { timeColZone: b.timeColZone } : {}) } : {}),
+                ...(b.eventsCol ? { eventsCol: b.eventsCol } : {}),
+                ...(p.entityType ? { entityType: p.entityType } : {}),
+                steps: this.unsavedOps(steps, b),
+            }),
+        );
+    }
+
+    /** Drop the newest unsaved step (the canvas Undo reversed it). */
+    popUnsaved(): void {
+        this.unsaved.update((u) => (u ? { ...u, steps: u.steps.slice(0, -1) } : u));
+    }
+
+    /** LA-DEGREES-TRIM-1: the newest unsaved step becomes this one (Degrees resized it); nothing happens without unsaved work. */
+    replaceLastUnsaved(step: UnsavedStep): void {
+        this.unsaved.update((u) => (u && u.steps.length ? { ...u, steps: [...u.steps.slice(0, -1), step] } : u));
+    }
+
+    /** Keep the Save dialog's edits, so a cancelled Save opens with them next time. */
+    keepSaveDraft(name: string, purpose: string): void {
+        this.unsaved.update((u) => (u ? { ...u, draft: { name, purpose } } : u));
+    }
+
+    discardUnsaved(): void {
+        this.unsaved.set(null);
+    }
+
+    /**
+     * Save: create the Investigation with this Name and Purpose, then replay the unsaved steps in order through the step
+     * route, so the server records each one. A refused create keeps the unsaved work; a step refused or held partway stops
+     * the replay — the Investigation stays open with the steps before it, and the outcome names what was not recorded.
+     */
+    async saveUnsaved(name: string, purpose: string): Promise<UnsavedSaveOutcome> {
+        const u = this.unsaved();
+        if (!u) return { created: false, recorded: 0, message: '' };
+        const b = u.binding;
+        const created = await this.start(
+            b.projection,
+            purpose,
+            name,
+            b.timeCol,
+            b.timeColZone,
+            b.eventsCol,
+            b.projection.entityType,
+            b.profileId,
+        );
+        if (!created) return { created: false, recorded: 0, message: this.error() };
+        this.unsaved.set(null);
+        this.windowEnd.set(b.windowEnd ?? null);
+        const id = this.activeId();
+        /** Server steps recorded so far: a seed is one, an Expand one per degree. */
+        let recorded = 0;
+        for (let i = 0; i < u.steps.length; i++) {
+            const step = u.steps[i];
+            const r = step.kind === 'seed' ? await this.replaySeed(step) : await this.replayExpand(step, b);
+            recorded += r.recorded;
+            if (this.activeId() !== id) return { created: true, recorded, message: '' };
+            if (r.ok === 'held') {
+                const message = replayStopMessage(u.steps, i + 1, 'held');
+                this.error.set(message); // kept on the tab, not only in a toast
+                return { created: true, recorded, message };
+            }
+            if (!r.ok) {
+                const message = replayStopMessage(u.steps, i + 1, 'refused', this.error(), recorded);
+                this.error.set(message);
+                return { created: true, recorded, message };
+            }
+        }
+        return { created: true, recorded, message: '' };
+    }
+
+    private async replaySeed(step: Extract<UnsavedStep, { kind: 'seed' }>): Promise<{ ok: boolean; recorded: number }> {
+        const ok = await this.apply({ op: 'seed', ids: step.ids, ...(step.entityType ? { entityType: step.entityType } : {}) });
+        if (ok) this.showWorkingSet.set(true);
+        return { ok, recorded: ok ? 1 : 0 };
+    }
+
+    /** The server Working Set's outer ring, as "Expand next degree" reads it (held hubs only when Hold is off). */
+    private outerFrontier(step: Extract<UnsavedStep, { kind: 'expand' }>, b: UnsavedBinding): string[] {
+        const d = degreeState(this.workingSet(), b.maxDegree, this.degreeOutcomes(), !step.req.hold, this.overrideSteps());
+        return step.req.hold ? d.frontier : [...d.frontier, ...d.heldHubs];
+    }
+
+    /** One unsaved Expand, degree by degree as `growInvestigation` walks it: the outer ring (or the named values) first. */
+    private async replayExpand(
+        step: Extract<UnsavedStep, { kind: 'expand' }>,
+        b: UnsavedBinding,
+    ): Promise<{ ok: boolean | 'held'; recorded: number }> {
+        // What the screen drew, degree by degree: one recorded expand per list, nothing more is walked. The explorer draw
+        // cannot apply the profile presets (window, minimum events, row budget, fan-out), so the server may have admitted
+        // fewer: each list is spoken in this Investigation's ids (\`exploreAliases\`), kept to what the Working Set holds,
+        // and a degree whose values the server never admitted expands from what the server's previous degree admitted.
+        if (step.walked) {
+            let recorded = 0;
+            let admitted = step.from === 'outer' ? this.outerFrontier(step, b) : [];
+            for (const values of step.walked) {
+                const ws = this.workingSet();
+                const back = new Map(Object.entries(ws?.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]));
+                const held = new Set((ws?.entities ?? []).map((e) => e.id));
+                const named = [...new Set(values.map((v) => back.get(v) ?? v))].filter((id) => held.has(id));
+                const ids = named.length ? named : admitted;
+                if (!ids.length) break;
+                if (!(await this.apply(growExpandBody(ids, step.req, this.withPresets(b.presets, {}))))) return { ok: false, recorded };
+                recorded++;
+                const done = this.lastStep();
+                if (done?.status === 'pending') return { ok: 'held', recorded };
+                const flagged = new Set(done?.read?.hubs?.map((h) => h.id) ?? []);
+                admitted = (done?.delta?.admitted ?? []).filter((x) => !flagged.has(x));
+            }
+            return { ok: true, recorded };
+        }
+        let recorded = 0;
+        let frontier = step.ids;
+        if (step.from === 'outer') frontier = this.outerFrontier(step, b);
+        for (let d = 1; d <= step.req.degrees && frontier.length; d++) {
+            if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}))))) return { ok: false, recorded };
+            recorded++;
+            const done = this.lastStep();
+            if (done?.status === 'pending') return { ok: 'held', recorded };
+            const flagged = new Set(done?.read?.hubs?.map((h) => h.id) ?? []);
+            frontier = (done?.delta?.admitted ?? []).filter((x) => !flagged.has(x));
+        }
+        return { ok: true, recorded };
     }
 
     /** Every Investigation this screen knows about (created here or restored from a saved view). */
@@ -297,6 +471,7 @@ export class InvestigationSessionStore {
         this.hubContacts.set(new Map());
         this.windowEnd.set(null);
         this.lastOverride.set(null);
+        this.addingStart.set(false);
     }
 
     /** Stop remembering an id (e.g. one the server no longer answers for). Nothing is deleted server-side. */

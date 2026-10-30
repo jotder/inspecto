@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.entitystore.MaskTokens;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.InvestigationStores;
 import com.gamma.la.core.InvestigationVersionConflictException;
@@ -156,6 +157,9 @@ public final class InvestigationRoutes implements RouteModule {
         // LA-GROW-EXCLUDE-1 GE-3: gated as the append it dry-runs (a lead's act on the main log), though it persists nothing
         api.post("/inv/investigations/([^/]+)/expand/preview", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> previewExpand(api, e, m.group(1), api.body(e))));
+        // LA-UNSAVED-INVESTIGATION-1: the unsaved Investigation's dry run - read-shaped like the explorer's neighbours reads
+        // (it persists nothing and names no Investigation), so it is exempt as they are
+        api.post("/inv/expand/preview", (e, m) -> previewUnsaved(api, e, api.body(e)));
         api.post("/inv/investigations/([^/]+)/undo", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> undo(api, e, m.group(1), api.body(e))));
         api.post("/inv/investigations/([^/]+)/reorder", ApiContext.withCapability("canManageIncidents",
@@ -597,7 +601,7 @@ public final class InvestigationRoutes implements RouteModule {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this expand is sensitive " + sensitive.get("exceeded")
                             + " - four-eyes approval applies to the main log, so a Draft cannot hold it; lower the budget / fan-out or ask a lead to expand");
                 if (sensitive != null) return masked(inv, requestExpansion(ex, inv, params, sensitive, before));
-                entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, ""), null, before.entities.keySet()));
+                entry.put("read", expandRead(api, ex, inv, params, fr, before));
             }
             return masked(inv, commit(ex, inv, log, entry, before));
         });
@@ -650,7 +654,7 @@ public final class InvestigationRoutes implements RouteModule {
         Map<String, Object> entry = entry(log.size() + 1, "op", ex);
         entry.put("op", "expand");
         entry.put("params", params);
-        entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, ""), null, before.entities.keySet()));
+        entry.put("read", expandRead(api, ex, inv, params, fr, before));
         Map<String, Object> e = roundTrip(entry);   // exactly what commit would evaluate
         List<Map<String, Object>> next = new ArrayList<>(log);
         next.add(e);
@@ -660,6 +664,164 @@ public final class InvestigationRoutes implements RouteModule {
         EntityMasking mask = EntityMasking.of(inv, next, List.of());   // the would-be log: a held id masks as it will once appended
         @SuppressWarnings("unchecked") Map<String, Object> answer = new LinkedHashMap<>((Map<String, Object>) mask.apply(out));
         answer.put("masking", mask.describe());
+        return answer;
+    }
+
+    /**
+     * The read an appended {@code expand} seals over {@code before} (its rung, then the read), ONE method for the append, the
+     * Investigation's Grow preview and the unsaved preview, so the three cannot drift.
+     */
+    private Map<String, Object> expandRead(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> params, Frontier fr,
+                                           InvestigationEvaluator.State before) {
+        return read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, ""), null, before.entities.keySet());
+    }
+
+    /** The ops an unsaved Investigation can take before it is saved (LA-UNSAVED-INVESTIGATION-1): starts and Expands. */
+    private static final Set<String> UNSAVED_OPS = Set.of("seed", "expand");
+    /**
+     * The longest step list one preview evaluates. The Studio sends the current Working Set as one seed plus the ONE degree it
+     * walks next (never the whole history), and a start sends its seed plus the ring: four leaves room, no more.
+     */
+    static final int UNSAVED_MAX_STEPS = 4;
+
+    /**
+     * {@code POST /inv/expand/preview} (LA-UNSAVED-INVESTIGATION-1) - the unsaved Investigation's dry run: the binding a
+     * create would take ({@code dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?,
+     * entityType?/sourceType?/targetType?}) and {@code steps}, the {@code seed} / {@code expand} bodies the step route would
+     * append, in order. Every step is validated, read and evaluated by the SAME code an append runs ({@link #params},
+     * {@link #requireBindings}, {@link #expandFrontier}, {@link #sensitivity}, {@link #expandRead}, the evaluator): the
+     * answer is the Working Set those steps would build - so the screen draws exactly what Save records - plus, per step,
+     * the entities it admitted. An expand the four-eyes thresholds make sensitive is not read: the walk stops there with
+     * {@code needsApproval} (it could not run unsaved). Nothing is stored and no event is written. Ids in and out are the
+     * Space's exploration aliases when it masks (DR-D2), as the explorer's reads speak them. Gates: write root 503 → a bad
+     * body or step 422 → unknown / not viewable Dataset 404 → a column the relation lacks or a bad zone 422.
+     */
+    @SuppressWarnings("unchecked")
+    Object previewUnsaved(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis unsaved preview");
+        String dataset = ApiContext.str(body, "dataset");
+        if (dataset == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        String sourceCol = ident(body, "sourceCol", true);
+        String targetCol = ident(body, "targetCol", true);
+        String kindCol = ident(body, "linkKindCol", false);
+        String timeCol = ident(body, "timeCol", false);
+        String eventsCol = ident(body, "eventsCol", false);
+        if (!(body.get("steps") instanceof List<?> steps) || steps.isEmpty() || steps.size() > UNSAVED_MAX_STEPS)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'steps': 1 to " + UNSAVED_MAX_STEPS
+                    + " seed / expand bodies - send the Working Set as one seed and the next degree, not the whole history");
+        String[] endpointTypes = endpointTypes(writeRoot, body);
+
+        String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);   // unknown / not viewable: 404
+        List<String> columns = relationColumns(dataset, relationSql);
+        for (String col : java.util.Arrays.asList(sourceCol, targetCol, kindCol, timeCol, eventsCol))
+            if (col != null && columns.stream().noneMatch(col::equalsIgnoreCase))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
+        String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(body, "timeColZone"));
+        requireEventsCol(dataset, relationSql, eventsCol);
+
+        // the header a create would seal: what every read and binding check below takes from it
+        Map<String, Object> header = new LinkedHashMap<>();
+        header.put("id", "unsaved");
+        header.put("dataset", dataset);
+        header.put("sourceCol", sourceCol);
+        header.put("targetCol", targetCol);
+        header.put("linkKindCol", kindCol);
+        if (timeCol != null) {
+            header.put("timeCol", timeCol);
+            header.put("timeColZone", timeColZone);
+        }
+        if (eventsCol != null) header.put("eventsCol", eventsCol);
+        if (endpointTypes[0] != null) header.put("sourceType", endpointTypes[0]);
+        if (endpointTypes[1] != null) header.put("targetType", endpointTypes[1]);
+        Inv inv = new Inv(null, writeRoot, "unsaved", header);   // no store: nothing below reads or writes one
+        ExplorationMasking mask = ExplorationMasking.of(writeRoot, dataset, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
+
+        List<Map<String, Object>> log = new ArrayList<>();
+        InvestigationEvaluator.State state = evaluate(log, -1, null);
+        List<Map<String, Object>> out = new ArrayList<>();
+        // the rows one preview may read, across all its expands: one expand's own maximum (each budget is at most that)
+        int maxRows = SpaceLimits.get(writeRoot, LaLimit.INVESTIGATION_EXPAND_BUDGET_MAX);
+        long rowsAsked = 0;
+        for (int i = 0; i < steps.size(); i++) {
+            if (!(steps.get(i) instanceof Map<?, ?> raw))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "step " + (i + 1) + " must be an object");
+            Map<String, Object> b = new LinkedHashMap<>((Map<String, Object>) raw);
+            String op = ApiContext.str(b, "op");
+            if (op == null || !UNSAVED_OPS.contains(op))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "step " + (i + 1) + ": an unsaved Investigation takes "
+                        + new TreeSet<>(UNSAVED_OPS) + " only, got '" + op + "'");
+            // the explorer's aliases in, the raw values the reads take. On a masked Space ONLY an alias this Space served is
+            // taken: a raw value would come back as its alias and let a caller match guesses in bulk (ReferenceRows' rule)
+            for (String k : List.of("ids", "expandHubs", "only"))
+                if (b.get(k) instanceof List<?> l) {
+                    List<String> in = new ArrayList<>();
+                    for (Object v : l) {
+                        String id = String.valueOf(v);
+                        if (mask.active() && !id.startsWith(MaskTokens.TOKEN_PREFIX))
+                            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "step " + (i + 1) + ": this Space masks entity ids, "
+                                    + "so '" + k + "' takes only the aliases its reads served - draw the entity first, then start from it");
+                        in.add(mask.in(id));
+                    }
+                    b.put(k, in);
+                }
+            Map<String, Object> params = params(op, b, SpaceLimits.of(writeRoot));
+            requireBindings(header, op, params, "step " + (i + 1) + ": ");
+            Map<String, Object> entry = entry(log.size() + 1, "op", ex);
+            entry.put("op", op);
+            entry.put("params", params);
+            if (op.equals("expand")) {
+                for (String id : strings(params.get("ids")))
+                    if (!state.entities.containsKey(id))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "step " + (i + 1) + ": '" + mask.out(id) + "' is not in the Working Set");
+                Frontier fr = expandFrontier(inv, params, state);
+                Map<String, Object> sensitive = sensitivity(inv, params);
+                if (sensitive != null) {
+                    Map<String, Object> held = new LinkedHashMap<>();
+                    held.put("step", i + 1);
+                    held.put("needsApproval", true);
+                    held.put("exceeded", sensitive.get("exceeded"));
+                    out.add(held);
+                    break;
+                }
+                rowsAsked += ((Number) params.get("budget")).longValue();
+                if (rowsAsked > maxRows)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this preview would read up to " + rowsAsked
+                            + " rows; one preview reads at most " + maxRows + " - preview one degree at a time");
+                Map<String, Object> read = expandRead(api, ex, inv, params, fr, state);
+                entry.put("read", read);
+                // audited as the explorer's neighbours read is: one event per read, the values as the caller sees them
+                List<String> from = new ArrayList<>();
+                for (String f : strings(params.get("ids"))) from.add(mask.out(f));
+                InvRoutes.audit(ex, dataset, String.join(",", from), ((Number) read.get("rowCount")).intValue(),
+                        Boolean.TRUE.equals(read.get("truncated")), null);
+            }
+            log.add(roundTrip(entry));
+            InvestigationEvaluator.State next = evaluate(log, -1, null);
+            List<String> admitted = new ArrayList<>();
+            for (String id : next.entities.keySet()) if (!state.entities.containsKey(id)) admitted.add(mask.out(id));
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("step", i + 1);
+            line.put("op", op);
+            line.put("needsApproval", false);
+            line.put("admitted", admitted);
+            out.add(line);
+            state = next;
+        }
+        Map<String, Object> ws = state.toMap();
+        for (Object o : (List<Object>) ws.get("entities")) {
+            Map<String, Object> e = (Map<String, Object>) o;
+            e.put("id", mask.out(String.valueOf(e.get("id"))));
+            if (e.get("seed") != null) e.put("seed", mask.out(String.valueOf(e.get("seed"))));
+        }
+        for (Object o : (List<Object>) ws.get("links")) {
+            Map<String, Object> l = (Map<String, Object>) o;
+            l.put("source", mask.out(String.valueOf(l.get("source"))));
+            l.put("target", mask.out(String.valueOf(l.get("target"))));
+        }
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("workingSet", ws);
+        answer.put("steps", out);
+        answer.put("masked", mask.active());
         return answer;
     }
 
@@ -2984,7 +3146,7 @@ public final class InvestigationRoutes implements RouteModule {
             entry.put("op", "expand");
             entry.put("params", params);
             entry.put("approval", approval);
-            entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, ""), null, before.entities.keySet()));
+            entry.put("read", expandRead(api, ex, inv, params, fr, before));
             return (Map<String, Object>) commit(ex, inv, log, entry, before);
                 });
             } catch (IOException | RuntimeException failed) {

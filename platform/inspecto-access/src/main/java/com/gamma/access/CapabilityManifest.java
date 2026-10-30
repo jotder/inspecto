@@ -558,6 +558,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/inv/projection", "read-shaped", "computes a projection from the body"),
             new Exemption("POST", "/inv/projection/neighbors", "read-shaped", "computes neighbours from the body"),
             new Exemption("POST", "/inv/projection/neighbors/preview", "read-shaped", "counts what one neighbours step would add (LA-GROW-EXCLUDE-1); persists nothing"),
+            new Exemption("POST", "/inv/expand/preview", "read-shaped", "evaluates an unsaved Investigation's seed / expand steps (LA-UNSAVED-INVESTIGATION-1); persists nothing"),
             new Exemption("POST", "/inv/projection/multi", "read-shaped", "computes a multi-dataset projection from the body; persists nothing"),
             new Exemption("POST", "/inv/schema/overlap-profile", "read-shaped", "profiles column cardinality/overlap; persists nothing"),
             new Exemption("POST", "/inv/reference-rows", "read-shaped", "looks up reference rows for at most 500 entity keys; persists nothing"),

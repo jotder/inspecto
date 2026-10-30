@@ -25,14 +25,14 @@ export type StartRequest =
     | { kind: 'found'; datasetId: string; values: string[]; what: string };
 
 /**
- * The New Investigation form's answer (LA-PANELS-REDESIGN-1): what to start from, the name and reason, the time column
- * read settings, and how many degrees to expand on start (0 = none - the standalone Expand… stays for later).
+ * The Investigation tab's start form's answer (LA-UNSAVED-INVESTIGATION-1): what to start from, the time column read
+ * settings and how many degrees to draw (the start draws one ring; 0 for a seedless start). No Name or Purpose: the work
+ * is unsaved, and `defaults` is what Save's dialog opens with.
  */
-export interface NewInvestigationRequest {
-    /** `graph` = a seedless Investigation over the graph on screen (its one mapping). */
+export interface UnsavedStartRequest {
+    /** `graph` = a seedless start over the graph on screen (its one mapping). */
     start: Exclude<StartRequest, { kind: 'found' }> | { kind: 'graph' };
-    title: string;
-    purpose: string;
+    defaults: { name: string; purpose: string };
     /** '' = the Dataset's own time column. */
     timeCol: string;
     timeColZone: string;

@@ -98,22 +98,44 @@ export const INVESTIGATION_SECTION_LABELS: Record<InvestigationSection, string> 
     excluded: 'Investigation exclusions',
 };
 type MoreStepId = 'window' | 'threshold' | 'snapshot' | 'compare' | 'connect';
-const MORE_STEPS: readonly { id: MoreStepId; label: string }[] = [
-    { id: 'window', label: 'Time window' },
-    { id: 'threshold', label: 'Threshold' },
-    { id: 'snapshot', label: 'Snapshot marker' },
-    { id: 'compare', label: 'Compare' },
-    { id: 'connect', label: 'Connect start entities' },
+/** One heading of the Steps section and its actions (LA-UNSAVED-INVESTIGATION-1: groups of buttons, not a menu). */
+export interface StepGroup {
+    id: string;
+    title: string;
+    steps: readonly { id: MoreStepId; label: string }[];
+}
+/** The Steps section, in order of importance: each action directly reachable as a button under its group. */
+export const STEP_GROUPS: readonly StepGroup[] = [
+    { id: 'connect', title: 'Connect', steps: [{ id: 'connect', label: 'Connect start entities' }] },
+    {
+        id: 'time',
+        title: 'Time',
+        steps: [
+            { id: 'window', label: 'Time window' },
+            { id: 'snapshot', label: 'Snapshot marker' },
+        ],
+    },
+    {
+        id: 'compare',
+        title: 'Compare',
+        steps: [
+            { id: 'threshold', label: 'Threshold' },
+            { id: 'compare', label: 'Compare' },
+        ],
+    },
 ];
+const MORE_STEPS = STEP_GROUPS.flatMap((g) => g.steps);
 
 import { LaFoldComponent } from './la-fold.component';
+import { NgTemplateOutlet } from '@angular/common';
+import { DISABLED_REASON } from './disabled-reasons';
 import { laLimit } from './la-limits';
 
 @Component({
     selector: 'inspecto-link-analysis-investigation',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [LaFoldComponent, PenFieldComponent, 
+    imports: [LaFoldComponent, PenFieldComponent, NgTemplateOutlet,
         FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
@@ -184,9 +206,26 @@ export class LinkAnalysisInvestigationComponent {
     /** "Open the Op log": the screen opens that dock tab. */
     readonly dockRequested = output<InvestigationSection>();
     readonly sectionLabel = computed(() => INVESTIGATION_SECTION_LABELS[this.section()]);
-    /** More steps ▾ (§5.8 block 7): the one step open in place, or null. */
-    readonly moreSteps = MORE_STEPS;
+    /** The Steps section (§5.8 block 7): its groups, and the one step open in place, or null. */
+    readonly stepGroups = STEP_GROUPS;
     readonly moreStep = signal<MoreStepId | null>(null);
+    /** The open step when it belongs to this group (it opens under its own group). */
+    moreStepIn(g: StepGroup): MoreStepId | null {
+        const m = this.moreStep();
+        return m && g.steps.some((x) => x.id === m) ? m : null;
+    }
+
+    // ── LA-UNSAVED-INVESTIGATION-1: working before Save ──
+    /** How many entities are selected on the canvas: Start from selected names them. */
+    readonly selectionCount = input(0);
+    /** Save…: the page asks for the Name and Purpose and records the steps. */
+    readonly saveRequested = output<void>();
+    /** Close of the unsaved work: the page asks Save, Discard or Cancel. */
+    readonly closeRequested = output<void>();
+    /** Start from selected: the page draws the selection's links and records them as start entities. */
+    readonly startFromSelected = output<void>();
+    readonly saveNeeds = needsPermission('canManageIncidents');
+    readonly pickNode = DISABLED_REASON.selectEntities;
     readonly moreStepLabel = computed(() => MORE_STEPS.find((m) => m.id === this.moreStep())?.label ?? '');
 
     // ── Settings ▸ General: rename and restate the purpose (LA-INVESTIGATION-RENAME-1) ──
@@ -399,10 +438,6 @@ export class LinkAnalysisInvestigationComponent {
     readonly degreeSteps = computed(() => Array.from({ length: this.maxDegree() }, (_, i) => i + 1));
     readonly outcomeMessage = degreeOutcomeMessage;
 
-    async expandNextDegree(): Promise<void> {
-        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
-        await this.store.expandNextDegree(this.degreePresets(), this.maxDegree());
-    }
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 
     readonly title = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });

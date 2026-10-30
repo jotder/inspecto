@@ -1215,14 +1215,12 @@
                     >
                         <p class="sr-only" role="status" data-testid="la-draw-announcement">{{ drawAnnouncement() }}</p>
                         @if (emptyWorkingSet()) {
-                            <!-- a seedless Investigation draws nothing yet: say so on the canvas, with the one-click way back -->
+                            <!-- a seedless Investigation draws nothing yet: say so on the canvas -->
                             <inspecto-empty-state
                                 class="absolute inset-x-0 top-1/4 z-10 mx-auto block w-full max-w-md p-4"
                                 icon="heroicons_outline:magnifying-glass-plus"
                                 title="The Working Set is empty"
-                                message="No start entities yet. Show the full graph to pick some."
-                                actionLabel="Show the query graph"
-                                (action)="investigation.showWorkingSet.set(false)"
+                                message="No start entities yet. In the Investigation tab choose Add start entities…, or select entities on a graph and choose Start."
                                 data-testid="la-empty-working-set"
                             ></inspecto-empty-state>
                         }
@@ -1427,25 +1425,28 @@
                                 data-testid="investigate-issue"
                             ></inspecto-empty-state>
                         }
-                        @if (newFormInDock()) {
-                            <!-- the Investigation tab's New form is on screen: one form for one job, so only a pointer here -->
-                            <p class="text-secondary m-0 max-w-md p-4 text-center text-sm" data-testid="la-start-pointer">
-                                Use New Investigation in the Investigation tab.
-                            </p>
+                        @if (investigationsEnabled()) {
+                            <!-- LA-UNSAVED-INVESTIGATION-1 D1: the start form lives only in the Investigation tab -->
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                class="m-4"
+                                data-testid="la-start-pointer"
+                                (click)="openNewInvestigation()"
+                            >
+                                Start from the Investigation tab →
+                            </button>
                         } @else {
                             <inspecto-link-analysis-start-box
                                 [catalogue]="startCatalogue()"
                                 [lists]="entityLists()"
                                 [dataset]="startDataset()"
-                                [investigations]="investigationsEnabled()"
-                                [canWrite]="canStartInvestigation()"
                                 [nodeCap]="nodeCap()"
                                 [notice]="startNotice()"
                                 [busy]="starting()"
                                 [addData]="addDataOffered"
                                 (start)="startFrom($event)"
                                 (listsWanted)="refreshEntityLists()"
-                                (newInvestigation)="openNewInvestigation()"
                                 (openAddData)="openAddData()"
                             ></inspecto-link-analysis-start-box>
                         }
@@ -1603,9 +1604,13 @@
                                     (pendingDone)="pendingInvestigation.set(null)"
                                     (settingsRequested)="openSettings('investigation')"
                                     (dockRequested)="openDock($event)"
+                                    [selectionCount]="selectionCount()"
+                                    (saveRequested)="saveUnsaved()"
+                                    (closeRequested)="closeOpenWork()"
+                                    (startFromSelected)="startFromSelected()"
                                 >
-                                    <!-- LA-INV-EXPAND-1: for an open Investigation, Expand is a section of this tab -->
-                                    @if (growMode() === 'investigation') {
+                                    <!-- LA-INV-EXPAND-1: Expand is a section of this tab, for an open or an unsaved Investigation -->
+                                    @if (growMode() === 'investigation' || investigation.unsaved()) {
                                         <inspecto-link-analysis-expand
                                             #tabExpand
                                             laExpand
@@ -1614,15 +1619,12 @@
                                             [ctx]="growContext()"
                                             [presets]="degreePresets()"
                                             [limits]="fourEyesLimits()"
+                                            [lastExpand]="lastExpandDegrees()"
                                             (expand)="onExpand($event)"
+                                            (degreesChange)="onDegreesChange($event)"
                                         ></inspecto-link-analysis-expand>
-                                    } @else if (!investigation.showWorkingSet()) {
-                                        <!-- the full graph is drawn instead of the Working Set: say why the section has no form -->
-                                        <p laExpand class="text-secondary m-0 text-sm" data-testid="expand-full-graph">
-                                            Expand works on the Working Set; untick “Show the full graph to pick start entities”.
-                                        </p>
                                     }
-                                    <!-- LA-PANELS-REDESIGN-1: ONE New Investigation form (File ▸ New lands here) -->
+                                    <!-- the ONE start form (File ▸ New and the centre pointer land here); it starts unsaved -->
                                     <inspecto-link-analysis-start-box
                                         #newInvForm
                                         laNewInvestigation
@@ -1630,7 +1632,6 @@
                                         [catalogue]="startCatalogue()"
                                         [lists]="entityLists()"
                                         [dataset]="startDataset()"
-                                        [investigations]="true"
                                         [nodeCap]="nodeCap()"
                                         [notice]="startNotice()"
                                         [busy]="starting() || investigation.busy() || investigation.chainRunning()"
@@ -1638,7 +1639,10 @@
                                         [maxDegree]="maxDegree()"
                                         [canWrite]="canStartInvestigation()"
                                         [graphOnScreen]="graphOnScreen()"
-                                        (create)="createInvestigation($event)"
+                                        [columns]="startColumns()"
+                                        (datasetPicked)="readStartColumns($event)"
+                                        [adding]="investigation.active()"
+                                        (create)="onStartForm($event)"
                                         (listsWanted)="refreshEntityLists()"
                                     ></inspecto-link-analysis-start-box>
                                 </inspecto-link-analysis-investigation>
@@ -1762,6 +1766,18 @@
                     [style.height.px]="dockSplit.width()"
                 >
                     @switch (dockTabShown()) {
+                        @case ('steps') {
+                            <p class="text-secondary m-0 mb-2 text-sm">Nothing is recorded yet. Save asks for a Name and a Purpose, then records these steps in order.</p>
+                            @if (unsavedStepLines().length) {
+                                <ol class="m-0 flex flex-col gap-0.5 pl-5 text-sm" data-testid="dock-steps">
+                                    @for (line of unsavedStepLines(); track $index) {
+                                        <li>{{ line }}</li>
+                                    }
+                                </ol>
+                            } @else {
+                                <p class="text-secondary m-0 text-sm" data-testid="dock-steps-empty">No start entities yet: select some on the graph.</p>
+                            }
+                        }
                         @case ('rows') {
                         <div class="mb-2 flex flex-wrap items-center gap-2">
                             <mat-button-toggle-group

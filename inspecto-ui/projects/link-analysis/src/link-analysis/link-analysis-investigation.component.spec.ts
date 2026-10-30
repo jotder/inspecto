@@ -41,6 +41,10 @@ import { configureLaLimits, resetLaLimits } from './la-limits';
         (pendingDone)="pending.set(null)"
         (settingsRequested)="settingsAsked = true"
         (dockRequested)="dockAsked = $event"
+        [selectionCount]="selectionCount()"
+        (saveRequested)="saveAsked = saveAsked + 1"
+        (closeRequested)="closeAsked = closeAsked + 1"
+        (startFromSelected)="startAsked = startAsked + 1"
     ><p laNewInvestigation data-testid="projected-new-form">New Investigation form</p
     ><p laExpand data-testid="projected-expand">Expand form</p></inspecto-link-analysis-investigation>
     <!-- §5.8/§5.9: the parts the Act panel handed to the dock and the settings sections, over the same store -->
@@ -55,6 +59,10 @@ class Host {
     readonly sections: InvestigationSection[] = ['settings', 'oplog', 'ws-rows', 'coverage', 'annotations', 'excluded'];
     settingsAsked = false;
     dockAsked: InvestigationSection | null = null;
+    readonly selectionCount = signal(0);
+    saveAsked = 0;
+    closeAsked = 0;
+    startAsked = 0;
 }
 
 const LOG: InvestigationLog = {
@@ -835,20 +843,13 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         expect(host.pending()).toBeNull();
     });
 
-    it('"Expand next degree" shows the degree, the per-degree result, and stops at degree 4', async () => {
+    it('the Expand section shows the degree reached and the per-degree results, with ONE Expand control', async () => {
         const { fixture, el, store } = create();
         await openInv(store);
-        // The fixture log's expand (step 2) admitted nobody, so its rebuilt line would block the ladder; start fresh.
         store.degreeOutcomes.set([]);
         fixture.detectChanges();
-        const next = () => el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement;
         expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('Degree 0 of 4');
-        expect(next().disabled).toBe(false);
-
-        const spy = vi.spyOn(store, 'expandNextDegree').mockResolvedValue(true);
-        next().click();
-        expect(spy).toHaveBeenCalledWith({ budget: 2000 }, 4);
-
+        expect(el.querySelector('[data-testid="expand-next-degree"]')).toBeNull(); // merged into the one Expand form
         store.degreeOutcomes.set([
             { degree: 1, admitted: 3, linksAdded: 4, truncated: true, fanOutCapped: 0, budget: 2000 },
         ]);
@@ -861,7 +862,6 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         });
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('Degree 4 of 4');
-        expect(next().disabled).toBe(true);
         expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Degree 4 reached');
         expect(el.querySelector('[aria-label="Degree results"]')?.textContent).toContain(
             'Degree 1: 3 new entities, 4 links added. The read stopped at its budget of 2,000 rows',
@@ -993,16 +993,13 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
     });
 
-    it('"Expand next degree" (the quick action) never passes through a held hub, and says to use Expand… or Expand anyway', async () => {
+    it('the next degree (the chain Save and deep links use) never passes through a held hub, and the tab says how to', async () => {
         const confirm = vi.fn(async () => true);
         const { fixture, store, el, inv } = create({ ws: HUB_WS, confirm });
         await openInv(store);
         inv.appendInvestigationOp.mockReturnValue(stepResult(3) as never);
         fixture.detectChanges();
-        const next = () => el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement;
-
-        next().click(); // not opted in: the hub stays out of the frontier, no override, no confirmation
-        await fixture.whenStable();
+        await store.expandNextDegree({ budget: 2000 }, 4);
         expect(confirm).not.toHaveBeenCalled();
         const first = inv.appendInvestigationOp.mock.calls[0] as unknown as [string, Record<string, unknown>];
         expect(first[1]['ids']).toEqual(['b']);
@@ -1011,7 +1008,6 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold busy entities” under Expand ▸ Limits');
     });
-
     it('badges a hub with the sealed count its step read answered when the Working Set row has none', async () => {
         const { fixture, store, el } = create({ ws: HUB_WS });
         await openInv(store);
@@ -1035,8 +1031,6 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         };
         store.degreeOutcomes.set([held]);
         fixture.detectChanges();
-        const next = el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement;
-        expect(next.disabled).toBe(true);
         expect(el.querySelector('[data-testid="degree-blocked"]')).toBeNull();
         expect(el.textContent?.match(/waiting for approval/g)?.length).toBe(1);
         await expectNoA11yViolations(el);
@@ -1058,9 +1052,10 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(section.querySelector('#act-expand-title')!.textContent!.trim()).toBe('Expand');
         const form = section.querySelector('[data-testid="projected-expand"]')!;
         expect(form).not.toBeNull();
-        // the quick "Expand next degree" sits beside the degree reached, above the form
-        const next = section.querySelector('[data-testid="expand-next-degree"]')!;
-        expect(next.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // ONE control: the degree reached sits above the form, and there is no separate "Expand next degree"
+        expect(section.querySelector('[data-testid="expand-next-degree"]')).toBeNull();
+        const reached = section.querySelector('[data-testid="degree-label"]')!;
+        expect(reached.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         // the old "Expand…" opener is gone: the form is right here
         expect(el.querySelector('[data-testid="expand-dialog-open"]')).toBeNull();
         expect(section.querySelector('[data-testid="expand-read-only"]')).toBeNull();
@@ -1075,12 +1070,19 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(el.querySelector('[data-testid="expand-read-only"]')!.textContent).toContain('Needs Incident management.');
     });
 
-    it('nothing seeded: "Expand next degree" is locked, and the reason shows (UI test 2026-10-29)', async () => {
+    it('nothing seeded: the Expand section says why the next degree cannot run (UI test 2026-10-29)', async () => {
         const { fixture, store, el } = create({ ws: { ...WS, entities: [], links: [] } });
         await openInv(store);
         fixture.detectChanges();
-        expect((el.querySelector('[data-testid="expand-next-degree"]') as HTMLButtonElement).disabled).toBe(true);
         expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Seed an entity first.');
+    });
+
+    it('LA-UNSAVED-INVESTIGATION-1 D3: no "Show the full graph to pick start entities" checkbox', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.textContent).not.toContain('Show the full graph');
+        expect(el.querySelector('mat-checkbox')?.textContent ?? '').not.toContain('full graph');
     });
 });
 
@@ -1160,7 +1162,7 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
         fixture.detectChanges();
         const panel = act(el);
         expect(panel.querySelector('la-fold')).toBeNull();
-        const order = ['act-header', 'degrees', 'act-selected', 'scope-list', 'act-more-steps', 'act-links'].map(
+        const order = ['act-header', 'degrees', 'act-selected', 'act-step-groups', 'scope-list', 'act-links'].map(
             (id) => panel.querySelector(`[data-testid="${id}"]`),
         );
         expect(order.every(Boolean)).toBe(true);
@@ -1351,5 +1353,99 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
         for (const s of ['oplog', 'ws-rows', 'coverage', 'annotations', 'excluded'] as InvestigationSection[]) {
             expect(part(el, s).querySelector('section')!.children.length).toBe(0);
         }
+    });
+});
+
+describe('LinkAnalysisInvestigationComponent - the steps in visible groups (LA-UNSAVED-INVESTIGATION-1)', { timeout: 45_000 }, () => {
+    it('every step is a button under its group heading (no menu), and opens in place under that group', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        const groups = el.querySelector('[data-testid="act-step-groups"]') as HTMLElement;
+        expect(el.querySelector('[data-testid="more-steps"]')).toBeNull(); // the "More steps" menu is gone
+        const heads = Array.from(groups.querySelectorAll('[role="group"]')).map((g) => g.getAttribute('aria-label'));
+        expect(heads).toEqual(['Connect', 'Time', 'Compare']);
+        const buttons = Array.from(groups.querySelectorAll('button')).map((b) => b.textContent!.trim());
+        expect(buttons).toEqual(['Connect start entities', 'Time window', 'Snapshot marker', 'Threshold', 'Compare']);
+        const window = groups.querySelector('[data-testid="step-window"]') as HTMLButtonElement;
+        window.click();
+        fixture.detectChanges();
+        expect(window.getAttribute('aria-expanded')).toBe('true');
+        const open = groups.querySelector('[data-testid="step-group-time"] [data-testid="step-open"]');
+        expect(open?.querySelector('inspecto-la-window-op')).not.toBeNull();
+        window.click(); // a second press closes it
+        fixture.detectChanges();
+        expect(groups.querySelector('[data-testid="step-open"]')).toBeNull();
+        await expectNoA11yViolations(groups);
+    });
+});
+
+describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIGATION-1)', { timeout: 45_000 }, () => {
+    const begin = (store: InvestigationSessionStore) =>
+        store.beginUnsaved(
+            { projection: { datasetId: 'calls', sourceCol: 'A', targetCol: 'B' }, presets: {}, maxDegree: 4 },
+            { name: 'Account', purpose: 'Review of an Account and its links' },
+            [
+                { kind: 'seed', ids: ['a', 'b'] },
+                { kind: 'expand', from: 'outer', ids: [], req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } },
+            ],
+        );
+
+    it('shows the Unsaved marker with Save, Expand and Start from selected - not the start form', async () => {
+        const { fixture, store, el } = create();
+        begin(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="unsaved-marker"]')?.textContent?.trim()).toBe('Unsaved');
+        expect(el.querySelector('[data-testid="projected-new-form"]')).toBeNull();
+        expect(el.querySelector('[data-testid="unsaved-steps"]')).toBeNull(); // the steps are the dock's Steps tab
+        expect(el.querySelector('[data-testid="projected-expand"]')).not.toBeNull();
+        const start = el.querySelector('[data-testid="unsaved-start-selected"]') as HTMLButtonElement;
+        expect(start.getAttribute('aria-disabled') === 'true' || start.disabled).toBe(true);
+        expect(el.querySelector('[data-testid="unsaved-start-entities"]')!.textContent).toContain('Select entities first.');
+        fixture.componentInstance.selectionCount.set(2);
+        fixture.detectChanges();
+        start.click();
+        expect(fixture.componentInstance.startAsked).toBe(1);
+        (el.querySelector('[data-testid="unsaved-save"]') as HTMLButtonElement).click();
+        expect(fixture.componentInstance.saveAsked).toBe(1);
+        (el.querySelector('[data-testid="unsaved-close"]') as HTMLButtonElement).click();
+        expect(fixture.componentInstance.closeAsked).toBe(1);
+        expect(el.querySelector('[data-testid="unsaved-save-first"]')?.textContent).toContain('Save first');
+        await expectNoA11yViolations(el);
+    });
+
+    it('a reader without Incident management may explore, but Save is disabled and says why', async () => {
+        const { fixture, store, el } = create({ canManage: false });
+        begin(store);
+        fixture.detectChanges();
+        const save = el.querySelector('[data-testid="unsaved-save"]') as HTMLButtonElement;
+        expect(save.getAttribute('aria-disabled')).toBe('true');
+        expect(el.querySelector('[data-testid="unsaved-save-why"]')?.textContent?.trim()).toBe('Needs Incident management.');
+        expect(save.getAttribute('aria-describedby')).toBe('unsaved-save-why');
+        save.click();
+        expect(fixture.componentInstance.saveAsked).toBe(0);
+        await expectNoA11yViolations(el);
+    });
+});
+
+describe('LinkAnalysisInvestigationComponent - Add start entities… (LA-UNSAVED-INVESTIGATION-1 review)', { timeout: 45_000 }, () => {
+    it('opens the start form on the open Investigation, to pick start entities outside the Working Set', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="projected-new-form"]')).toBeNull();
+        const add = el.querySelector('[data-testid="add-start-entities"]') as HTMLButtonElement;
+        add.click();
+        fixture.detectChanges();
+        expect(add.getAttribute('aria-expanded')).toBe('true');
+        expect(el.querySelector('[data-testid="act-add-start"] [data-testid="projected-new-form"]')).not.toBeNull();
+        await expectNoA11yViolations(el.querySelector('[data-testid="act-add-start"]') as HTMLElement);
+    });
+
+    it('is not offered to a reader', async () => {
+        const { fixture, store, el } = create({ canManage: false });
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="add-start-entities"]')).toBeNull();
     });
 });
