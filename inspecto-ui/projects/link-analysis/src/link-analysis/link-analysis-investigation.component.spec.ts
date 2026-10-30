@@ -1391,14 +1391,13 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
             ],
         );
 
-    it('shows the Unsaved marker with Save, the steps in order, Expand and Start from selected - not the start form', async () => {
+    it('shows the Unsaved marker with Save, Expand and Start from selected - not the start form', async () => {
         const { fixture, store, el } = create();
         begin(store);
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="unsaved-marker"]')?.textContent?.trim()).toBe('Unsaved');
         expect(el.querySelector('[data-testid="projected-new-form"]')).toBeNull();
-        const steps = Array.from(el.querySelectorAll('[data-testid="unsaved-steps"] li')).map((li) => li.textContent!.trim());
-        expect(steps).toEqual(['Start from 2 entities', 'Expand 1 degree from the outer ring, both ways']);
+        expect(el.querySelector('[data-testid="unsaved-steps"]')).toBeNull(); // the steps are the dock's Steps tab
         expect(el.querySelector('[data-testid="projected-expand"]')).not.toBeNull();
         const start = el.querySelector('[data-testid="unsaved-start-selected"]') as HTMLButtonElement;
         expect(start.getAttribute('aria-disabled') === 'true' || start.disabled).toBe(true);

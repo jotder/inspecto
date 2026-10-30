@@ -121,7 +121,7 @@ import {
     SaveInvestigationDialogData,
     SaveInvestigationDialogResult,
 } from './link-analysis-save-investigation.dialog';
-import { UNSAVED_FOUR_EYES, UNSAVED_FOUR_EYES_START, UnsavedBinding, UnsavedStep } from './unsaved-investigation';
+import { UNSAVED_FOUR_EYES, UNSAVED_FOUR_EYES_START, UnsavedBinding, UnsavedStep, unsavedStepLine } from './unsaved-investigation';
 import type { WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { HeldItem, LinkAnalysisHeldTrayComponent } from './link-analysis-held-tray.component';
 import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.component';
@@ -426,11 +426,12 @@ export function nodeDisplayId(id: string, types: readonly (string | null | undef
 }
 
 /** The bottom dock's tabs (§5.9); `inv` = an Investigation tab. */
-export type DockTab = 'rows' | InvestigationSection | 'results';
+export type DockTab = 'rows' | 'steps' | InvestigationSection | 'results';
 /** The right dock's tabs (LA-PANELS-REDESIGN-1). */
 export type ToolboxTab = 'browser' | 'server' | 'investigation';
-const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean }[] = [
+const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean; unsaved?: boolean }[] = [
     { id: 'rows', label: 'Rows' },
+    { id: 'steps', label: 'Steps', unsaved: true },
     { id: 'oplog', label: 'Step log', inv: true },
     { id: 'ws-rows', label: 'Working Set rows', inv: true },
     { id: 'coverage', label: 'Coverage', inv: true },
@@ -1541,10 +1542,17 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly dockShown = computed(() => !!this.graph() || this.workingSetCanvas() || !!this.investigation.active());
     /** The dock's chosen tab; an Investigation tab falls back to Rows while none is open (see `dockTabShown`). */
     readonly dockTab = signal<DockTab>(readDock().tab);
-    /** The dock's tabs: Rows always; the Investigation's only while one is open, and never on the Explorer level. */
-    readonly dockTabs = computed<readonly { id: DockTab; label: string }[]>(() =>
-        this.investigationsEnabled() && this.investigation.active() ? DOCK_TABS : DOCK_TABS.filter((t) => !t.inv),
-    );
+    /**
+     * The dock's tabs: Rows and Results always; the Investigation's only while one is open (never on the Explorer level);
+     * Steps only while an unsaved Investigation is (an open one has the Step log).
+     */
+    readonly dockTabs = computed<readonly { id: DockTab; label: string }[]>(() => {
+        const open = this.investigationsEnabled() && !!this.investigation.active();
+        const unsaved = this.investigationsEnabled() && !!this.investigation.unsaved();
+        return DOCK_TABS.filter((t) => (t.inv ? open : t.unsaved ? unsaved : true));
+    });
+    /** The unsaved Investigation's steps in order, one line each (the dock's Steps tab). */
+    readonly unsavedStepLines = computed<readonly string[]>(() => (this.investigation.unsaved()?.steps ?? []).map(unsavedStepLine));
     readonly dockTabShown = computed<DockTab>(() =>
         this.dockTabs().some((t) => t.id === this.dockTab()) ? this.dockTab() : 'rows',
     );

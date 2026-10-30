@@ -129,7 +129,6 @@ const MORE_STEPS = STEP_GROUPS.flatMap((g) => g.steps);
 import { LaFoldComponent } from './la-fold.component';
 import { NgTemplateOutlet } from '@angular/common';
 import { DISABLED_REASON } from './disabled-reasons';
-import { UnsavedStep, unsavedStepLine } from './unsaved-investigation';
 import { laLimit } from './la-limits';
 
 @Component({
@@ -227,7 +226,6 @@ export class LinkAnalysisInvestigationComponent {
     readonly startFromSelected = output<void>();
     readonly saveNeeds = needsPermission('canManageIncidents');
     readonly pickNode = DISABLED_REASON.selectEntities;
-    readonly stepLine = (s: UnsavedStep): string => unsavedStepLine(s);
     readonly moreStepLabel = computed(() => MORE_STEPS.find((m) => m.id === this.moreStep())?.label ?? '');
 
     // ── Settings ▸ General: rename and restate the purpose (LA-INVESTIGATION-RENAME-1) ──

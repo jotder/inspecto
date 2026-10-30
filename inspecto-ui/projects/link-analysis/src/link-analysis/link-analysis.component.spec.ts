@@ -3703,6 +3703,25 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
             t.textContent?.trim(),
         );
 
+    it('operator 2026-10-30: an unsaved Investigation has a Steps tab beside Rows and Results, listing the steps in order', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        expect(tabs(el)).not.toContain('Steps');
+        c.investigation.beginUnsaved(
+            { projection: { datasetId: 'calls', sourceCol: 'A', targetCol: 'B' }, presets: {}, maxDegree: 4 },
+            { name: 'n', purpose: 'p' },
+            [{ kind: 'seed', ids: ['a', 'b'] }],
+        );
+        c.openDock('steps');
+        fixture.detectChanges();
+        expect(tabs(el)).toEqual(['Rows', 'Steps', 'Results']);
+        const steps = Array.from(el.querySelectorAll('[data-testid="dock-steps"] li')).map((li) => li.textContent!.trim());
+        expect(steps).toEqual(['Start from 2 entities']);
+    });
+
     it('operator 2026-10-29: the tab strip is plain text tabs (no cell borders), one row that scrolls sideways, axe-clean', async () => {
         const { fixture } = create();
         fixture.detectChanges();

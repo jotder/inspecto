@@ -547,20 +547,6 @@
                 <p class="text-secondary m-0 text-sm">
                     Nothing is recorded yet. Save asks for a Name and a Purpose, then records these steps in order.
                 </p>
-                <section class="flex flex-col gap-1" aria-labelledby="unsaved-steps-title" data-testid="unsaved-steps">
-                    <h3 id="unsaved-steps-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
-                        Steps so far
-                    </h3>
-                    @if (u.steps.length) {
-                        <ol class="m-0 flex flex-col gap-0.5 pl-5 text-sm">
-                            @for (s of u.steps; track $index) {
-                                <li>{{ stepLine(s) }}</li>
-                            }
-                        </ol>
-                    } @else {
-                        <p class="text-secondary m-0 text-sm">No start entities yet: select some on the graph.</p>
-                    }
-                </section>
                 <section class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" aria-labelledby="unsaved-expand-title">
                     <h3 id="unsaved-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
                     <ng-container [ngTemplateOutlet]="expandSlot" />

@@ -1760,6 +1760,18 @@
                     [style.height.px]="dockSplit.width()"
                 >
                     @switch (dockTabShown()) {
+                        @case ('steps') {
+                            <p class="text-secondary m-0 mb-2 text-sm">Nothing is recorded yet. Save asks for a Name and a Purpose, then records these steps in order.</p>
+                            @if (unsavedStepLines().length) {
+                                <ol class="m-0 flex flex-col gap-0.5 pl-5 text-sm" data-testid="dock-steps">
+                                    @for (line of unsavedStepLines(); track $index) {
+                                        <li>{{ line }}</li>
+                                    }
+                                </ol>
+                            } @else {
+                                <p class="text-secondary m-0 text-sm" data-testid="dock-steps-empty">No start entities yet: select some on the graph.</p>
+                            }
+                        }
                         @case ('rows') {
                         <div class="mb-2 flex flex-wrap items-center gap-2">
                             <mat-button-toggle-group
