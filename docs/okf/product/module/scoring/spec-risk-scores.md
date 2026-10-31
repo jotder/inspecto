@@ -167,8 +167,19 @@ Real-HTTP coverage with an armed Subject is in `ControlApiRiskScoreTest`.
 exploration holds a node by its `masked:` alias — the Space key's `MaskTokens` token, the same token this route
 masks the key with on read. A key starting `masked:` is resolved by tokenising the model's scored keys under
 the Space key; no match is the same 404, and the 404 names only the alias. The scan is bounded by
-`EntityCap.CEILING`. ⚠ An Investigation canvas masks with its own per-Investigation key, which this route
-cannot resolve (`LA-SUSPICION-FACTORS-INVESTIGATION-1`).
+`EntityCap.CEILING`.
+
+**An Investigation's alias needs the Investigation** (`LA-SUSPICION-FACTORS-INVESTIGATION-1`, 2026-10-31). An
+Investigation canvas masks with that Investigation's own key (`mask.key` in its directory, LA-19 D-U6), not the
+Space key, so the Studio sends `?investigation=<id>` with the alias. The route then resolves the alias through
+the `InvestigationAliases` port (`inspecto-entity-store`, ServiceLoader). Link Analysis provides it
+(`InvestigationAliasResolver`): the Investigation **read gate** runs first (`InvestigationRoutes.openForRead` —
+members and linked-Case members, R3, the Advanced PDP), and only a pseudonym that Investigation issued resolves
+(`EntityMasking.reveal`). A caller who cannot read the Investigation gets its 404, never the score. A Space that
+switched `geoLink` or `investigations` off, an edition without Investigations, or no Link Analysis module resolves
+nothing (404). The answer echoes the Investigation's alias as asked (not the Space token) unless the caller holds
+`canRevealLinkEntities`. Without `?investigation=` an Investigation alias is read under the Space key and 404s.
+⚠ The classified evidence inside the factors stays masked under the Space key (masked at write time).
 
 ⚠ "Dataset data scopes" do not exist as a separate mechanism. `Subject.dataScopes` filters case-typed
 objects (SEC-7d), and nothing scopes Dataset rows. The route applies that rule to the model's optional
