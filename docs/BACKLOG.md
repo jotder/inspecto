@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **80<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 65<!--count:backlog-p3--> × P3** —
+> **79<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 64<!--count:backlog-p3--> × P3** —
+> ⬇ **80 → 79 (P3 65 → 64) on 2026-10-31**: closed P3 chore `DUCKDB-2-DECIMAL-WIDENING-AUDIT-1` — a type probe ran every Space Template Job and View on the 1.5.6.0 and 2.0.0.0 drivers (68 Jobs and Views, 993 output columns): one stored type changed, `ra_rollforward` `LEAKAGE_AMOUNT` `DECIMAL(18,4)` → `DECIMAL(22,4)`, now `CAST` back and pinned in `TelcoRaGoldenTest`; values, hashes and text never change. Findings table in `okf/product/module/engine/spec-duckdb.md` § *Decimal widening audit*.
 > ⬆ **79 → 80 (P3 64 → 65) on 2026-10-31**: filed and closed P2 feature `LA-INVESTIGATE-UX-1` — the Investigation tab as ONE Expand filter (six foldable groups with change dots and resets, no popups) that every canvas expand uses (double-click, right-click, G); one-press Clean up with counts (leaves, weakly linked, by Entity Type, paths between two picked, keep only selected; *Exclude instead*); Redo of recorded steps; Keep / Shrink / Select neighbours / *Investigate this* on the node menu; recent reasons in Exclude…; a *How to investigate* strip. UI only, no new op. As-built: `okf/product/module/la-core/architecture.md` §6.9.1; plan archived. Filed its residuals as P3 `LA-INVESTIGATE-UX-2`.
 > ⬇ **79 → 78 (P2 16 → 15) on 2026-10-30**: closed P2 feature `LA-PRODUCT-NEXT-1` — shipped `bb85cc532` (phases 1–3, access) and `29d8c6e0f` (phases 4–6, Link Analysis), merged `ddf10a369`. Phase 5c (patterns as standing detection) was measured and parked: 12–13 s per whole-Dataset run at 1M rows, so it needs an incremental sweep first. Phase 6 shipped *Possible duplicates* over the canvas only; a server-side source waits for an ask. Plan archived.
 > ⬇ **80 → 79 (P2 17 → 16) on 2026-10-30**: closed P2 `LA-UNSAVED-INVESTIGATION-1` (shipped, `f83bce424`…`226571957`; known limit: an unsaved Working Set larger than `input.max_ids` is refused with 422); `LA-DEGREES-TRIM-1` shipped (residual `LA-DEGREES-TRIM-2`).
@@ -374,10 +375,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 65<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 64<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 65<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 80<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 64<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 79<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -687,7 +688,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 - **P2** · `OPSTORE-BULK-INSERT-1` — **row-at-a-time JDBC inserts into a file-backed DuckDB run at hundreds of rows/s, on 1.5.6 AND 2.0.** Measured 2026-10-22/23 (`tools/bench-duckdb.ps1 -Workloads store`): ledger `INSERT … ON CONFLICT DO NOTHING` 247–297 rows/s, upsert 234–263, plain batched `INSERT` into a table with no key 568–859 on 2.0.0.0; 1.5.6.0 did not finish the 50,000-row ledger step in 7.5 h. `DbDedupLedger.claim()`, the status and event stores write this way. Fix: a bulk path (Appender into a staging table + one `INSERT … SELECT` / anti-join), keeping the concurrency contract and the Postgres variant; first find the real per-call batch sizes. → `okf/product/module/engine/spec-duckdb.md` [items: module.engine, module.ops, module.event · kind: defect]
 - **P3** · `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` — **report DuckDB 2.0.0's `window_self_join` hive-pruning defect upstream, then drop the workaround when it is fixed.** A `PARTITION BY` aggregate over a day-filtered hive `read_parquet` aggregates the pruned days (4-row repro in `DuckDbWindowSelfJoinWorkaroundTest`). The product runs `SET disabled_optimizers = 'window_self_join'` on every analytics connection; the test's canary goes red when a driver stops miscounting. → `okf/product/module/engine/spec-duckdb.md` [items: module.engine · kind: chore · hold: external]
 - **P3** · `DUCKDB-2-LOOP-QUERIES-1` — **the looping / graph-style query candidates now that 2.0.0.0 is pinned: C1 / C2 `USING KEY` recursion behind `SqlGraphEngine` (Analytics C7), C3 temporal scan as window functions, C4 / C5 / C8.** Each needs its benchmark first (timings in the research were directions on an alpha build); adopt C1 only if it beats `IndexedTraversal` at 10^8 edges. → `archived-documents/plans-archive/duckdb-2-plan.md` §7 [items: module.graph, module.la-storage, module.analytics · kind: feature]
-- **P3** · `DUCKDB-2-DECIMAL-WIDENING-AUDIT-1` — **DuckDB 2.0 widens `DECIMAL(18,4) ± DECIMAL(18,4)` to `DECIMAL(19,4)` (1.5 capped at 18); only partner-settlement is pinned.** Sweep every Space Template Job / View for decimal `+` / `-` whose output type a seed, a Schema or a consumer pins, and `CAST` it explicitly. → `okf/product/module/engine/spec-duckdb.md` [items: module.engine, layer.platform · kind: chore]
 
 #### Module architecture
 
