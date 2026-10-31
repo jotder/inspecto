@@ -71,9 +71,12 @@ export interface RiskScoreList {
 export class RiskScoresService {
     private http = inject(HttpClient);
 
-    latest(model: string, entityKey: string): Observable<RiskScore> {
+    /** `investigation`: the Investigation whose pseudonym `entityKey` is (its canvas masks with its own key). */
+    latest(model: string, entityKey: string, investigation?: string | null): Observable<RiskScore> {
+        const params = investigation ? new HttpParams().set('investigation', investigation) : undefined;
         return this.http.get<RiskScore>(
             apiUrl(`/risk-scores/${encodeURIComponent(model)}/${encodeURIComponent(entityKey)}`),
+            { params },
         );
     }
 

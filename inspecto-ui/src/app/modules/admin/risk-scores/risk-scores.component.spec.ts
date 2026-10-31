@@ -133,7 +133,7 @@ describe('RiskScoresComponent', () => {
 
         (el.querySelector('table[data-scores] tbody button') as HTMLButtonElement).click();
         fixture.detectChanges();
-        expect(latest).toHaveBeenCalledWith('sim_box', '966501234567');
+        expect(latest).toHaveBeenCalledWith('sim_box', '966501234567', null);
     });
 
     it('says why the scores could not be listed', () => {
@@ -168,7 +168,7 @@ describe('RiskScoresComponent', () => {
         input.dispatchEvent(new Event('input'));
         (el.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
         fixture.detectChanges();
-        expect(latest).toHaveBeenCalledWith('sim_box', '966501234567');
+        expect(latest).toHaveBeenCalledWith('sim_box', '966501234567', null);
         const panel = el.querySelector('inspecto-risk-score-panel section');
         expect(panel?.getAttribute('aria-label')).toBe('Risk Score of ••••••••4567');
         // the anomaly panel looks the same entity up in every Anomaly Model, and hides on a 404

@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.scoring` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `LA-SUSPICION-FACTORS-INVESTIGATION-1` | P3 | defect | an Investigation canvas's *Factors* still 404 on a masked Space (residual of LA-SUSPICION-FACTORS-MASKED-1, 2026-10-28). | — |
+_No open rows._

@@ -55,6 +55,8 @@ class ControlApiRiskScoreTest {
         if ("Bearer fraud".equals(auth)) return Optional.of(new Subject("fay", CAPS, Set.of("fraud")));
         if ("Bearer billing".equals(auth)) return Optional.of(new Subject("bo", CAPS, Set.of("billing")));
         if ("Bearer nocap".equals(auth)) return Optional.of(new Subject("nc", Set.of("canAuthorWorkbench")));
+        if ("Bearer lead".equals(auth))
+            return Optional.of(new Subject("lee", Set.of("canWorkIncidents", "canManageIncidents")));
         if ("Bearer revealer".equals(auth))
             return Optional.of(new Subject("rev", Set.of("canWorkIncidents", "canRevealLinkEntities")));
         return Optional.empty();
@@ -289,6 +291,49 @@ class ControlApiRiskScoreTest {
             HttpResponse<String> miss = send(c.port, "GET", "/spaces/s1/risk-scores/subs/"
                     + java.net.URLEncoder.encode(other, java.nio.charset.StandardCharsets.UTF_8), null, "analyst");
             assertEquals(404, miss.statusCode(), miss.body());
+        }
+    }
+
+    @Test
+    void anInvestigationAliasResolvesUnderItsOwnKeyOnlyForACallerWhoCanReadThatInvestigation(@TempDir Path root) throws Exception {
+        // LA-SUSPICION-FACTORS-INVESTIGATION-1: an Investigation masks with its OWN key, not the Space key, so the Studio
+        // names the Investigation and the route resolves the alias after the Investigation's read gate.
+        try (Ctx c = open(root)) {
+            score(c, "subs", model(null));
+            Files.writeString(c.config.resolve("link-analysis.toon"), "masking_mode: all\n");
+            new com.gamma.pipeline.ViewStore(c.config.resolve("views")).write(new com.gamma.pipeline.ViewDefinition("calls_view",
+                    "flow-x", List.of(), "SELECT * FROM (VALUES ('m1','m2'),('m2','m3')) AS t(caller,callee)", "2026-10-31T00:00:00Z"));
+            new ComponentStore(c.config.resolve("registry")).write("dataset", "calls_ds", Map.of("view", "calls_view"));
+            HttpResponse<String> made = send(c.port, "POST", "/spaces/s1/inv/investigations",
+                    "{\"purpose\":\"test\",\"id\":\"inv-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}", "lead");
+            assertEquals(200, made.statusCode(), made.body());
+            HttpResponse<String> seeded = send(c.port, "POST", "/spaces/s1/inv/investigations/inv-a/ops",
+                    "{\"op\":\"seed\",\"ids\":[\"m1\"]}", "lead");
+            assertEquals(200, seeded.statusCode(), seeded.body());
+            assertFalse(seeded.body().contains("\"m1\""), "the Investigation masks m1: " + seeded.body());
+            java.util.regex.Matcher t = java.util.regex.Pattern.compile("masked:[0-9a-f]{16}").matcher(seeded.body());
+            assertTrue(t.find(), seeded.body());
+            String alias = t.group();
+            String spaceAlias = com.gamma.entitystore.MaskTokens.token(com.gamma.entitystore.MaskTokens.spaceKey(c.config), "m1");
+            assertNotEquals(spaceAlias, alias, "the Investigation's own key, not the Space key");
+            String path = "/spaces/s1/risk-scores/subs/" + java.net.URLEncoder.encode(alias, java.nio.charset.StandardCharsets.UTF_8);
+
+            assertEquals(404, send(c.port, "GET", path, null, "lead").statusCode(),
+                    "without the Investigation the alias is read under the Space key and resolves nothing");
+            HttpResponse<String> r = send(c.port, "GET", path + "?investigation=inv-a", null, "lead");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode d = V1Body.of(r.body());
+            assertEquals(55.0, d.get("score").asDouble(), 1e-9, "m1's latest score");
+            assertEquals(alias, d.get("entityKey").asText(), "the Investigation's alias is echoed: " + r.body());
+            assertTrue(d.get("keyMasked").asBoolean());
+            assertFalse(r.body().contains("\"m1\""), "the raw key leaked: " + r.body());
+
+            // A caller who cannot read the Investigation (not a member) gets its 404, never the score.
+            HttpResponse<String> outsider = send(c.port, "GET", path + "?investigation=inv-a", null, "analyst");
+            assertEquals(404, outsider.statusCode(), outsider.body());
+            assertFalse(outsider.body().contains("\"score\""), outsider.body());
+            assertEquals(404, send(c.port, "GET", path + "?investigation=nope", null, "lead").statusCode(),
+                    "an unknown Investigation is a 404");
         }
     }
 

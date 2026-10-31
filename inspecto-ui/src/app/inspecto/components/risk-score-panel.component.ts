@@ -78,6 +78,8 @@ export class RiskScorePanelComponent {
 
     readonly model = input.required<string>();
     readonly entityKey = input.required<string>();
+    /** The Investigation whose canvas `entityKey` comes from: its pseudonym resolves under that Investigation's key. */
+    readonly investigation = input<string | null>(null);
     /** A ready score to render instead of loading the latest one (the S3 preview). */
     readonly preset = input<RiskScore | null>(null);
 
@@ -101,12 +103,13 @@ export class RiskScorePanelComponent {
         effect((onCleanup) => {
             const model = this.model();
             const key = this.entityKey();
+            const investigation = this.investigation();
             const preset = this.preset();
             this.score.set(preset);
             this.absent.set(false);
             this.loadError.set(null);
             if (preset) return;
-            const sub = this.api.latest(model, key).subscribe({
+            const sub = this.api.latest(model, key, investigation).subscribe({
                 next: (s) => this.score.set(s),
                 error: (err) => {
                     this.score.set(null);

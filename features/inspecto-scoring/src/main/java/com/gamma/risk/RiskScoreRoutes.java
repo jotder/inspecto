@@ -9,7 +9,9 @@ import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.mask.EvidenceMasker;
+import com.gamma.entitystore.InvestigationAliases;
 import com.gamma.entitystore.MaskTokens;
+import com.gamma.etl.EditionFeatures;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.control.AuditReadMasking;
@@ -40,6 +42,8 @@ import java.util.regex.Pattern;
  *       ({@link RowScope}), or no score for that entity → <b>404</b>, all indistinguishable (existence-hiding,
  *       the SEC-7d rule {@code ObjectRoutes} applies).</li>
  * </ol>
+ * The key may be a {@code masked:} alias: the Space key's by default, or, with {@code ?investigation=<id>}, that
+ * Investigation's — resolved only after the Investigation's read gate ({@link InvestigationAliases}), whose 404 it keeps.
  * <h3>{@code GET /risk-score-lists/{model}}</h3>
  * The latest run's scores of one model, highest first, optionally filtered by the model's declared
  * {@code segments} (evidence columns, see {@link RiskScoreModel}): {@code ?<column>=<value>} per segment, ANDed. The
@@ -175,6 +179,20 @@ public final class RiskScoreRoutes implements RouteModule {
             if (MaskTokens.token(spaceKey, raw).equals(alias)) return raw;
         }
         return null;
+    }
+
+    /**
+     * The raw key behind an Investigation's alias, or null (→ the route's 404): Link Analysis' {@link InvestigationAliases}
+     * runs the Investigation READ gate first and throws its refusal, so a caller who cannot read that Investigation gets
+     * its 404. A Space that switched Link Analysis or Investigations off, an edition without Investigations, or no Link
+     * Analysis module at all resolves nothing.
+     */
+    private static String investigationUnalias(ApiContext api, HttpExchange ex, String investigation, String alias)
+            throws Exception {
+        if (api.disabledFeatures().contains("geoLink") || api.disabledFeatures().contains(EditionFeatures.INVESTIGATIONS)
+                || !EditionFeatures.present(EditionFeatures.INVESTIGATIONS)) return null;
+        Optional<InvestigationAliases> aliases = InvestigationAliases.provider();
+        return aliases.isEmpty() ? null : aliases.get().resolve(api, ex, investigation, alias);
     }
 
     /**
@@ -317,8 +335,14 @@ public final class RiskScoreRoutes implements RouteModule {
         // LA-SUSPICION-FACTORS-MASKED-1: on a masked Space the Studio holds a node by its alias (the Space key's
         // MaskTokens token, the same token the key is masked with on read), never the raw key. Resolve it to the
         // scored key it tokenises; errors keep the alias, so the raw key is never answered for it.
+        // LA-SUSPICION-FACTORS-INVESTIGATION-1: an Investigation canvas masks with the Investigation's own key, so the
+        // Studio names it (?investigation=) and the alias resolves under that key AFTER the Investigation read gate.
         boolean alias = entityKey.startsWith(MaskTokens.TOKEN_PREFIX);
-        String key = alias ? unalias(relation, modelId, MaskTokens.spaceKey(writeRoot), entityKey) : entityKey;
+        String investigation = ApiContext.query(ex, "investigation");
+        boolean byInvestigation = alias && investigation != null && !investigation.isEmpty();
+        String key = !alias ? entityKey
+                : byInvestigation ? investigationUnalias(api, ex, investigation, entityKey)
+                : unalias(relation, modelId, MaskTokens.spaceKey(writeRoot), entityKey);
         if (key == null) throw notFound(modelId, entityKey);
         Map<String, Object> resource = new LinkedHashMap<>();
         resource.put("id", modelId + "/" + key);
@@ -339,8 +363,10 @@ public final class RiskScoreRoutes implements RouteModule {
         out.put("model", modelId);
         out.put("entityType", row.get("entity_type"));
         // The entity key is masked on read (D-P8) like the preview's; classified evidence was masked at WRITE time
-        // by the Job under the same Space key (EvidenceMasker), so the factors are returned as stored.
+        // by the Job under the same Space key (EvidenceMasker), so the factors are returned as stored. An Investigation
+        // alias is echoed as asked, so the panel names the node by the pseudonym its canvas shows.
         putEntityKey(ex, writeRoot, out, String.valueOf(row.get("entity_key")));
+        if (byInvestigation && Boolean.TRUE.equals(out.get("keyMasked"))) out.put("entityKey", entityKey);
         out.put("score", row.get("score"));
         out.put("high", row.get("high"));
         out.put("highThreshold", model.highThreshold());

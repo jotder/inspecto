@@ -317,6 +317,14 @@ Anomaly Scores. A list member's token therefore differs from an Investigation's 
 to `typed` (fail closed). `EntityMasking` (la-api) masks on the way **out**: engine results and caches stay raw; a
 raw id that masking hides is answered as a nonexistent node; `reveal` needs `canRevealLinkEntities`.
 
+**A reader outside Link Analysis resolves an Investigation's alias through a port** (`LA-SUSPICION-FACTORS-INVESTIGATION-1`,
+2026-10-31). `InvestigationAliases` (entity-store, ServiceLoader) is provided by la-api's `InvestigationAliasResolver`:
+`InvestigationRoutes.openForRead` first (its 404 / 422 propagate), then `EntityMasking.of(inv, []).reveal(alias)`, so only a
+pseudonym that Investigation issued resolves. Its one caller is `GET /risk-scores/{model}/{alias}?investigation=<id>` (the
+Studio's *Factors* on an Investigation canvas: the toolbox passes `investigationId()` to `inspecto-risk-score-panel`). We kept
+the per-Investigation key rather than moving Investigations to the Space key: moving would change every existing Investigation's
+pseudonyms (Dossiers, notes and hand-offs already carry them).
+
 **Mask the same way everywhere (DR-D2, operator 2026-10-10).** The stateless exploration reads (`/inv/projection{,/neighbors,/multi}`,
 `/inv/traversal/recursive-paths`, `/inv/pattern/*`, `/inv/value-measures`) have no Investigation, so `ExplorationMasking`
 (la-api) masks them under the **Space** identity key (`MaskTokens.spaceKey`, the key an Entity List member uses; D-M7): `all`
