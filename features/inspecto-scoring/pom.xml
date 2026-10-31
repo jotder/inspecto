@@ -104,6 +104,15 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- inspecto-geo-link (test scope): ControlApiRiskScoreTest reads a score by an Investigation's alias through the real
+             Investigation read gate (LA-SUSPICION-FACTORS-INVESTIGATION-1). Link Analysis never depends on scoring, so no cycle;
+             the inspecto-policy pattern. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-geo-link</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>

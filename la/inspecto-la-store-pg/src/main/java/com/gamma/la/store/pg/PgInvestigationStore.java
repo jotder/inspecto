@@ -227,7 +227,7 @@ public final class PgInvestigationStore implements InvestigationStore {
             // set_bytes: the running total of this Investigation's sets (main + live Drafts); NULL = not counted yet (a table made before the
             // counter existed): computed once, lazily, under the row lock, then kept in the SAME transaction as every write that changes a set.
             "ALTER TABLE " + t("la_investigation") + " ADD COLUMN IF NOT EXISTS set_bytes bigint",
-            // details: the title and purpose as edited after create (LA-INVESTIGATION-RENAME-1); the sealed header never changes
+            // details: the title and purpose as edited after create (LA-INVESTIGATION-RENAME-1) and the creator's display name (T-186); the sealed header never changes
             "ALTER TABLE " + t("la_investigation") + " ADD COLUMN IF NOT EXISTS details text",
             "CREATE TABLE IF NOT EXISTS " + t("la_log") + " (inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), draft text NOT NULL DEFAULT '', "
                     + "seq int NOT NULL, line text NOT NULL, PRIMARY KEY (inv, draft, seq))",

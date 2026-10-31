@@ -68,6 +68,21 @@ describe('RiskScorePanelComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('asks under the Investigation its key comes from (LA-SUSPICION-FACTORS-INVESTIGATION-1)', async () => {
+        const calls: (string | null | undefined)[] = [];
+        const fixture = mount({
+            latest: (_m: string, _k: string, inv?: string | null) => {
+                calls.push(inv);
+                return of(SCORE);
+            },
+        });
+        await fixture.whenStable();
+        fixture.componentRef.setInput('investigation', 'inv-a');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(calls).toEqual([null, 'inv-a']);
+    });
+
     it('renders nothing when there is no visible score', async () => {
         const fixture = mount({ latest: () => throwError(() => ({ status: 404 })) });
         await fixture.whenStable();

@@ -8542,7 +8542,7 @@
         "tags" : [ "inv" ],
         "summary" : "GET /inv/investigations (generated skeleton)",
         "operationId" : "getInvInvestigations",
-        "description" : "The Investigations the caller may read, newest first, paged by limit and offset. Answers {items, total, offset, limit, truncated}; each item {id, title, dataset, owner, ownerName?, createdAt, headStep, caseRef?, access, readOnly}, the title masked per the Space's maskingMode. ownerName (T-186, additive) is the owner's display name where the server can resolve it: only the caller's own Investigations, from the signed-in Subject (there is no directory of other people's names); absent otherwise, so a client shows the owner login id.",
+        "description" : "The Investigations the caller may read, newest first, paged by limit and offset. Answers {items, total, offset, limit, truncated}; each item {id, title, dataset, owner, ownerName?, createdAt, headStep, caseRef?, access, readOnly}, the title masked per the Space's maskingMode. ownerName (T-186, additive) is the owner's display name as recorded when the Investigation was created, forked or instantiated, masked as the title; an older Investigation without one names only the caller's own (from the signed-in Subject) and is absent otherwise, so a client shows the owner login id.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -10964,7 +10964,7 @@
         "tags" : [ "risk-scores" ],
         "summary" : "The latest Risk Score of one entity under a saved risk-score model, with its factors",
         "operationId" : "getRiskScore",
-        "description" : "ASSURE-RISK-SCORE-1. Gated on canWorkIncidents. An unknown model, a model outside the caller's data scopes, a row the policy engine denies, or no score for the entity are all 404 (existence-hiding). score = sum of factor contributions (weight x indicator, held to cap), clamped 0-100; every score is recomputable from its factors. The entity key is returned as the Space masked: token (keyMasked: true) unless the caller holds canRevealLinkEntities; classified evidence is masked at write time.",
+        "description" : "ASSURE-RISK-SCORE-1. Gated on canWorkIncidents. An unknown model, a model outside the caller's data scopes, a row the policy engine denies, or no score for the entity are all 404 (existence-hiding). score = sum of factor contributions (weight x indicator, held to cap), clamped 0-100; every score is recomputable from its factors. The entity key is returned as the Space masked: token (keyMasked: true) unless the caller holds canRevealLinkEntities; classified evidence is masked at write time. The entityKey may be a masked: alias: the Space key's, or with ?investigation= that Investigation's, resolved only after its read gate (LA-SUSPICION-FACTORS-INVESTIGATION-1).",
         "parameters" : [ {
           "name" : "model",
           "in" : "path",
@@ -10980,6 +10980,14 @@
           "schema" : {
             "type" : "string",
             "maxLength" : 256
+          }
+        }, {
+          "name" : "investigation",
+          "in" : "query",
+          "required" : false,
+          "description" : "The Investigation whose masked: alias entityKey is. A caller who cannot read that Investigation gets 404; its alias is echoed as entityKey.",
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {

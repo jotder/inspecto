@@ -313,7 +313,7 @@ final class FsInvestigationLayout {
     }
 
     // ── Edited details (LA-INVESTIGATION-RENAME-1) — title and purpose as edited after create, OUTSIDE the sealed header ──
-    //   investigations/<id>/investigation-details.json   {title?, purpose?, updatedBy, updatedAt}. Rewritten atomically; the read-modify-write is serialised by FsInvestigationStore.updateDetails;
+    //   investigations/<id>/investigation-details.json   {title?, purpose?, updatedBy?, updatedAt?, ownerName?} (ownerName: the creator's display name, T-186). Rewritten atomically; the read-modify-write is serialised by FsInvestigationStore.updateDetails;
     // never hashed into the header or the Dossier manifest, so an edit never invalidates an issued Dossier.
 
     /** Write (or replace) the Investigation's edited details. */

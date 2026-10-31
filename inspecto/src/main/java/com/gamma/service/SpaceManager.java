@@ -200,6 +200,23 @@ public final class SpaceManager implements AutoCloseable {
             log.warn("Space reference {} is shadowed by the folder '{}' beside it - ignored", ref, id);
             return null;
         }
+        RefTarget r = resolveRef(spacesRoot, ref);
+        if (r.why() == null) return r.folder();
+        log.error("Space reference {} {} - Space '{}' not booted", ref, r.why(), id);
+        skipped.put(id, new SkippedSpace(id, "SPACE_REF_INVALID", "the Space reference " + file + " " + r.why()));
+        return null;
+    }
+
+    /** A {@code <id>.ref} resolved: the Space folder it points at, or why it cannot be followed (exactly one is set). */
+    record RefTarget(Path folder, String why) {}
+
+    /**
+     * {@link #followRef}'s rules without its logging or skip record, for every reader that must agree with what
+     * {@link #discover} boots ({@link #isLastOnDisk}, {@link SpaceMigrator}). The shadowing folder is the caller's check.
+     */
+    static RefTarget resolveRef(Path spacesRoot, Path ref) {
+        String file = ref.getFileName().toString();
+        String id = file.substring(0, file.length() - REF_SUFFIX.length());
         String why;
         Path target = null;
         try {
@@ -216,10 +233,7 @@ public final class SpaceManager implements AutoCloseable {
         } catch (IOException | RuntimeException e) {
             why = "is unreadable: " + e.getMessage();
         }
-        if (why == null) return target.toAbsolutePath().normalize();
-        log.error("Space reference {} {} - Space '{}' not booted", ref, why, id);
-        skipped.put(id, new SkippedSpace(id, "SPACE_REF_INVALID", "the Space reference " + file + " " + why));
-        return null;
+        return why == null ? new RefTarget(target.toAbsolutePath().normalize(), null) : new RefTarget(null, why);
     }
 
     /**
@@ -769,16 +783,25 @@ public final class SpaceManager implements AutoCloseable {
      * True when {@code id}'s directory is the last one under the container root that {@link #discover} would boot —
      * i.e. purging it would leave an empty spaces root (bootable since 2026-09-25, but the last copy is gone). Uses the
      * same "dir with a {@code config/} subtree" predicate as discovery, so a deregistered-but-still-on-disk space
-     * (deleted without {@code purge}) correctly counts as a survivor; {@code false} in single-tenant mode.
+     * (deleted without {@code purge}) correctly counts as a survivor; {@code false} in single-tenant mode. A
+     * {@code <id>.ref} counts only when discovery would boot it: not shadowed, followable, and pointing at a Space.
      */
     public boolean isLastOnDisk(SpaceId id) throws IOException {
         if (spacesRoot == null || !Files.isDirectory(spacesRoot)) return false;
         try (Stream<Path> dirs = Files.list(spacesRoot)) {
-            return dirs.filter(d -> Files.isDirectory(d) ? notASpaceReason(d) == null
-                            : d.getFileName().toString().endsWith(REF_SUFFIX))
+            return dirs.filter(d -> Files.isDirectory(d) ? notASpaceReason(d) == null : bootableRef(d))
                     .allMatch(d -> d.getFileName().toString().equals(id.value())
                             || d.getFileName().toString().equals(id.value() + REF_SUFFIX));
         }
+    }
+
+    /** Whether {@code file} under the spaces root is a {@code <id>.ref} that {@link #discover} would boot. */
+    private boolean bootableRef(Path file) {
+        String name = file.getFileName().toString();
+        if (!name.endsWith(REF_SUFFIX) || !Files.isRegularFile(file)) return false;
+        if (Files.isDirectory(spacesRoot.resolve(name.substring(0, name.length() - REF_SUFFIX.length())))) return false;
+        Path folder = resolveRef(spacesRoot, file).folder();
+        return folder != null && notASpaceReason(folder) == null;
     }
 
     /**

@@ -300,6 +300,21 @@ public final class InvestigationRoutes implements RouteModule {
         }
     }
 
+    /**
+     * T-186: record the creator's display name in the new Investigation's details, outside the sealed header, so the list can
+     * name every owner - the server keeps no directory of other people's names. Nothing when the caller has no name.
+     */
+    private static void recordOwnerName(HttpExchange ex, InvestigationStore store, String id) throws IOException {
+        String actor = ApiContext.actor(ex);
+        Optional<String> name = ApiContext.subject(ex).filter(s -> s.id().equals(actor)).map(Subject::displayName);
+        if (name.isEmpty()) return;
+        store.updateDetails(id, current -> {
+            Map<String, Object> d = detailsOrEmpty(id, current);
+            d.put("ownerName", name.get());
+            return canonical(d);
+        });
+    }
+
     /** LA-INVESTIGATION-RENAME-1: the header as SHOWN — the sealed header with the edited title and purpose laid over it. */
     static Map<String, Object> withDetails(InvestigationStore store, String id, Map<String, Object> header) throws IOException {
         Map<String, Object> d = detailsOrEmpty(id, store.details(id).orElse(null));
@@ -438,6 +453,7 @@ public final class InvestigationRoutes implements RouteModule {
         }
         if (!created)
             throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
+        recordOwnerName(ex, store, id);
         if (caseLink != null) InvestigationCaseRoutes.write(ex, store, id, caseLink);
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_CREATED, "link.investigation.created",
                 "link.investigation.created — " + id + " over " + dataset,
@@ -498,15 +514,18 @@ public final class InvestigationRoutes implements RouteModule {
                 continue;   // not readable by this caller — absent from the list exactly as from a read
             }
             Map<String, Object> h = inv.header();
+            EntityMasking mask = EntityMasking.of(inv, List.of());
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", id);
-            item.put("title", h.get("title") == null ? null : EntityMasking.of(inv, List.of()).inText(String.valueOf(h.get("title"))));
+            item.put("title", h.get("title") == null ? null : mask.inText(String.valueOf(h.get("title"))));
             item.put("dataset", h.get("dataset"));
             item.put("owner", h.get("owner"));
-            // T-186: the owner's display name, only where the server can resolve it. Nothing keeps a directory of other people's
-            // names (a Subject carries only its own, from the IdP), so that is the caller's own Investigation; absent otherwise.
-            subject.filter(s -> s.displayName() != null && s.id().equals(h.get("owner")))
-                    .ifPresent(s -> item.put("ownerName", s.displayName()));
+            // T-186: the owner's display name as recorded at create (recordOwnerName); an older Investigation has none, so only
+            // the caller's own resolves (a Subject carries only its own name) and others show the login id. Masked as the title.
+            Object ownerName = detailsOrEmpty(id, inv.store().details(id).orElse(null)).get("ownerName");
+            if (ownerName == null)
+                ownerName = subject.filter(s -> s.id().equals(h.get("owner"))).map(Subject::displayName).orElse(null);
+            if (ownerName != null) item.put("ownerName", mask.inText(String.valueOf(ownerName)));
             item.put("createdAt", h.get("createdAt"));
             List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
             item.put("headStep", log.isEmpty() ? 0 : ((Number) parse(log.get(log.size() - 1)).get("step")).intValue());
@@ -1038,6 +1057,7 @@ public final class InvestigationRoutes implements RouteModule {
         }
         if (!forkChecked(parent.store(), forkId, canonical(header), lines, sets))
             throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + forkId + "' already exists");
+        recordOwnerName(ex, parent.store(), forkId);
         String fid = forkId;
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_FORKED, "link.investigation.forked",
                 "link.investigation.forked — " + parent.id() + " → " + fid,
@@ -1158,6 +1178,7 @@ public final class InvestigationRoutes implements RouteModule {
         }
         if (!forkChecked(store, id, canonical(h), lines, sets))
             throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
+        recordOwnerName(ex, store, id);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("header", h);

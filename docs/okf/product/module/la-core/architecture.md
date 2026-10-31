@@ -317,6 +317,14 @@ Anomaly Scores. A list member's token therefore differs from an Investigation's 
 to `typed` (fail closed). `EntityMasking` (la-api) masks on the way **out**: engine results and caches stay raw; a
 raw id that masking hides is answered as a nonexistent node; `reveal` needs `canRevealLinkEntities`.
 
+**A reader outside Link Analysis resolves an Investigation's alias through a port** (`LA-SUSPICION-FACTORS-INVESTIGATION-1`,
+2026-10-31). `InvestigationAliases` (entity-store, ServiceLoader) is provided by la-api's `InvestigationAliasResolver`:
+`InvestigationRoutes.openForRead` first (its 404 / 422 propagate), then `EntityMasking.of(inv, []).reveal(alias)`, so only a
+pseudonym that Investigation issued resolves. Its one caller is `GET /risk-scores/{model}/{alias}?investigation=<id>` (the
+Studio's *Factors* on an Investigation canvas: the toolbox passes `investigationId()` to `inspecto-risk-score-panel`). We kept
+the per-Investigation key rather than moving Investigations to the Space key: moving would change every existing Investigation's
+pseudonyms (Dossiers, notes and hand-offs already carry them).
+
 **Mask the same way everywhere (DR-D2, operator 2026-10-10).** The stateless exploration reads (`/inv/projection{,/neighbors,/multi}`,
 `/inv/traversal/recursive-paths`, `/inv/pattern/*`, `/inv/value-measures`) have no Investigation, so `ExplorationMasking`
 (la-api) masks them under the **Space** identity key (`MaskTokens.spaceKey`, the key an Entity List member uses; D-M7): `all`
@@ -387,6 +395,16 @@ MONOTONIC clock (`System.nanoTime`), so a backwards wall-clock step cannot stret
 seams (`WorkingSetRoutes` clock/window/`FULL_READS`, `FsInvestigationStore.LOG_READS`) are package-private, reached from other modules only
 through same-package accessors in the test source sets; (4) an error response of any status never carries an ETag - `WorkingSetRoutes` tags
 only around a successful serialisation and `ControlApi.respond` withdraws any tag from a status of 400 or above (this also covers the shared `ETags.respond`).
+
+**Owner display names in the list (T-186, 2026-11-01).** The server keeps no directory of people (a `Subject` carries only its own
+name), so `InvestigationRoutes.recordOwnerName` writes the creator's `displayName` as `ownerName` into the Investigation's `details`
+record right after the create, fork (`/reorder`) or template instantiation succeeds - through the existing `updateDetails`, so the
+filesystem and Postgres stores needed no change, and a later edit merges per field and keeps it. `GET /inv/investigations` serves the
+recorded name; an Investigation without one (created before this) falls back to the caller's own Subject name when the caller owns it,
+else no `ownerName` (the UI shows the login id). Masking: the name passes `EntityMasking.inText` exactly as the title does, so a name that
+is a masked entity id shows as its per-Investigation pseudonym; the name is never laid over the header (`withDetails` takes only title and
+purpose), so it reaches neither the log header, the embed nor the Dossier. Not atomic with the create: a crash between the two writes
+leaves an Investigation that shows its login id, which is the older behaviour, not a failure.
 
 
 **Reference rows (`POST /inv/reference-rows`, 2026-10-11).** Body `{dataset, keyCol, keys[1..500], columns?, investigationId?}`

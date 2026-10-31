@@ -93,6 +93,20 @@ class SpaceRefTest {
     }
 
     @Test
+    void onlyAReferenceThatWouldBootCountsAsASurvivingSpace() throws Exception {
+        Path root = spacesRoot();
+        Files.createDirectories(root.resolve("last").resolve("config"));
+        Files.writeString(root.resolve("gone.ref"), tmp.resolve("nope").resolve("gone").toString());   // dangling
+        Files.writeString(root.resolve("rel.ref"), "../somewhere/rel");
+        Files.writeString(root.resolve("bare.ref"), Files.createDirectories(tmp.resolve("x").resolve("bare")).toString());   // no config/
+        try (SpaceManager mgr = SpaceManager.discover(root)) {
+            assertTrue(mgr.isLastOnDisk(SpaceId.of("last")), "a reference that cannot boot is no surviving copy");
+            Files.writeString(root.resolve("acme.ref"), elsewhere("acme").toString());
+            assertFalse(mgr.isLastOnDisk(SpaceId.of("last")), "a reference that would boot is a surviving Space");
+        }
+    }
+
+    @Test
     void purgeOfAFolderSpaceIgnoresAShadowedReference() throws Exception {
         Path root = spacesRoot();
         Files.writeString(root.resolve("acme.ref"), elsewhere("acme").toString());

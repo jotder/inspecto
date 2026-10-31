@@ -92,6 +92,11 @@ It relocates `<configDir>` → `spaces/<id>/config` and the working-dir artifact
 file moves — author relative paths, or fix them up after migrating. Custom (non-default) flat locations must be
 moved by hand.
 
+A `spaces/<id>.ref` is followed: the config and manifest go into the folder it names; a ref that cannot be followed
+stops the migration before anything moves. When the Space's data lives on another volume (`space.toon data_root`,
+or `-Dspaces.data.root`), `data/`, `audit/` and `duckdb/` go onto that data root, which is checked and claimed first
+(an unmounted volume stops the migration). Pass the same `-Dspaces.data.root` to the migrator as to the server.
+
 ### Configuration by source format
 
 Configuration is organized **per source format** — each format has its own

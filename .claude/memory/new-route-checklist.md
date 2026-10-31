@@ -17,6 +17,9 @@ Complements the `endpoint` skill. Order:
    `mvn -o -pl inspecto -am test -Dtest=OpenApiPathsContractTest -Dopenapi.paths.write=true -Dsurefire.failIfNoSpecifiedTests=false`
    (add the edition profile you build with). `OpenApiPathsContractTest` fails in `inspecto-processor` and skips
    ~13 downstream modules.
+   ⚠ A route of an optional MODULE (scoring, LA, …) lives in that module's `META-INF/inspecto/openapi.fragment.json`:
+   edit the fragment, then `node tools/openapi-merge.mjs --write`. The Maven write above never sees module fragments and
+   only reformats the file (592 noise lines, 2026-10-31).
 5. `node tools/check-authgate-coverage.mjs` and `route-gating-report.mjs --check` with real exit codes.
 
 **Merging openapi-v1.json conflicts:** `json.loads` passing proves nothing (duplicate keys are legal; a route can

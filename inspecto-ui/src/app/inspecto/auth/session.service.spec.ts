@@ -284,6 +284,17 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.token()).toBeNull();
     });
 
+    it('a lost session remembers the page for the next sign-in; a deliberate sign-out does not (ANOMALY-UI-FINDINGS-1 h)', async () => {
+        svc.onAuthLost();
+        expect(sessionStorage.getItem('inspecto.signin.return')).toBe('/');
+        sessionStorage.clear();
+
+        svc.logout();
+        httpMock.expectOne(`${base}/auth/logout`).flush({ loggedOut: true });
+        await tick();
+        expect(sessionStorage.getItem('inspecto.signin.return')).toBeNull();
+    });
+
     /** Stub the one seam that navigates away from the SPA (jsdom forbids spying `location.assign`). */
     function spyOnRedirect() {
         return vi.spyOn(svc as unknown as { redirect(url: string): void }, 'redirect').mockImplementation(() => {});
