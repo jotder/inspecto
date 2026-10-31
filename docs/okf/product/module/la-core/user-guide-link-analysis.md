@@ -671,7 +671,7 @@ Server side repeats the search across the whole Dataset.
 | Item | What it does |
 |---|---|
 | **New Investigation** (**New** without Investigations) | Closes what is open (unsaved work asks Save, Discard or Cancel). With Investigations it opens the start form in the Investigation tab ([§11.1](#111-start-one)); without them, back to *Start a graph* |
-| **Open…** | One dialog, two tabs. **Saved views**: search, filter by Tag, Dataset and last change; **Open**, **Rename**, **Duplicate**, **Delete** (asks first), **Version history**, **Comments**, **Tags**, **Share…**. **Investigations**: the ones you may read plus **Recent**; filter by owner, Dataset, date and **Show** (All, Recent, Mine, Via a Case); type an id to open one directly. The owner shows by display name where the server knows it (today your own Investigations, from your sign-in), else by login id. |
+| **Open…** | One dialog, two tabs. **Saved views**: search, filter by Tag, Dataset and last change; **Open**, **Rename**, **Duplicate**, **Delete** (asks first), **Version history**, **Comments**, **Tags**, **Share…**. **Investigations**: the ones you may read plus **Recent**; filter by owner, Dataset, date and **Show** (All, Recent, Mine, Via a Case); type an id to open one directly. The owner shows by display name, the one they signed in with when they created the Investigation; an Investigation created before 2026-11-01 shows its owner's login id (your own show your name). |
 | **Explore Dataset…** | Opens ⚙ Settings ▸ Graph model with its guided Dataset picker: choose a Dataset and its From and To columns yourself ([§5.2](#52-graph-model-draw-a-dataset-yourself)) |
 | **Examples ▸ Follow the money** | Opens the Space's ready-made money-mule view and draws it now. Greyed out when the Space has none |
 | **Save view** | Saves over the open view (with none open it asks a name). Saving, renaming, duplicating and deleting views needs the *Workbench author* permission; without it these items are greyed out and the menu says *Needs Workbench author.* under them. Every greyed-out File item says why (*Draw a graph first.*, *Open an Investigation or saved view first.*). A view shared with others may be deleted only by its owner |
@@ -1886,7 +1886,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   characters; the purpose is non-blank and within the Space's `input.purpose_length` (422 otherwise, shown in place); the pen field and the New
   Investigation form cap it at that same Space value, never at a number of their own. **What changes:** the
   title and purpose every read shows (log header, list, embed). The sealed header is never rewritten — the edit is a `details` record
-  beside it (`investigation-details.json`, or the `details` column on Postgres) — so a Dossier issued before the edit still verifies, and a Dossier
+  beside it (`investigation-details.json`, or the `details` column on Postgres; the same record keeps the creator's display name, written at create, which **File ▸ Open…** shows — T-186) — so a Dossier issued before the edit still verifies, and a Dossier
   built now states the purpose and title sealed at create. **Two edits at once** (`LA-INVESTIGATION-EDIT-HARDENING-1`, 2026-10-29): an
   edit writes only the fields it was given, as one read-modify-write per Investigation (the store's lock: the JVM monitor plus the
   `.store.lock` file lock on the filesystem, the Investigation row lock `FOR NO KEY UPDATE` on Postgres), so one lead's new name never

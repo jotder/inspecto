@@ -378,7 +378,7 @@
         "tags" : [ "inv" ],
         "summary" : "GET /inv/investigations (generated skeleton)",
         "operationId" : "getInvInvestigations",
-        "description" : "The Investigations the caller may read, newest first, paged by limit and offset. Answers {items, total, offset, limit, truncated}; each item {id, title, dataset, owner, ownerName?, createdAt, headStep, caseRef?, access, readOnly}, the title masked per the Space's maskingMode. ownerName (T-186, additive) is the owner's display name where the server can resolve it: only the caller's own Investigations, from the signed-in Subject (there is no directory of other people's names); absent otherwise, so a client shows the owner login id.",
+        "description" : "The Investigations the caller may read, newest first, paged by limit and offset. Answers {items, total, offset, limit, truncated}; each item {id, title, dataset, owner, ownerName?, createdAt, headStep, caseRef?, access, readOnly}, the title masked per the Space's maskingMode. ownerName (T-186, additive) is the owner's display name as recorded when the Investigation was created, forked or instantiated, masked as the title; an older Investigation without one names only the caller's own (from the signed-in Subject) and is absent otherwise, so a client shows the owner login id.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

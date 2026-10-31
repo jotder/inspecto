@@ -22,6 +22,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlApiInvestigationListTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String OWNER = "Bearer owner", MEMBER = "Bearer member", STRANGER = "Bearer stranger";
+    private static final String OWNER = "Bearer owner", MEMBER = "Bearer member", STRANGER = "Bearer stranger", NAMED_A = "Bearer named-a";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port) implements AutoCloseable {
@@ -65,6 +66,7 @@ class ControlApiInvestigationListTest {
             case OWNER -> Optional.of(new Subject("analyst-1", all, Set.of(), Map.of(), null, "Analyst One"));
             case MEMBER -> Optional.of(new Subject("analyst-2", all));     // the Case's assignee
             case STRANGER -> Optional.of(new Subject("analyst-3", all));
+            case NAMED_A -> Optional.of(new Subject("analyst-4", all, Set.of(), Map.of(), null, "a"));   // a name that is an entity id
             default -> Optional.empty();
         });
     }
@@ -100,9 +102,18 @@ class ControlApiInvestigationListTest {
     }
 
     private void create(Ctx c, String id, String caseRef) throws Exception {
+        create(c, id, caseRef, OWNER);
+    }
+
+    private void create(Ctx c, String id, String caseRef, String auth) throws Exception {
         ok(c, "POST", "/inv/investigations", "{\"id\":\"" + id + "\",\"title\":\"T " + id + "\",\"purpose\":\"FR-1\","
                 + "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\""
-                + (caseRef == null ? "" : ",\"caseRef\":\"" + caseRef + "\"") + "}", OWNER);
+                + (caseRef == null ? "" : ",\"caseRef\":\"" + caseRef + "\"") + "}", auth);
+    }
+
+    private static JsonNode item(JsonNode list, String id) {
+        for (JsonNode i : list.get("items")) if (i.get("id").asText().equals(id)) return i;
+        throw new AssertionError("no " + id + " in " + list);
     }
 
     private List<String> ids(JsonNode list) {
@@ -143,13 +154,60 @@ class ControlApiInvestigationListTest {
             assertEquals("case-member", item.get("access").asText());
             assertTrue(item.get("readOnly").asBoolean());
             assertEquals("CASE-1", item.get("caseRef").asText());
-            assertFalse(item.has("ownerName"), "no directory of other people's names: the UI shows the login id");
+            assertEquals("Analyst One", item.get("ownerName").asText(), "T-186: the creator's name, recorded at create, shows to others");
 
             assertEquals(List.of(), ids(ok(c, "GET", "/inv/investigations", null, STRANGER)), "a stranger sees none");
 
             cases.put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-2", true));
             assertEquals(List.of(), ids(ok(c, "GET", "/inv/investigations", null, MEMBER)), "a closed Case shares nothing");
             assertEquals(2, ok(c, "GET", "/inv/investigations", null, OWNER).get("total").asInt(), "the owner is untouched");
+        }
+    }
+
+    /**
+     * T-186: the creator's display name is recorded in the Investigation's details at create (and at fork), so the list
+     * names every owner; an Investigation created before that has none, so only its owner (from the Subject) sees a name.
+     */
+    @Test
+    void theCreatorsNameIsRecordedAtCreateAndForkAndAnOlderInvestigationShowsTheLoginIdToOthers(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        subjects();
+        Map<String, Map<String, Object>> cases = CaseTeamObjectEngine.arm();
+        cases.put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-2", false));
+        try (Ctx c = open(cfg, root)) {
+            create(c, "inv-new", "CASE-1");
+            create(c, "inv-old", "CASE-1");
+            Path details = root.resolve("audit/snapshots/investigations/inv-new/investigation-details.json");
+            assertEquals("Analyst One", JSON.readTree(Files.readString(details)).get("ownerName").asText(), "recorded in the details");
+            Path older = root.resolve("audit/snapshots/investigations/inv-old/investigation-details.json");
+            Files.delete(older);   // as an Investigation created before T-186: no recorded name
+
+            JsonNode member = ok(c, "GET", "/inv/investigations", null, MEMBER);
+            assertEquals("Analyst One", item(member, "inv-new").get("ownerName").asText(), member.toString());
+            assertFalse(item(member, "inv-old").has("ownerName"), "an older Investigation: the UI shows the login id");
+            assertEquals("Analyst One", item(ok(c, "GET", "/inv/investigations", null, OWNER), "inv-old").get("ownerName").asText(),
+                    "…but its owner still resolves their own name from the Subject");
+
+            ok(c, "POST", "/inv/investigations/inv-new/reorder", "{\"id\":\"inv-fork\",\"order\":[]}", OWNER);
+            assertEquals("Analyst One", JSON.readTree(Files.readString(
+                    root.resolve("audit/snapshots/investigations/inv-fork/investigation-details.json"))).get("ownerName").asText());
+
+            ok(c, "PATCH", "/inv/investigations/inv-new", "{\"title\":\"Renamed\"}", OWNER);
+            assertEquals("Analyst One", item(ok(c, "GET", "/inv/investigations", null, MEMBER), "inv-new").get("ownerName").asText(),
+                    "an edit keeps the recorded name");
+        }
+    }
+
+    /** T-186 masking: a display name passes the Space's mask as the title does, so it never shows an id the list hides. */
+    @Test
+    void theOwnersNameIsMaskedAsTheTitleIs(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
+            create(c, "inv-a", null, NAMED_A);
+            ok(c, "POST", "/inv/investigations/inv-a/ops", "{\"op\":\"seed\",\"ids\":[\"a\"]}", NAMED_A);
+            String name = item(ok(c, "GET", "/inv/investigations", null, NAMED_A), "inv-a").get("ownerName").asText();
+            assertTrue(name.startsWith("masked:"), "the name is the masked entity id 'a', so it shows as its pseudonym: " + name);
         }
     }
 
