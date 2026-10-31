@@ -405,7 +405,8 @@ On an Investigation's canvas **Ctrl+Z** undoes the newest recorded step and **Ct
 it: Redo records the undone step again with the same parameters, through the same checks as the first time (an
 expand over the four-eyes thresholds is held again). A new step clears what can be redone. The rail's Undo / Redo
 arrows stay the display history (layout, colours, folds). The Investigation tab has the same **Undo** / **Redo** pair
-at its top.
+at its top. In an unsaved Investigation they undo and redo the unsaved steps (nothing is recorded until Save,
+[§11.1](#111-start-one)).
 
 ### 7.1 Expand
 
@@ -491,7 +492,9 @@ the button (a button with nothing to do is disabled and says why): **Hide 16 dan
 than [3] events** (the stepper sets the events), **Hide 40 imei** (one button per Entity Type when there are several),
 **Keep paths between the 2 selected** (exactly two selected; the stepper sets the longest path in links) and **Keep only
 the 9 selected**. Each is one recorded `hide` with its reason noted; **Exclude instead of hide** makes it one `exclude`
-carrying that reason. Start entities and kept entities are never taken away. Undo takes it back. The Working Set
+carrying that reason. Start entities and kept entities are never taken away. Undo takes it back. The fold works on an
+unsaved Investigation too: each press hides on screen and Save records it as the `hide` and its reason; *Exclude
+instead of hide* needs a saved Investigation. The Working Set
 carries link counts, not link times, so there is no "outside a time window" clean-up: set a **Time window** step (More
 steps) for later expands instead.
 
@@ -731,9 +734,13 @@ Until you save, nothing is on the server. The Investigation tab shows an **Unsav
 close button, then:
 
 * **Steps so far**, in order (*Start from 2 entities*, *Expand 1 degree from the outer ring, both ways*, …);
-* **Expand**, the same one control as in a saved Investigation ([§7.1](#71-expand)). Each Expand is a step; its Undo
-  (Ctrl+Z) takes the step back too;
+* **Undo** / **Redo** of the unsaved steps (also **Ctrl+Z** / **Ctrl+Shift+Z**), several steps back and forward, the
+  canvas with them. The start itself is not undone (Close discards it); a new step clears what can be redone;
+* **Expand**, the same one control as in a saved Investigation ([§7.1](#71-expand)). Each Expand is a step;
 * **Start entities ▸ Start from selected**: the selected entities and their links join the graph as a start;
+* **Clean up** ([§7.4](#74-clean-up)), the same one-press buttons: each hides on screen and is a step that Save records
+  as a `hide` with its reason. *Exclude instead of hide* waits for Save (*Save first to exclude: while unsaved, Clean up
+  hides.*);
 * one line: Keep, Hide, Exclude, Annotate and the other steps change a recorded Working Set, so **Save first**.
 
 An Expand that the Space would hold for a second person's approval cannot run unsaved: it says *This Expand needs
@@ -783,7 +790,8 @@ Top to bottom, most important first:
 7. **Selected entity:** who it is (masked, busy, not in the Working Set), **Start from it** when it is not in the Working
    Set yet, **Expand anyway** on a busy one, **Pick neighbours…** (tick some, or **Add the 10 strongest**: one expand to
    only those), its notes and **Note** / **Annotate**. Expand, Keep, Hide, Exclude and Shrink are on the canvas
-   (double-click, right-click, the selection bar, keys).
+   (double-click, right-click, the selection bar, keys). Right-click one entity ▸ **Pick neighbours…** selects it,
+   opens this tab and reads its neighbour list.
 8. **Busy entities** (a fold; each with its sealed count, *Busy: 650 linked entities (limit 500), not expanded*, and
    **Expand anyway**).
 9. **More steps** (a fold): **Connect** (Connect start entities) · **Time** (Time window, Snapshot marker) · **Compare**

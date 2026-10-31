@@ -45,6 +45,11 @@ import { configureLaLimits, resetLaLimits } from './la-limits';
         (saveRequested)="saveAsked = saveAsked + 1"
         (closeRequested)="closeAsked = closeAsked + 1"
         (startFromSelected)="startAsked = startAsked + 1"
+        [unsavedCanUndo]="unsavedCanUndo()"
+        [unsavedCanRedo]="unsavedCanRedo()"
+        (unsavedUndo)="undoAsked = undoAsked + 1"
+        (unsavedRedo)="redoAsked = redoAsked + 1"
+        (unsavedCleanUp)="cleaned.push($event)"
     ><p laNewInvestigation data-testid="projected-new-form">New Investigation form</p
     ><p laExpand data-testid="projected-expand">Expand form</p></inspecto-link-analysis-investigation>
     <!-- §5.8/§5.9: the parts the Act panel handed to the dock and the settings sections, over the same store -->
@@ -63,6 +68,11 @@ class Host {
     saveAsked = 0;
     closeAsked = 0;
     startAsked = 0;
+    readonly unsavedCanUndo = signal(false);
+    readonly unsavedCanRedo = signal(false);
+    undoAsked = 0;
+    redoAsked = 0;
+    readonly cleaned: { ids: string[]; reason: string }[] = [];
 }
 
 const LOG: InvestigationLog = {
@@ -1133,6 +1143,22 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', { timeout: 45_000 }, () => 
             truncated: false,
             workingSet: { entities: 3, links: 2, excluded: 0, hash: '' },
         });
+    it('LA-INVESTIGATE-UX-2: Pick neighbours… asked from the node menu opens and reads the list once the entity shows selected', async () => {
+        const { fixture, store, el, inv } = create();
+        const neighbourList = vi.fn(() => of({ neighbours: [{ id: 'c', count: 9, kinds: ['call'] }], total: 1, offset: 0, limit: 50, hasMore: false }));
+        (inv as unknown as { neighbourList: unknown }).neighbourList = neighbourList;
+        await openInv(store);
+        store.neighboursRequested.set('a');
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="neighbours-toggle"]')?.getAttribute('aria-expanded')).toBe('true');
+        expect(neighbourList).toHaveBeenCalledTimes(1);
+        expect(el.querySelector('[data-testid="neighbour-list"]')?.textContent).toContain('9 events');
+        expect(store.neighboursRequested()).toBeNull(); // asked once
+    });
+
     it('lists the neighbours of the selected entity strongest first, and Add selected sends ONE restricted expand', async () => {
         const { fixture, store, el, inv } = create();
         (inv as unknown as { neighbourList: unknown }).neighbourList = vi.fn(() =>
@@ -1452,6 +1478,44 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
         expect(fixture.componentInstance.closeAsked).toBe(1);
         expect(el.querySelector('[data-testid="unsaved-save-first"]')?.textContent).toContain('Save first');
         await expectNoA11yViolations(el);
+    });
+
+    it('LA-INVESTIGATE-UX-2: Undo and Redo are in reach while unsaved, and go to the page that holds the steps', async () => {
+        const { fixture, store, el, inv } = create();
+        begin(store);
+        fixture.detectChanges();
+        const undo = el.querySelector('[data-testid="act-undo"]') as HTMLButtonElement;
+        const redo = el.querySelector('[data-testid="act-redo"]') as HTMLButtonElement;
+        expect(el.querySelector('[data-testid="act-bar"]')?.textContent).toContain('Unsaved steps');
+        expect([undo.getAttribute('aria-disabled'), redo.getAttribute('aria-disabled')]).toEqual(['true', 'true']);
+        fixture.componentInstance.unsavedCanUndo.set(true);
+        fixture.componentInstance.unsavedCanRedo.set(true);
+        fixture.detectChanges();
+        undo.click();
+        redo.click();
+        expect([fixture.componentInstance.undoAsked, fixture.componentInstance.redoAsked]).toEqual([1, 1]);
+        expect(inv.undoInvestigation).not.toHaveBeenCalled(); // nothing on the server while unsaved
+        await expectNoA11yViolations(el.querySelector('[data-testid="act-bar"]') as HTMLElement);
+    });
+
+    it('LA-INVESTIGATE-UX-2: Clean up counts the unsaved Working Set and hands each hide to the page; Exclude waits for Save', async () => {
+        const e = (id: string, hop: number) => ({ id, type: 'msisdn', hop, seed: 'a', admittedBy: 1, hidden: false, kept: false });
+        const l = (source: string, target: string) => ({ source, target, kind: 'voice', count: 1, admittedBy: 2 });
+        const { fixture, store, el, inv } = create();
+        begin(store);
+        store.unsavedWs.set({ entities: [e('a', 0), e('b', 1), e('c', 2), e('d', 2)], links: [l('a', 'b'), l('b', 'c'), l('b', 'd')], excluded: [], hash: '' });
+        fixture.detectChanges();
+        await fixture.whenStable(); // ngModel applies [disabled] a tick later
+        fixture.detectChanges();
+        const leaves = el.querySelector('[data-testid="cleanup-leaves"]') as HTMLButtonElement;
+        expect(leaves.textContent).toContain('Hide 2 dangling leaves');
+        expect((el.querySelector('[data-testid="cleanup-exclude-instead"] input') as HTMLInputElement).disabled).toBe(true);
+        expect(el.querySelector('[data-testid="cleanup-unsaved-exclude"]')?.textContent).toContain('Save first to exclude');
+        leaves.click();
+        await fixture.whenStable();
+        expect(fixture.componentInstance.cleaned).toEqual([{ ids: ['c', 'd'], reason: 'Clean up: dangling leaves' }]);
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el.querySelector('[data-testid="act-cleanup"]') as HTMLElement);
     });
 
     it('a reader without Incident management may explore, but Save is disabled and says why', async () => {

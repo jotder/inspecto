@@ -32,7 +32,13 @@ export type UnsavedStep =
            * Degrees redraws `stages[M-1]` and drops the rest, so the terminal entities leave the canvas and the step.
            */
           stages?: WorkingSet[];
-      };
+      }
+    /**
+     * LA-INVESTIGATE-UX-2: a Clean up while unsaved — these Working Set entities hidden on screen. Save replays it as the
+     * saved Clean up records it: one `hide`, then one `annotate` carrying the reason. Never sent to the preview (a hide
+     * only marks entities, so the drawn set stays exactly what Save records).
+     */
+    | { kind: 'hide'; ids: string[]; reason: string };
 
 /** What Save binds the Investigation to (the same binding the New form used to create one at once). */
 export interface UnsavedBinding {
@@ -63,8 +69,11 @@ export const UNSAVED_FOUR_EYES =
 export const UNSAVED_FOUR_EYES_START =
     "This start's ring needs a second person's approval, so it cannot run unsaved. Save first: start from the whole Dataset, Save, then start from the selected entities.";
 
-/** The reason the steps other than Start and Expand are not offered while unsaved. */
+/** The reason the steps other than Start, Expand and Clean up are not offered while unsaved. */
 export const SAVE_FIRST = 'Save first: this step changes a recorded Working Set.';
+
+/** Why Clean up's "Exclude instead" waits for Save: the unsaved preview reads seeds and expands only. */
+export const UNSAVED_EXCLUDE = 'Save first to exclude: while unsaved, Clean up hides.';
 
 function many(n: number, one: string, more: string): string {
     return `${n.toLocaleString('en-GB')} ${n === 1 ? one : more}`;
@@ -80,6 +89,7 @@ const DIRECTION_WORDS: Record<string, string> = {
 /** One step in words, as the unsaved step list and the Save outcome say it. */
 export function unsavedStepLine(s: UnsavedStep): string {
     if (s.kind === 'seed') return `Start from ${many(s.ids.length, 'entity', 'entities')}`;
+    if (s.kind === 'hide') return `Hide ${many(s.ids.length, 'entity', 'entities')} (${s.reason})`;
     const from = s.from === 'outer' ? 'the outer ring' : many(s.ids.length, 'entity', 'entities');
     const kinds = s.req.linkKinds?.length ? `, ${s.req.linkKinds.join(', ')}` : '';
     const busy = s.req.hold ? '' : ', through busy entities';

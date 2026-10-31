@@ -1957,6 +1957,46 @@ describe('LinkAnalysisComponent', () => {
         expect(text('working-set-on-screen')).toBe('2 nodes · 1 link on screen');
         fixture.destroy();
     });
+    it('LA-INVESTIGATE-UX-2: the node menu offers Pick neighbours… on one Working Set entity; it selects it and asks the tab for its list', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [
+                { id: 'ws-a', hop: 0, hidden: false, kept: false },
+                { id: 'ws-b', hop: 1, hidden: false, kept: false },
+            ],
+            links: [{ source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        fixture.detectChanges();
+        const [nodeA, nodeB] = ['ws-a', 'ws-b'].map((l) => c.canvasData()!.nodes.find((n) => n.data.label === l)!);
+        c.onNodeContextMenu({ id: nodeA.id, x: 10, y: 10 });
+        await new Promise((r) => setTimeout(r, 20));
+        fixture.detectChanges();
+        const pick = document.querySelector('[data-testid="la-node-menu-pick-neighbours"]') as HTMLButtonElement;
+        expect(pick?.textContent).toContain('Pick neighbours…');
+        const load = vi.spyOn(c.investigation, 'loadNeighbours').mockResolvedValue();
+        pick.click();
+        expect(c.investigation.neighboursRequested()).toBe('ws-a');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        // the tab opened, showed the entity selected and read its list (the request is used once)
+        expect(load).toHaveBeenCalledWith('ws-a');
+        expect(c.investigation.neighboursRequested()).toBeNull();
+        expect(c.investigation.selected()?.id).toBe(nodeA.id);
+        expect(c.selectedOnCanvas()).toEqual([nodeA.id]);
+        expect(c.toolboxTab()).toBe('investigation');
+        // not offered on two entities: the list is one entity's
+        c.nodeMenuTargets.set([nodeA.id, nodeB.id]);
+        expect(c.nodeMenuEntity()).toBeNull();
+        fixture.destroy();
+    });
+
     it('LA-INVESTIGATE-UX-1: on an Investigation canvas K keeps, Ctrl+Z / Ctrl+Shift+Z undo and redo recorded steps, and the node menu expands with the tab filter', async () => {
         const { fixture } = create();
         fixture.detectChanges();
@@ -5095,6 +5135,85 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(steps[2].kind === 'expand' && steps[2].walked?.length).toBe(1); // the exact values degree 1 expanded from
         c.growExclude.lastChange()!.undo!();
         expect(c.investigation.unsaved()!.steps).toHaveLength(2);
+    });
+
+    it('LA-INVESTIGATE-UX-2: unsaved Undo and Redo walk the steps back and forward with the canvas; a new step drops Redo', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const steps = () => c.investigation.unsaved()!.steps.length;
+        const nodes = () => c.graph()!.nodes.length;
+        const started = nodes();
+        const req = { direction: 'out' as const, degrees: 1, linkKinds: null, hold: true, threshold: 500 };
+        await c.onExpand({ ctx: c.growContext(), req, from: 'outer' });
+        const once = nodes();
+        await c.onExpand({ ctx: c.growContext(), req, from: 'outer' });
+        const twice = nodes();
+        expect(steps()).toBe(4);
+        expect(twice).toBeGreaterThan(once);
+        expect(once).toBeGreaterThan(started);
+
+        // never while an Expand or a Degrees change is still reading: it would land on the state Undo put back
+        const lock = c as unknown as { expandBusy: boolean };
+        lock.expandBusy = true;
+        expect(c.undoUnsaved()).toBe(false);
+        lock.expandBusy = false;
+        // two levels back, not only the newest change; the start itself stays (Close discards it)
+        expect(c.undoUnsaved()).toBe(true);
+        expect(c.undoUnsaved()).toBe(true);
+        expect([steps(), nodes()]).toEqual([2, started]);
+        expect(c.canUndoUnsaved()).toBe(false);
+        // Ctrl+Shift+Z redoes an unsaved step, canvas and all
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true }));
+        expect([steps(), nodes()]).toEqual([3, once]);
+        expect(c.redoUnsaved()).toBe(true);
+        expect([steps(), nodes()]).toEqual([4, twice]);
+        expect(c.canRedoUnsaved()).toBe(false);
+        // Ctrl+Z goes back again; a fresh step forgets what was undone
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+        expect(steps()).toBe(3);
+        expect(c.canRedoUnsaved()).toBe(true);
+        await c.onExpand({ ctx: c.growContext(), req: { ...req, direction: 'either' }, from: 'outer' });
+        expect(c.canRedoUnsaved()).toBe(false);
+    });
+
+    it('LA-INVESTIGATE-UX-2: an unsaved Clean up hides on the drawn Working Set, records one hide step, and Undo / Redo take it', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const leaf = 'MULE-HUB-01.n';
+        const hidden = () => c.investigation.unsavedWs()!.entities.find((e) => e.id === leaf)!.hidden;
+        const shown = () => c.graph()!.nodes.length;
+        const before = shown();
+        c.cleanUpUnsaved({ ids: [leaf], reason: 'Clean up: dangling leaves' });
+        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({ kind: 'hide', ids: [leaf], reason: 'Clean up: dangling leaves' });
+        expect(hidden()).toBe(true);
+        expect(shown()).toBe(before - 1); // a hidden entity is not drawn
+        expect(c.growExclude.lastChange()?.text).toBe('Hid 1 (not saved yet).');
+        // the tab's Keep only these / paths between 2 name the drawn unsaved Working Set's ids
+        const hub = c.graph()!.nodes.find((n) => n.data.label === 'MULE-HUB-01')!;
+        c.onSelectionChange([hub.id]);
+        expect(c.selectionWorkingSetIds()).toEqual(['MULE-HUB-01']);
+        expect(c.undoUnsaved()).toBe(true);
+        expect([c.investigation.unsaved()!.steps.length, hidden(), shown()]).toEqual([2, false, before]);
+        expect(c.redoUnsaved()).toBe(true);
+        expect([c.investigation.unsaved()!.steps.length, hidden(), shown()]).toEqual([3, true, before - 1]);
     });
 
     it('LA-UNSAVED-INVESTIGATION-1: Close with unsaved steps asks Save, Discard or Cancel', async () => {
