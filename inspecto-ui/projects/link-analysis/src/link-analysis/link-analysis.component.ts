@@ -1,4 +1,3 @@
-import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
 import {
     ChangeDetectionStrategy,
     ChangeDetectorRef,
@@ -15,6 +14,7 @@ import {
     inject,
     signal,
     untracked,
+    WritableSignal,
 } from '@angular/core';
 import {
     FormBuilder,
@@ -332,6 +332,15 @@ function uniqueNameValidator(taken: () => string[]): ValidatorFn {
     };
 }
 
+/** LA-INVESTIGATE-UX-2: one unsaved Investigation state — its steps and the canvas they drew — for Undo and Redo. */
+interface UnsavedCanvas {
+    steps: UnsavedStep[];
+    ws: WorkingSet | null;
+    graph: G6GraphData | null;
+    expanded: string[];
+    held: ReadonlyMap<string, number>;
+}
+
 /** Undo/redo scope (Phase G): presentation state only — search/filter, display options, layout, and
  *  collapsed branches. NOT the query or the loaded graph itself (a heavier, separate feature). */
 interface PresentationSnapshot {
@@ -485,7 +494,6 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
     imports: [
         DatePipe,
         InvestigationSettingsSections,
-        TermHelpComponent,
         FormMenuDirective,
         LinkAnalysisDiscoverComponent,
         LinkAnalysisGlossaryComponent,
@@ -2186,6 +2194,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.startNotice.set(null);
         this.investigateIssue.set('');
         this.unsavedWs.set(null);
+        this.unsavedHistory.set(emptyHistory());
         const zone = req.timeColZone || undefined;
         const common = { presets: this.degreePresets(), maxDegree: this.maxDegree(), profileId: activeDomainProfileId() };
         if (req.start.kind === 'graph') {
@@ -2284,7 +2293,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             return false;
         }
         const named = this.rawNamed(growIds(ctx, req));
-        const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld(), ws: this.unsavedWs() };
+        const before = this.unsavedCanvas();
         const walk = await this.walkUnsaved(u.binding, this.unsavedWs(), [], named, req);
         if (!walk) {
             this.growExclude.lastChange.set({ text: UNSAVED_FOUR_EYES });
@@ -2300,27 +2309,95 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.investigation.recordUnsaved(step);
         const added = walk.ws.entities.length - (before.graph?.nodes.length ?? 0);
         this.drawUnsaved(walk.ws, u.binding);
+        this.commitUnsaved(before);
         const after = this.graph();
         const t = ctx.terms;
         const text = `Expanded ${walk.walked.length === 1 ? 'one degree' : walk.walked.length + ' degrees'}: added ${Math.max(0, added).toLocaleString('en-GB')} ${added === 1 ? t.node : t.nodes} (not saved yet).`;
-        this.growExclude.lastChange.set({
-            text,
-            valid: () => this.graph() === after,
-            undo: () => {
-                this.graph.set(before.graph);
-                this.expandedNodeIds.set(before.expanded);
-                this.growExclude.basicHeld.set(before.held);
-                this.unsavedWs.set(before.ws);
-                this.investigation.popUnsaved();
-                this.growExclude.lastChange.set({ text: 'Undone.' });
-            },
-        });
+        this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
         this.drawAnnouncement.set(text);
         return true;
     }
 
     /** The unsaved Working Set on the canvas, as the server previewed it (each preview sends it, not the step history). */
-    private readonly unsavedWs = signal<WorkingSet | null>(null);
+    private get unsavedWs(): WritableSignal<WorkingSet | null> {
+        return this.investigation.unsavedWs;
+    }
+
+    // ── LA-INVESTIGATE-UX-2: Undo and Redo of unsaved steps (each snapshot is the steps and the canvas they drew) ──
+    private readonly unsavedHistory = signal<HistoryStack<UnsavedCanvas>>(emptyHistory());
+    /** The graph the newest unsaved change drew: Undo and Redo are offered only while the canvas still shows it. */
+    private readonly unsavedDrawn = signal<G6GraphData | null>(null);
+    private readonly unsavedLive = computed(() => !!this.investigation.unsaved() && this.graph() === this.unsavedDrawn());
+    readonly canUndoUnsaved = computed(() => this.unsavedLive() && this.unsavedHistory().past.length > 0);
+    readonly canRedoUnsaved = computed(() => this.unsavedLive() && this.unsavedHistory().future.length > 0);
+
+    private unsavedCanvas(): UnsavedCanvas {
+        return {
+            steps: this.investigation.unsaved()?.steps ?? [],
+            ws: this.unsavedWs(),
+            graph: this.graph(),
+            expanded: this.expandedNodeIds(),
+            held: this.growExclude.basicHeld(),
+        };
+    }
+
+    /** After an unsaved change drew: `before` becomes what Undo returns to, and what was undone is forgotten. */
+    private commitUnsaved(before: UnsavedCanvas): void {
+        this.unsavedHistory.update((h) => pushHistory(h, before));
+        this.unsavedDrawn.set(this.graph());
+    }
+
+    private restoreUnsaved(s: UnsavedCanvas): void {
+        this.graph.set(s.graph);
+        this.expandedNodeIds.set(s.expanded);
+        this.growExclude.basicHeld.set(s.held);
+        this.unsavedWs.set(s.ws);
+        this.investigation.setUnsavedSteps(s.steps);
+        this.unsavedDrawn.set(s.graph);
+    }
+
+    /** Undo the newest unsaved change (Expand, Degrees, Start from selected, Clean up). False when there is none. */
+    undoUnsaved(): boolean {
+        // an Expand or a Degrees change still reading would land on the state Undo put back
+        if (this.expandBusy || !this.canUndoUnsaved()) return false;
+        const r = undoHistory(this.unsavedHistory(), this.unsavedCanvas());
+        if (!r) return false;
+        this.unsavedHistory.set(r.history);
+        this.restoreUnsaved(r.state);
+        this.growExclude.lastChange.set({ text: 'Undone (not saved yet).' });
+        return true;
+    }
+
+    /** Redo the newest undone unsaved change. False when there is none. */
+    redoUnsaved(): boolean {
+        if (this.expandBusy || !this.canRedoUnsaved()) return false;
+        const r = redoHistory(this.unsavedHistory(), this.unsavedCanvas());
+        if (!r) return false;
+        this.unsavedHistory.set(r.history);
+        this.restoreUnsaved(r.state);
+        this.growExclude.lastChange.set({ text: 'Redone (not saved yet).' });
+        return true;
+    }
+
+    /**
+     * LA-INVESTIGATE-UX-2: a Clean up while unsaved. The entities are marked hidden on the drawn Working Set (a `hide` only
+     * marks them, so what is drawn stays what Save records) and the hide is recorded as one unsaved step.
+     */
+    cleanUpUnsaved({ ids, reason }: { ids: string[]; reason: string }): void {
+        const u = this.investigation.unsaved();
+        const ws = this.unsavedWs();
+        const hide = new Set(ids);
+        if (!u || !ws || !hide.size) return;
+        const before = this.unsavedCanvas();
+        const next: WorkingSet = { ...ws, entities: ws.entities.map((e) => (hide.has(e.id) ? { ...e, hidden: true } : e)) };
+        this.investigation.recordUnsaved({ kind: 'hide', ids: [...hide], reason });
+        this.drawUnsaved(next, u.binding);
+        this.commitUnsaved(before);
+        const after = this.graph();
+        const text = `Hid ${hide.size.toLocaleString('en-GB')} (not saved yet).`;
+        this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
+        this.drawAnnouncement.set(text);
+    }
 
     /**
      * Walk an unsaved Expand degree by degree through the server's preview (\`POST /inv/expand/preview\`, the step route's own
@@ -2431,7 +2508,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const u = this.investigation.unsaved();
         const step = u?.steps.at(-1);
         if (!u || !step) return;
-        const before = { graph: this.graph(), expanded: this.expandedNodeIds(), held: this.growExclude.basicHeld(), ws: this.unsavedWs(), step };
+        const before = this.unsavedCanvas();
         let next: UnsavedStep;
         let ws: WorkingSet;
         if (degrees < have) {
@@ -2460,6 +2537,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         }
         this.investigation.replaceLastUnsaved(next);
         this.drawUnsaved(ws, u.binding);
+        this.commitUnsaved(before);
         const after = this.graph();
         const moved = Math.abs(ws.entities.length - (before.ws?.entities.length ?? 0));
         const to = expandStepDegrees(next) ?? degrees;
@@ -2468,18 +2546,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             degrees < have
                 ? `Lowered to ${to === 1 ? 'one degree' : to + ' degrees'}: removed ${moved.toLocaleString('en-GB')} ${moved === 1 ? t.node : t.nodes} and the ${t.links} only they carried (not saved yet).`
                 : `Raised to ${to} degrees: added ${moved.toLocaleString('en-GB')} ${moved === 1 ? t.node : t.nodes} (not saved yet).`;
-        this.growExclude.lastChange.set({
-            text,
-            valid: () => this.graph() === after,
-            undo: () => {
-                this.graph.set(before.graph);
-                this.expandedNodeIds.set(before.expanded);
-                this.growExclude.basicHeld.set(before.held);
-                this.unsavedWs.set(before.ws);
-                this.investigation.replaceLastUnsaved(before.step);
-                this.growExclude.lastChange.set({ text: 'Undone.' });
-            },
-        });
+        this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
         this.drawAnnouncement.set(text);
     }
 
@@ -2517,6 +2584,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const values = [...new Set(picked.flatMap((n) => rawIdsOf(n)))];
         const type = u.binding.projection.entityType;
         const seed: UnsavedStep = { kind: 'seed', ids: values, ...(type ? { entityType: type } : {}) };
+        const before = this.unsavedCanvas();
         let walk: Awaited<ReturnType<LinkAnalysisComponent['walkUnsaved']>>;
         try {
             walk = await this.walkUnsaved(u.binding, this.unsavedWs(), values, values, this.startRing());
@@ -2531,6 +2599,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         }
         this.investigation.recordUnsaved(seed, { kind: 'expand', from: 'ids', ids: values, req: this.startRing(walk.walked.length), walked: walk.walked, stages: walk.stages });
         this.drawUnsaved(walk.ws, u.binding);
+        this.commitUnsaved(before);
     }
 
     /**
@@ -3699,6 +3768,7 @@ Its prior copies stay in its version history.`,
                 void this.growExclude.undoLast();
                 return;
             }
+            if (this.undoUnsaved()) return; // LA-INVESTIGATE-UX-2: the unsaved steps, further back
             if (recorded && this.investigation.canUndo()) {
                 if (!this.investigation.busy()) void this.investigation.undo(this.investigation.undoTarget());
                 return;
@@ -3706,6 +3776,7 @@ Its prior copies stay in its version history.`,
             this.undoPresentation();
         } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
             e.preventDefault();
+            if (this.redoUnsaved()) return;
             if (recorded && this.investigation.canRedo()) {
                 if (!this.investigation.busy()) void this.investigation.redo();
                 return;
@@ -3914,13 +3985,15 @@ Its prior copies stay in its version history.`,
     }
 
     /** The selection as Working Set ids, for the Investigation tab's Clean up (Keep only these, paths between 2). */
-    readonly selectionWorkingSetIds = computed(() =>
-        this.investigation.canvas() === null ? [] : this.selectedWorkingSetIds(),
-    );
+    readonly selectionWorkingSetIds = computed(() => {
+        if (this.investigation.canvas() !== null) return this.selectedWorkingSetIds();
+        // LA-INVESTIGATE-UX-2: unsaved, Clean up's Keep only these and paths between 2 name the drawn Working Set's ids
+        const ws = this.investigation.unsaved() ? this.unsavedWs() : null;
+        return ws ? this.selectedWorkingSetIds(ws) : [];
+    });
 
     /** The selection's raw ids that are entities of the open Investigation's Working Set - what an op may name (else 422). */
-    private selectedWorkingSetIds(): string[] {
-        const ws = this.investigation.workingSet();
+    private selectedWorkingSetIds(ws = this.investigation.workingSet()): string[] {
         return [...new Set(this.selectedNodes().flatMap((n) => idsInWorkingSet(n, ws)))];
     }
 
@@ -4168,14 +4241,15 @@ Its prior copies stay in its version history.`,
         const invId = this.graphRunInvestigationId();
         const ws = this.investigation.workingSet();
         const key = rawIdsOf(node)[0] ?? node.data.label;
+        // the node's own type first, then the type the graph was drawn as (T-042: a start from an Entity Type has one)
+        const entityType = (node.data.entityType as string | undefined) ?? this.growEntityType() ?? undefined;
         const insight: NodeInsightContext = {
             nodeId: id,
             label: node.data.label,
             key,
             listKey: ws?.exploreAliases?.[key],
             profileId: this.profileId() ?? 'generic',
-            // the node's own type first, then the type the graph was drawn as (T-042: a start from an Entity Type has one)
-            entityType: (node.data.entityType as string | undefined) ?? this.growEntityType() ?? undefined,
+            entityType,
             investigationId: invId,
             graphKey: invId && ws ? `${invId}:${ws.hash}` : null,
             serverId: ids?.serverNode(id) ?? null,
@@ -4190,7 +4264,7 @@ Its prior copies stay in its version history.`,
             canManageLists: this.lens.canManageIncidents(),
             onListChanged: () => this.investigation.entityListsChanged.update((n) => n + 1),
             canHide: !this.investigation.active(),
-            entityPage: this.entityPageOf(this.profile().investigate?.entityType, rawIdsOf(node)[0] ?? node.data.label),
+            entityPage: this.entityPageOf(entityType, key),
         };
         this.dialog
             .open(ElementDetailDialog, {
@@ -5751,6 +5825,24 @@ Its prior copies stay in its version history.`,
         }
         this.selectedNodeIds.set([...next]);
         this.announceSelection(next.size);
+    }
+
+    /** LA-INVESTIGATE-UX-2: the one Working Set entity the menu was opened on (*Pick neighbours…* reads its list); null otherwise. */
+    readonly nodeMenuEntity = computed(() => {
+        if (this.nodeMenuTargets().length !== 1) return null;
+        const node = this.canvasData()?.nodes.find((n) => n.id === this.nodeMenuTargets()[0]);
+        const id = node ? idsInWorkingSet(node, this.investigation.workingSet())[0] : undefined;
+        return node && id ? { node, id } : null;
+    });
+
+    /** *Pick neighbours…*: select the entity and open the Investigation tab with its neighbour list read. */
+    pickNeighboursFromMenu(): void {
+        const target = this.nodeMenuEntity();
+        if (!target) return;
+        this.selectedNodeIds.set([target.node.id]);
+        this.investigation.selected.set(target.node);
+        this.investigation.neighboursRequested.set(target.id);
+        this.openInvestigation();
     }
 
     /** "Investigate this" (no Investigation open): the start form, filled with the entity. */

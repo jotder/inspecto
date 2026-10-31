@@ -1136,7 +1136,7 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         begin(store);
         store.recordUnsaved({ kind: 'seed', ids: ['c'] });
         expect(store.unsaved()!.steps).toHaveLength(4);
-        store.popUnsaved();
+        store.setUnsavedSteps(store.unsaved()!.steps.slice(0, -1));
         expect(store.unsaved()!.steps).toHaveLength(3);
         store.keepSaveDraft('Operation Larch', 'Warrant 7');
         expect(store.unsaved()!.draft).toEqual({ name: 'Operation Larch', purpose: 'Warrant 7' });
@@ -1164,6 +1164,24 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         expect(out).toEqual({ created: true, recorded: 3, message: '' });
         expect(t.store.unsaved()).toBeNull();
         expect(t.store.activeId()).toBe('inv-1');
+    });
+
+    it('LA-INVESTIGATE-UX-2: Save replays an unsaved Clean up as one hide and one annotate with its reason, of ids the set holds', async () => {
+        const t = setup();
+        const sent = server(t);
+        t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'N', purpose: 'P' }, [
+            { kind: 'seed', ids: ['a'] },
+            { kind: 'expand', from: 'outer', ids: [], req: RING },
+            { kind: 'hide', ids: ['a-n', 'gone'], reason: 'Clean up: dangling leaves' },
+        ]);
+        // the preview takes seeds and expands only: a hide never reaches it
+        expect(t.store.unsavedOps(t.store.unsaved()!.steps, t.store.unsaved()!.binding).map((o) => o.op)).toEqual(['seed', 'expand']);
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(sent.slice(2)).toEqual([
+            { op: 'hide', ids: ['a-n'] }, // 'gone' is not in the replayed Working Set
+            { op: 'annotate', ids: ['a-n'], note: 'Clean up: dangling leaves' },
+        ]);
+        expect(out).toEqual({ created: true, recorded: 4, message: '' });
     });
 
     it('a step refused partway stops the replay: the steps before it are saved, the rest named as not recorded', async () => {

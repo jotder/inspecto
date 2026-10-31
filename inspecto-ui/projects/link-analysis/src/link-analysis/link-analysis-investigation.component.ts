@@ -59,6 +59,7 @@ import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.compo
 import { stepReadSuffix } from './index-source';
 import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf, stepName } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
+import { UNSAVED_EXCLUDE } from './unsaved-investigation';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import {
     InvestigationSnapshotOpComponent,
@@ -244,48 +245,85 @@ export class LinkAnalysisInvestigationComponent {
         this.showHowTo.set(false);
     }
 
+    // ── LA-INVESTIGATE-UX-2: Undo, Redo and Clean up on an unsaved Investigation (the page holds its steps and canvas) ──
+    /** An unsaved Investigation is what the tab shows (no saved one open). */
+    readonly isUnsaved = computed(() => !this.store.active() && !!this.store.unsaved());
+    readonly unsavedCanUndo = input(false);
+    readonly unsavedCanRedo = input(false);
+    readonly unsavedUndo = output<void>();
+    readonly unsavedRedo = output<void>();
+    /** A Clean up while unsaved: the page hides these on the drawn Working Set and records the step. */
+    readonly unsavedCleanUp = output<{ ids: string[]; reason: string }>();
+    readonly unsavedExcludeWhy = UNSAVED_EXCLUDE;
+
+    readonly canUndoNow = computed(() => (this.isUnsaved() ? this.unsavedCanUndo() : this.canWrite() && this.store.canUndo()));
+    readonly canRedoNow = computed(() => (this.isUnsaved() ? this.unsavedCanRedo() : this.canWrite() && this.store.canRedo()));
     readonly undoTip = computed(() =>
-        !this.canWrite() ? this.expandNeeds : this.store.canUndo() ? 'Undo the newest recorded step (Ctrl+Z)' : 'Nothing to undo',
+        this.isUnsaved()
+            ? this.unsavedCanUndo()
+                ? 'Undo the newest unsaved step (Ctrl+Z)'
+                : 'Nothing to undo'
+            : !this.canWrite()
+              ? this.expandNeeds
+              : this.store.canUndo()
+                ? 'Undo the newest recorded step (Ctrl+Z)'
+                : 'Nothing to undo',
     );
     readonly redoTip = computed(() =>
-        !this.canWrite()
-            ? this.expandNeeds
-            : this.store.canRedo()
-              ? `Record the undone ${this.store.redoName().toLowerCase()} step again (Ctrl+Shift+Z)`
-              : 'Nothing to redo',
+        this.isUnsaved()
+            ? this.unsavedCanRedo()
+                ? 'Take the undone unsaved step again (Ctrl+Shift+Z)'
+                : 'Nothing to redo'
+            : !this.canWrite()
+              ? this.expandNeeds
+              : this.store.canRedo()
+                ? `Record the undone ${this.store.redoName().toLowerCase()} step again (Ctrl+Shift+Z)`
+                : 'Nothing to redo',
     );
 
     /** The last Grow / Exclude / Clean up of this browser first (it may be several steps), else the newest step. */
     async undo(): Promise<void> {
+        if (this.isUnsaved()) {
+            if (this.unsavedCanUndo()) this.unsavedUndo.emit();
+            return;
+        }
         if (!this.canWrite()) return;
         if (this.grow?.undoable()) await this.grow.undoLast();
         else await this.store.undo(this.store.undoTarget());
     }
 
     async redo(): Promise<void> {
+        if (this.isUnsaved()) {
+            if (this.unsavedCanRedo()) this.unsavedRedo.emit();
+            return;
+        }
         if (this.canWrite()) await this.store.redo();
     }
 
     readonly cleanupExclude = signal(false);
-    readonly verb = computed(() => (this.cleanupExclude() ? 'Exclude' : 'Hide'));
+    /** While unsaved Clean up hides: an exclude waits for Save. */
+    private readonly excluding = computed(() => this.cleanupExclude() && !this.isUnsaved());
+    readonly verb = computed(() => (this.excluding() ? 'Exclude' : 'Hide'));
+    /** The Working Set Clean up counts: the saved one, or the unsaved one the canvas draws. */
+    private readonly cleanupWs = computed(() => (this.isUnsaved() ? this.store.unsavedWs() : this.store.workingSet()));
     readonly weakEvents = new FormControl(2, { nonNullable: true });
     readonly weakMin = toSignal(this.weakEvents.valueChanges, { initialValue: this.weakEvents.value });
     readonly pathLinks = new FormControl(4, { nonNullable: true });
     private readonly pathMax = toSignal(this.pathLinks.valueChanges, { initialValue: this.pathLinks.value });
     readonly cleanup = computed(() => {
-        const ws = this.store.workingSet();
+        const ws = this.cleanupWs();
         return ws ? cleanupSets(ws) : { leaves: [], types: [] };
     });
     readonly weak = computed(() => {
-        const ws = this.store.workingSet();
+        const ws = this.cleanupWs();
         return ws ? weaklyLinked(ws, this.weakMin()) : [];
     });
     readonly keepOnlyIds = computed(() => {
-        const ws = this.store.workingSet();
+        const ws = this.cleanupWs();
         return ws ? keepOnlySelected(ws, this.selectedIds()) : [];
     });
     readonly offPaths = computed(() => {
-        const ws = this.store.workingSet();
+        const ws = this.cleanupWs();
         const [a, b] = this.selectedIds();
         return ws && this.selectedIds().length === 2 ? offPathsBetween(ws, a, b, this.pathMax()) : [];
     });
@@ -297,7 +335,11 @@ export class LinkAnalysisInvestigationComponent {
     /** One press = one recorded step (`hide`, or `exclude` with the reason), its reason noted; Undo takes it back. */
     async cleanUp(ids: string[], reason: string): Promise<void> {
         if (!this.canWrite() || !ids.length) return;
-        const exclude = this.cleanupExclude();
+        if (this.isUnsaved()) {
+            this.unsavedCleanUp.emit({ ids, reason });
+            return;
+        }
+        const exclude = this.excluding();
         if (this.grow) await this.grow.cleanUp(ids, reason, exclude);
         else await this.store.apply(exclude ? { op: 'exclude', ids, reason } : { op: 'hide', ids });
     }
@@ -400,6 +442,16 @@ export class LinkAnalysisInvestigationComponent {
             if (this.section() !== 'act' || !this.store.awaitingApproval()) return;
             const timer = setInterval(() => void this.store.reload(), APPROVAL_POLL_MS);
             onCleanup(() => clearInterval(timer));
+        });
+        // LA-INVESTIGATE-UX-2: *Pick neighbours…* on the node menu — once this tab shows that entity selected, open its list
+        effect(() => {
+            const asked = this.store.neighboursRequested();
+            if (this.section() !== 'act' || !asked || this.selectedInSet()[0] !== asked) return;
+            untracked(() => {
+                this.store.neighboursRequested.set(null);
+                this.neighboursOpen.set(true);
+                void this.readNeighbours();
+            });
         });
     }
 
