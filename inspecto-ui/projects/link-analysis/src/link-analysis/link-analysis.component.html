@@ -1302,6 +1302,13 @@
                                     <mat-icon svgIcon="heroicons_outline:cursor-arrow-rays" aria-hidden="true"></mat-icon>
                                     <span>Select neighbours</span>
                                 </button>
+                                @if (nodeMenuEntity()) {
+                                    <!-- LA-INVESTIGATE-UX-2: the tab's neighbour list for this entity, read and shown -->
+                                    <button mat-menu-item type="button" (click)="pickNeighboursFromMenu()" data-testid="la-node-menu-pick-neighbours">
+                                        <mat-icon svgIcon="heroicons_outline:list-bullet" aria-hidden="true"></mat-icon>
+                                        <span>Pick neighbours…</span>
+                                    </button>
+                                }
                             } @else if (canInvestigateNode()) {
                                 <button mat-menu-item type="button" (click)="investigateNode(nodeMenuTargets()[0])" data-testid="la-node-menu-investigate">
                                     <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle" aria-hidden="true"></mat-icon>
@@ -1674,6 +1681,11 @@
                                     (saveRequested)="saveUnsaved()"
                                     (closeRequested)="closeOpenWork()"
                                     (startFromSelected)="startFromSelected()"
+                                    [unsavedCanUndo]="canUndoUnsaved()"
+                                    [unsavedCanRedo]="canRedoUnsaved()"
+                                    (unsavedUndo)="undoUnsaved()"
+                                    (unsavedRedo)="redoUnsaved()"
+                                    (unsavedCleanUp)="cleanUpUnsaved($event)"
                                 >
                                     <!-- LA-INV-EXPAND-1: Expand is a section of this tab, for an open or an unsaved Investigation -->
                                     @if (growMode() === 'investigation' || investigation.unsaved()) {

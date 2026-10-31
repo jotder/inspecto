@@ -25,13 +25,65 @@ changes one again fails loudly:
 | `json_serialize_sql` shape: constants `literal {kind, text}`, function operands `arguments[].expression`, `NOT IN` = `OPERATOR_NOT(COMPARE_IN)`, `TRUE` a `BOOLEAN` literal, `query_location_length` on every node | the SPA condition reader (`inspecto/query/sql-ast.ts`) reads the 2.0 shape only; `BiResultMasking` reads both operand lists and fails closed on neither | `SqlAstContractTest`, `ControlApiBiQueryMaskingTest`, `ControlApiDbBrowserMaskingTest` |
 | 22 non-table functions name a `path` parameter | `SqlGuard` refuses `import_database` / `export_database`, `setval` / `nextval`, `sleep_ms` / `pg_sleep` and the external-resource functions by name; the 21 JSON / VARIANT path extractors, `path_join` and `index_key` are a reviewed set that never opens a file | `SqlGuardFileFunctionContractTest` |
 | A runtime error echoes the SQL as `LINE n: …`, cut off at a fixed width (a literal can lose its closing quote); the pending-query preamble is gone | `FailureText` fingerprints the whole echo line; the preamble strip stays as a sanitiser | `FailureTextTest`, `DuckDbPendingQueryPreambleTest` |
-| `DECIMAL(18,4) ± DECIMAL(18,4)` widens to `DECIMAL(19,4)` (1.5 capped at 18) | partner-settlement pins `variance` with `CAST(… AS DECIMAL(18,4))` so its seeds hold on both engines; other packs' decimal arithmetic is not audited yet (`DUCKDB-2-DECIMAL-WIDENING-AUDIT-1`) | `PartnerSettlementSeedTest` |
+| `DECIMAL(18,4) ± DECIMAL(18,4)` widens to `DECIMAL(19,4)` (1.5 capped at 18), one digit per further term | a Job that stores a `±` of `DECIMAL(18,s)` columns `CAST`s it back to the 1.5 type: partner-settlement `variance`, telco-ra `ra_rollforward` `LEAKAGE_AMOUNT`; every other Space Template Job, View and Measure stores the same type on both engines (audit below) | `PartnerSettlementSeedTest`, `TelcoRaGoldenTest` |
 | `approx_count_distinct` is sharper (1.5's sketch merged two of three dates) · `FILE_SIZE_BYTES` now combines with `PARTITION_BY` (the writer still sizes files by bucket count) · a bare `?` binds in `json_serialize_sql`, a slim tree round-trips, nodes carry a length (the tree stays read-only, operator 2026-10-05) | — | `ColumnProfileGoldenTest`, `PartitionWriterLayoutSpikeTest`, `SqlSandboxTest` T2–T4 |
 
 Performance (interleaved A/B/A/B, 2026-10-23, quiet machine): engine ingest level with 1.5.6, parquet write 30–60 %
 faster, 4–8 concurrent readers about 10–20 % slower; row-at-a-time JDBC inserts into a file-backed store run at
 hundreds of rows/s on BOTH versions (`OPSTORE-BULK-INSERT-1`). The decision, every measurement and the trial history
 are in the archived [`duckdb-2-plan.md`](../../../../archived-documents/plans-archive/duckdb-2-plan.md).
+
+### Decimal widening audit (`DUCKDB-2-DECIMAL-WIDENING-AUDIT-1`, 2026-10-31)
+
+**The rule, measured** on the 1.5.6.0 and 2.0.0.0 JDBC drivers side by side:
+
+| Expression | 1.5.6.0 | 2.0.0.0 |
+|---|---|---|
+| `DECIMAL(18,4) + DECIMAL(18,4)` (also `-`, `abs(a - b)`, a `CASE` mixing it with a plain `DECIMAL(18,4)`) | `DECIMAL(18,4)` | `DECIMAL(19,4)` |
+| `DECIMAL(18,2) - DECIMAL(18,2)` | `DECIMAL(18,2)` | `DECIMAL(19,2)` |
+| `a + b - c` / five terms, all `DECIMAL(18,4)` | `DECIMAL(18,4)` / `DECIMAL(18,4)` | `DECIMAL(20,4)` / `DECIMAL(22,4)` |
+| `DECIMAL(17,4) + DECIMAL(17,4)` | `DECIMAL(18,4)` | `DECIMAL(18,4)` |
+| `DECIMAL(18,4) * DECIMAL(18,8)`, unary minus | `DECIMAL(18,12)`, `DECIMAL(18,4)` | same |
+| `sum(DECIMAL(18,4))`, `sum(…) - sum(…)` | `DECIMAL(38,4)` | `DECIMAL(38,4)` |
+| `hash()` / `CAST(… AS VARCHAR)` / `md5` of the text, one value at width 18, 19 and 22 | equal | equal |
+| `99999999999999.9999 + 1` at `DECIMAL(18,4)` | Out of Range error | `100000000000000.9999` |
+
+So the change is to the **type** of a `±` of two width-18 decimals, never to its value: a comparison, a `sum`, a
+hash and the text form read the same on both engines, and 2.0 no longer overflows where 1.5 did. What a widening can
+change is a **stored** type: a sink's Parquet column (`DECIMAL(18,s)` is an INT64, wider is a fixed-length byte
+array), a schema seed, a downstream union. Only those were fixed.
+
+**How it was swept:** a type probe registered every Space Template's Schemas and schema seeds as empty tables, ran
+every `sql.template` Job (incremental ones bootstrapped without their own-sink `UNION ALL BY NAME` branch) and
+every View `derived_sql` in chain order with `LIMIT 0`, and compared `DESCRIBE` of every output column on both
+drivers: 68 Jobs and Views, 993 columns, **one** differs. Not run by the probe, read instead: `tb_clusters`,
+`tb_cluster_members`, `tb_findings` (read Entity List and Risk Score tables; their only `±` are `BIGINT` counts),
+`ra_recovery` (no arithmetic), and `ba_margin_erosion` / `ba_revenue_forecast` (their Views, which embed the same
+SQL, were run). Measures are `sum(col)` or `count` only (`DECIMAL(38,s)` either way); Dataset `calculated` fields
+are date expressions; the two mapping `custom` expressions are `DOUBLE`.
+
+| File | Expression | 1.5 type | 2.0 type | Verdict |
+|---|---|---|---|---|
+| `telco-ra/config/jobs/ra_rollforward_job.toon` | `LEAKAGE_AMOUNT = OPENING + TOPUPS + ADJUSTMENTS - USAGE_DEBITS - CLOSING` / `PREV_CLOSING - OPENING` (stored) | `DECIMAL(18,4)` | `DECIMAL(22,4)` | **Fixed**: `CAST(… AS DECIMAL(18,4))`, the type 1.5 wrote; `TelcoRaGoldenTest` pins every findings sink's `LEAKAGE_AMOUNT` type |
+| same | `ABS(… - CLOSING) > tolerance`, `ABS(OPENING - PREV_CLOSING) > tolerance` | `DECIMAL(18,4)` | `DECIMAL(22,4)` / `DECIMAL(19,4)` | Harmless: a comparison |
+| `partner-settlement/config/jobs/ps_billed_job.toon`, `ps_findings_job.toon`, `ps_position_job.toon` | `variance`, `net` (stored) | `DECIMAL(18,4)` | `DECIMAL(19,4)` | Already `CAST(… AS DECIMAL(18,4))` (`DUCKDB-2-MIGRATION-1`); seeds pinned by `PartnerSettlementSeedTest` |
+| same | `abs(amount_billed - amount) <= tolerance`, `abs(n.variance + j.variance)`, `abs(bil_amount - …)` | `DECIMAL(18,4)` | `DECIMAL(19,4)` | Harmless: a comparison |
+| `partner-settlement/config/jobs/ps_rollforward_job.toon` | `sum(invoiced - paid + adjustments) OVER …` | `DECIMAL(38,4)` | `DECIMAL(38,4)` | Harmless: a `sum`, then `CAST(… AS DECIMAL(18,4))` |
+| `partner-settlement/config/jobs/ps_statement_findings_job.toon` | `amount_delta = line_sum - ct_amount` (stored) | `DECIMAL(38,4)` | `DECIMAL(38,4)` | Harmless: `line_sum` is a `sum` |
+| `telco-ra/config/jobs/ra_rerating_job.toon` | `LEAKAGE_AMOUNT = EXPECTED_CHARGE - CHARGE` (stored; `DECIMAL(37,2)` − `DECIMAL(18,4)`) | `DECIMAL(38,4)` | `DECIMAL(38,4)` | Harmless: one operand is already 37 wide |
+| `telco-ra/config/jobs/ra_settlement_job.toon` | `BILLED_AMOUNT - EXPECTED_AMOUNT` (stored; `DECIMAL(38,4)` − `DECIMAL(38,2)`), `ABS(MIN/MAX_LINE_AMOUNT - EXPECTED_AMOUNT)` | `DECIMAL(38,4)` | `DECIMAL(38,4)` | Harmless: `sum`s |
+| `telco-ra/config/jobs/ra_xdr_lost_job.toon` | `ABS(s.USAGE_UNITS - m.USAGE_UNITS)` | `BIGINT` | `BIGINT` | Harmless: not a decimal |
+| `telco-rerating/config/jobs/rr_rerate_job.toon` | `CHARGE - EXPECTED_HIGH`, `EXPECTED_LOW - CHARGE` (`DECIMAL(18,4)` against `DECIMAL(37,2)`) | `DECIMAL(38,4)` | `DECIMAL(38,4)` | Harmless: one operand is already 37 wide |
+| `telco-rerating/config/jobs/rr_explain_job.toon` | `EXPECTED_HIGH - ACTUAL_CHARGE`, `abs(CF_AMOUNT - ACTUAL_CHARGE)`, `abs(ACTUAL_CHARGE - ROUND(…))` | `DECIMAL(38,4)` or narrower | at most one digit wider | Harmless: comparisons and `sum`s; every stored column (`LEAKAGE_AMOUNT` `DECIMAL(38,4)`) is equal on both (the probe) |
+| `mobile-money/config/jobs/mm_commission_job.toon` | `abs(commission_paid - commission_expected)` (stored) | `DECIMAL(38,2)` | `DECIMAL(38,2)` | Harmless: both are `sum`s |
+| `mobile-money/config/jobs/mm_fee_job.toon` | `sum(greatest(fee - expected_fee, 0))` | `DECIMAL(38,2)` | `DECIMAL(38,2)` | Harmless: inside a `sum` |
+| `mobile-money/config/jobs/mm_kyc_limit_job.toon` | `greatest(outflow - tier_limit, 0)` (stored) | `DECIMAL(38,2)` | `DECIMAL(38,2)` | Harmless: `outflow` is a `sum` |
+| `features/inspecto-reconciliation/…/ReconService.java` `within` | `ABS(a - b) <= tol` over `SUM`s | `DECIMAL(38,s)` | `DECIMAL(38,s)` | Harmless: sums, compared, never stored |
+| `platform/inspecto-analytics` (`AccuracySql`, `KMeansSql`, `LogisticSql`, `OutlierSql`, `Binning`) | `p - a`, `x - mean` … | `DOUBLE` | `DOUBLE` | Harmless: operands are cast to `DOUBLE` (`Binning` yields a `BIGINT` bin index) |
+| `features/inspecto-ops/…/ObjectsAnalyticsJob.java` | impact amounts | `DECIMAL(21,6)` | `DECIMAL(21,6)` | Harmless: a declared table column, filled from Java |
+
+**Rule for new SQL:** a `±` of two `DECIMAL(18,s)` columns that is **stored** gets an explicit
+`CAST(… AS DECIMAL(18,s))` (or a deliberate wider type), and its template pins the stored type in a test.
 
 * **Appender, not JDBC batch.** `DuckDbRecordSink` and `TypedRecordIngester` bulk-load via the DuckDB
   `DuckDBAppender` API (heap buffer `APPEND_BATCH = 10,000` rows). Benchmarked on 1M rows: JDBC

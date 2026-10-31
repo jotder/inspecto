@@ -27,6 +27,12 @@ describe('unsaved steps in words (LA-UNSAVED-INVESTIGATION-1)', () => {
         expect(replayStopMessage(STEPS, 4, 'refused')).toBe('Saved with 3 steps. Step 4 (Start from 1 entity) was refused.');
         expect(replayStopMessage(STEPS, 3, 'held')).toContain('Step 4 was not recorded.');
     });
+
+    it('LA-INVESTIGATE-UX-2: says an unsaved Clean up with its reason', () => {
+        expect(unsavedStepLine({ kind: 'hide', ids: ['a', 'b'], reason: 'Clean up: dangling leaves' })).toBe(
+            'Hide 2 entities (Clean up: dangling leaves)',
+        );
+    });
 });
 
 const ws = (...ids: string[]): WorkingSet =>

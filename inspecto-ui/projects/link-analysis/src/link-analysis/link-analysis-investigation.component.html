@@ -511,6 +511,151 @@
             <!-- the page projects ONE Expand form; captured once, stamped where it shows (a slot in an unrendered branch swallows it) -->
             <ng-template #expandSlot><ng-content select="[laExpand]" /></ng-template>
             <ng-template #startSlot><ng-content select="[laNewInvestigation]" /></ng-template>
+            <ng-template #actBar>
+                <!-- LA-INVESTIGATE-UX-1: Undo and Redo of recorded steps, always in reach; LA-INVESTIGATE-UX-2: of unsaved ones too -->
+                <div class="la-act-bar flex flex-wrap items-center gap-1 py-1" role="toolbar" aria-label="Steps" data-testid="act-bar">
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        data-testid="act-undo"
+                        [disabled]="store.busy() || !canUndoNow()"
+                        [disabledInteractive]="true"
+                        [matTooltip]="undoTip()"
+                        (click)="undo()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
+                        Undo
+                    </button>
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        data-testid="act-redo"
+                        [disabled]="store.busy() || !canRedoNow()"
+                        [disabledInteractive]="true"
+                        [matTooltip]="redoTip()"
+                        (click)="redo()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:arrow-uturn-right"></mat-icon>
+                        Redo
+                    </button>
+                    <span class="text-secondary text-xs">{{ isUnsaved() ? 'Unsaved' : 'Recorded' }} steps · Ctrl+Z / Ctrl+Shift+Z</span>
+                </div>
+            </ng-template>
+            <ng-template #cleanupFold>
+                <!-- LA-INVESTIGATE-UX-1: Clean up — one press each, the count on the button, one recorded step; Undo takes it back -->
+                <la-fold title="Clean up" [hint]="cleanupHint()" [startOpen]="true" rememberKey="act.cleanup" data-testid="act-cleanup">
+                    <p class="text-secondary m-0 text-xs">
+                        @if (isUnsaved()) {
+                            Each press is one step, recorded with its reason when you Save. Start entities and kept entities are
+                            never taken away.
+                        } @else {
+                            Each press is one recorded step with its reason in the step log. Start entities and kept entities are never
+                            taken away.
+                        }
+                    </p>
+                    <mat-checkbox
+                        [ngModel]="cleanupExclude() && !isUnsaved()"
+                        (ngModelChange)="cleanupExclude.set($event)"
+                        [disabled]="isUnsaved()"
+                        data-testid="cleanup-exclude-instead"
+                    >
+                        <span class="text-xs">Exclude instead of hide (excluded entities stay out of later expands)</span>
+                    </mat-checkbox>
+                    @if (isUnsaved()) {
+                        <p class="text-secondary m-0 text-xs" data-testid="cleanup-unsaved-exclude">{{ unsavedExcludeWhy }}</p>
+                    }
+                    @if (!canWrite()) {
+                        <p class="text-secondary m-0 text-xs">{{ expandNeeds }}</p>
+                    }
+                    <div class="flex flex-col items-start gap-1">
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-testid="cleanup-leaves"
+                            [disabled]="!canWrite() || store.busy() || !cleanup().leaves.length"
+                            [disabledInteractive]="true"
+                            [matTooltip]="cleanup().leaves.length ? 'Entities with one link; press again to go one ring further' : 'No dangling leaves'"
+                            (click)="cleanUp(cleanup().leaves, 'Clean up: dangling leaves')"
+                        >
+                            {{ verb() }} {{ cleanup().leaves.length.toLocaleString('en') }} dangling {{ cleanup().leaves.length === 1 ? 'leaf' : 'leaves' }}
+                        </button>
+                        <div class="flex flex-wrap items-center gap-1">
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                data-testid="cleanup-weak"
+                                [disabled]="!canWrite() || store.busy() || !weak().length"
+                                [disabledInteractive]="true"
+                                [matTooltip]="weak().length ? '' : 'Every entity has at least this many events'"
+                                (click)="cleanUp(weak(), 'Clean up: fewer than ' + weakMin() + ' events')"
+                            >
+                                {{ verb() }} {{ weak().length.toLocaleString('en') }} with fewer than {{ weakMin() }} events
+                            </button>
+                            <inspecto-stepper-field
+                                label="Events"
+                                [formControl]="weakEvents"
+                                decrementLabel="Fewer events"
+                                incrementLabel="More events"
+                                [min]="2"
+                                [max]="1000"
+                                data-testid="cleanup-weak-min"
+                            ></inspecto-stepper-field>
+                        </div>
+                        @if (cleanup().types.length > 1) {
+                            <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Clean up an entity type" data-testid="cleanup-types">
+                                @for (t of cleanup().types; track t.type) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        [attr.data-testid]="'cleanup-type-' + t.type"
+                                        [disabled]="!canWrite() || store.busy()"
+                                        (click)="cleanUp(t.ids, 'Clean up: entity type ' + t.type)"
+                                    >
+                                        {{ verb() }} {{ t.ids.length.toLocaleString('en') }} {{ t.type }}
+                                    </button>
+                                }
+                            </div>
+                        }
+                        @if (selectedIds().length === 2) {
+                            <div class="flex flex-wrap items-center gap-1">
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    data-testid="cleanup-paths"
+                                    [disabled]="!canWrite() || store.busy() || offPaths() === null || !offPaths()!.length"
+                                    [disabledInteractive]="true"
+                                    [matTooltip]="offPaths() === null ? 'Too many paths to work out in the browser: fewer links, or clean up first' : ''"
+                                    (click)="cleanUp(offPaths() ?? [], 'Clean up: kept the paths between ' + selectedIds().join(' and '))"
+                                >
+                                    Keep paths between the 2 selected ({{ verb().toLowerCase() }} {{ (offPaths()?.length ?? 0).toLocaleString('en') }})
+                                </button>
+                                <inspecto-stepper-field
+                                    label="Links"
+                                    [formControl]="pathLinks"
+                                    decrementLabel="Shorter paths"
+                                    incrementLabel="Longer paths"
+                                    [min]="1"
+                                    [max]="6"
+                                ></inspecto-stepper-field>
+                            </div>
+                        }
+                        @if (selectedIds().length) {
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                data-testid="cleanup-keep-only"
+                                [disabled]="!canWrite() || store.busy() || !keepOnlyIds().length"
+                                [disabledInteractive]="true"
+                                (click)="cleanUp(keepOnlyIds(), 'Clean up: kept only the ' + selectedIds().length + ' selected')"
+                            >
+                                Keep only the {{ selectedIds().length }} selected ({{ verb().toLowerCase() }} {{ keepOnlyIds().length.toLocaleString('en') }})
+                            </button>
+                        } @else {
+                            <p class="text-secondary m-0 text-xs">Select entities on the canvas for Keep only these, or two for the paths between them.</p>
+                        }
+                    </div>
+                </la-fold>
+            </ng-template>
             @if (!store.active() && store.unsaved(); as u) {
                 <!-- ── LA-UNSAVED-INVESTIGATION-1: working before Save ── -->
                 <div class="flex flex-wrap items-center gap-2" data-testid="unsaved-header">
@@ -547,6 +692,7 @@
                 <p class="text-secondary m-0 text-sm">
                     Nothing is recorded yet. Save asks for a Name and a Purpose, then records these steps in order.
                 </p>
+                <ng-container [ngTemplateOutlet]="actBar" />
                 <section class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" aria-labelledby="unsaved-expand-title">
                     <h3 id="unsaved-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
                     <ng-container [ngTemplateOutlet]="expandSlot" />
@@ -570,8 +716,10 @@
                         <p class="text-secondary m-0 text-xs">{{ pickNode }}</p>
                     }
                 </section>
+                <ng-container [ngTemplateOutlet]="cleanupFold" />
                 <p class="text-secondary m-0 text-sm" data-testid="unsaved-save-first">
-                    Keep, Hide, Exclude, Annotate and the other steps change a recorded Working Set: Save first.
+                    Keep, Hide, Exclude, Annotate and the other steps change a recorded Working Set: Save first. Clean up
+                    hides while unsaved.
                 </p>
             } @else if (!store.active()) {
                 <!-- ── start ── -->
@@ -815,34 +963,7 @@
                         <button mat-button type="button" class="mt-1" data-testid="act-howto-dismiss" (click)="dismissHowTo()">Got it</button>
                     </section>
                 }
-                <!-- LA-INVESTIGATE-UX-1: Undo and Redo of recorded steps, always in reach -->
-                <div class="la-act-bar flex flex-wrap items-center gap-1 py-1" role="toolbar" aria-label="Steps" data-testid="act-bar">
-                    <button
-                        mat-stroked-button
-                        type="button"
-                        data-testid="act-undo"
-                        [disabled]="!canWrite() || store.busy() || !store.canUndo()"
-                        [disabledInteractive]="true"
-                        [matTooltip]="undoTip()"
-                        (click)="undo()"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
-                        Undo
-                    </button>
-                    <button
-                        mat-stroked-button
-                        type="button"
-                        data-testid="act-redo"
-                        [disabled]="!canWrite() || store.busy() || !store.canRedo()"
-                        [disabledInteractive]="true"
-                        [matTooltip]="redoTip()"
-                        (click)="redo()"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:arrow-uturn-right"></mat-icon>
-                        Redo
-                    </button>
-                    <span class="text-secondary text-xs">Recorded steps · Ctrl+Z / Ctrl+Shift+Z</span>
-                </div>
+                <ng-container [ngTemplateOutlet]="actBar" />
             }
             @if (store.queuedSeeds().length) {
                 <!-- ── ranked nodes carried over from an analysis result; nothing is created until Start / Seed ── -->
@@ -967,106 +1088,7 @@
                     {{ store.lastStep()!.protected!.join(', ') }} — a keep step protects them.
                 </inspecto-alert>
             }
-            <!-- LA-INVESTIGATE-UX-1: Clean up — one press each, the count on the button, one recorded step; Undo takes it back -->
-            <la-fold title="Clean up" [hint]="cleanupHint()" [startOpen]="true" rememberKey="act.cleanup" data-testid="act-cleanup">
-                <p class="text-secondary m-0 text-xs">
-                    Each press is one recorded step with its reason in the step log. Start entities and kept entities are never
-                    taken away.
-                </p>
-                <mat-checkbox [ngModel]="cleanupExclude()" (ngModelChange)="cleanupExclude.set($event)" data-testid="cleanup-exclude-instead">
-                    <span class="text-xs">Exclude instead of hide (excluded entities stay out of later expands)</span>
-                </mat-checkbox>
-                @if (!canWrite()) {
-                    <p class="text-secondary m-0 text-xs">{{ expandNeeds }}</p>
-                }
-                <div class="flex flex-col items-start gap-1">
-                    <button
-                        mat-stroked-button
-                        type="button"
-                        data-testid="cleanup-leaves"
-                        [disabled]="!canWrite() || store.busy() || !cleanup().leaves.length"
-                        [disabledInteractive]="true"
-                        [matTooltip]="cleanup().leaves.length ? 'Entities with one link; press again to go one ring further' : 'No dangling leaves'"
-                        (click)="cleanUp(cleanup().leaves, 'Clean up: dangling leaves')"
-                    >
-                        {{ verb() }} {{ cleanup().leaves.length.toLocaleString('en') }} dangling {{ cleanup().leaves.length === 1 ? 'leaf' : 'leaves' }}
-                    </button>
-                    <div class="flex flex-wrap items-center gap-1">
-                        <button
-                            mat-stroked-button
-                            type="button"
-                            data-testid="cleanup-weak"
-                            [disabled]="!canWrite() || store.busy() || !weak().length"
-                            [disabledInteractive]="true"
-                            [matTooltip]="weak().length ? '' : 'Every entity has at least this many events'"
-                            (click)="cleanUp(weak(), 'Clean up: fewer than ' + weakMin() + ' events')"
-                        >
-                            {{ verb() }} {{ weak().length.toLocaleString('en') }} with fewer than {{ weakMin() }} events
-                        </button>
-                        <inspecto-stepper-field
-                            label="Events"
-                            [formControl]="weakEvents"
-                            decrementLabel="Fewer events"
-                            incrementLabel="More events"
-                            [min]="2"
-                            [max]="1000"
-                            data-testid="cleanup-weak-min"
-                        ></inspecto-stepper-field>
-                    </div>
-                    @if (cleanup().types.length > 1) {
-                        <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Clean up an entity type" data-testid="cleanup-types">
-                            @for (t of cleanup().types; track t.type) {
-                                <button
-                                    mat-stroked-button
-                                    type="button"
-                                    [attr.data-testid]="'cleanup-type-' + t.type"
-                                    [disabled]="!canWrite() || store.busy()"
-                                    (click)="cleanUp(t.ids, 'Clean up: entity type ' + t.type)"
-                                >
-                                    {{ verb() }} {{ t.ids.length.toLocaleString('en') }} {{ t.type }}
-                                </button>
-                            }
-                        </div>
-                    }
-                    @if (selectedIds().length === 2) {
-                        <div class="flex flex-wrap items-center gap-1">
-                            <button
-                                mat-stroked-button
-                                type="button"
-                                data-testid="cleanup-paths"
-                                [disabled]="!canWrite() || store.busy() || offPaths() === null || !offPaths()!.length"
-                                [disabledInteractive]="true"
-                                [matTooltip]="offPaths() === null ? 'Too many paths to work out in the browser: fewer links, or clean up first' : ''"
-                                (click)="cleanUp(offPaths() ?? [], 'Clean up: kept the paths between ' + selectedIds().join(' and '))"
-                            >
-                                Keep paths between the 2 selected ({{ verb().toLowerCase() }} {{ (offPaths()?.length ?? 0).toLocaleString('en') }})
-                            </button>
-                            <inspecto-stepper-field
-                                label="Links"
-                                [formControl]="pathLinks"
-                                decrementLabel="Shorter paths"
-                                incrementLabel="Longer paths"
-                                [min]="1"
-                                [max]="6"
-                            ></inspecto-stepper-field>
-                        </div>
-                    }
-                    @if (selectedIds().length) {
-                        <button
-                            mat-stroked-button
-                            type="button"
-                            data-testid="cleanup-keep-only"
-                            [disabled]="!canWrite() || store.busy() || !keepOnlyIds().length"
-                            [disabledInteractive]="true"
-                            (click)="cleanUp(keepOnlyIds(), 'Clean up: kept only the ' + selectedIds().length + ' selected')"
-                        >
-                            Keep only the {{ selectedIds().length }} selected ({{ verb().toLowerCase() }} {{ keepOnlyIds().length.toLocaleString('en') }})
-                        </button>
-                    } @else {
-                        <p class="text-secondary m-0 text-xs">Select entities on the canvas for Keep only these, or two for the paths between them.</p>
-                    }
-                </div>
-            </la-fold>
+            <ng-container [ngTemplateOutlet]="cleanupFold" />
             <div class="flex flex-col gap-2" data-testid="act-selected">
                 <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Selected entity</h3>
             <section
