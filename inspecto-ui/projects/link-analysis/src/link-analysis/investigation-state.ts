@@ -121,6 +121,12 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
             if (raws.some((raw) => ws.entities.some((e) => e.id === raw))) n.data.unexpanded = true;
         }
     }
+    // F-11: a `masked:<16 hex>` alias is drawn short so labels stop overlapping; the label itself stays the full alias
+    // (the hover text, the Selected line, search and every op still read it). Nothing the alias hides is shown.
+    for (const n of g.nodes) {
+        const short = shortMaskedLabel(n.data.label);
+        if (short) n.data.canvasLabel = short;
+    }
     const hidden = new Set(ws.entities.filter((e) => e.hidden).map((e) => e.id));
     const done = (out: ProjectedGraph): ProjectedGraph => {
         if (out.edges.length <= WORKING_SET_LINK_RENDER_CEILING) return out;
@@ -380,6 +386,15 @@ export function mergePairOf(
 
 /** The `maskingMode` pseudonym prefix (D-U6) — `masked:<16 hex>`. */
 const MASKED_PREFIX = 'masked:';
+/** How many characters of a pseudonym's hash the canvas draws (F-11). */
+const MASKED_LABEL_CHARS = 4;
+
+/** The canvas text for a masked alias (`masked:6065…`); null when `label` is not one or is already that short. */
+export function shortMaskedLabel(label: string): string | null {
+    if (!label.startsWith(MASKED_PREFIX)) return null;
+    const hash = label.slice(MASKED_PREFIX.length);
+    return hash.length > MASKED_LABEL_CHARS ? `${MASKED_PREFIX}${hash.slice(0, MASKED_LABEL_CHARS)}…` : null;
+}
 
 /**
  * LA-17 — what "add this node to an Entity List" may send. The members route takes RAW values and normalises them

@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { AbstractControl, FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import {
     Dossier,
@@ -14,6 +15,7 @@ import {
 } from '@inspecto/link-analysis/api/inv.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { formatDay } from './data-trust';
+import { DISABLED_REASON } from './disabled-reasons';
 import { investigationErrorMessage } from './investigation-state';
 import { laLimit } from './la-limits';
 
@@ -48,6 +50,7 @@ function saveBlob(blob: Blob, name: string): void {
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
+        MatTooltipModule,
         InspectoAlertComponent,
     ],
     host: { class: 'block' },
@@ -200,7 +203,14 @@ function saveBlob(blob: Blob, name: string): void {
             }
 
             <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Verify a manifest">
-                <button mat-stroked-button [disabled]="busy() || !dossier()" (click)="verifyIssued()">
+                <button
+                    mat-stroked-button
+                    [disabled]="busy() || !!verifyIssuedWhyNot()"
+                    [disabledInteractive]="true"
+                    [matTooltip]="verifyIssuedWhyNot()"
+                    [attr.aria-describedby]="verifyIssuedWhyNot() ? 'why-verify-issued' : null"
+                    (click)="!busy() && !verifyIssuedWhyNot() && verifyIssued()"
+                >
                     Verify this Dossier
                 </button>
                 <button mat-button [disabled]="busy()" (click)="file.click()">Verify an uploaded manifest…</button>
@@ -212,6 +222,11 @@ function saveBlob(blob: Blob, name: string): void {
                     aria-label="Manifest or dossier JSON file"
                     (change)="upload($event)"
                 />
+                @if (verifyIssuedWhyNot(); as why) {
+                    <p class="text-secondary m-0 w-full text-xs" id="why-verify-issued" data-testid="why-verify-issued">
+                        {{ why }}
+                    </p>
+                }
             </div>
             <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Export bundle">
                 <button mat-stroked-button [disabled]="busy()" (click)="downloadBundle()">Download Dossier (sealed)</button>
@@ -391,6 +406,9 @@ export class LinkAnalysisDossierComponent {
             `${this.investigationId()}-manifest.json`,
         );
     }
+
+    /** Why *Verify this Dossier* is off (F-19): there is no issued manifest until the Dossier is built. */
+    readonly verifyIssuedWhyNot = computed(() => (this.dossier() ? '' : DISABLED_REASON.buildDossier));
 
     verifyIssued(): Promise<void> {
         const d = this.dossier();

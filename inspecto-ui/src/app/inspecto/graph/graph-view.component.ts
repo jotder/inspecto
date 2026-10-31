@@ -1298,7 +1298,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     // returns `undefined` does NOT clear a label: G6 reads that as "no change" and the
                     // previous text stays on the canvas, so turning labels off left them showing.
                     label: () => this.display?.nodeLabels !== false,
-                    labelText: (d): string => (d.data as { label: string }).label,
+                    labelText: (d): string =>
+                        (d.data as { label: string; canvasLabel?: string }).canvasLabel ??
+                        (d.data as { label: string }).label,
                     labelFill: () => this.styleFg,
                     labelFontSize: 11,
                     labelPlacement: 'bottom',

@@ -12,6 +12,9 @@ export interface G6Node {
     id: string;
     data: {
         label: string;
+        /** The text the canvas draws when it differs from `label` (Link Analysis: a masked alias drawn short); the
+         *  hover text and every other reader keep `label`. Absent = draw `label`. */
+        canvasLabel?: string;
         kind: NodeKind;
         iconSrc?: string;
         color?: string;

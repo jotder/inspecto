@@ -49,6 +49,18 @@ describe('Working Set entity types on the canvas (ONB-LA-ENDPOINT-TYPE-1)', () =
         expect(g.nodes[0].data.label).toBe('masked:0123456789abcdef');
     });
 
+    it('F-11: draws a masked alias short on the canvas and keeps the full alias as the label (hover, search, ops)', () => {
+        const g = workingSetToGraph(
+            ws([entity('masked:6065a1b2c3d4e5f6', { type: 'msisdn' }), entity('99979100001', { type: 'msisdn' })]),
+            P,
+        );
+        const node = (raw: string) => g.nodes.find((n) => rawIdsOf(n).includes(raw))!;
+        expect(node('masked:6065a1b2c3d4e5f6').data.canvasLabel).toBe('masked:6065…');
+        expect(node('masked:6065a1b2c3d4e5f6').data.label).toBe('masked:6065a1b2c3d4e5f6');
+        expect(rawIdsOf(node('masked:6065a1b2c3d4e5f6'))).toEqual(['masked:6065a1b2c3d4e5f6']);
+        expect(node('99979100001').data.canvasLabel).toBeUndefined(); // a clear id is drawn as it is
+    });
+
     it('builds the merge pair from the Working Set types for bare ids', () => {
         const set = ws([entity('99979100001', { type: 'msisdn' }), entity('SHELL-A', { type: 'account' }), entity('plain')]);
         expect(mergePairOf(['99979100001', 'SHELL-A'], set)).toEqual({

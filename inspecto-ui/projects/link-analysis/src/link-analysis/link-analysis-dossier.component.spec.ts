@@ -247,6 +247,32 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('says why Verify this Dossier is off until a Dossier is built (F-19), and drops the reason once it is', async () => {
+        const { f, c, el } = create();
+        const button = () =>
+            Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Verify this Dossier'))!;
+        expect(button().getAttribute('aria-disabled')).toBe('true');
+        expect(button().getAttribute('aria-describedby')).toContain('why-verify-issued');
+        expect(el.querySelector('[data-testid="why-verify-issued"]')?.textContent?.trim()).toBe('Build the Dossier first.');
+        await expectNoA11yViolations(el);
+        await c.build();
+        f.detectChanges();
+        expect(button().getAttribute('aria-disabled')).not.toBe('true');
+        expect(el.querySelector('[data-testid="why-verify-issued"]')).toBeNull();
+    });
+
+    it('ignores a click on Verify this Dossier while another Dossier call runs', async () => {
+        const { f, c, el, inv } = create();
+        await c.build();
+        f.detectChanges();
+        c.busy.set(true);
+        f.detectChanges();
+        Array.from(el.querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Verify this Dossier'))!
+            .click();
+        expect(inv.verifyDossier).not.toHaveBeenCalled();
+    });
+
     it('verifies an uploaded whole dossier by sending its manifest', async () => {
         const { c, inv } = create();
         const file = { name: 'd.json', text: () => Promise.resolve(JSON.stringify({ manifest: MANIFEST })) };

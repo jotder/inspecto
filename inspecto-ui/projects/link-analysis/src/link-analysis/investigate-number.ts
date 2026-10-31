@@ -354,6 +354,8 @@ export interface DegreeOutcome {
     override?: string;
     /** A one-hop expand from the panel (not the ladder's next degree): what it expanded from, in words. */
     oneHop?: string;
+    /** With `oneHop`, on a line rebuilt from the sealed log: the step it was sealed as, so two such lines differ (F-10). */
+    step?: number;
 }
 
 const BUDGET_KEY = 'four_eyes_budget_above';
@@ -457,7 +459,7 @@ export function degreeOutcomesFromLog(entries: readonly InvestigationLogEntry[],
             ...(p.budget != null ? { budget: p.budget } : {}),
             ...(p.maxFanOut != null ? { maxFanOut: p.maxFanOut } : {}),
             ...(range ? { range } : {}),
-            ...(override ? { override } : isOneHopStep(e, ws) ? { oneHop: oneHopFrom(p.ids) } : {}),
+            ...(override ? { override } : isOneHopStep(e, ws) ? { oneHop: oneHopFrom(p.ids), step: e.step } : {}),
         });
     }
     return out;
@@ -679,8 +681,10 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
                 ? ' Ask an approver, or use Expand with a fan-out at or below the threshold (Expand ▸ Limits).'
                 : ''
         }`;
+    // A one-hop line names no degree, so two of them ("every entity" twice) would read as one line repeated (F-10).
+    const notes = [o.oneHop && o.step != null ? `step ${o.step}` : '', o.range ?? ''].filter(Boolean).join(', ');
     const parts = [
-        `${o.override || o.oneHop ? head : `Degree ${o.degree}`}${o.range ? ` (${o.range})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
+        `${o.override || o.oneHop ? head : `Degree ${o.degree}`}${notes ? ` (${notes})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
     ];
     if (o.truncated)
         parts.push(

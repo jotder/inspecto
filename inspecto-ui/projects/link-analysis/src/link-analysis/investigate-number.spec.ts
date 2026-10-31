@@ -556,6 +556,30 @@ describe('investigate-number - walk-through 6 fixes', () => {
         expect(out[0].budget).toBe(5000);
     });
 
+    it('F-10: two "every entity" expands with the same counts read as two lines, not one line repeated', () => {
+        // mule-hub-case: the seeded expand (step 2) and the approved four-eyes one (step 9) each admitted 6 and 7
+        const six = (step: number, hop: number) => Array.from({ length: 6 }, (_, i) => at(`e${step}-${i}`, hop, step));
+        const seven = (step: number) => Array.from({ length: 7 }, () => ({ admittedBy: step }) as never);
+        const set: WorkingSet = {
+            entities: [at('s', 0, 1), ...six(2, 1), ...six(9, 2)],
+            links: [...seven(2), ...seven(9)],
+            excluded: [],
+            hash: '',
+        };
+        const entries = [
+            { step: 1, kind: 'op', op: 'seed', undoneBy: null, params: { ids: ['s'] } },
+            // both sealed with `window: 'inherit'`, as the server seals them: no range text tells them apart
+            { step: 2, kind: 'op', op: 'expand', undoneBy: null, params: { ids: [], window: 'inherit' } },
+            { step: 9, kind: 'op', op: 'expand', undoneBy: null, params: { ids: [], window: 'inherit' } },
+        ] as never;
+        const lines = degreeOutcomesFromLog(entries, set).map(degreeOutcomeMessage);
+        expect(new Set(lines).size).toBe(2); // never one line repeated
+        expect(lines).toEqual([
+            'Expand one hop from every entity (step 2): 6 new entities, 7 links added.',
+            'Expand one hop from every entity (step 9): 6 new entities, 7 links added.',
+        ]);
+    });
+
     it('rebuilds the fan-out and hub counts from the sealed read, worded like the live line', () => {
         const hub = { ...at('h', 1, 2), highConnectivity: true };
         const set: WorkingSet = { entities: [at('s', 0, 1), hub, at('x', 1, 2)], links: [], excluded: [], hash: '' };

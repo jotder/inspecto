@@ -13,6 +13,7 @@ export const DISABLED_REASON = {
     openInvestigation: 'Open an Investigation first.',
     fewestDegrees: 'One degree is the fewest.',
     noExpand: "Already set to Don't expand.",
+    buildDossier: 'Build the Dossier first.',
 } as const;
 
 /** The New form's Expand on start at its own top (lower than the Industry pack's): where to go further. */
