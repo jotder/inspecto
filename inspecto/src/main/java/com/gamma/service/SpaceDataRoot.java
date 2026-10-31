@@ -99,7 +99,7 @@ final class SpaceDataRoot {
      *       since purge deletes what a Space owns. One holding only those is a Space's state moved there by hand.</li>
      * </ul>
      */
-    private static void stake(SpaceRoot root, SpaceContext.SpaceManifest manifest) throws IOException {
+    static void stake(SpaceRoot root, SpaceContext.SpaceManifest manifest) throws IOException {
         Path base = root.base();
         Path dataRoot = root.dataRoot();
         String declared = manifest.dataRoot() == null ? "" : manifest.dataRoot().trim();

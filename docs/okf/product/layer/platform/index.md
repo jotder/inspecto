@@ -40,7 +40,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
 | — | P2 | feature | Postgres multi-user | operator |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
-| `DUCKDB-2-DECIMAL-WIDENING-AUDIT-1` | P3 | chore | DuckDB 2.0 widens DECIMAL(18,4) ± DECIMAL(18,4) to DECIMAL(19,4) (1.5 capped at 18); only partner-settlement is pinned. | — |
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Decisioning add-on | — |
 | `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

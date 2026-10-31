@@ -31,6 +31,12 @@ import org.slf4j.LoggerFactory;
  *   *.duckdb / *.db     → spaces/&lt;id&gt;/duckdb/           (+ any sibling .wal)
  * </pre>
  *
+ * <p><b>Space references and moved data roots</b> ({@code SPACE-DATA-ROOT-1}) — a {@code spaces/<id>.ref} is
+ * followed to the folder it names (an unfollowable one is refused, never shadowed by a new {@code <id>/}), and
+ * {@code data}, {@code audit}, {@code duckdb} land under the Space's {@link SpaceRoot#dataRoot() data root}: its
+ * {@code space.toon data_root}, else {@code -Dspaces.data.root/<id>} — so run the migrator with the server's
+ * {@code -Dspaces.data.root}. The data root is checked and claimed exactly as at boot before anything moves.
+ *
  * <p><b>Idempotent</b> — a step applies only when its source exists and its target does not, so a re-run is a clean
  * no-op and an already-migrated target is never clobbered. <b>{@code --dry-run}</b> prints the plan without moving.
  * Moves are crash-tolerant across filesystems (atomic rename where possible, else recursive copy + delete).
@@ -67,17 +73,35 @@ public final class SpaceMigrator {
      * ({@code data} before {@code data/events} so the parent exists). Pure — does not touch the filesystem.
      */
     public static List<Step> plan(Path workingDir, Path configDir, Path spacesRoot, String id) {
-        Path base = spacesRoot.resolve(SpaceId.of(id).value());
+        Path base = baseFor(spacesRoot, id);
+        Path state = SpaceRoot.dataRootFor(base, true);   // data/, audit/, duckdb/ go where the Space will boot them
         List<Step> steps = new ArrayList<>();
-        addStep(steps, configDir,                       base.resolve("config"),               "config");
-        addStep(steps, workingDir.resolve(FLAT_DATA),   base.resolve("data"),                 "data");
-        addStep(steps, workingDir.resolve(FLAT_AUDIT),  base.resolve("audit"),                "audit");
-        addStep(steps, workingDir.resolve(FLAT_EVENTS), base.resolve("data").resolve("events"), "events");
+        addStep(steps, configDir,                       base.resolve("config"),                "config");
+        addStep(steps, workingDir.resolve(FLAT_DATA),   state.resolve("data"),                 "data");
+        addStep(steps, workingDir.resolve(FLAT_AUDIT),  state.resolve("audit"),                "audit");
+        addStep(steps, workingDir.resolve(FLAT_EVENTS), state.resolve("data").resolve("events"), "events");
         for (String db : FLAT_DB_FILES) {
-            addStep(steps, workingDir.resolve(db),        base.resolve("duckdb").resolve(db),        "duckdb/" + db);
-            addStep(steps, workingDir.resolve(db + ".wal"), base.resolve("duckdb").resolve(db + ".wal"), "duckdb/" + db + ".wal");
+            addStep(steps, workingDir.resolve(db),        state.resolve("duckdb").resolve(db),        "duckdb/" + db);
+            addStep(steps, workingDir.resolve(db + ".wal"), state.resolve("duckdb").resolve(db + ".wal"), "duckdb/" + db + ".wal");
         }
         return steps;
+    }
+
+    /**
+     * The Space folder {@code id} migrates into: {@code <spaces root>/<id>/}, or the folder its {@code <id>.ref}
+     * points at (under {@link SpaceManager#resolveRef}'s rules). An unfollowable reference is refused: a new
+     * {@code <id>/} folder beside it would shadow it, and the referenced Space would silently stop booting.
+     */
+    static Path baseFor(Path spacesRoot, String id) {
+        Path root = spacesRoot.toAbsolutePath().normalize();   // the data root's stamp must name an absolute base, as at boot
+        Path folder = root.resolve(SpaceId.of(id).value());
+        Path ref = root.resolve(SpaceId.of(id).value() + SpaceManager.REF_SUFFIX);
+        if (Files.isDirectory(folder) || !Files.isRegularFile(ref)) return folder;
+        SpaceManager.RefTarget r = SpaceManager.resolveRef(root, ref);
+        if (r.why() != null)
+            throw new IllegalStateException("the Space reference " + ref + " " + r.why()
+                    + " - fix or remove it before migrating (a new folder beside it would shadow it)");
+        return r.folder();
     }
 
     private static void addStep(List<Step> steps, Path from, Path to, String what) {
@@ -90,15 +114,23 @@ public final class SpaceMigrator {
      */
     public static List<Step> migrate(Path workingDir, Path configDir, Path spacesRoot, String id, boolean dryRun)
             throws IOException {
-        Path base = spacesRoot.resolve(SpaceId.of(id).value());
+        Path base = baseFor(spacesRoot, id);
+        Path state = SpaceRoot.dataRootFor(base, true);
         List<Step> steps = plan(workingDir, configDir, spacesRoot, id);
 
         log.info("Migrating flat layout → {}  ({})", base, dryRun ? "DRY RUN" : "apply");
+        if (!state.equals(base)) log.info("  data, audit and duckdb → data root {}", state);
         if (steps.isEmpty()) log.info("  (nothing to relocate — already migrated, or no flat artifacts found)");
         for (Step s : steps) log.info("  {} {} → {}", String.format("%-22s", s.what()), s.from(), s.to());
 
         if (!dryRun) {
             Files.createDirectories(base);
+            if (!state.equals(base)) {
+                // The boot's own checks (mount present, no overlap, empty or stamped by this Space), before any byte moves.
+                SpaceDataRoot.registerSpacesRoot(spacesRoot);
+                SpaceDataRoot.stake(new DirSpaceRoot(base, state),
+                        SpaceContext.SpaceManifest.read(base.resolve("space.toon"), id));
+            }
             for (Step s : steps) moveTree(s.from(), s.to());
             Path manifest = base.resolve("space.toon");
             if (!Files.exists(manifest)) {

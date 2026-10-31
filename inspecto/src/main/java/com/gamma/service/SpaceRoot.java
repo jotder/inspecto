@@ -149,11 +149,17 @@ public interface SpaceRoot {
      * when relative — {@code SpaceBootstrap} refuses that at load), else {@code -Dspaces.data.root/<id>}, else {@code base}.
      */
     static Path dataRootFor(Path base) {
+        return dataRootFor(base, Files.isDirectory(base.resolve("config")));
+    }
+
+    /** {@link #dataRootFor(Path)} for a {@code base} that is a Space when {@code isSpace} — {@link SpaceMigrator}
+     *  plans into a folder whose {@code config/} is not moved yet. */
+    static Path dataRootFor(Path base, boolean isSpace) {
         String declared = SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "").dataRoot();
         if (!declared.isBlank()) return base.resolve(declared.trim()).normalize();
         String mount = System.getProperty(DATA_ROOT_PROPERTY);
         // Only a Space (a dir with config/) takes the convention; the spaces root itself (the fleet inbox registry) stays put.
-        if (mount != null && !mount.isBlank() && base.getFileName() != null && Files.isDirectory(base.resolve("config")))
+        if (mount != null && !mount.isBlank() && base.getFileName() != null && isSpace)
             return Path.of(mount.trim()).toAbsolutePath().normalize().resolve(base.getFileName().toString());
         return base;
     }

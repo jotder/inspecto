@@ -85,7 +85,16 @@ object-storage mount (s3fs / mountpoint-s3). On such a mount the inbox loses ato
 names (`SpaceManager.followRef`): the folder must be named `<id>`, exist, and lie outside the spaces root; a real
 `<id>/` folder beside it wins. An unfollowable ref is skipped with `SPACE_REF_INVALID`. Create refuses an id taken
 by a ref; `update` writes `space.toon` in the referenced folder; purge deletes only the `.ref` (the folder and its
-data root stay).
+data root stay). Every reader that must agree with discovery uses `SpaceManager.resolveRef` (`followRef`'s rules,
+no logging): the last-Space purge guard (`isLastOnDisk`) counts a ref only when it would boot — not shadowed,
+followable, pointing at a folder with `config/` — so a dangling ref is no surviving copy.
+**Migration (`SpaceMigrator`).** It follows `<id>.ref` to the referenced folder and refuses an unfollowable one
+(a new `<id>/` beside it would shadow it). `data`, `audit`, `duckdb` and the DuckDB files land on the Space's
+data root (`SpaceRoot.dataRootFor(base, true)`: `space.toon data_root`, else `-Dspaces.data.root/<id>`), which is
+checked and stamped by `SpaceDataRoot.stake` before anything moves — an unmounted volume, an overlap or a root
+stamped by another Space refuses the migration with nothing moved. ⚠ Run the migrator with the server's
+`-Dspaces.data.root`; without it the state lands under the base and the boot refuses it (`claim`: "move data/ there
+first"). The migrator's process knows no other Space, so it cannot see an overlap with one; the boot still does.
 **Overlap refusal (`SPACE_OVERLAP`).** Discovery resolves every candidate's folder and data root before any Space
 boots: two overlapping Space folders (a ref target inside another, or containing the spaces root) are both refused;
 a data root that is, contains or sits inside another Space's folder or data root refuses only the Space that
