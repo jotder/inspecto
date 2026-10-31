@@ -6236,6 +6236,47 @@ describe('LinkAnalysisComponent - the node dialog Entity page link follows /boot
             expect(tree === null ? null : String(tree)).toBe(expected);
         }
     });
+
+    // LA-DOC-CODE-SYNC-1: the link is typed as the dialog's own entityType is, never by the profile's default alone.
+    it("links each node to its own Entity Type's page, on a generic Space and on a multi-type canvas", async () => {
+        const typed: G6GraphData = {
+            nodes: [
+                { id: 'a', data: { label: 'ACC-01', kind: 'entity', entityType: 'account' } },
+                { id: 'b', data: { label: 'DEV-99', kind: 'entity', entityType: 'device' } },
+                { id: 'c', data: { label: 'C-7', kind: 'entity' } },
+            ],
+            edges: [
+                { id: 'a->b', source: 'a', target: 'b', data: { kind: 'link' } },
+                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'link' } },
+            ],
+        };
+        const { fixture } = create({
+            graph: typed,
+            features: { ...STANDARD_EDITION_FEATURES, flags: signal({ entityPages: true }) },
+        });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        onLinkAnalysisRoute(c);
+        const open = vi
+            .spyOn(fixture.debugElement.injector.get(MatDialog), 'open')
+            .mockReturnValue({ afterClosed: () => of(undefined) } as never);
+        const pageOf = (id: string) => {
+            (c as unknown as { openNodeDetail: (id: string) => void }).openNodeDetail(id);
+            type Data = { extension: { inputs: { ctx: { entityPage: unknown } } } };
+            const ctx = (open.mock.lastCall as unknown as [unknown, { data: Data }])[1].data.extension.inputs.ctx;
+            return ctx.entityPage === null ? null : String(ctx.entityPage);
+        };
+
+        expect(c.profileId()).toBe('generic'); // no pack names an Entity Type to investigate
+        expect(pageOf('a')).toBe('/s1/entities/account/ACC-01');
+        expect(pageOf('b')).toBe('/s1/entities/device/DEV-99');
+        expect(pageOf('c')).toBe('/s1/entities/account/C-7'); // untyped: the type the canvas is drawn as
+
+        c.boundProfile.set('telecom'); // a pack whose investigate.entityType is msisdn
+        expect(pageOf('b')).toBe('/s1/entities/device/DEV-99'); // the node's own type wins over the pack default
+        expect(pageOf('c')).toBe('/s1/entities/msisdn/C-7');
+    });
 });
 
 describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {

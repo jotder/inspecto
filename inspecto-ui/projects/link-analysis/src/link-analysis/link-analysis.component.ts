@@ -4168,14 +4168,15 @@ Its prior copies stay in its version history.`,
         const invId = this.graphRunInvestigationId();
         const ws = this.investigation.workingSet();
         const key = rawIdsOf(node)[0] ?? node.data.label;
+        // the node's own type first, then the type the graph was drawn as (T-042: a start from an Entity Type has one)
+        const entityType = (node.data.entityType as string | undefined) ?? this.growEntityType() ?? undefined;
         const insight: NodeInsightContext = {
             nodeId: id,
             label: node.data.label,
             key,
             listKey: ws?.exploreAliases?.[key],
             profileId: this.profileId() ?? 'generic',
-            // the node's own type first, then the type the graph was drawn as (T-042: a start from an Entity Type has one)
-            entityType: (node.data.entityType as string | undefined) ?? this.growEntityType() ?? undefined,
+            entityType,
             investigationId: invId,
             graphKey: invId && ws ? `${invId}:${ws.hash}` : null,
             serverId: ids?.serverNode(id) ?? null,
@@ -4190,7 +4191,7 @@ Its prior copies stay in its version history.`,
             canManageLists: this.lens.canManageIncidents(),
             onListChanged: () => this.investigation.entityListsChanged.update((n) => n + 1),
             canHide: !this.investigation.active(),
-            entityPage: this.entityPageOf(this.profile().investigate?.entityType, rawIdsOf(node)[0] ?? node.data.label),
+            entityPage: this.entityPageOf(entityType, key),
         };
         this.dialog
             .open(ElementDetailDialog, {
